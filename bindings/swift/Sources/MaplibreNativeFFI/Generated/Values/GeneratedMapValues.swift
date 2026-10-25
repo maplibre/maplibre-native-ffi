@@ -164,6 +164,68 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// A complete camera, as native reports it.
+///
+/// See `mln_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct Camera: Equatable, Hashable, Sendable {
+  public var center: LatLng
+  public var centerAltitude: Double
+  public var padding: EdgeInsets
+  public var zoom: Double
+  public var bearing: Double
+  public var pitch: Double
+  public var roll: Double
+  public var fieldOfView: Double
+  public static var `default`: Self {
+    Self(raw: mln_camera())
+  }
+
+  public init(
+    center: LatLng = Camera.default.center,
+    centerAltitude: Double = Camera.default.centerAltitude,
+    padding: EdgeInsets = Camera.default.padding,
+    zoom: Double = Camera.default.zoom,
+    bearing: Double = Camera.default.bearing,
+    pitch: Double = Camera.default.pitch,
+    roll: Double = Camera.default.roll,
+    fieldOfView: Double = Camera.default.fieldOfView
+  ) {
+    self.center = center
+    self.centerAltitude = centerAltitude
+    self.padding = padding
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
+    self.roll = roll
+    self.fieldOfView = fieldOfView
+  }
+
+  init(raw: mln_camera) {
+    center = LatLng(raw: raw.center)
+    centerAltitude = raw.center_altitude
+    padding = EdgeInsets(raw: raw.padding)
+    zoom = raw.zoom
+    bearing = raw.bearing
+    pitch = raw.pitch
+    roll = raw.roll
+    fieldOfView = raw.field_of_view
+  }
+
+  func nativeValue() -> mln_camera {
+    var raw = mln_camera()
+    raw.center = center.nativeValue()
+    raw.center_altitude = centerAltitude
+    raw.padding = padding.nativeValue()
+    raw.zoom = zoom
+    raw.bearing = bearing
+    raw.pitch = pitch
+    raw.roll = roll
+    raw.field_of_view = fieldOfView
+    return raw
+  }
+}
+
 /// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
@@ -398,14 +460,14 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraQueryResult: Equatable, Hashable, Sendable {
   public var generation: UInt64
-  public var camera: CameraOptions
+  public var camera: Camera
   public static var `default`: Self {
     Self(raw: mln_camera_query_result())
   }
 
   public init(
     generation: UInt64 = CameraQueryResult.default.generation,
-    camera: CameraOptions = CameraQueryResult.default.camera
+    camera: Camera = CameraQueryResult.default.camera
   ) {
     self.generation = generation
     self.camera = camera
@@ -413,7 +475,7 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
 
   init(raw: mln_camera_query_result) {
     generation = raw.generation
-    camera = CameraOptions(raw: raw.camera)
+    camera = Camera(raw: raw.camera)
   }
 }
 
@@ -1186,9 +1248,8 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapView: Equatable, Hashable, Sendable {
   /// The camera. Its center is unwrapped: the longitude keeps the visible world
-  /// copy and may fall outside -180 to 180. Every field except
-  /// `MLN_CAMERA_OPTION_ANCHOR` is set.
-  public var camera: CameraOptions
+  /// copy and may fall outside -180 to 180.
+  public var camera: Camera
   /// Logical size and device-pixel scale. A snapshot carries the map's scale
   /// factor, and a frame carries the scale factor of the target that drew it.
   public var extent: LogicalExtent
@@ -1202,7 +1263,7 @@ public struct MapView: Equatable, Hashable, Sendable {
   }
 
   public init(
-    camera: CameraOptions = MapView.default.camera,
+    camera: Camera = MapView.default.camera,
     extent: LogicalExtent = MapView.default.extent,
     projectionMode: ProjectionMode = MapView.default.projectionMode,
     viewport: MapViewportOptions = MapView.default.viewport
@@ -1214,7 +1275,7 @@ public struct MapView: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_map_view) {
-    camera = CameraOptions(raw: raw.camera)
+    camera = Camera(raw: raw.camera)
     extent = LogicalExtent(raw: raw.extent)
     projectionMode = ProjectionMode(raw: raw.projection_mode)
     viewport = MapViewportOptions(raw: raw.viewport)

@@ -280,6 +280,23 @@ typedef struct mln_camera_options {
   double field_of_view MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_FOV");
 } mln_camera_options;
 
+/**
+ * A complete camera, as native reports it.
+ *
+ * Unlike mln_camera_options, every member is set and there is no anchor, which
+ * only directs a camera change.
+ */
+typedef struct mln_camera {
+  mln_lat_lng center;
+  double center_altitude;
+  mln_edge_insets padding;
+  double zoom;
+  double bearing;
+  double pitch;
+  double roll;
+  double field_of_view;
+} mln_camera;
+
 /** Cubic easing curve for animated camera transitions. */
 typedef struct mln_unit_bezier {
   double x1;
@@ -998,9 +1015,9 @@ typedef struct mln_map_viewport_options {
  * snapshot or a rendered frame describes.
  *
  * Every member is set on output. mln_map_projection_create() reads every
- * member and requires every field of each nested struct, except
- * MLN_CAMERA_OPTION_ANCHOR, which it ignores. Camera constraints are map
- * policy and stay out of the view, because no conversion reads them.
+ * member and requires every field of projection_mode and viewport. Camera
+ * constraints are map policy and stay out of the view, because no conversion
+ * reads them.
  *
  * A later version may append members. mln_map_snapshot and
  * mln_render_frame_result embed the view as their last member, so their own
@@ -1010,10 +1027,9 @@ typedef struct mln_map_view {
   uint32_t size;
   /**
    * The camera. Its center is unwrapped: the longitude keeps the visible world
-   * copy and may fall outside -180 to 180. Every field except
-   * MLN_CAMERA_OPTION_ANCHOR is set.
+   * copy and may fall outside -180 to 180.
    */
-  mln_camera_options camera;
+  mln_camera camera;
   /**
    * Logical size and device-pixel scale. A snapshot carries the map's scale
    * factor, and a frame carries the scale factor of the target that drew it.
@@ -1114,7 +1130,7 @@ typedef struct mln_map_snapshot {
 /** Camera result borrowed for an ordered camera-query completion. */
 typedef struct mln_camera_query_result {
   uint64_t generation;
-  mln_camera_options camera;
+  mln_camera camera;
 } mln_camera_query_result;
 
 /**

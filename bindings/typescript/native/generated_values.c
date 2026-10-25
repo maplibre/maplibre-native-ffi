@@ -525,6 +525,53 @@ napi_value mln_ts_read_bound_options(
   return result;
 }
 
+napi_value mln_ts_read_camera(
+  napi_env env, const mln_camera* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "center",
+        mln_ts_read_lat_lng(env, &(source->center), sizeof(source->center))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "centerAltitude",
+        mln_ts_number(env, (double)(source->center_altitude))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "padding",
+        mln_ts_read_edge_insets(
+          env, &(source->padding), sizeof(source->padding)
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "zoom", mln_ts_number(env, (double)(source->zoom))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "bearing", mln_ts_number(env, (double)(source->bearing))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "pitch", mln_ts_number(env, (double)(source->pitch))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "roll", mln_ts_number(env, (double)(source->roll))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "fieldOfView",
+        mln_ts_number(env, (double)(source->field_of_view))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_camera_delta(
   napi_env env, const mln_camera_delta* source, size_t size
 ) {
@@ -697,9 +744,7 @@ napi_value mln_ts_read_camera_query_result(
     return NULL;
   if (!mln_ts_set(
         env, result, "camera",
-        mln_ts_read_camera_options(
-          env, &(source->camera), sizeof(source->camera)
-        )
+        mln_ts_read_camera(env, &(source->camera), sizeof(source->camera))
       ))
     return NULL;
   return result;
@@ -1483,9 +1528,7 @@ napi_value mln_ts_read_map_view(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "camera",
-        mln_ts_read_camera_options(
-          env, &(source->camera), sizeof(source->camera)
-        )
+        mln_ts_read_camera(env, &(source->camera), sizeof(source->camera))
       ))
     return NULL;
   if (!mln_ts_set(
@@ -4216,6 +4259,84 @@ bool mln_ts_write_bound_options(
   return true;
 }
 
+bool mln_ts_write_camera(
+  mln_ts_call* call, napi_value value, mln_camera* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "center", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "center");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->center, 0, sizeof out->center);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_lat_lng(call, member, &out->center, child)) return false;
+  }
+  if (!mln_ts_member(call, value, "centerAltitude", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "centerAltitude");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->center_altitude = (double)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "padding", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "padding");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->padding, 0, sizeof out->padding);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_edge_insets(call, member, &out->padding, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "zoom", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "zoom");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->zoom = (double)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "bearing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bearing");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->bearing = (double)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "pitch", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "pitch");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->pitch = (double)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "roll", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "roll");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->roll = (double)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "fieldOfView", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "fieldOfView");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->field_of_view = (double)number;
+    }
+  }
+  return true;
+}
+
 bool mln_ts_write_camera_delta(
   mln_ts_call* call, napi_value value, mln_camera_delta* out, const char* path
 ) {
@@ -5589,10 +5710,9 @@ bool mln_ts_write_map_view(
   if (!mln_ts_member(call, value, "camera", &member)) return false;
   mln_ts_path(child, sizeof child, path, "camera");
   if (!mln_ts_is_absent(call, member)) {
-    out->camera = mln_camera_options_default();
+    memset(&out->camera, 0, sizeof out->camera);
     if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_camera_options(call, member, &out->camera, child))
-      return false;
+    if (!mln_ts_write_camera(call, member, &out->camera, child)) return false;
   }
   if (!mln_ts_member(call, value, "extent", &member)) return false;
   mln_ts_path(child, sizeof child, path, "extent");

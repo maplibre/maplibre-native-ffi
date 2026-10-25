@@ -159,6 +159,73 @@ impl FromNative<sys::mln_bound_options> for BoundOptions {
     }
 }
 
+/// A complete camera, as native reports it.
+///
+/// See `mln_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Camera {
+    pub center: LatLng,
+    pub center_altitude: f64,
+    pub padding: EdgeInsets,
+    pub zoom: f64,
+    pub bearing: f64,
+    pub pitch: f64,
+    pub roll: f64,
+    pub field_of_view: f64,
+}
+impl Camera {
+    pub const fn new(
+        center: LatLng,
+        center_altitude: f64,
+        padding: EdgeInsets,
+        zoom: f64,
+        bearing: f64,
+        pitch: f64,
+        roll: f64,
+        field_of_view: f64,
+    ) -> Self {
+        Self {
+            center,
+            center_altitude,
+            padding,
+            zoom,
+            bearing,
+            pitch,
+            roll,
+            field_of_view,
+        }
+    }
+}
+impl ToNative<sys::mln_camera> for Camera {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera> {
+        let mut raw: sys::mln_camera = unsafe { std::mem::zeroed() };
+        raw.center = to_native(&self.center, arena)?;
+        raw.center_altitude = self.center_altitude;
+        raw.padding = to_native(&self.padding, arena)?;
+        raw.zoom = self.zoom;
+        raw.bearing = self.bearing;
+        raw.pitch = self.pitch;
+        raw.roll = self.roll;
+        raw.field_of_view = self.field_of_view;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_camera> for Camera {
+    unsafe fn from_native(raw: sys::mln_camera) -> Result<Self> {
+        Ok(Self {
+            center: unsafe { from_native(raw.center) }?,
+            center_altitude: raw.center_altitude,
+            padding: unsafe { from_native(raw.padding) }?,
+            zoom: raw.zoom,
+            bearing: raw.bearing,
+            pitch: raw.pitch,
+            roll: raw.roll,
+            field_of_view: raw.field_of_view,
+        })
+    }
+}
+
 native_enum! {
 /// Camera change kinds reported by camera will-change and did-change events.
 ///
@@ -397,7 +464,7 @@ impl FromNative<sys::mln_camera_options> for CameraOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CameraQueryResult {
     pub generation: u64,
-    pub camera: CameraOptions,
+    pub camera: Camera,
 }
 impl FromNative<sys::mln_camera_query_result> for CameraQueryResult {
     unsafe fn from_native(raw: sys::mln_camera_query_result) -> Result<Self> {
@@ -2083,9 +2150,8 @@ impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MapView {
     /// The camera. Its center is unwrapped: the longitude keeps the visible
-    /// world copy and may fall outside -180 to 180. Every field except
-    /// `MLN_CAMERA_OPTION_ANCHOR` is set.
-    pub camera: CameraOptions,
+    /// world copy and may fall outside -180 to 180.
+    pub camera: Camera,
     /// Logical size and device-pixel scale. A snapshot carries the map's scale
     /// factor, and a frame carries the scale factor of the target that drew it.
     pub extent: LogicalExtent,

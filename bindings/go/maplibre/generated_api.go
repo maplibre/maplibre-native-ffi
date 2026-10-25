@@ -1741,6 +1741,47 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 
 func DefaultBoundOptions() BoundOptions { return copyBoundOptions(C.mln_bound_options_default()) }
 
+// Camera corresponds to mln_camera. A complete camera, as native reports it.
+//
+// See mln_camera in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type Camera struct {
+	Center         LatLng
+	CenterAltitude float64
+	Padding        EdgeInsets
+	Zoom           float64
+	Bearing        float64
+	Pitch          float64
+	Roll           float64
+	FieldOfView    float64
+}
+
+func copyCamera(raw C.mln_camera) Camera {
+	var result Camera
+	result.Center = copyLatLng(raw.center)
+	result.CenterAltitude = float64(raw.center_altitude)
+	result.Padding = copyEdgeInsets(raw.padding)
+	result.Zoom = float64(raw.zoom)
+	result.Bearing = float64(raw.bearing)
+	result.Pitch = float64(raw.pitch)
+	result.Roll = float64(raw.roll)
+	result.FieldOfView = float64(raw.field_of_view)
+	return result
+}
+
+func nativeCamera(input Camera, arena *bindingArena) C.mln_camera {
+	raw := C.mln_camera{}
+	raw.center = nativeLatLng(input.Center, arena)
+	raw.center_altitude = C.double(input.CenterAltitude)
+	raw.padding = nativeEdgeInsets(input.Padding, arena)
+	raw.zoom = C.double(input.Zoom)
+	raw.bearing = C.double(input.Bearing)
+	raw.pitch = C.double(input.Pitch)
+	raw.roll = C.double(input.Roll)
+	raw.field_of_view = C.double(input.FieldOfView)
+	return raw
+}
+
 // CameraDelta corresponds to mln_camera_delta. One atomic relative camera
 // update.
 //
@@ -1879,13 +1920,13 @@ func DefaultCameraOptions() CameraOptions { return copyCameraOptions(C.mln_camer
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraQueryResult struct {
 	Generation uint64
-	Camera     CameraOptions
+	Camera     Camera
 }
 
 func copyCameraQueryResult(raw C.mln_camera_query_result) CameraQueryResult {
 	var result CameraQueryResult
 	result.Generation = uint64(raw.generation)
-	result.Camera = copyCameraOptions(raw.camera)
+	result.Camera = copyCamera(raw.camera)
 	return result
 }
 
@@ -2784,9 +2825,8 @@ func DefaultMapTileOptions() MapTileOptions {
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapView struct {
 	// The camera. Its center is unwrapped: the longitude keeps the visible world
-	// copy and may fall outside -180 to 180. Every field except
-	// MLN_CAMERA_OPTION_ANCHOR is set.
-	Camera CameraOptions
+	// copy and may fall outside -180 to 180.
+	Camera Camera
 	// Logical size and device-pixel scale. A snapshot carries the map's scale
 	// factor, and a frame carries the scale factor of the target that drew it.
 	Extent LogicalExtent
@@ -2799,7 +2839,7 @@ type MapView struct {
 
 func copyMapView(raw C.mln_map_view) MapView {
 	var result MapView
-	result.Camera = copyCameraOptions(raw.camera)
+	result.Camera = copyCamera(raw.camera)
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.ProjectionMode = copyProjectionMode(raw.projection_mode)
 	result.Viewport = copyMapViewportOptions(raw.viewport)
@@ -2809,7 +2849,7 @@ func copyMapView(raw C.mln_map_view) MapView {
 func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
 	raw := C.mln_map_view{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.camera = nativeCameraOptions(input.Camera, arena)
+	raw.camera = nativeCamera(input.Camera, arena)
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.projection_mode = nativeProjectionMode(input.ProjectionMode, arena)
 	raw.viewport = nativeMapViewportOptions(input.Viewport, arena)

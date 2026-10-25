@@ -79,92 +79,32 @@ EdgeInsets _readEdgeInsets(raw.mln_edge_insets source) => EdgeInsets(
   right: source.right,
 );
 
-Pointer<raw.mln_screen_point> _writeScreenPoint(
-  ScreenPoint value,
+Pointer<raw.mln_camera> _writeCamera(
+  Camera value,
   Allocator arena, {
-  Pointer<raw.mln_screen_point>? into,
+  Pointer<raw.mln_camera>? into,
 }) {
-  final result = into ?? arena<raw.mln_screen_point>();
-  result.ref.x = value.x;
-  result.ref.y = value.y;
+  final result = into ?? arena<raw.mln_camera>();
+  result.ref.center = _writeLatLng(value.center, arena).ref;
+  result.ref.center_altitude = value.centerAltitude;
+  result.ref.padding = _writeEdgeInsets(value.padding, arena).ref;
+  result.ref.zoom = value.zoom;
+  result.ref.bearing = value.bearing;
+  result.ref.pitch = value.pitch;
+  result.ref.roll = value.roll;
+  result.ref.field_of_view = value.fieldOfView;
   return result;
 }
 
-ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
-    ScreenPoint(x: source.x, y: source.y);
-
-Pointer<raw.mln_camera_options> _writeCameraOptions(
-  CameraOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_camera_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_camera_options>();
-  result.ref = raw.mln_camera_options_default();
-  if (value.center != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
-    result.ref.center = _writeLatLng(value.center!, arena).ref;
-  }
-  if (value.centerAltitude != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
-    result.ref.center_altitude = value.centerAltitude!;
-  }
-  if (value.padding != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_PADDING;
-    result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
-  }
-  if (value.anchor != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ANCHOR;
-    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
-  }
-  if (value.zoom != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ZOOM;
-    result.ref.zoom = value.zoom!;
-  }
-  if (value.bearing != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_BEARING;
-    result.ref.bearing = value.bearing!;
-  }
-  if (value.pitch != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_PITCH;
-    result.ref.pitch = value.pitch!;
-  }
-  if (value.roll != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ROLL;
-    result.ref.roll = value.roll!;
-  }
-  if (value.fieldOfView != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_FOV;
-    result.ref.field_of_view = value.fieldOfView!;
-  }
-  return result;
-}
-
-CameraOptions _readCameraOptions(
-  raw.mln_camera_options source,
-) => CameraOptions(
-  center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
-      ? _readLatLng(source.center)
-      : null,
-  centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
-      ? source.center_altitude
-      : null,
-  padding: (source.fields & raw.MLN_CAMERA_OPTION_PADDING) != 0
-      ? _readEdgeInsets(source.padding)
-      : null,
-  anchor: (source.fields & raw.MLN_CAMERA_OPTION_ANCHOR) != 0
-      ? _readScreenPoint(source.anchor)
-      : null,
-  zoom: (source.fields & raw.MLN_CAMERA_OPTION_ZOOM) != 0 ? source.zoom : null,
-  bearing: (source.fields & raw.MLN_CAMERA_OPTION_BEARING) != 0
-      ? source.bearing
-      : null,
-  pitch: (source.fields & raw.MLN_CAMERA_OPTION_PITCH) != 0
-      ? source.pitch
-      : null,
-  roll: (source.fields & raw.MLN_CAMERA_OPTION_ROLL) != 0 ? source.roll : null,
-  fieldOfView: (source.fields & raw.MLN_CAMERA_OPTION_FOV) != 0
-      ? source.field_of_view
-      : null,
+Camera _readCamera(raw.mln_camera source) => Camera(
+  center: _readLatLng(source.center),
+  centerAltitude: source.center_altitude,
+  padding: _readEdgeInsets(source.padding),
+  zoom: source.zoom,
+  bearing: source.bearing,
+  pitch: source.pitch,
+  roll: source.roll,
+  fieldOfView: source.field_of_view,
 );
 
 Pointer<raw.mln_logical_extent> _writeLogicalExtent(
@@ -278,7 +218,7 @@ Pointer<raw.mln_map_view> _writeMapView(
 }) {
   final result = into ?? arena<raw.mln_map_view>();
   result.ref.size = sizeOf<raw.mln_map_view>();
-  result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
+  result.ref.camera = _writeCamera(value.camera, arena).ref;
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.projection_mode = _writeProjectionMode(
     value.projectionMode,
@@ -289,7 +229,7 @@ Pointer<raw.mln_map_view> _writeMapView(
 }
 
 MapView _readMapView(raw.mln_map_view source) => MapView(
-  camera: _readCameraOptions(source.camera),
+  camera: _readCamera(source.camera),
   extent: _readLogicalExtent(source.extent),
   projectionMode: _readProjectionMode(source.projection_mode),
   viewport: _readMapViewportOptions(source.viewport),
@@ -511,6 +451,20 @@ BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
       : null,
 );
 
+Pointer<raw.mln_screen_point> _writeScreenPoint(
+  ScreenPoint value,
+  Allocator arena, {
+  Pointer<raw.mln_screen_point>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_point>();
+  result.ref.x = value.x;
+  result.ref.y = value.y;
+  return result;
+}
+
+ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
+    ScreenPoint(x: source.x, y: source.y);
+
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
   Allocator arena,
@@ -602,6 +556,80 @@ CameraFitOptions _readCameraFitOptions(raw.mln_camera_fit_options source) =>
           ? source.pitch
           : null,
     );
+
+Pointer<raw.mln_camera_options> _writeCameraOptions(
+  CameraOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_options>();
+  result.ref = raw.mln_camera_options_default();
+  if (value.center != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
+    result.ref.center = _writeLatLng(value.center!, arena).ref;
+  }
+  if (value.centerAltitude != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+    result.ref.center_altitude = value.centerAltitude!;
+  }
+  if (value.padding != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PADDING;
+    result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
+  }
+  if (value.anchor != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ANCHOR;
+    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
+  }
+  if (value.zoom != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ZOOM;
+    result.ref.zoom = value.zoom!;
+  }
+  if (value.bearing != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_BEARING;
+    result.ref.bearing = value.bearing!;
+  }
+  if (value.pitch != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PITCH;
+    result.ref.pitch = value.pitch!;
+  }
+  if (value.roll != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ROLL;
+    result.ref.roll = value.roll!;
+  }
+  if (value.fieldOfView != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_FOV;
+    result.ref.field_of_view = value.fieldOfView!;
+  }
+  return result;
+}
+
+CameraOptions _readCameraOptions(
+  raw.mln_camera_options source,
+) => CameraOptions(
+  center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
+      ? _readLatLng(source.center)
+      : null,
+  centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
+      ? source.center_altitude
+      : null,
+  padding: (source.fields & raw.MLN_CAMERA_OPTION_PADDING) != 0
+      ? _readEdgeInsets(source.padding)
+      : null,
+  anchor: (source.fields & raw.MLN_CAMERA_OPTION_ANCHOR) != 0
+      ? _readScreenPoint(source.anchor)
+      : null,
+  zoom: (source.fields & raw.MLN_CAMERA_OPTION_ZOOM) != 0 ? source.zoom : null,
+  bearing: (source.fields & raw.MLN_CAMERA_OPTION_BEARING) != 0
+      ? source.bearing
+      : null,
+  pitch: (source.fields & raw.MLN_CAMERA_OPTION_PITCH) != 0
+      ? source.pitch
+      : null,
+  roll: (source.fields & raw.MLN_CAMERA_OPTION_ROLL) != 0 ? source.roll : null,
+  fieldOfView: (source.fields & raw.MLN_CAMERA_OPTION_FOV) != 0
+      ? source.field_of_view
+      : null,
+);
 
 Pointer<raw.mln_camera_update> _writeCameraUpdate(
   CameraUpdate value,
@@ -1695,7 +1723,7 @@ VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
 CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
     CameraQueryResult(
       generation: source.generation,
-      camera: _readCameraOptions(source.camera),
+      camera: _readCamera(source.camera),
     );
 
 Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(

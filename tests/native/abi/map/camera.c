@@ -186,12 +186,8 @@ static const camera_row camera_rows[] = {
 };
 
 static void assert_camera_field(
-  const char* label, const mln_camera_options* sent,
-  const mln_camera_options* got
+  const char* label, const mln_camera_options* sent, const mln_camera* got
 ) {
-  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    sent->fields, got->fields & sent->fields, label
-  );
   if ((sent->fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
     TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
       1e-9, sent->center.latitude, got->center.latitude, label
@@ -375,7 +371,7 @@ static void every_camera_delta_field_follows_its_convention(void) {
     const delta_row* row = &delta_rows[index];
     const bool pans = (row->fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
     const bool anchored = (row->fields & MLN_CAMERA_DELTA_ANCHOR) != 0U;
-    const mln_camera_options before = query_camera(map).camera;
+    const mln_camera before = query_camera(map).camera;
     const mln_lat_lng before_center = before.center;
     const mln_lat_lng moved_to_center =
       pans
@@ -407,7 +403,7 @@ static void every_camera_delta_field_follows_its_convention(void) {
     );
     mln_test_completion_destroy(&completion);
 
-    const mln_camera_options after = query_camera(map).camera;
+    const mln_camera after = query_camera(map).camera;
     const mln_lat_lng after_center = after.center;
     const double expected_zoom =
       before.zoom +
@@ -730,7 +726,7 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 15.0, padded.pitch);
 
   // A fit is a query: the map camera stays where it was.
-  const mln_camera_options current = query_camera(map).camera;
+  const mln_camera current = query_camera(map).camera;
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, current.zoom);
 
   mln_test_destroy_map(map);

@@ -21,6 +21,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/Maplibre.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/AnimationOptions.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Map/Camera.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraDelta.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptions.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraOptions.g.cs",

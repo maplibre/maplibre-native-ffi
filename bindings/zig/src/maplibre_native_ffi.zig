@@ -1707,6 +1707,45 @@ pub const BoundOptions = struct {
     }
 };
 
+/// A complete camera, as native reports it.
+///
+/// See `mln_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const Camera = struct {
+    center: LatLng = .{},
+    center_altitude: f64 = 0,
+    padding: EdgeInsets = .{},
+    zoom: f64 = 0,
+    bearing: f64 = 0,
+    pitch: f64 = 0,
+    roll: f64 = 0,
+    field_of_view: f64 = 0,
+    pub fn toNative(self: Camera) c.mln_camera {
+        var raw = std.mem.zeroes(c.mln_camera);
+        raw.center = self.center.toNative();
+        raw.center_altitude = self.center_altitude;
+        raw.padding = self.padding.toNative();
+        raw.zoom = self.zoom;
+        raw.bearing = self.bearing;
+        raw.pitch = self.pitch;
+        raw.roll = self.roll;
+        raw.field_of_view = self.field_of_view;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_camera) Camera {
+        return .{
+            .center = LatLng.fromNative(raw.center),
+            .center_altitude = raw.center_altitude,
+            .padding = EdgeInsets.fromNative(raw.padding),
+            .zoom = raw.zoom,
+            .bearing = raw.bearing,
+            .pitch = raw.pitch,
+            .roll = raw.roll,
+            .field_of_view = raw.field_of_view,
+        };
+    }
+};
+
 /// Camera change kinds reported by camera will-change and did-change events.
 ///
 /// See `mln_camera_change_mode` in the
@@ -1841,11 +1880,11 @@ pub const CameraOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraQueryResult = struct {
     generation: u64 = 0,
-    camera: CameraOptions,
+    camera: Camera = .{},
     pub fn fromNative(raw: c.mln_camera_query_result) CameraQueryResult {
         return .{
             .generation = raw.generation,
-            .camera = CameraOptions.fromNative(raw.camera),
+            .camera = Camera.fromNative(raw.camera),
         };
     }
 };
@@ -3104,9 +3143,8 @@ pub const MapTileOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapView = struct {
     /// The camera. Its center is unwrapped: the longitude keeps the visible
-    /// world copy and may fall outside -180 to 180. Every field except
-    /// `MLN_CAMERA_OPTION_ANCHOR` is set.
-    camera: CameraOptions,
+    /// world copy and may fall outside -180 to 180.
+    camera: Camera = .{},
     /// Logical size and device-pixel scale. A snapshot carries the map's scale
     /// factor, and a frame carries the scale factor of the target that drew it.
     extent: LogicalExtent,
@@ -3126,7 +3164,7 @@ pub const MapView = struct {
     }
     pub fn fromNative(raw: c.mln_map_view) MapView {
         return .{
-            .camera = CameraOptions.fromNative(raw.camera),
+            .camera = Camera.fromNative(raw.camera),
             .extent = LogicalExtent.fromNative(raw.extent),
             .projection_mode = ProjectionMode.fromNative(raw.projection_mode),
             .viewport = MapViewportOptions.fromNative(raw.viewport),

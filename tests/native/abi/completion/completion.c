@@ -126,7 +126,7 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
   TEST_ASSERT_EQUAL_UINT32(96, after.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(80, after.view.extent.height);
   TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, after.debug_options);
-  mln_camera_options observed;
+  mln_camera observed;
   MLN_TEST_OK(mln_test_map_get_camera(map, &observed));
   TEST_ASSERT_EQUAL_DOUBLE(4, observed.zoom);
   TEST_ASSERT_GREATER_THAN_size_t(

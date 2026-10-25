@@ -2009,6 +2009,22 @@ auto from_native_camera(const mln::CameraOptions& camera)
   return result;
 }
 
+// Converts camera options that MapLibre Native reports with every member but
+// the anchor set, as a transform's current camera always is.
+auto from_native_complete_camera(const mln::CameraOptions& camera)
+  -> mln_camera {
+  return mln_camera{
+    .center = from_native_lat_lng(camera.center.value()),
+    .center_altitude = camera.centerAltitude.value(),
+    .padding = from_native_edge_insets(camera.padding.value()),
+    .zoom = camera.zoom.value(),
+    .bearing = camera.bearing.value(),
+    .pitch = camera.pitch.value(),
+    .roll = camera.roll.value(),
+    .field_of_view = camera.fov.value(),
+  };
+}
+
 // The MapLibre transitions that one camera command with an end handler
 // started. A command that starts several transitions, such as a camera delta
 // that pans and zooms, gives each of them a copy of one finish function, and
@@ -2499,15 +2515,10 @@ auto from_native_free_camera(const mln::FreeCameraOptions& options)
   return result;
 }
 
-// A view's camera carries every field but the anchor, and its zoom, pitch, and
-// field of view stay within MapLibre Native's absolute limits, the only range
-// in which a transform converts coordinates.
+// A view's camera has finite members, and its zoom, pitch, and field of view
+// stay within MapLibre Native's absolute limits, the only range in which a
+// transform converts coordinates.
 auto validate_map_view(const mln_map_view& view) -> mln_status {
-  constexpr auto camera_fields =
-    static_cast<uint32_t>(MLN_CAMERA_OPTION_CENTER) | MLN_CAMERA_OPTION_ZOOM |
-    MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
-    MLN_CAMERA_OPTION_CENTER_ALTITUDE | MLN_CAMERA_OPTION_PADDING |
-    MLN_CAMERA_OPTION_ROLL | MLN_CAMERA_OPTION_FOV;
   constexpr auto projection_mode_fields =
     static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
     MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
@@ -2518,15 +2529,23 @@ auto validate_map_view(const mln_map_view& view) -> mln_status {
     MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
   const auto& camera = view.camera;
   if (
-    const auto status = validate_camera_fields(&camera); status != MLN_STATUS_OK
+    const auto status = validate_lat_lng(camera.center); status != MLN_STATUS_OK
   ) {
     return status;
   }
-  if ((camera.fields & camera_fields) != camera_fields) {
-    mln::core::set_thread_error(
-      "view camera must set every field except MLN_CAMERA_OPTION_ANCHOR"
-    );
+  if (
+    !std::isfinite(camera.center_altitude) || !std::isfinite(camera.zoom) ||
+    !std::isfinite(camera.bearing) || !std::isfinite(camera.pitch) ||
+    !std::isfinite(camera.roll) || !std::isfinite(camera.field_of_view)
+  ) {
+    mln::core::set_thread_error("view camera numeric fields must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    const auto status = validate_edge_insets(camera.padding);
+    status != MLN_STATUS_OK
+  ) {
+    return status;
   }
   static const auto limits = mln::TransformState{};
   if (
@@ -2608,7 +2627,8 @@ namespace mln::core {
 auto map_view_from_transform(
   const mln::TransformState& transform, double scale_factor
 ) -> mln_map_view {
-  auto camera = from_native_camera(transform.getCameraOptions(std::nullopt));
+  auto camera =
+    from_native_complete_camera(transform.getCameraOptions(std::nullopt));
   // The center keeps its world copy, which a later conversion needs and which
   // camera options may wrap.
   camera.center =
@@ -4561,7 +4581,7 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
           MLN_STATUS_OK, {},
           std::any{mln_camera_query_result{
             .generation = generation,
-            .camera = from_native_camera(live->map->getCameraOptions())
+            .camera = from_native_complete_camera(live->map->getCameraOptions())
           }}
         );
       } catch (...) {

@@ -87,6 +87,32 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static Camera CopyCamera(mln_camera value) =>
+        new(
+            CopyLatLng(value.center),
+            value.center_altitude,
+            CopyEdgeInsets(value.padding),
+            value.zoom,
+            value.bearing,
+            value.pitch,
+            value.roll,
+            value.field_of_view
+        );
+
+    internal static mln_camera NativeCamera(Camera value)
+    {
+        var native = new mln_camera();
+        native.center = NativeLatLng(value.Center);
+        native.center_altitude = value.CenterAltitude;
+        native.padding = NativeEdgeInsets(value.Padding);
+        native.zoom = value.Zoom;
+        native.bearing = value.Bearing;
+        native.pitch = value.Pitch;
+        native.roll = value.Roll;
+        native.field_of_view = value.FieldOfView;
+        return native;
+    }
+
     internal static CameraDelta CopyCameraDelta(mln_camera_delta value) =>
         new()
         {
@@ -214,7 +240,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static CameraQueryResult CopyCameraQueryResult(mln_camera_query_result value) =>
-        new(value.generation, CopyCameraOptions(value.camera));
+        new(value.generation, CopyCamera(value.camera));
 
     internal static CameraTransitionEnd CopyCameraTransitionEnd(mln_camera_transition_end value) =>
         new((CameraTransitionOutcome)value.outcome, value.generation);
@@ -1031,7 +1057,7 @@ internal static unsafe class GeneratedValues
 
     internal static MapView CopyMapView(mln_map_view value) =>
         new(
-            CopyCameraOptions(value.camera),
+            CopyCamera(value.camera),
             CopyLogicalExtent(value.extent),
             CopyProjectionMode(value.projection_mode),
             CopyMapViewportOptions(value.viewport)
@@ -1039,12 +1065,11 @@ internal static unsafe class GeneratedValues
 
     internal static mln_map_view NativeMapView(MapView value)
     {
-        Required(value.Camera, "MapView.Camera must not be null.");
         Required(value.ProjectionMode, "MapView.ProjectionMode must not be null.");
         Required(value.Viewport, "MapView.Viewport must not be null.");
         var native = new mln_map_view();
         native.size = (uint)sizeof(mln_map_view);
-        native.camera = NativeCameraOptions(value.Camera);
+        native.camera = NativeCamera(value.Camera);
         native.extent = NativeLogicalExtent(value.Extent);
         native.projection_mode = NativeProjectionMode(value.ProjectionMode);
         native.viewport = NativeMapViewportOptions(value.Viewport);

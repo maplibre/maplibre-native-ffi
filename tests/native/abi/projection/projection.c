@@ -182,11 +182,11 @@ static void null_view(void* call) {
 static void undersized(void* call) {
   ((projection_call*)call)->view.size = sizeof(mln_map_view) - 1;
 }
-static void unset_zoom(void* call) {
-  ((projection_call*)call)->view.camera.fields &= ~MLN_CAMERA_OPTION_ZOOM;
+static void latitude_past_the_pole(void* call) {
+  ((projection_call*)call)->view.camera.center.latitude = 90.5;
 }
-static void unknown_camera_field(void* call) {
-  ((projection_call*)call)->view.camera.fields |= 1U << 31U;
+static void negative_padding(void* call) {
+  ((projection_call*)call)->view.camera.padding.left = -1.0;
 }
 static void nan_bearing(void* call) {
   ((projection_call*)call)->view.camera.bearing = NAN;
@@ -251,9 +251,10 @@ static void creation_rejects_incomplete_or_invalid_views(void) {
     {"a snapshot's view", NULL, MLN_STATUS_OK, NULL},
     {"null view", null_view, MLN_STATUS_INVALID_ARGUMENT, "view"},
     {"undersized view", undersized, MLN_STATUS_INVALID_ARGUMENT, "size"},
-    {"unset zoom", unset_zoom, MLN_STATUS_INVALID_ARGUMENT, "every field"},
-    {"unknown camera field", unknown_camera_field, MLN_STATUS_INVALID_ARGUMENT,
-     "unknown"},
+    {"latitude past the pole", latitude_past_the_pole,
+     MLN_STATUS_INVALID_ARGUMENT, "within [-90, 90]"},
+    {"negative padding", negative_padding, MLN_STATUS_INVALID_ARGUMENT,
+     "padding"},
     {"non-finite bearing", nan_bearing, MLN_STATUS_INVALID_ARGUMENT, "finite"},
     {"zoom past the limit", zoom_past_the_limit, MLN_STATUS_INVALID_ARGUMENT,
      "limits"},

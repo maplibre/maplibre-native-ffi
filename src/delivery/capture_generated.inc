@@ -68,42 +68,6 @@ auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_camera_query_result& source
 ) -> mln_camera_query_result {
   auto result = source;
-  if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
-  } else {
-    result.camera.center = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
-  } else {
-    result.camera.center_altitude = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_PADDING) != 0) {
-  } else {
-    result.camera.padding = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_ANCHOR) != 0) {
-  } else {
-    result.camera.anchor = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_ZOOM) != 0) {
-  } else {
-    result.camera.zoom = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_BEARING) != 0) {
-  } else {
-    result.camera.bearing = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_PITCH) != 0) {
-  } else {
-    result.camera.pitch = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_ROLL) != 0) {
-  } else {
-    result.camera.roll = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_FOV) != 0) {
-  } else {
-    result.camera.field_of_view = {};
-  }
   return result;
 }
 inline auto discard_element(

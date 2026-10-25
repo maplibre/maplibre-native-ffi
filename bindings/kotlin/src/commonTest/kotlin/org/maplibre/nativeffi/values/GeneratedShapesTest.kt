@@ -108,18 +108,26 @@ class GeneratedShapesTest {
     withMap {
       val camera = CameraOptions(center = LatLng(12.0, 34.0), zoom = 4.0, bearing = 25.0)
       map.updateCamera(CameraUpdate(camera = camera)).await()
-      val snapshot = map.getSnapshot().view.camera
-      assertEquals(12.0, assertNotNull(snapshot.center).latitude, 1e-6)
-      assertEquals(34.0, assertNotNull(snapshot.center).longitude, 1e-6)
-      assertEquals(4.0, assertNotNull(snapshot.zoom), 1e-6)
-      // A field the snapshot does not report stays absent rather than reading as zero.
-      assertNull(snapshot.anchor)
+      val view = map.getSnapshot().view
+      assertEquals(12.0, view.camera.center.latitude, 1e-6)
+      assertEquals(34.0, view.camera.center.longitude, 1e-6)
+      assertEquals(4.0, view.camera.zoom, 1e-6)
+
+      // A field the output does not report stays absent rather than reading as zero.
+      val projection = GeneratedApi.mapProjectionCreate(view)
+      try {
+        val reported = projection.getCamera()
+        assertEquals(4.0, assertNotNull(reported.zoom), 1e-6)
+        assertNull(reported.anchor)
+      } finally {
+        projection.close()
+      }
 
       // An update that sets only the zoom leaves every other field where it was.
       map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).await()
       val updated = map.getSnapshot().view.camera
-      assertEquals(6.0, assertNotNull(updated.zoom), 1e-6)
-      assertEquals(25.0, assertNotNull(updated.bearing), 1e-6)
+      assertEquals(6.0, updated.zoom, 1e-6)
+      assertEquals(25.0, updated.bearing, 1e-6)
 
       // A selector's optional state key narrows a removal to one member.
       val selector = FeatureStateSelector("source", featureId = "feature")

@@ -137,6 +137,23 @@ final class mln_buffer_view extends Struct {
   external int size;
 }
 
+final class mln_camera extends Struct {
+  external mln_lat_lng center;
+  @Double()
+  external double center_altitude;
+  external mln_edge_insets padding;
+  @Double()
+  external double zoom;
+  @Double()
+  external double bearing;
+  @Double()
+  external double pitch;
+  @Double()
+  external double roll;
+  @Double()
+  external double field_of_view;
+}
+
 final class mln_camera_delta extends Struct {
   @Uint32()
   external int size;
@@ -194,7 +211,7 @@ final class mln_camera_options extends Struct {
 final class mln_camera_query_result extends Struct {
   @Uint64()
   external int generation;
-  external mln_camera_options camera;
+  external mln_camera camera;
 }
 
 final class mln_camera_transition_end extends Struct {
@@ -608,7 +625,7 @@ final class mln_map_tile_options extends Struct {
 final class mln_map_view extends Struct {
   @Uint32()
   external int size;
-  external mln_camera_options camera;
+  external mln_camera camera;
   external mln_logical_extent extent;
   external mln_projection_mode projection_mode;
   external mln_map_viewport_options viewport;

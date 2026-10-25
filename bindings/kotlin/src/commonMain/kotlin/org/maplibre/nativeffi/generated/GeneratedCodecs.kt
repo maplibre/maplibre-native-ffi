@@ -85,15 +85,15 @@ internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
   allocate(16, 8).also { putLogicalExtent(it, value) }
 
 internal fun NativeArena.putMapView(target: Long, value: MapView) {
-  writeU32(target, 232.toUInt())
-  putCameraOptions(target + 8, value.camera)
-  putLogicalExtent(target + 128, value.extent)
-  putProjectionMode(target + 144, value.projectionMode)
-  putMapViewportOptions(target + 176, value.viewport)
+  writeU32(target, 208.toUInt())
+  putCamera(target + 8, value.camera)
+  putLogicalExtent(target + 104, value.extent)
+  putProjectionMode(target + 120, value.projectionMode)
+  putMapViewportOptions(target + 152, value.viewport)
 }
 
 internal fun NativeArena.writeMapView(value: MapView): Long =
-  allocate(232, 8).also { putMapView(it, value) }
+  allocate(208, 8).also { putMapView(it, value) }
 
 internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)
@@ -1531,7 +1531,7 @@ internal fun readWebgpuSurfaceDescriptor(source: Long): WebgpuSurfaceDescriptor 
   )
 
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
-  CameraQueryResult(generation = readU64(source), camera = readCameraOptions(source + 8))
+  CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))
 
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
@@ -1619,7 +1619,7 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    280,
+    256,
   ) { item ->
     readRenderFrameResult(item)
   }
@@ -1683,6 +1683,20 @@ internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo =
     isFeatureConstant = readBool(source + 4),
     isZoomConstant = readBool(source + 5),
   )
+
+internal fun NativeArena.putCamera(target: Long, value: Camera) {
+  putLatLng(target, value.center)
+  writeF64(target + 16, value.centerAltitude)
+  putEdgeInsets(target + 24, value.padding)
+  writeF64(target + 56, value.zoom)
+  writeF64(target + 64, value.bearing)
+  writeF64(target + 72, value.pitch)
+  writeF64(target + 80, value.roll)
+  writeF64(target + 88, value.fieldOfView)
+}
+
+internal fun NativeArena.writeCamera(value: Camera): Long =
+  allocate(96, 8).also { putCamera(it, value) }
 
 internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
   writeU32(target, value.kind.rawValue)
@@ -1986,10 +2000,10 @@ internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
 
 internal fun readMapView(source: Long): MapView =
   MapView(
-    camera = readCameraOptions(source + 8),
-    extent = readLogicalExtent(source + 128),
-    projectionMode = readProjectionMode(source + 144),
-    viewport = readMapViewportOptions(source + 176),
+    camera = readCamera(source + 8),
+    extent = readLogicalExtent(source + 104),
+    projectionMode = readProjectionMode(source + 120),
+    viewport = readMapViewportOptions(source + 152),
   )
 
 internal fun readUnitBezier(source: Long): UnitBezier =
@@ -2089,6 +2103,18 @@ internal fun readWebgpuBorrowedTexture(source: Long): WebgpuBorrowedTexture =
   WebgpuBorrowedTexture(
     texture = NativePointer.ofAddress(readAddress(source)),
     textureView = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+  )
+
+internal fun readCamera(source: Long): Camera =
+  Camera(
+    center = readLatLng(source),
+    centerAltitude = readF64(source + 16),
+    padding = readEdgeInsets(source + 24),
+    zoom = readF64(source + 56),
+    bearing = readF64(source + 64),
+    pitch = readF64(source + 72),
+    roll = readF64(source + 80),
+    fieldOfView = readF64(source + 88),
   )
 
 internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =

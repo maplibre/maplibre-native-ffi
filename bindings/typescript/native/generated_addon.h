@@ -111,6 +111,9 @@ napi_value mln_ts_read_animation_options(
 napi_value mln_ts_read_bound_options(
   napi_env env, const mln_bound_options* source, size_t size
 );
+napi_value mln_ts_read_camera(
+  napi_env env, const mln_camera* source, size_t size
+);
 napi_value mln_ts_read_camera_delta(
   napi_env env, const mln_camera_delta* source, size_t size
 );
@@ -485,6 +488,9 @@ bool mln_ts_write_animation_options(
 );
 bool mln_ts_write_bound_options(
   mln_ts_call* call, napi_value value, mln_bound_options* out, const char* path
+);
+bool mln_ts_write_camera(
+  mln_ts_call* call, napi_value value, mln_camera* out, const char* path
 );
 bool mln_ts_write_camera_delta(
   mln_ts_call* call, napi_value value, mln_camera_delta* out, const char* path

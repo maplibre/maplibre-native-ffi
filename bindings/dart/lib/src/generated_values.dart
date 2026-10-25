@@ -1493,70 +1493,44 @@ final class EdgeInsets extends _Value {
       _describe('EdgeInsets', const ['top', 'left', 'bottom', 'right']);
 }
 
-/// Screen-space point in logical map pixels, from the top-left of the viewport
-/// with y growing downward.
+/// A complete camera, as native reports it.
 ///
-/// See `mln_screen_point` in the
+/// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ScreenPoint extends _Value {
-  const ScreenPoint({this.x = 0, this.y = 0});
-  final double x;
-  final double y;
-
-  /// A copy of this value with the given members replaced.
-  ScreenPoint copyWith({double? x, double? y}) =>
-      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
-
-  @override
-  List<Object?> get _members => [x, y];
-  @override
-  String toString() => _describe('ScreenPoint', const ['x', 'y']);
-}
-
-/// Camera fields used by snapshots and camera updates.
-///
-/// See `mln_camera_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraOptions extends _Value {
-  CameraOptions({
-    this.center,
-    this.centerAltitude,
-    this.padding,
-    this.anchor,
-    this.zoom,
-    this.bearing,
-    this.pitch,
-    this.roll,
-    this.fieldOfView,
+final class Camera extends _Value {
+  const Camera({
+    this.center = const LatLng(),
+    this.centerAltitude = 0,
+    this.padding = const EdgeInsets(),
+    this.zoom = 0,
+    this.bearing = 0,
+    this.pitch = 0,
+    this.roll = 0,
+    this.fieldOfView = 0,
   });
-  final LatLng? center;
-  final double? centerAltitude;
-  final EdgeInsets? padding;
-
-  /// Optional screen-space focal point in logical map pixels.
-  final ScreenPoint? anchor;
-  final double? zoom;
-  final double? bearing;
-  final double? pitch;
-  final double? roll;
-  final double? fieldOfView;
+  final LatLng center;
+  final double centerAltitude;
+  final EdgeInsets padding;
+  final double zoom;
+  final double bearing;
+  final double pitch;
+  final double roll;
+  final double fieldOfView;
 
   /// A copy of this value with the given members replaced.
-  CameraOptions copyWith({
+  Camera copyWith({
     LatLng? center,
     double? centerAltitude,
     EdgeInsets? padding,
-    ScreenPoint? anchor,
     double? zoom,
     double? bearing,
     double? pitch,
     double? roll,
     double? fieldOfView,
-  }) => CameraOptions(
+  }) => Camera(
     center: center ?? this.center,
     centerAltitude: centerAltitude ?? this.centerAltitude,
     padding: padding ?? this.padding,
-    anchor: anchor ?? this.anchor,
     zoom: zoom ?? this.zoom,
     bearing: bearing ?? this.bearing,
     pitch: pitch ?? this.pitch,
@@ -1569,7 +1543,6 @@ final class CameraOptions extends _Value {
     center,
     centerAltitude,
     padding,
-    anchor,
     zoom,
     bearing,
     pitch,
@@ -1577,11 +1550,10 @@ final class CameraOptions extends _Value {
     fieldOfView,
   ];
   @override
-  String toString() => _describe('CameraOptions', const [
+  String toString() => _describe('Camera', const [
     'center',
     'centerAltitude',
     'padding',
-    'anchor',
     'zoom',
     'bearing',
     'pitch',
@@ -1707,16 +1679,15 @@ final class MapViewportOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapView extends _Value {
   const MapView({
-    required this.camera,
+    this.camera = const Camera(),
     required this.extent,
     required this.projectionMode,
     required this.viewport,
   });
 
   /// The camera. Its center is unwrapped: the longitude keeps the visible world
-  /// copy and may fall outside -180 to 180. Every field except
-  /// `MLN_CAMERA_OPTION_ANCHOR` is set.
-  final CameraOptions camera;
+  /// copy and may fall outside -180 to 180.
+  final Camera camera;
 
   /// Logical size and device-pixel scale. A snapshot carries the map's scale
   /// factor, and a frame carries the scale factor of the target that drew it.
@@ -1731,7 +1702,7 @@ final class MapView extends _Value {
 
   /// A copy of this value with the given members replaced.
   MapView copyWith({
-    CameraOptions? camera,
+    Camera? camera,
     LogicalExtent? extent,
     ProjectionMode? projectionMode,
     MapViewportOptions? viewport,
@@ -2136,6 +2107,26 @@ final class BoundOptions extends _Value {
   ]);
 }
 
+/// Screen-space point in logical map pixels, from the top-left of the viewport
+/// with y growing downward.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ScreenPoint extends _Value {
+  const ScreenPoint({this.x = 0, this.y = 0});
+  final double x;
+  final double y;
+
+  /// A copy of this value with the given members replaced.
+  ScreenPoint copyWith({double? x, double? y}) =>
+      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
+
+  @override
+  List<Object?> get _members => [x, y];
+  @override
+  String toString() => _describe('ScreenPoint', const ['x', 'y']);
+}
+
 /// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
@@ -2237,6 +2228,83 @@ final class CameraFitOptions extends _Value {
   @override
   String toString() =>
       _describe('CameraFitOptions', const ['padding', 'bearing', 'pitch']);
+}
+
+/// Camera fields used by snapshots and camera updates.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraOptions extends _Value {
+  CameraOptions({
+    this.center,
+    this.centerAltitude,
+    this.padding,
+    this.anchor,
+    this.zoom,
+    this.bearing,
+    this.pitch,
+    this.roll,
+    this.fieldOfView,
+  });
+  final LatLng? center;
+  final double? centerAltitude;
+  final EdgeInsets? padding;
+
+  /// Optional screen-space focal point in logical map pixels.
+  final ScreenPoint? anchor;
+  final double? zoom;
+  final double? bearing;
+  final double? pitch;
+  final double? roll;
+  final double? fieldOfView;
+
+  /// A copy of this value with the given members replaced.
+  CameraOptions copyWith({
+    LatLng? center,
+    double? centerAltitude,
+    EdgeInsets? padding,
+    ScreenPoint? anchor,
+    double? zoom,
+    double? bearing,
+    double? pitch,
+    double? roll,
+    double? fieldOfView,
+  }) => CameraOptions(
+    center: center ?? this.center,
+    centerAltitude: centerAltitude ?? this.centerAltitude,
+    padding: padding ?? this.padding,
+    anchor: anchor ?? this.anchor,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    roll: roll ?? this.roll,
+    fieldOfView: fieldOfView ?? this.fieldOfView,
+  );
+
+  @override
+  List<Object?> get _members => [
+    center,
+    centerAltitude,
+    padding,
+    anchor,
+    zoom,
+    bearing,
+    pitch,
+    roll,
+    fieldOfView,
+  ];
+  @override
+  String toString() => _describe('CameraOptions', const [
+    'center',
+    'centerAltitude',
+    'padding',
+    'anchor',
+    'zoom',
+    'bearing',
+    'pitch',
+    'roll',
+    'fieldOfView',
+  ]);
 }
 
 /// One atomic absolute camera update.
@@ -3780,9 +3848,9 @@ final class VulkanSurfaceDescriptor extends _Value {
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraQueryResult extends _Value {
-  const CameraQueryResult({this.generation = 0, required this.camera});
+  const CameraQueryResult({this.generation = 0, this.camera = const Camera()});
   final int generation;
-  final CameraOptions camera;
+  final Camera camera;
 
   @override
   List<Object?> get _members => [generation, camera];

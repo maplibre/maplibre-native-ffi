@@ -472,6 +472,18 @@ pub struct mln_buffer_view {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_camera {
+    pub center: mln_lat_lng,
+    pub center_altitude: f64,
+    pub padding: mln_edge_insets,
+    pub zoom: f64,
+    pub bearing: f64,
+    pub pitch: f64,
+    pub roll: f64,
+    pub field_of_view: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_camera_delta {
     pub size: u32,
     pub fields: mln_camera_delta_fields,
@@ -512,7 +524,7 @@ pub struct mln_camera_options {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_query_result {
     pub generation: u64,
-    pub camera: mln_camera_options,
+    pub camera: mln_camera,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -794,7 +806,7 @@ pub struct mln_map_tile_options {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_map_view {
     pub size: u32,
-    pub camera: mln_camera_options,
+    pub camera: mln_camera,
     pub extent: mln_logical_extent,
     pub projection_mode: mln_projection_mode,
     pub viewport: mln_map_viewport_options,

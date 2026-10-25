@@ -52,8 +52,8 @@ test "optional fields and masks round-trip through presence bits" {
     update.value.camera = .{ .zoom = 5.0 };
     try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
     const snapshot = try fixture.map.getSnapshot(null);
-    try testing.expectEqual(@as(?f64, 5.0), snapshot.view.camera.zoom);
-    try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch.?, 1e-9);
+    try testing.expectEqual(@as(f64, 5.0), snapshot.view.camera.zoom);
+    try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch, 1e-9);
 
     var mask = maplibre.RuntimeEventFlag.all;
     mask.map_tile_action = false;

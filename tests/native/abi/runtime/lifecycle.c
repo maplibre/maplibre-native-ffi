@@ -167,7 +167,7 @@ static void a_released_map_accepts_no_call(void) {
   MLN_TEST_INVALID_STATE(mln_test_map_request_repaint(map));
   mln_completion completion = mln_test_discard_completion();
   MLN_TEST_INVALID_STATE(mln_map_request_still_image(map, &completion, NULL));
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera camera = {0};
   MLN_TEST_INVALID_STATE(mln_test_map_get_camera(map, &camera));
   MLN_TEST_INVALID_STATE(mln_map_dispose(map, NULL));
   mln_test_destroy_runtime(runtime);

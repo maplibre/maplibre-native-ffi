@@ -72,7 +72,7 @@ static mln_map_snapshot read_settled_snapshot(
 }
 
 // An ordered camera read.
-static mln_camera_options query_camera(mln_map map) {
+static mln_camera query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
   MLN_TEST_OK(mln_map_get_camera(map, &query.descriptor, NULL));
@@ -599,7 +599,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  const mln_camera_options start = query_camera(map);
+  const mln_camera start = query_camera(map);
 
   mln_test_transition_end rendered;
   mln_test_transition_end_init(&rendered);
@@ -611,7 +611,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   apply_delta(map, &delta);
   render_until_ended(&fixture, &rendered);
   assert_ended(&rendered, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "rendered");
-  const mln_camera_options camera = query_camera(map);
+  const mln_camera camera = query_camera(map);
   TEST_ASSERT_DOUBLE_WITHIN(1e-4, start.zoom + 1.0, camera.zoom);
   TEST_ASSERT_TRUE(camera.center.longitude < start.center.longitude);
   MLN_TEST_OK(mln_test_map_fence(map));

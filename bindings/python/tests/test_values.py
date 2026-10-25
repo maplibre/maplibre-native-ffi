@@ -54,7 +54,6 @@ def test_absent_fields_stay_distinct_from_present_values(
     _jump(map_handle, mln.CameraOptions(zoom=5.0, bearing=0.0))
 
     camera = result(map_handle.get_camera()).camera
-    assert camera.center is not None
     assert camera.center.latitude == pytest.approx(10.0)
     assert camera.center.longitude == pytest.approx(20.0)
     assert camera.zoom == pytest.approx(5.0)

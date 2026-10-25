@@ -519,7 +519,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(464, 8)
+      val out = sized(440, 8)
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }

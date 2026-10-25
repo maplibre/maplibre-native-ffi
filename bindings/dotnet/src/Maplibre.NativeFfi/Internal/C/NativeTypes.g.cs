@@ -55,6 +55,18 @@ internal unsafe struct mln_buffer_view
     public nuint size;
 }
 
+internal unsafe struct mln_camera
+{
+    public mln_lat_lng center;
+    public double center_altitude;
+    public mln_edge_insets padding;
+    public double zoom;
+    public double bearing;
+    public double pitch;
+    public double roll;
+    public double field_of_view;
+}
+
 internal unsafe struct mln_camera_delta
 {
     public uint size;
@@ -96,7 +108,7 @@ internal unsafe struct mln_camera_options
 internal unsafe struct mln_camera_query_result
 {
     public ulong generation;
-    public mln_camera_options camera;
+    public mln_camera camera;
 }
 
 internal unsafe struct mln_camera_transition_end
@@ -395,7 +407,7 @@ internal unsafe struct mln_map_tile_options
 internal unsafe struct mln_map_view
 {
     public uint size;
-    public mln_camera_options camera;
+    public mln_camera camera;
     public mln_logical_extent extent;
     public mln_projection_mode projection_mode;
     public mln_map_viewport_options viewport;

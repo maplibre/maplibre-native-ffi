@@ -110,13 +110,10 @@ public sealed class GeneratedValueTests
         );
         var camera = (await fixture.Map.GetCameraAsync()).Camera;
 
-        Assert.NotNull(camera.Center);
-        Assert.Equal(10, camera.Center.Value.Latitude, 6);
-        Assert.Equal(20, camera.Center.Value.Longitude, 6);
-        Assert.NotNull(camera.Zoom);
-        Assert.Equal(3, camera.Zoom.Value, 6);
-        Assert.NotNull(camera.Bearing);
-        Assert.Equal(30, camera.Bearing.Value, 6);
+        Assert.Equal(10, camera.Center.Latitude, 6);
+        Assert.Equal(20, camera.Center.Longitude, 6);
+        Assert.Equal(3, camera.Zoom, 6);
+        Assert.Equal(30, camera.Bearing, 6);
     }
 
     [Fact]

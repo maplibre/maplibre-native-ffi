@@ -1857,39 +1857,21 @@ public data class EdgeInsets(
 )
 
 /**
- * Screen-space point in logical map pixels, from the top-left of the viewport with y growing
- * downward.
+ * A complete camera, as native reports it.
  *
- * See `mln_screen_point` in the
+ * See `mln_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class ScreenPoint(
-  public val x: Double = 0.0,
-  public val y: Double = 0.0,
+public data class Camera(
+  public val center: LatLng = LatLng(),
+  public val centerAltitude: Double = 0.0,
+  public val padding: EdgeInsets = EdgeInsets(),
+  public val zoom: Double = 0.0,
+  public val bearing: Double = 0.0,
+  public val pitch: Double = 0.0,
+  public val roll: Double = 0.0,
+  public val fieldOfView: Double = 0.0,
 )
-
-/**
- * Camera fields used by snapshots and camera updates.
- *
- * See `mln_camera_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraOptions(
-  public val center: LatLng? = null,
-  public val centerAltitude: Double? = null,
-  public val padding: EdgeInsets? = null,
-  /** Optional screen-space focal point in logical map pixels. */
-  public val anchor: ScreenPoint? = null,
-  public val zoom: Double? = null,
-  public val bearing: Double? = null,
-  public val pitch: Double? = null,
-  public val roll: Double? = null,
-  public val fieldOfView: Double? = null,
-) {
-  public companion object {
-    internal val default: CameraOptions by lazy { GeneratedApi.cameraOptionsDefault() }
-  }
-}
 
 /**
  * Logical extent in UI pixels and the device-pixel scale.
@@ -1956,9 +1938,9 @@ public data class MapViewportOptions(
 public data class MapView(
   /**
    * The camera. Its center is unwrapped: the longitude keeps the visible world copy and may fall
-   * outside -180 to 180. Every field except `MLN_CAMERA_OPTION_ANCHOR` is set.
+   * outside -180 to 180.
    */
-  public val camera: CameraOptions = CameraOptions(),
+  public val camera: Camera = Camera(),
   /**
    * Logical size and device-pixel scale. A snapshot carries the map's scale factor, and a frame
    * carries the scale factor of the target that drew it.
@@ -2335,6 +2317,18 @@ public data class BoundOptions(
 }
 
 /**
+ * Screen-space point in logical map pixels, from the top-left of the viewport with y growing
+ * downward.
+ *
+ * See `mln_screen_point` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ScreenPoint(
+  public val x: Double = 0.0,
+  public val y: Double = 0.0,
+)
+
+/**
  * One atomic relative camera update.
  *
  * See `mln_camera_delta` in the
@@ -2372,6 +2366,29 @@ public data class CameraFitOptions(
 ) {
   public companion object {
     internal val default: CameraFitOptions by lazy { GeneratedApi.cameraFitOptionsDefault() }
+  }
+}
+
+/**
+ * Camera fields used by snapshots and camera updates.
+ *
+ * See `mln_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraOptions(
+  public val center: LatLng? = null,
+  public val centerAltitude: Double? = null,
+  public val padding: EdgeInsets? = null,
+  /** Optional screen-space focal point in logical map pixels. */
+  public val anchor: ScreenPoint? = null,
+  public val zoom: Double? = null,
+  public val bearing: Double? = null,
+  public val pitch: Double? = null,
+  public val roll: Double? = null,
+  public val fieldOfView: Double? = null,
+) {
+  public companion object {
+    internal val default: CameraOptions by lazy { GeneratedApi.cameraOptionsDefault() }
   }
 }
 
@@ -3478,7 +3495,7 @@ public data class WebgpuSurfaceDescriptor(
  */
 public data class CameraQueryResult(
   public val generation: ULong,
-  public val camera: CameraOptions,
+  public val camera: Camera,
 )
 
 /**

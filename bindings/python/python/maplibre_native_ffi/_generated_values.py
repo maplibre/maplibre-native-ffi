@@ -936,6 +936,44 @@ class BoundOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class Camera:
+    """A complete camera, as native reports it.
+
+    See `mln_camera` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    center: LatLng
+
+    center_altitude: float
+
+    padding: EdgeInsets
+
+    zoom: float
+
+    bearing: float
+
+    pitch: float
+
+    roll: float
+
+    field_of_view: float
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            center=LatLng._from_native(raw["center"]),
+            center_altitude=raw["center_altitude"],
+            padding=EdgeInsets._from_native(raw["padding"]),
+            zoom=raw["zoom"],
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
+            roll=raw["roll"],
+            field_of_view=raw["field_of_view"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class CameraDelta:
     """One atomic relative camera update.
 
@@ -1074,13 +1112,12 @@ class CameraQueryResult:
 
     generation: int
 
-    camera: CameraOptions
+    camera: Camera
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            generation=raw["generation"],
-            camera=CameraOptions._from_native(raw["camera"]),
+            generation=raw["generation"], camera=Camera._from_native(raw["camera"])
         )
 
 
@@ -1901,10 +1938,9 @@ class MapView:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    camera: CameraOptions
+    camera: Camera
     """The camera. Its center is unwrapped: the longitude keeps the visible
-    world copy and may fall outside -180 to 180. Every field except
-    `MLN_CAMERA_OPTION_ANCHOR` is set.
+    world copy and may fall outside -180 to 180.
     """
 
     extent: LogicalExtent
@@ -1923,7 +1959,7 @@ class MapView:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            camera=CameraOptions._from_native(raw["camera"]),
+            camera=Camera._from_native(raw["camera"]),
             extent=LogicalExtent._from_native(raw["extent"]),
             projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
             viewport=MapViewportOptions._from_native(raw["viewport"]),

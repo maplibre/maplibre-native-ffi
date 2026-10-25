@@ -248,9 +248,7 @@ mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
   return status;
 }
 
-mln_status mln_test_map_get_camera(
-  mln_map map, mln_camera_options* out_camera
-) {
+mln_status mln_test_map_get_camera(mln_map map, mln_camera* out_camera) {
   if (out_camera == NULL) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }

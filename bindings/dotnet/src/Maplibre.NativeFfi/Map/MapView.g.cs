@@ -12,8 +12,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Camera">
 /// The camera. Its center is unwrapped: the longitude keeps the visible world
-/// copy and may fall outside -180 to 180. Every field except
-/// <c>MLN_CAMERA_OPTION_ANCHOR</c> is set.
+/// copy and may fall outside -180 to 180.
 /// </param>
 /// <param name="Extent">
 /// Logical size and device-pixel scale. A snapshot carries the map's scale
@@ -27,7 +26,7 @@ namespace Maplibre.NativeFfi;
 /// every field set.
 /// </param>
 public readonly partial record struct MapView(
-    CameraOptions Camera,
+    Camera Camera,
     LogicalExtent Extent,
     ProjectionMode ProjectionMode,
     MapViewportOptions Viewport

@@ -81,6 +81,23 @@ export interface BoundOptions {
 }
 
 /**
+ * A complete camera, as native reports it.
+ *
+ * See `mln_camera` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface Camera {
+  center?: LatLng;
+  centerAltitude?: number;
+  padding?: EdgeInsets;
+  zoom?: number;
+  bearing?: number;
+  pitch?: number;
+  roll?: number;
+  fieldOfView?: number;
+}
+
+/**
  * Camera change kinds reported by camera will-change and did-change events.
  *
  * See `mln_camera_change_mode` in the
@@ -174,7 +191,7 @@ export interface CameraOptions {
  */
 export interface CameraQueryResult {
   readonly generation: bigint;
-  readonly camera: CameraOptions;
+  readonly camera: Camera;
 }
 
 /**
@@ -958,10 +975,9 @@ export interface MapTileOptions {
 export interface MapView {
   /**
    * The camera. Its center is unwrapped: the longitude keeps the visible world
-   * copy and may fall outside -180 to 180. Every field except
-   * `MLN_CAMERA_OPTION_ANCHOR` is set.
+   * copy and may fall outside -180 to 180.
    */
-  camera?: CameraOptions;
+  camera?: Camera;
   /**
    * Logical size and device-pixel scale. A snapshot carries the map's scale
    * factor, and a frame carries the scale factor of the target that drew it.

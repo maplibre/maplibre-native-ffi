@@ -98,6 +98,25 @@ fn generated_copy_mln_bound_options(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_camera(py: Python<'_>, value: &sys::mln_camera) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("center", generated_copy_mln_lat_lng(py, &value.center)?)?;
+    dict.set_item(
+        "center_altitude",
+        generated_value(py, value.center_altitude)?,
+    )?;
+    dict.set_item(
+        "padding",
+        generated_copy_mln_edge_insets(py, &value.padding)?,
+    )?;
+    dict.set_item("zoom", generated_value(py, value.zoom)?)?;
+    dict.set_item("bearing", generated_value(py, value.bearing)?)?;
+    dict.set_item("pitch", generated_value(py, value.pitch)?)?;
+    dict.set_item("roll", generated_value(py, value.roll)?)?;
+    dict.set_item("field_of_view", generated_value(py, value.field_of_view)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_camera_delta(
     py: Python<'_>,
     value: &sys::mln_camera_delta,
@@ -253,10 +272,7 @@ fn generated_copy_mln_camera_query_result(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item(
-        "camera",
-        generated_copy_mln_camera_options(py, &value.camera)?,
-    )?;
+    dict.set_item("camera", generated_copy_mln_camera(py, &value.camera)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -919,10 +935,7 @@ fn generated_copy_mln_map_tile_options(
 
 fn generated_copy_mln_map_view(py: Python<'_>, value: &sys::mln_map_view) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item(
-        "camera",
-        generated_copy_mln_camera_options(py, &value.camera)?,
-    )?;
+    dict.set_item("camera", generated_copy_mln_camera(py, &value.camera)?)?;
     dict.set_item(
         "extent",
         generated_copy_mln_logical_extent(py, &value.extent)?,
@@ -2591,6 +2604,22 @@ fn generated_input_mln_bound_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_camera<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_camera> {
+    let mut raw: sys::mln_camera = unsafe { std::mem::zeroed() };
+    raw.center = generated_input_mln_lat_lng(&value.getattr("center")?, storage)?;
+    raw.center_altitude = value.getattr("center_altitude")?.extract::<f64>()?;
+    raw.padding = generated_input_mln_edge_insets(&value.getattr("padding")?, storage)?;
+    raw.zoom = value.getattr("zoom")?.extract::<f64>()?;
+    raw.bearing = value.getattr("bearing")?.extract::<f64>()?;
+    raw.pitch = value.getattr("pitch")?.extract::<f64>()?;
+    raw.roll = value.getattr("roll")?.extract::<f64>()?;
+    raw.field_of_view = value.getattr("field_of_view")?.extract::<f64>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_camera_delta<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3216,7 +3245,7 @@ fn generated_input_mln_map_view<'py>(
 ) -> PyResult<sys::mln_map_view> {
     let mut raw: sys::mln_map_view = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_view>() as _;
-    raw.camera = generated_input_mln_camera_options(&value.getattr("camera")?, storage)?;
+    raw.camera = generated_input_mln_camera(&value.getattr("camera")?, storage)?;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.projection_mode =
         generated_input_mln_projection_mode(&value.getattr("projection_mode")?, storage)?;
