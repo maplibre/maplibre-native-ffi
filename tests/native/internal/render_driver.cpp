@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <mln/gfx/context.hpp>
@@ -17,6 +19,7 @@
 #include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
 #include "support/frames.h"
+#include "support/map.h"
 #include "support/test_support.h"
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -204,13 +207,16 @@ class FailedActivation final : public mln::gfx::RendererBackend {
 
 class FailingFrameBackend final : public mln::core::TextureSessionBackend {
  public:
+  // `before_failure` runs on the driver just before a drawable failure.
   FailingFrameBackend(
     std::unique_ptr<TextureSessionBackend> backend, FrameFailure failure,
-    mln::core::RenderSessionScheduler& scheduler
+    mln::core::RenderSessionScheduler& scheduler,
+    std::function<void()> before_failure
   )
       : backend_(std::move(backend)),
         failure_(failure),
-        scheduler_(scheduler) {}
+        scheduler_(scheduler),
+        before_failure_(std::move(before_failure)) {}
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_->headless_backend();
@@ -226,6 +232,7 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
     }
     if (failure_ == FrameFailure::Drawable && !retried_) {
       retried_ = true;
+      if (before_failure_) before_failure_();
       throw mln::core::RenderTargetNotReady("drawable unavailable");
     }
     return backend_->select_render_slot(slot);
@@ -270,17 +277,22 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
   FrameFailure failure_;
   mln::core::RenderSessionScheduler& scheduler_;
   FailedActivation failed_activation_;
+  std::function<void()> before_failure_;
   bool retried_ = false;
 };
 
-void install_frame_failure(const Fixture& fixture, FrameFailure failure) {
+void install_frame_failure(
+  const Fixture& fixture, FrameFailure failure,
+  std::function<void()> before_failure = {}
+) {
   auto install = mln_test_completion_default(0);
   MLN_TEST_OK(
     mln::core::enqueue_driver_operation(
       fixture.render.session,
-      [failure](mln_render_session_object& session) {
+      [failure,
+       before = std::move(before_failure)](mln_render_session_object& session) {
         session.texture.backend = std::make_unique<FailingFrameBackend>(
-          std::move(session.texture.backend), failure, session.scheduler
+          std::move(session.texture.backend), failure, session.scheduler, before
         );
         return MLN_STATUS_OK;
       },
@@ -398,6 +410,77 @@ void an_unavailable_drawable_releases_its_slot_for_a_retry() {
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, retried.disposition);
+}
+
+struct UpdateDuringAttempt {
+  mln_map map;
+  mln_status camera = MLN_STATUS_NATIVE_ERROR;
+  mln_status fence = MLN_STATUS_NATIVE_ERROR;
+};
+
+// Moves the camera, which makes a map with a pending still image publish an
+// update, and waits until the map has announced it to the session. A case
+// cannot assert off its own thread, so this records what it saw.
+void publish_an_update(UpdateDuringAttempt& update) {
+  auto camera = mln_camera_update_default();
+  camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.camera.zoom = 1.0;
+  auto moved = mln_test_completion_default(0);
+  if (
+    mln_map_update_camera(update.map, &camera, &moved.descriptor, nullptr) !=
+    MLN_STATUS_OK
+  ) {
+    moved.descriptor.release_user_data(moved.descriptor.user_data);
+    mln_test_completion_destroy(&moved);
+    return;
+  }
+  update.camera = mln_test_completion_settle(&moved);
+  // The map announces a command burst's update before its next other work,
+  // such as this read.
+  auto read = mln_test_completion_default(sizeof(mln_camera_query_result));
+  if (
+    mln_map_get_camera(update.map, &read.descriptor, nullptr) != MLN_STATUS_OK
+  ) {
+    read.descriptor.release_user_data(read.descriptor.user_data);
+    mln_test_completion_destroy(&read);
+    return;
+  }
+  auto value = mln_camera_query_result{};
+  update.fence = mln_test_completion_finish_value(&read, &value, sizeof(value));
+}
+
+// A still image's demand that the target fails while a map update arrives
+// leaves the image a retry: the update found the demand running, so the
+// demand's result submits the next one, which renders the image.
+void an_update_during_a_failed_still_image_attempt_retries_it() {
+  auto fixture = Fixture{};
+  fixture.runtime = mln_test_create_runtime();
+  auto options = mln_map_options_default();
+  options.initial_extent =
+    mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  fixture.map = mln_test_create_map_with_options(fixture.runtime, &options);
+  mln_test_load_style_and_wait(fixture.map, mln_test_red_background_style_json);
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create(fixture.map, &fixture.render)
+  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture.render, fixture.map));
+  auto update = UpdateDuringAttempt{.map = fixture.map};
+  install_frame_failure(fixture, FrameFailure::Drawable, [&update] {
+    publish_an_update(update);
+  });
+
+  auto still = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_map_request_still_image(fixture.map, &still.descriptor, nullptr)
+  );
+  const auto status =
+    mln_test_render_pending_still_image(&fixture.render, &still);
+  mln_test_completion_destroy(&still);
+  destroy_fixture(fixture);
+  MLN_TEST_OK(update.camera);
+  MLN_TEST_OK(update.fence);
+  MLN_TEST_OK(status);
 }
 
 void an_idle_demand_reports_a_failed_backend_activation() {
@@ -1603,6 +1686,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
 MLN_TEST_GROUP {
   RUN_TEST(graphics_failures_finish_demands_and_lose_the_target);
   RUN_TEST(an_unavailable_drawable_releases_its_slot_for_a_retry);
+  RUN_TEST(an_update_during_a_failed_still_image_attempt_retries_it);
   RUN_TEST(an_idle_demand_reports_a_failed_backend_activation);
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);

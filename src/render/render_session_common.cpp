@@ -1203,13 +1203,13 @@ auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
   return count;
 }
 
-// Submits the demand that renders the map's pending still image, unless one
-// submitted for that image is outstanding, the session cannot render now, or
-// the session already rendered a frame that completes the image and the map
-// has yet to say so. Called wherever the session can render again: the
-// request itself, attachment, a barrier's completion, and wherever waiting
-// demands resume. A demand that cannot be allocated leaves the image for the
-// next of those.
+// Submits the demand that renders the map's pending still image, unless the
+// session cannot render now, or already rendered a frame that completes the
+// image and the map has yet to say so. While a demand submitted for that image
+// is outstanding, its result submits the next instead. Called wherever the
+// session can render again: the request itself, attachment, a barrier's
+// completion, and wherever waiting demands resume. A demand that cannot be
+// allocated leaves the image for the next of those.
 auto arm_still_image_demand_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -1220,12 +1220,14 @@ auto arm_still_image_demand_locked(
   )
     return;
   const auto image = map_still_image_generation(*session.map_object);
+  if (image == 0 || session.rendered_update_generation >= image) return;
   if (
-    image == 0 || session.rendered_update_generation >= image ||
-    (session.still_image_demands != 0 &&
-     session.still_image_demand_generation == image)
-  )
+    session.still_image_demands != 0 &&
+    session.still_image_demand_generation == image
+  ) {
+    session.still_image_rearm = true;
     return;
+  }
   try {
     session.demands.push_back(
       std::make_shared<const mln_frame_demand>(mln_frame_demand{
@@ -2790,6 +2792,11 @@ auto publish_frame_result(
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{session->control_mutex};
     publish_frame_result_locked(*session, result, wakes);
+    if (
+      result.token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE &&
+      std::exchange(session->still_image_rearm, false)
+    )
+      arm_still_image_demand_locked(*session, wakes);
   }
   mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
 }
@@ -2974,6 +2981,9 @@ auto run_frame_demand(
       return;
     demand = session->demands.front();
     session->demands.pop_front();
+    // Only what arrives while this attempt runs asks for another.
+    if (demand->token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE)
+      session->still_image_rearm = false;
   }
   auto selected_slot = std::optional<std::size_t>{};
   struct RenderingSlotGuard {

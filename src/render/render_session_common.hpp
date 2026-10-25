@@ -818,6 +818,10 @@ struct mln_render_session_object
   // demand ends, so two can be outstanding.
   std::size_t still_image_demands = 0;
   uint64_t still_image_demand_generation = 0;
+  // Something that would submit a still-image demand, such as a map update,
+  // found the image's demand still running. The demand's result submits the
+  // next one, so a demand that fails meanwhile leaves the image a retry.
+  bool still_image_rearm = false;
   std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
   mln::core::WorkerThread worker;
