@@ -102,7 +102,7 @@ internal class RenderSessionFixture(
    */
   suspend fun renderStill(still: Deferred<Unit> = mapFixture.map.requestStillImage()) {
     var rendered = false
-    serviceUntil("a still image") {
+    serviceUntil("a still image", still) {
       if (drainResults().isNotEmpty()) rendered = true
       if (acquiresFrames) releaseFrames()
       still.isCompleted && (rendered || still.isCancelled)

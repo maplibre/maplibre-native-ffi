@@ -61,6 +61,10 @@ enum class SyncPoint : std::uint8_t {
   // which the host can drain, and is about to finish the demand. The call
   // stays in flight until the handler returns. No lock is held.
   RenderFrameResultPublished,
+  // A render session's driver has rendered a frame for a demand and is about
+  // to publish its result. The frame's completion may already have reached
+  // the map. No lock is held.
+  RenderFrameRendered,
   // A render session's driver found every slot of its texture ring busy,
   // returned a frame demand to the front of the session's demands, and is
   // about to finish the work item. No lock is held.

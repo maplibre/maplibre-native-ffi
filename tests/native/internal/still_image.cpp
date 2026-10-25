@@ -1,8 +1,11 @@
 // A still image and the frames that may complete it. The map hears of a
 // frame through a mailbox that hands the runtime worker one message per turn,
 // so no public command can be ordered after a given frame's delivery; the
-// StillImageFrameHeldBack point marks it.
+// StillImageFrameHeldBack point marks it. The map can also complete an image
+// before the session publishes the result of the frame that completed it,
+// which the RenderFrameRendered point holds open.
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -14,6 +17,7 @@
 #include "support/frames.h"
 #include "support/map.h"
 #include "support/test_support.h"
+#include "testing/sync_point.hpp"
 
 namespace {
 
@@ -119,8 +123,81 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   mln_test_destroy_runtime(runtime);
 }
 
+struct NextRequest {
+  mln_map map;
+  mln_test_completion* first;
+  mln_test_completion* second;
+  std::atomic_bool requested{false};
+  bool first_completed = false;
+  mln_status second_submitted = MLN_STATUS_NATIVE_ERROR;
+  mln_status fence = MLN_STATUS_NATIVE_ERROR;
+};
+
+// Runs on the driver once the first image's frame has rendered and before its
+// result is published. It waits for the map to complete that image, then
+// requests the next one and waits until the request has run, so the next
+// request arrives while the first one's demand is still outstanding. A case
+// cannot assert off its own thread, so this records what it saw.
+void request_the_next_image(SyncPoint point, void* context) noexcept {
+  if (point != SyncPoint::RenderFrameRendered) return;
+  auto& next = *static_cast<NextRequest*>(context);
+  if (next.requested.exchange(true)) return;
+  next.first_completed = mln_test_completion_wait(next.first, -1);
+  next.second_submitted =
+    mln_map_request_still_image(next.map, &next.second->descriptor, nullptr);
+  // A read behind the request completes once the request has run.
+  auto camera = mln_test_completion_default(sizeof(mln_camera_query_result));
+  if (
+    mln_map_get_camera(next.map, &camera.descriptor, nullptr) != MLN_STATUS_OK
+  ) {
+    camera.descriptor.release_user_data(camera.descriptor.user_data);
+    mln_test_completion_destroy(&camera);
+    return;
+  }
+  auto value = mln_camera_query_result{};
+  next.fence = mln_test_completion_finish_value(&camera, &value, sizeof(value));
+}
+
+// A request that arrives while the previous request's demand is still
+// outstanding, because the map completed that image before the session
+// published the frame's result, gets a demand of its own and renders.
+void a_request_behind_an_unfinished_demand_still_renders() {
+  const auto runtime = mln_test_create_runtime();
+  auto options = mln_map_options_default();
+  options.initial_extent =
+    mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  const auto map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  auto fixture = mln_test_render_fixture{};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+
+  auto first = mln_test_completion_default(0);
+  auto second = mln_test_completion_default(0);
+  auto next = NextRequest{.map = map, .first = &first, .second = &second};
+  mln::testing::set_sync_point_handler(request_the_next_image, &next);
+  MLN_TEST_OK(mln_map_request_still_image(map, &first.descriptor, nullptr));
+  const auto status = mln_test_render_pending_still_image(&fixture, &first);
+  const auto requested = next.requested.load();
+  mln::testing::set_sync_point_handler(nullptr, nullptr);
+  MLN_TEST_OK(status);
+  TEST_ASSERT_TRUE(requested);
+  TEST_ASSERT_TRUE(next.first_completed);
+  MLN_TEST_OK(next.second_submitted);
+  MLN_TEST_OK(next.fence);
+
+  MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &second));
+  mln_test_completion_destroy(&first);
+  mln_test_completion_destroy(&second);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_of_an_older_update_does_not_complete_a_still_image);
+  RUN_TEST(a_request_behind_an_unfinished_demand_still_renders);
 }

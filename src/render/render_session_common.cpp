@@ -1203,24 +1203,29 @@ auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
   return count;
 }
 
-// Submits the demand that renders the map's pending still image, unless one is
-// outstanding, the session cannot render now, or the session already rendered
-// a frame that completes the image and the map has yet to say so. Called
-// wherever the session can render again: the request itself, attachment, a
-// barrier's completion, and wherever waiting demands resume. A demand that
-// cannot be allocated leaves the image for the next of those.
+// Submits the demand that renders the map's pending still image, unless one
+// submitted for that image is outstanding, the session cannot render now, or
+// the session already rendered a frame that completes the image and the map
+// has yet to say so. Called wherever the session can render again: the
+// request itself, attachment, a barrier's completion, and wherever waiting
+// demands resume. A demand that cannot be allocated leaves the image for the
+// next of those.
 auto arm_still_image_demand_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
   if (
-    session.still_image_demand_outstanding ||
     session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
     session.pending_frame_barriers != 0 ||
     every_slot_quarantined_locked(session)
   )
     return;
   const auto image = map_still_image_generation(*session.map_object);
-  if (image == 0 || session.rendered_update_generation >= image) return;
+  if (
+    image == 0 || session.rendered_update_generation >= image ||
+    (session.still_image_demands != 0 &&
+     session.still_image_demand_generation == image)
+  )
+    return;
   try {
     session.demands.push_back(
       std::make_shared<const mln_frame_demand>(mln_frame_demand{
@@ -1237,7 +1242,8 @@ auto arm_still_image_demand_locked(
     session.demands.pop_back();
     return;
   }
-  session.still_image_demand_outstanding = true;
+  ++session.still_image_demands;
+  session.still_image_demand_generation = image;
 }
 
 // Runs every demand that waits for a map update again. Called wherever an
@@ -1905,16 +1911,17 @@ auto notify_render_session_still_image(
     arm_still_image_demand_locked(*session, wakes);
     return;
   }
-  // Another frame completed the image, or the map closed, so a demand that
-  // waits for the image's update would wait for nothing.
+  // Another frame completed the image, or the map closed, so a still-image
+  // demand that waits for an update would wait for nothing.
   auto& waiting = session->update_waiting_demands;
-  const auto entry =
-    std::find_if(waiting.begin(), waiting.end(), [](const auto& pending) {
-      return pending->token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
-    });
-  if (entry == waiting.end()) return;
-  finish_demand_locked(*session, **entry, MLN_RENDER_RESULT_NO_UPDATE, wakes);
-  waiting.erase(entry);
+  for (auto entry = waiting.begin(); entry != waiting.end();) {
+    if ((*entry)->token != MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE) {
+      ++entry;
+      continue;
+    }
+    finish_demand_locked(*session, **entry, MLN_RENDER_RESULT_NO_UPDATE, wakes);
+    entry = waiting.erase(entry);
+  }
 }
 
 auto validate_render_session(
@@ -2723,8 +2730,11 @@ auto publish_frame_result_locked(
   result.size = sizeof(mln_render_frame_result);
   if (result.disposition != MLN_RENDER_RESULT_RENDERED)
     result.generation = session.generation;
-  if (result.token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE)
-    session.still_image_demand_outstanding = false;
+  if (
+    result.token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE &&
+    session.still_image_demands != 0
+  )
+    --session.still_image_demands;
   session.frame_results.push_back(result);
   if (session.frame_wake && !session.frame_wake_pending) {
     session.frame_wake_pending = true;
@@ -3212,6 +3222,8 @@ auto run_frame_demand(
     !wait_for_map_update(session, demand, rendered_map_generation, result)
   )
     return;
+  if (result.disposition == MLN_RENDER_RESULT_RENDERED)
+    mln::testing::hit(mln::testing::SyncPoint::RenderFrameRendered);
   publish_frame_result(session, result);
 }
 }  // namespace
