@@ -40,20 +40,24 @@ labels:
       labels:
         "area:*": ~
         area:api: >-
-          What hosts program against: the C declarations and their contracts,
-          the bindings with their runtimes, generated code, generator, and
-          tests, and the example apps. A capability belongs to core or
-          rendering, and also to api only when the interface design or the
-          binding layer is the subject.
+          The interface hosts program against, as the subject: the C
+          declarations and their contracts, each binding's API and runtime,
+          generated code and the generator, and the example apps. Building,
+          packaging, or publishing a binding is tooling, and its reference
+          documentation is docs. A capability belongs to core or rendering, and
+          also to api only when the interface design or the binding layer is the
+          subject.
         area:core: >-
-          The library's behavior behind the API: the runtime, threads, wakes,
-          and event delivery; maps, the camera, styles, sources, layers, and
-          feature state; queries and projection; resource providers, cache, and
-          offline; and logging.
+          The library's behavior behind the API, outside rendering: the runtime,
+          threads, wakes, and event delivery; maps, the camera, styles, sources,
+          layers, and feature state; queries and projection; resource providers,
+          cache, and offline; and logging. Render sessions, surfaces, and
+          backends are rendering, even where the runtime drives them.
         area:rendering: >-
           Turning a map into pixels: render sessions and drivers, targets,
           surfaces, textures, readback, frame pacing, the OpenGL, Vulkan, Metal,
-          and WebGPU backends, and layer plugins.
+          and WebGPU backends, and layer plugins. How a binding or the generator
+          exposes rendering types is api, not rendering.
         area:platform: >-
           The OS services under `src/platform/` that MapLibre Native runs on:
           the run loop, threads, HTTP and TLS, image decoding, locale and text,
