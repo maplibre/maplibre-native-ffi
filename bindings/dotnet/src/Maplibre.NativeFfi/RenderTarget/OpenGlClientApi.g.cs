@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_client_api</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-public enum OpenglClientApi : uint
+public enum OpenGlClientApi : uint
 {
     /// <summary>
     /// No client API is named.

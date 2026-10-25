@@ -7,10 +7,10 @@ import {
   FrameDemandFlag,
   type LogicalExtent,
   type MapHandle,
-  OpenglClientApi,
-  OpenglContextOwnership,
-  OpenglContextProviderFlag,
-  openglSupportedContextProviderMask,
+  OpenGlClientApi,
+  OpenGlContextOwnership,
+  OpenGlContextProviderFlag,
+  openGlSupportedContextProviderMask,
   RenderBackendFlag,
   RenderDriverKind,
   type RenderFrameResult,
@@ -74,10 +74,10 @@ function buildBackend(): Backend {
   if ((mask & RenderBackendFlag.vulkan) !== 0) {
     return "vulkan";
   }
-  const providers = openglSupportedContextProviderMask();
+  const providers = openGlSupportedContextProviderMask();
   if (
-    (mask & RenderBackendFlag.opengl) !== 0 &&
-    (providers & OpenglContextProviderFlag.egl) !== 0
+    (mask & RenderBackendFlag.openGl) !== 0 &&
+    (providers & OpenGlContextProviderFlag.egl) !== 0
   ) {
     return "egl";
   }
@@ -143,20 +143,20 @@ function attachOwnedTexture(
     );
   }
   const dedicated = options.driver === RenderDriverKind.coreWorker;
-  return map.attachOpenglOwnedTexture(
+  return map.attachOpenGlOwnedTexture(
     {
       extent,
       context: {
         ownership: dedicated
-          ? OpenglContextOwnership.dedicated
-          : OpenglContextOwnership.shared,
+          ? OpenGlContextOwnership.dedicated
+          : OpenGlContextOwnership.shared,
         data: {
           kind: "egl",
           value: {
             display: context.eglDisplay,
             config: context.eglConfig,
             shareContext: dedicated ? undefined : context.eglContext,
-            clientApi: OpenglClientApi.gles,
+            clientApi: OpenGlClientApi.gles,
             getProcAddress: context.getProcAddress,
           },
         },

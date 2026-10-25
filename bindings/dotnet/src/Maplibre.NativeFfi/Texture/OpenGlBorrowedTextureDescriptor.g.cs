@@ -9,15 +9,15 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct OpenglBorrowedTextureDescriptor
+public readonly partial record struct OpenGlBorrowedTextureDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OpenglBorrowedTextureDescriptor(
+    public OpenGlBorrowedTextureDescriptor(
         LogicalExtent Extent,
         uint PhysicalWidth,
         uint PhysicalHeight,
-        OpenglContextDescriptor Context,
-        ImmutableArray<OpenglBorrowedTexture> Textures,
+        OpenGlContextDescriptor Context,
+        ImmutableArray<OpenGlBorrowedTexture> Textures,
         uint Target
     )
     {
@@ -50,17 +50,17 @@ public readonly partial record struct OpenglBorrowedTextureDescriptor
     /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
     /// </summary>
-    public required OpenglContextDescriptor Context { get; init; }
+    public required OpenGlContextDescriptor Context { get; init; }
 
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public required ImmutableArray<OpenglBorrowedTexture> Textures
+    public required ImmutableArray<OpenGlBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
         init => TexturesStorage = ValueArray.From(value);
     }
-    internal ValueArray<OpenglBorrowedTexture> TexturesStorage { get; init; }
+    internal ValueArray<OpenGlBorrowedTexture> TexturesStorage { get; init; }
 
     /// <summary>
     /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.

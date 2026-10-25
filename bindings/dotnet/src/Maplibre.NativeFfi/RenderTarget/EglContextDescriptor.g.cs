@@ -16,7 +16,7 @@ public readonly partial record struct EglContextDescriptor
         NativePointer Display,
         NativePointer Config,
         NativePointer ShareContext,
-        OpenglClientApi ClientApi,
+        OpenGlClientApi ClientApi,
         NativePointer GetProcAddress
     )
     {
@@ -55,7 +55,7 @@ public readonly partial record struct EglContextDescriptor
     /// ownership. A shared session queries share_context for it, so this is
     /// ignored there.
     /// </summary>
-    public OpenglClientApi ClientApi { get; init; }
+    public OpenGlClientApi ClientApi { get; init; }
 
     /// <summary>
     /// Optional eglGetProcAddress-compatible function for the host loader.

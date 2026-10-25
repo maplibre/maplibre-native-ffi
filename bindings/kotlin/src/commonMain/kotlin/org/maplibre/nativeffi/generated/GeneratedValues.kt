@@ -510,22 +510,22 @@ public value class OfflineRegionDownloadState(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
-public value class OpenglClientApi(public val rawValue: UInt) {
+public value class OpenGlClientApi(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "UNSPECIFIED"
       1u -> "GL"
       2u -> "GLES"
-      else -> "OpenglClientApi($rawValue)"
+      else -> "OpenGlClientApi($rawValue)"
     }
 
   public companion object {
     /** No client API is named. */
-    public val UNSPECIFIED: OpenglClientApi = OpenglClientApi(0u)
+    public val UNSPECIFIED: OpenGlClientApi = OpenGlClientApi(0u)
     /** Desktop OpenGL, as EGL_OPENGL_API names it. */
-    public val GL: OpenglClientApi = OpenglClientApi(1u)
+    public val GL: OpenGlClientApi = OpenGlClientApi(1u)
     /** OpenGL ES, as EGL_OPENGL_ES_API names it. */
-    public val GLES: OpenglClientApi = OpenglClientApi(2u)
+    public val GLES: OpenGlClientApi = OpenGlClientApi(2u)
   }
 }
 
@@ -538,19 +538,19 @@ public value class OpenglClientApi(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
-public value class OpenglContextOwnership(public val rawValue: UInt) {
+public value class OpenGlContextOwnership(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "SHARED"
       1u -> "DEDICATED"
-      else -> "OpenglContextOwnership($rawValue)"
+      else -> "OpenGlContextOwnership($rawValue)"
     }
 
   public companion object {
     /** The session shares its thread with host graphics work. */
-    public val SHARED: OpenglContextOwnership = OpenglContextOwnership(0u)
+    public val SHARED: OpenGlContextOwnership = OpenGlContextOwnership(0u)
     /** The session keeps its own OpenGL context current on its thread. */
-    public val DEDICATED: OpenglContextOwnership = OpenglContextOwnership(1u)
+    public val DEDICATED: OpenGlContextOwnership = OpenGlContextOwnership(1u)
   }
 }
 
@@ -563,14 +563,14 @@ public value class OpenglContextOwnership(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
-public value class OpenglContextProviderFlag(public val rawValue: UInt) {
-  public infix fun or(other: OpenglContextProviderFlag): OpenglContextProviderFlag =
-    OpenglContextProviderFlag(rawValue or other.rawValue)
+public value class OpenGlContextProviderFlag(public val rawValue: UInt) {
+  public infix fun or(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag =
+    OpenGlContextProviderFlag(rawValue or other.rawValue)
 
-  public infix fun and(other: OpenglContextProviderFlag): OpenglContextProviderFlag =
-    OpenglContextProviderFlag(rawValue and other.rawValue)
+  public infix fun and(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag =
+    OpenGlContextProviderFlag(rawValue and other.rawValue)
 
-  public operator fun contains(other: OpenglContextProviderFlag): Boolean =
+  public operator fun contains(other: OpenGlContextProviderFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
   override fun toString(): String =
@@ -578,11 +578,11 @@ public value class OpenglContextProviderFlag(public val rawValue: UInt) {
 
   public companion object {
     /** No flags. */
-    public val NONE: OpenglContextProviderFlag = OpenglContextProviderFlag(0u)
-    public val WGL: OpenglContextProviderFlag = OpenglContextProviderFlag(1u)
-    public val EGL: OpenglContextProviderFlag = OpenglContextProviderFlag(2u)
+    public val NONE: OpenGlContextProviderFlag = OpenGlContextProviderFlag(0u)
+    public val WGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(1u)
+    public val EGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(2u)
     /** Browser WebGL context imported into an Emscripten module. */
-    public val WEBGL: OpenglContextProviderFlag = OpenglContextProviderFlag(4u)
+    public val WEBGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(4u)
   }
 }
 
@@ -1546,22 +1546,22 @@ public value class ViewportMode(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
-public value class WebglContextKind(public val rawValue: UInt) {
+public value class WebGlContextKind(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "EXISTING"
       1u -> "TRANSFERRED_CANVAS"
-      else -> "WebglContextKind($rawValue)"
+      else -> "WebGlContextKind($rawValue)"
     }
 
   public companion object {
     /** Use a host-created context on its current browser agent. */
-    public val EXISTING: WebglContextKind = WebglContextKind(0u)
+    public val EXISTING: WebGlContextKind = WebGlContextKind(0u)
     /**
      * Transfer the canvas named by canvas_selector to a native worker and create a WebGL 2 context
      * there.
      */
-    public val TRANSFERRED_CANVAS: WebglContextKind = WebglContextKind(1u)
+    public val TRANSFERRED_CANVAS: WebGlContextKind = WebGlContextKind(1u)
   }
 }
 
@@ -1616,7 +1616,7 @@ public class MetalTextureFrame(
  * See `mln_opengl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class OpenglTextureFrame(
+public class OpenGlTextureFrame(
   /** Session generation that produced this frame. */
   public val generation: ULong,
   /** Physical OpenGL texture width in device pixels. */
@@ -1896,7 +1896,7 @@ public class VulkanTextureFrame(
  * See `mln_webgpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class WebgpuTextureFrame(
+public class WebGpuTextureFrame(
   /** Session generation that produced this frame. */
   public val generation: ULong,
   /** Physical WebGPU texture width in device pixels. */
@@ -1950,7 +1950,7 @@ public class WebgpuTextureFrame(
  * See `mln_geojson_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public data class GeojsonSourceOptions(
+public data class GeoJsonSourceOptions(
   /** Minimum tiling zoom. Absent selects 0. */
   public val minZoom: Double? = null,
   /** Maximum tiling zoom, an integer within &#91;0, 24&#93;. Absent selects 18. */
@@ -2335,7 +2335,7 @@ public data class EglContextDescriptor(
    * Client API the session creates its context for. Required under dedicated ownership. A shared
    * session queries share_context for it, so this is ignored there.
    */
-  public val clientApi: OpenglClientApi = OpenglClientApi.UNSPECIFIED,
+  public val clientApi: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED,
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   public val getProcAddress: NativePointer,
 )
@@ -2346,8 +2346,8 @@ public data class EglContextDescriptor(
  * See `mln_webgl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class WebglContextDescriptor(
-  public val kind: WebglContextKind = WebglContextKind.EXISTING,
+public data class WebGlContextDescriptor(
+  public val kind: WebGlContextKind = WebGlContextKind.EXISTING,
   /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive. */
   public val context: Int = 0,
   /**
@@ -2363,12 +2363,12 @@ public data class WebglContextDescriptor(
  * See `mln_opengl_context_descriptor_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public sealed interface OpenglContextDescriptorData {
-  public data class Wgl(public val value: WglContextDescriptor) : OpenglContextDescriptorData
+public sealed interface OpenGlContextDescriptorData {
+  public data class Wgl(public val value: WglContextDescriptor) : OpenGlContextDescriptorData
 
-  public data class Egl(public val value: EglContextDescriptor) : OpenglContextDescriptorData
+  public data class Egl(public val value: EglContextDescriptor) : OpenGlContextDescriptorData
 
-  public data class Webgl(public val value: WebglContextDescriptor) : OpenglContextDescriptorData
+  public data class WebGl(public val value: WebGlContextDescriptor) : OpenGlContextDescriptorData
 }
 
 /**
@@ -2377,13 +2377,13 @@ public sealed interface OpenglContextDescriptorData {
  * See `mln_opengl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class OpenglContextDescriptor(
+public data class OpenGlContextDescriptor(
   /**
    * Whether the session shares its driver thread and graphics objects with the host. A private EGL
    * or WGL owned texture and a transferred WebGL canvas are dedicated to their core worker.
    */
-  public val ownership: OpenglContextOwnership = OpenglContextOwnership.SHARED,
-  public val data: OpenglContextDescriptorData,
+  public val ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED,
+  public val data: OpenGlContextDescriptorData,
 )
 
 /**
@@ -2392,7 +2392,7 @@ public data class OpenglContextDescriptor(
  * See `mln_opengl_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class OpenglBorrowedTexture(
+public data class OpenGlBorrowedTexture(
   /** Borrowed OpenGL texture object name. Required. */
   public val texture: UInt,
 )
@@ -2403,7 +2403,7 @@ public data class OpenglBorrowedTexture(
  * See `mln_opengl_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class OpenglBorrowedTextureDescriptor(
+public data class OpenGlBorrowedTextureDescriptor(
   /**
    * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
@@ -2417,9 +2417,9 @@ public data class OpenglBorrowedTextureDescriptor(
    * Borrowed OpenGL context provider data. The textures must belong to this context or a context in
    * the same share group.
    */
-  public val context: OpenglContextDescriptor,
+  public val context: OpenGlContextDescriptor,
   /** The ring's textures, one per slot, in slot order. Required. */
-  public val textures: List<OpenglBorrowedTexture>,
+  public val textures: List<OpenGlBorrowedTexture>,
   /** OpenGL texture target of every texture. Required: GL_TEXTURE_2D. */
   public val target: UInt,
 )
@@ -2430,7 +2430,7 @@ public data class OpenglBorrowedTextureDescriptor(
  * See `mln_opengl_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class OpenglOwnedTextureDescriptor(
+public data class OpenGlOwnedTextureDescriptor(
   /**
    * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
    * logged as a warning.
@@ -2441,7 +2441,7 @@ public data class OpenglOwnedTextureDescriptor(
    * the host can acquire. Dedicated EGL, WGL, or transferred WebGL ownership creates a private
    * core-worker context for CPU readback.
    */
-  public val context: OpenglContextDescriptor,
+  public val context: OpenGlContextDescriptor,
 )
 
 /**
@@ -2450,14 +2450,14 @@ public data class OpenglOwnedTextureDescriptor(
  * See `mln_opengl_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
-public data class OpenglSurfaceDescriptor(
+public data class OpenGlSurfaceDescriptor(
   /**
    * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
    * logged as a warning.
    */
   public val extent: LogicalExtent,
   /** Borrowed OpenGL context provider data. */
-  public val context: OpenglContextDescriptor,
+  public val context: OpenGlContextDescriptor,
   /**
    * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL, both required. Null
    * for WebGL, whose context carries its canvas binding.
@@ -2582,7 +2582,7 @@ public data class VulkanSurfaceDescriptor(
  * See `mln_webgpu_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class WebgpuContextDescriptor(
+public data class WebGpuContextDescriptor(
   /** Borrowed WGPUInstance. Optional for texture targets. */
   public val instance: NativePointer,
   /** Borrowed WGPUDevice. Required. */
@@ -2600,7 +2600,7 @@ public data class WebgpuContextDescriptor(
  * See `mln_webgpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class WebgpuBorrowedTexture(
+public data class WebGpuBorrowedTexture(
   /** Borrowed WGPUTexture. Required. */
   public val texture: NativePointer,
   /**
@@ -2616,7 +2616,7 @@ public data class WebgpuBorrowedTexture(
  * See `mln_webgpu_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class WebgpuBorrowedTextureDescriptor(
+public data class WebGpuBorrowedTextureDescriptor(
   /**
    * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
@@ -2630,9 +2630,9 @@ public data class WebgpuBorrowedTextureDescriptor(
    * Borrowed WebGPU context. device is required. Rendering is submitted through context.queue or
    * that device's default queue.
    */
-  public val context: WebgpuContextDescriptor,
+  public val context: WebGpuContextDescriptor,
   /** The ring's textures, one per slot, in slot order. Required. */
-  public val textures: List<WebgpuBorrowedTexture>,
+  public val textures: List<WebGpuBorrowedTexture>,
   /** Backend-native WGPUTextureFormat value of every texture. Required, so Undefined is invalid. */
   public val format: UInt,
 )
@@ -2643,14 +2643,14 @@ public data class WebgpuBorrowedTextureDescriptor(
  * See `mln_webgpu_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public data class WebgpuOwnedTextureDescriptor(
+public data class WebGpuOwnedTextureDescriptor(
   /**
    * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
    * logged as a warning.
    */
   public val extent: LogicalExtent,
   /** Borrowed WebGPU context. device is required. */
-  public val context: WebgpuContextDescriptor,
+  public val context: WebGpuContextDescriptor,
 )
 
 /**
@@ -2659,14 +2659,14 @@ public data class WebgpuOwnedTextureDescriptor(
  * See `mln_webgpu_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
-public data class WebgpuSurfaceDescriptor(
+public data class WebGpuSurfaceDescriptor(
   /**
    * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
    * logged as a warning.
    */
   public val extent: LogicalExtent,
   /** Borrowed WebGPU context. device is required. */
-  public val context: WebgpuContextDescriptor,
+  public val context: WebGpuContextDescriptor,
   /**
    * Borrowed WGPUSurface. Required, and must stay alive for the session. The session configures it
    * for this device and extent, and unconfigures it when the session ends.
@@ -2989,7 +2989,7 @@ public data class StyleSourceInfo(
   /** URL that the source loads from, or empty when it has none. */
   public val url: String,
   /** Inline TileJSON metadata, when the source was defined with it. */
-  public val tilejson: StyleSourceTileInfo?,
+  public val tileJson: StyleSourceTileInfo?,
   /** Geographic bounds, when inline TileJSON sets them. */
   public val bounds: LatLngBounds?,
   /** Tile size in pixels, for a tile source. */

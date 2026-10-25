@@ -41,7 +41,7 @@ final Object _wglSkip = buildHasCoreWorkerTexture
 /// An OpenGL session exposes frames only from a context that it shares with
 /// the host, which only a caller-driven session can drive. A core-worker EGL
 /// session keeps its frames in its own context and offers readback instead.
-final Object _openglFrameSkip = buildExposesCoreWorkerFrames
+final Object _openGlFrameSkip = buildExposesCoreWorkerFrames
     ? false
     : 'An OpenGL core-worker session exposes no frames to view';
 
@@ -169,7 +169,7 @@ void main() {
       );
       expect(frame.getResult, throwsA(isA<MaplibreException>()));
     },
-    skip: _openglFrameSkip,
+    skip: _openGlFrameSkip,
   );
 }
 

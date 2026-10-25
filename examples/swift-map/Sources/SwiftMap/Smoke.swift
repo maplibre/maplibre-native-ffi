@@ -3,7 +3,7 @@ import MaplibreNativeFFI
 import QuartzCore
 
 /// A style with only a background layer, so the smoke run needs no network.
-private let smokeStyleJSON = ##"""
+private let smokeStyleJson = ##"""
 {"version":8,"sources":{},"layers":[{"id":"background","type":"background",
 "paint":{"background-color":"#2a6f97"}}]}
 """##
@@ -28,7 +28,7 @@ func runSmoke(mode: RenderTargetMode) async -> Int32 {
       mode: mode,
       graphics: graphics,
       viewport: viewport,
-      styleJSON: smokeStyleJSON
+      styleJson: smokeStyleJson
     )
     let rendered = await firstFrame(of: loop, within: .seconds(60))
     try await loop.close()

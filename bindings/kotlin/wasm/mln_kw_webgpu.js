@@ -1,5 +1,5 @@
 // The WebGPU imports of the Kotlin/Wasm binding's WebGraphics, which the
-// module of a WebGPU build links and exports as Module.mlnKwWebgpu.
+// module of a WebGPU build links and exports as Module.mlnKwWebGpu.
 //
 // emdawnwebgpu keeps every WebGPU object of the module in its own table, so
 // only the module can turn a page's GPUDevice or GPUCanvasContext into the
@@ -9,14 +9,14 @@
 // Each import passes no parent. Sessions use spontaneous callbacks, which an
 // object without an instance still receives.
 addToLibrary({
-  $mlnKwWebgpu__deps: [
+  $mlnKwWebGpu__deps: [
     "$WebGPU",
     "wgpuDeviceRelease",
     "wgpuSurfaceRelease",
     "wgpuTextureRelease",
     "wgpuTextureViewRelease",
   ],
-  $mlnKwWebgpu: {
+  $mlnKwWebGpu: {
     // Each import returns a handle that holds one reference, or 0 when the
     // object is not of its kind in this realm.
     importDevice: (device) =>

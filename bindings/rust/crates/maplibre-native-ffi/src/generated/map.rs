@@ -67,7 +67,7 @@ impl MapHandle {
     pub fn add_geojson_source_data(
         &self,
         source_id: &str,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let data = data.inner.native();
@@ -85,7 +85,7 @@ impl MapHandle {
         &self,
         source_id: &str,
         url: &str,
-        options: Option<&GeojsonSourceOptions>,
+        options: Option<&GeoJsonSourceOptions>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -331,7 +331,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_opengl_borrowed_texture(
         &self,
-        descriptor: &OpenglBorrowedTextureDescriptor,
+        descriptor: &OpenGlBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -364,7 +364,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_opengl_owned_texture(
         &self,
-        descriptor: &OpenglOwnedTextureDescriptor,
+        descriptor: &OpenGlOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -397,7 +397,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_opengl_surface(
         &self,
-        descriptor: &OpenglSurfaceDescriptor,
+        descriptor: &OpenGlSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -548,7 +548,7 @@ impl MapHandle {
     #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_borrowed_texture(
         &self,
-        descriptor: &WebgpuBorrowedTextureDescriptor,
+        descriptor: &WebGpuBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -582,7 +582,7 @@ impl MapHandle {
     #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_owned_texture(
         &self,
-        descriptor: &WebgpuOwnedTextureDescriptor,
+        descriptor: &WebGpuOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -616,7 +616,7 @@ impl MapHandle {
     #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_surface(
         &self,
-        descriptor: &WebgpuSurfaceDescriptor,
+        descriptor: &WebGpuSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
@@ -1485,7 +1485,7 @@ impl MapHandle {
     pub fn set_geojson_source_data(
         &self,
         source_id: &str,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let data = data.inner.native();
@@ -1901,7 +1901,7 @@ impl MapHandleDiscarding<'_> {
     pub fn add_geojson_source_data(
         &self,
         source_id: &str,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let data = data.inner.native();
@@ -1919,7 +1919,7 @@ impl MapHandleDiscarding<'_> {
         &self,
         source_id: &str,
         url: &str,
-        options: Option<&GeojsonSourceOptions>,
+        options: Option<&GeoJsonSourceOptions>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
@@ -2430,7 +2430,7 @@ impl MapHandleDiscarding<'_> {
     pub fn set_geojson_source_data(
         &self,
         source_id: &str,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let data = data.inner.native();

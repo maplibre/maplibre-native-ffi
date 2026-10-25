@@ -25,21 +25,21 @@ public object GeneratedApi {
    * See `mln_geojson_source_data_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun geojsonSourceDataCreate(
+  public fun geoJsonSourceDataCreate(
     data: String,
-    options: GeojsonSourceOptions? = null,
-  ): GeojsonSourceDataHandle =
+    options: GeoJsonSourceOptions? = null,
+  ): GeoJsonSourceDataHandle =
     nativeCall(null, null) {
       val out = allocate(8, 8)
       check(
         C.mln_geojson_source_data_create(
           view(data),
-          options?.let { writeGeojsonSourceOptions(it) } ?: 0L,
+          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
           out,
           diagnostic,
         ),
       )
-      adopt(out, GeneratedOwnerDisposal::geojsonSourceData) { GeojsonSourceDataHandle(it) }
+      adopt(out, GeneratedOwnerDisposal::geoJsonSourceData) { GeoJsonSourceDataHandle(it) }
     }
 
   /**
@@ -131,10 +131,10 @@ public object GeneratedApi {
    * See `mln_opengl_supported_context_provider_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
-  public fun openglSupportedContextProviderMask(): OpenglContextProviderFlag =
+  public fun openGlSupportedContextProviderMask(): OpenGlContextProviderFlag =
     nativeCall(null, null) {
       val raw = C.mln_opengl_supported_context_provider_mask()
-      OpenglContextProviderFlag(raw.toUInt())
+      OpenGlContextProviderFlag(raw.toUInt())
     }
 
   /**

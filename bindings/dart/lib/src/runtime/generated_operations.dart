@@ -14,9 +14,9 @@ MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
       pixelFormat: source.pixel_format,
     );
 
-OpenglTextureFrame _readOpenglTextureFrame(
+OpenGlTextureFrame _readOpenGlTextureFrame(
   raw.mln_opengl_texture_frame source,
-) => OpenglTextureFrame(
+) => OpenGlTextureFrame(
   generation: source.generation,
   width: source.width,
   height: source.height,
@@ -261,8 +261,8 @@ VulkanTextureFrame _readVulkanTextureFrame(
   layout: source.layout,
 );
 
-Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
-  GeojsonSourceOptions value,
+Pointer<raw.mln_geojson_source_options> _writeGeoJsonSourceOptions(
+  GeoJsonSourceOptions value,
   Allocator arena, {
   Pointer<raw.mln_geojson_source_options>? into,
 }) {
@@ -858,8 +858,8 @@ Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
   return result;
 }
 
-Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
-  WebglContextDescriptor value,
+Pointer<raw.mln_webgl_context_descriptor> _writeWebGlContextDescriptor(
+  WebGlContextDescriptor value,
   Allocator arena, {
   Pointer<raw.mln_webgl_context_descriptor>? into,
 }) {
@@ -873,8 +873,8 @@ Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   return result;
 }
 
-Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
-  OpenglContextDescriptor value,
+Pointer<raw.mln_opengl_context_descriptor> _writeOpenGlContextDescriptor(
+  OpenGlContextDescriptor value,
   Allocator arena, {
   Pointer<raw.mln_opengl_context_descriptor>? into,
 }) {
@@ -882,21 +882,21 @@ Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
 
   result.ref.ownership = value.ownership.rawValue;
   switch (value.data) {
-    case OpenglContextDescriptorDataWgl(:final value):
+    case OpenGlContextDescriptorDataWgl(:final value):
       result.ref.platform = 1;
       result.ref.data.wgl = _writeWglContextDescriptor(value, arena).ref;
-    case OpenglContextDescriptorDataEgl(:final value):
+    case OpenGlContextDescriptorDataEgl(:final value):
       result.ref.platform = 2;
       result.ref.data.egl = _writeEglContextDescriptor(value, arena).ref;
-    case OpenglContextDescriptorDataWebgl(:final value):
+    case OpenGlContextDescriptorDataWebGl(:final value):
       result.ref.platform = 3;
-      result.ref.data.webgl = _writeWebglContextDescriptor(value, arena).ref;
+      result.ref.data.webgl = _writeWebGlContextDescriptor(value, arena).ref;
   }
   return result;
 }
 
-Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
-  OpenglBorrowedTexture value,
+Pointer<raw.mln_opengl_borrowed_texture> _writeOpenGlBorrowedTexture(
+  OpenGlBorrowedTexture value,
   Allocator arena, {
   Pointer<raw.mln_opengl_borrowed_texture>? into,
 }) {
@@ -906,8 +906,8 @@ Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
 }
 
 Pointer<raw.mln_opengl_borrowed_texture_descriptor>
-_writeOpenglBorrowedTextureDescriptor(
-  OpenglBorrowedTextureDescriptor value,
+_writeOpenGlBorrowedTextureDescriptor(
+  OpenGlBorrowedTextureDescriptor value,
   Allocator arena, {
   Pointer<raw.mln_opengl_borrowed_texture_descriptor>? into,
 }) {
@@ -924,13 +924,13 @@ _writeOpenglBorrowedTextureDescriptor(
     0,
     4294967295,
   );
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  result.ref.context = _writeOpenGlContextDescriptor(value.context, arena).ref;
   result.ref.textures = arena<raw.mln_opengl_borrowed_texture>(
     value.textures.isEmpty ? 1 : value.textures.length,
   );
   result.ref.texture_count = value.textures.length;
   for (var index = 0; index < value.textures.length; index++) {
-    _writeOpenglBorrowedTexture(
+    _writeOpenGlBorrowedTexture(
       value.textures[index],
       arena,
       into: result.ref.textures + index,
@@ -941,27 +941,27 @@ _writeOpenglBorrowedTextureDescriptor(
 }
 
 Pointer<raw.mln_opengl_owned_texture_descriptor>
-_writeOpenglOwnedTextureDescriptor(
-  OpenglOwnedTextureDescriptor value,
+_writeOpenGlOwnedTextureDescriptor(
+  OpenGlOwnedTextureDescriptor value,
   Allocator arena, {
   Pointer<raw.mln_opengl_owned_texture_descriptor>? into,
 }) {
   final result = into ?? arena<raw.mln_opengl_owned_texture_descriptor>();
   result.ref.size = sizeOf<raw.mln_opengl_owned_texture_descriptor>();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  result.ref.context = _writeOpenGlContextDescriptor(value.context, arena).ref;
   return result;
 }
 
-Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
-  OpenglSurfaceDescriptor value,
+Pointer<raw.mln_opengl_surface_descriptor> _writeOpenGlSurfaceDescriptor(
+  OpenGlSurfaceDescriptor value,
   Allocator arena, {
   Pointer<raw.mln_opengl_surface_descriptor>? into,
 }) {
   final result = into ?? arena<raw.mln_opengl_surface_descriptor>();
   result.ref.size = sizeOf<raw.mln_opengl_surface_descriptor>();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  result.ref.context = _writeOpenGlContextDescriptor(value.context, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
 }
@@ -1498,7 +1498,7 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
       isVolatile: source.is_volatile,
       attribution: utf8.decode(_copyBufferView(source.attribution)),
       url: utf8.decode(_copyBufferView(source.url)),
-      tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
+      tileJson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
           ? _readStyleSourceTileInfo(source.tilejson)
           : null,
       bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
@@ -2595,23 +2595,23 @@ int cVersion() {
 ///
 /// See `mln_geojson_source_data_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-GeojsonSourceDataHandle geojsonSourceDataCreate(
+GeoJsonSourceDataHandle geoJsonSourceDataCreate(
   Object? data, {
-  GeojsonSourceOptions? options,
+  GeoJsonSourceOptions? options,
 }) => withNativeArena((arena) {
   ensureAbiVersion();
   final outData = arena<Uint64>();
   _check(
     raw.mln_geojson_source_data_create(
       _nativeJsonView(data, arena),
-      options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
+      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
       outData,
       nativeDiagnostic,
     ),
   );
   return _adoptOwned(
     outData.value,
-    () => GeojsonSourceDataHandle._(_NativeGeojsonSourceData(outData.value)),
+    () => GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData(outData.value)),
     (handle) {
       raw.mln_geojson_source_data_release(handle);
     },
@@ -2742,10 +2742,10 @@ void networkSetStatus(NetworkStatus status) {
 ///
 /// See `mln_opengl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-OpenglContextProviderFlag openglSupportedContextProviderMask() {
+OpenGlContextProviderFlag openGlSupportedContextProviderMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_opengl_supported_context_provider_mask();
-  return OpenglContextProviderFlag.fromRawValue(nativeResult);
+  return OpenGlContextProviderFlag.fromRawValue(nativeResult);
 }
 
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
@@ -2904,16 +2904,16 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_opengl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  T withOpenglTexture<T>(T Function(ScopedOpenglTextureFrame view) use) =>
+  T withOpenGlTexture<T>(T Function(ScopedOpenGlTextureFrame view) use) =>
       _NativeViewScope(
         _state,
         raw.mln_acquired_frame_view_begin,
         raw.mln_acquired_frame_view_end,
       ).use(
-        (scope) => use(ScopedOpenglTextureFrame._(scope, _getOpenglTexture())),
+        (scope) => use(ScopedOpenGlTextureFrame._(scope, _getOpenGlTexture())),
       );
 
-  OpenglTextureFrame _getOpenglTexture() => withNativeArena((arena) {
+  OpenGlTextureFrame _getOpenGlTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_opengl_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_opengl_texture_frame>();
     _check(
@@ -2923,7 +2923,7 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return _readOpenglTextureFrame(outFrame.ref);
+    return _readOpenGlTextureFrame(outFrame.ref);
   });
 
   /// Copies the producer synchronization for an acquired texture frame.
@@ -3010,7 +3010,7 @@ final class AcquiredFrameHandle implements Finalizable {
 }
 
 /// Issued `mln_geojson_source_data` handle id.
-extension type const _NativeGeojsonSourceData(int raw)
+extension type const _NativeGeoJsonSourceData(int raw)
     implements NativeHandle {}
 
 /// Owner of one native `mln_geojson_source_data` handle.
@@ -3019,12 +3019,12 @@ extension type const _NativeGeojsonSourceData(int raw)
 ///
 /// See `mln_geojson_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class GeojsonSourceDataHandle implements Finalizable {
-  GeojsonSourceDataHandle._(_NativeGeojsonSourceData handle)
-    : _state = NativeHandleState(handle, 'GeojsonSourceDataHandle');
-  final NativeHandleState<_NativeGeojsonSourceData> _state;
+final class GeoJsonSourceDataHandle implements Finalizable {
+  GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData handle)
+    : _state = NativeHandleState(handle, 'GeoJsonSourceDataHandle');
+  final NativeHandleState<_NativeGeoJsonSourceData> _state;
   // ignore: unused_element
-  _NativeGeojsonSourceData get _handle => _state.handle;
+  _NativeGeoJsonSourceData get _handle => _state.handle;
 
   /// The native handle id.
   int get id => _state.handleId;
@@ -3035,7 +3035,7 @@ final class GeojsonSourceDataHandle implements Finalizable {
 
   @override
   String toString() =>
-      'GeojsonSourceDataHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+      'GeoJsonSourceDataHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Releases prepared GeoJSON source data.
   ///
@@ -3084,7 +3084,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       ),
     );
   });
-  void addGeojsonSourceData(String sourceId, GeojsonSourceDataHandle data) =>
+  void addGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) =>
       _discard(
         (arena, completion) => raw.mln_map_add_geojson_source_data(
           _handle.raw,
@@ -3094,16 +3094,16 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
           nativeDiagnostic,
         ),
       );
-  void addGeojsonSourceUrl(
+  void addGeoJsonSourceUrl(
     String sourceId,
     String url, {
-    GeojsonSourceOptions? options,
+    GeoJsonSourceOptions? options,
   }) => _discard(
     (arena, completion) => raw.mln_map_add_geojson_source_url(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
+      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -3399,7 +3399,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setGeojsonSourceData(String sourceId, GeojsonSourceDataHandle data) =>
+  void setGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) =>
       _discard(
         (arena, completion) => raw.mln_map_set_geojson_source_data(
           _handle.raw,
@@ -3409,7 +3409,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
           nativeDiagnostic,
         ),
       );
-  void setGeojsonSourceSynchronousTiling(String sourceId, bool enabled) =>
+  void setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) =>
       _discard(
         (arena, completion) =>
             raw.mln_map_set_geojson_source_synchronous_tiling(
@@ -3420,7 +3420,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
               nativeDiagnostic,
             ),
       );
-  void setGeojsonSourceUrl(String sourceId, String url) => _discard(
+  void setGeoJsonSourceUrl(String sourceId, String url) => _discard(
     (arena, completion) => raw.mln_map_set_geojson_source_url(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
@@ -3685,9 +3685,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_add_geojson_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addGeojsonSourceData(
+  Future<CommandCompletion> addGeoJsonSourceData(
     String sourceId,
-    GeojsonSourceDataHandle data,
+    GeoJsonSourceDataHandle data,
   ) => _command(
     (arena, completion) => raw.mln_map_add_geojson_source_data(
       _handle.raw,
@@ -3702,16 +3702,16 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_add_geojson_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addGeojsonSourceUrl(
+  Future<CommandCompletion> addGeoJsonSourceUrl(
     String sourceId,
     String url, {
-    GeojsonSourceOptions? options,
+    GeoJsonSourceOptions? options,
   }) => _command(
     (arena, completion) => raw.mln_map_add_geojson_source_url(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
+      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -3929,8 +3929,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  NewRenderSession attachOpenglBorrowedTexture(
-    OpenglBorrowedTextureDescriptor descriptor,
+  NewRenderSession attachOpenGlBorrowedTexture(
+    OpenGlBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
     final registrations = _NativeRegistrations(_CallbackRoots());
@@ -3938,7 +3938,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_borrowed_texture(
           _handle.raw,
-          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+          _writeOpenGlBorrowedTextureDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -3964,8 +3964,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  NewRenderSession attachOpenglOwnedTexture(
-    OpenglOwnedTextureDescriptor descriptor,
+  NewRenderSession attachOpenGlOwnedTexture(
+    OpenGlOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
     final registrations = _NativeRegistrations(_CallbackRoots());
@@ -3973,7 +3973,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_owned_texture(
           _handle.raw,
-          _writeOpenglOwnedTextureDescriptor(descriptor, arena),
+          _writeOpenGlOwnedTextureDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -3999,8 +3999,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  NewRenderSession attachOpenglSurface(
-    OpenglSurfaceDescriptor descriptor,
+  NewRenderSession attachOpenGlSurface(
+    OpenGlSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
     final registrations = _NativeRegistrations(_CallbackRoots());
@@ -4008,7 +4008,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_surface(
           _handle.raw,
-          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          _writeOpenGlSurfaceDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -4820,9 +4820,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_geojson_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setGeojsonSourceData(
+  Future<CommandCompletion> setGeoJsonSourceData(
     String sourceId,
-    GeojsonSourceDataHandle data,
+    GeoJsonSourceDataHandle data,
   ) => _command(
     (arena, completion) => raw.mln_map_set_geojson_source_data(
       _handle.raw,
@@ -4837,7 +4837,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_geojson_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setGeojsonSourceSynchronousTiling(
+  Future<CommandCompletion> setGeoJsonSourceSynchronousTiling(
     String sourceId,
     bool enabled,
   ) => _command(
@@ -4854,7 +4854,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_geojson_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setGeojsonSourceUrl(String sourceId, String url) =>
+  Future<CommandCompletion> setGeoJsonSourceUrl(String sourceId, String url) =>
       _command(
         (arena, completion) => raw.mln_map_set_geojson_source_url(
           _handle.raw,
@@ -5779,13 +5779,13 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> setOpenglBorrowedTextureTarget(
-    OpenglBorrowedTextureDescriptor descriptor,
+  Future<void> setOpenGlBorrowedTextureTarget(
+    OpenGlBorrowedTextureDescriptor descriptor,
   ) => _run(
     (arena, completion) =>
         raw.mln_render_session_set_opengl_borrowed_texture_target(
           _handle.raw,
-          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+          _writeOpenGlBorrowedTextureDescriptor(descriptor, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -5795,11 +5795,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_set_opengl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> setOpenglSurfaceTarget(OpenglSurfaceDescriptor descriptor) =>
+  Future<void> setOpenGlSurfaceTarget(OpenGlSurfaceDescriptor descriptor) =>
       _run(
         (arena, completion) => raw.mln_render_session_set_opengl_surface_target(
           _handle.raw,
-          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          _writeOpenGlSurfaceDescriptor(descriptor, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -6615,12 +6615,12 @@ final class ScopedMetalTextureFrame {
   int get pixelFormat => _value.pixelFormat;
 }
 
-/// A `OpenglTextureFrame` whose native objects are readable only while the
-/// callback of `AcquiredFrameHandle.withOpenglTexture` runs. Its
+/// A `OpenGlTextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withOpenGlTexture` runs. Its
 /// other members stay readable after the callback returns.
-final class ScopedOpenglTextureFrame {
-  ScopedOpenglTextureFrame._(this._scope, this._value);
-  final OpenglTextureFrame _value;
+final class ScopedOpenGlTextureFrame {
+  ScopedOpenGlTextureFrame._(this._scope, this._value);
+  final OpenGlTextureFrame _value;
   final _NativeViewScope _scope;
   int get generation => _value.generation;
   int get width => _value.width;

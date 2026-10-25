@@ -46,9 +46,9 @@ def _backends() -> list[str]:
         backends.append("vulkan")
     if mask & mln.RenderBackendFlag.OPENGL:
         providers = mln.opengl_supported_context_provider_mask()
-        if providers & mln.OpenglContextProviderFlag.EGL:
+        if providers & mln.OpenGlContextProviderFlag.EGL:
             backends.append("egl")
-        if providers & mln.OpenglContextProviderFlag.WGL:
+        if providers & mln.OpenGlContextProviderFlag.WGL:
             backends.append("wgl")
     return backends
 
@@ -64,25 +64,25 @@ _GRAPHICS = {
 
 def _opengl_context(backend: str, context: graphics.Context) -> object:
     if backend == "egl":
-        platform: object = mln.OpenglContextDescriptorEglVariant(
+        platform: object = mln.OpenGlContextDescriptorEglVariant(
             mln.EglContextDescriptor(
                 display=context.egl_display or 0,
                 config=context.egl_config or 0,
                 share_context=context.egl_context or 0,
-                client_api=mln.OpenglClientApi.GLES,
+                client_api=mln.OpenGlClientApi.GLES,
                 get_proc_address=context.get_proc_address or 0,
             )
         )
     else:
-        platform = mln.OpenglContextDescriptorWglVariant(
+        platform = mln.OpenGlContextDescriptorWglVariant(
             mln.WglContextDescriptor(
                 device_context=context.wgl_device_context or 0,
                 share_context=context.wgl_context or 0,
                 get_proc_address=context.get_proc_address or 0,
             )
         )
-    return mln.OpenglContextDescriptor(
-        ownership=mln.OpenglContextOwnership.SHARED, data=platform
+    return mln.OpenGlContextDescriptor(
+        ownership=mln.OpenGlContextOwnership.SHARED, data=platform
     )
 
 
@@ -201,7 +201,7 @@ class OwnedTexture:
                 options,
             )
         return self.map.attach_opengl_owned_texture(
-            mln.OpenglOwnedTextureDescriptor(
+            mln.OpenGlOwnedTextureDescriptor(
                 extent=extent, context=_opengl_context(self.backend, context)
             ),
             options,

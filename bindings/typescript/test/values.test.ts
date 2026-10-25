@@ -6,7 +6,7 @@ import {
   CameraTransitionOutcome,
   type CameraTransitionEnd,
   CameraUpdateMode,
-  geojsonSourceDataCreate,
+  geoJsonSourceDataCreate,
   type LatLng,
   MaplibreError,
   mapProjectionCreate,
@@ -148,7 +148,7 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
   // rather than truncated into a valid one.
   assert.throws(
     () =>
-      geojsonSourceDataCreate(
+      geoJsonSourceDataCreate(
         { type: "FeatureCollection", features: [] },
         { buffer: 2 ** 32 },
       ),

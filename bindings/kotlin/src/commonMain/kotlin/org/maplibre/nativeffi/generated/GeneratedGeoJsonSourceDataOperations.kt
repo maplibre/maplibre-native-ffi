@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
-public abstract class GeneratedGeojsonSourceDataOperations internal constructor() {
+public abstract class GeneratedGeoJsonSourceDataOperations internal constructor() {
   internal abstract val binding: HandleState
 
   /**

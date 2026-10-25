@@ -27,11 +27,11 @@ public extension Maplibre {
   ///
   /// See `mln_opengl_supported_context_provider_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func openglSupportedContextProviderMask()
-    -> OpenglContextProviderFlag
+  static func openGlSupportedContextProviderMask()
+    -> OpenGlContextProviderFlag
   {
     nativeDirect {
-      OpenglContextProviderFlag(
+      OpenGlContextProviderFlag(
         rawValue: mln_opengl_supported_context_provider_mask()
       )
     }

@@ -44,7 +44,7 @@ namespace Maplibre.NativeFfi;
 /// <param name="Type">
 /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
 /// </param>
-public readonly partial record struct OpenglTextureFrame(
+public readonly partial record struct OpenGlTextureFrame(
     ulong Generation,
     uint Width,
     uint Height,

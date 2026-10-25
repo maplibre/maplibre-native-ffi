@@ -6,7 +6,7 @@
 // session and hold it for the session's lifetime.
 //
 // Acquired frames expose their texture only inside a callback such as
-// [AcquiredFrameHandle.WithOpenglTexture], on the callback's OS thread. Keep
+// [AcquiredFrameHandle.WithOpenGlTexture], on the callback's OS thread. Keep
 // servicing a caller-driver render session while its attachment or detachment
 // is pending.
 //

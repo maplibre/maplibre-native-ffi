@@ -9,12 +9,12 @@ import org.maplibre.nativeffi.internal.lifecycle.*
  * See `mln_geojson_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-public class GeojsonSourceDataHandle
+public class GeoJsonSourceDataHandle
 internal constructor(
   handle: Long,
-) : GeneratedGeojsonSourceDataOperations(), AutoCloseable {
+) : GeneratedGeoJsonSourceDataOperations(), AutoCloseable {
   internal override val binding =
-    HandleState("GeojsonSourceDataHandle", handle, GeneratedOwnerDisposal::geojsonSourceData)
+    HandleState("GeoJsonSourceDataHandle", handle, GeneratedOwnerDisposal::geoJsonSourceData)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /** The native handle value. It stays readable after close. */
   public val id: ULong
@@ -29,5 +29,5 @@ internal constructor(
   }
 
   override fun toString(): String =
-    "GeojsonSourceDataHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+    "GeoJsonSourceDataHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 }

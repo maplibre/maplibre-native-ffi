@@ -166,7 +166,7 @@ public sealed class RenderTests
                         );
                         break;
                     default:
-                        frame.WithOpenglTexture(view =>
+                        frame.WithOpenGlTexture(view =>
                             Inside(() => view.Width, () => _ = view.Texture)
                         );
                         break;

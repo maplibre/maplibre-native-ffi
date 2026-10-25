@@ -65,9 +65,9 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_add_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun addGeojsonSourceData(
+  public fun addGeoJsonSourceData(
     sourceId: String,
-    data: GeojsonSourceDataHandle,
+    data: GeoJsonSourceDataHandle,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -87,10 +87,10 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_add_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun addGeojsonSourceUrl(
+  public fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
-    options: GeojsonSourceOptions? = null,
+    options: GeoJsonSourceOptions? = null,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -98,7 +98,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           handle,
           view(sourceId),
           view(url),
-          options?.let { writeGeojsonSourceOptions(it) } ?: 0L,
+          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
         ),
@@ -213,8 +213,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_attach_opengl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun attachOpenglBorrowedTexture(
-    descriptor: OpenglBorrowedTextureDescriptor,
+  public fun attachOpenGlBorrowedTexture(
+    descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession =
     nativeCall(this, binding) {
@@ -222,7 +222,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { out, completion ->
           C.mln_map_attach_opengl_borrowed_texture(
             handle,
-            writeOpenglBorrowedTextureDescriptor(descriptor),
+            writeOpenGlBorrowedTextureDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
             out,
             completion,
@@ -243,8 +243,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_attach_opengl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun attachOpenglOwnedTexture(
-    descriptor: OpenglOwnedTextureDescriptor,
+  public fun attachOpenGlOwnedTexture(
+    descriptor: OpenGlOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession =
     nativeCall(this, binding) {
@@ -252,7 +252,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { out, completion ->
           C.mln_map_attach_opengl_owned_texture(
             handle,
-            writeOpenglOwnedTextureDescriptor(descriptor),
+            writeOpenGlOwnedTextureDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
             out,
             completion,
@@ -273,8 +273,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_attach_opengl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun attachOpenglSurface(
-    descriptor: OpenglSurfaceDescriptor,
+  public fun attachOpenGlSurface(
+    descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession =
     nativeCall(this, binding) {
@@ -282,7 +282,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { out, completion ->
           C.mln_map_attach_opengl_surface(
             handle,
-            writeOpenglSurfaceDescriptor(descriptor),
+            writeOpenGlSurfaceDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
             out,
             completion,
@@ -1103,9 +1103,9 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setGeojsonSourceData(
+  public fun setGeoJsonSourceData(
     sourceId: String,
-    data: GeojsonSourceDataHandle,
+    data: GeoJsonSourceDataHandle,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1125,7 +1125,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_geojson_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setGeojsonSourceSynchronousTiling(
+  public fun setGeoJsonSourceSynchronousTiling(
     sourceId: String,
     enabled: Boolean,
   ): Deferred<CommandCompletion> =
@@ -1147,7 +1147,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setGeojsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
@@ -1495,8 +1495,8 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
       )
     }
 
-  /** [MapHandle.addGeojsonSourceData] without its completion. */
-  public fun addGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
+  /** [MapHandle.addGeoJsonSourceData] without its completion. */
+  public fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_geojson_source_data(
@@ -1509,11 +1509,11 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
       )
     }
 
-  /** [MapHandle.addGeojsonSourceUrl] without its completion. */
-  public fun addGeojsonSourceUrl(
+  /** [MapHandle.addGeoJsonSourceUrl] without its completion. */
+  public fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
-    options: GeojsonSourceOptions? = null,
+    options: GeoJsonSourceOptions? = null,
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1521,7 +1521,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
           handle,
           view(sourceId),
           view(url),
-          options?.let { writeGeojsonSourceOptions(it) } ?: 0L,
+          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
         ),
@@ -1850,8 +1850,8 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
       )
     }
 
-  /** [MapHandle.setGeojsonSourceData] without its completion. */
-  public fun setGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
+  /** [MapHandle.setGeoJsonSourceData] without its completion. */
+  public fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_data(
@@ -1864,8 +1864,8 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
       )
     }
 
-  /** [MapHandle.setGeojsonSourceSynchronousTiling] without its completion. */
-  public fun setGeojsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
+  /** [MapHandle.setGeoJsonSourceSynchronousTiling] without its completion. */
+  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_synchronous_tiling(
@@ -1878,8 +1878,8 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
       )
     }
 
-  /** [MapHandle.setGeojsonSourceUrl] without its completion. */
-  public fun setGeojsonSourceUrl(sourceId: String, url: String): Unit =
+  /** [MapHandle.setGeoJsonSourceUrl] without its completion. */
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),

@@ -38,16 +38,16 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Status }
 
-// ABIVersionMismatchError identifies the incompatible native and binding versions.
-type ABIVersionMismatchError struct {
+// AbiVersionMismatchError identifies the incompatible native and binding versions.
+type AbiVersionMismatchError struct {
 	Expected uint32
 	Actual   uint32
 }
 
-func (e *ABIVersionMismatchError) Error() string {
+func (e *AbiVersionMismatchError) Error() string {
 	return fmt.Sprintf("maplibre: unsupported C ABI version %d; this binding supports %d", e.Actual, e.Expected)
 }
-func (e *ABIVersionMismatchError) Unwrap() error { return StatusUnsupported }
+func (e *AbiVersionMismatchError) Unwrap() error { return StatusUnsupported }
 
 // Native writes a call's diagnostic at call exit, and checkNative copies the
 // message before returning the diagnostic to the pool, so calls reuse

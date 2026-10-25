@@ -10,7 +10,7 @@ use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 use glutin_winit::DisplayBuilder;
-use maplibre_native_ffi::{AcquiredFrameHandle, OpenglContextDescriptor};
+use maplibre_native_ffi::{AcquiredFrameHandle, OpenGlContextDescriptor};
 use raw_window_handle::HasWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -21,26 +21,26 @@ mod platform;
 
 const TEXTURE_TARGET: u32 = glow::TEXTURE_2D;
 
-pub struct OpenGLContext {
-    platform: platform::OpenGLPlatformContext,
+pub struct OpenGlContext {
+    platform: platform::OpenGlPlatformContext,
     context: PossiblyCurrentContext,
     surface: Surface<WindowSurface>,
     gl: Rc<glow::Context>,
 }
 
-pub struct OpenGLTextureCompositor {
+pub struct OpenGlTextureCompositor {
     gl: Rc<glow::Context>,
     program: glow::Program,
     vertex_array: glow::VertexArray,
     viewport: Viewport,
 }
 
-pub struct OpenGLBorrowedTexture {
+pub struct OpenGlHostTexture {
     gl: Rc<glow::Context>,
     texture: glow::Texture,
 }
 
-impl OpenGLContext {
+impl OpenGlContext {
     pub fn new(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
@@ -86,7 +86,7 @@ impl OpenGLContext {
             })
         });
 
-        let platform = platform::OpenGLPlatformContext::new(&window, config)?;
+        let platform = platform::OpenGlPlatformContext::new(&window, config)?;
 
         let context = Self {
             platform,
@@ -98,7 +98,7 @@ impl OpenGLContext {
         Ok((window, context))
     }
 
-    pub fn descriptor(&self) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
+    pub fn descriptor(&self) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
         self.platform.descriptor(&self.context)
     }
 
@@ -143,14 +143,14 @@ impl OpenGLContext {
     }
 }
 
-impl Drop for OpenGLContext {
+impl Drop for OpenGlContext {
     fn drop(&mut self) {
         self.wait_idle();
     }
 }
 
-impl OpenGLTextureCompositor {
-    pub fn new(context: &OpenGLContext, viewport: Viewport) -> Result<Self, Box<dyn Error>> {
+impl OpenGlTextureCompositor {
+    pub fn new(context: &OpenGlContext, viewport: Viewport) -> Result<Self, Box<dyn Error>> {
         context.make_current()?;
         let gl = context.gl();
         let program = create_texture_program(&gl)?;
@@ -187,7 +187,7 @@ impl OpenGLTextureCompositor {
 
     pub fn draw_frame(
         &self,
-        context: &OpenGLContext,
+        context: &OpenGlContext,
         frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
         frame.get_opengl_texture(|metadata| {
@@ -206,7 +206,7 @@ impl OpenGLTextureCompositor {
 
     fn draw_texture(
         &self,
-        context: &OpenGLContext,
+        context: &OpenGlContext,
         texture: u32,
     ) -> maplibre_native_ffi::Result<()> {
         context
@@ -257,7 +257,7 @@ impl OpenGLTextureCompositor {
             .map_err(|error| compositor_error(format!("OpenGL swap buffers failed: {error}")))
     }
 
-    pub fn close(self, context: Option<&OpenGLContext>) {
+    pub fn close(self, context: Option<&OpenGlContext>) {
         if let Some(context) = context {
             let _ = context.make_current();
         }
@@ -269,8 +269,8 @@ impl OpenGLTextureCompositor {
     }
 }
 
-impl OpenGLBorrowedTexture {
-    pub fn new(context: &OpenGLContext, viewport: Viewport) -> Result<Self, Box<dyn Error>> {
+impl OpenGlHostTexture {
+    pub fn new(context: &OpenGlContext, viewport: Viewport) -> Result<Self, Box<dyn Error>> {
         context.make_current()?;
         let gl = context.gl();
         let texture = unsafe { gl.create_texture()? };
@@ -316,7 +316,7 @@ impl OpenGLBorrowedTexture {
         TEXTURE_TARGET
     }
 
-    pub fn close(self, context: Option<&OpenGLContext>) {
+    pub fn close(self, context: Option<&OpenGlContext>) {
         if let Some(context) = context {
             let _ = context.make_current();
         }

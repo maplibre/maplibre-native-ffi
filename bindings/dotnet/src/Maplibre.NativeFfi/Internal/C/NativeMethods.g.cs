@@ -79,12 +79,12 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_geojson_source_data_create(
         mln_buffer_view data,
         mln_geojson_source_options* options,
-        MlnGeojsonSourceData* out_data,
+        MlnGeoJsonSourceData* out_data,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_geojson_source_data_release(MlnGeojsonSourceData data);
+    internal static partial void mln_geojson_source_data_release(MlnGeoJsonSourceData data);
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
@@ -146,7 +146,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_add_geojson_source_data(
         MlnMap map,
         mln_buffer_view source_id,
-        MlnGeojsonSourceData data,
+        MlnGeoJsonSourceData data,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -768,7 +768,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_set_geojson_source_data(
         MlnMap map,
         mln_buffer_view source_id,
-        MlnGeojsonSourceData data,
+        MlnGeoJsonSourceData data,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

@@ -1,12 +1,12 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    MapHandle, OpenglBorrowedTexture, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
-    OpenglOwnedTextureDescriptor, OpenglSurfaceDescriptor, RenderDriverKind,
+    MapHandle, OpenGlBorrowedTexture, OpenGlBorrowedTextureDescriptor, OpenGlContextDescriptor,
+    OpenGlOwnedTextureDescriptor, OpenGlSurfaceDescriptor, RenderDriverKind,
 };
 
 use crate::graphics::GraphicsContext;
-use crate::opengl::{OpenGLBorrowedTexture, OpenGLContext, OpenGLTextureCompositor};
+use crate::opengl::{OpenGlContext, OpenGlHostTexture, OpenGlTextureCompositor};
 use crate::render_target::{
     Mode, RING_DEPTH, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
@@ -15,19 +15,19 @@ use crate::shell::Wakes;
 use crate::viewport::Viewport;
 
 /// The textures of a borrowed ring, one per slot.
-type OpenGLRing = [OpenGLBorrowedTexture; RING_DEPTH];
+type OpenGlRing = [OpenGlHostTexture; RING_DEPTH];
 
 pub enum RenderTarget {
     OwnedTexture {
         session: Session,
-        compositor: Box<OpenGLTextureCompositor>,
+        compositor: Box<OpenGlTextureCompositor>,
     },
     BorrowedTexture {
         session: Session,
-        compositor: Box<OpenGLTextureCompositor>,
+        compositor: Box<OpenGlTextureCompositor>,
         /// The ring the session renders into.
-        ring: Box<OpenGLRing>,
-        replacements: Replacements<Box<OpenGLRing>>,
+        ring: Box<OpenGlRing>,
+        replacements: Replacements<Box<OpenGlRing>>,
     },
     Surface {
         session: Session,
@@ -51,7 +51,7 @@ impl RenderTarget {
         let options = attach_options(wakes, mode, RenderDriverKind::CallerGraphicsThread);
         match mode {
             Mode::OwnedTexture => {
-                let descriptor = OpenglOwnedTextureDescriptor {
+                let descriptor = OpenGlOwnedTextureDescriptor {
                     extent: extent(viewport),
                     context,
                 };
@@ -86,7 +86,7 @@ impl RenderTarget {
                 let surface = gl.surface_pointer().map_err(|error| {
                     compositor_error(format!("OpenGL surface handle failed: {error}"))
                 })?;
-                let descriptor = OpenglSurfaceDescriptor {
+                let descriptor = OpenGlSurfaceDescriptor {
                     extent: extent(viewport),
                     context,
                     surface,
@@ -247,16 +247,16 @@ impl RenderTarget {
 }
 
 fn compositor(
-    gl: &OpenGLContext,
+    gl: &OpenGlContext,
     viewport: Viewport,
-) -> maplibre_native_ffi::Result<OpenGLTextureCompositor> {
-    OpenGLTextureCompositor::new(gl, viewport)
+) -> maplibre_native_ffi::Result<OpenGlTextureCompositor> {
+    OpenGlTextureCompositor::new(gl, viewport)
         .map_err(|error| compositor_error(format!("OpenGL compositor creation failed: {error}")))
 }
 
-fn ring(gl: &OpenGLContext, viewport: Viewport) -> maplibre_native_ffi::Result<Box<OpenGLRing>> {
+fn ring(gl: &OpenGlContext, viewport: Viewport) -> maplibre_native_ffi::Result<Box<OpenGlRing>> {
     let texture = || {
-        OpenGLBorrowedTexture::new(gl, viewport)
+        OpenGlHostTexture::new(gl, viewport)
             .map_err(|error| compositor_error(format!("OpenGL texture creation failed: {error}")))
     };
     let first = texture()?;
@@ -269,25 +269,25 @@ fn ring(gl: &OpenGLContext, viewport: Viewport) -> maplibre_native_ffi::Result<B
     }
 }
 
-fn close_ring(ring: OpenGLRing, gl: Option<&OpenGLContext>) {
+fn close_ring(ring: OpenGlRing, gl: Option<&OpenGlContext>) {
     for texture in ring {
         texture.close(gl);
     }
 }
 
 fn borrowed_descriptor(
-    context: OpenglContextDescriptor,
-    ring: &OpenGLRing,
+    context: OpenGlContextDescriptor,
+    ring: &OpenGlRing,
     viewport: Viewport,
-) -> OpenglBorrowedTextureDescriptor {
-    OpenglBorrowedTextureDescriptor {
+) -> OpenGlBorrowedTextureDescriptor {
+    OpenGlBorrowedTextureDescriptor {
         extent: extent(viewport),
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
         context,
         textures: ring
             .iter()
-            .map(|texture| OpenglBorrowedTexture::new(texture.texture()))
+            .map(|texture| OpenGlBorrowedTexture::new(texture.texture()))
             .collect(),
         target: ring[0].target(),
     }

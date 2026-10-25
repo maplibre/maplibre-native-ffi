@@ -25,14 +25,14 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   /// Client API the session creates its context for. Required under dedicated
   /// ownership. A shared session queries share_context for it, so this is
   /// ignored there.
-  public var clientApi: OpenglClientApi
+  public var clientApi: OpenGlClientApi
   /// Optional eglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
   public init(
     display: NativePointer,
     config: NativePointer,
     shareContext: NativePointer = .null,
-    clientApi: OpenglClientApi = .init(rawValue: 0),
+    clientApi: OpenGlClientApi = .init(rawValue: 0),
     getProcAddress: NativePointer = .null
   ) {
     self.display = display
@@ -52,7 +52,7 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
       raw.share_context,
       to: UInt.self
     ))
-    clientApi = OpenglClientApi(rawValue: raw.client_api.rawValue)
+    clientApi = OpenGlClientApi(rawValue: raw.client_api.rawValue)
     getProcAddress = NativePointer(bitPattern: unsafeBitCast(
       raw.get_proc_address,
       to: UInt.self
@@ -115,11 +115,11 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
   /// GLsync in the shared EGL or WGL context's share group, used only by a
   /// caller-graphics-thread driver. handle is nonzero.
-  public static let openglFence: GpuSyncKind = .init(rawValue: 1)
+  public static let openGlFence: GpuSyncKind = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "cpuComplete"
-    case 1: return "openglFence"
+    case 1: return "openGlFence"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
@@ -151,7 +151,7 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct OpenglClientApi: RawRepresentable, CustomStringConvertible,
+public struct OpenGlClientApi: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -160,17 +160,17 @@ public struct OpenglClientApi: RawRepresentable, CustomStringConvertible,
   }
 
   /// No client API is named.
-  public static let unspecified: OpenglClientApi = .init(rawValue: 0)
+  public static let unspecified: OpenGlClientApi = .init(rawValue: 0)
   /// Desktop OpenGL, as EGL_OPENGL_API names it.
-  public static let gl: OpenglClientApi = .init(rawValue: 1)
+  public static let gl: OpenGlClientApi = .init(rawValue: 1)
   /// OpenGL ES, as EGL_OPENGL_ES_API names it.
-  public static let gles: OpenglClientApi = .init(rawValue: 2)
+  public static let gles: OpenGlClientApi = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
     case 0: return "unspecified"
     case 1: return "gl"
     case 2: return "gles"
-    default: return "OpenglClientApi(\(rawValue))"
+    default: return "OpenGlClientApi(\(rawValue))"
     }
   }
 }
@@ -179,15 +179,15 @@ public struct OpenglClientApi: RawRepresentable, CustomStringConvertible,
 ///
 /// See `mln_opengl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
+public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
   /// Whether the session shares its driver thread and graphics objects with the
   /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
   /// are dedicated to their core worker.
-  public var ownership: OpenglContextOwnership
-  public var data: OpenglContextDescriptorData
+  public var ownership: OpenGlContextOwnership
+  public var data: OpenGlContextDescriptorData
   public init(
-    ownership: OpenglContextOwnership = .init(rawValue: 0),
-    data: OpenglContextDescriptorData
+    ownership: OpenGlContextOwnership = .init(rawValue: 0),
+    data: OpenGlContextDescriptorData
   ) {
     self.ownership = ownership
     self.data = data
@@ -197,8 +197,8 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_context_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    ownership = OpenglContextOwnership(rawValue: raw.ownership.rawValue)
-    data = try { () throws -> OpenglContextDescriptorData in
+    ownership = OpenGlContextOwnership(rawValue: raw.ownership.rawValue)
+    data = try { () throws -> OpenGlContextDescriptorData in
       switch raw.platform
         .rawValue
       {
@@ -207,7 +207,7 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
             .wgl)) case MLN_OPENGL_CONTEXT_PLATFORM_EGL
                   .rawValue: return .egl(EglContextDescriptor(raw: raw.data
             .egl)) case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
-                  .rawValue: return try .webgl(WebglContextDescriptor(raw: raw
+                  .rawValue: return try .webGl(WebGlContextDescriptor(raw: raw
             .data
             .webgl)) default: throw MaplibreError
         .invalidState("native union contains an unsupported variant")
@@ -225,7 +225,7 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
       .data.wgl = item.nativeValue()
     case let .egl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL; raw
       .data.egl = item.nativeValue()
-    case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL; raw
+    case let .webGl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL; raw
       .data.webgl = try item.nativeValue(arena: arena)
     }
     return raw
@@ -236,10 +236,10 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_context_descriptor_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
+public enum OpenGlContextDescriptorData: Equatable, Hashable, Sendable {
   case wgl(WglContextDescriptor)
   case egl(EglContextDescriptor)
-  case webgl(WebglContextDescriptor)
+  case webGl(WebGlContextDescriptor)
 }
 
 /// How a session's OpenGL context relates to its driver thread and host
@@ -247,7 +247,7 @@ public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
+public struct OpenGlContextOwnership: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -256,14 +256,14 @@ public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
   }
 
   /// The session shares its thread with host graphics work.
-  public static let shared: OpenglContextOwnership = .init(rawValue: 0)
+  public static let shared: OpenGlContextOwnership = .init(rawValue: 0)
   /// The session keeps its own OpenGL context current on its thread.
-  public static let dedicated: OpenglContextOwnership = .init(rawValue: 1)
+  public static let dedicated: OpenGlContextOwnership = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "shared"
     case 1: return "dedicated"
-    default: return "OpenglContextOwnership(\(rawValue))"
+    default: return "OpenGlContextOwnership(\(rawValue))"
     }
   }
 }
@@ -272,7 +272,7 @@ public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
 ///
 /// See `mln_opengl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
+public struct OpenGlContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -280,10 +280,10 @@ public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  public static let wgl: OpenglContextProviderFlag = .init(rawValue: 1)
-  public static let egl: OpenglContextProviderFlag = .init(rawValue: 2)
+  public static let wgl: OpenGlContextProviderFlag = .init(rawValue: 1)
+  public static let egl: OpenGlContextProviderFlag = .init(rawValue: 2)
   /// Browser WebGL context imported into an Emscripten module.
-  public static let webgl: OpenglContextProviderFlag = .init(rawValue: 4)
+  public static let webGl: OpenGlContextProviderFlag = .init(rawValue: 4)
 }
 
 /// Host lock on the graphics queue that a session shares with its host, copied
@@ -563,15 +563,15 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_webgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
-  public var kind: WebglContextKind
+public struct WebGlContextDescriptor: Equatable, Hashable, Sendable {
+  public var kind: WebGlContextKind
   /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
   public var context: Int32
   /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
   /// canvas must still be transferable when attachment starts.
   public var canvasSelector: String
   public init(
-    kind: WebglContextKind = .init(rawValue: 0),
+    kind: WebGlContextKind = .init(rawValue: 0),
     context: Int32 = 0,
     canvasSelector: String = ""
   ) {
@@ -584,7 +584,7 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
     raw: mln_webgl_context_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kind = WebglContextKind(rawValue: raw.kind.rawValue)
+    kind = WebGlContextKind(rawValue: raw.kind.rawValue)
     context = raw.context
     canvasSelector = try NativeString.copyUTF8(
       data: raw.canvas_selector.data,
@@ -607,7 +607,7 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_webgl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct WebglContextKind: RawRepresentable, CustomStringConvertible,
+public struct WebGlContextKind: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -616,15 +616,15 @@ public struct WebglContextKind: RawRepresentable, CustomStringConvertible,
   }
 
   /// Use a host-created context on its current browser agent.
-  public static let existing: WebglContextKind = .init(rawValue: 0)
+  public static let existing: WebGlContextKind = .init(rawValue: 0)
   /// Transfer the canvas named by canvas_selector to a native worker and create
   /// a WebGL 2 context there.
-  public static let transferredCanvas: WebglContextKind = .init(rawValue: 1)
+  public static let transferredCanvas: WebGlContextKind = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "existing"
     case 1: return "transferredCanvas"
-    default: return "WebglContextKind(\(rawValue))"
+    default: return "WebGlContextKind(\(rawValue))"
     }
   }
 }

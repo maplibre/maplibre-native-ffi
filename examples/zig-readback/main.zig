@@ -232,7 +232,7 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
     fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
         return .{ .device = (self.device) };
     }
-} else if (build_options.supports_opengl) OpenGLAttachContext else struct {};
+} else if (build_options.supports_opengl) OpenGlAttachContext else struct {};
 
 /// Supplies transferable state to a core worker or a WGL context to the caller
 /// driver.
@@ -255,7 +255,7 @@ fn attachOwnedTexture(
             .pixel_format = 80,
         }, attachOptions(signal, .core_worker), null)
     else if (build_options.supports_opengl)
-        try map.attachOpenglOwnedTexture(.{
+        try map.attachOpenGlOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
         }, attachOptions(signal, if (supports_egl) .core_worker else .caller_graphics_thread), null)
@@ -272,12 +272,12 @@ fn attachOptions(signal: *WakeSignal, driver: maplibre.RenderDriverKind) maplibr
     };
 }
 
-const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+const OpenGlAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
     window: *sdl.SDL_Window,
     context: sdl.SDL_GLContext,
     device_context: *anyopaque,
 
-    fn init() !OpenGLAttachContext {
+    fn init() !OpenGlAttachContext {
         // WGL contexts need a Win32 device context with a selected pixel
         // format, so this path uses a hidden SDL window rather than being
         // surfaceless like the EGL pbuffer path.
@@ -311,7 +311,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         };
     }
 
-    fn deinit(self: *OpenGLAttachContext) void {
+    fn deinit(self: *OpenGlAttachContext) void {
         _ = sdl.SDL_GL_MakeCurrent(self.window, null);
         _ = sdl.SDL_GL_DestroyContext(self.context);
         sdl.SDL_DestroyWindow(self.window);
@@ -320,7 +320,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 
     /// A WGL context is current on one thread at a time, so a thread must make
     /// the host context current before its work and release it after.
-    fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenglContextDescriptor {
+    fn descriptor(self: *const OpenGlAttachContext) maplibre.OpenGlContextDescriptor {
         return .{ .ownership = .shared, .data = .{ .wgl = .{
             .device_context = (@ptrCast(self.device_context)),
             .share_context = (@ptrCast(self.context)),
@@ -388,7 +388,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         return display;
     }
 
-    fn descriptor(self: *const @This()) maplibre.OpenglContextDescriptor {
+    fn descriptor(self: *const @This()) maplibre.OpenGlContextDescriptor {
         return .{ .ownership = .dedicated, .data = .{ .egl = .{
             .display = (@ptrCast(self.display.?)),
             .config = (@ptrCast(self.config.?)),

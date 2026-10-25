@@ -13,9 +13,9 @@ enum SwiftMapMain {
     // The configuration parses the same command line as the app does.
     let mode = swiftMapConfiguration.mode
     Task { @MainActor in
-      installCAPILogging()
+      installCApiLogging()
       let status = await runSmoke(mode: mode)
-      clearCAPILogging()
+      clearCApiLogging()
       exit(status)
     }
     // The run loop drains the main queue, and with it the main actor, on the
@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationDidFinishLaunching(_: Notification) {
     NSApp.setActivationPolicy(.regular)
-    installCAPILogging()
+    installCApiLogging()
     createWindow()
     NSApp.activate(ignoringOtherApps: true)
   }
@@ -59,12 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     .TerminateReply
   {
     guard let mapView else {
-      clearCAPILogging()
+      clearCApiLogging()
       return .terminateNow
     }
     Task { @MainActor in
       await mapView.shutdown()
-      clearCAPILogging()
+      clearCApiLogging()
       NSApp.reply(toApplicationShouldTerminate: true)
     }
     return .terminateLater

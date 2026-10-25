@@ -220,7 +220,7 @@ public typealias CustomSourceFetchTileCallback =
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
+public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   /// Minimum tiling zoom. Absent selects 0.
   public var minZoom: Double?
   /// Maximum tiling zoom, an integer within \[0, 24\]. Absent selects 18.
@@ -794,7 +794,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   /// URL that the source loads from, or empty when it has none.
   public var url: String
   /// Inline TileJSON metadata, when the source was defined with it.
-  public var tilejson: StyleSourceTileInfo?
+  public var tileJson: StyleSourceTileInfo?
   /// Geographic bounds, when inline TileJSON sets them.
   public var bounds: LatLngBounds?
   /// Tile size in pixels, for a tile source.
@@ -809,7 +809,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     isVolatile: Bool = false,
     attribution: String = "",
     url: String = "",
-    tilejson: StyleSourceTileInfo? = nil,
+    tileJson: StyleSourceTileInfo? = nil,
     bounds: LatLngBounds? = nil,
     tileSize: UInt32? = nil,
     vectorEncoding: StyleVectorTileEncoding? = nil,
@@ -820,7 +820,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     self.isVolatile = isVolatile
     self.attribution = attribution
     self.url = url
-    self.tilejson = tilejson
+    self.tileJson = tileJson
     self.bounds = bounds
     self.tileSize = tileSize
     self.vectorEncoding = vectorEncoding
@@ -839,7 +839,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
       size: raw.attribution.size
     )
     url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
-    tilejson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+    tileJson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
       .rawValue != 0 ? try StyleSourceTileInfo(raw: raw.tilejson) : nil
     bounds = raw.fields & MLN_STYLE_SOURCE_INFO_BOUNDS
       .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
@@ -908,7 +908,7 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
   public static let vector: StyleSourceType = .init(rawValue: 1)
   public static let raster: StyleSourceType = .init(rawValue: 2)
   public static let rasterDem: StyleSourceType = .init(rawValue: 3)
-  public static let geojson: StyleSourceType = .init(rawValue: 4)
+  public static let geoJson: StyleSourceType = .init(rawValue: 4)
   public static let image: StyleSourceType = .init(rawValue: 5)
   public static let video: StyleSourceType = .init(rawValue: 6)
   public static let annotations: StyleSourceType = .init(rawValue: 7)
@@ -920,7 +920,7 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
     case 1: return "vector"
     case 2: return "raster"
     case 3: return "rasterDem"
-    case 4: return "geojson"
+    case 4: return "geoJson"
     case 5: return "image"
     case 6: return "video"
     case 7: return "annotations"

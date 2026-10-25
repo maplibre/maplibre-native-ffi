@@ -45,19 +45,19 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
+public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// Logical surface extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data.
-  public var context: OpenglContextDescriptor
+  public var context: OpenGlContextDescriptor
   /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
   /// EGL, both required. Null for WebGL, whose context carries its canvas
   /// binding.
   public var surface: NativePointer
   public init(
     extent: LogicalExtent,
-    context: OpenglContextDescriptor,
+    context: OpenGlContextDescriptor,
     surface: NativePointer = .null
   ) {
     self.extent = extent
@@ -70,7 +70,7 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     extent = LogicalExtent(raw: raw.extent)
-    context = try OpenglContextDescriptor(raw: raw.context)
+    context = try OpenGlContextDescriptor(raw: raw.context)
     surface = NativePointer(bitPattern: unsafeBitCast(
       raw.surface,
       to: UInt.self

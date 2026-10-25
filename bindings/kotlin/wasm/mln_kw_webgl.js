@@ -1,17 +1,17 @@
 // The WebGL registration of the Kotlin/Wasm binding's WebGraphics, which
-// the module of a WebGL build links and exports as Module.mlnKwWebgl.
+// the module of a WebGL build links and exports as Module.mlnKwWebGl.
 //
 // Emscripten names a WebGL context by a handle in the GL table of the agent
 // that registered it, so only the module can turn a page's
 // WebGL2RenderingContext into the handle that a session descriptor takes.
 // Unregistering the handle leaves the context usable.
 addToLibrary({
-  $mlnKwWebgl__deps: [
+  $mlnKwWebGl__deps: [
     "$GL",
     "emscripten_webgl_get_current_context",
     "emscripten_webgl_make_context_current",
   ],
-  $mlnKwWebgl: {
+  $mlnKwWebGl: {
     // Returns the context's handle, or 0 when [context] is not a WebGL 2
     // context in this realm. The registration records the attributes that
     // the context was created with.

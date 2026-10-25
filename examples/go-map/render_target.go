@@ -257,54 +257,54 @@ func reportFailure[T any](future *maplibre.Future[T], err error, operation strin
 	}()
 }
 
-func newOpenGLRenderTarget(context *openGLContext, v viewport, mode renderTargetMode, m *maplibre.MapHandle, eventType sdl.EventType) (renderTarget, error) {
+func newOpenGlRenderTarget(context *openGlContext, v viewport, mode renderTargetMode, m *maplibre.MapHandle, eventType sdl.EventType) (renderTarget, error) {
 	driver := newCallerDriver(eventType)
 	switch mode {
 	case modeOwnedTexture:
-		return newOpenGLOwnedTextureTarget(context, v, m, driver)
+		return newOpenGlOwnedTextureTarget(context, v, m, driver)
 	case modeBorrowedTexture:
-		return newOpenGLBorrowedTextureTarget(context, v, m, driver)
+		return newOpenGlBorrowedTextureTarget(context, v, m, driver)
 	case modeNativeSurface:
-		return newOpenGLSurfaceTarget(context, v, m, driver)
+		return newOpenGlSurfaceTarget(context, v, m, driver)
 	default:
 		return nil, fmt.Errorf("unsupported render target mode: %s", mode)
 	}
 }
 
-// openGLFrameTarget composes a texture ring's frames. After a rendered result,
+// openGlFrameTarget composes a texture ring's frames. After a rendered result,
 // it acquires every ready frame, keeps the newest, and composes it. It holds
 // that frame until a newer one replaces it, so the session renders into the
 // ring's other slot meanwhile.
-type openGLFrameTarget struct {
+type openGlFrameTarget struct {
 	callerDriver
-	compositor *openGLTextureCompositor
+	compositor *openGlTextureCompositor
 	held       *maplibre.AcquiredFrameHandle
 }
 
-func newOpenGLFrameTarget(compositor *openGLTextureCompositor, driver callerDriver) *openGLFrameTarget {
-	target := &openGLFrameTarget{callerDriver: driver, compositor: compositor}
+func newOpenGlFrameTarget(compositor *openGlTextureCompositor, driver callerDriver) *openGlFrameTarget {
+	target := &openGlFrameTarget{callerDriver: driver, compositor: compositor}
 	target.present = target.drawFrame
 	target.releaseFrames = target.releaseHeld
 	return target
 }
 
-// openGLOwnedTextureTarget composes a session-owned texture ring.
-type openGLOwnedTextureTarget struct {
-	*openGLFrameTarget
+// openGlOwnedTextureTarget composes a session-owned texture ring.
+type openGlOwnedTextureTarget struct {
+	*openGlFrameTarget
 }
 
-func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLOwnedTextureTarget, error) {
+func newOpenGlOwnedTextureTarget(context *openGlContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGlOwnedTextureTarget, error) {
 	descriptor, err := context.descriptor(true)
 	if err != nil {
 		return nil, err
 	}
-	compositor, err := newOpenGLTextureCompositor(context, v)
+	compositor, err := newOpenGlTextureCompositor(context, v)
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLOwnedTextureTarget{newOpenGLFrameTarget(compositor, driver)}
-	session, ready, err := m.AttachOpenglOwnedTexture(
-		maplibre.OpenglOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
+	target := &openGlOwnedTextureTarget{newOpenGlFrameTarget(compositor, driver)}
+	session, ready, err := m.AttachOpenGlOwnedTexture(
+		maplibre.OpenGlOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
 		target.attachOptions(textureRingDepth),
 	)
 	if err == nil {
@@ -316,11 +316,11 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	return target, nil
 }
 
-func (target *openGLOwnedTextureTarget) Close() error {
+func (target *openGlOwnedTextureTarget) Close() error {
 	return errors.Join(target.callerDriver.Close(), target.compositor.Close())
 }
 
-func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
+func (target *openGlOwnedTextureTarget) Resize(v viewport) error {
 	if err := target.compositor.Resize(v); err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 
 // drawFrame composes the newest ready frame and releases the older ones.
 // DrawTexture finishes its GPU reads, so each frame releases CPU-complete.
-func (target *openGLFrameTarget) drawFrame() (bool, error) {
+func (target *openGlFrameTarget) drawFrame() (bool, error) {
 	var newest *maplibre.AcquiredFrameHandle
 	for {
 		frame, err := target.session.AcquireFrame()
@@ -349,7 +349,7 @@ func (target *openGLFrameTarget) drawFrame() (bool, error) {
 	}
 	drawErr := requireCPUCompleteProducer(newest)
 	if drawErr == nil {
-		drawErr = newest.WithOpenglTexture(func(info maplibre.OpenglTextureFrameView) error {
+		drawErr = newest.WithOpenGlTexture(func(info maplibre.OpenGlTextureFrameView) error {
 			texture, err := info.Texture()
 			if err != nil {
 				return err
@@ -362,7 +362,7 @@ func (target *openGLFrameTarget) drawFrame() (bool, error) {
 	return drawErr == nil, errors.Join(drawErr, releaseErr)
 }
 
-func (target *openGLFrameTarget) releaseHeld() error {
+func (target *openGlFrameTarget) releaseHeld() error {
 	err := releaseFrame(target.held)
 	target.held = nil
 	return err
@@ -384,25 +384,25 @@ func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
 	})
 }
 
-// openGLBorrowedTextureTarget renders into a ring of textures that the example
+// openGlBorrowedTextureTarget renders into a ring of textures that the example
 // owns, and composes its frames as a session-owned ring's.
-type openGLBorrowedTextureTarget struct {
-	*openGLFrameTarget
+type openGlBorrowedTextureTarget struct {
+	*openGlFrameTarget
 	ring [textureRingDepth]uint32
 }
 
-func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLBorrowedTextureTarget, error) {
-	compositor, err := newOpenGLTextureCompositor(context, v)
+func newOpenGlBorrowedTextureTarget(context *openGlContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGlBorrowedTextureTarget, error) {
+	compositor, err := newOpenGlTextureCompositor(context, v)
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLBorrowedTextureTarget{openGLFrameTarget: newOpenGLFrameTarget(compositor, driver)}
+	target := &openGlBorrowedTextureTarget{openGlFrameTarget: newOpenGlFrameTarget(compositor, driver)}
 	ring, descriptor, err := target.describe(v)
 	if err == nil {
 		target.ring = ring
 		var session *maplibre.RenderSessionHandle
 		var ready *maplibre.Future[struct{}]
-		session, ready, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(textureRingDepth))
+		session, ready, err = m.AttachOpenGlBorrowedTexture(descriptor, target.attachOptions(textureRingDepth))
 		if err == nil {
 			err = target.attach(session, ready)
 		}
@@ -415,23 +415,23 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 }
 
 // describe allocates a ring at the viewport's size and describes it.
-func (target *openGLBorrowedTextureTarget) describe(v viewport) ([textureRingDepth]uint32, maplibre.OpenglBorrowedTextureDescriptor, error) {
+func (target *openGlBorrowedTextureTarget) describe(v viewport) ([textureRingDepth]uint32, maplibre.OpenGlBorrowedTextureDescriptor, error) {
 	var ring [textureRingDepth]uint32
 	context, err := target.compositor.context.descriptor(true)
 	if err != nil {
-		return ring, maplibre.OpenglBorrowedTextureDescriptor{}, err
+		return ring, maplibre.OpenGlBorrowedTextureDescriptor{}, err
 	}
-	textures := make([]maplibre.OpenglBorrowedTexture, 0, textureRingDepth)
+	textures := make([]maplibre.OpenGlBorrowedTexture, 0, textureRingDepth)
 	for slot := range ring {
 		texture, err := createBorrowedTexture(target.compositor.context, v)
 		if err != nil {
 			target.deleteRing(ring)
-			return [textureRingDepth]uint32{}, maplibre.OpenglBorrowedTextureDescriptor{}, err
+			return [textureRingDepth]uint32{}, maplibre.OpenGlBorrowedTextureDescriptor{}, err
 		}
 		ring[slot] = texture
-		textures = append(textures, maplibre.OpenglBorrowedTexture{Texture: texture})
+		textures = append(textures, maplibre.OpenGlBorrowedTexture{Texture: texture})
 	}
-	return ring, maplibre.OpenglBorrowedTextureDescriptor{
+	return ring, maplibre.OpenGlBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
@@ -441,7 +441,7 @@ func (target *openGLBorrowedTextureTarget) describe(v viewport) ([textureRingDep
 	}, nil
 }
 
-func (target *openGLBorrowedTextureTarget) deleteRing(ring [textureRingDepth]uint32) {
+func (target *openGlBorrowedTextureTarget) deleteRing(ring [textureRingDepth]uint32) {
 	if target.compositor.context.MakeCurrent() != nil {
 		return
 	}
@@ -452,7 +452,7 @@ func (target *openGLBorrowedTextureTarget) deleteRing(ring [textureRingDepth]uin
 	}
 }
 
-func (target *openGLBorrowedTextureTarget) Close() error {
+func (target *openGlBorrowedTextureTarget) Close() error {
 	err := target.callerDriver.Close()
 	target.deleteRing(target.ring)
 	return errors.Join(err, target.compositor.Close())
@@ -463,7 +463,7 @@ func (target *openGLBorrowedTextureTarget) Close() error {
 // window keeps what it last presented. The outgoing ring stays alive until the
 // replacement completes. A failed replacement leaves it unknown which ring the
 // session holds, so the session detaches before either ring is released.
-func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
+func (target *openGlBorrowedTextureTarget) Resize(v viewport) error {
 	if err := target.releaseHeld(); err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	future, err := target.session.SetOpenglBorrowedTextureTarget(descriptor)
+	future, err := target.session.SetOpenGlBorrowedTextureTarget(descriptor)
 	if err != nil {
 		target.deleteRing(ring)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
@@ -491,14 +491,14 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	return target.RequestFrame(true)
 }
 
-// openGLSurfaceTarget renders into the window's EGL surface, and the session
+// openGlSurfaceTarget renders into the window's EGL surface, and the session
 // presents each frame.
-type openGLSurfaceTarget struct {
+type openGlSurfaceTarget struct {
 	callerDriver
-	context *openGLContext
+	context *openGlContext
 }
 
-func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLSurfaceTarget, error) {
+func newOpenGlSurfaceTarget(context *openGlContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGlSurfaceTarget, error) {
 	if err := context.refreshPlatformSurface(); err != nil {
 		return nil, fmt.Errorf("OpenGL surface refresh failed: %w", err)
 	}
@@ -506,10 +506,10 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLSurfaceTarget{callerDriver: driver, context: context}
+	target := &openGlSurfaceTarget{callerDriver: driver, context: context}
 	target.presents = true
-	session, ready, err := m.AttachOpenglSurface(
-		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
+	session, ready, err := m.AttachOpenGlSurface(
+		maplibre.OpenGlSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
 		target.attachOptions(0),
 	)
 	if err == nil {
@@ -523,7 +523,7 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 
 // Resize resizes the session, or, when SDL returns a different EGL window
 // surface for the resized window, replaces the session's target with it.
-func (target *openGLSurfaceTarget) Resize(v viewport) error {
+func (target *openGlSurfaceTarget) Resize(v viewport) error {
 	outgoing := target.context.surface()
 	if err := target.context.refreshPlatformSurface(); err != nil {
 		// SDL may already have dropped the surface the session presents
@@ -537,7 +537,7 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	if err := target.replaceTarget(target.session.SetOpenglSurfaceTarget(maplibre.OpenglSurfaceDescriptor{
+	if err := target.replaceTarget(target.session.SetOpenGlSurfaceTarget(maplibre.OpenGlSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),

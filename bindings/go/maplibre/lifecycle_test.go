@@ -63,17 +63,17 @@ func TestDisposeAndReleaseCloseOnce(t *testing.T) {
 	checkHandleMembers(t, f.m, "MapHandle", true)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
-	data, err := GeojsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := GeoJsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkHandleMembers(t, data, "GeojsonSourceDataHandle", false)
+	checkHandleMembers(t, data, "GeoJsonSourceDataHandle", false)
 	for range 2 {
 		if err := data.Close(); err != nil {
-			t.Fatalf("GeojsonSourceDataHandle.Close: %v", err)
+			t.Fatalf("GeoJsonSourceDataHandle.Close: %v", err)
 		}
 	}
-	checkHandleMembers(t, data, "GeojsonSourceDataHandle", true)
+	checkHandleMembers(t, data, "GeoJsonSourceDataHandle", true)
 }
 
 // A runtime refuses to close while its map is live. The refusal leaves the
@@ -129,19 +129,19 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	for _, input := range []*GeojsonSourceDataHandle{nil, {}} {
-		if future, err := f.m.AddGeojsonSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
+	for _, input := range []*GeoJsonSourceDataHandle{nil, {}} {
+		if future, err := f.m.AddGeoJsonSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
 			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
-	data, err := GeojsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := GeoJsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := data.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if future, err := f.m.AddGeojsonSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
+	if future, err := f.m.AddGeoJsonSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("closed input: (%v, %v), want nil and StatusInvalidState", future, err)
 	}
 }

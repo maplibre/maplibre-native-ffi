@@ -21,5 +21,5 @@ public enum GpuSyncKind : uint
     /// GLsync in the shared EGL or WGL context's share group, used only by a
     /// caller-graphics-thread driver. handle is nonzero.
     /// </summary>
-    OpenglFence = 1,
+    OpenGlFence = 1,
 }

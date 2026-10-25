@@ -17,7 +17,7 @@ internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
   allocate(16, 8).also { putGpuSync(it, value) }
 
-internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSourceOptions) {
+internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
   writeU32(target, w(64, 72).toUInt())
   var fields = 0u
   value.minZoom?.let {
@@ -64,8 +64,8 @@ internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSou
   writeU32(target + 4, fields)
 }
 
-internal fun NativeArena.writeGeojsonSourceOptions(value: GeojsonSourceOptions): Long =
-  allocate(w(64, 72), 8).also { putGeojsonSourceOptions(it, value) }
+internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long =
+  allocate(w(64, 72), 8).also { putGeoJsonSourceOptions(it, value) }
 
 internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)
@@ -310,49 +310,49 @@ internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSur
 internal fun NativeArena.writeMetalSurfaceDescriptor(value: MetalSurfaceDescriptor): Long =
   allocate(w(32, 40), 8).also { putMetalSurfaceDescriptor(it, value) }
 
-internal fun NativeArena.putOpenglBorrowedTextureDescriptor(
+internal fun NativeArena.putOpenGlBorrowedTextureDescriptor(
   target: Long,
-  value: OpenglBorrowedTextureDescriptor,
+  value: OpenGlBorrowedTextureDescriptor,
 ) {
   writeU32(target, w(72, 104).toUInt())
   putLogicalExtent(target + 8, value.extent)
   writeU32(target + 24, value.physicalWidth)
   writeU32(target + 28, value.physicalHeight)
-  putOpenglContextDescriptor(target + 32, value.context)
+  putOpenGlContextDescriptor(target + 32, value.context)
   writeAddress(
     target + w(60, 80),
-    array(value.textures, 4, 4) { at, item -> putOpenglBorrowedTexture(at, item) },
+    array(value.textures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) },
   )
   writeSize(target + w(64, 88), value.textures.size.toULong())
   writeU32(target + w(68, 96), value.target)
 }
 
-internal fun NativeArena.writeOpenglBorrowedTextureDescriptor(
-  value: OpenglBorrowedTextureDescriptor,
-): Long = allocate(w(72, 104), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
+internal fun NativeArena.writeOpenGlBorrowedTextureDescriptor(
+  value: OpenGlBorrowedTextureDescriptor,
+): Long = allocate(w(72, 104), 8).also { putOpenGlBorrowedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putOpenglOwnedTextureDescriptor(
+internal fun NativeArena.putOpenGlOwnedTextureDescriptor(
   target: Long,
-  value: OpenglOwnedTextureDescriptor,
+  value: OpenGlOwnedTextureDescriptor,
 ) {
   writeU32(target, w(56, 72).toUInt())
   putLogicalExtent(target + 8, value.extent)
-  putOpenglContextDescriptor(target + 24, value.context)
+  putOpenGlContextDescriptor(target + 24, value.context)
 }
 
-internal fun NativeArena.writeOpenglOwnedTextureDescriptor(
-  value: OpenglOwnedTextureDescriptor,
-): Long = allocate(w(56, 72), 8).also { putOpenglOwnedTextureDescriptor(it, value) }
+internal fun NativeArena.writeOpenGlOwnedTextureDescriptor(
+  value: OpenGlOwnedTextureDescriptor,
+): Long = allocate(w(56, 72), 8).also { putOpenGlOwnedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putOpenglSurfaceDescriptor(target: Long, value: OpenglSurfaceDescriptor) {
+internal fun NativeArena.putOpenGlSurfaceDescriptor(target: Long, value: OpenGlSurfaceDescriptor) {
   writeU32(target, w(56, 80).toUInt())
   putLogicalExtent(target + 8, value.extent)
-  putOpenglContextDescriptor(target + 24, value.context)
+  putOpenGlContextDescriptor(target + 24, value.context)
   writeAddress(target + w(52, 72), value.surface.address)
 }
 
-internal fun NativeArena.writeOpenglSurfaceDescriptor(value: OpenglSurfaceDescriptor): Long =
-  allocate(w(56, 80), 8).also { putOpenglSurfaceDescriptor(it, value) }
+internal fun NativeArena.writeOpenGlSurfaceDescriptor(value: OpenGlSurfaceDescriptor): Long =
+  allocate(w(56, 80), 8).also { putOpenGlSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
   target: Long,
@@ -400,50 +400,50 @@ internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanS
 internal fun NativeArena.writeVulkanSurfaceDescriptor(value: VulkanSurfaceDescriptor): Long =
   allocate(w(64, 88), 8).also { putVulkanSurfaceDescriptor(it, value) }
 
-internal fun NativeArena.putWebgpuBorrowedTextureDescriptor(
+internal fun NativeArena.putWebGpuBorrowedTextureDescriptor(
   target: Long,
-  value: WebgpuBorrowedTextureDescriptor,
+  value: WebGpuBorrowedTextureDescriptor,
 ) {
   writeU32(target, w(56, 80).toUInt())
   putLogicalExtent(target + 8, value.extent)
   writeU32(target + 24, value.physicalWidth)
   writeU32(target + 28, value.physicalHeight)
-  putWebgpuContextDescriptor(target + 32, value.context)
+  putWebGpuContextDescriptor(target + 32, value.context)
   writeAddress(
     target + w(44, 56),
-    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebgpuBorrowedTexture(at, item) },
+    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebGpuBorrowedTexture(at, item) },
   )
   writeSize(target + w(48, 64), value.textures.size.toULong())
   writeU32(target + w(52, 72), value.format)
 }
 
-internal fun NativeArena.writeWebgpuBorrowedTextureDescriptor(
-  value: WebgpuBorrowedTextureDescriptor,
-): Long = allocate(w(56, 80), 8).also { putWebgpuBorrowedTextureDescriptor(it, value) }
+internal fun NativeArena.writeWebGpuBorrowedTextureDescriptor(
+  value: WebGpuBorrowedTextureDescriptor,
+): Long = allocate(w(56, 80), 8).also { putWebGpuBorrowedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putWebgpuOwnedTextureDescriptor(
+internal fun NativeArena.putWebGpuOwnedTextureDescriptor(
   target: Long,
-  value: WebgpuOwnedTextureDescriptor,
+  value: WebGpuOwnedTextureDescriptor,
 ) {
   writeU32(target, w(40, 48).toUInt())
   putLogicalExtent(target + 8, value.extent)
-  putWebgpuContextDescriptor(target + 24, value.context)
+  putWebGpuContextDescriptor(target + 24, value.context)
 }
 
-internal fun NativeArena.writeWebgpuOwnedTextureDescriptor(
-  value: WebgpuOwnedTextureDescriptor,
-): Long = allocate(w(40, 48), 8).also { putWebgpuOwnedTextureDescriptor(it, value) }
+internal fun NativeArena.writeWebGpuOwnedTextureDescriptor(
+  value: WebGpuOwnedTextureDescriptor,
+): Long = allocate(w(40, 48), 8).also { putWebGpuOwnedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putWebgpuSurfaceDescriptor(target: Long, value: WebgpuSurfaceDescriptor) {
+internal fun NativeArena.putWebGpuSurfaceDescriptor(target: Long, value: WebGpuSurfaceDescriptor) {
   writeU32(target, w(48, 64).toUInt())
   putLogicalExtent(target + 8, value.extent)
-  putWebgpuContextDescriptor(target + 24, value.context)
+  putWebGpuContextDescriptor(target + 24, value.context)
   writeAddress(target + w(36, 48), value.surface.address)
   writeU32(target + w(40, 56), value.format)
 }
 
-internal fun NativeArena.writeWebgpuSurfaceDescriptor(value: WebgpuSurfaceDescriptor): Long =
-  allocate(w(48, 64), 8).also { putWebgpuSurfaceDescriptor(it, value) }
+internal fun NativeArena.writeWebGpuSurfaceDescriptor(value: WebGpuSurfaceDescriptor): Long =
+  allocate(w(48, 64), 8).also { putWebGpuSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   writeU32(target, 56.toUInt())
@@ -1025,8 +1025,8 @@ internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): Meta
     )
     .also { it.bindingScope = scope }
 
-internal fun readOpenglTextureFrame(source: Long, scope: ViewScope? = null): OpenglTextureFrame =
-  OpenglTextureFrame(
+internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): OpenGlTextureFrame =
+  OpenGlTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
@@ -1076,8 +1076,8 @@ internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): Vul
     )
     .also { it.bindingScope = scope }
 
-internal fun readWebgpuTextureFrame(source: Long, scope: ViewScope? = null): WebgpuTextureFrame =
-  WebgpuTextureFrame(
+internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): WebGpuTextureFrame =
+  WebGpuTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
@@ -1183,7 +1183,7 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
     isVolatile = readBool(source + w(16, 24)),
     attribution = readViewString(source + w(20, 32)),
     url = readViewString(source + w(28, 48)),
-    tilejson = if ((fields and 1u) != 0u) readStyleSourceTileInfo(source + w(40, 64)) else null,
+    tileJson = if ((fields and 1u) != 0u) readStyleSourceTileInfo(source + w(40, 64)) else null,
     bounds = if ((fields and 2u) != 0u) readLatLngBounds(source + w(72, 104)) else null,
     tileSize = if ((fields and 4u) != 0u) readU32(source + w(104, 136)) else null,
     vectorEncoding =
@@ -1388,33 +1388,33 @@ internal fun NativeArena.putMetalContextDescriptor(target: Long, value: MetalCon
 internal fun NativeArena.writeMetalContextDescriptor(value: MetalContextDescriptor): Long =
   allocate(w(4, 8), w(4, 8)).also { putMetalContextDescriptor(it, value) }
 
-internal fun NativeArena.putOpenglContextDescriptor(target: Long, value: OpenglContextDescriptor) {
+internal fun NativeArena.putOpenGlContextDescriptor(target: Long, value: OpenGlContextDescriptor) {
   writeU32(target + 4, value.ownership.rawValue)
   when (val variant = value.data) {
-    is OpenglContextDescriptorData.Wgl -> {
+    is OpenGlContextDescriptorData.Wgl -> {
       writeU32(target, 1u)
       putWglContextDescriptor(target + 8, variant.value)
     }
-    is OpenglContextDescriptorData.Egl -> {
+    is OpenGlContextDescriptorData.Egl -> {
       writeU32(target, 2u)
       putEglContextDescriptor(target + 8, variant.value)
     }
-    is OpenglContextDescriptorData.Webgl -> {
+    is OpenGlContextDescriptorData.WebGl -> {
       writeU32(target, 3u)
-      putWebglContextDescriptor(target + 8, variant.value)
+      putWebGlContextDescriptor(target + 8, variant.value)
     }
   }
 }
 
-internal fun NativeArena.writeOpenglContextDescriptor(value: OpenglContextDescriptor): Long =
-  allocate(w(28, 48), w(4, 8)).also { putOpenglContextDescriptor(it, value) }
+internal fun NativeArena.writeOpenGlContextDescriptor(value: OpenGlContextDescriptor): Long =
+  allocate(w(28, 48), w(4, 8)).also { putOpenGlContextDescriptor(it, value) }
 
-internal fun NativeArena.putOpenglBorrowedTexture(target: Long, value: OpenglBorrowedTexture) {
+internal fun NativeArena.putOpenGlBorrowedTexture(target: Long, value: OpenGlBorrowedTexture) {
   writeU32(target, value.texture)
 }
 
-internal fun NativeArena.writeOpenglBorrowedTexture(value: OpenglBorrowedTexture): Long =
-  allocate(4, 4).also { putOpenglBorrowedTexture(it, value) }
+internal fun NativeArena.writeOpenGlBorrowedTexture(value: OpenGlBorrowedTexture): Long =
+  allocate(4, 4).also { putOpenGlBorrowedTexture(it, value) }
 
 internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanContextDescriptor) {
   writeAddress(target, value.instance.address)
@@ -1437,22 +1437,22 @@ internal fun NativeArena.putVulkanBorrowedTexture(target: Long, value: VulkanBor
 internal fun NativeArena.writeVulkanBorrowedTexture(value: VulkanBorrowedTexture): Long =
   allocate(16, 8).also { putVulkanBorrowedTexture(it, value) }
 
-internal fun NativeArena.putWebgpuContextDescriptor(target: Long, value: WebgpuContextDescriptor) {
+internal fun NativeArena.putWebGpuContextDescriptor(target: Long, value: WebGpuContextDescriptor) {
   writeAddress(target, value.instance.address)
   writeAddress(target + w(4, 8), value.device.address)
   writeAddress(target + w(8, 16), value.queue.address)
 }
 
-internal fun NativeArena.writeWebgpuContextDescriptor(value: WebgpuContextDescriptor): Long =
-  allocate(w(12, 24), w(4, 8)).also { putWebgpuContextDescriptor(it, value) }
+internal fun NativeArena.writeWebGpuContextDescriptor(value: WebGpuContextDescriptor): Long =
+  allocate(w(12, 24), w(4, 8)).also { putWebGpuContextDescriptor(it, value) }
 
-internal fun NativeArena.putWebgpuBorrowedTexture(target: Long, value: WebgpuBorrowedTexture) {
+internal fun NativeArena.putWebGpuBorrowedTexture(target: Long, value: WebGpuBorrowedTexture) {
   writeAddress(target, value.texture.address)
   writeAddress(target + w(4, 8), value.textureView.address)
 }
 
-internal fun NativeArena.writeWebgpuBorrowedTexture(value: WebgpuBorrowedTexture): Long =
-  allocate(w(8, 16), w(4, 8)).also { putWebgpuBorrowedTexture(it, value) }
+internal fun NativeArena.writeWebGpuBorrowedTexture(value: WebGpuBorrowedTexture): Long =
+  allocate(w(8, 16), w(4, 8)).also { putWebGpuBorrowedTexture(it, value) }
 
 internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
   writeF64(target, value.top)
@@ -1751,14 +1751,14 @@ internal fun NativeArena.putEglContextDescriptor(target: Long, value: EglContext
 internal fun NativeArena.writeEglContextDescriptor(value: EglContextDescriptor): Long =
   allocate(w(20, 40), w(4, 8)).also { putEglContextDescriptor(it, value) }
 
-internal fun NativeArena.putWebglContextDescriptor(target: Long, value: WebglContextDescriptor) {
+internal fun NativeArena.putWebGlContextDescriptor(target: Long, value: WebGlContextDescriptor) {
   writeU32(target, value.kind.rawValue)
   writeI32(target + 4, value.context)
   putView(target + 8, value.canvasSelector)
 }
 
-internal fun NativeArena.writeWebglContextDescriptor(value: WebglContextDescriptor): Long =
-  allocate(w(16, 24), w(4, 8)).also { putWebglContextDescriptor(it, value) }
+internal fun NativeArena.writeWebGlContextDescriptor(value: WebGlContextDescriptor): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWebGlContextDescriptor(it, value) }
 
 internal fun readRuntimeEvent(source: Long): RuntimeEvent =
   RuntimeEvent(

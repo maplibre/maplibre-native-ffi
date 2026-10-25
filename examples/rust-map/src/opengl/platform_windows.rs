@@ -4,18 +4,18 @@ use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawContext, Version};
 use glutin::surface::{Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native_ffi::{OpenglContextDescriptor, WglContextDescriptor};
+use maplibre_native_ffi::{OpenGlContextDescriptor, WglContextDescriptor};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
 use winit::window::Window;
 
-pub struct OpenGLPlatformContext {
+pub struct OpenGlPlatformContext {
     hwnd: HWND,
     hdc: HDC,
 }
 
-impl OpenGLPlatformContext {
+impl OpenGlPlatformContext {
     pub fn new(window: &Window, _config: Config) -> Result<Self, Box<dyn Error>> {
         let hwnd = hwnd_from_window(window)?;
         let hdc = unsafe { GetDC(hwnd) };
@@ -28,16 +28,16 @@ impl OpenGLPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
         let RawContext::Wgl(raw_context) = context.raw_context() else {
             return Err("glutin did not create a WGL context".into());
         };
-        Ok(OpenglContextDescriptor {
-            data: maplibre_native_ffi::OpenglContextDescriptorData::Wgl(WglContextDescriptor {
+        Ok(OpenGlContextDescriptor {
+            data: maplibre_native_ffi::OpenGlContextDescriptorData::Wgl(WglContextDescriptor {
                 share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
                 ..WglContextDescriptor::new(self.hdc.cast::<std::ffi::c_void>())
             }),
-            ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
+            ownership: maplibre_native_ffi::OpenGlContextOwnership::Shared,
         })
     }
 
@@ -53,7 +53,7 @@ impl OpenGLPlatformContext {
     }
 }
 
-impl Drop for OpenGLPlatformContext {
+impl Drop for OpenGlPlatformContext {
     fn drop(&mut self) {
         // SAFETY: hdc was acquired from this live window with GetDC, and the
         // constructor returns Err on null. Drop runs unconditionally.

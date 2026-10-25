@@ -350,7 +350,7 @@ pub const Graphics = struct {
         return error.GraphicsUnavailable;
     }
 
-    fn openglContext(self: *const Graphics) maplibre.OpenglContextDescriptor {
+    fn openGlContext(self: *const Graphics) maplibre.OpenGlContextDescriptor {
         if (supports_egl) return .{ .data = .{ .egl = .{
             .display = self.context.egl_display,
             .config = self.context.egl_config,
@@ -383,7 +383,7 @@ pub const OwnedTextureFrame = if (build_options.supports_metal)
 else if (build_options.supports_vulkan)
     maplibre.VulkanTextureFrame
 else
-    maplibre.OpenglTextureFrame;
+    maplibre.OpenGlTextureFrame;
 
 /// Reads a scoped view of an acquired frame's texture on this build's backend.
 pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(getBackendTexture(frame, context, use, null)) {
@@ -395,7 +395,7 @@ const getBackendTexture = if (build_options.supports_metal)
 else if (build_options.supports_vulkan)
     maplibre.AcquiredFrame.getVulkanTexture
 else
-    maplibre.AcquiredFrame.getOpenglTexture;
+    maplibre.AcquiredFrame.getOpenGlTexture;
 
 /// An owned-texture render session on a fixture's map, with the wakes that
 /// its waits block on. OpenGL sessions share the fixture context, which is
@@ -432,7 +432,7 @@ pub const OwnedTexture = struct {
         else if (build_options.supports_vulkan)
             try map.attachVulkanOwnedTexture(.{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
         else
-            try map.attachOpenglOwnedTexture(.{ .extent = extent, .context = self.graphics.openglContext() }, options, null);
+            try map.attachOpenGlOwnedTexture(.{ .extent = extent, .context = self.graphics.openGlContext() }, options, null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);

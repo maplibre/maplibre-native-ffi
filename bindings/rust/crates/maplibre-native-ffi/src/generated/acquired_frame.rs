@@ -62,7 +62,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_opengl_texture<R>(
         &self,
-        callback: impl FnOnce(&OpenglTextureFrame) -> R,
+        callback: impl FnOnce(&OpenGlTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.call();
         unsafe {
@@ -152,7 +152,7 @@ impl AcquiredFrameHandle {
     #[cfg(target_os = "emscripten")]
     pub fn get_webgpu_texture<R>(
         &self,
-        callback: impl FnOnce(&WebgpuTextureFrame) -> R,
+        callback: impl FnOnce(&WebGpuTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.call();
         unsafe {

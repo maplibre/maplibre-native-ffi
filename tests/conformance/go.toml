@@ -16,7 +16,7 @@
 
 [cases]
 "ERR-01" = "bindings/go/maplibre/errors_test.go::TestNativeStatusMapsToTypedErrors"
-"ERR-02" = "bindings/go/maplibre/errors_test.go::TestMismatchedCABIVersionIsRejected"
+"ERR-02" = "bindings/go/maplibre/errors_test.go::TestMismatchedCAbiVersionIsRejected"
 "ERR-03" = "bindings/go/maplibre/render_test.go::TestDrainBeforeAnyDemandReturnsNoBatch"
 "LIFE-01" = "bindings/go/maplibre/lifecycle_test.go::TestClosingTwiceIsSafe"
 "LIFE-02" = "bindings/go/maplibre/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"

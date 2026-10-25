@@ -37,10 +37,10 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_opengl_supported_context_provider_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
     /// </remarks>
-    public static OpenglContextProviderFlag OpenglSupportedContextProviderMask()
+    public static OpenGlContextProviderFlag OpenGlSupportedContextProviderMask()
     {
         using var call = Enter(null);
         var returned = NativeMethods.mln_opengl_supported_context_provider_mask();
-        return (OpenglContextProviderFlag)returned;
+        return (OpenGlContextProviderFlag)returned;
     }
 }

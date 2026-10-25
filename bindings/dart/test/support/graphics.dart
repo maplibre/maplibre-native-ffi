@@ -85,9 +85,9 @@ int _buildBackend() {
   final backends = supportedRenderBackendMask();
   if (backends.contains(RenderBackendFlag.metal)) return _backendMetal;
   if (backends.contains(RenderBackendFlag.vulkan)) return _backendVulkan;
-  final providers = openglSupportedContextProviderMask();
-  if (providers.contains(OpenglContextProviderFlag.egl)) return _backendEgl;
-  if (providers.contains(OpenglContextProviderFlag.wgl)) return _backendWgl;
+  final providers = openGlSupportedContextProviderMask();
+  if (providers.contains(OpenGlContextProviderFlag.egl)) return _backendEgl;
+  if (providers.contains(OpenGlContextProviderFlag.wgl)) return _backendWgl;
   throw StateError('no test graphics backend for $backends');
 }
 
@@ -183,17 +183,17 @@ final class TestGraphics {
           options,
         );
       case _backendEgl:
-        return map.attachOpenglOwnedTexture(
-          OpenglOwnedTextureDescriptor(
+        return map.attachOpenGlOwnedTexture(
+          OpenGlOwnedTextureDescriptor(
             extent: extent,
-            context: OpenglContextDescriptor(
-              ownership: OpenglContextOwnership.dedicated,
-              data: OpenglContextDescriptorDataEgl(
+            context: OpenGlContextDescriptor(
+              ownership: OpenGlContextOwnership.dedicated,
+              data: OpenGlContextDescriptorDataEgl(
                 EglContextDescriptor(
                   display: pointer(context.eglDisplay),
                   config: pointer(context.eglConfig),
                   shareContext: NativePointer.nullPointer,
-                  clientApi: OpenglClientApi.gles,
+                  clientApi: OpenGlClientApi.gles,
                 ),
               ),
             ),

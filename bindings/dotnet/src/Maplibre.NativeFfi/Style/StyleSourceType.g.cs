@@ -14,7 +14,7 @@ public enum StyleSourceType : uint
     Vector = 1,
     Raster = 2,
     RasterDem = 3,
-    Geojson = 4,
+    GeoJson = 4,
     Image = 5,
     Video = 6,
     Annotations = 7,

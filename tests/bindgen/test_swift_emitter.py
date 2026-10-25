@@ -112,6 +112,12 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertFalse(swift.repeats("setHeader", "name"))
         self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
 
+    def test_a_type_name_cases_each_word_of_a_joined_token(self):
+        self.assertEqual(swift.name("geojson_source_options"), "GeoJsonSourceOptions")
+        self.assertEqual(
+            swift.name("opengl_context_descriptor"), "OpenGlContextDescriptor"
+        )
+
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
         outputs = swift.generate(real_api())
         values = "".join(

@@ -444,7 +444,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_opengl_borrowed_texture_target(
         &self,
-        descriptor: &OpenglBorrowedTextureDescriptor,
+        descriptor: &OpenGlBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
@@ -470,7 +470,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_opengl_surface_target(
         &self,
-        descriptor: &OpenglSurfaceDescriptor,
+        descriptor: &OpenGlSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
@@ -563,7 +563,7 @@ impl RenderSessionHandle {
     #[cfg(target_os = "emscripten")]
     pub unsafe fn set_webgpu_borrowed_texture_target(
         &self,
-        descriptor: &WebgpuBorrowedTextureDescriptor,
+        descriptor: &WebGpuBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
@@ -590,7 +590,7 @@ impl RenderSessionHandle {
     #[cfg(target_os = "emscripten")]
     pub unsafe fn set_webgpu_surface_target(
         &self,
-        descriptor: &WebgpuSurfaceDescriptor,
+        descriptor: &WebGpuSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;

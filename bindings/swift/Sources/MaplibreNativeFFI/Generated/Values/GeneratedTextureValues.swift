@@ -188,7 +188,7 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
+public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
   /// Borrowed OpenGL texture object name. Required.
   public var texture: UInt32
   public init(texture: UInt32) {
@@ -210,7 +210,7 @@ public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
+public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. Required. physical_width and physical_height give
   /// the texture's size. A scale_factor that differs from the map's is accepted
   /// and logged as a warning.
@@ -221,17 +221,17 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalHeight: UInt32
   /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
-  public var context: OpenglContextDescriptor
+  public var context: OpenGlContextDescriptor
   /// The ring's textures, one per slot, in slot order. Required.
-  public var textures: [OpenglBorrowedTexture]
+  public var textures: [OpenGlBorrowedTexture]
   /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
   public var target: UInt32
   public init(
     extent: LogicalExtent,
     physicalWidth: UInt32,
     physicalHeight: UInt32,
-    context: OpenglContextDescriptor,
-    textures: [OpenglBorrowedTexture],
+    context: OpenGlContextDescriptor,
+    textures: [OpenGlBorrowedTexture],
     target: UInt32
   ) {
     self.extent = extent
@@ -249,11 +249,11 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
-    context = try OpenglContextDescriptor(raw: raw.context)
+    context = try OpenGlContextDescriptor(raw: raw.context)
     textures = try NativeInputArena.copyArray(
       raw.textures,
       count: Int(raw.texture_count)
-    ).map { OpenglBorrowedTexture(raw: $0) }
+    ).map { OpenGlBorrowedTexture(raw: $0) }
     target = raw.target
   }
 
@@ -277,7 +277,7 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
+public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
@@ -285,8 +285,8 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
   /// transferred WebGL ownership creates a private core-worker context for CPU
   /// readback.
-  public var context: OpenglContextDescriptor
-  public init(extent: LogicalExtent, context: OpenglContextDescriptor) {
+  public var context: OpenGlContextDescriptor
+  public init(extent: LogicalExtent, context: OpenGlContextDescriptor) {
     self.extent = extent
     self.context = context
   }
@@ -296,7 +296,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     extent = LogicalExtent(raw: raw.extent)
-    context = try OpenglContextDescriptor(raw: raw.context)
+    context = try OpenGlContextDescriptor(raw: raw.context)
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -314,7 +314,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
 ///
 /// See `mln_opengl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenglTextureFrame: Equatable, Hashable, Sendable {
+public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
   public var generation: UInt64
   /// Physical OpenGL texture width in device pixels.

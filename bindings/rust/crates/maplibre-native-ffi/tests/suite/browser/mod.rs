@@ -54,7 +54,7 @@ fn owned_texture_session(map: &MapHandle) -> (webgl::WebGlTestContext, Session) 
     // SAFETY: the context outlives the session, on this thread.
     let attachment = unsafe {
         map.attach_opengl_owned_texture(
-            &OpenglOwnedTextureDescriptor {
+            &OpenGlOwnedTextureDescriptor {
                 extent: EXTENT,
                 context: context.descriptor(),
             },
@@ -72,7 +72,7 @@ fn owned_texture_session(map: &MapHandle) -> (webgpu::WebGpuTestContext, Session
     // SAFETY: the device outlives the session, on this thread.
     let attachment = unsafe {
         map.attach_webgpu_owned_texture(
-            &WebgpuOwnedTextureDescriptor {
+            &WebGpuOwnedTextureDescriptor {
                 extent: EXTENT,
                 context: context.descriptor(),
             },
@@ -87,7 +87,7 @@ fn owned_texture_session(map: &MapHandle) -> (webgpu::WebGpuTestContext, Session
 #[test]
 fn a_webgl_session_renders_into_a_host_texture() {
     let fixture = styled_fixture();
-    let texture = webgl::WebGlBorrowedTexture::new(EXTENT.width, EXTENT.height).unwrap();
+    let texture = webgl::WebGlHostTexture::new(EXTENT.width, EXTENT.height).unwrap();
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the texture and its context outlive the session, on this thread.
     let attachment = unsafe {
@@ -108,8 +108,7 @@ fn a_webgl_session_renders_into_a_host_texture() {
 fn a_webgpu_session_renders_into_a_host_texture() {
     let fixture = styled_fixture();
     let context = webgpu::WebGpuTestContext::new().unwrap();
-    let texture =
-        webgpu::WebGpuBorrowedTexture::new(&context, EXTENT.width, EXTENT.height).unwrap();
+    let texture = webgpu::WebGpuHostTexture::new(&context, EXTENT.width, EXTENT.height).unwrap();
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the texture and its device outlive the session, on this thread.
     let attachment = unsafe {

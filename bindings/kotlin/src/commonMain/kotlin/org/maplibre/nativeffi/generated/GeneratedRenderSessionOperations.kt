@@ -335,14 +335,14 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * See `mln_render_session_set_opengl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun setOpenglBorrowedTextureTarget(
-    descriptor: OpenglBorrowedTextureDescriptor,
+  public fun setOpenGlBorrowedTextureTarget(
+    descriptor: OpenGlBorrowedTextureDescriptor,
   ): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_opengl_borrowed_texture_target(
           handle,
-          writeOpenglBorrowedTextureDescriptor(descriptor),
+          writeOpenGlBorrowedTextureDescriptor(descriptor),
           completion,
           diagnostic,
         ),
@@ -355,12 +355,12 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * See `mln_render_session_set_opengl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun setOpenglSurfaceTarget(descriptor: OpenglSurfaceDescriptor): Deferred<Unit> =
+  public fun setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_opengl_surface_target(
           handle,
-          writeOpenglSurfaceDescriptor(descriptor),
+          writeOpenGlSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
         ),

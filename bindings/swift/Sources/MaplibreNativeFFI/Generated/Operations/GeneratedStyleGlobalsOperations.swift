@@ -8,10 +8,10 @@ public extension Maplibre {
   ///
   /// See `mln_geojson_source_data_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func geojsonSourceDataCreate(
+  static func geoJsonSourceDataCreate(
     _ bindingArg0: String,
-    options bindingArg1: GeojsonSourceOptions? = nil
-  ) throws -> GeojsonSourceDataHandle {
+    options bindingArg1: GeoJsonSourceOptions? = nil
+  ) throws -> GeoJsonSourceDataHandle {
     var value0: mln_geojson_source_data = 0
     return try nativeInvoke { _, arena, diagnostic in
       try mln_geojson_source_data_create(
@@ -20,6 +20,6 @@ public extension Maplibre {
         &value0,
         diagnostic
       )
-    } result: { try GeojsonSourceDataHandle(adopting: value0) }
+    } result: { try GeoJsonSourceDataHandle(adopting: value0) }
   }
 }

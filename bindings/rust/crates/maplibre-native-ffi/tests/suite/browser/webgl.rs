@@ -111,13 +111,13 @@ impl WebGlTestContext {
         Ok(created)
     }
 
-    pub(super) fn descriptor(&self) -> OpenglContextDescriptor {
-        OpenglContextDescriptor {
-            data: OpenglContextDescriptorData::Webgl(WebglContextDescriptor {
+    pub(super) fn descriptor(&self) -> OpenGlContextDescriptor {
+        OpenGlContextDescriptor {
+            data: OpenGlContextDescriptorData::WebGl(WebGlContextDescriptor {
                 context: self.context,
                 ..Default::default()
             }),
-            ownership: OpenglContextOwnership::Shared,
+            ownership: OpenGlContextOwnership::Shared,
         }
     }
 
@@ -159,14 +159,14 @@ impl Drop for WebGlTestContext {
 
 /// An RGBA8 texture that the host allocates in its context and hands to a
 /// session as its render target.
-pub(super) struct WebGlBorrowedTexture {
+pub(super) struct WebGlHostTexture {
     context: WebGlTestContext,
     texture: gl::NativeTexture,
     width: u32,
     height: u32,
 }
 
-impl WebGlBorrowedTexture {
+impl WebGlHostTexture {
     pub(super) fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let context = WebGlTestContext::new(width, height)?;
         let gl = context.gl();
@@ -203,13 +203,13 @@ impl WebGlBorrowedTexture {
         })
     }
 
-    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenglBorrowedTextureDescriptor {
-        OpenglBorrowedTextureDescriptor {
+    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenGlBorrowedTextureDescriptor {
+        OpenGlBorrowedTextureDescriptor {
             extent,
             physical_width: self.width,
             physical_height: self.height,
             context: self.context.descriptor(),
-            textures: vec![OpenglBorrowedTexture::new(self.texture.0.get())],
+            textures: vec![OpenGlBorrowedTexture::new(self.texture.0.get())],
             target: gl::TEXTURE_2D,
         }
     }
@@ -254,7 +254,7 @@ impl WebGlBorrowedTexture {
     }
 }
 
-impl Drop for WebGlBorrowedTexture {
+impl Drop for WebGlHostTexture {
     fn drop(&mut self) {
         if self.context.make_current().is_ok() {
             // SAFETY: the texture is this value's and is deleted once.

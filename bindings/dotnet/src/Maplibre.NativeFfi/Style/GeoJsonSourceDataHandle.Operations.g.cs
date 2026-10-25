@@ -12,32 +12,32 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_geojson_source_data</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
 /// </remarks>
-public sealed unsafe partial class GeojsonSourceDataHandle
+public sealed unsafe partial class GeoJsonSourceDataHandle
     : IDisposable,
-        INativeOwner<MlnGeojsonSourceData>
+        INativeOwner<MlnGeoJsonSourceData>
 {
-    private readonly NativeHandleState<MlnGeojsonSourceData> state;
+    private readonly NativeHandleState<MlnGeoJsonSourceData> state;
 
-    internal GeojsonSourceDataHandle(MlnGeojsonSourceData handle)
+    internal GeoJsonSourceDataHandle(MlnGeoJsonSourceData handle)
     {
-        state = new(handle, Abandon, nameof(GeojsonSourceDataHandle), Abandon);
+        state = new(handle, Abandon, nameof(GeoJsonSourceDataHandle), Abandon);
     }
 
-    internal static GeojsonSourceDataHandle Adopt(MlnGeojsonSourceData handle) =>
-        NativeHandleState<MlnGeojsonSourceData>.Adopt(
+    internal static GeoJsonSourceDataHandle Adopt(MlnGeoJsonSourceData handle) =>
+        NativeHandleState<MlnGeoJsonSourceData>.Adopt(
             handle,
-            () => new GeojsonSourceDataHandle(handle),
+            () => new GeoJsonSourceDataHandle(handle),
             Abandon
         );
 
-    private static mln_status Abandon(MlnGeojsonSourceData live, mln_diagnostic* diagnostic)
+    private static mln_status Abandon(MlnGeoJsonSourceData live, mln_diagnostic* diagnostic)
     {
         NativeMethods.mln_geojson_source_data_release(live);
         return mln_status.MLN_STATUS_OK;
     }
 
-    NativeHandleState<MlnGeojsonSourceData> INativeOwner<MlnGeojsonSourceData>.State => state;
-    internal MlnGeojsonSourceData Handle => state.Handle;
+    NativeHandleState<MlnGeoJsonSourceData> INativeOwner<MlnGeoJsonSourceData>.State => state;
+    internal MlnGeoJsonSourceData Handle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after close.
@@ -66,13 +66,13 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     /// See <c>mln_geojson_source_data_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public static GeojsonSourceDataHandle Create(string data, GeojsonSourceOptions? options = null)
+    public static GeoJsonSourceDataHandle Create(string data, GeoJsonSourceOptions? options = null)
     {
         using var scope = new NativeCallScope(null);
         var nativeOptions = options is null
             ? default(mln_geojson_source_options)
-            : NativeGeojsonSourceOptions(options, scope);
-        MlnGeojsonSourceData outData = default;
+            : NativeGeoJsonSourceOptions(options, scope);
+        MlnGeoJsonSourceData outData = default;
         Check(
             NativeMethods.mln_geojson_source_data_create(
                 scope.Utf8(data),
@@ -82,6 +82,6 @@ public sealed unsafe partial class GeojsonSourceDataHandle
             )
         );
         scope.Accept();
-        return GeojsonSourceDataHandle.Adopt(outData);
+        return GeoJsonSourceDataHandle.Adopt(outData);
     }
 }

@@ -17,7 +17,7 @@ class _AcquiredFrameHandle:
     def vulkan_texture(self) -> Any: ...
     def close(self, consumer_completion: GpuSync | None = None) -> Any: ...
 
-class _GeojsonSourceDataHandle:
+class _GeoJsonSourceDataHandle:
     _is_closed: bool
     id: int
     def _exit(self) -> Any: ...
@@ -44,16 +44,16 @@ class _MapHandle:
         self, source_id: str, options: CustomMvtVectorSourceOptions
     ) -> None: ...
     def add_geojson_source_data(
-        self, source_id: str, data: _GeojsonSourceDataHandle
+        self, source_id: str, data: _GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]: ...
     def _discard_add_geojson_source_data(
-        self, source_id: str, data: _GeojsonSourceDataHandle
+        self, source_id: str, data: _GeoJsonSourceDataHandle
     ) -> None: ...
     def add_geojson_source_url(
-        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> Future[CommandCompletion]: ...
     def _discard_add_geojson_source_url(
-        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> None: ...
     def add_image_source_image(
         self,
@@ -102,16 +102,16 @@ class _MapHandle:
     ) -> dict[str, Any]: ...
     def attach_opengl_borrowed_texture(
         self,
-        descriptor: OpenglBorrowedTextureDescriptor,
+        descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> dict[str, Any]: ...
     def attach_opengl_owned_texture(
         self,
-        descriptor: OpenglOwnedTextureDescriptor,
+        descriptor: OpenGlOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> dict[str, Any]: ...
     def attach_opengl_surface(
-        self, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions
+        self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> dict[str, Any]: ...
     def attach_vulkan_borrowed_texture(
         self,
@@ -257,10 +257,10 @@ class _MapHandle:
         self, options: FreeCameraOptions | None = None
     ) -> None: ...
     def set_geojson_source_data(
-        self, source_id: str, data: _GeojsonSourceDataHandle
+        self, source_id: str, data: _GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]: ...
     def _discard_set_geojson_source_data(
-        self, source_id: str, data: _GeojsonSourceDataHandle
+        self, source_id: str, data: _GeoJsonSourceDataHandle
     ) -> None: ...
     def set_geojson_source_synchronous_tiling(
         self, source_id: str, enabled: bool
@@ -417,10 +417,10 @@ class _RenderSessionHandle:
         self, descriptor: MetalSurfaceDescriptor
     ) -> Future[None]: ...
     def set_opengl_borrowed_texture_target(
-        self, descriptor: OpenglBorrowedTextureDescriptor
+        self, descriptor: OpenGlBorrowedTextureDescriptor
     ) -> Future[None]: ...
     def set_opengl_surface_target(
-        self, descriptor: OpenglSurfaceDescriptor
+        self, descriptor: OpenGlSurfaceDescriptor
     ) -> Future[None]: ...
     def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor
@@ -514,7 +514,7 @@ class _StyleExpressionHandle:
 def android_init(jni_env: int, context: int) -> Any: ...
 def c_version() -> Any: ...
 def geojson_source_data_create(
-    data: Any, options: GeojsonSourceOptions | None = None
+    data: Any, options: GeoJsonSourceOptions | None = None
 ) -> Any: ...
 def lat_lng_for_projected_meters(meters: ProjectedMeters) -> Any: ...
 def log_clear_callback() -> Any: ...

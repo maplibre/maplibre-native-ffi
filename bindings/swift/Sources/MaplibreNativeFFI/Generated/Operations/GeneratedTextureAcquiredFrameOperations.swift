@@ -38,7 +38,7 @@ public extension AcquiredFrameHandle {
   ///
   /// See `mln_acquired_frame_get_opengl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withOpenglTexture<Result>(_ body: (OpenglTextureFrameView) throws
+  func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws
     -> Result) throws -> Result
   {
     var raw = mln_opengl_texture_frame()
@@ -56,8 +56,8 @@ public extension AcquiredFrameHandle {
         value,
         diagnostic
       ) }
-    ) { raw, scope in try body(OpenglTextureFrameView(
-      OpenglTextureFrame(raw: raw),
+    ) { raw, scope in try body(OpenGlTextureFrameView(
+      OpenGlTextureFrame(raw: raw),
       scope: scope
     )) }
   }

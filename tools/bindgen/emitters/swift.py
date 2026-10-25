@@ -9,7 +9,7 @@ from pathlib import Path
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
-from tools.bindgen.names import camel
+from tools.bindgen.names import camel, words
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -54,10 +54,11 @@ def identifier(value: str) -> str:
 
 
 def name(value: str) -> str:
-    return "".join(part[:1].upper() + part[1:] for part in value.split("_"))
+    return "".join(part[:1].upper() + part[1:] for part in words(value))
 
 
-def words(text: str) -> list[str]:
+def label_words(text: str) -> list[str]:
+    """The lowercase words of a camel-case Swift name."""
     return [word.lower() for word in re.findall(r"[A-Z]?[a-z]+|[A-Z]+|\d+", text)]
 
 
@@ -65,10 +66,10 @@ def repeats(method: str, label: str) -> bool:
     """Whether a first argument label only repeats words of its method's name,
     as `setStyleUrl(url:)` and `deleteOfflineRegion(regionId:)` do. A trailing
     `Id` or `Name` names the key of what the method already names."""
-    named = words(label)
+    named = label_words(label)
     while len(named) > 1 and named[-1] in {"id", "name"}:
         named.pop()
-    return set(named) <= set(words(method))
+    return set(named) <= set(label_words(method))
 
 
 def native(type_: CType) -> str:

@@ -1,6 +1,6 @@
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-internal sealed class OpenGLBorrowedTexture : IDisposable
+internal sealed class OpenGlBorrowedTexture : IDisposable
 {
     public const uint Texture2D = 0x0DE1;
 
@@ -11,10 +11,10 @@ internal sealed class OpenGLBorrowedTexture : IDisposable
     private const uint UnsignedByte = 0x1401;
     private const int Linear = 0x2601;
 
-    private readonly OpenGLContext context;
+    private readonly OpenGlContext context;
     private uint texture;
 
-    public OpenGLBorrowedTexture(OpenGLContext context, Viewport viewport)
+    public OpenGlBorrowedTexture(OpenGlContext context, Viewport viewport)
     {
         this.context = context;
         context.MakeCurrentForRendering();

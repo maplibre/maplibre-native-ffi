@@ -43,7 +43,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
 
 
 def _check_handle(
-    handle: mln.GeojsonSourceDataHandle | mln.MapHandle | mln.RuntimeHandle,
+    handle: mln.GeoJsonSourceDataHandle | mln.MapHandle | mln.RuntimeHandle,
     *,
     closed: bool,
 ) -> None:

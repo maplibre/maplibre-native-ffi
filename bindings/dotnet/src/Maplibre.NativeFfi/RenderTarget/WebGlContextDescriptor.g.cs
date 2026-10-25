@@ -16,12 +16,12 @@ namespace Maplibre.NativeFfi;
 /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
 /// canvas must still be transferable when attachment starts.
 /// </param>
-public readonly partial record struct WebglContextDescriptor(
-    WebglContextKind Kind,
+public readonly partial record struct WebGlContextDescriptor(
+    WebGlContextKind Kind,
     int Context,
     string CanvasSelector
 )
 {
-    public WebglContextDescriptor()
+    public WebGlContextDescriptor()
         : this(default, default, "") { }
 }

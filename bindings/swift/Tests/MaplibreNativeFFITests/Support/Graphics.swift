@@ -95,10 +95,10 @@ final class TestGraphics: @unchecked Sendable {
       #endif
     default:
       let dedicated = options.driver == .coreWorker
-      return try map.attachOpenglOwnedTexture(
-        descriptor: OpenglOwnedTextureDescriptor(
+      return try map.attachOpenGlOwnedTexture(
+        descriptor: OpenGlOwnedTextureDescriptor(
           extent: extent,
-          context: OpenglContextDescriptor(
+          context: OpenGlContextDescriptor(
             ownership: dedicated ? .dedicated : .shared,
             data: .egl(EglContextDescriptor(
               display: pointer(context.egl_display),
@@ -132,7 +132,7 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Vulkan backend needs Linux or macOS")
       #endif
     default:
-      try frame.withOpenglTexture { try body($0) }
+      try frame.withOpenGlTexture { try body($0) }
     }
   }
 
@@ -170,7 +170,7 @@ extension VulkanTextureFrameView: OwnedTextureFrameView {
   }
 }
 
-extension OpenglTextureFrameView: OwnedTextureFrameView {
+extension OpenGlTextureFrameView: OwnedTextureFrameView {
   func readTexture() throws {
     _ = try texture
   }

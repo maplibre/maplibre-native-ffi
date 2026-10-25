@@ -38,8 +38,8 @@ pub fn c_version() -> u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn geojson_source_data_create(
     data: &str,
-    options: Option<&GeojsonSourceOptions>,
-) -> Result<GeojsonSourceDataHandle> {
+    options: Option<&GeoJsonSourceOptions>,
+) -> Result<GeoJsonSourceDataHandle> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     let mut out_data = sys::mln_geojson_source_data(0);
@@ -48,7 +48,7 @@ pub fn geojson_source_data_create(
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_geojson_source_data_create(data, options, &mut out_data, out_diagnostic)
     })?;
-    Ok(GeojsonSourceDataHandle::adopt(out_data, None)?)
+    Ok(GeoJsonSourceDataHandle::adopt(out_data, None)?)
 }
 
 /// Converts spherical Mercator projected meters to a geographic coordinate.
@@ -171,11 +171,11 @@ pub fn network_set_status(status: NetworkStatus) -> Result<()> {
 ///
 /// See `mln_opengl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn opengl_supported_context_provider_mask() -> OpenglContextProviderFlag {
+pub fn opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
     let mut call = Call::global();
     maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_opengl_supported_context_provider_mask() });
-    OpenglContextProviderFlag::from_bits_retain(value)
+    OpenGlContextProviderFlag::from_bits_retain(value)
 }
 
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never

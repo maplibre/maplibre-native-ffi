@@ -20,7 +20,7 @@ internal interface ITextureCompositor : IDisposable
         );
     }
 
-    bool Draw(OpenglTextureFrameView frame)
+    bool Draw(OpenGlTextureFrameView frame)
     {
         _ = frame;
         throw new NotSupportedException(

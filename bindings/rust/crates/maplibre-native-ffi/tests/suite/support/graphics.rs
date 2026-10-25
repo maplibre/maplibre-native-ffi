@@ -201,11 +201,11 @@ impl Graphics {
                     options,
                 ),
                 BACKEND_WGL => map.attach_opengl_owned_texture(
-                    &OpenglOwnedTextureDescriptor {
+                    &OpenGlOwnedTextureDescriptor {
                         extent,
-                        context: OpenglContextDescriptor {
-                            ownership: OpenglContextOwnership::Shared,
-                            data: OpenglContextDescriptorData::Wgl(WglContextDescriptor {
+                        context: OpenGlContextDescriptor {
+                            ownership: OpenGlContextOwnership::Shared,
+                            data: OpenGlContextDescriptorData::Wgl(WglContextDescriptor {
                                 device_context: context.wgl_device_context,
                                 share_context: context.wgl_context,
                                 get_proc_address: context.get_proc_address,
@@ -215,11 +215,11 @@ impl Graphics {
                     options,
                 ),
                 _ => map.attach_opengl_owned_texture(
-                    &OpenglOwnedTextureDescriptor {
+                    &OpenGlOwnedTextureDescriptor {
                         extent,
-                        context: OpenglContextDescriptor {
-                            ownership: OpenglContextOwnership::Shared,
-                            data: OpenglContextDescriptorData::Egl(EglContextDescriptor {
+                        context: OpenGlContextDescriptor {
+                            ownership: OpenGlContextOwnership::Shared,
+                            data: OpenGlContextDescriptorData::Egl(EglContextDescriptor {
                                 share_context: context.egl_context,
                                 ..EglContextDescriptor::new(context.egl_display, context.egl_config)
                             }),

@@ -47,10 +47,10 @@ public final class MetalTextureFrameView {
   }
 }
 
-public final class OpenglTextureFrameView {
-  private let snapshot: OpenglTextureFrame
+public final class OpenGlTextureFrameView {
+  private let snapshot: OpenGlTextureFrame
   private let scope: NativeViewScope
-  init(_ value: OpenglTextureFrame, scope: NativeViewScope) {
+  init(_ value: OpenGlTextureFrame, scope: NativeViewScope) {
     snapshot = value; self.scope = scope
   }
 

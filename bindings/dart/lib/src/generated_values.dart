@@ -192,11 +192,11 @@ final class GpuSyncKind extends _Enum {
 
   /// GLsync in the shared EGL or WGL context's share group, used only by a
   /// caller-graphics-thread driver. handle is nonzero.
-  static const openglFence = GpuSyncKind.fromRawValue(1);
+  static const openGlFence = GpuSyncKind.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
-    1 => 'GpuSyncKind.openglFence',
+    1 => 'GpuSyncKind.openGlFence',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -395,23 +395,23 @@ final class OfflineRegionDownloadState extends _Enum {
 ///
 /// See `mln_opengl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenglClientApi extends _Enum {
-  const OpenglClientApi.fromRawValue(super.rawValue);
+final class OpenGlClientApi extends _Enum {
+  const OpenGlClientApi.fromRawValue(super.rawValue);
 
   /// No client API is named.
-  static const unspecified = OpenglClientApi.fromRawValue(0);
+  static const unspecified = OpenGlClientApi.fromRawValue(0);
 
   /// Desktop OpenGL, as EGL_OPENGL_API names it.
-  static const gl = OpenglClientApi.fromRawValue(1);
+  static const gl = OpenGlClientApi.fromRawValue(1);
 
   /// OpenGL ES, as EGL_OPENGL_ES_API names it.
-  static const gles = OpenglClientApi.fromRawValue(2);
+  static const gles = OpenGlClientApi.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
-    0 => 'OpenglClientApi.unspecified',
-    1 => 'OpenglClientApi.gl',
-    2 => 'OpenglClientApi.gles',
-    _ => 'OpenglClientApi($rawValue)',
+    0 => 'OpenGlClientApi.unspecified',
+    1 => 'OpenGlClientApi.gl',
+    2 => 'OpenGlClientApi.gles',
+    _ => 'OpenGlClientApi($rawValue)',
   };
 }
 
@@ -420,19 +420,19 @@ final class OpenglClientApi extends _Enum {
 ///
 /// See `mln_opengl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenglContextOwnership extends _Enum {
-  const OpenglContextOwnership.fromRawValue(super.rawValue);
+final class OpenGlContextOwnership extends _Enum {
+  const OpenGlContextOwnership.fromRawValue(super.rawValue);
 
   /// The session shares its thread with host graphics work.
-  static const shared = OpenglContextOwnership.fromRawValue(0);
+  static const shared = OpenGlContextOwnership.fromRawValue(0);
 
   /// The session keeps its own OpenGL context current on its thread.
-  static const dedicated = OpenglContextOwnership.fromRawValue(1);
+  static const dedicated = OpenGlContextOwnership.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
-    0 => 'OpenglContextOwnership.shared',
-    1 => 'OpenglContextOwnership.dedicated',
-    _ => 'OpenglContextOwnership($rawValue)',
+    0 => 'OpenGlContextOwnership.shared',
+    1 => 'OpenGlContextOwnership.dedicated',
+    _ => 'OpenGlContextOwnership($rawValue)',
   };
 }
 
@@ -440,26 +440,26 @@ final class OpenglContextOwnership extends _Enum {
 ///
 /// See `mln_opengl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenglContextProviderFlag
-    extends _Flags<OpenglContextProviderFlag> {
-  const OpenglContextProviderFlag.fromRawValue(super.rawValue);
-  static const wgl = OpenglContextProviderFlag.fromRawValue(1);
-  static const egl = OpenglContextProviderFlag.fromRawValue(2);
+final class OpenGlContextProviderFlag
+    extends _Flags<OpenGlContextProviderFlag> {
+  const OpenGlContextProviderFlag.fromRawValue(super.rawValue);
+  static const wgl = OpenGlContextProviderFlag.fromRawValue(1);
+  static const egl = OpenGlContextProviderFlag.fromRawValue(2);
 
   /// Browser WebGL context imported into an Emscripten module.
-  static const webgl = OpenglContextProviderFlag.fromRawValue(4);
+  static const webGl = OpenGlContextProviderFlag.fromRawValue(4);
 
   /// No flags.
-  static const none = OpenglContextProviderFlag.fromRawValue(0);
+  static const none = OpenGlContextProviderFlag.fromRawValue(0);
   @override
-  OpenglContextProviderFlag _of(int rawValue) =>
-      OpenglContextProviderFlag.fromRawValue(rawValue);
+  OpenGlContextProviderFlag _of(int rawValue) =>
+      OpenGlContextProviderFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('OpenglContextProviderFlag', const {
+  String toString() => _describe('OpenGlContextProviderFlag', const {
     0: 'none',
     1: 'wgl',
     2: 'egl',
-    4: 'webgl',
+    4: 'webGl',
   });
 }
 
@@ -491,8 +491,8 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
   const RenderBackendFlag.fromRawValue(super.rawValue);
   static const metal = RenderBackendFlag.fromRawValue(1);
   static const vulkan = RenderBackendFlag.fromRawValue(2);
-  static const opengl = RenderBackendFlag.fromRawValue(4);
-  static const webgpu = RenderBackendFlag.fromRawValue(8);
+  static const openGl = RenderBackendFlag.fromRawValue(4);
+  static const webGpu = RenderBackendFlag.fromRawValue(8);
 
   /// No flags.
   static const none = RenderBackendFlag.fromRawValue(0);
@@ -504,8 +504,8 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
     0: 'none',
     1: 'metal',
     2: 'vulkan',
-    4: 'opengl',
-    8: 'webgpu',
+    4: 'openGl',
+    8: 'webGpu',
   });
 }
 
@@ -1083,7 +1083,7 @@ final class StyleSourceType extends _Enum {
   static const vector = StyleSourceType.fromRawValue(1);
   static const raster = StyleSourceType.fromRawValue(2);
   static const rasterDem = StyleSourceType.fromRawValue(3);
-  static const geojson = StyleSourceType.fromRawValue(4);
+  static const geoJson = StyleSourceType.fromRawValue(4);
   static const image = StyleSourceType.fromRawValue(5);
   static const video = StyleSourceType.fromRawValue(6);
   static const annotations = StyleSourceType.fromRawValue(7);
@@ -1095,7 +1095,7 @@ final class StyleSourceType extends _Enum {
     1 => 'StyleSourceType.vector',
     2 => 'StyleSourceType.raster',
     3 => 'StyleSourceType.rasterDem',
-    4 => 'StyleSourceType.geojson',
+    4 => 'StyleSourceType.geoJson',
     5 => 'StyleSourceType.image',
     6 => 'StyleSourceType.video',
     7 => 'StyleSourceType.annotations',
@@ -1219,20 +1219,20 @@ final class ViewportMode extends _Enum {
 ///
 /// See `mln_webgl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WebglContextKind extends _Enum {
-  const WebglContextKind.fromRawValue(super.rawValue);
+final class WebGlContextKind extends _Enum {
+  const WebGlContextKind.fromRawValue(super.rawValue);
 
   /// Use a host-created context on its current browser agent.
-  static const existing = WebglContextKind.fromRawValue(0);
+  static const existing = WebGlContextKind.fromRawValue(0);
 
   /// Transfer the canvas named by canvas_selector to a native worker and create
   /// a WebGL 2 context there.
-  static const transferredCanvas = WebglContextKind.fromRawValue(1);
+  static const transferredCanvas = WebGlContextKind.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
-    0 => 'WebglContextKind.existing',
-    1 => 'WebglContextKind.transferredCanvas',
-    _ => 'WebglContextKind($rawValue)',
+    0 => 'WebGlContextKind.existing',
+    1 => 'WebGlContextKind.transferredCanvas',
+    _ => 'WebGlContextKind($rawValue)',
   };
 }
 
@@ -1311,8 +1311,8 @@ final class MetalTextureFrame extends _Value {
 ///
 /// See `mln_opengl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglTextureFrame extends _Value {
-  const OpenglTextureFrame({
+final class OpenGlTextureFrame extends _Value {
+  const OpenGlTextureFrame({
     this.generation = 0,
     this.width = 0,
     this.height = 0,
@@ -1376,7 +1376,7 @@ final class OpenglTextureFrame extends _Value {
     type,
   ];
   @override
-  String toString() => _describe('OpenglTextureFrame', const [
+  String toString() => _describe('OpenGlTextureFrame', const [
     'generation',
     'width',
     'height',
@@ -1864,8 +1864,8 @@ final class VulkanTextureFrame extends _Value {
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class GeojsonSourceOptions extends _Value {
-  const GeojsonSourceOptions({
+final class GeoJsonSourceOptions extends _Value {
+  const GeoJsonSourceOptions({
     this.minZoom,
     this.maxZoom,
     this.tolerance,
@@ -1916,7 +1916,7 @@ final class GeojsonSourceOptions extends _Value {
   final bool? synchronousTiling;
 
   /// A copy of this value with the given members replaced.
-  GeojsonSourceOptions copyWith({
+  GeoJsonSourceOptions copyWith({
     double? minZoom,
     double? maxZoom,
     double? tolerance,
@@ -1928,7 +1928,7 @@ final class GeojsonSourceOptions extends _Value {
     bool? lineMetrics,
     bool? cluster,
     bool? synchronousTiling,
-  }) => GeojsonSourceOptions(
+  }) => GeoJsonSourceOptions(
     minZoom: minZoom ?? this.minZoom,
     maxZoom: maxZoom ?? this.maxZoom,
     tolerance: tolerance ?? this.tolerance,
@@ -1959,7 +1959,7 @@ final class GeojsonSourceOptions extends _Value {
     synchronousTiling,
   ];
   @override
-  String toString() => _describe('GeojsonSourceOptions', const [
+  String toString() => _describe('GeoJsonSourceOptions', const [
     'minZoom',
     'maxZoom',
     'tolerance',
@@ -2755,7 +2755,7 @@ final class EglContextDescriptor extends _Value {
     required this.display,
     required this.config,
     this.shareContext = NativePointer.nullPointer,
-    this.clientApi = const OpenglClientApi.fromRawValue(0),
+    this.clientApi = const OpenGlClientApi.fromRawValue(0),
     this.getProcAddress = NativePointer.nullPointer,
   });
 
@@ -2779,7 +2779,7 @@ final class EglContextDescriptor extends _Value {
   /// Client API the session creates its context for. Required under dedicated
   /// ownership. A shared session queries share_context for it, so this is
   /// ignored there.
-  final OpenglClientApi clientApi;
+  final OpenGlClientApi clientApi;
 
   /// Optional eglGetProcAddress-compatible function for the host loader.
   final NativePointer getProcAddress;
@@ -2789,7 +2789,7 @@ final class EglContextDescriptor extends _Value {
     NativePointer? display,
     NativePointer? config,
     NativePointer? shareContext,
-    OpenglClientApi? clientApi,
+    OpenGlClientApi? clientApi,
     NativePointer? getProcAddress,
   }) => EglContextDescriptor(
     display: display ?? this.display,
@@ -2821,13 +2821,13 @@ final class EglContextDescriptor extends _Value {
 ///
 /// See `mln_webgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WebglContextDescriptor extends _Value {
-  const WebglContextDescriptor({
-    this.kind = const WebglContextKind.fromRawValue(0),
+final class WebGlContextDescriptor extends _Value {
+  const WebGlContextDescriptor({
+    this.kind = const WebGlContextKind.fromRawValue(0),
     this.context = 0,
     this.canvasSelector = '',
   });
-  final WebglContextKind kind;
+  final WebGlContextKind kind;
 
   /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
   final int context;
@@ -2837,11 +2837,11 @@ final class WebglContextDescriptor extends _Value {
   final String canvasSelector;
 
   /// A copy of this value with the given members replaced.
-  WebglContextDescriptor copyWith({
-    WebglContextKind? kind,
+  WebGlContextDescriptor copyWith({
+    WebGlContextKind? kind,
     int? context,
     String? canvasSelector,
-  }) => WebglContextDescriptor(
+  }) => WebGlContextDescriptor(
     kind: kind ?? this.kind,
     context: context ?? this.context,
     canvasSelector: canvasSelector ?? this.canvasSelector,
@@ -2850,7 +2850,7 @@ final class WebglContextDescriptor extends _Value {
   @override
   List<Object?> get _members => [kind, context, canvasSelector];
   @override
-  String toString() => _describe('WebglContextDescriptor', const [
+  String toString() => _describe('WebGlContextDescriptor', const [
     'kind',
     'context',
     'canvasSelector',
@@ -2861,70 +2861,70 @@ final class WebglContextDescriptor extends _Value {
 ///
 /// See `mln_opengl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenglContextDescriptor {
-  const OpenglContextDescriptor({
-    this.ownership = const OpenglContextOwnership.fromRawValue(0),
+final class OpenGlContextDescriptor {
+  const OpenGlContextDescriptor({
+    this.ownership = const OpenGlContextOwnership.fromRawValue(0),
     required this.data,
   });
 
   /// Whether the session shares its driver thread and graphics objects with the
   /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
   /// are dedicated to their core worker.
-  final OpenglContextOwnership ownership;
-  final OpenglContextDescriptorData data;
+  final OpenGlContextOwnership ownership;
+  final OpenGlContextDescriptorData data;
 }
 
-sealed class OpenglContextDescriptorData {
-  const OpenglContextDescriptorData._();
+sealed class OpenGlContextDescriptorData {
+  const OpenGlContextDescriptorData._();
 }
 
-final class OpenglContextDescriptorDataWgl extends OpenglContextDescriptorData {
-  const OpenglContextDescriptorDataWgl(this.value) : super._();
+final class OpenGlContextDescriptorDataWgl extends OpenGlContextDescriptorData {
+  const OpenGlContextDescriptorDataWgl(this.value) : super._();
   final WglContextDescriptor value;
 }
 
-final class OpenglContextDescriptorDataEgl extends OpenglContextDescriptorData {
-  const OpenglContextDescriptorDataEgl(this.value) : super._();
+final class OpenGlContextDescriptorDataEgl extends OpenGlContextDescriptorData {
+  const OpenGlContextDescriptorDataEgl(this.value) : super._();
   final EglContextDescriptor value;
 }
 
-final class OpenglContextDescriptorDataWebgl
-    extends OpenglContextDescriptorData {
-  const OpenglContextDescriptorDataWebgl(this.value) : super._();
-  final WebglContextDescriptor value;
+final class OpenGlContextDescriptorDataWebGl
+    extends OpenGlContextDescriptorData {
+  const OpenGlContextDescriptorDataWebGl(this.value) : super._();
+  final WebGlContextDescriptor value;
 }
 
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
 /// See `mln_opengl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglBorrowedTexture extends _Value {
-  const OpenglBorrowedTexture({required this.texture});
+final class OpenGlBorrowedTexture extends _Value {
+  const OpenGlBorrowedTexture({required this.texture});
 
   /// Borrowed OpenGL texture object name. Required.
   final int texture;
 
   /// A copy of this value with the given members replaced.
-  OpenglBorrowedTexture copyWith({int? texture}) =>
-      OpenglBorrowedTexture(texture: texture ?? this.texture);
+  OpenGlBorrowedTexture copyWith({int? texture}) =>
+      OpenGlBorrowedTexture(texture: texture ?? this.texture);
 
   @override
   List<Object?> get _members => [texture];
   @override
-  String toString() => _describe('OpenglBorrowedTexture', const ['texture']);
+  String toString() => _describe('OpenGlBorrowedTexture', const ['texture']);
 }
 
 /// OpenGL attachment options for a borrowed texture target.
 ///
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglBorrowedTextureDescriptor extends _Value {
-  OpenglBorrowedTextureDescriptor({
+final class OpenGlBorrowedTextureDescriptor extends _Value {
+  OpenGlBorrowedTextureDescriptor({
     required this.extent,
     required this.physicalWidth,
     required this.physicalHeight,
     required this.context,
-    required List<OpenglBorrowedTexture> textures,
+    required List<OpenGlBorrowedTexture> textures,
     required this.target,
   }) : textures = List.unmodifiable(textures);
 
@@ -2941,23 +2941,23 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 
   /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
-  final OpenglContextDescriptor context;
+  final OpenGlContextDescriptor context;
 
   /// The ring's textures, one per slot, in slot order. Required.
-  final List<OpenglBorrowedTexture> textures;
+  final List<OpenGlBorrowedTexture> textures;
 
   /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
   final int target;
 
   /// A copy of this value with the given members replaced.
-  OpenglBorrowedTextureDescriptor copyWith({
+  OpenGlBorrowedTextureDescriptor copyWith({
     LogicalExtent? extent,
     int? physicalWidth,
     int? physicalHeight,
-    OpenglContextDescriptor? context,
-    List<OpenglBorrowedTexture>? textures,
+    OpenGlContextDescriptor? context,
+    List<OpenGlBorrowedTexture>? textures,
     int? target,
-  }) => OpenglBorrowedTextureDescriptor(
+  }) => OpenGlBorrowedTextureDescriptor(
     extent: extent ?? this.extent,
     physicalWidth: physicalWidth ?? this.physicalWidth,
     physicalHeight: physicalHeight ?? this.physicalHeight,
@@ -2976,7 +2976,7 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
     target,
   ];
   @override
-  String toString() => _describe('OpenglBorrowedTextureDescriptor', const [
+  String toString() => _describe('OpenGlBorrowedTextureDescriptor', const [
     'extent',
     'physicalWidth',
     'physicalHeight',
@@ -2990,8 +2990,8 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 ///
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglOwnedTextureDescriptor extends _Value {
-  const OpenglOwnedTextureDescriptor({
+final class OpenGlOwnedTextureDescriptor extends _Value {
+  const OpenGlOwnedTextureDescriptor({
     required this.extent,
     required this.context,
   });
@@ -3004,13 +3004,13 @@ final class OpenglOwnedTextureDescriptor extends _Value {
   /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
   /// transferred WebGL ownership creates a private core-worker context for CPU
   /// readback.
-  final OpenglContextDescriptor context;
+  final OpenGlContextDescriptor context;
 
   /// A copy of this value with the given members replaced.
-  OpenglOwnedTextureDescriptor copyWith({
+  OpenGlOwnedTextureDescriptor copyWith({
     LogicalExtent? extent,
-    OpenglContextDescriptor? context,
-  }) => OpenglOwnedTextureDescriptor(
+    OpenGlContextDescriptor? context,
+  }) => OpenGlOwnedTextureDescriptor(
     extent: extent ?? this.extent,
     context: context ?? this.context,
   );
@@ -3019,15 +3019,15 @@ final class OpenglOwnedTextureDescriptor extends _Value {
   List<Object?> get _members => [extent, context];
   @override
   String toString() =>
-      _describe('OpenglOwnedTextureDescriptor', const ['extent', 'context']);
+      _describe('OpenGlOwnedTextureDescriptor', const ['extent', 'context']);
 }
 
 /// OpenGL attachment options for a native surface.
 ///
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class OpenglSurfaceDescriptor extends _Value {
-  const OpenglSurfaceDescriptor({
+final class OpenGlSurfaceDescriptor extends _Value {
+  const OpenGlSurfaceDescriptor({
     required this.extent,
     required this.context,
     this.surface = NativePointer.nullPointer,
@@ -3038,7 +3038,7 @@ final class OpenglSurfaceDescriptor extends _Value {
   final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data.
-  final OpenglContextDescriptor context;
+  final OpenGlContextDescriptor context;
 
   /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
   /// EGL, both required. Null for WebGL, whose context carries its canvas
@@ -3046,11 +3046,11 @@ final class OpenglSurfaceDescriptor extends _Value {
   final NativePointer surface;
 
   /// A copy of this value with the given members replaced.
-  OpenglSurfaceDescriptor copyWith({
+  OpenGlSurfaceDescriptor copyWith({
     LogicalExtent? extent,
-    OpenglContextDescriptor? context,
+    OpenGlContextDescriptor? context,
     NativePointer? surface,
-  }) => OpenglSurfaceDescriptor(
+  }) => OpenGlSurfaceDescriptor(
     extent: extent ?? this.extent,
     context: context ?? this.context,
     surface: surface ?? this.surface,
@@ -3059,7 +3059,7 @@ final class OpenglSurfaceDescriptor extends _Value {
   @override
   List<Object?> get _members => [extent, context, surface];
   @override
-  String toString() => _describe('OpenglSurfaceDescriptor', const [
+  String toString() => _describe('OpenGlSurfaceDescriptor', const [
     'extent',
     'context',
     'surface',
@@ -4047,7 +4047,7 @@ final class StyleSourceInfo extends _Value {
     this.isVolatile = false,
     this.attribution = '',
     this.url = '',
-    this.tilejson,
+    this.tileJson,
     this.bounds,
     this.tileSize,
     this.vectorEncoding,
@@ -4068,7 +4068,7 @@ final class StyleSourceInfo extends _Value {
   final String url;
 
   /// Inline TileJSON metadata, when the source was defined with it.
-  final StyleSourceTileInfo? tilejson;
+  final StyleSourceTileInfo? tileJson;
 
   /// Geographic bounds, when inline TileJSON sets them.
   final LatLngBounds? bounds;
@@ -4089,7 +4089,7 @@ final class StyleSourceInfo extends _Value {
     isVolatile,
     attribution,
     url,
-    tilejson,
+    tileJson,
     bounds,
     tileSize,
     vectorEncoding,
@@ -4102,7 +4102,7 @@ final class StyleSourceInfo extends _Value {
     'isVolatile',
     'attribution',
     'url',
-    'tilejson',
+    'tileJson',
     'bounds',
     'tileSize',
     'vectorEncoding',

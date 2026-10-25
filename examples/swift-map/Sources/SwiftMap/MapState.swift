@@ -36,11 +36,11 @@ final class MapState {
   /// Reports a command that failed after native code accepted it.
   var onFailure: (@MainActor (Error) -> Void)?
 
-  /// Creates the map and loads `styleJSON`, or the example's network style
+  /// Creates the map and loads `styleJson`, or the example's network style
   /// when it is nil.
   init(
     viewport: Viewport,
-    styleJSON: String? = nil
+    styleJson: String? = nil
   ) async throws {
     precondition(
       !viewport.isEmpty,
@@ -71,8 +71,8 @@ final class MapState {
 
     self.runtime = runtime
     self.map = map
-    if let styleJSON {
-      _ = try await map.setStyleJson(styleJSON)
+    if let styleJson {
+      _ = try await map.setStyleJson(styleJson)
     } else {
       _ = try await map
         .setStyleUrl("https://tiles.openfreemap.org/styles/bright")

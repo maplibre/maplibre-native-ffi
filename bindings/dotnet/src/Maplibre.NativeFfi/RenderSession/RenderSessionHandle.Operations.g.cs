@@ -597,10 +597,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOpenglBorrowedTextureTargetAsync(OpenglBorrowedTextureDescriptor descriptor)
+    public Task SetOpenGlBorrowedTextureTargetAsync(OpenGlBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlBorrowedTextureDescriptor(descriptor, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
             Handle,
@@ -618,10 +618,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// See <c>mln_render_session_set_opengl_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOpenglSurfaceTargetAsync(OpenglSurfaceDescriptor descriptor)
+    public Task SetOpenGlSurfaceTargetAsync(OpenGlSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_set_opengl_surface_target(
             Handle,

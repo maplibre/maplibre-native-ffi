@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_webgl_context_kind</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-public enum WebglContextKind : uint
+public enum WebGlContextKind : uint
 {
     /// <summary>
     /// Use a host-created context on its current browser agent.

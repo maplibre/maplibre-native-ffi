@@ -9,7 +9,7 @@ internal object GeneratedOwnerDisposal {
     NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_discard(handle, diagnostic) }
   }
 
-  fun geojsonSourceData(handle: Long) {
+  fun geoJsonSourceData(handle: Long) {
     C.mln_geojson_source_data_release(handle)
   }
 

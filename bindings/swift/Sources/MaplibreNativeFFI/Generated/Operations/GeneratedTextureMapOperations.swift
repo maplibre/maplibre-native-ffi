@@ -58,8 +58,8 @@ public extension MapHandle {
   ///
   /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachOpenglBorrowedTexture(
-    descriptor bindingArg0: OpenglBorrowedTextureDescriptor,
+  func attachOpenGlBorrowedTexture(
+    descriptor bindingArg0: OpenGlBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
@@ -81,8 +81,8 @@ public extension MapHandle {
   ///
   /// See `mln_map_attach_opengl_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachOpenglOwnedTexture(
-    descriptor bindingArg0: OpenglOwnedTextureDescriptor,
+  func attachOpenGlOwnedTexture(
+    descriptor bindingArg0: OpenGlOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> NewRenderSession {
     var value0: mln_render_session = 0

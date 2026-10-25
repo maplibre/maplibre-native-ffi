@@ -13,8 +13,8 @@ import (
 // ABI version this binding targets, and the render backend that the test
 // task's build tag names.
 func TestLinkedLibraryMatchesTheBuild(t *testing.T) {
-	if version := CVersion(); version != bindingCABIVersion {
-		t.Fatalf("CVersion() = %d, want %d", version, bindingCABIVersion)
+	if version := CVersion(); version != bindingCAbiVersion {
+		t.Fatalf("CVersion() = %d, want %d", version, bindingCAbiVersion)
 	}
 	if backends := SupportedRenderBackendMask(); !backends.Has(buildBackend) {
 		t.Fatalf("SupportedRenderBackendMask() = %#x, want the build's backend %#x", uint32(backends), uint32(buildBackend))

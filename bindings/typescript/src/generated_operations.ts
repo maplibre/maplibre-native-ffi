@@ -15,7 +15,7 @@ import type {
   FeatureStateSelector,
   FrameDemand,
   FreeCameraOptions,
-  GeojsonSourceOptions,
+  GeoJsonSourceOptions,
   GpuSync,
   HttpHeaderTransform,
   LatLng,
@@ -38,11 +38,11 @@ import type {
   OfflineRegionDownloadState,
   OfflineRegionInfo,
   OfflineRegionStatus,
-  OpenglBorrowedTextureDescriptor,
-  OpenglContextProviderFlag,
-  OpenglOwnedTextureDescriptor,
-  OpenglSurfaceDescriptor,
-  OpenglTextureFrame,
+  OpenGlBorrowedTextureDescriptor,
+  OpenGlContextProviderFlag,
+  OpenGlOwnedTextureDescriptor,
+  OpenGlSurfaceDescriptor,
+  OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
   ProjectionMode,
@@ -125,14 +125,14 @@ export function cVersion(): number {
  * See `mln_geojson_source_data_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-export function geojsonSourceDataCreate(
+export function geoJsonSourceDataCreate(
   data: unknown,
-  options?: GeojsonSourceOptions,
-): GeojsonSourceDataHandle {
+  options?: GeoJsonSourceOptions,
+): GeoJsonSourceDataHandle {
   const handle = native.mln_geojson_source_data_create(data, options);
   return adopt(
     handle,
-    () => new GeojsonSourceDataHandle(ADOPT, handle),
+    () => new GeoJsonSourceDataHandle(ADOPT, handle),
     (disposed) => native.mln_geojson_source_data_release(disposed, undefined),
   );
 }
@@ -235,7 +235,7 @@ export function networkSetStatus(status: NetworkStatus): void {
  * See `mln_opengl_supported_context_provider_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export function openglSupportedContextProviderMask(): OpenglContextProviderFlag {
+export function openGlSupportedContextProviderMask(): OpenGlContextProviderFlag {
   return native.mln_opengl_supported_context_provider_mask();
 }
 
@@ -389,7 +389,7 @@ export class AcquiredFrameHandle extends Owner {
    * See `mln_acquired_frame_get_opengl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  withOpenglTexture<T>(use: (view: ScopedOpenglTextureFrame) => T): T {
+  withOpenGlTexture<T>(use: (view: ScopedOpenGlTextureFrame) => T): T {
     return new ViewScope(
       ADOPT,
       this,
@@ -397,7 +397,7 @@ export class AcquiredFrameHandle extends Owner {
       (scope) => native.mln_acquired_frame_view_end(scope),
     ).use((scope) =>
       use(
-        new ScopedOpenglTextureFrame(
+        new ScopedOpenGlTextureFrame(
           ADOPT,
           scope,
           native.mln_acquired_frame_get_opengl_texture(this.id),
@@ -460,14 +460,14 @@ defineDisposers(AcquiredFrameHandle, undefined, undefined);
  * See `mln_geojson_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-export class GeojsonSourceDataHandle extends Owner {
+export class GeoJsonSourceDataHandle extends Owner {
   /**
    * Created by the API, which passes a key that only it holds.
    *
    * @internal
    */
   constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "GeojsonSourceDataHandle", { registrations });
+    super(key, handle, "GeoJsonSourceDataHandle", { registrations });
   }
   /**
    * Calls `close()`, for `await using`.
@@ -492,7 +492,7 @@ export class GeojsonSourceDataHandle extends Owner {
     );
   }
 }
-defineDisposers(GeojsonSourceDataHandle, undefined, "close");
+defineDisposers(GeoJsonSourceDataHandle, undefined, "close");
 
 /**
  * A map, which holds map state independent of any render target.
@@ -589,9 +589,9 @@ export class MapHandle extends Owner {
    * See `mln_map_add_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addGeojsonSourceData(
+  addGeoJsonSourceData(
     sourceId: string,
-    data: GeojsonSourceDataHandle,
+    data: GeoJsonSourceDataHandle,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_geojson_source_data(
@@ -609,10 +609,10 @@ export class MapHandle extends Owner {
    * See `mln_map_add_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addGeojsonSourceUrl(
+  addGeoJsonSourceUrl(
     sourceId: string,
     url: string,
-    options?: GeojsonSourceOptions,
+    options?: GeoJsonSourceOptions,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_geojson_source_url(
@@ -823,8 +823,8 @@ export class MapHandle extends Owner {
    * See `mln_map_attach_opengl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  attachOpenglBorrowedTexture(
-    descriptor: OpenglBorrowedTextureDescriptor,
+  attachOpenGlBorrowedTexture(
+    descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
@@ -854,8 +854,8 @@ export class MapHandle extends Owner {
    * See `mln_map_attach_opengl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  attachOpenglOwnedTexture(
-    descriptor: OpenglOwnedTextureDescriptor,
+  attachOpenGlOwnedTexture(
+    descriptor: OpenGlOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
@@ -885,8 +885,8 @@ export class MapHandle extends Owner {
    * See `mln_map_attach_opengl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  attachOpenglSurface(
-    descriptor: OpenglSurfaceDescriptor,
+  attachOpenGlSurface(
+    descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
@@ -1716,9 +1716,9 @@ export class MapHandle extends Owner {
    * See `mln_map_set_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceData(
+  setGeoJsonSourceData(
     sourceId: string,
-    data: GeojsonSourceDataHandle,
+    data: GeoJsonSourceDataHandle,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_geojson_source_data(
@@ -1736,7 +1736,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_geojson_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceSynchronousTiling(
+  setGeoJsonSourceSynchronousTiling(
     sourceId: string,
     enabled: boolean,
   ): Promise<CommandCompletion> {
@@ -1756,7 +1756,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceUrl(
+  setGeoJsonSourceUrl(
     sourceId: string,
     url: string,
   ): Promise<CommandCompletion> {
@@ -2112,7 +2112,7 @@ export class MapHandleDiscarding {
    * See `mln_map_add_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addGeojsonSourceData(sourceId: string, data: GeojsonSourceDataHandle): void {
+  addGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
     native.mln_map_add_geojson_source_data(
       this.#owner.id,
       sourceId,
@@ -2127,10 +2127,10 @@ export class MapHandleDiscarding {
    * See `mln_map_add_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addGeojsonSourceUrl(
+  addGeoJsonSourceUrl(
     sourceId: string,
     url: string,
-    options?: GeojsonSourceOptions,
+    options?: GeoJsonSourceOptions,
   ): void {
     native.mln_map_add_geojson_source_url(
       this.#owner.id,
@@ -2551,7 +2551,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_geojson_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceData(sourceId: string, data: GeojsonSourceDataHandle): void {
+  setGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
     native.mln_map_set_geojson_source_data(
       this.#owner.id,
       sourceId,
@@ -2566,7 +2566,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_geojson_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceSynchronousTiling(sourceId: string, enabled: boolean): void {
+  setGeoJsonSourceSynchronousTiling(sourceId: string, enabled: boolean): void {
     native.mln_map_set_geojson_source_synchronous_tiling(
       this.#owner.id,
       sourceId,
@@ -2581,7 +2581,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_geojson_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeojsonSourceUrl(sourceId: string, url: string): void {
+  setGeoJsonSourceUrl(sourceId: string, url: string): void {
     native.mln_map_set_geojson_source_url(
       this.#owner.id,
       sourceId,
@@ -3332,8 +3332,8 @@ export class RenderSessionHandle extends Owner {
    * See `mln_render_session_set_opengl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  setOpenglBorrowedTextureTarget(
-    descriptor: OpenglBorrowedTextureDescriptor,
+  setOpenGlBorrowedTextureTarget(
+    descriptor: OpenGlBorrowedTextureDescriptor,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_opengl_borrowed_texture_target(
@@ -3350,7 +3350,7 @@ export class RenderSessionHandle extends Owner {
    * See `mln_render_session_set_opengl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setOpenglSurfaceTarget(descriptor: OpenglSurfaceDescriptor): Promise<void> {
+  setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_opengl_surface_target(
         this.id,
@@ -4293,12 +4293,12 @@ export class ScopedMetalTextureFrame {
 }
 
 /**
- * A `OpenglTextureFrame` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withOpenglTexture} runs. Its other members stay
+ * A `OpenGlTextureFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withOpenGlTexture} runs. Its other members stay
  * readable after the callback returns.
  */
-export class ScopedOpenglTextureFrame {
-  readonly #value: OpenglTextureFrame;
+export class ScopedOpenGlTextureFrame {
+  readonly #value: OpenGlTextureFrame;
   readonly #scope: ViewScope;
 
   /**
@@ -4306,53 +4306,53 @@ export class ScopedOpenglTextureFrame {
    *
    * @internal
    */
-  constructor(key: AdoptKey, scope: ViewScope, value: OpenglTextureFrame) {
+  constructor(key: AdoptKey, scope: ViewScope, value: OpenGlTextureFrame) {
     checkKey(key);
     this.#value = value;
     this.#scope = scope;
   }
 
-  get generation(): OpenglTextureFrame["generation"] {
+  get generation(): OpenGlTextureFrame["generation"] {
     return this.#value.generation;
   }
 
-  get width(): OpenglTextureFrame["width"] {
+  get width(): OpenGlTextureFrame["width"] {
     return this.#value.width;
   }
 
-  get height(): OpenglTextureFrame["height"] {
+  get height(): OpenGlTextureFrame["height"] {
     return this.#value.height;
   }
 
-  get scaleFactor(): OpenglTextureFrame["scaleFactor"] {
+  get scaleFactor(): OpenGlTextureFrame["scaleFactor"] {
     return this.#value.scaleFactor;
   }
 
-  get frameId(): OpenglTextureFrame["frameId"] {
+  get frameId(): OpenGlTextureFrame["frameId"] {
     return this.#value.frameId;
   }
 
-  get slot(): OpenglTextureFrame["slot"] {
+  get slot(): OpenGlTextureFrame["slot"] {
     return this.#value.slot;
   }
 
-  get texture(): OpenglTextureFrame["texture"] {
+  get texture(): OpenGlTextureFrame["texture"] {
     return this.#scope.active(this.#value).texture;
   }
 
-  get target(): OpenglTextureFrame["target"] {
+  get target(): OpenGlTextureFrame["target"] {
     return this.#value.target;
   }
 
-  get internalFormat(): OpenglTextureFrame["internalFormat"] {
+  get internalFormat(): OpenGlTextureFrame["internalFormat"] {
     return this.#value.internalFormat;
   }
 
-  get format(): OpenglTextureFrame["format"] {
+  get format(): OpenGlTextureFrame["format"] {
     return this.#value.format;
   }
 
-  get type(): OpenglTextureFrame["type"] {
+  get type(): OpenGlTextureFrame["type"] {
     return this.#value.type;
   }
 }

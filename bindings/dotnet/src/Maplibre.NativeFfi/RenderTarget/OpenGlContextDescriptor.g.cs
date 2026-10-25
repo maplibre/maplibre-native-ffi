@@ -9,12 +9,12 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct OpenglContextDescriptor
+public readonly partial record struct OpenGlContextDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OpenglContextDescriptor(
-        OpenglContextOwnership Ownership,
-        OpenglContextDescriptor.DataValue Data
+    public OpenGlContextDescriptor(
+        OpenGlContextOwnership Ownership,
+        OpenGlContextDescriptor.DataValue Data
     )
     {
         this.Ownership = Ownership;
@@ -26,8 +26,8 @@ public readonly partial record struct OpenglContextDescriptor
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
     /// canvas are dedicated to their core worker.
     /// </summary>
-    public OpenglContextOwnership Ownership { get; init; }
-    public required OpenglContextDescriptor.DataValue Data { get; init; }
+    public OpenGlContextOwnership Ownership { get; init; }
+    public required OpenGlContextDescriptor.DataValue Data { get; init; }
 
     public abstract record DataValue
     {
@@ -37,6 +37,6 @@ public readonly partial record struct OpenglContextDescriptor
 
         public sealed record Egl(EglContextDescriptor Value) : DataValue;
 
-        public sealed record Webgl(WebglContextDescriptor Value) : DataValue;
+        public sealed record WebGl(WebGlContextDescriptor Value) : DataValue;
     }
 }

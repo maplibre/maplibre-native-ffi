@@ -32,9 +32,9 @@ internal static class GraphicsContext
             return MetalContext.Create(title, width, height, visible);
         }
 
-        if (backends.HasFlag(RenderBackendFlag.Opengl))
+        if (backends.HasFlag(RenderBackendFlag.OpenGl))
         {
-            return OpenGLContext.Create(title, width, height, visible);
+            return OpenGlContext.Create(title, width, height, visible);
         }
 
         if (backends.HasFlag(RenderBackendFlag.Vulkan))

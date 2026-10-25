@@ -199,9 +199,9 @@ void main() {
     // A value outside a 32-bit field's range is rejected before it crosses,
     // rather than truncated into a valid one.
     expect(
-      () => geojsonSourceDataCreate(
+      () => geoJsonSourceDataCreate(
         _featureCollection,
-        options: GeojsonSourceOptions(buffer: 4294967296),
+        options: GeoJsonSourceOptions(buffer: 4294967296),
       ),
       throwsA(
         isA<MaplibreException>().having(
@@ -296,7 +296,7 @@ void main() {
       'LatLng(latitude=1.0, longitude=2.0)',
     );
     expect(
-      GeojsonSourceOptions(clusterProperties: Uint8List(3)).toString(),
+      GeoJsonSourceOptions(clusterProperties: Uint8List(3)).toString(),
       contains('clusterProperties=Uint8List(3 bytes)'),
     );
     expect(FrameDemandFlag.none.toString(), 'FrameDemandFlag.none');

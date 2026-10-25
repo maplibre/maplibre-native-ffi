@@ -5,19 +5,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.OpenglContextDescriptor
-import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenglContextOwnership
-import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenGlContextOwnership
+import org.maplibre.nativeffi.generated.OpenGlSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.generated.WebglContextDescriptor
-import org.maplibre.nativeffi.generated.WebglContextKind
-import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
-import org.maplibre.nativeffi.generated.WebgpuSurfaceDescriptor
-import org.maplibre.nativeffi.generated.attachWebgpuSurface
+import org.maplibre.nativeffi.generated.WebGlContextDescriptor
+import org.maplibre.nativeffi.generated.WebGlContextKind
+import org.maplibre.nativeffi.generated.WebGpuContextDescriptor
+import org.maplibre.nativeffi.generated.WebGpuSurfaceDescriptor
+import org.maplibre.nativeffi.generated.attachWebGpuSurface
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -57,13 +57,13 @@ class CanvasSurfaceTest {
     return when (TestGraphics.backend) {
       TestBackend.WEBGL -> {
         val descriptor =
-          OpenglSurfaceDescriptor(
+          OpenGlSurfaceDescriptor(
             extent,
-            OpenglContextDescriptor(
-              OpenglContextOwnership.DEDICATED,
-              OpenglContextDescriptorData.Webgl(
-                WebglContextDescriptor(
-                  WebglContextKind.TRANSFERRED_CANVAS,
+            OpenGlContextDescriptor(
+              OpenGlContextOwnership.DEDICATED,
+              OpenGlContextDescriptorData.WebGl(
+                WebGlContextDescriptor(
+                  WebGlContextKind.TRANSFERRED_CANVAS,
                   canvasSelector = canvas.selector,
                 ),
               ),
@@ -72,19 +72,19 @@ class CanvasSurfaceTest {
           )
         withRenderSession(
           RenderDriverKind.CORE_WORKER,
-          attach = { options -> map.attachOpenglSurface(descriptor, options) },
+          attach = { options -> map.attachOpenGlSurface(descriptor, options) },
           block = block,
         )
       }
       TestBackend.WEBGPU -> {
         val context = TestGraphics.context()
-        webgpuCanvasSurface(canvas).use { surface ->
+        webGpuCanvasSurface(canvas).use { surface ->
           val descriptor =
-            WebgpuSurfaceDescriptor(
+            WebGpuSurfaceDescriptor(
               extent,
-              WebgpuContextDescriptor(
+              WebGpuContextDescriptor(
                 NativePointer.NULL_POINTER,
-                NativePointer.ofAddress(context.webgpuDevice),
+                NativePointer.ofAddress(context.webGpuDevice),
                 NativePointer.NULL_POINTER,
               ),
               surface.pointer,
@@ -92,7 +92,7 @@ class CanvasSurfaceTest {
             )
           withRenderSession(
             RenderDriverKind.CALLER_GRAPHICS_THREAD,
-            attach = { options -> map.attachWebgpuSurface(descriptor, options) },
+            attach = { options -> map.attachWebGpuSurface(descriptor, options) },
             block = block,
           )
         }

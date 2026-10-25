@@ -22,11 +22,11 @@ private func expectDescription(
 @Test func aSecondCloseIsANoOpAndTheHandleReportsItIsClosed() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(emptyStyle)
-    let data = try Maplibre.geojsonSourceDataCreate(
+    let data = try Maplibre.geoJsonSourceDataCreate(
       #"{"type":"FeatureCollection","features":[]}"#
     )
     let other = try Maplibre
-      .geojsonSourceDataCreate(
+      .geoJsonSourceDataCreate(
         #"{"type":"FeatureCollection","features":[]}"#
       )
     #expect(Set([data, data, other]).count == 2)
@@ -34,7 +34,7 @@ private func expectDescription(
     #expect(!data.isClosed)
     expectDescription(
       of: data.description,
-      typeName: "GeojsonSourceDataHandle",
+      typeName: "GeoJsonSourceDataHandle",
       id: data.id,
       closed: false
     )
@@ -45,13 +45,13 @@ private func expectDescription(
     other.close()
     expectDescription(
       of: String(describing: data),
-      typeName: "GeojsonSourceDataHandle",
+      typeName: "GeoJsonSourceDataHandle",
       id: data.id,
       closed: true
     )
 
     let error = await expectMaplibreError(.invalidState) {
-      try await fixture.map.addGeojsonSourceData("late", data: data)
+      try await fixture.map.addGeoJsonSourceData("late", data: data)
     }
     #expect(error?.status == .invalidState)
   }

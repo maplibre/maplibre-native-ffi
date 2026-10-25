@@ -24,7 +24,7 @@ from ._generated_values import (
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
-    GeojsonSourceOptions,
+    GeoJsonSourceOptions,
     GpuSync,
     HttpHeaderTransform,
     LatLng,
@@ -47,11 +47,11 @@ from ._generated_values import (
     OfflineRegionDownloadState,
     OfflineRegionInfo,
     OfflineRegionStatus,
-    OpenglBorrowedTextureDescriptor,
-    OpenglContextProviderFlag,
-    OpenglOwnedTextureDescriptor,
-    OpenglSurfaceDescriptor,
-    OpenglTextureFrame,
+    OpenGlBorrowedTextureDescriptor,
+    OpenGlContextProviderFlag,
+    OpenGlOwnedTextureDescriptor,
+    OpenGlSurfaceDescriptor,
+    OpenGlTextureFrame,
     PremultipliedRgba8Image,
     ProjectedMeters,
     ProjectionMode,
@@ -94,7 +94,7 @@ from ._operation import GeneratedOperations, _adopt_value, _view
 if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
-        GeojsonSourceDataHandle,
+        GeoJsonSourceDataHandle,
         MapHandle,
         MapProjectionHandle,
         RenderSessionHandle,
@@ -123,17 +123,17 @@ class MapAttachMetalSurfaceResult(NamedTuple):
     ready: Future[None]
 
 
-class MapAttachOpenglBorrowedTextureResult(NamedTuple):
+class MapAttachOpenGlBorrowedTextureResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
 
-class MapAttachOpenglOwnedTextureResult(NamedTuple):
+class MapAttachOpenGlOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
 
-class MapAttachOpenglSurfaceResult(NamedTuple):
+class MapAttachOpenGlSurfaceResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
@@ -184,7 +184,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             lambda raw: MetalTextureFrame._from_native(raw),
         )
 
-    def opengl_texture(self) -> AbstractContextManager[OpenglTextureFrame]:
+    def opengl_texture(self) -> AbstractContextManager[OpenGlTextureFrame]:
         """Copies OpenGL-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_opengl_texture` in the
@@ -195,7 +195,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return _view(
             self,
             lambda: self._native.opengl_texture(),
-            lambda raw: OpenglTextureFrame._from_native(raw),
+            lambda raw: OpenGlTextureFrame._from_native(raw),
         )
 
     def producer_sync(self) -> AbstractContextManager[GpuSync]:
@@ -243,8 +243,8 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return self._native.close(consumer_completion)
 
 
-class _GeojsonSourceDataHandleOperations(GeneratedOperations):
-    _native: _native._GeojsonSourceDataHandle
+class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
+    _native: _native._GeoJsonSourceDataHandle
 
     def close(self) -> None:
         """Releases prepared GeoJSON source data.
@@ -292,7 +292,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_custom_mvt_vector_source(source_id, options)
 
     def add_geojson_source_data(
-        self, source_id: str, data: GeojsonSourceDataHandle
+        self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Adds a GeoJSON source with prepared inline data.
 
@@ -302,7 +302,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_geojson_source_data(source_id, data._native)
 
     def add_geojson_source_url(
-        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> Future[CommandCompletion]:
         """Adds a GeoJSON source with URL data.
 
@@ -410,46 +410,46 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_opengl_borrowed_texture(
         self,
-        descriptor: OpenglBorrowedTextureDescriptor,
+        descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
-    ) -> MapAttachOpenglBorrowedTextureResult:
+    ) -> MapAttachOpenGlBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned OpenGL textures.
 
         See `mln_map_attach_opengl_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
         raw = self._native.attach_opengl_borrowed_texture(descriptor, options)
-        return MapAttachOpenglBorrowedTextureResult(
+        return MapAttachOpenGlBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
 
     def attach_opengl_owned_texture(
         self,
-        descriptor: OpenglOwnedTextureDescriptor,
+        descriptor: OpenGlOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
-    ) -> MapAttachOpenglOwnedTextureResult:
+    ) -> MapAttachOpenGlOwnedTextureResult:
         """Starts attachment of a session-owned OpenGL texture ring.
 
         See `mln_map_attach_opengl_owned_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
         raw = self._native.attach_opengl_owned_texture(descriptor, options)
-        return MapAttachOpenglOwnedTextureResult(
+        return MapAttachOpenGlOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
 
     def attach_opengl_surface(
-        self, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions
-    ) -> MapAttachOpenglSurfaceResult:
+        self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
+    ) -> MapAttachOpenGlSurfaceResult:
         """Starts attachment of an OpenGL surface target.
 
         See `mln_map_attach_opengl_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
         raw = self._native.attach_opengl_surface(descriptor, options)
-        return MapAttachOpenglSurfaceResult(
+        return MapAttachOpenGlSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
@@ -970,7 +970,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_free_camera_options(options)
 
     def set_geojson_source_data(
-        self, source_id: str, data: GeojsonSourceDataHandle
+        self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Updates one GeoJSON source with prepared inline data.
 
@@ -1499,7 +1499,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_metal_surface_target(descriptor)
 
     def set_opengl_borrowed_texture_target(
-        self, descriptor: OpenglBorrowedTextureDescriptor
+        self, descriptor: OpenGlBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every texture of a caller-owned
         OpenGL ring.
@@ -1510,7 +1510,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_opengl_borrowed_texture_target(descriptor)
 
     def set_opengl_surface_target(
-        self, descriptor: OpenglSurfaceDescriptor
+        self, descriptor: OpenGlSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered OpenGL surface replacement.
 
@@ -1908,8 +1908,8 @@ def c_version() -> int:
 
 
 def geojson_source_data_create(
-    data: Any, options: GeojsonSourceOptions | None = None
-) -> GeojsonSourceDataHandle:
+    data: Any, options: GeoJsonSourceOptions | None = None
+) -> GeoJsonSourceDataHandle:
     """Prepares GeoJSON source data for installation on a map.
 
     See `mln_geojson_source_data_create` in the
@@ -1917,7 +1917,7 @@ def geojson_source_data_create(
     """
     return _adopt_value(
         _native.geojson_source_data_create(data, options),
-        "GeojsonSourceDataHandle",
+        "GeoJsonSourceDataHandle",
         None,
     )
 
@@ -2002,13 +2002,13 @@ def network_set_status(status: NetworkStatus) -> None:
     return _native.network_set_status(status)
 
 
-def opengl_supported_context_provider_mask() -> OpenglContextProviderFlag:
+def opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
     """Returns OpenGL context providers supported by this build.
 
     See `mln_opengl_supported_context_provider_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
-    return OpenglContextProviderFlag(_native.opengl_supported_context_provider_mask())
+    return OpenGlContextProviderFlag(_native.opengl_supported_context_provider_mask())
 
 
 def plugin_get_register_function_v1() -> int:
@@ -2094,7 +2094,7 @@ class MapHandleDiscarding:
         return self._native._discard_add_custom_mvt_vector_source(source_id, options)
 
     def add_geojson_source_data(
-        self, source_id: str, data: GeojsonSourceDataHandle
+        self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
         """Adds a GeoJSON source with prepared inline data.
 
@@ -2104,7 +2104,7 @@ class MapHandleDiscarding:
         return self._native._discard_add_geojson_source_data(source_id, data._native)
 
     def add_geojson_source_url(
-        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> None:
         """Adds a GeoJSON source with URL data.
 
@@ -2386,7 +2386,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_free_camera_options(options)
 
     def set_geojson_source_data(
-        self, source_id: str, data: GeojsonSourceDataHandle
+        self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
         """Updates one GeoJSON source with prepared inline data.
 

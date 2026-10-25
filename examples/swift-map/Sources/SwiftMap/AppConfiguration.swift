@@ -61,7 +61,7 @@ struct AppConfiguration {
     if backends.contains(.metal) {
       labels.append("metal")
     }
-    if backends.contains(.opengl) {
+    if backends.contains(.openGl) {
       labels.append("opengl")
     }
     if backends.contains(.vulkan) {

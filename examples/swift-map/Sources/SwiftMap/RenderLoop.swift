@@ -34,19 +34,19 @@ final class RenderLoop {
     self.target = target
   }
 
-  /// Creates the map at `viewport`, loading `styleJSON` or the network style
+  /// Creates the map at `viewport`, loading `styleJson` or the network style
   /// when it is nil, and attaches the render target.
   static func start(
     mode: RenderTargetMode,
     graphics: MetalGraphicsContext,
     viewport: Viewport,
-    styleJSON: String? = nil
+    styleJson: String? = nil
   ) async throws -> RenderLoop {
     // The wakes exist before the loop does, so a relay forwards them.
     let relay = WakeRelay()
     let mapState = try await MapState(
       viewport: viewport,
-      styleJSON: styleJSON
+      styleJson: styleJson
     )
     let target: MetalRenderTarget
     do {

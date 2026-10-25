@@ -16,7 +16,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    installCAPILogging()
+    installCApiLogging()
     validateMetalBackend()
 
     let window = UIWindow(frame: windowFrame(application))
@@ -32,7 +32,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
       name: MetalMapView.willTerminateMapViews,
       object: nil
     )
-    clearCAPILogging()
+    clearCApiLogging()
   }
 
   private func validateMetalBackend() {
@@ -63,7 +63,7 @@ private func renderBackendLabel(_ backends: RenderBackendFlag) -> String {
   if backends.contains(.metal) {
     labels.append("metal")
   }
-  if backends.contains(.opengl) {
+  if backends.contains(.openGl) {
     labels.append("opengl")
   }
   if backends.contains(.vulkan) {
@@ -72,7 +72,7 @@ private func renderBackendLabel(_ backends: RenderBackendFlag) -> String {
   return labels.isEmpty ? "none" : labels.joined(separator: ",")
 }
 
-private func installCAPILogging() {
+private func installCApiLogging() {
   let log = Logger(
     subsystem: "org.maplibre.nativeffi.examples.swift-map-ios",
     category: "MapLibre"
@@ -93,7 +93,7 @@ private func installCAPILogging() {
   }
 }
 
-private func clearCAPILogging() {
+private func clearCApiLogging() {
   do {
     try Maplibre.logClearCallback()
   } catch {

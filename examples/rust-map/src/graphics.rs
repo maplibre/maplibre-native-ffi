@@ -8,14 +8,14 @@ use winit::window::WindowAttributes;
 #[cfg(maplibre_render_backend = "metal")]
 use crate::metal::MetalContext;
 #[cfg(maplibre_render_backend = "opengl")]
-use crate::opengl::OpenGLContext;
+use crate::opengl::OpenGlContext;
 #[cfg(maplibre_render_backend = "vulkan")]
 use crate::vulkan::VulkanContext;
 
 #[cfg(maplibre_render_backend = "metal")]
 pub struct GraphicsContext(MetalContext);
 #[cfg(maplibre_render_backend = "opengl")]
-pub struct GraphicsContext(Box<OpenGLContext>);
+pub struct GraphicsContext(Box<OpenGlContext>);
 #[cfg(maplibre_render_backend = "vulkan")]
 pub struct GraphicsContext(Box<VulkanContext>);
 
@@ -77,7 +77,7 @@ impl GraphicsContext {
                 "no usable graphics backend is supported by the loaded native library".into(),
             );
         }
-        let (window, context) = OpenGLContext::new(event_loop, window_attributes)?;
+        let (window, context) = OpenGlContext::new(event_loop, window_attributes)?;
         Ok((window, Self(Box::new(context))))
     }
 
@@ -90,7 +90,7 @@ impl GraphicsContext {
         Ok(())
     }
 
-    pub fn opengl(&self) -> &OpenGLContext {
+    pub fn opengl(&self) -> &OpenGlContext {
         &self.0
     }
 }

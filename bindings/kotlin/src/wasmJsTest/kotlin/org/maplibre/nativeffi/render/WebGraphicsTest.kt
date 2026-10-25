@@ -13,19 +13,19 @@ import kotlinx.coroutines.await
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.OpenglContextDescriptor
-import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenglContextOwnership
-import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenGlContextOwnership
+import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.generated.WebglContextDescriptor
-import org.maplibre.nativeffi.generated.WebglContextKind
-import org.maplibre.nativeffi.generated.WebgpuBorrowedTexture
-import org.maplibre.nativeffi.generated.WebgpuBorrowedTextureDescriptor
-import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
-import org.maplibre.nativeffi.generated.attachWebgpuBorrowedTexture
-import org.maplibre.nativeffi.generated.withWebgpuTexture
+import org.maplibre.nativeffi.generated.WebGlContextDescriptor
+import org.maplibre.nativeffi.generated.WebGlContextKind
+import org.maplibre.nativeffi.generated.WebGpuBorrowedTexture
+import org.maplibre.nativeffi.generated.WebGpuBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.WebGpuContextDescriptor
+import org.maplibre.nativeffi.generated.attachWebGpuBorrowedTexture
+import org.maplibre.nativeffi.generated.withWebGpuTexture
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -50,27 +50,27 @@ class WebGraphicsTest {
 
   private suspend fun MapFixture.renderWithPageDevice() {
     val pageDevice =
-      checkNotNull(requestPageWebgpuDevice().await<JsAny?>()) {
+      checkNotNull(requestPageWebGpuDevice().await<JsAny?>()) {
         "the browser provided no WebGPU device; see the console for why"
       }
     val pageTexture = createRingTexture(pageDevice, WIDTH, HEIGHT)
-    val device = WebGraphics.importWebgpuDevice(pageDevice)
-    val texture = WebGraphics.importWebgpuTexture(pageTexture)
-    val view = WebGraphics.importWebgpuTextureView(createTextureView(pageTexture))
+    val device = WebGraphics.importWebGpuDevice(pageDevice)
+    val texture = WebGraphics.importWebGpuTexture(pageTexture)
+    val view = WebGraphics.importWebGpuTextureView(createTextureView(pageTexture))
     val pointer = device.pointer
     val descriptor =
-      WebgpuBorrowedTextureDescriptor(
+      WebGpuBorrowedTextureDescriptor(
         extent,
         physicalWidth = WIDTH.toUInt(),
         physicalHeight = HEIGHT.toUInt(),
         context =
-          WebgpuContextDescriptor(NativePointer.NULL_POINTER, pointer, NativePointer.NULL_POINTER),
-        textures = listOf(WebgpuBorrowedTexture(texture.pointer, view.pointer)),
-        format = WebGraphics.webgpuTextureFormat("rgba8unorm"),
+          WebGpuContextDescriptor(NativePointer.NULL_POINTER, pointer, NativePointer.NULL_POINTER),
+        textures = listOf(WebGpuBorrowedTexture(texture.pointer, view.pointer)),
+        format = WebGraphics.webGpuTextureFormat("rgba8unorm"),
       )
     withRenderSession(
       RenderDriverKind.CALLER_GRAPHICS_THREAD,
-      attach = { options -> map.attachWebgpuBorrowedTexture(descriptor, options) },
+      attach = { options -> map.attachWebGpuBorrowedTexture(descriptor, options) },
     ) {
       setStyle(RED_BACKGROUND_STYLE)
       renderStill()
@@ -81,8 +81,8 @@ class WebGraphicsTest {
       // The frame names the page's own texture, which the page reads through its own device. The
       // copy is submitted while the frame is borrowed, and the queue orders it after the session's
       // rendering.
-      val center = frame.withWebgpuTexture { frameTexture ->
-        val named = WebGraphics.webgpuObject(frameTexture.texture)
+      val center = frame.withWebGpuTexture { frameTexture ->
+        val named = WebGraphics.webGpuObject(frameTexture.texture)
         assertTrue(isSameObject(named, pageTexture), "the frame names another texture")
         readCenterPixel(pageDevice, named, WIDTH, HEIGHT)
       }
@@ -97,26 +97,26 @@ class WebGraphicsTest {
     device.close()
     assertFailsWith<IllegalStateException> { device.pointer }
     assertFailsWith<IllegalStateException> { pointer.address }
-    destroyWebgpuDevice(pageDevice)
+    destroyWebGpuDevice(pageDevice)
   }
 
   private suspend fun MapFixture.renderWithPageContext() {
     val pageContext =
-      checkNotNull(pageWebglContext(WIDTH)) { "creating the page's WebGL context failed" }
-    val context = WebGraphics.registerWebglContext(pageContext)
+      checkNotNull(pageWebGlContext(WIDTH)) { "creating the page's WebGL context failed" }
+    val context = WebGraphics.registerWebGlContext(pageContext)
     val descriptor =
-      OpenglOwnedTextureDescriptor(
+      OpenGlOwnedTextureDescriptor(
         extent,
-        OpenglContextDescriptor(
-          OpenglContextOwnership.SHARED,
-          OpenglContextDescriptorData.Webgl(
-            WebglContextDescriptor(WebglContextKind.EXISTING, context.context),
+        OpenGlContextDescriptor(
+          OpenGlContextOwnership.SHARED,
+          OpenGlContextDescriptorData.WebGl(
+            WebGlContextDescriptor(WebGlContextKind.EXISTING, context.context),
           ),
         ),
       )
     withRenderSession(
       RenderDriverKind.CALLER_GRAPHICS_THREAD,
-      attach = { options -> map.attachOpenglOwnedTexture(descriptor, options) },
+      attach = { options -> map.attachOpenGlOwnedTexture(descriptor, options) },
     ) {
       setStyle(RED_BACKGROUND_STYLE)
       renderStill()
@@ -136,9 +136,9 @@ class WebGraphicsTest {
     context.close()
     assertFailsWith<IllegalStateException> { context.context }
     // The closed handle stays reserved, so a new registration never takes it.
-    WebGraphics.registerWebglContext(pageContext).use { assertNotEquals(handle, it.context) }
+    WebGraphics.registerWebGlContext(pageContext).use { assertNotEquals(handle, it.context) }
     // Chromium caps the WebGL contexts of a page, so the test frees its own.
-    loseWebglContext(pageContext)
+    loseWebGlContext(pageContext)
   }
 
   private companion object {
@@ -198,7 +198,7 @@ private fun createTextureView(texture: JsAny): JsAny = js("texture.createView()"
 
 private fun isSameObject(first: JsAny, second: JsAny): Boolean = js("first === second")
 
-private fun destroyWebgpuDevice(device: JsAny): Unit = js("device.destroy()")
+private fun destroyWebGpuDevice(device: JsAny): Unit = js("device.destroy()")
 
-private fun loseWebglContext(context: JsAny): Unit =
+private fun loseWebGlContext(context: JsAny): Unit =
   js("context.getExtension('WEBGL_lose_context')?.loseContext()")

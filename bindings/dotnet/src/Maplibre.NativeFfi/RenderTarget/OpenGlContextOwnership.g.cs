@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_context_ownership</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-public enum OpenglContextOwnership : uint
+public enum OpenGlContextOwnership : uint
 {
     /// <summary>
     /// The session shares its thread with host graphics work.

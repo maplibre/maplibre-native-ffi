@@ -9,10 +9,10 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_owned_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct OpenglOwnedTextureDescriptor
+public readonly partial record struct OpenGlOwnedTextureDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OpenglOwnedTextureDescriptor(LogicalExtent Extent, OpenglContextDescriptor Context)
+    public OpenGlOwnedTextureDescriptor(LogicalExtent Extent, OpenGlContextDescriptor Context)
     {
         this.Extent = Extent;
         this.Context = Context;
@@ -30,5 +30,5 @@ public readonly partial record struct OpenglOwnedTextureDescriptor
     /// or transferred WebGL ownership creates a private core-worker context for
     /// CPU readback.
     /// </summary>
-    public required OpenglContextDescriptor Context { get; init; }
+    public required OpenGlContextDescriptor Context { get; init; }
 }

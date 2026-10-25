@@ -5,6 +5,7 @@ from dataclasses import replace
 
 from .. import async_hosts
 from ..model import ModelError
+from ..names import words
 from .go import GO_KEYWORDS, native_identifier
 from .go_values import name, public
 
@@ -37,7 +38,7 @@ def validate(values, plan):
 
 def parameter_name(parameter):
     """A callback argument's name in a func type: its C name in camel case."""
-    first, *rest = parameter.name.split("_")
+    first, *rest = words(parameter.name)
     label = first + "".join(name(part) for part in rest)
     while label in GO_KEYWORDS:
         label += "_"

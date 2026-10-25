@@ -10,21 +10,21 @@ import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.OpenglClientApi
-import org.maplibre.nativeffi.generated.OpenglContextDescriptor
-import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenglContextOwnership
-import org.maplibre.nativeffi.generated.OpenglContextProviderFlag
-import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenGlClientApi
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenGlContextOwnership
+import org.maplibre.nativeffi.generated.OpenGlContextProviderFlag
+import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.WebglContextDescriptor
-import org.maplibre.nativeffi.generated.WebglContextKind
-import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
-import org.maplibre.nativeffi.generated.WebgpuOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.WebGlContextDescriptor
+import org.maplibre.nativeffi.generated.WebGlContextKind
+import org.maplibre.nativeffi.generated.WebGpuContextDescriptor
+import org.maplibre.nativeffi.generated.WebGpuOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.WglContextDescriptor
 
 /**
@@ -46,8 +46,8 @@ internal class TestGraphicsContext(
   val eglContext: Long = 0,
   val wglDeviceContext: Long = 0,
   val wglContext: Long = 0,
-  val webglContext: Int = 0,
-  val webgpuDevice: Long = 0,
+  val webGlContext: Int = 0,
+  val webGpuDevice: Long = 0,
 )
 
 /**
@@ -109,10 +109,10 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
         RenderBackendFlag.VULKAN in backends -> VULKAN
         RenderBackendFlag.WEBGPU in backends -> WEBGPU
         RenderBackendFlag.OPENGL in backends -> {
-          val providers = GeneratedApi.openglSupportedContextProviderMask()
+          val providers = GeneratedApi.openGlSupportedContextProviderMask()
           when {
-            OpenglContextProviderFlag.WGL in providers -> WGL
-            OpenglContextProviderFlag.WEBGL in providers -> WEBGL
+            OpenGlContextProviderFlag.WGL in providers -> WGL
+            OpenGlContextProviderFlag.WEBGL in providers -> WEBGL
             else -> EGL
           }
         }
@@ -187,14 +187,14 @@ internal object TestGraphics {
   ): NewRenderSession {
     val extent = LogicalExtent(width.toUInt(), height.toUInt(), 1.0)
     if (canvas != null) {
-      return map.attachOpenglOwnedTexture(
-        OpenglOwnedTextureDescriptor(
+      return map.attachOpenGlOwnedTexture(
+        OpenGlOwnedTextureDescriptor(
           extent,
-          OpenglContextDescriptor(
-            OpenglContextOwnership.DEDICATED,
-            OpenglContextDescriptorData.Webgl(
-              WebglContextDescriptor(
-                WebglContextKind.TRANSFERRED_CANVAS,
+          OpenGlContextDescriptor(
+            OpenGlContextOwnership.DEDICATED,
+            OpenGlContextDescriptorData.WebGl(
+              WebGlContextDescriptor(
+                WebGlContextKind.TRANSFERRED_CANVAS,
                 canvasSelector = canvas.selector,
               ),
             ),
@@ -206,17 +206,17 @@ internal object TestGraphics {
     val context = context()
     return when (backend) {
       TestBackend.EGL ->
-        map.attachOpenglOwnedTexture(
-          OpenglOwnedTextureDescriptor(
+        map.attachOpenGlOwnedTexture(
+          OpenGlOwnedTextureDescriptor(
             extent,
-            OpenglContextDescriptor(
-              OpenglContextOwnership.SHARED,
-              OpenglContextDescriptorData.Egl(
+            OpenGlContextDescriptor(
+              OpenGlContextOwnership.SHARED,
+              OpenGlContextDescriptorData.Egl(
                 EglContextDescriptor(
                   pointer(context.eglDisplay),
                   pointer(context.eglConfig),
                   pointer(context.eglContext),
-                  OpenglClientApi.GLES,
+                  OpenGlClientApi.GLES,
                   NativePointer.NULL_POINTER,
                 ),
               ),
@@ -225,12 +225,12 @@ internal object TestGraphics {
           options,
         )
       TestBackend.WGL ->
-        map.attachOpenglOwnedTexture(
-          OpenglOwnedTextureDescriptor(
+        map.attachOpenGlOwnedTexture(
+          OpenGlOwnedTextureDescriptor(
             extent,
-            OpenglContextDescriptor(
-              OpenglContextOwnership.SHARED,
-              OpenglContextDescriptorData.Wgl(
+            OpenGlContextDescriptor(
+              OpenGlContextOwnership.SHARED,
+              OpenGlContextDescriptorData.Wgl(
                 WglContextDescriptor(
                   pointer(context.wglDeviceContext),
                   pointer(context.wglContext),
@@ -242,13 +242,13 @@ internal object TestGraphics {
           options,
         )
       TestBackend.WEBGL ->
-        map.attachOpenglOwnedTexture(
-          OpenglOwnedTextureDescriptor(
+        map.attachOpenGlOwnedTexture(
+          OpenGlOwnedTextureDescriptor(
             extent,
-            OpenglContextDescriptor(
-              OpenglContextOwnership.SHARED,
-              OpenglContextDescriptorData.Webgl(
-                WebglContextDescriptor(WebglContextKind.EXISTING, context.webglContext),
+            OpenGlContextDescriptor(
+              OpenGlContextOwnership.SHARED,
+              OpenGlContextDescriptorData.WebGl(
+                WebGlContextDescriptor(WebGlContextKind.EXISTING, context.webGlContext),
               ),
             ),
           ),
@@ -265,7 +265,7 @@ internal object TestGraphics {
     when (backend) {
       TestBackend.EGL,
       TestBackend.WGL,
-      TestBackend.WEBGL -> frame.withOpenglTexture { it.width to it.height }
+      TestBackend.WEBGL -> frame.withOpenGlTexture { it.width to it.height }
       TestBackend.METAL,
       TestBackend.VULKAN,
       TestBackend.WEBGPU -> backendTextureSize(frame)
@@ -296,14 +296,14 @@ internal object TestGraphics {
     )
 
   /** A WebGPU owned texture of [extent] on [context]'s device. */
-  fun webgpuOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
-    WebgpuOwnedTextureDescriptor(
+  fun webGpuOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
+    WebGpuOwnedTextureDescriptor(
       extent,
       // Sessions use no instance, and null names the device's default queue, as a browser host
       // without a queue of its own hands over.
-      WebgpuContextDescriptor(
+      WebGpuContextDescriptor(
         NativePointer.NULL_POINTER,
-        pointer(context.webgpuDevice),
+        pointer(context.webGpuDevice),
         NativePointer.NULL_POINTER,
       ),
     )

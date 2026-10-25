@@ -23,37 +23,37 @@ import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
  * that is never closed keeps its JavaScript object alive.
  *
  * A module carries one backend. The WebGPU functions need a WebGPU module, and
- * [registerWebglContext] needs a WebGL module. Import from the agent that runs Kotlin, which is the
+ * [registerWebGlContext] needs a WebGL module. Import from the agent that runs Kotlin, which is the
  * agent that drives the sessions.
  */
 public object WebGraphics {
   /**
-   * Imports a `GPUDevice` as the `WGPUDevice` of a `WebgpuContextDescriptor`. Pass a null instance
+   * Imports a `GPUDevice` as the `WGPUDevice` of a `WebGpuContextDescriptor`. Pass a null instance
    * and a null queue beside it: sessions use neither, and null names the device's default queue.
    *
    * Throws an `IllegalArgumentException` when [device] is not a `GPUDevice` of this realm.
    */
-  public fun importWebgpuDevice(device: JsAny): ImportedWebgpuObject =
-    importWebgpu(
+  public fun importWebGpuDevice(device: JsAny): ImportedWebGpuObject =
+    importWebGpu(
       "device",
       "GPUDevice",
-      import = { mlnKwWebgpuImportDevice(device) },
-      release = { mlnKwWebgpuReleaseDevice(it) },
+      import = { mlnKwWebGpuImportDevice(device) },
+      release = { mlnKwWebGpuReleaseDevice(it) },
     )
 
   /**
    * Imports a `GPUCanvasContext`, the `getContext("webgpu")` of a canvas element or an
-   * `OffscreenCanvas`, as the `WGPUSurface` of a `WebgpuSurfaceDescriptor`.
+   * `OffscreenCanvas`, as the `WGPUSurface` of a `WebGpuSurfaceDescriptor`.
    *
    * Throws an `IllegalArgumentException` when [canvasContext] is not a `GPUCanvasContext` of this
    * realm.
    */
-  public fun importWebgpuSurface(canvasContext: JsAny): ImportedWebgpuObject =
-    importWebgpu(
+  public fun importWebGpuSurface(canvasContext: JsAny): ImportedWebGpuObject =
+    importWebGpu(
       "canvasContext",
       "GPUCanvasContext",
-      import = { mlnKwWebgpuImportSurface(canvasContext) },
-      release = { mlnKwWebgpuReleaseSurface(it) },
+      import = { mlnKwWebGpuImportSurface(canvasContext) },
+      release = { mlnKwWebGpuReleaseSurface(it) },
     )
 
   /**
@@ -61,12 +61,12 @@ public object WebGraphics {
    *
    * Throws an `IllegalArgumentException` when [texture] is not a `GPUTexture` of this realm.
    */
-  public fun importWebgpuTexture(texture: JsAny): ImportedWebgpuObject =
-    importWebgpu(
+  public fun importWebGpuTexture(texture: JsAny): ImportedWebGpuObject =
+    importWebGpu(
       "texture",
       "GPUTexture",
-      import = { mlnKwWebgpuImportTexture(texture) },
-      release = { mlnKwWebgpuReleaseTexture(it) },
+      import = { mlnKwWebGpuImportTexture(texture) },
+      release = { mlnKwWebGpuReleaseTexture(it) },
     )
 
   /**
@@ -74,12 +74,12 @@ public object WebGraphics {
    *
    * Throws an `IllegalArgumentException` when [view] is not a `GPUTextureView` of this realm.
    */
-  public fun importWebgpuTextureView(view: JsAny): ImportedWebgpuObject =
-    importWebgpu(
+  public fun importWebGpuTextureView(view: JsAny): ImportedWebGpuObject =
+    importWebGpu(
       "view",
       "GPUTextureView",
-      import = { mlnKwWebgpuImportTextureView(view) },
-      release = { mlnKwWebgpuReleaseTextureView(it) },
+      import = { mlnKwWebGpuImportTextureView(view) },
+      release = { mlnKwWebGpuReleaseTextureView(it) },
     )
 
   /**
@@ -88,30 +88,30 @@ public object WebGraphics {
    *
    * Throws an `IllegalArgumentException` when the module knows no format of that name.
    */
-  public fun webgpuTextureFormat(format: String): UInt {
-    requireWebgpu()
-    val value = mlnKwWebgpuTextureFormat(format)
+  public fun webGpuTextureFormat(format: String): UInt {
+    requireWebGpu()
+    val value = mlnKwWebGpuTextureFormat(format)
     require(value >= 0) { "unknown WebGPU texture format: $format" }
     return value.toUInt()
   }
 
   /**
    * Returns the JavaScript object behind a WebGPU handle of the module, such as the `GPUTexture` of
-   * an acquired frame's `WebgpuTextureFrame.texture`. The object is valid for as long as the handle
+   * an acquired frame's `WebGpuTextureFrame.texture`. The object is valid for as long as the handle
    * is, so a frame's texture is valid until the frame's release.
    *
    * Throws an `IllegalArgumentException` when [pointer] is null or names no object of the module.
    */
-  public fun webgpuObject(pointer: NativePointer): JsAny {
-    requireWebgpu()
+  public fun webGpuObject(pointer: NativePointer): JsAny {
+    requireWebGpu()
     require(!pointer.isNull) { "pointer is null" }
-    return requireNotNull(mlnKwWebgpuObject(word(pointer.address))) {
+    return requireNotNull(mlnKwWebGpuObject(word(pointer.address))) {
       "pointer names no WebGPU object of this module"
     }
   }
 
   /**
-   * Registers a `WebGL2RenderingContext` as the context handle of a `WebglContextDescriptor` of
+   * Registers a `WebGL2RenderingContext` as the context handle of a `WebGlContextDescriptor` of
    * kind `EXISTING`. The registration records the attributes that the context was created with, and
    * the C reference's rules for an existing context apply: MapLibre draws with a depth and a
    * stencil buffer.
@@ -119,31 +119,31 @@ public object WebGraphics {
    * Throws an `IllegalArgumentException` when [context] is not a `WebGL2RenderingContext` of this
    * realm.
    */
-  public fun registerWebglContext(context: JsAny): RegisteredWebglContext {
+  public fun registerWebGlContext(context: JsAny): RegisteredWebGlContext {
     ensureNativeLibrary()
-    if (!mlnKwHasWebgl()) {
+    if (!mlnKwHasWebGl()) {
       throw MaplibreException(Status.UNSUPPORTED, "this browser module carries no WebGL backend")
     }
-    val handle = mlnKwWebglRegisterContext(context)
+    val handle = mlnKwWebGlRegisterContext(context)
     require(handle != 0) { "context is not a WebGL2RenderingContext of this realm" }
-    return RegisteredWebglContext(handle)
+    return RegisteredWebGlContext(handle)
   }
 
-  private fun importWebgpu(
+  private fun importWebGpu(
     name: String,
     type: String,
     import: () -> Int,
     release: (Int) -> Unit,
-  ): ImportedWebgpuObject {
-    requireWebgpu()
+  ): ImportedWebGpuObject {
+    requireWebGpu()
     val handle = import()
     require(handle != 0) { "$name is not a $type of this realm" }
-    return ImportedWebgpuObject(unsignedWord(handle), release)
+    return ImportedWebGpuObject(unsignedWord(handle), release)
   }
 
-  private fun requireWebgpu() {
+  private fun requireWebGpu() {
     ensureNativeLibrary()
-    if (!mlnKwHasWebgpu()) {
+    if (!mlnKwHasWebGpu()) {
       throw MaplibreException(Status.UNSUPPORTED, "this browser module carries no WebGPU backend")
     }
   }
@@ -154,7 +154,7 @@ public object WebGraphics {
  * after every session that names [pointer] has completed its detach or been destroyed: [close]
  * releases the module's reference at once, and the JavaScript object stays usable.
  */
-public class ImportedWebgpuObject
+public class ImportedWebGpuObject
 internal constructor(private val address: Long, private val release: (Int) -> Unit) :
   AutoCloseable {
   private val scope = ViewScope()
@@ -166,7 +166,7 @@ internal constructor(private val address: Long, private val release: (Int) -> Un
    */
   public val pointer: NativePointer
     get() {
-      check(!closed) { "ImportedWebgpuObject is closed" }
+      check(!closed) { "ImportedWebGpuObject is closed" }
       return NativePointer.scoped(address, scope)
     }
 
@@ -184,16 +184,16 @@ internal constructor(private val address: Long, private val release: (Int) -> Un
  * after every session that names [context] has completed its detach or been destroyed: [close]
  * removes the registration at once, and the JavaScript context stays usable.
  */
-public class RegisteredWebglContext internal constructor(private val handle: Int) : AutoCloseable {
+public class RegisteredWebGlContext internal constructor(private val handle: Int) : AutoCloseable {
   private var closed = false
 
   /**
-   * The context's `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for a `WebglContextDescriptor` of kind
+   * The context's `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for a `WebGlContextDescriptor` of kind
    * `EXISTING`. Throws an `IllegalStateException` after [close].
    */
   public val context: Int
     get() {
-      check(!closed) { "RegisteredWebglContext is closed" }
+      check(!closed) { "RegisteredWebGlContext is closed" }
       return handle
     }
 
@@ -204,50 +204,50 @@ public class RegisteredWebglContext internal constructor(private val handle: Int
   override fun close() {
     if (closed) return
     closed = true
-    mlnKwWebglUnregisterContext(handle)
+    mlnKwWebGlUnregisterContext(handle)
   }
 }
 
 // The graphics libraries of bindings/kotlin/wasm, which a module of each backend exports as a
 // property of its own.
-private fun mlnKwHasWebgpu(): Boolean =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu !== undefined")
+private fun mlnKwHasWebGpu(): Boolean =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu !== undefined")
 
-private fun mlnKwHasWebgl(): Boolean =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgl !== undefined")
+private fun mlnKwHasWebGl(): Boolean =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGl !== undefined")
 
-private fun mlnKwWebgpuImportDevice(device: JsAny): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.importDevice(device)")
+private fun mlnKwWebGpuImportDevice(device: JsAny): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.importDevice(device)")
 
-private fun mlnKwWebgpuImportSurface(context: JsAny): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.importSurface(context)")
+private fun mlnKwWebGpuImportSurface(context: JsAny): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.importSurface(context)")
 
-private fun mlnKwWebgpuImportTexture(texture: JsAny): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.importTexture(texture)")
+private fun mlnKwWebGpuImportTexture(texture: JsAny): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.importTexture(texture)")
 
-private fun mlnKwWebgpuImportTextureView(view: JsAny): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.importTextureView(view)")
+private fun mlnKwWebGpuImportTextureView(view: JsAny): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.importTextureView(view)")
 
-private fun mlnKwWebgpuReleaseDevice(handle: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.releaseDevice(handle)")
+private fun mlnKwWebGpuReleaseDevice(handle: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.releaseDevice(handle)")
 
-private fun mlnKwWebgpuReleaseSurface(handle: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.releaseSurface(handle)")
+private fun mlnKwWebGpuReleaseSurface(handle: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.releaseSurface(handle)")
 
-private fun mlnKwWebgpuReleaseTexture(handle: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.releaseTexture(handle)")
+private fun mlnKwWebGpuReleaseTexture(handle: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.releaseTexture(handle)")
 
-private fun mlnKwWebgpuReleaseTextureView(handle: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.releaseTextureView(handle)")
+private fun mlnKwWebGpuReleaseTextureView(handle: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.releaseTextureView(handle)")
 
-private fun mlnKwWebgpuObject(handle: Int): JsAny? =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.object(handle)")
+private fun mlnKwWebGpuObject(handle: Int): JsAny? =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.object(handle)")
 
-private fun mlnKwWebgpuTextureFormat(name: String): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgpu.textureFormat(name)")
+private fun mlnKwWebGpuTextureFormat(name: String): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGpu.textureFormat(name)")
 
-private fun mlnKwWebglRegisterContext(context: JsAny): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgl.registerContext(context)")
+private fun mlnKwWebGlRegisterContext(context: JsAny): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGl.registerContext(context)")
 
-private fun mlnKwWebglUnregisterContext(handle: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebgl.unregisterContext(handle)")
+private fun mlnKwWebGlUnregisterContext(handle: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwWebGl.unregisterContext(handle)")

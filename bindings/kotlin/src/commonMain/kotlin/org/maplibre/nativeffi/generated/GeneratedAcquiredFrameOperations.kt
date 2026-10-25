@@ -25,7 +25,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * See `mln_acquired_frame_get_opengl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun <T> withOpenglTexture(block: (OpenglTextureFrame) -> T): T =
+  public fun <T> withOpenGlTexture(block: (OpenGlTextureFrame) -> T): T =
     nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -33,7 +33,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       ) { scope ->
         val out = sized(64, 8)
         check(C.mln_acquired_frame_get_opengl_texture(handle, out, diagnostic))
-        block(readOpenglTextureFrame(out, scope))
+        block(readOpenGlTextureFrame(out, scope))
       }
     }
 

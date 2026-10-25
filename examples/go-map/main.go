@@ -115,7 +115,7 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 		return errors.New("initial viewport is empty")
 	}
 
-	graphics, err := newOpenGLContext(window)
+	graphics, err := newOpenGlContext(window)
 	if err != nil {
 		return err
 	}
@@ -211,8 +211,8 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 
 // attach attaches a session, logs its mode and driver, and demands its first
 // frame.
-func attach(graphics *openGLContext, view viewport, mode renderTargetMode, mapState *runtimeMapState, wakeEvent sdl.EventType) (renderTarget, error) {
-	target, err := newOpenGLRenderTarget(graphics, view, mode, mapState.mapRef, wakeEvent)
+func attach(graphics *openGlContext, view viewport, mode renderTargetMode, mapState *runtimeMapState, wakeEvent sdl.EventType) (renderTarget, error) {
+	target, err := newOpenGlRenderTarget(graphics, view, mode, mapState.mapRef, wakeEvent)
 	if err != nil {
 		return nil, fmt.Errorf("render target attach failed: %w", err)
 	}
@@ -248,13 +248,13 @@ func waitEvent(event *sdl.Event, deadline time.Time, hasDeadline bool) bool {
 func validateNativeRenderBackend() error {
 	backends := maplibre.SupportedRenderBackendMask()
 	fmt.Printf("native render backends: %v\n", backends)
-	if !backends.Has(maplibre.RenderBackendFlagOpengl) {
+	if !backends.Has(maplibre.RenderBackendFlagOpenGl) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
-	providers := maplibre.OpenglSupportedContextProviderMask()
-	required := maplibre.OpenglContextProviderFlagEgl
+	providers := maplibre.OpenGlSupportedContextProviderMask()
+	required := maplibre.OpenGlContextProviderFlagEgl
 	if stdruntime.GOOS == "windows" {
-		required = maplibre.OpenglContextProviderFlagWgl
+		required = maplibre.OpenGlContextProviderFlagWgl
 	}
 	if !providers.Has(required) {
 		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %v", required)

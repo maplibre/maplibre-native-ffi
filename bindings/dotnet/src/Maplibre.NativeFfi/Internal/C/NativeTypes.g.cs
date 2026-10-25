@@ -9,7 +9,7 @@ internal readonly record struct MlnDeliveryBatch(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;
+internal readonly record struct MlnGeoJsonSourceData(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
 

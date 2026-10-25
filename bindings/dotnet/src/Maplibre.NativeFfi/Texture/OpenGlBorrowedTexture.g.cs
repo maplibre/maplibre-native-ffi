@@ -9,10 +9,10 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_borrowed_texture</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct OpenglBorrowedTexture
+public readonly partial record struct OpenGlBorrowedTexture
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OpenglBorrowedTexture(uint Texture)
+    public OpenGlBorrowedTexture(uint Texture)
     {
         this.Texture = Texture;
     }

@@ -61,7 +61,7 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 		t.Fatalf("testsupport.NewGraphics: %v", err)
 	}
 	t.Cleanup(graphics.Close)
-	if graphicsBackend == testsupport.BackendEGL {
+	if graphicsBackend == testsupport.BackendEgl {
 		if err := graphics.MakeCurrent(); err != nil {
 			t.Fatalf("Graphics.MakeCurrent: %v", err)
 		}

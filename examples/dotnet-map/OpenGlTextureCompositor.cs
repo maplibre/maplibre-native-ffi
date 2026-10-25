@@ -1,8 +1,8 @@
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-internal sealed class OpenGLTextureCompositor : ITextureCompositor
+internal sealed class OpenGlTextureCompositor : ITextureCompositor
 {
-    private const uint Texture2D = OpenGLBorrowedTexture.Texture2D;
+    private const uint Texture2D = OpenGlBorrowedTexture.Texture2D;
     private const uint TextureMinFilter = 0x2801;
     private const uint TextureMagFilter = 0x2800;
     private const uint Linear = 0x2601;
@@ -18,12 +18,12 @@ internal sealed class OpenGLTextureCompositor : ITextureCompositor
     private const uint Texture0 = 0x84C0;
     private const uint Triangles = 0x0004;
 
-    private readonly OpenGLContext context;
+    private readonly OpenGlContext context;
     private uint program;
     private uint vertexArray;
     private Viewport viewport;
 
-    public OpenGLTextureCompositor(OpenGLContext context, Viewport viewport)
+    public OpenGlTextureCompositor(OpenGlContext context, Viewport viewport)
     {
         this.context = context;
         this.viewport = viewport;
@@ -54,7 +54,7 @@ internal sealed class OpenGLTextureCompositor : ITextureCompositor
         this.viewport = viewport;
     }
 
-    public bool Draw(OpenglTextureFrameView frame)
+    public bool Draw(OpenGlTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {

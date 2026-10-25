@@ -52,7 +52,7 @@ def _bytes(value):
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglContextDescriptorWglVariant:
+class OpenGlContextDescriptorWglVariant:
     value: WglContextDescriptor
     _tag = 1
 
@@ -62,7 +62,7 @@ class OpenglContextDescriptorWglVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglContextDescriptorEglVariant:
+class OpenGlContextDescriptorEglVariant:
     value: EglContextDescriptor
     _tag = 2
 
@@ -72,13 +72,13 @@ class OpenglContextDescriptorEglVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglContextDescriptorWebglVariant:
-    value: WebglContextDescriptor
+class OpenGlContextDescriptorWebGlVariant:
+    value: WebGlContextDescriptor
     _tag = 3
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(WebglContextDescriptor._from_native(raw))
+        return cls(WebGlContextDescriptor._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
@@ -386,7 +386,7 @@ class OfflineRegionDownloadState(UnknownIntEnum):
     ACTIVE = 1
 
 
-class OpenglClientApi(UnknownIntEnum):
+class OpenGlClientApi(UnknownIntEnum):
     """OpenGL client API a dedicated EGL session creates its context for.
 
     See `mln_opengl_client_api` in the
@@ -398,7 +398,7 @@ class OpenglClientApi(UnknownIntEnum):
     GLES = 2
 
 
-class OpenglContextOwnership(UnknownIntEnum):
+class OpenGlContextOwnership(UnknownIntEnum):
     """How a session's OpenGL context relates to its driver thread and host
     graphics state.
 
@@ -410,7 +410,7 @@ class OpenglContextOwnership(UnknownIntEnum):
     DEDICATED = 1
 
 
-class OpenglContextProviderFlag(IntFlag):
+class OpenGlContextProviderFlag(IntFlag):
     """OpenGL context providers supported by this build.
 
     See `mln_opengl_context_provider_flag` in the
@@ -820,7 +820,7 @@ class ViewportMode(UnknownIntEnum):
     FLIPPED_Y = 1
 
 
-class WebglContextKind(UnknownIntEnum):
+class WebGlContextKind(UnknownIntEnum):
     """WebGL context placement.
 
     See `mln_webgl_context_kind` in the
@@ -1272,7 +1272,7 @@ class EglContextDescriptor:
     null there and names client_api instead.
     """
 
-    client_api: OpenglClientApi = OpenglClientApi.UNSPECIFIED
+    client_api: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED
     """Client API the session creates its context for. Required under dedicated
     ownership. A shared session queries share_context for it, so this is
     ignored there.
@@ -1287,7 +1287,7 @@ class EglContextDescriptor:
             display=raw["display"],
             config=raw["config"],
             share_context=raw["share_context"],
-            client_api=OpenglClientApi(raw["client_api"]),
+            client_api=OpenGlClientApi(raw["client_api"]),
             get_proc_address=raw["get_proc_address"],
         )
 
@@ -1373,7 +1373,7 @@ class FreeCameraOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class GeojsonSourceOptions:
+class GeoJsonSourceOptions:
     """Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel
     tile size.
 
@@ -2188,7 +2188,7 @@ class OfflineTilePyramidRegionDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglBorrowedTexture:
+class OpenGlBorrowedTexture:
     """One caller-owned OpenGL texture of a borrowed texture ring.
 
     See `mln_opengl_borrowed_texture` in the
@@ -2204,7 +2204,7 @@ class OpenglBorrowedTexture:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglBorrowedTextureDescriptor:
+class OpenGlBorrowedTextureDescriptor:
     """OpenGL attachment options for a borrowed texture target.
 
     See `mln_opengl_borrowed_texture_descriptor` in the
@@ -2223,12 +2223,12 @@ class OpenglBorrowedTextureDescriptor:
     physical_height: int
     """Physical texture height in device pixels. Required."""
 
-    context: OpenglContextDescriptor
+    context: OpenGlContextDescriptor
     """Borrowed OpenGL context provider data. The textures must belong to this
     context or a context in the same share group.
     """
 
-    textures: Sequence[OpenglBorrowedTexture]
+    textures: Sequence[OpenGlBorrowedTexture]
     """The ring's textures, one per slot, in slot order. Required."""
 
     target: int
@@ -2243,16 +2243,16 @@ class OpenglBorrowedTextureDescriptor:
             extent=LogicalExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            context=OpenglContextDescriptor._from_native(raw["context"]),
+            context=OpenGlContextDescriptor._from_native(raw["context"]),
             textures=tuple(
-                OpenglBorrowedTexture._from_native(item) for item in raw["textures"]
+                OpenGlBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
             target=raw["target"],
         )
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglContextDescriptor:
+class OpenGlContextDescriptor:
     """OpenGL backend context fields shared by OpenGL render targets.
 
     See `mln_opengl_context_descriptor` in the
@@ -2260,12 +2260,12 @@ class OpenglContextDescriptor:
     """
 
     data: (
-        OpenglContextDescriptorWglVariant
-        | OpenglContextDescriptorEglVariant
-        | OpenglContextDescriptorWebglVariant
+        OpenGlContextDescriptorWglVariant
+        | OpenGlContextDescriptorEglVariant
+        | OpenGlContextDescriptorWebGlVariant
     )
 
-    ownership: OpenglContextOwnership = OpenglContextOwnership.SHARED
+    ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED
     """Whether the session shares its driver thread and graphics objects with
     the host. A private EGL or WGL owned texture and a transferred WebGL
     canvas are dedicated to their core worker.
@@ -2274,13 +2274,13 @@ class OpenglContextDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            ownership=OpenglContextOwnership(raw["ownership"]),
+            ownership=OpenGlContextOwnership(raw["ownership"]),
             data=_copy_variant(
                 raw["data"],
                 {
-                    "wgl": OpenglContextDescriptorWglVariant,
-                    "egl": OpenglContextDescriptorEglVariant,
-                    "webgl": OpenglContextDescriptorWebglVariant,
+                    "wgl": OpenGlContextDescriptorWglVariant,
+                    "egl": OpenGlContextDescriptorEglVariant,
+                    "webgl": OpenGlContextDescriptorWebGlVariant,
                 },
                 None,
             ),
@@ -2288,7 +2288,7 @@ class OpenglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglOwnedTextureDescriptor:
+class OpenGlOwnedTextureDescriptor:
     """OpenGL attachment options for an owned texture target.
 
     See `mln_opengl_owned_texture_descriptor` in the
@@ -2300,7 +2300,7 @@ class OpenglOwnedTextureDescriptor:
     map's is accepted and logged as a warning.
     """
 
-    context: OpenglContextDescriptor
+    context: OpenGlContextDescriptor
     """Borrowed OpenGL context provider data. Shared ownership creates a context
     whose texture frames the host can acquire. Dedicated EGL, WGL, or
     transferred WebGL ownership creates a private core-worker context for CPU
@@ -2311,12 +2311,12 @@ class OpenglOwnedTextureDescriptor:
     def _from_native(cls, raw):
         return cls(
             extent=LogicalExtent._from_native(raw["extent"]),
-            context=OpenglContextDescriptor._from_native(raw["context"]),
+            context=OpenGlContextDescriptor._from_native(raw["context"]),
         )
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglSurfaceDescriptor:
+class OpenGlSurfaceDescriptor:
     """OpenGL attachment options for a native surface.
 
     See `mln_opengl_surface_descriptor` in the
@@ -2328,7 +2328,7 @@ class OpenglSurfaceDescriptor:
     map's is accepted and logged as a warning.
     """
 
-    context: OpenglContextDescriptor
+    context: OpenGlContextDescriptor
     """Borrowed OpenGL context provider data."""
 
     surface: int = 0
@@ -2341,13 +2341,13 @@ class OpenglSurfaceDescriptor:
     def _from_native(cls, raw):
         return cls(
             extent=LogicalExtent._from_native(raw["extent"]),
-            context=OpenglContextDescriptor._from_native(raw["context"]),
+            context=OpenGlContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
         )
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglTextureFrame:
+class OpenGlTextureFrame:
     """OpenGL frame acquired from a texture ring.
 
     See `mln_opengl_texture_frame` in the
@@ -4210,14 +4210,14 @@ class NativeWake:
 
 
 @dataclass(frozen=True, slots=True)
-class WebglContextDescriptor:
+class WebGlContextDescriptor:
     """WebGL context fields shared by OpenGL render targets in the browser.
 
     See `mln_webgl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    kind: WebglContextKind = WebglContextKind.EXISTING
+    kind: WebGlContextKind = WebGlContextKind.EXISTING
 
     context: int = 0
     """Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive."""
@@ -4230,7 +4230,7 @@ class WebglContextDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kind=WebglContextKind(raw["kind"]),
+            kind=WebGlContextKind(raw["kind"]),
             context=raw["context"],
             canvas_selector=raw["canvas_selector"],
         )

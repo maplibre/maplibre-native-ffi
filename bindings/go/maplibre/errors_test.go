@@ -52,9 +52,9 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 
 // The package's init runs this check on the linked library and panics on a
 // mismatch, so no call reaches a library with another C ABI version.
-func TestMismatchedCABIVersionIsRejected(t *testing.T) {
-	err := checkCABIVersion(bindingCABIVersion + 1)
+func TestMismatchedCAbiVersionIsRejected(t *testing.T) {
+	err := checkCAbiVersion(bindingCAbiVersion + 1)
 	if !errors.Is(err, StatusUnsupported) || !strings.Contains(err.Error(), "C ABI version") {
-		t.Fatalf("checkCABIVersion(other) = %v, want StatusUnsupported naming the version", err)
+		t.Fatalf("checkCAbiVersion(other) = %v, want StatusUnsupported naming the version", err)
 	}
 }

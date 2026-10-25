@@ -33,8 +33,8 @@ public extension MapHandle {
   ///
   /// See `mln_map_attach_opengl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func attachOpenglSurface(
-    descriptor bindingArg0: OpenglSurfaceDescriptor,
+  func attachOpenGlSurface(
+    descriptor bindingArg0: OpenGlSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> NewRenderSession {
     var value0: mln_render_session = 0

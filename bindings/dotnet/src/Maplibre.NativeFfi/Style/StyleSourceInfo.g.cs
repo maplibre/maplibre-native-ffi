@@ -35,7 +35,7 @@ public sealed record StyleSourceInfo
     /// <summary>
     /// Inline TileJSON metadata, when the source was defined with it.
     /// </summary>
-    public StyleSourceTileInfo? Tilejson { get; init; }
+    public StyleSourceTileInfo? TileJson { get; init; }
 
     /// <summary>
     /// Geographic bounds, when inline TileJSON sets them.

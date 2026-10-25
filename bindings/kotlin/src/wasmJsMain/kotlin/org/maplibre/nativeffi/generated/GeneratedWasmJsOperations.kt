@@ -13,8 +13,8 @@ import org.maplibre.nativeffi.internal.memory.*
  * See `mln_acquired_frame_get_webgpu_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public fun <T> GeneratedAcquiredFrameOperations.withWebgpuTexture(
-  block: (WebgpuTextureFrame) -> T,
+public fun <T> GeneratedAcquiredFrameOperations.withWebGpuTexture(
+  block: (WebGpuTextureFrame) -> T,
 ): T =
   nativeCall(this, binding) {
     borrowView(
@@ -23,7 +23,7 @@ public fun <T> GeneratedAcquiredFrameOperations.withWebgpuTexture(
     ) { scope ->
       val out = sized(w(64, 80), 8)
       check(C.mln_acquired_frame_get_webgpu_texture(handle, out, diagnostic))
-      block(readWebgpuTextureFrame(out, scope))
+      block(readWebGpuTextureFrame(out, scope))
     }
   }
 
@@ -33,8 +33,8 @@ public fun <T> GeneratedAcquiredFrameOperations.withWebgpuTexture(
  * See `mln_map_attach_webgpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public fun GeneratedMapOperations.attachWebgpuBorrowedTexture(
-  descriptor: WebgpuBorrowedTextureDescriptor,
+public fun GeneratedMapOperations.attachWebGpuBorrowedTexture(
+  descriptor: WebGpuBorrowedTextureDescriptor,
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
   nativeCall(this, binding) {
@@ -42,7 +42,7 @@ public fun GeneratedMapOperations.attachWebgpuBorrowedTexture(
       { out, completion ->
         C.mln_map_attach_webgpu_borrowed_texture(
           handle,
-          writeWebgpuBorrowedTextureDescriptor(descriptor),
+          writeWebGpuBorrowedTextureDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
           out,
           completion,
@@ -50,7 +50,7 @@ public fun GeneratedMapOperations.attachWebgpuBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebgpuBorrowedTexture as MapHandle) },
+      { RenderSessionHandle(it, this@attachWebGpuBorrowedTexture as MapHandle) },
       { it.bindingCallbacks },
       { it.dispose() },
       ::NewRenderSession,
@@ -63,8 +63,8 @@ public fun GeneratedMapOperations.attachWebgpuBorrowedTexture(
  * See `mln_map_attach_webgpu_owned_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public fun GeneratedMapOperations.attachWebgpuOwnedTexture(
-  descriptor: WebgpuOwnedTextureDescriptor,
+public fun GeneratedMapOperations.attachWebGpuOwnedTexture(
+  descriptor: WebGpuOwnedTextureDescriptor,
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
   nativeCall(this, binding) {
@@ -72,7 +72,7 @@ public fun GeneratedMapOperations.attachWebgpuOwnedTexture(
       { out, completion ->
         C.mln_map_attach_webgpu_owned_texture(
           handle,
-          writeWebgpuOwnedTextureDescriptor(descriptor),
+          writeWebGpuOwnedTextureDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
           out,
           completion,
@@ -80,7 +80,7 @@ public fun GeneratedMapOperations.attachWebgpuOwnedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebgpuOwnedTexture as MapHandle) },
+      { RenderSessionHandle(it, this@attachWebGpuOwnedTexture as MapHandle) },
       { it.bindingCallbacks },
       { it.dispose() },
       ::NewRenderSession,
@@ -93,8 +93,8 @@ public fun GeneratedMapOperations.attachWebgpuOwnedTexture(
  * See `mln_map_attach_webgpu_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
-public fun GeneratedMapOperations.attachWebgpuSurface(
-  descriptor: WebgpuSurfaceDescriptor,
+public fun GeneratedMapOperations.attachWebGpuSurface(
+  descriptor: WebGpuSurfaceDescriptor,
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
   nativeCall(this, binding) {
@@ -102,7 +102,7 @@ public fun GeneratedMapOperations.attachWebgpuSurface(
       { out, completion ->
         C.mln_map_attach_webgpu_surface(
           handle,
-          writeWebgpuSurfaceDescriptor(descriptor),
+          writeWebGpuSurfaceDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
           out,
           completion,
@@ -110,7 +110,7 @@ public fun GeneratedMapOperations.attachWebgpuSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebgpuSurface as MapHandle) },
+      { RenderSessionHandle(it, this@attachWebGpuSurface as MapHandle) },
       { it.bindingCallbacks },
       { it.dispose() },
       ::NewRenderSession,
@@ -123,14 +123,14 @@ public fun GeneratedMapOperations.attachWebgpuSurface(
  * See `mln_render_session_set_webgpu_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public fun GeneratedRenderSessionOperations.setWebgpuBorrowedTextureTarget(
-  descriptor: WebgpuBorrowedTextureDescriptor,
+public fun GeneratedRenderSessionOperations.setWebGpuBorrowedTextureTarget(
+  descriptor: WebGpuBorrowedTextureDescriptor,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_webgpu_borrowed_texture_target(
         handle,
-        writeWebgpuBorrowedTextureDescriptor(descriptor),
+        writeWebGpuBorrowedTextureDescriptor(descriptor),
         completion,
         diagnostic,
       ),
@@ -143,14 +143,14 @@ public fun GeneratedRenderSessionOperations.setWebgpuBorrowedTextureTarget(
  * See `mln_render_session_set_webgpu_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
-public fun GeneratedRenderSessionOperations.setWebgpuSurfaceTarget(
-  descriptor: WebgpuSurfaceDescriptor,
+public fun GeneratedRenderSessionOperations.setWebGpuSurfaceTarget(
+  descriptor: WebGpuSurfaceDescriptor,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_webgpu_surface_target(
         handle,
-        writeWebgpuSurfaceDescriptor(descriptor),
+        writeWebGpuSurfaceDescriptor(descriptor),
         completion,
         diagnostic,
       ),

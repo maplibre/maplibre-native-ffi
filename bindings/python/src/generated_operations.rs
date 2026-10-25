@@ -3325,7 +3325,7 @@ impl AcquiredFrameHandle {
 }
 
 #[pymethods]
-impl GeojsonSourceDataHandle {
+impl GeoJsonSourceDataHandle {
     #[pyo3(signature = ())]
     fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -3498,7 +3498,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -3522,7 +3522,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -5650,7 +5650,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -5674,7 +5674,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeojsonSourceDataHandle,
+        data: &GeoJsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -8095,8 +8095,8 @@ generated_owner!(
     )
 );
 generated_owner!(
-    GeojsonSourceDataHandle,
-    "_GeojsonSourceDataHandle",
+    GeoJsonSourceDataHandle,
+    "_GeoJsonSourceDataHandle",
     mln_geojson_source_data,
     Some(generated_dispose_mln_geojson_source_data),
     None,
@@ -8213,7 +8213,7 @@ fn geojson_source_data_create(
             )
         })
     }?;
-    unsafe { GeojsonSourceDataHandle::adopt(py, out_data, Vec::new()) }
+    unsafe { GeoJsonSourceDataHandle::adopt(py, out_data, Vec::new()) }
 }
 
 #[pyfunction]
@@ -8409,7 +8409,7 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
-    module.add_class::<GeojsonSourceDataHandle>()?;
+    module.add_class::<GeoJsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
     module.add_class::<RenderSessionHandle>()?;

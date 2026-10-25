@@ -3,7 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-public extension GeojsonSourceDataHandle {
+public extension GeoJsonSourceDataHandle {
   /// Releases prepared GeoJSON source data.
   ///
   /// See `mln_geojson_source_data_release` in the

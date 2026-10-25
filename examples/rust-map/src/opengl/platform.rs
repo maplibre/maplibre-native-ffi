@@ -6,5 +6,5 @@ mod imp;
 mod imp;
 
 pub use imp::{
-    OpenGLPlatformContext, configure_template, context_api, opengl_api_preference, uses_gles,
+    OpenGlPlatformContext, configure_template, context_api, opengl_api_preference, uses_gles,
 };

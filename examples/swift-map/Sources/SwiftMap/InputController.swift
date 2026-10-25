@@ -1,8 +1,8 @@
 import AppKit
 import MaplibreNativeFFI
 
-private let keyboardAnimationDurationMS = 160.0
-private let resetAnimationDurationMS = 220.0
+private let keyboardAnimationDurationMs = 160.0
+private let resetAnimationDurationMs = 220.0
 private let preciseScrollDeltaDivisor = 10.0
 private let maxScrollDeltaPerEvent = 4.0
 
@@ -135,7 +135,7 @@ final class InputController {
     let bearingStep = 10.0
     let pitchStep = 5.0
     let animation =
-      AnimationOptions(durationMs: keyboardAnimationDurationMS)
+      AnimationOptions(durationMs: keyboardAnimationDurationMs)
     let center = ScreenPoint(
       x: Double(viewport.logicalWidth) / 2.0,
       y: Double(viewport.logicalHeight) / 2.0
@@ -185,7 +185,7 @@ final class InputController {
     case 29:
       mapState.resetOrientation(
         animation: AnimationOptions(
-          durationMs: resetAnimationDurationMS
+          durationMs: resetAnimationDurationMs
         )
       )
     default:

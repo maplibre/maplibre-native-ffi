@@ -234,7 +234,7 @@ const (
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
 	// GLsync in the shared EGL or WGL context's share group, used only by a
 	// caller-graphics-thread driver. handle is nonzero.
-	GpuSyncKindOpenglFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
+	GpuSyncKindOpenGlFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
 )
 
 func (value GpuSyncKind) String() string {
@@ -242,7 +242,7 @@ func (value GpuSyncKind) String() string {
 	case 0:
 		return "GpuSyncKindCpuComplete"
 	case 1:
-		return "GpuSyncKindOpenglFence"
+		return "GpuSyncKindOpenGlFence"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
 }
@@ -473,79 +473,79 @@ func (value OfflineRegionDownloadState) String() string {
 	return fmt.Sprintf("OfflineRegionDownloadState(%d)", value)
 }
 
-// OpenglClientApi corresponds to mln_opengl_client_api. OpenGL client API a
+// OpenGlClientApi corresponds to mln_opengl_client_api. OpenGL client API a
 // dedicated EGL session creates its context for.
 //
 // See mln_opengl_client_api in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglClientApi uint32
+type OpenGlClientApi uint32
 
 const (
 	// No client API is named.
-	OpenglClientApiUnspecified OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_UNSPECIFIED)
+	OpenGlClientApiUnspecified OpenGlClientApi = OpenGlClientApi(C.MLN_OPENGL_CLIENT_API_UNSPECIFIED)
 	// Desktop OpenGL, as EGL_OPENGL_API names it.
-	OpenglClientApiGl OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_GL)
+	OpenGlClientApiGl OpenGlClientApi = OpenGlClientApi(C.MLN_OPENGL_CLIENT_API_GL)
 	// OpenGL ES, as EGL_OPENGL_ES_API names it.
-	OpenglClientApiGles OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_GLES)
+	OpenGlClientApiGles OpenGlClientApi = OpenGlClientApi(C.MLN_OPENGL_CLIENT_API_GLES)
 )
 
-func (value OpenglClientApi) String() string {
+func (value OpenGlClientApi) String() string {
 	switch value {
 	case 0:
-		return "OpenglClientApiUnspecified"
+		return "OpenGlClientApiUnspecified"
 	case 1:
-		return "OpenglClientApiGl"
+		return "OpenGlClientApiGl"
 	case 2:
-		return "OpenglClientApiGles"
+		return "OpenGlClientApiGles"
 	}
-	return fmt.Sprintf("OpenglClientApi(%d)", value)
+	return fmt.Sprintf("OpenGlClientApi(%d)", value)
 }
 
-// OpenglContextOwnership corresponds to mln_opengl_context_ownership. How a
+// OpenGlContextOwnership corresponds to mln_opengl_context_ownership. How a
 // session's OpenGL context relates to its driver thread and host graphics
 // state.
 //
 // See mln_opengl_context_ownership in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextOwnership uint32
+type OpenGlContextOwnership uint32
 
 const (
 	// The session shares its thread with host graphics work.
-	OpenglContextOwnershipShared OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
+	OpenGlContextOwnershipShared OpenGlContextOwnership = OpenGlContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
 	// The session keeps its own OpenGL context current on its thread.
-	OpenglContextOwnershipDedicated OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
+	OpenGlContextOwnershipDedicated OpenGlContextOwnership = OpenGlContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
 )
 
-func (value OpenglContextOwnership) String() string {
+func (value OpenGlContextOwnership) String() string {
 	switch value {
 	case 0:
-		return "OpenglContextOwnershipShared"
+		return "OpenGlContextOwnershipShared"
 	case 1:
-		return "OpenglContextOwnershipDedicated"
+		return "OpenGlContextOwnershipDedicated"
 	}
-	return fmt.Sprintf("OpenglContextOwnership(%d)", value)
+	return fmt.Sprintf("OpenGlContextOwnership(%d)", value)
 }
 
-// OpenglContextProviderFlag corresponds to mln_opengl_context_provider_flag.
+// OpenGlContextProviderFlag corresponds to mln_opengl_context_provider_flag.
 // OpenGL context providers supported by this build.
 //
 // See mln_opengl_context_provider_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextProviderFlag uint32
+type OpenGlContextProviderFlag uint32
 
 const (
-	OpenglContextProviderFlagWgl OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
-	OpenglContextProviderFlagEgl OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
+	OpenGlContextProviderFlagWgl OpenGlContextProviderFlag = OpenGlContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
+	OpenGlContextProviderFlagEgl OpenGlContextProviderFlag = OpenGlContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
 	// Browser WebGL context imported into an Emscripten module.
-	OpenglContextProviderFlagWebgl OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL)
+	OpenGlContextProviderFlagWebGl OpenGlContextProviderFlag = OpenGlContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL)
 )
 
-func (value OpenglContextProviderFlag) Has(flags OpenglContextProviderFlag) bool {
+func (value OpenGlContextProviderFlag) Has(flags OpenGlContextProviderFlag) bool {
 	return value&flags == flags
 }
 
-func (value OpenglContextProviderFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "OpenglContextProviderFlagWgl"}, {2, "OpenglContextProviderFlagEgl"}, {4, "OpenglContextProviderFlagWebgl"}})
+func (value OpenGlContextProviderFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "OpenGlContextProviderFlagWgl"}, {2, "OpenGlContextProviderFlagEgl"}, {4, "OpenGlContextProviderFlagWebGl"}})
 }
 
 // RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
@@ -582,14 +582,14 @@ type RenderBackendFlag uint32
 const (
 	RenderBackendFlagMetal  RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_METAL)
 	RenderBackendFlagVulkan RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_VULKAN)
-	RenderBackendFlagOpengl RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_OPENGL)
-	RenderBackendFlagWebgpu RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_WEBGPU)
+	RenderBackendFlagOpenGl RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_OPENGL)
+	RenderBackendFlagWebGpu RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_WEBGPU)
 )
 
 func (value RenderBackendFlag) Has(flags RenderBackendFlag) bool { return value&flags == flags }
 
 func (value RenderBackendFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderBackendFlagMetal"}, {2, "RenderBackendFlagVulkan"}, {4, "RenderBackendFlagOpengl"}, {8, "RenderBackendFlagWebgpu"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderBackendFlagMetal"}, {2, "RenderBackendFlagVulkan"}, {4, "RenderBackendFlagOpenGl"}, {8, "RenderBackendFlagWebGpu"}})
 }
 
 // RenderDriverKind corresponds to mln_render_driver_kind. Execution placement
@@ -1287,7 +1287,7 @@ const (
 	StyleSourceTypeVector          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VECTOR)
 	StyleSourceTypeRaster          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER)
 	StyleSourceTypeRasterDem       StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
-	StyleSourceTypeGeojson         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEOJSON)
+	StyleSourceTypeGeoJson         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEOJSON)
 	StyleSourceTypeImage           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
 	StyleSourceTypeVideo           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
 	StyleSourceTypeAnnotations     StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
@@ -1306,7 +1306,7 @@ func (value StyleSourceType) String() string {
 	case 3:
 		return "StyleSourceTypeRasterDem"
 	case 4:
-		return "StyleSourceTypeGeojson"
+		return "StyleSourceTypeGeoJson"
 	case 5:
 		return "StyleSourceTypeImage"
 	case 6:
@@ -1471,29 +1471,29 @@ func (value ViewportMode) String() string {
 	return fmt.Sprintf("ViewportMode(%d)", value)
 }
 
-// WebglContextKind corresponds to mln_webgl_context_kind. WebGL context
+// WebGlContextKind corresponds to mln_webgl_context_kind. WebGL context
 // placement.
 //
 // See mln_webgl_context_kind in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type WebglContextKind uint32
+type WebGlContextKind uint32
 
 const (
 	// Use a host-created context on its current browser agent.
-	WebglContextKindExisting WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_EXISTING)
+	WebGlContextKindExisting WebGlContextKind = WebGlContextKind(C.MLN_WEBGL_CONTEXT_EXISTING)
 	// Transfer the canvas named by canvas_selector to a native worker and create a
 	// WebGL 2 context there.
-	WebglContextKindTransferredCanvas WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
+	WebGlContextKindTransferredCanvas WebGlContextKind = WebGlContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
 )
 
-func (value WebglContextKind) String() string {
+func (value WebGlContextKind) String() string {
 	switch value {
 	case 0:
-		return "WebglContextKindExisting"
+		return "WebGlContextKindExisting"
 	case 1:
-		return "WebglContextKindTransferredCanvas"
+		return "WebGlContextKindTransferredCanvas"
 	}
-	return fmt.Sprintf("WebglContextKind(%d)", value)
+	return fmt.Sprintf("WebGlContextKind(%d)", value)
 }
 
 // OfflineRegionDefinition corresponds to mln_offline_region_definition. Tagged
@@ -1526,36 +1526,36 @@ func (OfflineRegionDefinitionGeometryVariant) bindingTag() uint32 {
 }
 func (OfflineRegionDefinitionGeometryVariant) isOfflineRegionDefinition() {}
 
-// OpenglContextDescriptorData corresponds to
+// OpenGlContextDescriptorData corresponds to
 // mln_opengl_context_descriptor_data. Backend-specific OpenGL context data.
 //
 // See mln_opengl_context_descriptor_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextDescriptorData interface {
+type OpenGlContextDescriptorData interface {
 	bindingTag() uint32
-	isOpenglContextDescriptorData()
+	isOpenGlContextDescriptorData()
 }
 
-type OpenglContextDescriptorDataWglVariant struct{ Value WglContextDescriptor }
+type OpenGlContextDescriptorDataWglVariant struct{ Value WglContextDescriptor }
 
-func (OpenglContextDescriptorDataWglVariant) bindingTag() uint32 {
+func (OpenGlContextDescriptorDataWglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
 }
-func (OpenglContextDescriptorDataWglVariant) isOpenglContextDescriptorData() {}
+func (OpenGlContextDescriptorDataWglVariant) isOpenGlContextDescriptorData() {}
 
-type OpenglContextDescriptorDataEglVariant struct{ Value EglContextDescriptor }
+type OpenGlContextDescriptorDataEglVariant struct{ Value EglContextDescriptor }
 
-func (OpenglContextDescriptorDataEglVariant) bindingTag() uint32 {
+func (OpenGlContextDescriptorDataEglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
 }
-func (OpenglContextDescriptorDataEglVariant) isOpenglContextDescriptorData() {}
+func (OpenGlContextDescriptorDataEglVariant) isOpenGlContextDescriptorData() {}
 
-type OpenglContextDescriptorDataWebglVariant struct{ Value WebglContextDescriptor }
+type OpenGlContextDescriptorDataWebGlVariant struct{ Value WebGlContextDescriptor }
 
-func (OpenglContextDescriptorDataWebglVariant) bindingTag() uint32 {
+func (OpenGlContextDescriptorDataWebGlVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
 }
-func (OpenglContextDescriptorDataWebglVariant) isOpenglContextDescriptorData() {}
+func (OpenGlContextDescriptorDataWebGlVariant) isOpenGlContextDescriptorData() {}
 
 // RenderedQueryGeometry corresponds to mln_rendered_query_geometry. Rendered
 // feature query geometry descriptor.
@@ -2110,7 +2110,7 @@ type EglContextDescriptor struct {
 	// Client API the session creates its context for. Required under dedicated
 	// ownership. A shared session queries share_context for it, so this is ignored
 	// there.
-	ClientApi OpenglClientApi
+	ClientApi OpenGlClientApi
 	// Optional eglGetProcAddress-compatible function for the host loader.
 	GetProcAddress uintptr
 }
@@ -2207,12 +2207,12 @@ func nativeFreeCameraOptions(input FreeCameraOptions, arena *bindingArena) C.mln
 	return raw
 }
 
-// GeojsonSourceOptions corresponds to mln_geojson_source_options. Options for
+// GeoJsonSourceOptions corresponds to mln_geojson_source_options. Options for
 // GeoJSON sources, indexed and rendered at a fixed 512-pixel tile size.
 //
 // See mln_geojson_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type GeojsonSourceOptions struct {
+type GeoJsonSourceOptions struct {
 	// Minimum tiling zoom. Absent selects 0.
 	MinZoom *float64
 	// Maximum tiling zoom, an integer within [0, 24]. Absent selects 18.
@@ -2240,7 +2240,7 @@ type GeojsonSourceOptions struct {
 	SynchronousTiling *bool
 }
 
-func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena) C.mln_geojson_source_options {
+func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena) C.mln_geojson_source_options {
 	raw := C.mln_geojson_source_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
@@ -3043,29 +3043,29 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 	return raw
 }
 
-// OpenglBorrowedTexture corresponds to mln_opengl_borrowed_texture. One
+// OpenGlBorrowedTexture corresponds to mln_opengl_borrowed_texture. One
 // caller-owned OpenGL texture of a borrowed texture ring.
 //
 // See mln_opengl_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenglBorrowedTexture struct {
+type OpenGlBorrowedTexture struct {
 	// Borrowed OpenGL texture object name. Required.
 	Texture uint32
 }
 
-func nativeOpenglBorrowedTexture(input OpenglBorrowedTexture, arena *bindingArena) C.mln_opengl_borrowed_texture {
+func nativeOpenGlBorrowedTexture(input OpenGlBorrowedTexture, arena *bindingArena) C.mln_opengl_borrowed_texture {
 	raw := C.mln_opengl_borrowed_texture{}
 	raw.texture = C.uint32_t(input.Texture)
 	return raw
 }
 
-// OpenglBorrowedTextureDescriptor corresponds to
+// OpenGlBorrowedTextureDescriptor corresponds to
 // mln_opengl_borrowed_texture_descriptor. OpenGL attachment options for a
 // borrowed texture target.
 //
 // See mln_opengl_borrowed_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenglBorrowedTextureDescriptor struct {
+type OpenGlBorrowedTextureDescriptor struct {
 	// Logical texture extent. Required. physical_width and physical_height give the
 	// texture's size. A scale_factor that differs from the map's is accepted and
 	// logged as a warning.
@@ -3076,46 +3076,46 @@ type OpenglBorrowedTextureDescriptor struct {
 	PhysicalHeight uint32
 	// Borrowed OpenGL context provider data. The textures must belong to this
 	// context or a context in the same share group.
-	Context OpenglContextDescriptor
+	Context OpenGlContextDescriptor
 	// The ring's textures, one per slot, in slot order. Required.
-	Textures []OpenglBorrowedTexture
+	Textures []OpenGlBorrowedTexture
 	// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
 	Target uint32
 }
 
-func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
+func nativeOpenGlBorrowedTextureDescriptor(input OpenGlBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
 	raw := C.mln_opengl_borrowed_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenGlContextDescriptor(input.Context, arena)
 	{
 		raw.textures = (*C.mln_opengl_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
 		items := unsafe.Slice(raw.textures, len(input.Textures))
 		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
 		for i, item := range input.Textures {
-			items[i] = nativeOpenglBorrowedTexture(item, arena)
+			items[i] = nativeOpenGlBorrowedTexture(item, arena)
 		}
 	}
 	raw.target = C.uint32_t(input.Target)
 	return raw
 }
 
-// OpenglContextDescriptor corresponds to mln_opengl_context_descriptor. OpenGL
+// OpenGlContextDescriptor corresponds to mln_opengl_context_descriptor. OpenGL
 // backend context fields shared by OpenGL render targets.
 //
 // See mln_opengl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextDescriptor struct {
+type OpenGlContextDescriptor struct {
 	// Whether the session shares its driver thread and graphics objects with the
 	// host. A private EGL or WGL owned texture and a transferred WebGL canvas are
 	// dedicated to their core worker.
-	Ownership OpenglContextOwnership
-	Data      OpenglContextDescriptorData
+	Ownership OpenGlContextOwnership
+	Data      OpenGlContextDescriptorData
 }
 
-func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
+func nativeOpenGlContextDescriptor(input OpenGlContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
 	raw.ownership = C.mln_opengl_context_ownership(input.Ownership)
 	if input.Data == nil {
@@ -3123,73 +3123,73 @@ func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *binding
 	}
 	raw.platform = C.mln_opengl_context_platform(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
-	case OpenglContextDescriptorDataWglVariant:
+	case OpenGlContextDescriptorDataWglVariant:
 		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWglContextDescriptor(variant.Value, arena)
-	case OpenglContextDescriptorDataEglVariant:
+	case OpenGlContextDescriptorDataEglVariant:
 		*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeEglContextDescriptor(variant.Value, arena)
-	case OpenglContextDescriptorDataWebglVariant:
-		*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWebglContextDescriptor(variant.Value, arena)
+	case OpenGlContextDescriptorDataWebGlVariant:
+		*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWebGlContextDescriptor(variant.Value, arena)
 	default:
 		arena.fail("unknown input union variant")
 	}
 	return raw
 }
 
-// OpenglOwnedTextureDescriptor corresponds to
+// OpenGlOwnedTextureDescriptor corresponds to
 // mln_opengl_owned_texture_descriptor. OpenGL attachment options for an owned
 // texture target.
 //
 // See mln_opengl_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenglOwnedTextureDescriptor struct {
+type OpenGlOwnedTextureDescriptor struct {
 	// Logical texture extent. Required. A scale_factor that differs from the map's
 	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed OpenGL context provider data. Shared ownership creates a context
 	// whose texture frames the host can acquire. Dedicated EGL, WGL, or transferred
 	// WebGL ownership creates a private core-worker context for CPU readback.
-	Context OpenglContextDescriptor
+	Context OpenGlContextDescriptor
 }
 
-func nativeOpenglOwnedTextureDescriptor(input OpenglOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
+func nativeOpenGlOwnedTextureDescriptor(input OpenGlOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
 	raw := C.mln_opengl_owned_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenGlContextDescriptor(input.Context, arena)
 	return raw
 }
 
-// OpenglSurfaceDescriptor corresponds to mln_opengl_surface_descriptor. OpenGL
+// OpenGlSurfaceDescriptor corresponds to mln_opengl_surface_descriptor. OpenGL
 // attachment options for a native surface.
 //
 // See mln_opengl_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type OpenglSurfaceDescriptor struct {
+type OpenGlSurfaceDescriptor struct {
 	// Logical surface extent. Required. A scale_factor that differs from the map's
 	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed OpenGL context provider data.
-	Context OpenglContextDescriptor
+	Context OpenGlContextDescriptor
 	// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
 	// both required. Null for WebGL, whose context carries its canvas binding.
 	Surface uintptr
 }
 
-func nativeOpenglSurfaceDescriptor(input OpenglSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
+func nativeOpenGlSurfaceDescriptor(input OpenGlSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
 	raw := C.mln_opengl_surface_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenGlContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
 }
 
-// OpenglTextureFrame corresponds to mln_opengl_texture_frame. OpenGL frame
+// OpenGlTextureFrame corresponds to mln_opengl_texture_frame. OpenGL frame
 // acquired from a texture ring.
 //
 // See mln_opengl_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenglTextureFrame struct {
+type OpenGlTextureFrame struct {
 	// Session generation that produced this frame.
 	Generation uint64
 	// Physical OpenGL texture width in device pixels.
@@ -3216,8 +3216,8 @@ type OpenglTextureFrame struct {
 	Type uint32
 }
 
-func copyOpenglTextureFrame(raw C.mln_opengl_texture_frame) OpenglTextureFrame {
-	var result OpenglTextureFrame
+func copyOpenGlTextureFrame(raw C.mln_opengl_texture_frame) OpenGlTextureFrame {
+	var result OpenGlTextureFrame
 	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
@@ -4439,7 +4439,7 @@ type StyleSourceInfo struct {
 	// URL that the source loads from, or empty when it has none.
 	Url string
 	// Inline TileJSON metadata, when the source was defined with it.
-	Tilejson *StyleSourceTileInfo
+	TileJson *StyleSourceTileInfo
 	// Geographic bounds, when inline TileJSON sets them.
 	Bounds *LatLngBounds
 	// Tile size in pixels, for a tile source.
@@ -4457,7 +4457,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.IsVolatile = bool(raw.is_volatile)
 	result.Attribution = bindingString(raw.attribution.data, uint64(raw.attribution.size))
 	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
-	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
+	result.TileJson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
@@ -4890,13 +4890,13 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	return raw
 }
 
-// WebglContextDescriptor corresponds to mln_webgl_context_descriptor. WebGL
+// WebGlContextDescriptor corresponds to mln_webgl_context_descriptor. WebGL
 // context fields shared by OpenGL render targets in the browser.
 //
 // See mln_webgl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type WebglContextDescriptor struct {
-	Kind WebglContextKind
+type WebGlContextDescriptor struct {
+	Kind WebGlContextKind
 	// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
 	Context int32
 	// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
@@ -4904,7 +4904,7 @@ type WebglContextDescriptor struct {
 	CanvasSelector string
 }
 
-func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
+func nativeWebGlContextDescriptor(input WebGlContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
 	raw.kind = C.mln_webgl_context_kind(input.Kind)
 	raw.context = C.int32_t(input.Context)
@@ -4974,24 +4974,24 @@ func (view MetalTextureFrameView) UnsafeDevice() (uintptr, error) {
 
 func (view MetalTextureFrameView) PixelFormat() uint64 { return view.value.PixelFormat }
 
-type OpenglTextureFrameView struct {
-	value OpenglTextureFrame
+type OpenGlTextureFrameView struct {
+	value OpenGlTextureFrame
 	scope *bindingScope
 }
 
-func (view OpenglTextureFrameView) Generation() uint64 { return view.value.Generation }
+func (view OpenGlTextureFrameView) Generation() uint64 { return view.value.Generation }
 
-func (view OpenglTextureFrameView) Width() uint32 { return view.value.Width }
+func (view OpenGlTextureFrameView) Width() uint32 { return view.value.Width }
 
-func (view OpenglTextureFrameView) Height() uint32 { return view.value.Height }
+func (view OpenGlTextureFrameView) Height() uint32 { return view.value.Height }
 
-func (view OpenglTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+func (view OpenGlTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
 
-func (view OpenglTextureFrameView) FrameId() uint64 { return view.value.FrameId }
+func (view OpenGlTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
-func (view OpenglTextureFrameView) Slot() uint32 { return view.value.Slot }
+func (view OpenGlTextureFrameView) Slot() uint32 { return view.value.Slot }
 
-func (view OpenglTextureFrameView) Texture() (uint32, error) {
+func (view OpenGlTextureFrameView) Texture() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5000,13 +5000,13 @@ func (view OpenglTextureFrameView) Texture() (uint32, error) {
 	})
 }
 
-func (view OpenglTextureFrameView) Target() uint32 { return view.value.Target }
+func (view OpenGlTextureFrameView) Target() uint32 { return view.value.Target }
 
-func (view OpenglTextureFrameView) InternalFormat() uint32 { return view.value.InternalFormat }
+func (view OpenGlTextureFrameView) InternalFormat() uint32 { return view.value.InternalFormat }
 
-func (view OpenglTextureFrameView) Format() uint32 { return view.value.Format }
+func (view OpenGlTextureFrameView) Format() uint32 { return view.value.Format }
 
-func (view OpenglTextureFrameView) Type() uint32 { return view.value.Type }
+func (view OpenGlTextureFrameView) Type() uint32 { return view.value.Type }
 
 type GpuSyncView struct {
 	value GpuSync
@@ -5105,20 +5105,20 @@ func (handle *AcquiredFrameHandle) String() string {
 	return bindingDescribe("AcquiredFrameHandle", handle.owner())
 }
 
-// GeojsonSourceDataHandle corresponds to mln_geojson_source_data. Prepared
+// GeoJsonSourceDataHandle corresponds to mln_geojson_source_data. Prepared
 // GeoJSON data that sources retain independently of its handle.
 //
 // See mln_geojson_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type GeojsonSourceDataHandle struct{ *bindingOwner }
+type GeoJsonSourceDataHandle struct{ *bindingOwner }
 
-func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
-	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
+func adoptGeoJsonSourceDataHandle(raw uint64, parent any) *GeoJsonSourceDataHandle {
+	owner := &GeoJsonSourceDataHandle{bindingAdopt(raw, parent, "GeoJsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
 // owner returns the handle's owner state, or nil for a nil handle.
-func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
+func (handle *GeoJsonSourceDataHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
 	}
@@ -5127,15 +5127,15 @@ func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
 
 // Id returns the native handle value. It stays readable after the handle
 // closes.
-func (handle *GeojsonSourceDataHandle) Id() uint64 { return handle.owner().id() }
+func (handle *GeoJsonSourceDataHandle) Id() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
 // discard of the handle. A nil handle is closed.
-func (handle *GeojsonSourceDataHandle) IsClosed() bool { return handle.owner().isClosed() }
+func (handle *GeoJsonSourceDataHandle) IsClosed() bool { return handle.owner().isClosed() }
 
-// String formats the handle as GeojsonSourceDataHandle(id=0x<hex>, closed=<true|false>).
-func (handle *GeojsonSourceDataHandle) String() string {
-	return bindingDescribe("GeojsonSourceDataHandle", handle.owner())
+// String formats the handle as GeoJsonSourceDataHandle(id=0x<hex>, closed=<true|false>).
+func (handle *GeoJsonSourceDataHandle) String() string {
+	return bindingDescribe("GeoJsonSourceDataHandle", handle.owner())
 }
 
 // MapHandle corresponds to mln_map. A map, which holds map state independent of
@@ -5394,19 +5394,19 @@ func (receiver *AcquiredFrameHandle) Discard() error {
 	})
 }
 
-// WithOpenglTexture copies OpenGL-native metadata from an acquired frame.
+// WithOpenGlTexture copies OpenGL-native metadata from an acquired frame.
 //
 // See mln_acquired_frame_get_opengl_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglTextureFrameView) error) error {
+func (receiver *AcquiredFrameHandle) WithOpenGlTexture(callback func(OpenGlTextureFrameView) error) error {
 	var outFrame C.mln_opengl_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) OpenglTextureFrameView {
-		return OpenglTextureFrameView{value: copyOpenglTextureFrame(outFrame), scope: scope}
+	}, func(scope *bindingScope) OpenGlTextureFrameView {
+		return OpenGlTextureFrameView{value: copyOpenGlTextureFrame(outFrame), scope: scope}
 	})
 }
 
@@ -5474,17 +5474,17 @@ func CVersion() uint32 {
 	return uint32(C.mln_c_version())
 }
 
-// GeojsonSourceDataCreate prepares GeoJSON source data for installation on a
+// GeoJsonSourceDataCreate prepares GeoJSON source data for installation on a
 // map.
 //
 // See mln_geojson_source_data_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func GeojsonSourceDataCreate(data string, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
+func GeoJsonSourceDataCreate(data string, options *GeoJsonSourceOptions) (*GeoJsonSourceDataHandle, error) {
 	var outData C.mln_geojson_source_data
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), &outData, diagnostic))
-	}, func(arena *bindingArena) *GeojsonSourceDataHandle {
-		adopted := adoptGeojsonSourceDataHandle(uint64(outData), nil)
+		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), &outData, diagnostic))
+	}, func(arena *bindingArena) *GeoJsonSourceDataHandle {
+		adopted := adoptGeoJsonSourceDataHandle(uint64(outData), nil)
 		return adopted
 	})
 }
@@ -5493,7 +5493,7 @@ func GeojsonSourceDataCreate(data string, options *GeojsonSourceOptions) (*Geojs
 //
 // See mln_geojson_source_data_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *GeojsonSourceDataHandle) Close() error {
+func (receiver *GeoJsonSourceDataHandle) Close() error {
 	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw))
 		return struct{}{}
@@ -5599,23 +5599,23 @@ func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options Cus
 	}, completionCommand)
 }
 
-// AddGeojsonSourceData adds a GeoJSON source with prepared inline data.
+// AddGeoJsonSourceData adds a GeoJSON source with prepared inline data.
 //
 // See mln_map_add_geojson_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	}, completionCommand)
 }
 
-// AddGeojsonSourceUrl adds a GeoJSON source with URL data.
+// AddGeoJsonSourceUrl adds a GeoJSON source with URL data.
 //
 // See mln_map_add_geojson_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeoJsonSourceUrl(sourceId string, url string, options *GeoJsonSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
+		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -5671,15 +5671,15 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
-// AttachOpenglBorrowedTexture starts attachment of a ring of caller-owned
+// AttachOpenGlBorrowedTexture starts attachment of a ring of caller-owned
 // OpenGL textures.
 //
 // See mln_map_attach_opengl_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachOpenglBorrowedTexture(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+func (receiver *MapHandle) AttachOpenGlBorrowedTexture(descriptor OpenGlBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_opengl_borrowed_texture(C.mln_map(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+		return int32(C.mln_map_attach_opengl_borrowed_texture(C.mln_map(raw), bindingStore(nativeOpenGlBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -5694,15 +5694,15 @@ func (receiver *MapHandle) AttachOpenglBorrowedTexture(descriptor OpenglBorrowed
 	return result.session, result.ready, err
 }
 
-// AttachOpenglOwnedTexture starts attachment of a session-owned OpenGL texture
+// AttachOpenGlOwnedTexture starts attachment of a session-owned OpenGL texture
 // ring.
 //
 // See mln_map_attach_opengl_owned_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachOpenglOwnedTexture(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+func (receiver *MapHandle) AttachOpenGlOwnedTexture(descriptor OpenGlOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_opengl_owned_texture(C.mln_map(raw), bindingStore(nativeOpenglOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+		return int32(C.mln_map_attach_opengl_owned_texture(C.mln_map(raw), bindingStore(nativeOpenGlOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -5717,14 +5717,14 @@ func (receiver *MapHandle) AttachOpenglOwnedTexture(descriptor OpenglOwnedTextur
 	return result.session, result.ready, err
 }
 
-// AttachOpenglSurface starts attachment of an OpenGL surface target.
+// AttachOpenGlSurface starts attachment of an OpenGL surface target.
 //
 // See mln_map_attach_opengl_surface in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) AttachOpenglSurface(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+func (receiver *MapHandle) AttachOpenGlSurface(descriptor OpenGlSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_opengl_surface(C.mln_map(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+		return int32(C.mln_map_attach_opengl_surface(C.mln_map(raw), bindingStore(nativeOpenGlSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -6467,32 +6467,32 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 	}, completionCommand)
 }
 
-// SetGeojsonSourceData updates one GeoJSON source with prepared inline data.
+// SetGeoJsonSourceData updates one GeoJSON source with prepared inline data.
 //
 // See mln_map_set_geojson_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	}, completionCommand)
 }
 
-// SetGeojsonSourceSynchronousTiling overrides one GeoJSON source's synchronous
+// SetGeoJsonSourceSynchronousTiling overrides one GeoJSON source's synchronous
 // tiling at runtime.
 //
 // See mln_map_set_geojson_source_synchronous_tiling in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeoJsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
 	}, completionCommand)
 }
 
-// SetGeojsonSourceUrl updates one GeoJSON source to load data from a URL.
+// SetGeoJsonSourceUrl updates one GeoJSON source to load data from a URL.
 //
 // See mln_map_set_geojson_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeoJsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
 	}, completionCommand)
@@ -6699,13 +6699,13 @@ func NetworkSetStatus(status NetworkStatus) error {
 	})
 }
 
-// OpenglSupportedContextProviderMask returns OpenGL context providers supported
+// OpenGlSupportedContextProviderMask returns OpenGL context providers supported
 // by this build.
 //
 // See mln_opengl_supported_context_provider_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-func OpenglSupportedContextProviderMask() OpenglContextProviderFlag {
-	return OpenglContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
+func OpenGlSupportedContextProviderMask() OpenGlContextProviderFlag {
+	return OpenGlContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
 }
 
 // PluginGetRegisterFunctionV1 returns the process-wide mln_plugin_register_v1
@@ -6969,24 +6969,24 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 	})
 }
 
-// SetOpenglBorrowedTextureTarget starts an ordered replacement of every texture
+// SetOpenGlBorrowedTextureTarget starts an ordered replacement of every texture
 // of a caller-owned OpenGL ring.
 //
 // See mln_render_session_set_opengl_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) SetOpenGlBorrowedTextureTarget(descriptor OpenGlBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_opengl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_set_opengl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenGlBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
-// SetOpenglSurfaceTarget starts an ordered OpenGL surface replacement.
+// SetOpenGlSurfaceTarget starts an ordered OpenGL surface replacement.
 //
 // See mln_render_session_set_opengl_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) SetOpenGlSurfaceTarget(descriptor OpenGlSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_opengl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_set_opengl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenGlSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -7491,17 +7491,17 @@ func (view MapHandleDiscarding) AddCustomMvtVectorSource(sourceId string, option
 	})
 }
 
-func (view MapHandleDiscarding) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) error {
+func (view MapHandleDiscarding) AddGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) error {
+func (view MapHandleDiscarding) AddGeoJsonSourceUrl(sourceId string, url string, options *GeoJsonSourceOptions) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
+		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), completion, diagnostic))
 	})
 }
 
@@ -7708,21 +7708,21 @@ func (view MapHandleDiscarding) SetFreeCameraOptions(options FreeCameraOptions) 
 	})
 }
 
-func (view MapHandleDiscarding) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) error {
+func (view MapHandleDiscarding) SetGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) error {
+func (view MapHandleDiscarding) SetGeoJsonSourceSynchronousTiling(sourceId string, enabled bool) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetGeojsonSourceUrl(sourceId string, url string) error {
+func (view MapHandleDiscarding) SetGeoJsonSourceUrl(sourceId string, url string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))

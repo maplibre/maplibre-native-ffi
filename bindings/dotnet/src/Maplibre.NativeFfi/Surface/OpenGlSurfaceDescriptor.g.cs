@@ -9,12 +9,12 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct OpenglSurfaceDescriptor
+public readonly partial record struct OpenGlSurfaceDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OpenglSurfaceDescriptor(
+    public OpenGlSurfaceDescriptor(
         LogicalExtent Extent,
-        OpenglContextDescriptor Context,
+        OpenGlContextDescriptor Context,
         NativePointer Surface
     )
     {
@@ -32,7 +32,7 @@ public readonly partial record struct OpenglSurfaceDescriptor
     /// <summary>
     /// Borrowed OpenGL context provider data.
     /// </summary>
-    public required OpenglContextDescriptor Context { get; init; }
+    public required OpenGlContextDescriptor Context { get; init; }
 
     /// <summary>
     /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for

@@ -5,8 +5,8 @@ package maplibre
 import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport"
 
 const (
-	buildBackend    = RenderBackendFlagOpengl
-	graphicsBackend = testsupport.BackendEGL
+	buildBackend    = RenderBackendFlagOpenGl
+	graphicsBackend = testsupport.BackendEgl
 	// Only Vulkan sessions take a queue lock.
 	queueLockSupported = false
 )
@@ -16,24 +16,24 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	return m.AttachOpenglOwnedTexture(OpenglOwnedTextureDescriptor{
+	return m.AttachOpenGlOwnedTexture(OpenGlOwnedTextureDescriptor{
 		Extent: extent,
-		Context: OpenglContextDescriptor{
-			Ownership: OpenglContextOwnershipShared,
-			Data: OpenglContextDescriptorDataEglVariant{Value: EglContextDescriptor{
-				Display:      context.EGLDisplay,
-				Config:       context.EGLConfig,
-				ShareContext: context.EGLContext,
+		Context: OpenGlContextDescriptor{
+			Ownership: OpenGlContextOwnershipShared,
+			Data: OpenGlContextDescriptorDataEglVariant{Value: EglContextDescriptor{
+				Display:      context.EglDisplay,
+				Config:       context.EglConfig,
+				ShareContext: context.EglContext,
 			}},
 		},
 	}, options)
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
-	return frame.WithOpenglTexture(func(view OpenglTextureFrameView) error { return use(view) })
+	return frame.WithOpenGlTexture(func(view OpenGlTextureFrameView) error { return use(view) })
 }
 
 func readTexture(view frameView) error {
-	_, err := view.(OpenglTextureFrameView).Texture()
+	_, err := view.(OpenGlTextureFrameView).Texture()
 	return err
 }

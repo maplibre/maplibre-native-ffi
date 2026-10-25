@@ -180,7 +180,7 @@ func TestFlagsPrintTheirNames(t *testing.T) {
 	cases := map[RenderBackendFlag]string{
 		0:                      "0",
 		RenderBackendFlagMetal: "RenderBackendFlagMetal",
-		RenderBackendFlagOpengl | RenderBackendFlagMetal | 0x100: "RenderBackendFlagMetal|RenderBackendFlagOpengl|0x100",
+		RenderBackendFlagOpenGl | RenderBackendFlagMetal | 0x100: "RenderBackendFlagMetal|RenderBackendFlagOpenGl|0x100",
 	}
 	for flags, want := range cases {
 		if got := flags.String(); got != want {

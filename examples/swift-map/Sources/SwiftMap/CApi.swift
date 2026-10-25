@@ -1,6 +1,6 @@
 import MaplibreNativeFFI
 
-func installCAPILogging() {
+func installCApiLogging() {
   do {
     try Maplibre.logSetCallback(handler: LogHandler {
       severity, event, code, message in
@@ -14,7 +14,7 @@ func installCAPILogging() {
   }
 }
 
-func clearCAPILogging() {
+func clearCApiLogging() {
   do {
     try Maplibre.logClearCallback()
   } catch {

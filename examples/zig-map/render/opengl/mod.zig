@@ -8,14 +8,14 @@ const maplibre = @import("maplibre_native_ffi");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 
-pub const OpenGLRenderTarget = PlatformOpenGLRenderTarget;
+pub const OpenGlRenderTarget = PlatformOpenGlRenderTarget;
 const uses_egl = builtin.os.tag == .linux or builtin.os.tag == .macos;
 
 fn GlProc(comptime name: []const u8) type {
     return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
 }
 
-const OpenGLCompositorProcs = struct {
+const OpenGlCompositorProcs = struct {
     ActiveTexture: GlProc("ActiveTexture"),
     AttachShader: GlProc("AttachShader"),
     BindFramebuffer: GlProc("BindFramebuffer"),
@@ -140,15 +140,15 @@ fn glProcName(comptime command: []const u8) [:0]const u8 {
     return "gl" ++ command;
 }
 
-fn loadOpenGLCompositorProcs() !OpenGLCompositorProcs {
-    var procs: OpenGLCompositorProcs = undefined;
+fn loadOpenGlCompositorProcs() !OpenGlCompositorProcs {
+    var procs: OpenGlCompositorProcs = undefined;
     inline for (required_gl_commands) |command| {
         @field(procs, command) = try loadGlProc(@TypeOf(@field(procs, command)), glProcName(command));
     }
     return procs;
 }
 
-fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.uint {
+fn createTextureProgram(procs: OpenGlCompositorProcs) !gl.uint {
     const vertex_source = if (uses_egl) gles_texture_vertex_shader else desktop_texture_vertex_shader;
     const fragment_source = if (uses_egl) gles_texture_fragment_shader else desktop_texture_fragment_shader;
 
@@ -173,7 +173,7 @@ fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.uint {
 }
 
 fn compileShader(
-    procs: OpenGLCompositorProcs,
+    procs: OpenGlCompositorProcs,
     kind: gl.@"enum",
     source: []const u8,
     name: []const u8,
@@ -195,7 +195,7 @@ fn compileShader(
     return shader;
 }
 
-fn logShaderInfoLog(procs: OpenGLCompositorProcs, shader: gl.uint, name: []const u8) void {
+fn logShaderInfoLog(procs: OpenGlCompositorProcs, shader: gl.uint, name: []const u8) void {
     var buffer: [1024]gl.char = undefined;
     var length: gl.sizei = 0;
     procs.GetShaderInfoLog(shader, @intCast(buffer.len), &length, buffer[0..].ptr);
@@ -203,7 +203,7 @@ fn logShaderInfoLog(procs: OpenGLCompositorProcs, shader: gl.uint, name: []const
     std.debug.print("OpenGL compositor {s} compile failed: {s}\n", .{ name, log });
 }
 
-fn logProgramInfoLog(procs: OpenGLCompositorProcs, program: gl.uint, message: []const u8) void {
+fn logProgramInfoLog(procs: OpenGlCompositorProcs, program: gl.uint, message: []const u8) void {
     var buffer: [1024]gl.char = undefined;
     var length: gl.sizei = 0;
     procs.GetProgramInfoLog(program, @intCast(buffer.len), &length, buffer[0..].ptr);
@@ -216,38 +216,38 @@ const gl_internal_format: gl.int = gl.RGBA;
 const gl_pixel_format: gl.@"enum" = gl.RGBA;
 const gl_pixel_type: gl.@"enum" = gl.UNSIGNED_BYTE;
 
-const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
+const PlatformOpenGlRenderTarget = union(types.RenderTargetMode) {
     pub const window_flags = c.SDL_WINDOW_OPENGL;
 
-    owned_texture: OpenGLOwnedTextureBackend,
-    borrowed_texture: OpenGLBorrowedTextureBackend,
-    native_surface: OpenGLSurfaceBackend,
+    owned_texture: OpenGlOwnedTextureBackend,
+    borrowed_texture: OpenGlBorrowedTextureBackend,
+    native_surface: OpenGlSurfaceBackend,
 
     pub fn init(
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-    ) !PlatformOpenGLRenderTarget {
+    ) !PlatformOpenGlRenderTarget {
         _ = allocator;
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = .{ .compositor = try OpenGLTextureCompositor.init(window, viewport) } },
-            .borrowed_texture => .{ .borrowed_texture = try OpenGLBorrowedTextureBackend.init(window, viewport) },
-            .native_surface => .{ .native_surface = .{ .context = try OpenGLContext.init(window) } },
+            .owned_texture => .{ .owned_texture = .{ .compositor = try OpenGlTextureCompositor.init(window, viewport) } },
+            .borrowed_texture => .{ .borrowed_texture = try OpenGlBorrowedTextureBackend.init(window, viewport) },
+            .native_surface => .{ .native_surface = .{ .context = try OpenGlContext.init(window) } },
         };
     }
 
     /// Attaches the render session. An OpenGL target on the host's WGL or
     /// EGL context renders where that context is current, so the render loop
     /// services a caller driver.
-    pub fn attach(self: *PlatformOpenGLRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
+    pub fn attach(self: *PlatformOpenGlRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
             inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, .caller_graphics_thread)),
         }
     }
 
     /// Releases any held frame, then detaches the session.
-    pub fn detach(self: *PlatformOpenGLRenderTarget) void {
+    pub fn detach(self: *PlatformOpenGlRenderTarget) void {
         switch (self.*) {
             .owned_texture => |*backend| render_target.releaseFrame(&backend.held),
             .borrowed_texture => |*backend| render_target.releaseFrame(&backend.held),
@@ -256,33 +256,33 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
         self.session().deinit();
     }
 
-    pub fn deinit(self: *PlatformOpenGLRenderTarget) void {
+    pub fn deinit(self: *PlatformOpenGlRenderTarget) void {
         switch (self.*) {
             inline else => |*backend| backend.deinit(),
         }
     }
 
-    pub fn session(self: *PlatformOpenGLRenderTarget) *render_target.Session {
+    pub fn session(self: *PlatformOpenGlRenderTarget) *render_target.Session {
         return switch (self.*) {
             inline else => |*backend| &backend.session,
         };
     }
 
     /// Starts the session resize or target replacement a new viewport needs.
-    pub fn resize(self: *PlatformOpenGLRenderTarget, viewport: types.Viewport) !void {
+    pub fn resize(self: *PlatformOpenGlRenderTarget, viewport: types.Viewport) !void {
         switch (self.*) {
             inline else => |*backend| try backend.resize(viewport),
         }
     }
 
     /// Follows completed borrowed-ring replacements.
-    pub fn retireReplaced(self: *PlatformOpenGLRenderTarget) !void {
+    pub fn retireReplaced(self: *PlatformOpenGlRenderTarget) !void {
         if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window.
-    pub fn present(self: *PlatformOpenGLRenderTarget, viewport: types.Viewport) !bool {
+    pub fn present(self: *PlatformOpenGlRenderTarget, viewport: types.Viewport) !bool {
         _ = viewport;
         return switch (self.*) {
             .owned_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
@@ -293,7 +293,7 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
     }
 };
 
-const OpenGLContext = struct {
+const OpenGlContext = struct {
     const Platform = union(enum) {
         wgl: struct {
             device_context: *anyopaque,
@@ -309,7 +309,7 @@ const OpenGLContext = struct {
     context: c.SDL_GLContext,
     platform: Platform,
 
-    fn init(window: *c.SDL_Window) !OpenGLContext {
+    fn init(window: *c.SDL_Window) !OpenGlContext {
         const context = c.SDL_GL_CreateContext(window) orelse {
             logSdlError("SDL_GL_CreateContext failed");
             return types.AppError.BackendSetupFailed;
@@ -327,27 +327,27 @@ const OpenGLContext = struct {
         };
     }
 
-    fn deinit(self: *OpenGLContext) void {
+    fn deinit(self: *OpenGlContext) void {
         _ = c.SDL_GL_MakeCurrent(self.window, null);
         _ = c.SDL_GL_DestroyContext(self.context);
         self.context = null;
     }
 
-    fn makeCurrent(self: *const OpenGLContext) !void {
+    fn makeCurrent(self: *const OpenGlContext) !void {
         if (!c.SDL_GL_MakeCurrent(self.window, self.context)) {
             logSdlError("SDL_GL_MakeCurrent failed");
             return types.AppError.BackendSetupFailed;
         }
     }
 
-    fn swapWindow(self: *const OpenGLContext) !void {
+    fn swapWindow(self: *const OpenGlContext) !void {
         if (!c.SDL_GL_SwapWindow(self.window)) {
             logSdlError("SDL_GL_SwapWindow failed");
             return types.AppError.BackendDrawFailed;
         }
     }
 
-    fn descriptor(self: *const OpenGLContext) maplibre.OpenglContextDescriptor {
+    fn descriptor(self: *const OpenGlContext) maplibre.OpenGlContextDescriptor {
         return switch (self.platform) {
             .wgl => |wgl| .{ .ownership = .shared, .data = .{ .wgl = .{
                 .device_context = (@ptrCast(wgl.device_context)),
@@ -366,13 +366,13 @@ const OpenGLContext = struct {
     /// Re-reads the platform surface for this window and returns whether the
     /// handle changed. SDL can hand back a different EGL window surface after a
     /// resize, and a session still presenting through the old one draws nowhere.
-    fn refreshPlatformSurface(self: *OpenGLContext) !bool {
+    fn refreshPlatformSurface(self: *OpenGlContext) !bool {
         const previous = self.surface();
         self.platform = try platformContext(self.window);
         return !std.meta.eql(self.surface(), previous);
     }
 
-    fn surface(self: *const OpenGLContext) ?*anyopaque {
+    fn surface(self: *const OpenGlContext) ?*anyopaque {
         return switch (self.platform) {
             .wgl => |wgl| (@ptrCast(wgl.device_context)),
             .egl => |egl| (@ptrCast(egl.surface)),
@@ -380,7 +380,7 @@ const OpenGLContext = struct {
     }
 };
 
-fn platformContext(window: *c.SDL_Window) !OpenGLContext.Platform {
+fn platformContext(window: *c.SDL_Window) !OpenGlContext.Platform {
     switch (builtin.os.tag) {
         .windows => {
             const properties = c.SDL_GetWindowProperties(window);
@@ -418,17 +418,17 @@ fn platformContext(window: *c.SDL_Window) !OpenGLContext.Platform {
     }
 }
 
-const OpenGLTextureCompositor = struct {
-    context: OpenGLContext,
+const OpenGlTextureCompositor = struct {
+    context: OpenGlContext,
     viewport: types.Viewport,
-    procs: OpenGLCompositorProcs,
+    procs: OpenGlCompositorProcs,
     program: gl.uint,
     vertex_array: gl.uint,
 
-    fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGLTextureCompositor {
-        var context = try OpenGLContext.init(window);
+    fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGlTextureCompositor {
+        var context = try OpenGlContext.init(window);
         errdefer context.deinit();
-        const procs = try loadOpenGLCompositorProcs();
+        const procs = try loadOpenGlCompositorProcs();
         const program = try createTextureProgram(procs);
         errdefer procs.DeleteProgram(program);
         var vertex_array: gl.uint = 0;
@@ -449,7 +449,7 @@ const OpenGLTextureCompositor = struct {
         };
     }
 
-    fn deinit(self: *OpenGLTextureCompositor) void {
+    fn deinit(self: *OpenGlTextureCompositor) void {
         self.context.makeCurrent() catch {};
         self.procs.Finish();
         if (self.vertex_array != 0) {
@@ -463,14 +463,14 @@ const OpenGLTextureCompositor = struct {
         self.context.deinit();
     }
 
-    fn resize(self: *OpenGLTextureCompositor, viewport: types.Viewport) void {
+    fn resize(self: *OpenGlTextureCompositor, viewport: types.Viewport) void {
         self.viewport = viewport;
     }
 
     /// Samples texture into the window and presents it. The sampling finishes
     /// before this returns, so the caller may hand the texture back to the
     /// session.
-    fn drawTexture(self: *OpenGLTextureCompositor, texture: gl.uint) !bool {
+    fn drawTexture(self: *OpenGlTextureCompositor, texture: gl.uint) !bool {
         try self.context.makeCurrent();
         try self.drawTextureQuad(texture);
         try self.context.swapWindow();
@@ -478,7 +478,7 @@ const OpenGLTextureCompositor = struct {
         return true;
     }
 
-    fn drawTextureQuad(self: *OpenGLTextureCompositor, texture: gl.uint) !void {
+    fn drawTextureQuad(self: *OpenGlTextureCompositor, texture: gl.uint) !void {
         clearGlErrors(self.procs);
         self.procs.BindFramebuffer(gl.FRAMEBUFFER, 0);
         self.procs.Disable(gl.CULL_FACE);
@@ -501,21 +501,21 @@ const OpenGLTextureCompositor = struct {
     }
 };
 
-const OpenGLOwnedTextureBackend = struct {
-    compositor: OpenGLTextureCompositor,
+const OpenGlOwnedTextureBackend = struct {
+    compositor: OpenGlTextureCompositor,
     session: render_target.Session = .{},
     /// The newest frame, held until a newer one replaces it.
     held: ?maplibre.AcquiredFrame = null,
 
-    fn deinit(self: *OpenGLOwnedTextureBackend) void {
+    fn deinit(self: *OpenGlOwnedTextureBackend) void {
         render_target.releaseFrame(&self.held);
         self.session.deinit();
         self.compositor.deinit();
     }
 
-    fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
+    fn attach(self: *OpenGlOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = map.attachOpenglOwnedTexture(.{
+        const attachment = map.attachOpenGlOwnedTexture(.{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
         }, options, &diagnostic) catch |err| {
@@ -525,7 +525,7 @@ const OpenGLOwnedTextureBackend = struct {
         self.session = try render_target.Session.attach(attachment, options, .owned_texture);
     }
 
-    fn resize(self: *OpenGLOwnedTextureBackend, viewport: types.Viewport) !void {
+    fn resize(self: *OpenGlOwnedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
         // A session resizes only while the host holds none of its frames.
         render_target.releaseFrame(&self.held);
@@ -535,18 +535,18 @@ const OpenGLOwnedTextureBackend = struct {
 
 /// Acquires the newest frame into `held` and samples its texture into the
 /// window. Both texture modes hand their frames over this way.
-fn presentAcquired(session: *render_target.Session, compositor: *OpenGLTextureCompositor, held: *?maplibre.AcquiredFrame) !bool {
+fn presentAcquired(session: *render_target.Session, compositor: *OpenGlTextureCompositor, held: *?maplibre.AcquiredFrame) !bool {
     // Without a new frame, the window keeps the one it already shows.
     if (!try session.acquireNewest(held)) return true;
     const frame = held.*.?;
     const Context = struct {
-        compositor: *OpenGLTextureCompositor,
+        compositor: *OpenGlTextureCompositor,
         frame: maplibre.AcquiredFrame,
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-            return context.frame.getOpenglTexture(context, draw, null);
+            return context.frame.getOpenGlTexture(context, draw, null);
         }
-        fn draw(context: @This(), info: maplibre.OpenglTextureFrame) anyerror!bool {
+        fn draw(context: @This(), info: maplibre.OpenGlTextureFrame) anyerror!bool {
             return context.compositor.drawTexture(info.texture);
         }
     };
@@ -556,7 +556,7 @@ fn presentAcquired(session: *render_target.Session, compositor: *OpenGLTextureCo
 const BorrowedTexture = struct {
     texture: gl.uint,
 
-    fn init(context: *const OpenGLContext, procs: OpenGLCompositorProcs, viewport: types.Viewport) !BorrowedTexture {
+    fn init(context: *const OpenGlContext, procs: OpenGlCompositorProcs, viewport: types.Viewport) !BorrowedTexture {
         try context.makeCurrent();
         var texture: gl.uint = 0;
         procs.GenTextures(1, @ptrCast(&texture));
@@ -579,7 +579,7 @@ const BorrowedTexture = struct {
         return .{ .texture = texture };
     }
 
-    fn deinit(self: *BorrowedTexture, context: *const OpenGLContext, procs: OpenGLCompositorProcs) void {
+    fn deinit(self: *BorrowedTexture, context: *const OpenGlContext, procs: OpenGlCompositorProcs) void {
         if (self.texture == 0) return;
         context.makeCurrent() catch {};
         procs.DeleteTextures(1, @ptrCast(&self.texture));
@@ -588,11 +588,11 @@ const BorrowedTexture = struct {
 };
 
 /// The textures of a borrowed ring, one per slot.
-const OpenGLRing = struct {
+const OpenGlRing = struct {
     textures: [render_target.borrowed_ring_depth]BorrowedTexture,
 
-    fn init(context: *const OpenGLContext, procs: OpenGLCompositorProcs, viewport: types.Viewport) !OpenGLRing {
-        var ring: OpenGLRing = undefined;
+    fn init(context: *const OpenGlContext, procs: OpenGlCompositorProcs, viewport: types.Viewport) !OpenGlRing {
+        var ring: OpenGlRing = undefined;
         var created: usize = 0;
         errdefer for (ring.textures[0..created]) |*texture| texture.deinit(context, procs);
         while (created < ring.textures.len) : (created += 1) {
@@ -601,36 +601,36 @@ const OpenGLRing = struct {
         return ring;
     }
 
-    fn deinit(self: *OpenGLRing, context: *const OpenGLContext, procs: OpenGLCompositorProcs) void {
+    fn deinit(self: *OpenGlRing, context: *const OpenGlContext, procs: OpenGlCompositorProcs) void {
         for (&self.textures) |*texture| texture.deinit(context, procs);
     }
 
-    fn entries(self: OpenGLRing) [render_target.borrowed_ring_depth]maplibre.OpenglBorrowedTexture {
-        var result: [render_target.borrowed_ring_depth]maplibre.OpenglBorrowedTexture = undefined;
+    fn entries(self: OpenGlRing) [render_target.borrowed_ring_depth]maplibre.OpenGlBorrowedTexture {
+        var result: [render_target.borrowed_ring_depth]maplibre.OpenGlBorrowedTexture = undefined;
         for (self.textures, &result) |texture, *entry| entry.* = .{ .texture = texture.texture };
         return result;
     }
 };
 
-const OpenGLBorrowedTextureBackend = struct {
-    compositor: OpenGLTextureCompositor,
+const OpenGlBorrowedTextureBackend = struct {
+    compositor: OpenGlTextureCompositor,
     session: render_target.Session = .{},
     /// The newest frame, held until a newer one replaces it.
     held: ?maplibre.AcquiredFrame = null,
     /// The ring the session renders into.
-    ring: OpenGLRing,
-    replacements: render_target.Replacements(OpenGLRing) = .{},
+    ring: OpenGlRing,
+    replacements: render_target.Replacements(OpenGlRing) = .{},
 
-    fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGLBorrowedTextureBackend {
-        var compositor = try OpenGLTextureCompositor.init(window, viewport);
+    fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGlBorrowedTextureBackend {
+        var compositor = try OpenGlTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
         return .{
-            .ring = try OpenGLRing.init(&compositor.context, compositor.procs, viewport),
+            .ring = try OpenGlRing.init(&compositor.context, compositor.procs, viewport),
             .compositor = compositor,
         };
     }
 
-    fn deinit(self: *OpenGLBorrowedTextureBackend) void {
+    fn deinit(self: *OpenGlBorrowedTextureBackend) void {
         render_target.releaseFrame(&self.held);
         self.session.deinit();
         while (self.replacements.takeAny()) |ring| {
@@ -642,10 +642,10 @@ const OpenGLBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
+    fn attach(self: *OpenGlBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = self.ring.entries();
-        const attachment = map.attachOpenglBorrowedTexture(std.heap.smp_allocator, .{
+        const attachment = map.attachOpenGlBorrowedTexture(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -663,18 +663,18 @@ const OpenGLBorrowedTextureBackend = struct {
     /// to the live session, which stays attached. A replacement is refused
     /// while the host holds a frame, so the held one goes first; the window
     /// keeps showing what it last presented.
-    fn resize(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
+    fn resize(self: *OpenGlBorrowedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
         render_target.releaseFrame(&self.held);
         try self.replaceRing(viewport);
     }
 
-    fn replaceRing(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
-        var replacement = try OpenGLRing.init(&self.compositor.context, self.compositor.procs, viewport);
+    fn replaceRing(self: *OpenGlBorrowedTextureBackend, viewport: types.Viewport) !void {
+        var replacement = try OpenGlRing.init(&self.compositor.context, self.compositor.procs, viewport);
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = replacement.entries();
-        var completion = (self.session.handle.?).setOpenglBorrowedTextureTarget(std.heap.smp_allocator, .{
+        var completion = (self.session.handle.?).setOpenGlBorrowedTextureTarget(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -693,7 +693,7 @@ const OpenGLBorrowedTextureBackend = struct {
     }
 
     /// Destroys each ring that a completed replacement retired.
-    fn retireReplaced(self: *OpenGLBorrowedTextureBackend) !void {
+    fn retireReplaced(self: *OpenGlBorrowedTextureBackend) !void {
         while (try self.replacements.takeCompleted(&self.session)) |ring| {
             var retired = ring;
             retired.deinit(&self.compositor.context, self.compositor.procs);
@@ -701,18 +701,18 @@ const OpenGLBorrowedTextureBackend = struct {
     }
 };
 
-const OpenGLSurfaceBackend = struct {
-    context: OpenGLContext,
+const OpenGlSurfaceBackend = struct {
+    context: OpenGlContext,
     session: render_target.Session = .{},
 
-    fn deinit(self: *OpenGLSurfaceBackend) void {
+    fn deinit(self: *OpenGlSurfaceBackend) void {
         self.session.deinit();
         self.context.deinit();
     }
 
-    fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
+    fn attach(self: *OpenGlSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = map.attachOpenglSurface(.{
+        const attachment = map.attachOpenGlSurface(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
@@ -726,7 +726,7 @@ const OpenGLSurfaceBackend = struct {
     /// Follows a resized window. When SDL hands back a different EGL window
     /// surface, the live session takes the replacement rather than being closed
     /// and attached again.
-    fn resize(self: *OpenGLSurfaceBackend, viewport: types.Viewport) !void {
+    fn resize(self: *OpenGlSurfaceBackend, viewport: types.Viewport) !void {
         // A failure unwinds straight to shutdown, which detaches the session
         // before anything presents through the surface SDL may have dropped.
         const replaced = self.context.refreshPlatformSurface() catch |err| {
@@ -735,7 +735,7 @@ const OpenGLSurfaceBackend = struct {
         };
         if (!replaced) return self.session.resize(viewport);
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = (self.session.handle.?).setOpenglSurfaceTarget(.{
+        var completion = (self.session.handle.?).setOpenGlSurfaceTarget(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
@@ -747,14 +747,14 @@ const OpenGLSurfaceBackend = struct {
     }
 };
 
-fn checkGlError(procs: OpenGLCompositorProcs, operation: []const u8) !void {
+fn checkGlError(procs: OpenGlCompositorProcs, operation: []const u8) !void {
     const gl_error = procs.GetError();
     if (gl_error == gl.NO_ERROR) return;
     std.debug.print("{s} failed with OpenGL error 0x{x}\n", .{ operation, gl_error });
     return types.AppError.BackendSetupFailed;
 }
 
-fn clearGlErrors(procs: OpenGLCompositorProcs) void {
+fn clearGlErrors(procs: OpenGlCompositorProcs) void {
     while (procs.GetError() != gl.NO_ERROR) {}
 }
 

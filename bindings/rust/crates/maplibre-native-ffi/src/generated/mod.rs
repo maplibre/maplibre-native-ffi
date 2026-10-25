@@ -36,7 +36,7 @@ pub use global::*;
 #[cfg(test)]
 static_assertions::assert_impl_all!(AcquiredFrameHandle: Send, Sync);
 #[cfg(test)]
-static_assertions::assert_impl_all!(GeojsonSourceDataHandle: Send, Sync);
+static_assertions::assert_impl_all!(GeoJsonSourceDataHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(MapHandle: Send, Sync);
 #[cfg(test)]

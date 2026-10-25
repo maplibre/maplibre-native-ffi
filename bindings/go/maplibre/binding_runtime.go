@@ -20,19 +20,19 @@ import (
 	"weak"
 )
 
-const bindingCABIVersion = C.MLN_C_VERSION
+const bindingCAbiVersion = C.MLN_C_VERSION
 
 // A native library with another C ABI version would misread every struct this
 // binding passes, so loading one fails before any call can reach it.
 func init() {
-	if err := checkCABIVersion(uint32(C.mln_c_version())); err != nil {
+	if err := checkCAbiVersion(uint32(C.mln_c_version())); err != nil {
 		panic(err)
 	}
 }
 
-func checkCABIVersion(version uint32) error {
-	if version != bindingCABIVersion {
-		return &ABIVersionMismatchError{Expected: bindingCABIVersion, Actual: version}
+func checkCAbiVersion(version uint32) error {
+	if version != bindingCAbiVersion {
+		return &AbiVersionMismatchError{Expected: bindingCAbiVersion, Actual: version}
 	}
 	return nil
 }

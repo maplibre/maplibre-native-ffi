@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
+from ..names import words
 from ..semantic import output_member
 from .go import GO_KEYWORDS, documented_operation, name, native_call
 from .go_values import Values, is_text, public
@@ -16,7 +17,7 @@ def element(value):
 
 
 def camel(value):
-    first, *rest = value.split("_")
+    first, *rest = words(value)
     return first + "".join(name(part) for part in rest)
 
 

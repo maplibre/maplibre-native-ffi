@@ -10,22 +10,22 @@ import (
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
-type openGLContext struct {
+type openGlContext struct {
 	window   *sdl.Window
 	context  sdl.GLContext
-	platform openGLPlatform
+	platform openGlPlatform
 }
 
-type openGLPlatform struct {
-	wgl *openGLWGLPlatform
-	egl *openGLEGLPlatform
+type openGlPlatform struct {
+	wgl *openGlWglPlatform
+	egl *openGlEglPlatform
 }
 
-type openGLWGLPlatform struct {
+type openGlWglPlatform struct {
 	deviceContext unsafe.Pointer
 }
 
-type openGLEGLPlatform struct {
+type openGlEglPlatform struct {
 	display       unsafe.Pointer
 	windowConfig  unsafe.Pointer
 	pbufferConfig unsafe.Pointer
@@ -36,17 +36,17 @@ func usesEGL() bool {
 	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
 }
 
-func newOpenGLContext(window *sdl.Window) (*openGLContext, error) {
+func newOpenGlContext(window *sdl.Window) (*openGlContext, error) {
 	context, err := sdl.GL_CreateContext(window)
 	if err != nil {
 		return nil, fmt.Errorf("SDL_GL_CreateContext failed: %w", err)
 	}
-	ctx := &openGLContext{window: window, context: context}
+	ctx := &openGlContext{window: window, context: context}
 	if err := ctx.MakeCurrent(); err != nil {
 		_ = sdl.GL_DestroyContext(context)
 		return nil, err
 	}
-	platform, err := platformOpenGLContext(window, context)
+	platform, err := platformOpenGlContext(window, context)
 	if err != nil {
 		_ = ctx.Close()
 		return nil, err
@@ -59,34 +59,34 @@ func newOpenGLContext(window *sdl.Window) (*openGLContext, error) {
 	return ctx, nil
 }
 
-func platformOpenGLContext(window *sdl.Window, context sdl.GLContext) (openGLPlatform, error) {
+func platformOpenGlContext(window *sdl.Window, context sdl.GLContext) (openGlPlatform, error) {
 	if runtime.GOOS == "windows" {
 		properties, err := window.Properties()
 		if err != nil {
-			return openGLPlatform{}, fmt.Errorf("SDL_GetWindowProperties failed: %w", err)
+			return openGlPlatform{}, fmt.Errorf("SDL_GetWindowProperties failed: %w", err)
 		}
 		deviceContext := properties.Pointer(sdl.PropWindowWin32HDCPointer, nil)
 		if deviceContext == nil {
-			return openGLPlatform{}, errors.New("SDL Win32 HDC property is not available")
+			return openGlPlatform{}, errors.New("SDL Win32 HDC property is not available")
 		}
-		return openGLPlatform{wgl: &openGLWGLPlatform{deviceContext: deviceContext}}, nil
+		return openGlPlatform{wgl: &openGlWglPlatform{deviceContext: deviceContext}}, nil
 	}
 
 	display, err := sdl.EGL_GetCurrentDisplay()
 	if err != nil {
-		return openGLPlatform{}, fmt.Errorf("SDL_EGL_GetCurrentDisplay failed: %w", err)
+		return openGlPlatform{}, fmt.Errorf("SDL_EGL_GetCurrentDisplay failed: %w", err)
 	}
 	config, err := sdl.EGL_GetCurrentConfig()
 	if err != nil {
-		return openGLPlatform{}, fmt.Errorf("SDL_EGL_GetCurrentConfig failed: %w", err)
+		return openGlPlatform{}, fmt.Errorf("SDL_EGL_GetCurrentConfig failed: %w", err)
 	}
 	surface, err := sdl.EGL_GetWindowSurface(window)
 	if err != nil {
-		return openGLPlatform{}, fmt.Errorf("SDL_EGL_GetWindowSurface failed: %w", err)
+		return openGlPlatform{}, fmt.Errorf("SDL_EGL_GetWindowSurface failed: %w", err)
 	}
 	pbufferConfig := eglPbufferConfig(unsafe.Pointer(display), unsafe.Pointer(config))
 	_ = context
-	return openGLPlatform{egl: &openGLEGLPlatform{
+	return openGlPlatform{egl: &openGlEglPlatform{
 		display:       unsafe.Pointer(display),
 		windowConfig:  unsafe.Pointer(config),
 		pbufferConfig: pbufferConfig,
@@ -94,21 +94,21 @@ func platformOpenGLContext(window *sdl.Window, context sdl.GLContext) (openGLPla
 	}}, nil
 }
 
-func (ctx *openGLContext) MakeCurrent() error {
+func (ctx *openGlContext) MakeCurrent() error {
 	if err := sdl.GL_MakeCurrent(ctx.window, ctx.context); err != nil {
 		return fmt.Errorf("SDL_GL_MakeCurrent failed: %w", err)
 	}
 	return nil
 }
 
-func (ctx *openGLContext) SwapWindow() error {
+func (ctx *openGlContext) SwapWindow() error {
 	if err := sdl.GL_SwapWindow(ctx.window); err != nil {
 		return fmt.Errorf("SDL_GL_SwapWindow failed: %w", err)
 	}
 	return nil
 }
 
-func (ctx *openGLContext) Close() error {
+func (ctx *openGlContext) Close() error {
 	_ = sdl.GL_MakeCurrent(ctx.window, nil)
 	if ctx.context == nil {
 		return nil
@@ -118,9 +118,9 @@ func (ctx *openGLContext) Close() error {
 	return err
 }
 
-func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenglContextDescriptor, error) {
+func (ctx *openGlContext) descriptor(texture bool) (maplibre.OpenGlContextDescriptor, error) {
 	if ctx.platform.wgl != nil {
-		return maplibre.OpenglContextDescriptor{Data: maplibre.OpenglContextDescriptorDataWglVariant{Value: maplibre.WglContextDescriptor{
+		return maplibre.OpenGlContextDescriptor{Data: maplibre.OpenGlContextDescriptorDataWglVariant{Value: maplibre.WglContextDescriptor{
 			DeviceContext:  nativePointer(ctx.platform.wgl.deviceContext),
 			ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
 			GetProcAddress: 0,
@@ -130,10 +130,10 @@ func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenglContextDescri
 	if texture {
 		config = ctx.platform.egl.pbufferConfig
 		if config == nil {
-			return maplibre.OpenglContextDescriptor{}, errors.New("no EGL config compatible with the current context supports pbuffer surfaces")
+			return maplibre.OpenGlContextDescriptor{}, errors.New("no EGL config compatible with the current context supports pbuffer surfaces")
 		}
 	}
-	return maplibre.OpenglContextDescriptor{Data: maplibre.OpenglContextDescriptorDataEglVariant{Value: maplibre.EglContextDescriptor{
+	return maplibre.OpenGlContextDescriptor{Data: maplibre.OpenGlContextDescriptorDataEglVariant{Value: maplibre.EglContextDescriptor{
 		Display:        nativePointer(ctx.platform.egl.display),
 		Config:         nativePointer(config),
 		ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
@@ -141,21 +141,21 @@ func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenglContextDescri
 	}}}, nil
 }
 
-func (ctx *openGLContext) surface() uintptr {
+func (ctx *openGlContext) surface() uintptr {
 	if ctx.platform.wgl != nil {
 		return nativePointer(ctx.platform.wgl.deviceContext)
 	}
 	return nativePointer(ctx.platform.egl.surface)
 }
 
-func (ctx *openGLContext) refreshPlatformSurface() error {
+func (ctx *openGlContext) refreshPlatformSurface() error {
 	if ctx.platform.egl == nil {
 		return nil
 	}
 	if err := ctx.MakeCurrent(); err != nil {
 		return err
 	}
-	platform, err := platformOpenGLContext(ctx.window, ctx.context)
+	platform, err := platformOpenGlContext(ctx.window, ctx.context)
 	if err != nil {
 		return err
 	}
@@ -167,15 +167,15 @@ func nativePointer(value unsafe.Pointer) uintptr {
 	return uintptr(uintptr(value))
 }
 
-type openGLTextureCompositor struct {
-	context *openGLContext
+type openGlTextureCompositor struct {
+	context *openGlContext
 	program uint32
 	vao     uint32
 	view    viewport
 }
 
-func newOpenGLTextureCompositor(context *openGLContext, v viewport) (*openGLTextureCompositor, error) {
-	compositor := &openGLTextureCompositor{context: context, view: v}
+func newOpenGlTextureCompositor(context *openGlContext, v viewport) (*openGlTextureCompositor, error) {
+	compositor := &openGlTextureCompositor{context: context, view: v}
 	program, err := createTextureProgram()
 	if err != nil {
 		_ = compositor.Close()
@@ -199,7 +199,7 @@ func newOpenGLTextureCompositor(context *openGLContext, v viewport) (*openGLText
 	return compositor, nil
 }
 
-func (compositor *openGLTextureCompositor) Close() error {
+func (compositor *openGlTextureCompositor) Close() error {
 	var result error
 	if compositor.context != nil {
 		result = errors.Join(result, compositor.context.MakeCurrent())
@@ -216,7 +216,7 @@ func (compositor *openGLTextureCompositor) Close() error {
 	return result
 }
 
-func (compositor *openGLTextureCompositor) Resize(v viewport) error {
+func (compositor *openGlTextureCompositor) Resize(v viewport) error {
 	if err := compositor.context.MakeCurrent(); err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (compositor *openGLTextureCompositor) Resize(v viewport) error {
 	return nil
 }
 
-func (compositor *openGLTextureCompositor) DrawTexture(target uint32, texture uint32) error {
+func (compositor *openGlTextureCompositor) DrawTexture(target uint32, texture uint32) error {
 	if err := compositor.context.MakeCurrent(); err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (compositor *openGLTextureCompositor) DrawTexture(target uint32, texture ui
 	return nil
 }
 
-func createBorrowedTexture(context *openGLContext, v viewport) (uint32, error) {
+func createBorrowedTexture(context *openGlContext, v viewport) (uint32, error) {
 	if err := context.MakeCurrent(); err != nil {
 		return 0, err
 	}

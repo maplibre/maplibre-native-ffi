@@ -24,7 +24,7 @@ type Backend uint32
 const (
 	BackendMetal  Backend = C.MLN_TEST_GRAPHICS_BACKEND_METAL
 	BackendVulkan Backend = C.MLN_TEST_GRAPHICS_BACKEND_VULKAN
-	BackendEGL    Backend = C.MLN_TEST_GRAPHICS_BACKEND_EGL
+	BackendEgl    Backend = C.MLN_TEST_GRAPHICS_BACKEND_EGL
 )
 
 // Context holds the handles that a backend's context descriptor takes. Only
@@ -39,9 +39,9 @@ type Context struct {
 	VulkanQueueFamilyIndex    uint32
 	VulkanGetInstanceProcAddr uintptr
 	VulkanGetDeviceProcAddr   uintptr
-	EGLDisplay                uintptr
-	EGLConfig                 uintptr
-	EGLContext                uintptr
+	EglDisplay                uintptr
+	EglConfig                 uintptr
+	EglContext                uintptr
 }
 
 // Graphics is a device or context that stands in for the host's. The handles
@@ -83,9 +83,9 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 			VulkanQueueFamilyIndex:    uint32(context.vulkan_queue_family_index),
 			VulkanGetInstanceProcAddr: uintptr(unsafe.Pointer(context.vulkan_get_instance_proc_addr)),
 			VulkanGetDeviceProcAddr:   uintptr(unsafe.Pointer(context.vulkan_get_device_proc_addr)),
-			EGLDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
-			EGLConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
-			EGLContext:                uintptr(unsafe.Pointer(context.egl_context)),
+			EglDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
+			EglConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
+			EglContext:                uintptr(unsafe.Pointer(context.egl_context)),
 		},
 	}, nil
 }

@@ -187,8 +187,8 @@ impl WebGpuTestContext {
         Ok(self)
     }
 
-    pub(super) fn descriptor(&self) -> WebgpuContextDescriptor {
-        WebgpuContextDescriptor {
+    pub(super) fn descriptor(&self) -> WebGpuContextDescriptor {
+        WebGpuContextDescriptor {
             device: self.device.cast::<std::ffi::c_void>(),
             instance: self.instance.cast::<std::ffi::c_void>(),
             // Null asks the session for the device's default queue, which is
@@ -228,7 +228,7 @@ impl Drop for WebGpuTestContext {
 
 /// A caller-owned WebGPU texture and view, the way a host that allocates its own
 /// render target hands one over.
-pub(super) struct WebGpuBorrowedTexture {
+pub(super) struct WebGpuHostTexture {
     texture: webgpu_sys::WGPUTexture,
     texture_view: webgpu_sys::WGPUTextureView,
     format: u32,
@@ -236,7 +236,7 @@ pub(super) struct WebGpuBorrowedTexture {
     height: u32,
 }
 
-impl WebGpuBorrowedTexture {
+impl WebGpuHostTexture {
     pub(super) fn new(
         context: &WebGpuTestContext,
         width: u32,
@@ -285,13 +285,13 @@ impl WebGpuBorrowedTexture {
         &self,
         extent: LogicalExtent,
         context: &WebGpuTestContext,
-    ) -> WebgpuBorrowedTextureDescriptor {
-        WebgpuBorrowedTextureDescriptor {
+    ) -> WebGpuBorrowedTextureDescriptor {
+        WebGpuBorrowedTextureDescriptor {
             extent,
             physical_width: self.width,
             physical_height: self.height,
             context: context.descriptor(),
-            textures: vec![WebgpuBorrowedTexture {
+            textures: vec![WebGpuBorrowedTexture {
                 texture: self.texture.cast::<std::ffi::c_void>(),
                 texture_view: self.texture_view.cast::<std::ffi::c_void>(),
             }],
@@ -310,7 +310,7 @@ unsafe extern "C" fn on_buffer_mapped(
     unsafe { fill_callback_slot::<webgpu_sys::WGPUMapAsyncStatus>(user_data, status) };
 }
 
-impl WebGpuBorrowedTexture {
+impl WebGpuHostTexture {
     /// Reads this texture back, so a test can tell what the session drew into
     /// it rather than only that the call returned.
     ///
@@ -408,7 +408,7 @@ impl WebGpuBorrowedTexture {
     }
 }
 
-impl Drop for WebGpuBorrowedTexture {
+impl Drop for WebGpuHostTexture {
     fn drop(&mut self) {
         // SAFETY: both handles are this value's and are released exactly once.
         unsafe {

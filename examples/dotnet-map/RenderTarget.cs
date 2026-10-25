@@ -171,7 +171,7 @@ internal abstract class RenderTarget : IDisposable
     )
     {
         var driver = SessionDriver.For(graphics);
-        if (graphics is OpenGLContext openGl)
+        if (graphics is OpenGlContext openGl)
         {
             openGl.MakeCurrentForRendering();
         }
@@ -353,7 +353,7 @@ internal abstract class TextureRenderTarget : RenderTarget
         {
             MetalContext metal => new MetalTextureCompositor(metal, viewport),
             VulkanContext vulkan => new VulkanTextureCompositor(vulkan, viewport),
-            OpenGLContext openGl => new OpenGLTextureCompositor(openGl, viewport),
+            OpenGlContext openGl => new OpenGlTextureCompositor(openGl, viewport),
             _ => throw new InvalidOperationException(
                 $"Texture targets are not implemented for {graphics.Backend}."
             ),
@@ -383,8 +383,8 @@ internal abstract class TextureRenderTarget : RenderTarget
             case VulkanContext:
                 newest.WithVulkanTexture(view => presented = Compositor.Draw(view));
                 break;
-            case OpenGLContext openGl:
-                newest.WithOpenglTexture(view =>
+            case OpenGlContext openGl:
+                newest.WithOpenGlTexture(view =>
                 {
                     presented = Compositor.Draw(view);
                     openGl.FinishGpuWork();
@@ -473,8 +473,8 @@ internal sealed class OwnedTextureRenderTarget : TextureRenderTarget
                             },
                             options
                         ),
-                        OpenGLContext openGl => map.AttachOpenglOwnedTexture(
-                            new OpenglOwnedTextureDescriptor
+                        OpenGlContext openGl => map.AttachOpenGlOwnedTexture(
+                            new OpenGlOwnedTextureDescriptor
                             {
                                 Extent = viewport.LogicalExtent,
                                 Context = openGl.Descriptor(requirePbufferConfig: true),
@@ -553,8 +553,8 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
                                 DescribeVulkan(vulkan, ring, viewport),
                                 options
                             ),
-                            OpenGLContext openGl => map.AttachOpenglBorrowedTexture(
-                                DescribeOpenGL(openGl, ring, viewport),
+                            OpenGlContext openGl => map.AttachOpenGlBorrowedTexture(
+                                DescribeOpenGl(openGl, ring, viewport),
                                 options
                             ),
                             _ => throw new InvalidOperationException(
@@ -600,8 +600,8 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
                 VulkanContext vulkan => Session.SetVulkanBorrowedTextureTargetAsync(
                     DescribeVulkan(vulkan, replacement, viewport)
                 ),
-                OpenGLContext openGl => Session.SetOpenglBorrowedTextureTargetAsync(
-                    DescribeOpenGL(openGl, replacement, viewport)
+                OpenGlContext openGl => Session.SetOpenGlBorrowedTextureTargetAsync(
+                    DescribeOpenGl(openGl, replacement, viewport)
                 ),
                 _ => throw new InvalidOperationException(
                     $"Borrowed textures are not implemented for {Graphics.Backend}."
@@ -653,7 +653,7 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
                 {
                     MetalContext metal => new MetalBorrowedTexture(metal, viewport),
                     VulkanContext vulkan => new VulkanBorrowedImage(vulkan, viewport),
-                    OpenGLContext openGl => new OpenGLBorrowedTexture(openGl, viewport),
+                    OpenGlContext openGl => new OpenGlBorrowedTexture(openGl, viewport),
                     _ => throw new InvalidOperationException(
                         $"Borrowed textures are not implemented for {graphics.Backend}."
                     ),
@@ -718,8 +718,8 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
             FinalLayout = (uint)VulkanBorrowedImage.FinalLayout,
         };
 
-    private static OpenglBorrowedTextureDescriptor DescribeOpenGL(
-        OpenGLContext context,
+    private static OpenGlBorrowedTextureDescriptor DescribeOpenGl(
+        OpenGlContext context,
         IDisposable[] ring,
         Viewport viewport
     ) =>
@@ -731,10 +731,12 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
             Context = context.Descriptor(requirePbufferConfig: true),
             Textures =
             [
-                .. ring.Cast<OpenGLBorrowedTexture>()
-                    .Select(texture => new OpenglBorrowedTexture(texture.Texture)),
+                .. ring.Cast<OpenGlBorrowedTexture>()
+                    .Select(texture => new global::Maplibre.NativeFfi.OpenGlBorrowedTexture(
+                        texture.Texture
+                    )),
             ],
-            Target = OpenGLBorrowedTexture.Texture2D,
+            Target = OpenGlBorrowedTexture.Texture2D,
         };
 }
 
@@ -779,8 +781,8 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                         },
                         options
                     ),
-                    OpenGLContext openGl => map.AttachOpenglSurface(
-                        new OpenglSurfaceDescriptor
+                    OpenGlContext openGl => map.AttachOpenGlSurface(
+                        new OpenGlSurfaceDescriptor
                         {
                             Extent = viewport.LogicalExtent,
                             Surface = openGl.SurfacePointer(),

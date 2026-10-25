@@ -13,6 +13,7 @@ from tools.bindgen.semantic import (
 )
 
 from ..model import Api, CType
+from ..names import words
 
 SCALARS = {
     "int8_t": "i8",
@@ -83,7 +84,7 @@ def ctype(value: CType) -> str:
 
 
 def pascal(value: str) -> str:
-    return "".join(word.title() for word in value.removeprefix("mln_").split("_"))
+    return "".join(word.title() for word in words(value.removeprefix("mln_")))
 
 
 RUST_KEYWORDS = {

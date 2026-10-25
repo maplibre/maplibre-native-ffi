@@ -2,7 +2,7 @@
 
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
-    _GeojsonSourceDataHandleOperations,
+    _GeoJsonSourceDataHandleOperations,
     _HttpHeaderTransformResponseScopeOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
@@ -54,7 +54,7 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
         return int(self._native.id)
 
 
-class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, ScopedHandleMixin):
+class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMixin):
     """Prepared GeoJSON data that sources retain independently of its handle.
 
     See `mln_geojson_source_data` in the
@@ -62,7 +62,7 @@ class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, ScopedHandleMi
     """
 
     __module__ = "maplibre_native_ffi"
-    _handle_name = "GeojsonSourceDataHandle"
+    _handle_name = "GeoJsonSourceDataHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

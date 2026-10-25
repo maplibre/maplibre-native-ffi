@@ -18,8 +18,8 @@ public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
 
   public static let metal: RenderBackendFlag = .init(rawValue: 1)
   public static let vulkan: RenderBackendFlag = .init(rawValue: 2)
-  public static let opengl: RenderBackendFlag = .init(rawValue: 4)
-  public static let webgpu: RenderBackendFlag = .init(rawValue: 8)
+  public static let openGl: RenderBackendFlag = .init(rawValue: 4)
+  public static let webGpu: RenderBackendFlag = .init(rawValue: 8)
 }
 
 /// Status values returned by status-returning functions.

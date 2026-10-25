@@ -2396,7 +2396,7 @@ napi_value mln_ts_read_style_source_info(
     return NULL;
   if ((source->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
     if (!mln_ts_set(
-          env, result, "tilejson",
+          env, result, "tileJson",
           mln_ts_read_style_source_tile_info(
             env, &(source->tilejson), sizeof(source->tilejson)
           )
@@ -4742,7 +4742,7 @@ bool mln_ts_write_opengl_context_descriptor(
   mln_ts_path(child, sizeof child, path, "data");
   if (!mln_ts_read_record(call, member, child)) return false;
   {
-    static const char* const kinds[] = {"wgl", "egl", "webgl"};
+    static const char* const kinds[] = {"wgl", "egl", "webGl"};
     napi_value arm;
     char arm_path[256];
     (void)arm;

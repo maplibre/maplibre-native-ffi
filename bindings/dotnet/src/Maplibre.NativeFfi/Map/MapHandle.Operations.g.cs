@@ -133,9 +133,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_add_geojson_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddGeojsonSourceDataAsync(
+    public Task<CommandCompletion> AddGeoJsonSourceDataAsync(
         string sourceId,
-        GeojsonSourceDataHandle data
+        GeoJsonSourceDataHandle data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -157,16 +157,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_add_geojson_source_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddGeojsonSourceUrlAsync(
+    public Task<CommandCompletion> AddGeoJsonSourceUrlAsync(
         string sourceId,
         string url,
-        GeojsonSourceOptions? options = null
+        GeoJsonSourceOptions? options = null
     )
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = options is null
             ? default(mln_geojson_source_options)
-            : NativeGeojsonSourceOptions(options, scope);
+            : NativeGeoJsonSourceOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_geojson_source_url(
             Handle,
@@ -403,13 +403,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_opengl_borrowed_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public RenderSessionHandle AttachOpenglBorrowedTexture(
-        OpenglBorrowedTextureDescriptor descriptor,
+    public RenderSessionHandle AttachOpenGlBorrowedTexture(
+        OpenGlBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlBorrowedTextureDescriptor(descriptor, scope);
         var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
@@ -433,13 +433,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_opengl_owned_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public RenderSessionHandle AttachOpenglOwnedTexture(
-        OpenglOwnedTextureDescriptor descriptor,
+    public RenderSessionHandle AttachOpenGlOwnedTexture(
+        OpenGlOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenglOwnedTextureDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlOwnedTextureDescriptor(descriptor, scope);
         var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
@@ -463,13 +463,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_opengl_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public RenderSessionHandle AttachOpenglSurface(
-        OpenglSurfaceDescriptor descriptor,
+    public RenderSessionHandle AttachOpenGlSurface(
+        OpenGlSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor, scope);
         var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
@@ -1748,9 +1748,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_geojson_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGeojsonSourceDataAsync(
+    public Task<CommandCompletion> SetGeoJsonSourceDataAsync(
         string sourceId,
-        GeojsonSourceDataHandle data
+        GeoJsonSourceDataHandle data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1772,7 +1772,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_geojson_source_synchronous_tiling</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGeojsonSourceSynchronousTilingAsync(
+    public Task<CommandCompletion> SetGeoJsonSourceSynchronousTilingAsync(
         string sourceId,
         bool enabled
     )
@@ -1796,7 +1796,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_geojson_source_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGeojsonSourceUrlAsync(string sourceId, string url)
+    public Task<CommandCompletion> SetGeoJsonSourceUrlAsync(string sourceId, string url)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2247,7 +2247,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
+        public void AddGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2263,17 +2263,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddGeojsonSourceUrl(
+        public void AddGeoJsonSourceUrl(
             string sourceId,
             string url,
-            GeojsonSourceOptions? options = null
+            GeoJsonSourceOptions? options = null
         )
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = options is null
                 ? default(mln_geojson_source_options)
-                : NativeGeojsonSourceOptions(options, scope);
+                : NativeGeoJsonSourceOptions(options, scope);
             Check(
                 NativeMethods.mln_map_add_geojson_source_url(
                     receiverHandle,
@@ -2733,7 +2733,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
+        public void SetGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2749,7 +2749,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGeojsonSourceSynchronousTiling(string sourceId, bool enabled)
+        public void SetGeoJsonSourceSynchronousTiling(string sourceId, bool enabled)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2765,7 +2765,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGeojsonSourceUrl(string sourceId, string url)
+        public void SetGeoJsonSourceUrl(string sourceId, string url)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);

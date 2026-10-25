@@ -93,7 +93,7 @@ internal static class Program
     private static bool SupportsUsableBackend(RenderBackendFlag backends)
     {
         return backends.HasFlag(RenderBackendFlag.Metal)
-            || backends.HasFlag(RenderBackendFlag.Opengl)
+            || backends.HasFlag(RenderBackendFlag.OpenGl)
             || backends.HasFlag(RenderBackendFlag.Vulkan);
     }
 

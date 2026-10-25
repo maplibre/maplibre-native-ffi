@@ -8,12 +8,12 @@ native_owner! {
     ///
     /// See `mln_geojson_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct GeojsonSourceDataHandle(mln_geojson_source_data) dispose |raw| { unsafe { sys::mln_geojson_source_data_release(raw) }; Ok(()) };
+    pub struct GeoJsonSourceDataHandle(mln_geojson_source_data) dispose |raw| { unsafe { sys::mln_geojson_source_data_release(raw) }; Ok(()) };
     /// Returns the native handle value.
     fn id;
 }
 
-impl GeojsonSourceDataHandle {
+impl GeoJsonSourceDataHandle {
     /// Releases prepared GeoJSON source data.
     ///
     /// See `mln_geojson_source_data_release` in the

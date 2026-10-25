@@ -53,7 +53,7 @@ import Testing
   let copied = try StyleSourceInfo(raw: source)
   #expect(copied.tileSize == 0)
   #expect(copied.bounds == nil)
-  #expect(copied.tilejson == nil)
+  #expect(copied.tileJson == nil)
 }
 
 /// A count that does not fit the native type is rejected rather than
@@ -71,7 +71,7 @@ import Testing
   source.tilejson.scheme = mln_style_tile_scheme(rawValue: 701)
   let copied = try StyleSourceInfo(raw: source)
   #expect(copied.type.rawValue == 700)
-  #expect(copied.tilejson?.scheme.rawValue == 701)
+  #expect(copied.tileJson?.scheme.rawValue == 701)
 
   let texture = VulkanBorrowedTexture(
     image: 0x8000_0000_0000_0001,

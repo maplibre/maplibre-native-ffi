@@ -15,8 +15,8 @@ import org.maplibre.nativeffi.internal.memory.NativeMemory
  */
 internal actual object TestGraphicsLibrary {
   // Kept for the process, as the context that every caller-driven session shares.
-  private var webglContext: RegisteredWebglContext? = null
-  private var webgpuDevice: ImportedWebgpuObject? = null
+  private var webGlContext: RegisteredWebGlContext? = null
+  private var webGpuDevice: ImportedWebGpuObject? = null
 
   /**
    * Creates a WebGL 2 context on the page over an OffscreenCanvas of its own, or requests a WebGPU
@@ -27,17 +27,17 @@ internal actual object TestGraphicsLibrary {
     when (backend) {
       TestBackend.WEBGL.graphicsBackend -> {
         val context =
-          checkNotNull(pageWebglContext(PAGE_CANVAS_SIZE)) {
+          checkNotNull(pageWebGlContext(PAGE_CANVAS_SIZE)) {
             "creating the page's WebGL context failed"
           }
-        WebGraphics.registerWebglContext(context).also { webglContext = it }.context.toLong()
+        WebGraphics.registerWebGlContext(context).also { webGlContext = it }.context.toLong()
       }
       TestBackend.WEBGPU.graphicsBackend -> {
         val device =
-          checkNotNull(requestPageWebgpuDevice().await<JsAny?>()) {
+          checkNotNull(requestPageWebGpuDevice().await<JsAny?>()) {
             "the browser provided no WebGPU device; see the console for why"
           }
-        WebGraphics.importWebgpuDevice(device).also { webgpuDevice = it }.pointer.address
+        WebGraphics.importWebGpuDevice(device).also { webGpuDevice = it }.pointer.address
       }
       else ->
         error("the browser fixtures create WebGL and WebGPU contexts, not test backend $backend")
@@ -46,8 +46,8 @@ internal actual object TestGraphicsLibrary {
   actual fun context(graphics: Long): TestGraphicsContext =
     when (TestGraphics.backend) {
       // Sessions use no WebGPU instance, and the module imports a device without one.
-      TestBackend.WEBGPU -> TestGraphicsContext(webgpuDevice = graphics)
-      else -> TestGraphicsContext(webglContext = graphics.toInt())
+      TestBackend.WEBGPU -> TestGraphicsContext(webGpuDevice = graphics)
+      else -> TestGraphicsContext(webGlContext = graphics.toInt())
     }
 
   actual fun makeCurrent(graphics: Long) {
@@ -99,7 +99,7 @@ private fun mln_kw_test_canvas_destroy(canvas: Int): Unit =
  * into textures of their own, and nothing presents this canvas, so it needs neither antialiasing
  * nor a preserved buffer.
  */
-internal fun pageWebglContext(size: Int): JsAny? =
+internal fun pageWebGlContext(size: Int): JsAny? =
   js(
     """new OffscreenCanvas(size, size).getContext('webgl2', {
       depth: true, stencil: true, antialias: false, preserveDrawingBuffer: false,
@@ -107,14 +107,14 @@ internal fun pageWebglContext(size: Int): JsAny? =
   )
 
 /** Requests a WebGPU device for the page, which resolves to null when the browser has none. */
-internal fun requestPageWebgpuDevice(): Promise<JsAny?> =
+internal fun requestPageWebGpuDevice(): Promise<JsAny?> =
   js("navigator.gpu.requestAdapter().then((adapter) => adapter && adapter.requestDevice())")
 
 /**
  * A WebGPU surface over a canvas element, imported as [surface], and the [format] that the page
  * prefers. [close] releases it once its session has closed.
  */
-internal class WebgpuCanvasSurface(private val surface: ImportedWebgpuObject, val format: UInt) :
+internal class WebGpuCanvasSurface(private val surface: ImportedWebGpuObject, val format: UInt) :
   AutoCloseable {
   val pointer: NativePointer
     get() = surface.pointer
@@ -123,16 +123,16 @@ internal class WebgpuCanvasSurface(private val surface: ImportedWebgpuObject, va
 }
 
 /** Creates a WebGPU surface over [canvas], which must be a canvas element of the document. */
-internal fun webgpuCanvasSurface(canvas: TestCanvas): WebgpuCanvasSurface {
+internal fun webGpuCanvasSurface(canvas: TestCanvas): WebGpuCanvasSurface {
   val context =
-    checkNotNull(webgpuCanvasContext(canvas.selector)) {
+    checkNotNull(webGpuCanvasContext(canvas.selector)) {
       "${canvas.selector} offers no WebGPU context"
     }
-  val format = WebGraphics.webgpuTextureFormat(preferredCanvasFormat())
-  return WebgpuCanvasSurface(WebGraphics.importWebgpuSurface(context), format)
+  val format = WebGraphics.webGpuTextureFormat(preferredCanvasFormat())
+  return WebGpuCanvasSurface(WebGraphics.importWebGpuSurface(context), format)
 }
 
-private fun webgpuCanvasContext(selector: String): JsAny? =
+private fun webGpuCanvasContext(selector: String): JsAny? =
   js("document.querySelector(selector).getContext('webgpu')")
 
 private fun preferredCanvasFormat(): String = js("navigator.gpu.getPreferredCanvasFormat()")

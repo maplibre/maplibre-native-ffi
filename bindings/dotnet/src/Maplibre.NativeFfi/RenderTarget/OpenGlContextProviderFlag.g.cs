@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 [Flags]
-public enum OpenglContextProviderFlag : uint
+public enum OpenGlContextProviderFlag : uint
 {
     Wgl = 1,
     Egl = 2,
@@ -17,5 +17,5 @@ public enum OpenglContextProviderFlag : uint
     /// <summary>
     /// Browser WebGL context imported into an Emscripten module.
     /// </summary>
-    Webgl = 4,
+    WebGl = 4,
 }

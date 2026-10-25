@@ -13,7 +13,7 @@ import type {
   FeatureStateSelector,
   FrameDemand,
   FreeCameraOptions,
-  GeojsonSourceOptions,
+  GeoJsonSourceOptions,
   GpuSync,
   HttpHeaderTransform,
   LatLng,
@@ -34,11 +34,11 @@ import type {
   NetworkStatus,
   OfflineRegionDefinition,
   OfflineRegionDownloadState,
-  OpenglBorrowedTextureDescriptor,
-  OpenglContextProviderFlag,
-  OpenglOwnedTextureDescriptor,
-  OpenglSurfaceDescriptor,
-  OpenglTextureFrame,
+  OpenGlBorrowedTextureDescriptor,
+  OpenGlContextProviderFlag,
+  OpenGlOwnedTextureDescriptor,
+  OpenGlSurfaceDescriptor,
+  OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
   ProjectionMode,
@@ -74,7 +74,7 @@ import type {
 export interface NativeOperations {
   mln_acquired_frame_discard(frame: bigint, token: object | undefined): void;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
-  mln_acquired_frame_get_opengl_texture(frame: bigint): OpenglTextureFrame;
+  mln_acquired_frame_get_opengl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
   mln_acquired_frame_get_result(frame: bigint): RenderFrameResult;
   mln_acquired_frame_get_vulkan_texture(frame: bigint): VulkanTextureFrame;
@@ -86,7 +86,7 @@ export interface NativeOperations {
   mln_c_version(): number;
   mln_geojson_source_data_create(
     data: unknown,
-    options: GeojsonSourceOptions | undefined,
+    options: GeoJsonSourceOptions | undefined,
   ): bigint;
   mln_geojson_source_data_release(
     data: bigint,
@@ -122,7 +122,7 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     url: string,
-    options: GeojsonSourceOptions | undefined,
+    options: GeoJsonSourceOptions | undefined,
     completion: number | undefined,
   ): void;
   mln_map_add_image_source_image(
@@ -176,19 +176,19 @@ export interface NativeOperations {
   ): bigint;
   mln_map_attach_opengl_borrowed_texture(
     map: bigint,
-    descriptor: OpenglBorrowedTextureDescriptor,
+    descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_opengl_owned_texture(
     map: bigint,
-    descriptor: OpenglOwnedTextureDescriptor,
+    descriptor: OpenGlOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_opengl_surface(
     map: bigint,
-    descriptor: OpenglSurfaceDescriptor,
+    descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
@@ -563,7 +563,7 @@ export interface NativeOperations {
   ): void;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
-  mln_opengl_supported_context_provider_mask(): OpenglContextProviderFlag;
+  mln_opengl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_plugin_get_register_function_v1(): bigint;
   mln_projected_meters_for_lat_lng(
     coordinate: LatLng | undefined,
@@ -634,12 +634,12 @@ export interface NativeOperations {
   ): void;
   mln_render_session_set_opengl_borrowed_texture_target(
     session: bigint,
-    descriptor: OpenglBorrowedTextureDescriptor,
+    descriptor: OpenGlBorrowedTextureDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_opengl_surface_target(
     session: bigint,
-    descriptor: OpenglSurfaceDescriptor,
+    descriptor: OpenGlSurfaceDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_vulkan_borrowed_texture_target(

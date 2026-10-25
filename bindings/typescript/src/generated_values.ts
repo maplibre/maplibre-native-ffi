@@ -395,7 +395,7 @@ export interface EglContextDescriptor {
    * ownership. A shared session queries share_context for it, so this is
    * ignored there.
    */
-  clientApi?: OpenglClientApi;
+  clientApi?: OpenGlClientApi;
   /**
    * Optional eglGetProcAddress-compatible function for the host loader.
    */
@@ -504,7 +504,7 @@ export interface FreeCameraOptions {
  * See `mln_geojson_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-export interface GeojsonSourceOptions {
+export interface GeoJsonSourceOptions {
   /**
    * Minimum tiling zoom. Absent selects 0.
    */
@@ -620,7 +620,7 @@ export const GpuSyncKind = {
    * GLsync in the shared EGL or WGL context's share group, used only by a
    * caller-graphics-thread driver. handle is nonzero.
    */
-  openglFence: 1,
+  openGlFence: 1,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
@@ -1279,7 +1279,7 @@ export interface OfflineTilePyramidRegionDefinition {
  * See `mln_opengl_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-export interface OpenglBorrowedTexture {
+export interface OpenGlBorrowedTexture {
   /**
    * Borrowed OpenGL texture object name. Required.
    */
@@ -1292,7 +1292,7 @@ export interface OpenglBorrowedTexture {
  * See `mln_opengl_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-export interface OpenglBorrowedTextureDescriptor {
+export interface OpenGlBorrowedTextureDescriptor {
   /**
    * Logical texture extent. Required. physical_width and physical_height give
    * the texture's size. A scale_factor that differs from the map's is accepted
@@ -1311,11 +1311,11 @@ export interface OpenglBorrowedTextureDescriptor {
    * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
    */
-  context: OpenglContextDescriptor;
+  context: OpenGlContextDescriptor;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    */
-  textures: readonly OpenglBorrowedTexture[];
+  textures: readonly OpenGlBorrowedTexture[];
   /**
    * OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
    */
@@ -1328,7 +1328,7 @@ export interface OpenglBorrowedTextureDescriptor {
  * See `mln_opengl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export const OpenglClientApi = {
+export const OpenGlClientApi = {
   /**
    * No client API is named.
    */
@@ -1342,9 +1342,9 @@ export const OpenglClientApi = {
    */
   gles: 2,
 } as const;
-/** One of the OpenglClientApi values, or a value this binding does not know. */
-export type OpenglClientApi =
-  | (typeof OpenglClientApi)[keyof typeof OpenglClientApi]
+/** One of the OpenGlClientApi values, or a value this binding does not know. */
+export type OpenGlClientApi =
+  | (typeof OpenGlClientApi)[keyof typeof OpenGlClientApi]
   | (number & {});
 
 /**
@@ -1353,14 +1353,14 @@ export type OpenglClientApi =
  * See `mln_opengl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OpenglContextDescriptor {
+export interface OpenGlContextDescriptor {
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
-  ownership?: OpenglContextOwnership;
-  data: OpenglContextDescriptorData;
+  ownership?: OpenGlContextOwnership;
+  data: OpenGlContextDescriptorData;
 }
 
 /**
@@ -1369,10 +1369,10 @@ export interface OpenglContextDescriptor {
  * See `mln_opengl_context_descriptor_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export type OpenglContextDescriptorData =
+export type OpenGlContextDescriptorData =
   | { readonly kind: "wgl"; readonly value: WglContextDescriptor }
   | { readonly kind: "egl"; readonly value: EglContextDescriptor }
-  | { readonly kind: "webgl"; readonly value: WebglContextDescriptor };
+  | { readonly kind: "webGl"; readonly value: WebGlContextDescriptor };
 
 /**
  * How a session's OpenGL context relates to its driver thread and host graphics
@@ -1381,7 +1381,7 @@ export type OpenglContextDescriptorData =
  * See `mln_opengl_context_ownership` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export const OpenglContextOwnership = {
+export const OpenGlContextOwnership = {
   /**
    * The session shares its thread with host graphics work.
    */
@@ -1391,9 +1391,9 @@ export const OpenglContextOwnership = {
    */
   dedicated: 1,
 } as const;
-/** One of the OpenglContextOwnership values, or a value this binding does not know. */
-export type OpenglContextOwnership =
-  | (typeof OpenglContextOwnership)[keyof typeof OpenglContextOwnership]
+/** One of the OpenGlContextOwnership values, or a value this binding does not know. */
+export type OpenGlContextOwnership =
+  | (typeof OpenGlContextOwnership)[keyof typeof OpenGlContextOwnership]
   | (number & {});
 
 /**
@@ -1402,16 +1402,16 @@ export type OpenglContextOwnership =
  * See `mln_opengl_context_provider_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export const OpenglContextProviderFlag = {
+export const OpenGlContextProviderFlag = {
   wgl: 1,
   egl: 2,
   /**
    * Browser WebGL context imported into an Emscripten module.
    */
-  webgl: 4,
+  webGl: 4,
 } as const;
-/** A bitwise OR of OpenglContextProviderFlag flags. */
-export type OpenglContextProviderFlag = number;
+/** A bitwise OR of OpenGlContextProviderFlag flags. */
+export type OpenGlContextProviderFlag = number;
 
 /**
  * OpenGL attachment options for an owned texture target.
@@ -1419,7 +1419,7 @@ export type OpenglContextProviderFlag = number;
  * See `mln_opengl_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-export interface OpenglOwnedTextureDescriptor {
+export interface OpenGlOwnedTextureDescriptor {
   /**
    * Logical texture extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
@@ -1431,7 +1431,7 @@ export interface OpenglOwnedTextureDescriptor {
    * transferred WebGL ownership creates a private core-worker context for CPU
    * readback.
    */
-  context: OpenglContextDescriptor;
+  context: OpenGlContextDescriptor;
 }
 
 /**
@@ -1440,7 +1440,7 @@ export interface OpenglOwnedTextureDescriptor {
  * See `mln_opengl_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
-export interface OpenglSurfaceDescriptor {
+export interface OpenGlSurfaceDescriptor {
   /**
    * Logical surface extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
@@ -1449,7 +1449,7 @@ export interface OpenglSurfaceDescriptor {
   /**
    * Borrowed OpenGL context provider data.
    */
-  context: OpenglContextDescriptor;
+  context: OpenGlContextDescriptor;
   /**
    * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
    * both required. Null for WebGL, whose context carries its canvas binding.
@@ -1463,7 +1463,7 @@ export interface OpenglSurfaceDescriptor {
  * See `mln_opengl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-export interface OpenglTextureFrame {
+export interface OpenGlTextureFrame {
   /**
    * Session generation that produced this frame.
    */
@@ -1667,8 +1667,8 @@ export interface RenderAbandonResult {
 export const RenderBackendFlag = {
   metal: 1,
   vulkan: 2,
-  opengl: 4,
-  webgpu: 8,
+  openGl: 4,
+  webGpu: 8,
 } as const;
 /** A bitwise OR of RenderBackendFlag flags. */
 export type RenderBackendFlag = number;
@@ -2923,7 +2923,7 @@ export interface StyleSourceInfo {
   /**
    * Inline TileJSON metadata, when the source was defined with it.
    */
-  readonly tilejson?: StyleSourceTileInfo;
+  readonly tileJson?: StyleSourceTileInfo;
   /**
    * Geographic bounds, when inline TileJSON sets them.
    */
@@ -2975,7 +2975,7 @@ export const StyleSourceType = {
   vector: 1,
   raster: 2,
   rasterDem: 3,
-  geojson: 4,
+  geoJson: 4,
   image: 5,
   video: 6,
   annotations: 7,
@@ -3432,8 +3432,8 @@ export interface NativeWakeFields {
  * See `mln_webgl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface WebglContextDescriptor {
-  kind?: WebglContextKind;
+export interface WebGlContextDescriptor {
+  kind?: WebGlContextKind;
   /**
    * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
    */
@@ -3451,7 +3451,7 @@ export interface WebglContextDescriptor {
  * See `mln_webgl_context_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export const WebglContextKind = {
+export const WebGlContextKind = {
   /**
    * Use a host-created context on its current browser agent.
    */
@@ -3462,9 +3462,9 @@ export const WebglContextKind = {
    */
   transferredCanvas: 1,
 } as const;
-/** One of the WebglContextKind values, or a value this binding does not know. */
-export type WebglContextKind =
-  | (typeof WebglContextKind)[keyof typeof WebglContextKind]
+/** One of the WebGlContextKind values, or a value this binding does not know. */
+export type WebGlContextKind =
+  | (typeof WebGlContextKind)[keyof typeof WebGlContextKind]
   | (number & {});
 
 /**

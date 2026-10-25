@@ -29,7 +29,7 @@ import org.maplibre.nativeffi.smallMapOptions
 class HandleLifecycleTest {
   @Test
   fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
-    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON)
+    val data = GeneratedApi.geoJsonSourceDataCreate(POINT_JSON)
     data.close()
     data.close()
 
@@ -43,13 +43,13 @@ class HandleLifecycleTest {
 
   @Test
   fun aHandleNamesItsIdAndWhetherItIsClosed() {
-    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON)
+    val data = GeneratedApi.geoJsonSourceDataCreate(POINT_JSON)
     val id = "0x" + data.id.toString(16)
     assertFalse(data.isClosed)
-    assertEquals("GeojsonSourceDataHandle(id=$id, closed=false)", data.toString())
+    assertEquals("GeoJsonSourceDataHandle(id=$id, closed=false)", data.toString())
     data.close()
     assertTrue(data.isClosed)
-    assertEquals("GeojsonSourceDataHandle(id=$id, closed=true)", data.toString())
+    assertEquals("GeoJsonSourceDataHandle(id=$id, closed=true)", data.toString())
   }
 
   @Test

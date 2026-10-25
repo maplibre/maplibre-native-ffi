@@ -5,14 +5,14 @@ use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawConte
 use glutin::display::{AsRawDisplay, GetGlDisplay, RawDisplay};
 use glutin::surface::{AsRawSurface, RawSurface, Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native_ffi::{EglContextDescriptor, OpenglContextDescriptor};
+use maplibre_native_ffi::{EglContextDescriptor, OpenGlContextDescriptor};
 use winit::window::Window;
 
-pub struct OpenGLPlatformContext {
+pub struct OpenGlPlatformContext {
     config: Config,
 }
 
-impl OpenGLPlatformContext {
+impl OpenGlPlatformContext {
     pub fn new(_window: &Window, config: Config) -> Result<Self, Box<dyn Error>> {
         Ok(Self { config })
     }
@@ -20,7 +20,7 @@ impl OpenGLPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
         let RawDisplay::Egl(raw_display) = self.config.display().raw_display() else {
             return Err("glutin did not create an EGL display".into());
         };
@@ -30,15 +30,15 @@ impl OpenGLPlatformContext {
         let RawContext::Egl(raw_context) = context.raw_context() else {
             return Err("glutin did not create an EGL context".into());
         };
-        Ok(OpenglContextDescriptor {
-            data: maplibre_native_ffi::OpenglContextDescriptorData::Egl(EglContextDescriptor {
+        Ok(OpenGlContextDescriptor {
+            data: maplibre_native_ffi::OpenGlContextDescriptorData::Egl(EglContextDescriptor {
                 share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
                 ..EglContextDescriptor::new(
                     raw_display.cast_mut().cast::<std::ffi::c_void>(),
                     raw_config.cast_mut().cast::<std::ffi::c_void>(),
                 )
             }),
-            ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
+            ownership: maplibre_native_ffi::OpenGlContextOwnership::Shared,
         })
     }
 

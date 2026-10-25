@@ -16,11 +16,11 @@ import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.OpenglClientApi
-import org.maplibre.nativeffi.generated.OpenglContextDescriptor
-import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenglContextOwnership
-import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenGlClientApi
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
+import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenGlContextOwnership
+import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
@@ -159,15 +159,15 @@ object RenderSessionExitProbe {
         NativePointer.ofAddress(context.eglDisplay),
         NativePointer.ofAddress(context.eglConfig),
         NativePointer.NULL_POINTER,
-        OpenglClientApi.GLES,
+        OpenGlClientApi.GLES,
         NativePointer.NULL_POINTER,
       )
-    return map.attachOpenglOwnedTexture(
-      OpenglOwnedTextureDescriptor(
+    return map.attachOpenGlOwnedTexture(
+      OpenGlOwnedTextureDescriptor(
         LogicalExtent(WIDTH.toUInt(), HEIGHT.toUInt(), 1.0),
-        OpenglContextDescriptor(
-          OpenglContextOwnership.DEDICATED,
-          OpenglContextDescriptorData.Egl(egl),
+        OpenGlContextDescriptor(
+          OpenGlContextOwnership.DEDICATED,
+          OpenGlContextDescriptorData.Egl(egl),
         ),
       ),
       options,

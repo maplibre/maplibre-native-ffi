@@ -171,8 +171,8 @@ static_assertions::assert_not_impl_any!(RuntimeEvent: Default);
 
 #[test]
 fn an_enum_defaults_to_its_zero_member() {
-    assert_eq!(OpenglClientApi::default(), OpenglClientApi::Unspecified);
-    assert_eq!(OpenglClientApi::default().as_raw(), 0);
+    assert_eq!(OpenGlClientApi::default(), OpenGlClientApi::Unspecified);
+    assert_eq!(OpenGlClientApi::default().as_raw(), 0);
 }
 
 #[test]

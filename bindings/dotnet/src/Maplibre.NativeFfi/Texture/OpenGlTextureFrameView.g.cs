@@ -2,12 +2,12 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
-public sealed class OpenglTextureFrameView
+public sealed class OpenGlTextureFrameView
 {
-    private readonly OpenglTextureFrame value;
+    private readonly OpenGlTextureFrame value;
     private readonly NativeViewScope scope;
 
-    internal OpenglTextureFrameView(OpenglTextureFrame value, NativeViewScope scope)
+    internal OpenGlTextureFrameView(OpenGlTextureFrame value, NativeViewScope scope)
     {
         this.value = value;
         this.scope = scope;

@@ -131,7 +131,7 @@ test("a frame view expires with its scope and holds off release inside it", asyn
         ? frame.withVulkanTexture((view) =>
             use({ width: () => view.width, texture: () => view.image }),
           )
-        : frame.withOpenglTexture((view) =>
+        : frame.withOpenGlTexture((view) =>
             use({ width: () => view.width, texture: () => view.texture }),
           );
   let escaped: Reader | undefined;

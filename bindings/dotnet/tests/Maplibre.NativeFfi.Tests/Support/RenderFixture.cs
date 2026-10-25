@@ -38,12 +38,12 @@ internal sealed class RenderFixture : IDisposable
                 data.Add(TestGraphicsBackend.Metal);
             if (backends.HasFlag(RenderBackendFlag.Vulkan))
                 data.Add(TestGraphicsBackend.Vulkan);
-            if (backends.HasFlag(RenderBackendFlag.Opengl))
+            if (backends.HasFlag(RenderBackendFlag.OpenGl))
             {
-                var providers = MaplibreNative.OpenglSupportedContextProviderMask();
-                if (providers.HasFlag(OpenglContextProviderFlag.Egl))
+                var providers = MaplibreNative.OpenGlSupportedContextProviderMask();
+                if (providers.HasFlag(OpenGlContextProviderFlag.Egl))
                     data.Add(TestGraphicsBackend.Egl);
-                if (providers.HasFlag(OpenglContextProviderFlag.Wgl))
+                if (providers.HasFlag(OpenGlContextProviderFlag.Wgl))
                     data.Add(TestGraphicsBackend.Wgl);
             }
             return data;
@@ -257,13 +257,13 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Egl => Map.AttachOpenglOwnedTexture(
-                new OpenglOwnedTextureDescriptor
+            TestGraphicsBackend.Egl => Map.AttachOpenGlOwnedTexture(
+                new OpenGlOwnedTextureDescriptor
                 {
                     Extent = extent,
-                    Context = new OpenglContextDescriptor(
-                        OpenglContextOwnership.Shared,
-                        new OpenglContextDescriptor.DataValue.Egl(
+                    Context = new OpenGlContextDescriptor(
+                        OpenGlContextOwnership.Shared,
+                        new OpenGlContextDescriptor.DataValue.Egl(
                             new EglContextDescriptor
                             {
                                 Display = Borrow(context.EglDisplay),
@@ -275,13 +275,13 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Wgl => Map.AttachOpenglOwnedTexture(
-                new OpenglOwnedTextureDescriptor
+            TestGraphicsBackend.Wgl => Map.AttachOpenGlOwnedTexture(
+                new OpenGlOwnedTextureDescriptor
                 {
                     Extent = extent,
-                    Context = new OpenglContextDescriptor(
-                        OpenglContextOwnership.Shared,
-                        new OpenglContextDescriptor.DataValue.Wgl(
+                    Context = new OpenGlContextDescriptor(
+                        OpenGlContextOwnership.Shared,
+                        new OpenGlContextDescriptor.DataValue.Wgl(
                             new WglContextDescriptor
                             {
                                 DeviceContext = Borrow(context.WglDeviceContext),

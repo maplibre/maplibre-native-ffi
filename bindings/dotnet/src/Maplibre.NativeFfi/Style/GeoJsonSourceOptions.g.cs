@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_geojson_source_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
-public sealed record GeojsonSourceOptions
+public sealed record GeoJsonSourceOptions
 {
     /// <summary>
     /// Minimum tiling zoom. Absent selects 0.

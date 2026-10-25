@@ -55,7 +55,7 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
-struct NativeGeojsonSourceDataHandle: NativeHandle {
+struct NativeGeoJsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool
   {
@@ -67,14 +67,14 @@ struct NativeGeojsonSourceDataHandle: NativeHandle {
 ///
 /// See `mln_geojson_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class GeojsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
+public final class GeoJsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
   Identifiable, Hashable, CustomStringConvertible
 {
-  let handle: NativeHandleState<NativeGeojsonSourceDataHandle>
+  let handle: NativeHandleState<NativeGeoJsonSourceDataHandle>
   init(adopting raw: mln_geojson_source_data) throws {
     handle = try NativeHandleState(
-      typeName: "GeojsonSourceDataHandle",
-      handle: NativeGeojsonSourceDataHandle(raw: raw)
+      typeName: "GeoJsonSourceDataHandle",
+      handle: NativeGeoJsonSourceDataHandle(raw: raw)
     )
   }
 
@@ -95,8 +95,8 @@ public final class GeojsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
   }
 
   public static func == (
-    lhs: GeojsonSourceDataHandle,
-    rhs: GeojsonSourceDataHandle
+    lhs: GeoJsonSourceDataHandle,
+    rhs: GeoJsonSourceDataHandle
   ) -> Bool {
     lhs.id == rhs.id
   }
