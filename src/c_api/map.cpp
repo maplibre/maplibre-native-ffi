@@ -20,11 +20,11 @@
 #include "runtime/runtime.hpp"
 
 auto mln_logical_extent_default(void) noexcept -> mln_logical_extent {
-  return mln::core::map_options_default().initial_extent;
+  return mln_logical_extent{};
 }
 
 auto mln_map_options_default(void) noexcept -> mln_map_options {
-  return mln::core::map_options_default();
+  return mln_map_options{.size = sizeof(mln_map_options)};
 }
 
 auto mln_runtime_create_map(

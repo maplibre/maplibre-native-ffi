@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns CPU-complete synchronization for this C API version.
+  /// Returns zeroed synchronization with size set for this C API version, which
+  /// is CPU completion.
   ///
   /// See `mln_gpu_sync_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -45,8 +46,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns attachment options initialized for this C API version, with each
-  /// field at its documented default.
+  /// Returns zeroed attachment options with size set for this C API version.
   ///
   /// See `mln_render_session_attach_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

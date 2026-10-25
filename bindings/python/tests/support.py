@@ -48,11 +48,17 @@ def result[T](future: Future[T]) -> T:
     return future.result(timeout=TIMEOUT)
 
 
+def map_options(**fields: object) -> mln.MapOptions:
+    """Map options with a 256 by 256 extent at scale 1, and the given fields."""
+    options = mln.MapOptions(initial_extent=mln.LogicalExtent(256, 256, 1.0))
+    return replace(options, **fields)
+
+
 def ready_map(
     runtime: mln.RuntimeHandle, options: mln.MapOptions | None = None
 ) -> mln.MapHandle:
     """Create a map and wait until it is ready."""
-    created = runtime.create_map(options)
+    created = runtime.create_map(map_options() if options is None else options)
     result(created.ready)
     return created.map
 
@@ -153,9 +159,7 @@ class Harness:
         handle.complete(denied_response())
 
     def create_map(self, **options: object) -> mln.MapHandle:
-        map_handle = ready_map(
-            self.runtime, replace(mln.MapOptions.default(), **options)
-        )
+        map_handle = ready_map(self.runtime, map_options(**options))
         self._maps.append(map_handle)
         return map_handle
 

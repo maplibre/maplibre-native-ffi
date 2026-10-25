@@ -30,21 +30,19 @@ public readonly record struct MetalBorrowedTextureDescriptor
     }
 
     /// <summary>
-    /// Logical texture extent; physical_width and physical_height give the
-    /// texture's size. A scale_factor that differs from the map's is accepted
-    /// and logged as a warning.
+    /// Logical texture extent. Required. physical_width and physical_height
+    /// give the texture's size. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
     /// </summary>
     public LogicalExtent Extent { get; init; }
 
     /// <summary>
-    /// Physical texture width in device pixels. Must be positive. Defaults to
-    /// 256.
+    /// Physical texture width in device pixels. Required.
     /// </summary>
     public uint PhysicalWidth { get; init; }
 
     /// <summary>
-    /// Physical texture height in device pixels. Must be positive. Defaults to
-    /// 256.
+    /// Physical texture height in device pixels. Required.
     /// </summary>
     public uint PhysicalHeight { get; init; }
 

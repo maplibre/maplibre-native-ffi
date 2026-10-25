@@ -31,24 +31,15 @@ struct GeoJsonSourceDataObject;
 struct MapObject;
 struct FeatureStateSnapshot;
 
-auto map_options_default() noexcept -> mln_map_options;
 auto camera_options_default() noexcept -> mln_camera_options;
-auto animation_options_default() noexcept -> mln_animation_options;
-auto camera_delta_default() noexcept -> mln_camera_delta;
-auto camera_update_default() noexcept -> mln_camera_update;
 auto camera_fit_options_default() noexcept -> mln_camera_fit_options;
 auto bound_options_default() noexcept -> mln_bound_options;
 auto free_camera_options_default() noexcept -> mln_free_camera_options;
-auto projection_mode_default() noexcept -> mln_projection_mode;
-auto map_viewport_options_default() noexcept -> mln_map_viewport_options;
-auto map_tile_options_default() noexcept -> mln_map_tile_options;
 auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
 auto custom_mvt_vector_source_options_default() noexcept
   -> mln_custom_mvt_vector_source_options;
-auto premultiplied_rgba8_image_default() noexcept
-  -> mln_premultiplied_rgba8_image;
 auto style_image_options_default() noexcept -> mln_style_image_options;
 auto style_transition_options_default() noexcept
   -> mln_style_transition_options;

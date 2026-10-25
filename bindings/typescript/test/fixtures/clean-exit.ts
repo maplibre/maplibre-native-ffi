@@ -4,14 +4,12 @@
 // keeps the event loop alive.
 
 import { RuntimeEventType, runtimeCreate } from "../../src/index.ts";
-import { listen } from "../support/fixture.ts";
+import { listen, mapOptions } from "../support/fixture.ts";
 import { backgroundStyle } from "../support/styles.ts";
 
 const runtime = runtimeCreate();
 const events = await listen(runtime);
-const { map, ready } = runtime.createMap({
-  initialExtent: { width: 64, height: 64, scaleFactor: 1 },
-});
+const { map, ready } = runtime.createMap(mapOptions);
 await ready;
 await map.setStyleJson(backgroundStyle());
 await events.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);

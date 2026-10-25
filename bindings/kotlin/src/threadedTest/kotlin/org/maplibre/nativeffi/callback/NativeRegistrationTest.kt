@@ -71,6 +71,7 @@ class NativeRegistrationTest {
       withSmallMap {
         val options =
           RenderSessionAttachOptions(
+            driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
             frameWake = Wake.native(host.call, host.userData, host.release),
           )
         withContext(TestGraphics.thread) {
@@ -115,7 +116,10 @@ class NativeRegistrationTest {
                 map,
                 WIDTH,
                 HEIGHT,
-                RenderSessionAttachOptions(queueLock = lock),
+                RenderSessionAttachOptions(
+                  driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+                  queueLock = lock,
+                ),
               )
             }
           }
@@ -127,7 +131,10 @@ class NativeRegistrationTest {
               map,
               WIDTH,
               HEIGHT,
-              RenderSessionAttachOptions(queueLock = lock),
+              RenderSessionAttachOptions(
+                driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+                queueLock = lock,
+              ),
             )
           }
         }

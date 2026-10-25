@@ -40,7 +40,8 @@ static void options_reject_unknown_event_mask_bits(void) {
   const uint64_t unknown = UINT64_C(1) << 40U;
 
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options map_options = mln_map_options_default();
+  mln_map_options map_options = mln_test_map_options();
+  map_options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   map_options.event_mask = MLN_RUNTIME_EVENT_FLAG_ALL | unknown;
   mln_map bad_map = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_test_map_create_status(runtime, &map_options, &bad_map));
@@ -52,6 +53,28 @@ static void options_reject_unknown_event_mask_bits(void) {
     mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_FLAG_ALL | unknown)
   );
   mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// An absent event mask selects every event type, and native leaves the member
+// unread. A present mask of zero selects none.
+static void options_without_an_event_mask_select_every_event(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options map_options = mln_test_map_options();
+  map_options.event_mask = UINT64_C(1) << 40U;
+  mln_map every = mln_test_create_map_with_options(runtime, &map_options);
+  uint64_t mask = 0;
+  MLN_TEST_OK(mln_test_map_get_event_mask(every, &mask));
+  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_ALL, mask);
+
+  map_options.fields = MLN_MAP_OPTION_EVENT_MASK;
+  map_options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
+  mln_map none = mln_test_create_map_with_options(runtime, &map_options);
+  MLN_TEST_OK(mln_test_map_get_event_mask(none, &mask));
+  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_NONE, mask);
+
+  mln_test_destroy_map(none);
+  mln_test_destroy_map(every);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -386,6 +409,7 @@ MLN_TEST_GROUP {
   RUN_TEST(events_and_their_completion_share_fifo_order);
   RUN_TEST(event_masks_change_from_any_thread_and_keep_foreign_bits);
   RUN_TEST(options_reject_unknown_event_mask_bits);
+  RUN_TEST(options_without_an_event_mask_select_every_event);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(each_event_carries_its_message);

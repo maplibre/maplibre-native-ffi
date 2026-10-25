@@ -51,7 +51,7 @@ static mln_render_frame_result render_update(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -310,7 +310,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
     180.0, views[row_count - 1].camera.center.longitude
   );
 
-  // An IF_NEEDED demand with nothing new to draw reports no view.
+  // An unforced demand with nothing new to draw reports no view.
   mln_frame_demand demand = mln_frame_demand_default();
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =

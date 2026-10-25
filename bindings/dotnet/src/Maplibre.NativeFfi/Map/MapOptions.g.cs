@@ -9,34 +9,27 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_map_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="InitialExtent">
-/// Initial logical extent. Width and height must be nonzero, and scale_factor
-/// must be finite and positive. scale_factor is fixed for the map's lifetime.
-/// </param>
-/// <param name="MapMode">
-/// Defaults to <c>MLN_MAP_MODE_CONTINUOUS</c>.
-/// </param>
-/// <param name="FastPforEnabled">
-/// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-/// encodings. Defaults to false.
-/// </param>
-/// <param name="EventMask">
-/// Map-originated event types this map queues, as a bitwise OR of
-/// <c>mln_runtime_event_flag</c> values.
-/// </param>
-public readonly partial record struct MapOptions(
-    LogicalExtent InitialExtent,
-    MapMode MapMode,
-    bool FastPforEnabled,
-    RuntimeEventFlag EventMask
-)
+public sealed record MapOptions
 {
-    public MapOptions()
-        : this(default!, default!, default!, default!)
-    {
-        this = Default;
-    }
+    /// <summary>
+    /// Initial logical extent. Required. Width and height must be nonzero, and
+    /// scale_factor must be finite and positive. scale_factor is fixed for the
+    /// map's lifetime.
+    /// </summary>
+    public LogicalExtent InitialExtent { get; init; }
+    public MapMode MapMode { get; init; }
 
+    /// <summary>
+    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+    /// encodings.
+    /// </summary>
+    public bool FastPforEnabled { get; init; }
+
+    /// <summary>
+    /// Map-originated event types this map queues, as a bitwise OR of
+    /// <c>mln_runtime_event_flag</c> values.
+    /// </summary>
+    public RuntimeEventFlag? EventMask { get; init; }
     public static MapOptions Default
     {
         get

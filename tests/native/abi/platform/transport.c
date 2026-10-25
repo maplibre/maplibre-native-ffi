@@ -98,7 +98,7 @@ static void a_percent_encoded_file_url_loads_its_file(void) {
 }
 
 static mln_map create_static_map(mln_runtime runtime) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
@@ -341,7 +341,8 @@ static void a_request_in_flight_does_not_hold_its_map_open(void) {
   mln_runtime runtime = mln_test_create_runtime();
   // The case waits for the map's release itself, so it creates it untracked.
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE(
     mln_test_http_server_wait_for_requests(server, "/held.json", 1)

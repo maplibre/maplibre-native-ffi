@@ -4,8 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns an exact-match header rule for every resource kind, with no
-  /// headers.
+  /// Returns a zeroed header rule with size set for this C API version: an
+  /// exact match of the empty URL for every resource kind, with no headers.
   ///
   /// See `mln_http_header_rule_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -38,7 +38,8 @@ public extension Maplibre {
     ) }
   }
 
-  /// Returns an exact-match route for every resource kind.
+  /// Returns a zeroed route with size set for this C API version: an exact
+  /// match of the empty URL for every resource kind.
   ///
   /// See `mln_resource_route_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -63,7 +64,7 @@ public extension Maplibre {
     ) } result: { try RuntimeHandle(adopting: value0) }
   }
 
-  /// Returns runtime options initialized for this C API version.
+  /// Returns zeroed runtime options with size set for this C API version.
   ///
   /// See `mln_runtime_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

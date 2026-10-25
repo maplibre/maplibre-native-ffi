@@ -15,7 +15,7 @@ import {
   Status,
   styleExpressionCreate,
 } from "../src/index.ts";
-import { openRuntime } from "./support/fixture.ts";
+import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
 import { backgroundStyle } from "./support/styles.ts";
@@ -206,15 +206,18 @@ test("an array input is copied when the call submits it", async () => {
 });
 
 test("a record with omitted members equals the native default", async () => {
-  // Every record converter starts from the native default function, so an
-  // empty record and the default's copy configure the same map.
+  // Every record converter starts from the native default function, so a
+  // record that omits members and one that spreads the default's copy
+  // configure the same map.
   const fixture = await openRuntime();
-  const omitted = await fixture.openMap({});
-  const defaulted = await fixture.openMap(mapOptionsDefault());
+  const omitted = await fixture.openMap(mapOptions);
+  const defaulted = await fixture.openMap({
+    ...mapOptionsDefault(),
+    ...mapOptions,
+  });
   const { generation: _first, ...fromOmitted } = omitted.getSnapshot();
   const { generation: _second, ...fromDefault } = defaulted.getSnapshot();
   assert.deepEqual(fromOmitted, fromDefault);
-  assert.deepEqual(fromOmitted.view.extent, mapOptionsDefault().initialExtent);
 });
 
 test("a synchronous call fills a caller-sized output array in input order", async () => {

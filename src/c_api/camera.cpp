@@ -8,44 +8,47 @@
 #include "maplibre_native_c.h"
 
 auto mln_camera_options_default(void) noexcept -> mln_camera_options {
-  return mln::core::camera_options_default();
+  return mln_camera_options{.size = sizeof(mln_camera_options)};
 }
 
 auto mln_animation_options_default(void) noexcept -> mln_animation_options {
-  return mln::core::animation_options_default();
+  return mln_animation_options{};
 }
 
 auto mln_camera_delta_default(void) noexcept -> mln_camera_delta {
-  return mln::core::camera_delta_default();
+  return mln_camera_delta{.size = sizeof(mln_camera_delta)};
 }
 
 auto mln_camera_update_default(void) noexcept -> mln_camera_update {
-  return mln::core::camera_update_default();
+  return mln_camera_update{
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)},
+  };
 }
 
 auto mln_camera_fit_options_default(void) noexcept -> mln_camera_fit_options {
-  return mln::core::camera_fit_options_default();
+  return mln_camera_fit_options{.size = sizeof(mln_camera_fit_options)};
 }
 
 auto mln_bound_options_default(void) noexcept -> mln_bound_options {
-  return mln::core::bound_options_default();
+  return mln_bound_options{.size = sizeof(mln_bound_options)};
 }
 
 auto mln_free_camera_options_default(void) noexcept -> mln_free_camera_options {
-  return mln::core::free_camera_options_default();
+  return mln_free_camera_options{.size = sizeof(mln_free_camera_options)};
 }
 
 auto mln_projection_mode_default(void) noexcept -> mln_projection_mode {
-  return mln::core::projection_mode_default();
+  return mln_projection_mode{.size = sizeof(mln_projection_mode)};
 }
 
 auto mln_map_viewport_options_default(void) noexcept
   -> mln_map_viewport_options {
-  return mln::core::map_viewport_options_default();
+  return mln_map_viewport_options{.size = sizeof(mln_map_viewport_options)};
 }
 
 auto mln_map_tile_options_default(void) noexcept -> mln_map_tile_options {
-  return mln::core::map_tile_options_default();
+  return mln_map_tile_options{.size = sizeof(mln_map_tile_options)};
 }
 
 auto mln_map_update_camera(

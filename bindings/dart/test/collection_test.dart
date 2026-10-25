@@ -52,7 +52,7 @@ Future<_Unreachable> _unreachableRuntimeWithProvider() async {
 Future<(MapHandle, WeakReference<RuntimeHandle>)>
 _mapWithoutItsRuntime() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await within(ready, 'map creation');
   return (map, WeakReference(runtime));
 }

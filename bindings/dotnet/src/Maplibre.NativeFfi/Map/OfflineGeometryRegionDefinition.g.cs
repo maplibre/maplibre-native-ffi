@@ -13,7 +13,7 @@ namespace Maplibre.NativeFfi;
 /// Style URL. Copied during region creation.
 /// </param>
 /// <param name="Geometry">
-/// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+/// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
 /// </param>
 /// <param name="MaxZoom">
 /// Maximum zoom. Positive infinity lets each tile source use its own maximum

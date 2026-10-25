@@ -188,7 +188,7 @@ extension RenderSessionHandle {
     ) {
       if pending == nil {
         token += 1
-        try requestFrame(demand: FrameDemand(flags: [], token: token))
+        try requestFrame(demand: FrameDemand(flags: [.force], token: token))
         pending = token
       }
       for result in try drainFrameResults() where result.token == pending {

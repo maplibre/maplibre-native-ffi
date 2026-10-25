@@ -3619,7 +3619,7 @@ internal val mln_canonical_tile_id: GroupLayout =
 internal val mln_map_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
-    Ffm.pad(4),
+    JAVA_INT.withName("fields"),
     mln_logical_extent.withName("initial_extent"),
     JAVA_INT.withName("map_mode"),
     JAVA_BOOLEAN.withName("fast_pfor_enabled"),

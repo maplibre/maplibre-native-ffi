@@ -5,31 +5,17 @@
 #include "render/render_session_common.hpp"
 
 auto mln_frame_demand_default() noexcept -> mln_frame_demand {
-  return mln_frame_demand{
-    .size = sizeof(mln_frame_demand),
-    .flags = MLN_FRAME_DEMAND_IF_NEEDED,
-    .token = 0,
-  };
+  return mln_frame_demand{.size = sizeof(mln_frame_demand)};
 }
 auto mln_render_session_attach_options_default() noexcept
   -> mln_render_session_attach_options {
   return mln_render_session_attach_options{
-    .size = sizeof(mln_render_session_attach_options),
-    .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
-    .requested_texture_ring_depth = 2,
-    .producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE,
-    .frame_wake = mln_wake{},
-    .driver_work_wake = mln_wake{},
-    .queue_lock = mln_queue_lock{},
+    .size = sizeof(mln_render_session_attach_options)
   };
 }
 
 auto mln_gpu_sync_default() noexcept -> mln_gpu_sync {
-  return mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync),
-    .kind = MLN_GPU_SYNC_CPU_COMPLETE,
-    .handle = 0,
-  };
+  return mln_gpu_sync{.size = sizeof(mln_gpu_sync)};
 }
 
 auto mln_render_session_get_capabilities(

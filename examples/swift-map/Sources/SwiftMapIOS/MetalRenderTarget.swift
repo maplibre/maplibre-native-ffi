@@ -92,7 +92,7 @@ final class MetalRenderTarget {
   func requestFrame(force: Bool = false) throws {
     nextToken += 1
     try session.requestFrame(demand: FrameDemand(
-      flags: force ? [.present] : [.ifNeeded, .waitForUpdate, .present],
+      flags: force ? [.force, .present] : [.waitForUpdate, .present],
       token: nextToken
     ))
   }

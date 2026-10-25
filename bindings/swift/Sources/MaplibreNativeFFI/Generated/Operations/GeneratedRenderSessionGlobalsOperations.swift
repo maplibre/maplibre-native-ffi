@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns a zero-token, render-if-needed, nonpresenting frame demand.
+  /// Returns a zeroed frame demand with size set for this C API version: a
+  /// zero-token, render-if-needed, nonpresenting demand.
   ///
   /// See `mln_frame_demand_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

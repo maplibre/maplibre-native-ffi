@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns Metal borrowed-texture descriptor defaults for this C API version.
+  /// Returns a zeroed Metal borrowed-texture descriptor with size set for this
+  /// C API version. The caller still sets every required member.
   ///
   /// See `mln_metal_borrowed_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -18,7 +19,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns Metal owned-texture descriptor defaults for this C API version.
+  /// Returns a zeroed Metal owned-texture descriptor with size set for this C
+  /// API version. The caller still sets every required member.
   ///
   /// See `mln_metal_owned_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -32,8 +34,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns OpenGL borrowed-texture descriptor defaults for this C API
-  /// version.
+  /// Returns a zeroed OpenGL borrowed-texture descriptor with size set for this
+  /// C API version. The caller still sets every required member.
   ///
   /// See `mln_opengl_borrowed_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -47,7 +49,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns OpenGL owned-texture descriptor defaults for this C API version.
+  /// Returns a zeroed OpenGL owned-texture descriptor with size set for this C
+  /// API version. The caller still sets every required member.
   ///
   /// See `mln_opengl_owned_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -61,8 +64,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns Vulkan borrowed-texture descriptor defaults for this C API
-  /// version.
+  /// Returns a zeroed Vulkan borrowed-texture descriptor with size set for this
+  /// C API version. The caller still sets every required member.
   ///
   /// See `mln_vulkan_borrowed_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -76,7 +79,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns Vulkan owned-texture descriptor defaults for this C API version.
+  /// Returns a zeroed Vulkan owned-texture descriptor with size set for this C
+  /// API version. The caller still sets every required member.
   ///
   /// See `mln_vulkan_owned_texture_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

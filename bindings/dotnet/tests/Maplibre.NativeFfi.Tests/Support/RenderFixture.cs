@@ -63,7 +63,7 @@ internal sealed class RenderFixture : IDisposable
             Runtime = RuntimeHandle.Create(RuntimeOptions.Default);
             Runtime.Discarding.SetResourceProvider(NativeFixture.DenyingProvider);
             Map = Runtime.CreateMap(
-                MapOptions.Default with
+                NativeFixture.SmallMap with
                 {
                     InitialExtent = new LogicalExtent(Width, Height, 1),
                 }

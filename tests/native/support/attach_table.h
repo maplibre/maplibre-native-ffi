@@ -125,6 +125,9 @@ static inline void mln_test_call_without_descriptor(void* call) {
 static inline void mln_test_call_without_options(void* call) {
   ((mln_test_target_call*)call)->null_options = true;
 }
+static inline void mln_test_call_with_zero_driver(void* call) {
+  ((mln_test_target_call*)call)->options.driver = 0;
+}
 static inline void mln_test_call_with_undersized_options(void* call) {
   ((mln_test_target_call*)call)->options.size =
     sizeof(mln_render_session_attach_options) - 1;

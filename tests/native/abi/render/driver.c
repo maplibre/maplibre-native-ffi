@@ -816,7 +816,8 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
@@ -1044,7 +1045,7 @@ static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
   };
   MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.scale_factor = 3.0;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_fixture fixture = {0};

@@ -129,7 +129,7 @@ func (driver *callerDriver) RequestFrame(force bool) error {
 	demand := maplibre.DefaultFrameDemand()
 	demand.Token = driver.nextToken
 	if force {
-		demand.Flags &^= maplibre.FrameDemandFlagIfNeeded
+		demand.Flags |= maplibre.FrameDemandFlagForce
 	} else {
 		demand.Flags |= maplibre.FrameDemandFlagWaitForUpdate
 	}

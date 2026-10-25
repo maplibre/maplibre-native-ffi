@@ -8,7 +8,7 @@
 #include "support/test_support.h"
 
 static mln_map create_square_map(mln_runtime runtime, uint32_t side) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = side, .height = side, .scale_factor = 1.0};
   return mln_test_create_map_with_options(runtime, &options);

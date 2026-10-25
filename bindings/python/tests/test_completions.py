@@ -10,7 +10,14 @@ import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import _future
 from maplibre_native_ffi._future import NativeFuture
-from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, result
+from support import (
+    EMPTY_STYLE,
+    TIMEOUT,
+    Harness,
+    leak_reports,
+    map_options,
+    result,
+)
 
 
 def test_discarded_commands_are_fenced_and_sync_rejection_raises(
@@ -120,8 +127,8 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
     # submissions hold every later creation behind it.
     closing = map_handle.close()
     assert running.wait(TIMEOUT)
-    created = harness.runtime.create_map()
-    awaited = harness.runtime.create_map()
+    created = harness.runtime.create_map(map_options())
+    awaited = harness.runtime.create_map(map_options())
     ready = created.ready
     with pytest.raises(TimeoutError):
         ready.result(timeout=0)

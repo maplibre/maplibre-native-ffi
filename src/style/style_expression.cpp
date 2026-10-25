@@ -282,35 +282,6 @@ auto replace_non_finite_numbers(mln::Value& value) -> void {
 
 namespace mln::core {
 
-auto style_expression_options_default() noexcept
-  -> mln_style_expression_options {
-  return mln_style_expression_options{
-    .size = sizeof(mln_style_expression_options),
-    .fields = 0,
-    .expected_type = mln_style_expression_type{
-      .kind = MLN_STYLE_EXPRESSION_TYPE_VALUE,
-      .item_kind = MLN_STYLE_EXPRESSION_TYPE_VALUE,
-      .item_count = 0,
-    },
-  };
-}
-
-auto style_expression_inputs_default() noexcept -> mln_style_expression_inputs {
-  return mln_style_expression_inputs{
-    .size = sizeof(mln_style_expression_inputs),
-    .fields = 0,
-    .zoom = 0.0,
-    .color_ramp_parameter = 0.0,
-    .elevation = 0.0,
-    .feature = mln_buffer_view{.data = nullptr, .size = 0},
-    .feature_state = mln_buffer_view{.data = nullptr, .size = 0},
-    .global_state = mln_buffer_view{.data = nullptr, .size = 0},
-    .canonical_tile_id = mln_canonical_tile_id{.z = 0, .x = 0, .y = 0},
-    .available_images = nullptr,
-    .available_image_count = 0,
-  };
-}
-
 auto style_expression_create(
   mln_buffer_view expression, const mln_style_expression_options* options,
   mln_style_expression* out_expression

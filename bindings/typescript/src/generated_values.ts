@@ -34,9 +34,9 @@ export interface AnimationOptions {
   durationMs?: number;
   /**
    * Average fly velocity in screenfuls per second. Must be positive and finite;
-   * defaults to 1.2 when omitted. A flight whose derived duration is too long
-   * to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An
-   * explicit duration overrides velocity.
+   * absent selects 1.2. A flight whose derived duration is too long to
+   * represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+   * duration overrides velocity.
    */
   velocity?: number;
   /**
@@ -426,7 +426,7 @@ export interface EglContextDescriptor {
  */
 export interface FeatureStateSelector {
   /**
-   * Source ID. Required and borrowed for the duration of the call.
+   * Source ID. Required. Borrowed for the duration of the call.
    */
   sourceId: string;
   /**
@@ -455,8 +455,8 @@ export interface FeatureStateSelector {
  */
 export interface FrameDemand {
   /**
-   * A bitwise OR of `mln_frame_demand_flag` values. Defaults to
-   * `MLN_FRAME_DEMAND_IF_NEEDED`.
+   * A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
+   * newer map update exists, without presenting.
    */
   flags?: FrameDemandFlag;
   /**
@@ -474,9 +474,9 @@ export interface FrameDemand {
  */
 export const FrameDemandFlag = {
   /**
-   * Render only when a newer map update exists.
+   * Render even when no map update is newer than the last rendered one.
    */
-  ifNeeded: 1,
+  force: 1,
   /**
    * Present the rendered frame on a target that supports presentation. A
    * presenting target whose demand clears this bit still renders and keeps
@@ -484,7 +484,7 @@ export const FrameDemandFlag = {
    */
   present: 2,
   /**
-   * With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+   * Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
    * `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the map's
    * next update, a target replacement, or an applied resize. A waiting demand
    * holds no ring slot. A later demand with the same flags supersedes it, a
@@ -522,19 +522,19 @@ export interface FreeCameraOptions {
  */
 export interface GeojsonSourceOptions {
   /**
-   * Minimum tiling zoom. Defaults to 0.
+   * Minimum tiling zoom. Absent selects 0.
    */
   minZoom?: number;
   /**
-   * Maximum tiling zoom, an integer within &#91;0, 24&#93;. Defaults to 18.
+   * Maximum tiling zoom, an integer within &#91;0, 24&#93;. Absent selects 18.
    */
   maxZoom?: number;
   /**
-   * Douglas-Peucker simplification tolerance. Defaults to 0.375.
+   * Douglas-Peucker simplification tolerance. Absent selects 0.375.
    */
   tolerance?: number;
   /**
-   * Highest zoom that clusters points. Defaults to 17.
+   * Highest zoom that clusters points. Absent selects 17.
    */
   clusterMaxZoom?: number;
   /**
@@ -544,28 +544,28 @@ export interface GeojsonSourceOptions {
    */
   clusterProperties?: unknown;
   /**
-   * Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128.
+   * Tile buffer in pixels within &#91;0, 512&#93;. Absent selects 128.
    */
   buffer?: number;
   /**
-   * Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50.
+   * Cluster radius in pixels within &#91;0, 4095&#93;. Absent selects 50.
    */
   clusterRadius?: number;
   /**
-   * Points required to form a cluster. Defaults to 2.
+   * Points required to form a cluster. Absent selects 2.
    */
   clusterMinPoints?: number;
   /**
-   * Adds line distance metrics to line features. Defaults to false.
+   * Adds line distance metrics to line features. Absent selects false.
    */
   lineMetrics?: boolean;
   /**
-   * Clusters point features. Defaults to false.
+   * Clusters point features. Absent selects false.
    */
   cluster?: boolean;
   /**
    * Tiles the data for the next render update instead of in the background.
-   * Defaults to false.
+   * Absent selects false.
    */
   synchronousTiling?: boolean;
 }
@@ -650,6 +650,9 @@ export type GpuSyncKind =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface HttpHeader {
+  /**
+   * Header field name. Required.
+   */
   name: string;
   value: string;
 }
@@ -662,7 +665,7 @@ export interface HttpHeader {
  */
 export interface HttpHeaderRule {
   /**
-   * The resource kinds to match.
+   * The resource kinds to match. Zero selects every kind.
    */
   kinds?: ResourceKindFlag;
   flags?: UrlMatchFlag;
@@ -823,15 +826,15 @@ export type LogSeverityFlag = number;
  */
 export interface LogicalExtent {
   /**
-   * Width in UI pixels. Defaults to 256.
+   * Width in UI pixels.
    */
   width?: number;
   /**
-   * Height in UI pixels. Defaults to 256.
+   * Height in UI pixels.
    */
   height?: number;
   /**
-   * Device pixels per UI pixel. Defaults to 1.0.
+   * Device pixels per UI pixel.
    */
   scaleFactor?: number;
 }
@@ -885,17 +888,15 @@ export type MapMode = (typeof MapMode)[keyof typeof MapMode] | (number & {});
  */
 export interface MapOptions {
   /**
-   * Initial logical extent. Width and height must be nonzero, and scale_factor
-   * must be finite and positive. scale_factor is fixed for the map's lifetime.
+   * Initial logical extent. Required. Width and height must be nonzero, and
+   * scale_factor must be finite and positive. scale_factor is fixed for the
+   * map's lifetime.
    */
   initialExtent?: LogicalExtent;
-  /**
-   * Defaults to `MLN_MAP_MODE_CONTINUOUS`.
-   */
   mapMode?: MapMode;
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-   * encodings. Defaults to false.
+   * encodings.
    */
   fastPforEnabled?: boolean;
   /**
@@ -1028,18 +1029,17 @@ export interface MetalBorrowedTexture {
  */
 export interface MetalBorrowedTextureDescriptor {
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
-   * Physical texture width in device pixels. Must be positive. Defaults to 256.
+   * Physical texture width in device pixels. Required.
    */
   physicalWidth?: number;
   /**
-   * Physical texture height in device pixels. Must be positive. Defaults to
-   * 256.
+   * Physical texture height in device pixels. Required.
    */
   physicalHeight?: number;
   /**
@@ -1069,8 +1069,8 @@ export interface MetalContextDescriptor {
  */
 export interface MetalOwnedTextureDescriptor {
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1079,8 +1079,8 @@ export interface MetalOwnedTextureDescriptor {
   context?: MetalContextDescriptor;
   /**
    * Backend-native MTLPixelFormat value of the ring's textures: either
-   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-   * MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+   * returns RGBA8 for either format.
    */
   pixelFormat?: bigint;
 }
@@ -1093,8 +1093,8 @@ export interface MetalOwnedTextureDescriptor {
  */
 export interface MetalSurfaceDescriptor {
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1191,7 +1191,7 @@ export interface OfflineGeometryRegionDefinition {
    */
   styleUrl: string;
   /**
-   * UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+   * UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
    */
   geometry: unknown;
   minZoom?: number;
@@ -1310,18 +1310,17 @@ export interface OpenglBorrowedTexture {
  */
 export interface OpenglBorrowedTextureDescriptor {
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
-   * Physical texture width in device pixels. Must be positive. Defaults to 256.
+   * Physical texture width in device pixels. Required.
    */
   physicalWidth?: number;
   /**
-   * Physical texture height in device pixels. Must be positive. Defaults to
-   * 256.
+   * Physical texture height in device pixels. Required.
    */
   physicalHeight?: number;
   /**
@@ -1334,7 +1333,7 @@ export interface OpenglBorrowedTextureDescriptor {
    */
   textures?: readonly OpenglBorrowedTexture[];
   /**
-   * OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
+   * OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
    */
   target?: number;
 }
@@ -1443,8 +1442,8 @@ export type OpenglContextProviderFlag = number;
  */
 export interface OpenglOwnedTextureDescriptor {
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1464,8 +1463,8 @@ export interface OpenglOwnedTextureDescriptor {
  */
 export interface OpenglSurfaceDescriptor {
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1541,14 +1540,20 @@ export interface OpenglTextureFrame {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface PremultipliedRgba8Image {
+  /**
+   * Image width in pixels. Required.
+   */
   width?: number;
+  /**
+   * Image height in pixels. Required.
+   */
   height?: number;
   /**
-   * Bytes per image row. Must be at least width &#42; 4.
+   * Bytes per image row. Required, and at least width &#42; 4.
    */
   stride?: number;
   /**
-   * Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+   * Premultiplied RGBA8 pixels. Required.
    */
   pixels?: Uint8Array;
 }
@@ -1800,8 +1805,8 @@ export const RenderResult = {
    */
   targetNotReady: 2,
   /**
-   * A newer IF_NEEDED demand with the same flags replaced this demand. A still
-   * image's demand is never replaced, and never replaces one.
+   * A newer demand with the same flags, neither of them forced, replaced this
+   * demand. A still image's demand is never replaced, and never replaces one.
    */
   superseded: 3,
 } as const;
@@ -1818,22 +1823,22 @@ export type RenderResult =
  */
 export interface RenderSessionAttachOptions {
   /**
-   * Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+   * Where the session's driver runs. Required.
    */
   driver?: RenderDriverKind;
   /**
-   * Requested slot count of a session-owned texture ring, from one to
-   * `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless of
-   * this value. A borrowed texture ring's depth is its texture count, so
-   * borrowed and other targets ignore this value. Defaults to 2, so the host
-   * can retain one frame while the session renders its replacement.
+   * Requested slot count of a session-owned texture ring, up to
+   * `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
+   * frame while the session renders its replacement. Private targets grant one
+   * slot regardless of this value. A borrowed texture ring's depth is its
+   * texture count, so borrowed and other targets ignore this value.
    */
   requestedTextureRingDepth?: number;
   /**
-   * Producer synchronization for acquired texture frames. Defaults to
-   * `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared
-   * EGL or WGL texture target and a caller-graphics-thread driver. Other
-   * targets support only CPU completion and fail an unsupported request.
+   * Producer synchronization for acquired texture frames.
+   * `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target and
+   * a caller-graphics-thread driver. Other targets support only CPU completion
+   * and fail an unsupported request.
    */
   producerSyncKind?: GpuSyncKind;
   /**
@@ -2050,8 +2055,8 @@ export type ResourceKind =
 
 /**
  * The resource kinds that a route or rule matches, one bit per
- * `mln_resource_kind` value. Registration requires at least one known bit.
- * `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
+ * `mln_resource_kind` value. Registration rejects unknown bits.
+ * `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
  *
  * See `mln_resource_kind_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2205,7 +2210,7 @@ export type ResourceResponseStatus =
  */
 export interface ResourceRoute {
   /**
-   * The resource kinds to match.
+   * The resource kinds to match. Zero selects every kind.
    */
   kinds?: ResourceKindFlag;
   flags?: UrlMatchFlag;
@@ -2815,19 +2820,19 @@ export interface StyleImageOptions {
    */
   content?: ImageContent;
   /**
-   * Defaults to STRETCH_OR_SHRINK.
+   * Absent selects STRETCH_OR_SHRINK.
    */
   textFitWidth?: StyleImageTextFit;
   /**
-   * Defaults to STRETCH_OR_SHRINK.
+   * Absent selects STRETCH_OR_SHRINK.
    */
   textFitHeight?: StyleImageTextFit;
   /**
-   * Sprite pixel ratio. Defaults to 1.
+   * Sprite pixel ratio. Absent selects 1.
    */
   pixelRatio?: number;
   /**
-   * Whether the image is a signed distance field icon. Defaults to false.
+   * Whether the image is a signed distance field icon. Absent selects false.
    */
   sdf?: boolean;
 }
@@ -3228,17 +3233,17 @@ export interface VulkanBorrowedTexture {
  */
 export interface VulkanBorrowedTextureDescriptor {
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
-   * Physical image width in device pixels. Must be positive. Defaults to 256.
+   * Physical image width in device pixels. Required.
    */
   physicalWidth?: number;
   /**
-   * Physical image height in device pixels. Must be positive. Defaults to 256.
+   * Physical image height in device pixels. Required.
    */
   physicalHeight?: number;
   /**
@@ -3250,8 +3255,8 @@ export interface VulkanBorrowedTextureDescriptor {
    */
   textures?: readonly VulkanBorrowedTexture[];
   /**
-   * Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-   * invalid.
+   * Backend-native VkFormat value of every image. Required, so
+   * VK_FORMAT_UNDEFINED is invalid.
    */
   format?: number;
   /**
@@ -3259,8 +3264,9 @@ export interface VulkanBorrowedTextureDescriptor {
    */
   initialLayout?: number;
   /**
-   * Backend-native VkImageLayout value left after rendering succeeds. Defaults
-   * to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+   * Backend-native VkImageLayout value left after rendering succeeds, such as
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+   * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
   finalLayout?: number;
 }
@@ -3312,8 +3318,8 @@ export interface VulkanContextDescriptor {
  */
 export interface VulkanOwnedTextureDescriptor {
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -3330,8 +3336,8 @@ export interface VulkanOwnedTextureDescriptor {
  */
 export interface VulkanSurfaceDescriptor {
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
   extent?: LogicalExtent;
   /**

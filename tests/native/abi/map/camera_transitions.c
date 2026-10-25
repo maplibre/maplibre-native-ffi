@@ -245,7 +245,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, query_camera(map).zoom);
 
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   MLN_TEST_OK(mln_test_render_step_until(
     &fixture, settled_result, (void*)&fixture, mln_test_deadline_default(),
@@ -261,7 +261,8 @@ static void a_rendered_ease_completes_at_its_target(void) {
 
 static void an_unobserved_animation_publishes_its_final_snapshot(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
+  options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_background_style_json));
@@ -371,7 +372,8 @@ static void an_immediate_command_completes_before_its_completion(void) {
 // The handler reports the end whatever the event mask selects.
 static void the_handler_runs_whatever_the_event_mask_selects(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
+  options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 
@@ -755,7 +757,8 @@ static void release_transition_close(void* user_data) {
 static void a_map_close_ends_running_transitions(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   mln_test_transition_end released;
   mln_test_transition_end_init(&released);
   const mln_camera_update eased = ease_to_zoom(6.0, 60000.0, &released);
@@ -781,7 +784,7 @@ static void a_map_close_ends_running_transitions(void) {
   TEST_ASSERT_EQUAL_UINT64(0, atomic_load(&released.generation));
 
   mln_map disposed = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &disposed));
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &disposed));
   mln_test_transition_end dispose;
   mln_test_transition_end_init(&dispose);
   const mln_camera_update dispose_ease = ease_to_zoom(6.0, 60000.0, &dispose);

@@ -47,8 +47,8 @@ typedef enum mln_render_result : uint32_t {
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
   /**
-   * A newer IF_NEEDED demand with the same flags replaced this demand. A still
-   * image's demand is never replaced, and never replaces one.
+   * A newer demand with the same flags, neither of them forced, replaced this
+   * demand. A still image's demand is never replaced, and never replaces one.
    */
   MLN_RENDER_RESULT_SUPERSEDED = 3,
 } mln_render_result;
@@ -68,10 +68,15 @@ typedef enum mln_render_session_state : uint32_t {
   MLN_RENDER_SESSION_STATE_ABANDONED = 6U,
 } mln_render_session_state;
 
-/** Frame-demand policy bits. */
+/**
+ * Frame-demand policy bits.
+ *
+ * A demand without MLN_FRAME_DEMAND_FORCE renders only when a newer map update
+ * exists, and otherwise finishes with MLN_RENDER_RESULT_NO_UPDATE.
+ */
 typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
-  /** Render only when a newer map update exists. */
-  MLN_FRAME_DEMAND_IF_NEEDED = 1U << 0U,
+  /** Render even when no map update is newer than the last rendered one. */
+  MLN_FRAME_DEMAND_FORCE = 1U << 0U,
   /**
    * Present the rendered frame on a target that supports presentation. A
    * presenting target whose demand clears this bit still renders and keeps
@@ -79,7 +84,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
    */
   MLN_FRAME_DEMAND_PRESENT = 1U << 1U,
   /**
-   * With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+   * Without MLN_FRAME_DEMAND_FORCE, a demand that would finish with
    * MLN_RENDER_RESULT_NO_UPDATE waits instead, and runs again after the map's
    * next update, a target replacement, or an applied resize. A waiting demand
    * holds no ring slot. A later demand with the same flags supersedes it, a
@@ -111,8 +116,8 @@ typedef uint32_t mln_frame_demand_flags;
 typedef struct mln_frame_demand {
   uint32_t size;
   /**
-   * A bitwise OR of mln_frame_demand_flag values. Defaults to
-   * MLN_FRAME_DEMAND_IF_NEEDED.
+   * A bitwise OR of mln_frame_demand_flag values. Zero renders only when a
+   * newer map update exists, without presenting.
    */
   mln_frame_demand_flags flags;
   /**
@@ -237,7 +242,10 @@ typedef struct mln_render_abandon_result {
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_render_abandon_result;
 
-/** Returns a zero-token, render-if-needed, nonpresenting frame demand. */
+/**
+ * Returns a zeroed frame demand with size set for this C API version: a
+ * zero-token, render-if-needed, nonpresenting demand.
+ */
 MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
 
 /**
@@ -283,8 +291,8 @@ MLN_API mln_status mln_render_session_get_snapshot(
  * - MLN_STATUS_OK when the demand is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
  *   null or undersized, demand->flags carries a bit outside
- *   mln_frame_demand_flag, or carries MLN_FRAME_DEMAND_WAIT_FOR_UPDATE without
- *   MLN_FRAME_DEMAND_IF_NEEDED, or demand->token is
+ *   mln_frame_demand_flag, or carries MLN_FRAME_DEMAND_WAIT_FOR_UPDATE with
+ *   MLN_FRAME_DEMAND_FORCE, or demand->token is
  *   MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or every slot of its texture ring is quarantined.

@@ -38,21 +38,19 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     }
 
     /// <summary>
-    /// Logical texture extent; physical_width and physical_height give the
-    /// texture's size. A scale_factor that differs from the map's is accepted
-    /// and logged as a warning.
+    /// Logical texture extent. Required. physical_width and physical_height
+    /// give the texture's size. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
     /// </summary>
     public LogicalExtent Extent { get; init; }
 
     /// <summary>
-    /// Physical image width in device pixels. Must be positive. Defaults to
-    /// 256.
+    /// Physical image width in device pixels. Required.
     /// </summary>
     public uint PhysicalWidth { get; init; }
 
     /// <summary>
-    /// Physical image height in device pixels. Must be positive. Defaults to
-    /// 256.
+    /// Physical image height in device pixels. Required.
     /// </summary>
     public uint PhysicalHeight { get; init; }
 
@@ -72,8 +70,8 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     internal ValueArray<VulkanBorrowedTexture> TexturesStorage { get; init; }
 
     /// <summary>
-    /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-    /// invalid.
+    /// Backend-native VkFormat value of every image. Required, so
+    /// VK_FORMAT_UNDEFINED is invalid.
     /// </summary>
     public uint Format { get; init; }
 
@@ -83,8 +81,9 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     public uint InitialLayout { get; init; }
 
     /// <summary>
-    /// Backend-native VkImageLayout value left after rendering succeeds.
-    /// Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+    /// Backend-native VkImageLayout value left after rendering succeeds, such
+    /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     /// </summary>
     public uint FinalLayout { get; init; }
     public static VulkanBorrowedTextureDescriptor Default

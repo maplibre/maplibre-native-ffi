@@ -177,6 +177,7 @@ bool mln_test_backend_attach(
     mln_opengl_owned_texture_descriptor_default();
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
+  descriptor.extent.scale_factor = 1.0;
   descriptor.context = context;
   *out_status = mln_map_attach_opengl_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
@@ -219,6 +220,7 @@ bool mln_test_transferred_webgl_surface_create(
     mln_opengl_surface_descriptor_default();
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
+  descriptor.extent.scale_factor = 1.0;
   descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.webgl = (mln_webgl_context_descriptor){

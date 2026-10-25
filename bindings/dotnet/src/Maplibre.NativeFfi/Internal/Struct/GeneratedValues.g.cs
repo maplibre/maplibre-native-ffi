@@ -968,21 +968,30 @@ internal static unsafe class GeneratedValues
     }
 
     internal static MapOptions CopyMapOptions(mln_map_options value) =>
-        new(
-            CopyLogicalExtent(value.initial_extent),
-            (MapMode)value.map_mode,
-            value.fast_pfor_enabled != 0,
-            (RuntimeEventFlag)value.event_mask
-        );
+        new()
+        {
+            InitialExtent = CopyLogicalExtent(value.initial_extent),
+            MapMode = (MapMode)value.map_mode,
+            FastPforEnabled = value.fast_pfor_enabled != 0,
+            EventMask = value.fields.HasFlag(MLN_MAP_OPTION_EVENT_MASK)
+                ? (RuntimeEventFlag)value.event_mask
+                : null,
+        };
 
     internal static mln_map_options NativeMapOptions(MapOptions value)
     {
         var native = NativeMethods.mln_map_options_default();
+        native.fields = 0;
         native.size = (uint)sizeof(mln_map_options);
         native.initial_extent = NativeLogicalExtent(value.InitialExtent);
         native.map_mode = (mln_map_mode)value.MapMode;
         native.fast_pfor_enabled = (byte)(value.FastPforEnabled ? 1 : 0);
-        native.event_mask = (ulong)value.EventMask;
+        native.fields |= Put(
+            value.EventMask,
+            ref native.event_mask,
+            MLN_MAP_OPTION_EVENT_MASK,
+            static present => (ulong)present
+        );
         return native;
     }
 

@@ -41,7 +41,7 @@ static void dedicated_texture_uses_a_readback_only_core_worker(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 41;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =

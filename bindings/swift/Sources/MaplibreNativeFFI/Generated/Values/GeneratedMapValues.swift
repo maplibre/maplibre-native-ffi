@@ -12,9 +12,9 @@ public struct AnimationOptions: Sendable {
   /// to represent as a duration.
   public var durationMs: Double?
   /// Average fly velocity in screenfuls per second. Must be positive and
-  /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
-  /// too long to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`.
-  /// An explicit duration overrides velocity.
+  /// finite; absent selects 1.2. A flight whose derived duration is too long to
+  /// represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+  /// duration overrides velocity.
   public var velocity: Double?
   /// Peak zoom for flyTo transitions.
   public var minZoom: Double?
@@ -738,7 +738,7 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
 /// See `mln_feature_state_selector` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FeatureStateSelector: Equatable, Hashable, Sendable {
-  /// Source ID. Required and borrowed for the duration of the call.
+  /// Source ID. Required. Borrowed for the duration of the call.
   public var sourceId: String
   /// Source layer ID, or empty for none. Required for vector-source
   /// disambiguation.
@@ -954,11 +954,11 @@ public struct LatLngBounds: Equatable, Hashable, Sendable {
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LogicalExtent: Equatable, Hashable, Sendable {
-  /// Width in UI pixels. Defaults to 256.
+  /// Width in UI pixels.
   public var width: UInt32
-  /// Height in UI pixels. Defaults to 256.
+  /// Height in UI pixels.
   public var height: UInt32
-  /// Device pixels per UI pixel. Defaults to 1.0.
+  /// Device pixels per UI pixel.
   public var scaleFactor: Double
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_logical_extent_default))
@@ -1043,17 +1043,17 @@ public struct MapMode: RawRepresentable, CustomStringConvertible,
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
-  /// Initial logical extent. Width and height must be nonzero, and scale_factor
-  /// must be finite and positive. scale_factor is fixed for the map's lifetime.
+  /// Initial logical extent. Required. Width and height must be nonzero, and
+  /// scale_factor must be finite and positive. scale_factor is fixed for the
+  /// map's lifetime.
   public var initialExtent: LogicalExtent
-  /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   public var mapMode: MapMode
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-  /// encodings. Defaults to false.
+  /// encodings.
   public var fastPforEnabled: Bool
   /// Map-originated event types this map queues, as a bitwise OR of
   /// `mln_runtime_event_flag` values.
-  public var eventMask: RuntimeEventFlag
+  public var eventMask: RuntimeEventFlag?
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_map_options_default))
   }
@@ -1062,7 +1062,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     initialExtent: LogicalExtent = MapOptions.default.initialExtent,
     mapMode: MapMode = MapOptions.default.mapMode,
     fastPforEnabled: Bool = MapOptions.default.fastPforEnabled,
-    eventMask: RuntimeEventFlag = MapOptions.default.eventMask
+    eventMask: RuntimeEventFlag? = MapOptions.default.eventMask
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1074,15 +1074,20 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     initialExtent = LogicalExtent(raw: raw.initial_extent)
     mapMode = MapMode(rawValue: raw.map_mode.rawValue)
     fastPforEnabled = raw.fast_pfor_enabled
-    eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
+    eventMask = raw.fields & MLN_MAP_OPTION_EVENT_MASK
+      .rawValue != 0 ? RuntimeEventFlag(rawValue: raw.event_mask) : nil
   }
 
   func nativeValue() -> mln_map_options {
     var raw = mln_map_options_default()
+    raw.fields = 0
     raw.initial_extent = initialExtent.nativeValue()
     raw.map_mode = mln_map_mode(rawValue: mapMode.rawValue)
     raw.fast_pfor_enabled = fastPforEnabled
-    raw.event_mask = eventMask.rawValue
+    if let item = eventMask {
+      raw.fields |= MLN_MAP_OPTION_EVENT_MASK.rawValue; raw.event_mask = item
+        .rawValue
+    }
     return raw
   }
 }
@@ -1388,7 +1393,7 @@ public struct NorthOrientation: RawRepresentable, CustomStringConvertible,
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   /// Style URL. Copied during region creation.
   public var styleUrl: String
-  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+  /// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
   public var geometry: String
   public var minZoom: Double
   /// Maximum zoom. Positive infinity lets each tile source use its own maximum

@@ -102,8 +102,6 @@
 
 namespace {
 
-constexpr auto default_map_width = uint32_t{256};
-constexpr auto default_map_height = uint32_t{256};
 constexpr double default_scale_factor = 1.0;
 
 auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
@@ -1254,7 +1252,8 @@ using mln::core::HeadlessFrontend;
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
   if (options == nullptr) {
-    return MLN_STATUS_OK;
+    mln::core::set_thread_error("map options must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   if (options->size < sizeof(mln_map_options)) {
@@ -1262,9 +1261,19 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_MAP_OPTION_EVENT_MASK);
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error("mln_map_options.fields contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   constexpr auto known_mask_bits =
     static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL);
-  if ((options->event_mask & ~known_mask_bits) != 0U) {
+  if (
+    (options->fields & MLN_MAP_OPTION_EVENT_MASK) != 0U &&
+    (options->event_mask & ~known_mask_bits) != 0U
+  ) {
     mln::core::set_thread_error(
       "mln_map_options.event_mask contains unknown bits"
     );
@@ -2994,19 +3003,6 @@ auto MapEventState::publish() -> uint64_t {
   return publish_map_snapshot(*locked);
 }
 
-auto map_options_default() noexcept -> mln_map_options {
-  return mln_map_options{
-    .size = sizeof(mln_map_options),
-    .initial_extent =
-      {.width = default_map_width,
-       .height = default_map_height,
-       .scale_factor = default_scale_factor},
-    .map_mode = MLN_MAP_MODE_CONTINUOUS,
-    .fast_pfor_enabled = false,
-    .event_mask = MLN_RUNTIME_EVENT_FLAG_ALL
-  };
-}
-
 auto camera_options_default() noexcept -> mln_camera_options {
   return mln_camera_options{
     .size = sizeof(mln_camera_options),
@@ -3020,49 +3016,6 @@ auto camera_options_default() noexcept -> mln_camera_options {
     .pitch = 0,
     .roll = 0,
     .field_of_view = 0
-  };
-}
-
-auto animation_options_default() noexcept -> mln_animation_options {
-  return mln_animation_options{
-    .fields = 0,
-    .duration_ms = 0,
-    .velocity = 0,
-    .min_zoom = 0,
-    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
-    .transition_id = 0,
-    .end_handler = {
-      .callback = nullptr,
-      .user_data = nullptr,
-      .release_user_data = nullptr,
-      .queue = MLN_HANDLE_NULL
-    }
-  };
-}
-
-auto camera_delta_default() noexcept -> mln_camera_delta {
-  return mln_camera_delta{
-    .size = sizeof(mln_camera_delta),
-    .fields = 0,
-    .offset = {},
-    .scale = 0,
-    .bearing = 0,
-    .pitch = 0,
-    .anchor = {},
-    .animation = animation_options_default(),
-    .gesture_phase = MLN_GESTURE_PHASE_NONE,
-    .reserved = 0
-  };
-}
-
-auto camera_update_default() noexcept -> mln_camera_update {
-  return mln_camera_update{
-    .size = sizeof(mln_camera_update),
-    .mode = MLN_CAMERA_UPDATE_MODE_JUMP,
-    .camera = camera_options_default(),
-    .animation = animation_options_default(),
-    .gesture_phase = MLN_GESTURE_PHASE_NONE,
-    .reserved = 0
   };
 }
 
@@ -3096,40 +3049,6 @@ auto free_camera_options_default() noexcept -> mln_free_camera_options {
     .fields = 0,
     .position = {.x = 0, .y = 0, .z = 0},
     .orientation = {.x = 0, .y = 0, .z = 0, .w = 1}
-  };
-}
-
-auto projection_mode_default() noexcept -> mln_projection_mode {
-  return mln_projection_mode{
-    .size = sizeof(mln_projection_mode),
-    .fields = 0,
-    .axonometric = false,
-    .x_skew = 0,
-    .y_skew = 0
-  };
-}
-
-auto map_viewport_options_default() noexcept -> mln_map_viewport_options {
-  return mln_map_viewport_options{
-    .size = sizeof(mln_map_viewport_options),
-    .fields = 0,
-    .north_orientation = MLN_NORTH_ORIENTATION_UP,
-    .constrain_mode = MLN_CONSTRAIN_MODE_HEIGHT_ONLY,
-    .viewport_mode = MLN_VIEWPORT_MODE_DEFAULT,
-    .frustum_offset = {.top = 0, .left = 0, .bottom = 0, .right = 0}
-  };
-}
-
-auto map_tile_options_default() noexcept -> mln_map_tile_options {
-  return mln_map_tile_options{
-    .size = sizeof(mln_map_tile_options),
-    .fields = 0,
-    .prefetch_zoom_delta = 0,
-    .lod_min_radius = 0,
-    .lod_scale = 0,
-    .lod_pitch_threshold = 0,
-    .lod_zoom_shift = 0,
-    .lod_mode = MLN_TILE_LOD_MODE_DEFAULT
   };
 }
 
@@ -3445,7 +3364,7 @@ auto create_map_start(
   }
   auto runtime_state = lease_runtime(runtime);
   if (runtime_state == nullptr) return recorded_handle_fault_status();
-  const auto effective = options == nullptr ? map_options_default() : *options;
+  const auto effective = *options;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(completion, completion_state);
@@ -3466,8 +3385,12 @@ auto create_map_start(
   owned_map->logical_extent = effective.initial_extent;
   owned_map->event_state = std::make_shared<MapEventState>();
   owned_map->callback_sources = std::make_shared<CallbackSourceRegistry>();
+  // An absent mask selects every event type.
   owned_map->event_state->mask.store(
-    effective.event_mask, std::memory_order_relaxed
+    (effective.fields & MLN_MAP_OPTION_EVENT_MASK) != 0U
+      ? effective.event_mask
+      : static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL),
+    std::memory_order_relaxed
   );
   owned_map->event_state->runtime_events = runtime_state->event_state;
   owned_map->event_state->owner = owned_map;

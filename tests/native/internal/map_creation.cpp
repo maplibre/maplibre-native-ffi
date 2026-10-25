@@ -40,8 +40,9 @@ void create_map_on_thread(void* context) {
       },
     .user_data = &probe,
   };
+  const auto map_options = mln_test_map_options();
   probe.status = mln_runtime_create_map(
-    probe.runtime, nullptr, &probe.map, &completion, nullptr
+    probe.runtime, &map_options, &probe.map, &completion, nullptr
   );
 }
 
@@ -76,7 +77,7 @@ void fail_construction(SyncPoint point, void* /*context*/) noexcept {
 
 void work_queued_on_a_failed_map_reports_invalid_state() {
   const auto runtime = mln_test_create_runtime();
-  auto options = mln_map_options_default();
+  auto options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_STATIC;
   auto created = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};

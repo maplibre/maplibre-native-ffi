@@ -143,11 +143,12 @@ typedef struct mln_style_expression_info {
   bool is_zoom_constant;
 } mln_style_expression_info;
 
-/** Returns default style expression options. */
+/** Returns zeroed style expression options with size set. */
 MLN_API mln_style_expression_options
 mln_style_expression_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default style expression inputs, which set no input. */
+/** Returns zeroed style expression inputs with size set, which set no input.
+ */
 MLN_API mln_style_expression_inputs
 mln_style_expression_inputs_default(void) MLN_NOEXCEPT;
 

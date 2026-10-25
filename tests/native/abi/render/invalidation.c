@@ -556,7 +556,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   demand_until(
     (frame_seek){
       .fixture = &fixture,
-      .flags = 0,
+      .flags = MLN_FRAME_DEMAND_FORCE,
       .disposition = MLN_RENDER_RESULT_RENDERED,
       .needs_repaint = false,
     },
@@ -567,7 +567,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   demand_until(
     (frame_seek){
       .fixture = &fixture,
-      .flags = MLN_FRAME_DEMAND_IF_NEEDED,
+      .flags = 0,
       .disposition = MLN_RENDER_RESULT_NO_UPDATE,
     },
     "an if-needed demand never found the map settled"
@@ -585,7 +585,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   demand_until(
     (frame_seek){
       .fixture = &fixture,
-      .flags = 0,
+      .flags = MLN_FRAME_DEMAND_FORCE,
       .disposition = MLN_RENDER_RESULT_RENDERED,
       .needs_repaint = true,
     },

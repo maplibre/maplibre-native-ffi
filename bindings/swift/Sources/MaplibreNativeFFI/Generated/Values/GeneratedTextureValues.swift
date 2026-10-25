@@ -37,15 +37,13 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical texture width in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical texture height in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture height in device pixels. Required.
   public var physicalHeight: UInt32
   /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [MetalBorrowedTexture]
@@ -100,14 +98,14 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Metal backend context. device is required.
   public var context: MetalContextDescriptor
   /// Backend-native MTLPixelFormat value of the ring's textures: either
-  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-  /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+  /// returns RGBA8 for either format.
   public var pixelFormat: UInt64
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_metal_owned_texture_descriptor_default))
@@ -236,22 +234,20 @@ public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical texture width in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical texture height in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture height in device pixels. Required.
   public var physicalHeight: UInt32
   /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
   public var context: OpenglContextDescriptor
   /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [OpenglBorrowedTexture]
-  /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
+  /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
   public var target: UInt32
   public static var `default`: Self {
     try! Self(
@@ -315,8 +311,8 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
   /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
@@ -532,25 +528,26 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical image width in device pixels. Must be positive. Defaults to 256.
+  /// Physical image width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical image height in device pixels. Must be positive. Defaults to 256.
+  /// Physical image height in device pixels. Required.
   public var physicalHeight: UInt32
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
   /// The ring's images, one per slot, in slot order. Required.
   public var textures: [VulkanBorrowedTexture]
-  /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-  /// invalid.
+  /// Backend-native VkFormat value of every image. Required, so
+  /// VK_FORMAT_UNDEFINED is invalid.
   public var format: UInt32
   /// Backend-native VkImageLayout value expected at render-pass begin.
   public var initialLayout: UInt32
-  /// Backend-native VkImageLayout value left after rendering succeeds. Defaults
-  /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+  /// Backend-native VkImageLayout value left after rendering succeeds, such as
+  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
   public var finalLayout: UInt32
   public static var `default`: Self {
     try! Self(
@@ -623,8 +620,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor

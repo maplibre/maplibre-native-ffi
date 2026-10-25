@@ -69,7 +69,7 @@ uint32_t mln_test_style_render_frame(const mln_test_render_fixture* fixture) {
     .token = atomic_fetch_add(&next_token, 1),
   };
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = wait.token;
   MLN_TEST_OK(mln_render_session_request_frame(
     fixture->session, &demand, MLN_TEST_DIAGNOSTIC

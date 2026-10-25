@@ -111,7 +111,7 @@ void main() {
       addTearDown(() => releaseSession(session));
       await within(attachment.ready, 'attachment');
 
-      session.requestFrame(FrameDemand(flags: FrameDemandFlag.none, token: 1));
+      session.requestFrame(FrameDemand(flags: FrameDemandFlag.force, token: 1));
       await wakes.wait('the frame wake');
       expect(wakes.contexts.toSet(), {2});
 

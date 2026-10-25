@@ -14,7 +14,7 @@ import {
   RuntimeEventType,
   runtimeCreate,
 } from "../src/index.ts";
-import { openRuntime, styleRoute } from "./support/fixture.ts";
+import { mapOptions, openRuntime, styleRoute } from "./support/fixture.ts";
 import {
   collectGarbageUntil,
   teardown,
@@ -101,7 +101,9 @@ test(
         "} catch (error) {",
         "  console.log(`the second copy failed: ${(error as Error).message}`);",
         "}",
-        "const { map, ready } = runtime.createMap();",
+        "const { map, ready } = runtime.createMap({",
+        "  initialExtent: { width: 64, height: 64, scaleFactor: 1 },",
+        "});",
         "await ready;",
         "await map.close();",
         "await runtime.close();",
@@ -173,7 +175,7 @@ test(
 /** Leaves a runtime and a map open for the collector. */
 async function abandonRuntimeWithMap() {
   const runtime = runtimeCreate();
-  const { map, ready } = runtime.createMap();
+  const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   return {
     runtime: runtime.id,

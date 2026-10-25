@@ -76,7 +76,7 @@ pub const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_mvt_vector_so
 pub type mln_feature_state_selector_field = u32;
 pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
-pub const MLN_FRAME_DEMAND_IF_NEEDED: mln_frame_demand_flag = 1;
+pub const MLN_FRAME_DEMAND_FORCE: mln_frame_demand_flag = 1;
 pub const MLN_FRAME_DEMAND_PRESENT: mln_frame_demand_flag = 2;
 pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
 pub type mln_free_camera_option_field = u32;
@@ -142,6 +142,8 @@ pub type mln_map_mode = u32;
 pub const MLN_MAP_MODE_CONTINUOUS: mln_map_mode = 0;
 pub const MLN_MAP_MODE_STATIC: mln_map_mode = 1;
 pub const MLN_MAP_MODE_TILE: mln_map_mode = 2;
+pub type mln_map_option_field = u32;
+pub const MLN_MAP_OPTION_EVENT_MASK: mln_map_option_field = 1;
 pub type mln_map_tile_option_field = u32;
 pub const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA: mln_map_tile_option_field = 1;
 pub const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS: mln_map_tile_option_field = 2;
@@ -769,6 +771,7 @@ pub struct mln_logical_extent {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_map_options {
     pub size: u32,
+    pub fields: mln_map_option_fields,
     pub initial_extent: mln_logical_extent,
     pub map_mode: mln_map_mode,
     pub fast_pfor_enabled: bool,
@@ -1657,6 +1660,7 @@ pub type mln_log_severity_flags = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map(pub u64);
 pub type mln_map_debug_flags = u32;
+pub type mln_map_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map_projection(pub u64);

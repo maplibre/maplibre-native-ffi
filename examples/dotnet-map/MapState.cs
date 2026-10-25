@@ -27,7 +27,7 @@ internal sealed class MapState : IDisposable
         try
         {
             map = runtime.CreateMap(
-                MapOptions.Default with
+                new MapOptions
                 {
                     InitialExtent = viewport.LogicalExtent,
                     MapMode = MapMode.Continuous,

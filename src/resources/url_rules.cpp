@@ -48,8 +48,8 @@ auto check_pattern(
 ) -> mln_status {
   if (!validate_c_string_view(url, "url"))
     return reject(what, index, "has an invalid url");
-  if (kinds == 0 || (kinds & ~MLN_RESOURCE_KIND_FLAG_ALL) != 0) {
-    return reject(what, index, "requires at least one known kind bit");
+  if ((kinds & ~MLN_RESOURCE_KIND_FLAG_ALL) != 0) {
+    return reject(what, index, "has unknown kind bits");
   }
   if ((flags & ~known_url_match_flags) != 0) {
     return reject(what, index, "has unknown flag bits");
@@ -133,10 +133,11 @@ auto CompiledGlob::matches(std::string_view candidate) const noexcept -> bool {
   return states[tokens_.size()] != 0;
 }
 
+// Zero kinds select every kind.
 UrlPattern::UrlPattern(
   std::uint32_t kinds_, std::uint32_t flags, std::string_view url_
 )
-    : kinds(kinds_),
+    : kinds(kinds_ == 0 ? MLN_RESOURCE_KIND_FLAG_ALL : kinds_),
       url(url_),
       glob(
         (flags & MLN_URL_MATCH_GLOB) != 0 ? std::make_shared<CompiledGlob>(url_)

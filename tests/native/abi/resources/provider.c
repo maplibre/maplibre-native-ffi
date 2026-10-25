@@ -335,7 +335,8 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
   );
@@ -784,7 +785,7 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
     mln_test_provider* provider = mln_test_provider_create(resources, 1);
     mln_runtime runtime = mln_test_create_runtime();
     mln_test_provider_install(runtime, provider);
-    mln_map_options options = mln_map_options_default();
+    mln_map_options options = mln_test_map_options();
     options.initial_extent =
       (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
     options.map_mode = MLN_MAP_MODE_STATIC;

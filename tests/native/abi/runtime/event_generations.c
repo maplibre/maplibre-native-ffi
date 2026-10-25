@@ -403,9 +403,10 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   mln_test_configure_events(runtime, (mln_wake){.callback = drain_on_wake});
   recorder_reset(runtime, true);
   // The extent the render fixture attaches with, so the first frame renders.
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
+  options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   options.event_mask = MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE |
                        MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED |
                        MLN_RUNTIME_EVENT_FLAG_MAP_IDLE;

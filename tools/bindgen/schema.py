@@ -62,6 +62,7 @@ ANNOTATION_VALUES = {
     "capture": frozenset({"manual"}),
     "blocks": frozenset({"thread_start"}),
     "consumes": frozenset({"success"}),
+    "required": frozenset({"true"}),
 }
 
 # The same semantic vocabulary applies to all target languages.
@@ -95,6 +96,21 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "empty_variant",
         "kind",
         "stride",
+        "required",
+    }
+)
+# Field roles that hold control state rather than a value a host chooses, so a
+# `required` annotation cannot apply to them.
+CONTROL_FIELD_KINDS = frozenset(
+    {
+        "size",
+        "reserved",
+        "count",
+        "presence_mask",
+        "tag",
+        "context",
+        "erased",
+        "delivery_queue",
     }
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
@@ -915,6 +931,25 @@ def validate(api: Api) -> None:
                 errors.append(f"{fcontext}: variant requires a union member")
             if "empty_variant" in field.metadata and "tag" not in field.metadata:
                 errors.append(f"{fcontext}: empty_variant requires a tagged union")
+            # A required member is one whose zero native rejects because no
+            # default suits every host. A masked member's absence already means
+            # its default, and control members are never the host's to choose.
+            if "required" in field.metadata and (
+                record.kind != "struct"
+                or "mask" in field.metadata
+                or field.metadata.get("kind") in CONTROL_FIELD_KINDS
+                or any(
+                    item.metadata.get("stride") == field.name for item in record.fields
+                )
+                or (
+                    typedef is not None
+                    and typedef.metadata.get("release") == field.name
+                )
+            ):
+                errors.append(
+                    f"{fcontext}: required applies only to an unmasked value "
+                    "member of a struct"
+                )
             if "tag" in field.metadata:
                 tag = field_path(record.name, field.metadata["tag"])
                 union = api.records_by_name.get(field.type.declaration or "")

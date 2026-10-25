@@ -22,10 +22,11 @@ static void a_creating_map_runs_accepted_work_once_it_is_ready(void) {
   mln_map parking = park_worker(runtime, &gate);
 
   mln_test_completion created = mln_test_completion_default(0);
+  const mln_map_options map_options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_runtime_create_map(runtime, NULL, &map, &created.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_create_map(
+    runtime, &map_options, &map, &created.descriptor, NULL
+  ));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
 
   // Calls that read the native map wait for the completion.
@@ -65,10 +66,11 @@ static void a_map_released_while_creating_reports_creation_first(void) {
   mln_map parking = park_worker(runtime, &gate);
 
   mln_test_completion created = mln_test_completion_default(0);
+  const mln_map_options map_options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_runtime_create_map(runtime, NULL, &map, &created.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_create_map(
+    runtime, &map_options, &map, &created.descriptor, NULL
+  ));
   mln_test_completion released = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_release(map, &released.descriptor, NULL));
   mln_test_gate_release(&gate);

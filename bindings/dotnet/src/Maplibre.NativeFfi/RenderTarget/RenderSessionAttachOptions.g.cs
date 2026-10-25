@@ -10,20 +10,20 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Driver">
-/// Defaults to <c>MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD</c>.
+/// Where the session's driver runs. Required.
 /// </param>
 /// <param name="RequestedTextureRingDepth">
-/// Requested slot count of a session-owned texture ring, from one to
-/// <c>MLN_TEXTURE_RING_MAX_DEPTH</c>. Private targets grant one slot regardless
-/// of this value. A borrowed texture ring's depth is its texture count, so
-/// borrowed and other targets ignore this value. Defaults to 2, so the host can
-/// retain one frame while the session renders its replacement.
+/// Requested slot count of a session-owned texture ring, up to
+/// <c>MLN_TEXTURE_RING_MAX_DEPTH</c>. Zero selects 2, so the host can retain
+/// one frame while the session renders its replacement. Private targets grant
+/// one slot regardless of this value. A borrowed texture ring's depth is its
+/// texture count, so borrowed and other targets ignore this value.
 /// </param>
 /// <param name="ProducerSyncKind">
-/// Producer synchronization for acquired texture frames. Defaults to
-/// <c>MLN_GPU_SYNC_CPU_COMPLETE</c>. <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires
-/// a shared EGL or WGL texture target and a caller-graphics-thread driver.
-/// Other targets support only CPU completion and fail an unsupported request.
+/// Producer synchronization for acquired texture frames.
+/// <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires a shared EGL or WGL texture target
+/// and a caller-graphics-thread driver. Other targets support only CPU
+/// completion and fail an unsupported request.
 /// </param>
 /// <param name="FrameWake">
 /// Wakes the receiver when the frame-result queue becomes nonempty.

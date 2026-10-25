@@ -49,8 +49,7 @@ static bool repaint_waits_for_a_demand(void* context) {
 
 static void request_next(replacement_wait* wait) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE |
-                 MLN_FRAME_DEMAND_PRESENT;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE | MLN_FRAME_DEMAND_PRESENT;
   demand.token = ++wait->token;
   MLN_TEST_OK(
     mln_render_session_request_frame(wait->fixture->session, &demand, NULL)
@@ -150,7 +149,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_prepare_map(map);
@@ -280,7 +279,7 @@ static void expect_green_center(
 // style.
 static void a_reloaded_style_renders_a_layer_added_again(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;

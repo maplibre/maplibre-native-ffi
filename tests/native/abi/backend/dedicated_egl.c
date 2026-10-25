@@ -18,7 +18,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_PRESENT;
+  demand.flags = MLN_FRAME_DEMAND_FORCE | MLN_FRAME_DEMAND_PRESENT;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(&fixture);
@@ -36,7 +36,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
 
 static void render_dedicated_frame(mln_test_render_fixture* fixture) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_PRESENT;
+  demand.flags = MLN_FRAME_DEMAND_FORCE | MLN_FRAME_DEMAND_PRESENT;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );

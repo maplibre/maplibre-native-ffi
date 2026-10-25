@@ -145,8 +145,7 @@ class Host {
   }
   void arm() {
     auto demand = mln_frame_demand_default();
-    demand.flags =
-      MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+    demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
     check(mln_render_session_request_frame(session_, &demand, nullptr));
   }
   void service() {

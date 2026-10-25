@@ -20,24 +20,24 @@ extern "C" {
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Metal backend context. device is optional for Metal surfaces. */
   mln_metal_context_descriptor context;
   /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
-  void* layer;
+  void* layer MLN_BINDING("required=true");
 } mln_metal_surface_descriptor;
 
 /** Vulkan attachment options for a native surface. */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size;
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /**
    * Borrowed Vulkan context. All handles are required. The device must support
    * VK_KHR_swapchain, and the queue family must support graphics and
@@ -45,17 +45,17 @@ typedef struct mln_vulkan_surface_descriptor {
    */
   mln_vulkan_context_descriptor context;
   /** Borrowed VkSurfaceKHR bit pattern. Required. */
-  mln_vulkan_non_dispatchable_handle surface;
+  mln_vulkan_non_dispatchable_handle surface MLN_BINDING("required=true");
 } mln_vulkan_surface_descriptor;
 
 /** WebGPU attachment options for a native surface. */
 typedef struct mln_webgpu_surface_descriptor {
   uint32_t size;
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
   /**
@@ -63,22 +63,22 @@ typedef struct mln_webgpu_surface_descriptor {
    * session configures it for this device and extent, and unconfigures it when
    * the session ends.
    */
-  void* surface;
+  void* surface MLN_BINDING("required=true");
   /**
    * WGPUTextureFormat to configure the surface with. Required. A browser host
    * takes it from navigator.gpu.getPreferredCanvasFormat().
    */
-  uint32_t format;
+  uint32_t format MLN_BINDING("required=true");
 } mln_webgpu_surface_descriptor;
 
 /** OpenGL attachment options for a native surface. */
 typedef struct mln_opengl_surface_descriptor {
   uint32_t size;
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed OpenGL context provider data. */
   mln_opengl_context_descriptor context;
   /**
@@ -89,25 +89,29 @@ typedef struct mln_opengl_surface_descriptor {
 } mln_opengl_surface_descriptor;
 
 /**
- * Returns Metal surface descriptor defaults for this C API version.
+ * Returns a zeroed Metal surface descriptor with size set for this C
+ * API version. The caller still sets every required member.
  */
 MLN_API mln_metal_surface_descriptor
 mln_metal_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns Vulkan surface descriptor defaults for this C API version.
+ * Returns a zeroed Vulkan surface descriptor with size set for this C
+ * API version. The caller still sets every required member.
  */
 MLN_API mln_vulkan_surface_descriptor
 mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns OpenGL surface descriptor defaults for this C API version.
+ * Returns a zeroed OpenGL surface descriptor with size set for this C
+ * API version. The caller still sets every required member.
  */
 MLN_API mln_opengl_surface_descriptor
 mln_opengl_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns WebGPU surface descriptor defaults for this C API version.
+ * Returns a zeroed WebGPU surface descriptor with size set for this C
+ * API version. The caller still sets every required member.
  */
 MLN_API mln_webgpu_surface_descriptor
 mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;

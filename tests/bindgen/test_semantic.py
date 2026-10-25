@@ -280,6 +280,76 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 require_complete=True,
             )
 
+    def test_a_required_member_is_an_unmasked_struct_value(self):
+        source = """
+typedef enum BIND("kind=bitmask") field : unsigned { ZOOM = 1 } field;
+typedef unsigned fields;
+typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;
+typedef struct options {
+  unsigned size;
+  fields fields;
+  double width BIND("required=true");
+  double zoom BIND("mask=fields;bit=ZOOM");
+  const double *items BIND("length=item_count");
+  unsigned long item_count;
+  choice tag;
+  union {
+    double text BIND("variant=TEXT");
+    double number BIND("variant=NUMBER");
+  } data BIND("tag=tag");
+} options;
+mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
+"""
+        api = bind(self.parse(source), require_complete=True)
+        value = api.operations[0].inputs[0].value.element
+        required = {field.name: field.required for field in value.fields}
+        self.assertTrue(required["width"])
+        self.assertFalse(required["zoom"])
+        self.assertTrue(
+            bind(
+                self.parse(
+                    source.replace(
+                        'BIND("length=item_count")',
+                        'BIND("length=item_count;required=true")',
+                    )
+                ),
+                require_complete=True,
+            )
+            .operations[0]
+            .inputs[0]
+            .value.element.fields[4]
+            .required
+        )
+        for before, after in (
+            (
+                'double zoom BIND("mask=fields;bit=ZOOM")',
+                'double zoom BIND("mask=fields;bit=ZOOM;required=true")',
+            ),
+            ("unsigned size;", 'unsigned size BIND("required=true");'),
+            (
+                "unsigned long item_count;",
+                'unsigned long item_count BIND("required=true");',
+            ),
+            ("choice tag;", 'choice tag BIND("required=true");'),
+            ("fields fields;", 'fields fields BIND("required=true");'),
+            (
+                'double text BIND("variant=TEXT")',
+                'double text BIND("variant=TEXT;required=true")',
+            ),
+        ):
+            with (
+                self.subTest(after=after),
+                self.assertRaisesRegex(
+                    ModelError, "required applies only to an unmasked value member"
+                ),
+            ):
+                bind(self.parse(source.replace(before, after)), require_complete=True)
+        with self.assertRaisesRegex(ModelError, "unsupported required='false'"):
+            bind(
+                self.parse(source.replace("required=true", "required=false")),
+                require_complete=True,
+            )
+
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
             self.parse("""

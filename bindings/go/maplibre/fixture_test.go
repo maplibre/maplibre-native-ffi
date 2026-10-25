@@ -94,6 +94,14 @@ func awaitFailure[T any](t *testing.T, future *Future[T]) *Error {
 	return native
 }
 
+// testMapOptions returns map options with every required member set: a 256
+// by 256 initial extent at scale factor 1.
+func testMapOptions() MapOptions {
+	options := DefaultMapOptions()
+	options.InitialExtent = LogicalExtent{Width: 256, Height: 256, ScaleFactor: 1}
+	return options
+}
+
 type fixture struct {
 	runtime       *RuntimeHandle
 	m             *MapHandle
@@ -104,7 +112,7 @@ type fixture struct {
 // provider, and one map, and closes both when the test ends.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	return newFixtureWith(t, DefaultMapOptions())
+	return newFixtureWith(t, testMapOptions())
 }
 
 // newFixtureWith is newFixture with the map created from options.

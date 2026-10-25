@@ -72,7 +72,7 @@ void render_forced_frame(const mln_test_render_fixture& fixture) {
 // image waits for a frame of its own update, which shows the new style.
 void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   const auto runtime = mln_test_create_runtime();
-  auto options = mln_map_options_default();
+  auto options = mln_test_map_options();
   options.initial_extent =
     mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
@@ -167,7 +167,7 @@ void request_the_next_image(SyncPoint point, void* context) noexcept {
 // published the frame's result, gets a demand of its own and renders.
 void a_request_behind_an_unfinished_demand_still_renders() {
   const auto runtime = mln_test_create_runtime();
-  auto options = mln_map_options_default();
+  auto options = mln_test_map_options();
   options.initial_extent =
     mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;

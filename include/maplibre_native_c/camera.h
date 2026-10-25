@@ -17,40 +17,41 @@
 extern "C" {
 #endif
 
-/**
- * Returns empty camera options initialized for this C API version.
- */
+/** Returns zeroed camera options with size set for this C API version. */
 MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
 
-/** Returns empty animation options initialized for this C API version. */
+/** Returns zeroed animation options. */
 MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
-/** Returns an empty relative camera update initialized for this API version. */
+/** Returns a zeroed relative camera update with size set for this version. */
 MLN_API mln_camera_delta mln_camera_delta_default(void) MLN_NOEXCEPT;
-/** Returns an empty atomic camera update initialized for this API version. */
+/**
+ * Returns a zeroed atomic camera update, with its size and its camera's size
+ * set for this C API version.
+ */
 MLN_API mln_camera_update mln_camera_update_default(void) MLN_NOEXCEPT;
 
-/** Returns empty camera fitting options initialized for this C API version. */
+/** Returns zeroed camera fitting options with size set for this version. */
 MLN_API mln_camera_fit_options
 mln_camera_fit_options_default(void) MLN_NOEXCEPT;
 
-/** Returns empty map bound options initialized for this C API version. */
+/** Returns zeroed map bound options with size set for this C API version. */
 MLN_API mln_bound_options mln_bound_options_default(void) MLN_NOEXCEPT;
 
-/** Returns empty free camera options initialized for this C API version. */
+/** Returns zeroed free camera options with size set for this C API version. */
 MLN_API mln_free_camera_options
 mln_free_camera_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns empty axonometric rendering options initialized for this C API
+ * Returns zeroed axonometric rendering options with size set for this C API
  * version.
  */
 MLN_API mln_projection_mode mln_projection_mode_default(void) MLN_NOEXCEPT;
 
-/** Returns empty viewport options initialized for this C API version. */
+/** Returns zeroed viewport options with size set for this C API version. */
 MLN_API mln_map_viewport_options
 mln_map_viewport_options_default(void) MLN_NOEXCEPT;
 
-/** Returns empty tile tuning options initialized for this C API version. */
+/** Returns zeroed tile tuning options with size set for this C API version. */
 MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 
 /**
@@ -170,10 +171,10 @@ MLN_API mln_status mln_map_set_tile_options(
  * update; replacing any of them stops that anchored update. Explicit center
  * takes precedence over anchor. Constraints apply to the combined camera.
  *
- * Ease duration defaults to zero. Fly duration is derived from flight distance
- * and velocity when omitted. The command completion reports application of the
- * update, and update->animation.end_handler reports the end of its
- * transitions, including for a jump.
+ * An ease without a duration applies immediately. Fly duration is derived from
+ * flight distance and velocity when omitted. The command completion reports
+ * application of the update, and update->animation.end_handler reports the end
+ * of its transitions, including for a jump.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.

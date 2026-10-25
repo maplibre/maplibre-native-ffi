@@ -22,6 +22,7 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent = render_target_extent(initial_viewport);
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
+  options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
 
   awaited_completion created;

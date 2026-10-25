@@ -28,7 +28,8 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.DefaultMapOptions()
 	mapOptions.InitialExtent = v.extent()
-	mapOptions.EventMask = 0
+	noEvents := maplibre.RuntimeEventFlagNone
+	mapOptions.EventMask = &noEvents
 	mapHandle, ready, err := runtimeHandle.CreateMap(mapOptions)
 	if err != nil {
 		_ = state.Close()

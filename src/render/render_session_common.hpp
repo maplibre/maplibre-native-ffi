@@ -984,12 +984,6 @@ auto logical_extent_physical_size(
 ) -> mln_status;
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
-auto opengl_context_descriptor_default() noexcept
-  -> mln_opengl_context_descriptor;
-auto opengl_owned_texture_descriptor_default() noexcept
-  -> mln_opengl_owned_texture_descriptor;
-auto opengl_borrowed_texture_descriptor_default() noexcept
-  -> mln_opengl_borrowed_texture_descriptor;
 auto validate_opengl_context(
   const mln_opengl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status;
@@ -1260,12 +1254,17 @@ auto lease_valid_acquired_frame(
 ) -> mln_status;
 
 // Slot count a session-owned texture ring is granted, between one and
-// max_texture_ring_depth. Attachment rejects null options, but some backends
-// size their ring before they reach that check, so null options take one slot.
+// max_texture_ring_depth. A zero request takes two slots, so the host can
+// retain one frame while the session renders its replacement. Attachment
+// rejects null options, but some backends size their ring before they reach
+// that check, so null options take one slot.
 inline auto attach_ring_depth(const mln_render_session_attach_options* options)
   -> uint32_t {
+  constexpr auto default_depth = uint32_t{2};
+  if (options == nullptr) return 1U;
+  const auto requested = options->requested_texture_ring_depth;
   return std::clamp(
-    options == nullptr ? 1U : options->requested_texture_ring_depth, 1U,
+    requested == 0 ? default_depth : requested, 1U,
     static_cast<uint32_t>(max_texture_ring_depth)
   );
 }

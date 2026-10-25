@@ -3,8 +3,8 @@ namespace Maplibre.NativeFfi;
 
 /// <summary>
 /// The resource kinds that a route or rule matches, one bit per
-/// <c>mln_resource_kind</c> value. Registration requires at least one known
-/// bit. <c>MLN_RESOURCE_KIND_FLAG_ALL</c> selects every resource kind.
+/// <c>mln_resource_kind</c> value. Registration rejects unknown bits.
+/// <c>MLN_RESOURCE_KIND_FLAG_ALL</c>, like zero, selects every resource kind.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_kind_flag</c> in the <see

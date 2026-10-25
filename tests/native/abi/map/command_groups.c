@@ -202,7 +202,7 @@ static void an_end_without_an_open_group_fails(void) {
 // hold, so the request fails rather than wait on a stale generation.
 static void a_still_image_inside_a_group_fails(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 

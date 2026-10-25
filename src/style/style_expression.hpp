@@ -23,10 +23,6 @@ struct HandleTraits<StyleExpressionObject> {
   static constexpr auto leasable = true;
 };
 
-auto style_expression_options_default() noexcept
-  -> mln_style_expression_options;
-auto style_expression_inputs_default() noexcept -> mln_style_expression_inputs;
-
 auto style_expression_create(
   mln_buffer_view expression, const mln_style_expression_options* options,
   mln_style_expression* out_expression

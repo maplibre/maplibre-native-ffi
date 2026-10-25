@@ -14,8 +14,7 @@ const egl = if (supports_egl) @import("egl") else struct {};
 
 const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("sdl") else struct {};
 
-const width = 512;
-const height = 512;
+const image_extent = maplibre.LogicalExtent{ .width = 512, .height = 512, .scale_factor = 1.0 };
 const style_url = "https://tiles.openfreemap.org/styles/bright";
 /// The style a smoke run renders, which needs no network.
 const smoke_style_json =
@@ -109,6 +108,7 @@ pub fn main(init_args: std.process.Init) !void {
     } else |_| runtime.deinit();
 
     var options = maplibre.mapOptionsDefault();
+    options.initial_extent = image_extent;
     options.map_mode = .static;
     options.event_mask = .{};
     var created = try runtime.createMap(options, &diagnostic);
@@ -122,8 +122,6 @@ pub fn main(init_args: std.process.Init) !void {
     defer created.ready.deinit();
     try created.ready.wait(&diagnostic);
 
-    var resize = try map.resize(.{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
-    resize.deinit();
     try setInitialCamera(allocator, &map);
     var style = if (isSmokeRun(init_args))
         try map.setStyleJson(smoke_style_json, &diagnostic)
@@ -153,11 +151,7 @@ fn renderWithDriver(
     signal: *WakeSignal,
     output_path: []const u8,
 ) !void {
-    var attachment = try attachOwnedTexture(allocator, context, map, signal, .{
-        .width = width,
-        .height = height,
-        .scale_factor = 1.0,
-    });
+    var attachment = try attachOwnedTexture(allocator, context, map, signal, image_extent);
     var attachment_needs_cleanup = true;
     errdefer if (attachment_needs_cleanup) {
         _ = attachment.session.abandon(null) catch {};

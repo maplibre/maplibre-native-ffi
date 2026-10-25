@@ -832,7 +832,14 @@ fn generated_copy_mln_map_options(
         "fast_pfor_enabled",
         generated_value(py, value.fast_pfor_enabled)?,
     )?;
-    dict.set_item("event_mask", generated_value(py, value.event_mask)?)?;
+    dict.set_item(
+        "event_mask",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_MAP_OPTION_EVENT_MASK != 0,
+            || generated_value(py, value.event_mask),
+        )?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3187,13 +3194,15 @@ fn generated_input_mln_map_options<'py>(
     }
     let mut raw: sys::mln_map_options = unsafe { sys::mln_map_options_default() };
     raw.size = std::mem::size_of::<sys::mln_map_options>() as _;
+    raw.fields = 0;
     raw.initial_extent =
         generated_input_mln_logical_extent(&value.getattr("initial_extent")?, storage)?;
     raw.map_mode = value.getattr("map_mode")?.extract::<sys::mln_map_mode>()?;
     raw.fast_pfor_enabled = value.getattr("fast_pfor_enabled")?.extract::<bool>()?;
-    raw.event_mask = value
-        .getattr("event_mask")?
-        .extract::<sys::mln_runtime_event_flags>()?;
+    if let Some(field) = generated_present(value, "event_mask")? {
+        raw.event_mask = field.extract::<sys::mln_runtime_event_flags>()?;
+        raw.fields |= sys::MLN_MAP_OPTION_EVENT_MASK;
+    }
     Ok(raw)
 }
 

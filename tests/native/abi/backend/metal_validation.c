@@ -24,6 +24,9 @@ static void surface_without_layer(void* call) {
 static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_owned.context.device = NULL;
 }
+static void owned_without_pixel_format(void* call) {
+  ((mln_test_target_call*)call)->descriptor.metal_owned.pixel_format = 0;
+}
 static void owned_with_another_pixel_format(void* call) {
   // MTLPixelFormatRGBA16Float.
   ((mln_test_target_call*)call)->descriptor.metal_owned.pixel_format = 115;
@@ -154,6 +157,8 @@ static void metal_attach_rejects_malformed_calls(void) {
     MLN_TEST_DESCRIPTOR_CASES(metal_surface),
     MLN_TEST_OVERFLOW_CASE(metal_surface),
     {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"zero driver", mln_test_call_with_zero_driver, MLN_STATUS_INVALID_ARGUMENT,
+     "render driver kind"},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
@@ -167,10 +172,14 @@ static void metal_attach_rejects_malformed_calls(void) {
   call.descriptor.metal_owned = mln_metal_owned_texture_descriptor_default();
   call.descriptor.metal_owned.extent = mln_test_target_extent();
   call.descriptor.metal_owned.context.device = MLN_TEST_FAKE_HANDLE;
+  // MTLPixelFormatRGBA8Unorm.
+  call.descriptor.metal_owned.pixel_format = 70;
   static const mln_test_validation_case owned_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(metal_owned),
     MLN_TEST_OVERFLOW_CASE(metal_owned),
     {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"zero pixel format", owned_without_pixel_format,
+     MLN_STATUS_INVALID_ARGUMENT, "RGBA8Unorm or BGRA8Unorm"},
     {"an unaccepted pixel format", owned_with_another_pixel_format,
      MLN_STATUS_INVALID_ARGUMENT, "RGBA8Unorm or BGRA8Unorm"},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)

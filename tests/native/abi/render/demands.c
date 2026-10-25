@@ -386,7 +386,7 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   void
 ) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.scale_factor = 3.0;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_prepare_map(map);
@@ -426,7 +426,7 @@ static void expect_map_size(mln_map map, uint32_t width, uint32_t height) {
 // the host resizing the map.
 static void attaching_sizes_the_map_to_the_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0};
   mln_map map = mln_test_create_map_with_options(runtime, &options);
@@ -524,7 +524,7 @@ static bool still_completed_under_keepalive(void* context) {
 // drains that scheduler rather than strand them.
 static void still_image_completes_under_if_needed_keepalive_demands(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_STATIC;
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
@@ -551,7 +551,7 @@ static void request_waiting(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -683,7 +683,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
   mln_frame_demand forced_wait = mln_frame_demand_default();
-  forced_wait.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  forced_wait.flags = MLN_FRAME_DEMAND_FORCE | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   MLN_TEST_INVALID(
     mln_render_session_request_frame(fixture.session, &forced_wait, NULL)
   );

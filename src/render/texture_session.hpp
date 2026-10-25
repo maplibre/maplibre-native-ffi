@@ -15,14 +15,6 @@ inline constexpr uint64_t metal_rgba8_unorm = 70;
 inline constexpr uint64_t metal_bgra8_unorm = 80;
 
 auto supported_render_backend_mask() noexcept -> uint32_t;
-auto metal_owned_texture_descriptor_default() noexcept
-  -> mln_metal_owned_texture_descriptor;
-auto metal_borrowed_texture_descriptor_default() noexcept
-  -> mln_metal_borrowed_texture_descriptor;
-auto vulkan_owned_texture_descriptor_default() noexcept
-  -> mln_vulkan_owned_texture_descriptor;
-auto vulkan_borrowed_texture_descriptor_default() noexcept
-  -> mln_vulkan_borrowed_texture_descriptor;
 auto validate_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
 ) -> mln_status;
@@ -58,10 +50,6 @@ auto validate_webgpu_owned_texture_descriptor(
 auto validate_webgpu_borrowed_texture_descriptor(
   const mln_webgpu_borrowed_texture_descriptor* descriptor
 ) -> mln_status;
-auto webgpu_owned_texture_descriptor_default() noexcept
-  -> mln_webgpu_owned_texture_descriptor;
-auto webgpu_borrowed_texture_descriptor_default() noexcept
-  -> mln_webgpu_borrowed_texture_descriptor;
 auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,

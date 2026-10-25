@@ -83,6 +83,9 @@ mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
 // its own, such as handling a frame that a render session finished.
 mln_status mln_test_map_fence(mln_map map);
 mln_status mln_test_runtime_close(mln_runtime runtime);
+// Map options with a 256 by 256 initial extent at one device pixel per UI
+// pixel, the extent the cases assume unless they set their own.
+mln_map_options mln_test_map_options(void);
 mln_map mln_test_create_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options

@@ -100,6 +100,28 @@ void routes_match_resolved_urls_and_selected_kinds() {
     resolved.matches(static_cast<mln_resource_kind>(UINT32_MAX), style_url)
   );
 
+  // Zero kinds select every kind.
+  const auto every_kind = table_of({
+    .size = sizeof(mln_resource_route),
+    .kinds = 0,
+    .flags = MLN_URL_MATCH_EXACT,
+    .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
+  });
+  for (const auto kind :
+       {MLN_RESOURCE_KIND_UNKNOWN, MLN_RESOURCE_KIND_STYLE,
+        MLN_RESOURCE_KIND_TILE, MLN_RESOURCE_KIND_IMAGE}) {
+    TEST_ASSERT_TRUE(every_kind.matches(kind, style_url));
+  }
+  // Unknown kind bits stay rejected.
+  auto rejected = mln::core::RouteTable{};
+  const auto unknown_kind = mln_resource_route{
+    .size = sizeof(mln_resource_route),
+    .kinds = 1U << 31U,
+    .flags = MLN_URL_MATCH_EXACT,
+    .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
+  };
+  MLN_TEST_INVALID(mln::core::copy_routes(&unknown_kind, 1, rejected));
+
   // A table without routes claims every request.
   TEST_ASSERT_TRUE(
     mln::core::RouteTable{}.matches(MLN_RESOURCE_KIND_STYLE, style_url)

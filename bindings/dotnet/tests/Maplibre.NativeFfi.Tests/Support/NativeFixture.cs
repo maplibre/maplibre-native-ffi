@@ -14,11 +14,8 @@ internal sealed class NativeFixture : IAsyncDisposable
 {
     internal const string EmptyStyle = """{"version":8,"sources":{},"layers":[]}""";
 
-    internal static MapOptions SmallMap =>
-        MapOptions.Default with
-        {
-            InitialExtent = new LogicalExtent(64, 64, 1),
-        };
+    /// <summary>The map options every test starts from: a 64 by 64 extent at scale 1.</summary>
+    internal static MapOptions SmallMap => new() { InitialExtent = new LogicalExtent(64, 64, 1) };
 
     /// <summary>Completes every request with a not-found error, so nothing leaves the process.</summary>
     internal static ResourceProvider DenyingProvider =>

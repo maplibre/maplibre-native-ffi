@@ -8,8 +8,8 @@ import Foundation
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Metal backend context. device is optional for Metal surfaces.
   public var context: MetalContextDescriptor
@@ -49,8 +49,8 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data.
   public var context: OpenglContextDescriptor
@@ -101,8 +101,8 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed Vulkan context. All handles are required. The device must support
   /// VK_KHR_swapchain, and the queue family must support graphics and

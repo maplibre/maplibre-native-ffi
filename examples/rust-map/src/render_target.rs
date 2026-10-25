@@ -179,11 +179,11 @@ impl Session {
     /// update, which a retry after a frame that missed the window needs.
     pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<()> {
         self.next_token += 1;
-        let mut flags = FrameDemandFlag::empty();
-        flags.set(
-            FrameDemandFlag::IF_NEEDED | FrameDemandFlag::WAIT_FOR_UPDATE,
-            !force,
-        );
+        let mut flags = if force {
+            FrameDemandFlag::FORCE
+        } else {
+            FrameDemandFlag::WAIT_FOR_UPDATE
+        };
         flags.set(FrameDemandFlag::PRESENT, self.presents);
         self.session.request_frame(&FrameDemand {
             flags,

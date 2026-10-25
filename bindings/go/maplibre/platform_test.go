@@ -56,7 +56,7 @@ func exitWithLiveHandles(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	f.m = createMap(t, runtime, DefaultMapOptions())
+	f.m = createMap(t, runtime, testMapOptions())
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func exitWithLiveHandles(t *testing.T) {
 func TestCollectorDisposesAndLogsALeakedHandle(t *testing.T) {
 	leaks := captureLeakLogs(t)
 	f := newRuntimeFixture(t)
-	dropped := createMap(t, f.runtime, DefaultMapOptions())
+	dropped := createMap(t, f.runtime, testMapOptions())
 	id := dropped.Id()
 	dropped = nil
 	closeOnceCollected(t, f.runtime, "the disposal of the dropped map")
@@ -145,7 +145,7 @@ func (handler leakLogHandler) Handle(_ context.Context, record slog.Record) erro
 func TestCollectorRetiresUnclosedMaps(t *testing.T) {
 	f := newRuntimeFixture(t)
 	// The test keeps neither the map nor its readiness.
-	if _, _, err := f.runtime.CreateMap(DefaultMapOptions()); err != nil {
+	if _, _, err := f.runtime.CreateMap(testMapOptions()); err != nil {
 		t.Fatal(err)
 	}
 	closeOnceCollected(t, f.runtime, "the disposal of the unclosed map")

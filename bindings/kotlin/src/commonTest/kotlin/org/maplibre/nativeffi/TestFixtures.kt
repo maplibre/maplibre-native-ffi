@@ -15,6 +15,7 @@ import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
@@ -112,12 +113,7 @@ internal fun smallMapOptions(
   width: Int = 64,
   height: Int = 64,
 ): MapOptions =
-  GeneratedApi.mapOptionsDefault().let { defaults ->
-    defaults.copy(
-      initialExtent = defaults.initialExtent.copy(width = width.toUInt(), height = height.toUInt()),
-      mapMode = mapMode,
-    )
-  }
+  MapOptions(initialExtent = LogicalExtent(width.toUInt(), height.toUInt(), 1.0), mapMode = mapMode)
 
 /**
  * A runtime whose event handler wakes the test, with a resource provider installed before anything

@@ -559,10 +559,11 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
 }
 
 static mln_map create_static_map(mln_runtime runtime, uint64_t event_mask) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_STATIC;
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
+  options.fields |= MLN_MAP_OPTION_EVENT_MASK;
   options.event_mask = event_mask;
   return mln_test_create_map_with_options(runtime, &options);
 }

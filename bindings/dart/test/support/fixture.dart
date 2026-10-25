@@ -21,6 +21,12 @@ const emptyStyle = {
   'layers': <Object?>[],
 };
 
+/// Map options with a 256 by 256 initial extent at one device pixel per UI
+/// pixel, the extent a test assumes unless it sets its own.
+MapOptions testMapOptions() => MapOptions(
+  initialExtent: LogicalExtent(width: 256, height: 256, scaleFactor: 1),
+);
+
 /// The UTF-8 bytes of a JSON value, as a resource response carries them.
 Uint8List jsonBytes(Object? value) => utf8.encode(jsonEncode(value));
 
@@ -96,9 +102,7 @@ final class RuntimeFixture {
 
   /// Creates a map that a teardown closes.
   Future<MapHandle> openMap([MapOptions? options]) async {
-    final NewMap(:map, :ready) = runtime.createMap(
-      options ?? mapOptionsDefault(),
-    );
+    final NewMap(:map, :ready) = runtime.createMap(options ?? testMapOptions());
     addTearDown(() => closeIfLive(map.close));
     await within(ready, 'map creation');
     return map;

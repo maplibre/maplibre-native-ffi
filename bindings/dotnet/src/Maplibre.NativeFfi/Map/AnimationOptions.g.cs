@@ -19,9 +19,9 @@ public sealed record AnimationOptions
 
     /// <summary>
     /// Average fly velocity in screenfuls per second. Must be positive and
-    /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
-    /// too long to represent fails its completion with
-    /// <c>MLN_STATUS_NATIVE_ERROR</c>. An explicit duration overrides velocity.
+    /// finite; absent selects 1.2. A flight whose derived duration is too long
+    /// to represent fails its completion with <c>MLN_STATUS_NATIVE_ERROR</c>.
+    /// An explicit duration overrides velocity.
     /// </summary>
     public double? Velocity { get; init; }
 

@@ -180,13 +180,13 @@ func (value ConstrainMode) String() string {
 type FrameDemandFlag uint32
 
 const (
-	// Render only when a newer map update exists.
-	FrameDemandFlagIfNeeded FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_IF_NEEDED)
+	// Render even when no map update is newer than the last rendered one.
+	FrameDemandFlagForce FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_FORCE)
 	// Present the rendered frame on a target that supports presentation. A
 	// presenting target whose demand clears this bit still renders and keeps
 	// whatever it presented last. Ignored by targets without presentation.
 	FrameDemandFlagPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
-	// With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+	// Without MLN_FRAME_DEMAND_FORCE, a demand that would finish with
 	// MLN_RENDER_RESULT_NO_UPDATE waits instead, and runs again after the map's
 	// next update, a target replacement, or an applied resize. A waiting demand
 	// holds no ring slot. A later demand with the same flags supersedes it, a
@@ -204,7 +204,7 @@ const (
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
 
 func (value FrameDemandFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagIfNeeded"}, {2, "FrameDemandFlagPresent"}, {4, "FrameDemandFlagWaitForUpdate"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagForce"}, {2, "FrameDemandFlagPresent"}, {4, "FrameDemandFlagWaitForUpdate"}})
 }
 
 // GesturePhase corresponds to mln_gesture_phase. Gesture boundary carried
@@ -686,8 +686,8 @@ const (
 	// result does not cause a map update, so the host demands again when the target
 	// can be ready, such as after a paced delay.
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
-	// A newer IF_NEEDED demand with the same flags replaced this demand. A still
-	// image's demand is never replaced, and never replaces one.
+	// A newer demand with the same flags, neither of them forced, replaced this
+	// demand. A still image's demand is never replaced, and never replaces one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
 )
 
@@ -830,7 +830,7 @@ func (value ResourceKind) String() string {
 
 // ResourceKindFlag corresponds to mln_resource_kind_flag. The resource kinds
 // that a route or rule matches, one bit per mln_resource_kind value.
-// Registration requires at least one known bit. MLN_RESOURCE_KIND_FLAG_ALL
+// Registration rejects unknown bits. MLN_RESOURCE_KIND_FLAG_ALL, like zero,
 // selects every resource kind.
 //
 // See mln_resource_kind_flag in the C API reference:
@@ -1685,9 +1685,9 @@ type AnimationOptions struct {
 	// represent as a duration.
 	DurationMs *float64
 	// Average fly velocity in screenfuls per second. Must be positive and finite;
-	// defaults to 1.2 when omitted. A flight whose derived duration is too long to
-	// represent fails its completion with MLN_STATUS_NATIVE_ERROR. An explicit
-	// duration overrides velocity.
+	// absent selects 1.2. A flight whose derived duration is too long to represent
+	// fails its completion with MLN_STATUS_NATIVE_ERROR. An explicit duration
+	// overrides velocity.
 	Velocity *float64
 	// Peak zoom for flyTo transitions.
 	MinZoom *float64
@@ -2250,7 +2250,7 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 // See mln_feature_state_selector in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type FeatureStateSelector struct {
-	// Source ID. Required and borrowed for the duration of the call.
+	// Source ID. Required. Borrowed for the duration of the call.
 	SourceId string
 	// Source layer ID, or empty for none. Required for vector-source
 	// disambiguation.
@@ -2284,8 +2284,8 @@ func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena)
 // See mln_frame_demand in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type FrameDemand struct {
-	// A bitwise OR of mln_frame_demand_flag values. Defaults to
-	// MLN_FRAME_DEMAND_IF_NEEDED.
+	// A bitwise OR of mln_frame_demand_flag values. Zero renders only when a newer
+	// map update exists, without presenting.
 	Flags FrameDemandFlag
 	// Host identity returned with the terminal frame result. Any value except
 	// MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, the maximum uint64_t value.
@@ -2345,30 +2345,30 @@ func DefaultFreeCameraOptions() FreeCameraOptions {
 // See mln_geojson_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type GeojsonSourceOptions struct {
-	// Minimum tiling zoom. Defaults to 0.
+	// Minimum tiling zoom. Absent selects 0.
 	MinZoom *float64
-	// Maximum tiling zoom, an integer within [0, 24]. Defaults to 18.
+	// Maximum tiling zoom, an integer within [0, 24]. Absent selects 18.
 	MaxZoom *float64
-	// Douglas-Peucker simplification tolerance. Defaults to 0.375.
+	// Douglas-Peucker simplification tolerance. Absent selects 0.375.
 	Tolerance *float64
-	// Highest zoom that clusters points. Defaults to 17.
+	// Highest zoom that clusters points. Absent selects 17.
 	ClusterMaxZoom *float64
 	// Cluster aggregation expressions keyed by property name, as a JSON object
 	// whose members follow the MapLibre Style Spec clusterProperties form, or empty
 	// for none. The UTF-8 bytes are borrowed for the call.
 	ClusterProperties string
-	// Tile buffer in pixels within [0, 512]. Defaults to 128.
+	// Tile buffer in pixels within [0, 512]. Absent selects 128.
 	Buffer *uint32
-	// Cluster radius in pixels within [0, 4095]. Defaults to 50.
+	// Cluster radius in pixels within [0, 4095]. Absent selects 50.
 	ClusterRadius *uint32
-	// Points required to form a cluster. Defaults to 2.
+	// Points required to form a cluster. Absent selects 2.
 	ClusterMinPoints *uint32
-	// Adds line distance metrics to line features. Defaults to false.
+	// Adds line distance metrics to line features. Absent selects false.
 	LineMetrics *bool
-	// Clusters point features. Defaults to false.
+	// Clusters point features. Absent selects false.
 	Cluster *bool
 	// Tiles the data for the next render update instead of in the background.
-	// Defaults to false.
+	// Absent selects false.
 	SynchronousTiling *bool
 }
 
@@ -2444,6 +2444,7 @@ func DefaultGpuSync() GpuSync { return copyGpuSync(C.mln_gpu_sync_default()) }
 // See mln_http_header in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeader struct {
+	// Header field name. Required.
 	Name  string
 	Value string
 }
@@ -2468,7 +2469,7 @@ func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
 // See mln_http_header_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeaderRule struct {
-	// The resource kinds to match.
+	// The resource kinds to match. Zero selects every kind.
 	Kinds ResourceKindFlag
 	Flags UrlMatchFlag
 	// The URL or glob pattern to compare.
@@ -2697,11 +2698,11 @@ func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
 // See mln_logical_extent in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type LogicalExtent struct {
-	// Width in UI pixels. Defaults to 256.
+	// Width in UI pixels.
 	Width uint32
-	// Height in UI pixels. Defaults to 256.
+	// Height in UI pixels.
 	Height uint32
-	// Device pixels per UI pixel. Defaults to 1.0.
+	// Device pixels per UI pixel.
 	ScaleFactor float64
 }
 
@@ -2728,17 +2729,17 @@ func DefaultLogicalExtent() LogicalExtent { return copyLogicalExtent(C.mln_logic
 // See mln_map_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapOptions struct {
-	// Initial logical extent. Width and height must be nonzero, and scale_factor
-	// must be finite and positive. scale_factor is fixed for the map's lifetime.
+	// Initial logical extent. Required. Width and height must be nonzero, and
+	// scale_factor must be finite and positive. scale_factor is fixed for the map's
+	// lifetime.
 	InitialExtent LogicalExtent
-	// Defaults to MLN_MAP_MODE_CONTINUOUS.
-	MapMode MapMode
+	MapMode       MapMode
 	// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-	// encodings. Defaults to false.
+	// encodings.
 	FastPforEnabled bool
 	// Map-originated event types this map queues, as a bitwise OR of
 	// mln_runtime_event_flag values.
-	EventMask RuntimeEventFlag
+	EventMask *RuntimeEventFlag
 }
 
 func copyMapOptions(raw C.mln_map_options) MapOptions {
@@ -2746,17 +2747,18 @@ func copyMapOptions(raw C.mln_map_options) MapOptions {
 	result.InitialExtent = copyLogicalExtent(raw.initial_extent)
 	result.MapMode = MapMode(raw.map_mode)
 	result.FastPforEnabled = bool(raw.fast_pfor_enabled)
-	result.EventMask = RuntimeEventFlag(raw.event_mask)
+	result.EventMask = bindingPresent(raw.fields&C.MLN_MAP_OPTION_EVENT_MASK != 0, func() RuntimeEventFlag { return RuntimeEventFlag(raw.event_mask) })
 	return result
 }
 
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	raw := C.mln_map_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
 	raw.initial_extent = nativeLogicalExtent(input.InitialExtent, arena)
 	raw.map_mode = C.mln_map_mode(input.MapMode)
 	raw.fast_pfor_enabled = C.bool(input.FastPforEnabled)
-	raw.event_mask = C.mln_runtime_event_flags(input.EventMask)
+	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, input.EventMask, arena, bindingNumber[RuntimeEventFlag, C.mln_runtime_event_flags])
 	return raw
 }
 
@@ -2954,13 +2956,13 @@ func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena)
 // See mln_metal_borrowed_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type MetalBorrowedTextureDescriptor struct {
-	// Logical texture extent; physical_width and physical_height give the texture's
-	// size. A scale_factor that differs from the map's is accepted and logged as a
-	// warning.
+	// Logical texture extent. Required. physical_width and physical_height give the
+	// texture's size. A scale_factor that differs from the map's is accepted and
+	// logged as a warning.
 	Extent LogicalExtent
-	// Physical texture width in device pixels. Must be positive. Defaults to 256.
+	// Physical texture width in device pixels. Required.
 	PhysicalWidth uint32
-	// Physical texture height in device pixels. Must be positive. Defaults to 256.
+	// Physical texture height in device pixels. Required.
 	PhysicalHeight uint32
 	// The ring's textures, one per slot, in slot order. Required.
 	Textures []MetalBorrowedTexture
@@ -3033,14 +3035,14 @@ func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingAr
 // See mln_metal_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type MetalOwnedTextureDescriptor struct {
-	// Logical texture extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical texture extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Metal backend context. device is required.
 	Context MetalContextDescriptor
 	// Backend-native MTLPixelFormat value of the ring's textures: either
-	// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-	// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+	// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+	// returns RGBA8 for either format.
 	PixelFormat uint64
 }
 
@@ -3071,8 +3073,8 @@ func DefaultMetalOwnedTextureDescriptor() MetalOwnedTextureDescriptor {
 // See mln_metal_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type MetalSurfaceDescriptor struct {
-	// Logical surface extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical surface extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Metal backend context. device is optional for Metal surfaces.
 	Context MetalContextDescriptor
@@ -3150,7 +3152,7 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 type OfflineGeometryRegionDefinition struct {
 	// Style URL. Copied during region creation.
 	StyleUrl string
-	// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+	// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
 	Geometry string
 	MinZoom  float64
 	// Maximum zoom. Positive infinity lets each tile source use its own maximum
@@ -3330,20 +3332,20 @@ func nativeOpenglBorrowedTexture(input OpenglBorrowedTexture, arena *bindingAren
 // See mln_opengl_borrowed_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type OpenglBorrowedTextureDescriptor struct {
-	// Logical texture extent; physical_width and physical_height give the texture's
-	// size. A scale_factor that differs from the map's is accepted and logged as a
-	// warning.
+	// Logical texture extent. Required. physical_width and physical_height give the
+	// texture's size. A scale_factor that differs from the map's is accepted and
+	// logged as a warning.
 	Extent LogicalExtent
-	// Physical texture width in device pixels. Must be positive. Defaults to 256.
+	// Physical texture width in device pixels. Required.
 	PhysicalWidth uint32
-	// Physical texture height in device pixels. Must be positive. Defaults to 256.
+	// Physical texture height in device pixels. Required.
 	PhysicalHeight uint32
 	// Borrowed OpenGL context provider data. The textures must belong to this
 	// context or a context in the same share group.
 	Context OpenglContextDescriptor
 	// The ring's textures, one per slot, in slot order. Required.
 	Textures []OpenglBorrowedTexture
-	// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
+	// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
 	Target uint32
 }
 
@@ -3446,8 +3448,8 @@ func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *binding
 // See mln_opengl_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type OpenglOwnedTextureDescriptor struct {
-	// Logical texture extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical texture extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed OpenGL context provider data. Shared ownership creates a context
 	// whose texture frames the host can acquire. Dedicated EGL, WGL, or transferred
@@ -3480,8 +3482,8 @@ func DefaultOpenglOwnedTextureDescriptor() OpenglOwnedTextureDescriptor {
 // See mln_opengl_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type OpenglSurfaceDescriptor struct {
-	// Logical surface extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical surface extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed OpenGL context provider data.
 	Context OpenglContextDescriptor
@@ -3565,11 +3567,13 @@ func copyOpenglTextureFrame(raw C.mln_opengl_texture_frame) OpenglTextureFrame {
 // See mln_premultiplied_rgba8_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type PremultipliedRgba8Image struct {
-	Width  uint32
+	// Image width in pixels. Required.
+	Width uint32
+	// Image height in pixels. Required.
 	Height uint32
-	// Bytes per image row. Must be at least width * 4.
+	// Bytes per image row. Required, and at least width * 4.
 	Stride uint32
-	// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+	// Premultiplied RGBA8 pixels. Required.
 	Pixels []byte
 }
 
@@ -3800,18 +3804,18 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 // See mln_render_session_attach_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionAttachOptions struct {
-	// Defaults to MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+	// Where the session's driver runs. Required.
 	Driver RenderDriverKind
-	// Requested slot count of a session-owned texture ring, from one to
-	// MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of this
-	// value. A borrowed texture ring's depth is its texture count, so borrowed and
-	// other targets ignore this value. Defaults to 2, so the host can retain one
-	// frame while the session renders its replacement.
+	// Requested slot count of a session-owned texture ring, up to
+	// MLN_TEXTURE_RING_MAX_DEPTH. Zero selects 2, so the host can retain one frame
+	// while the session renders its replacement. Private targets grant one slot
+	// regardless of this value. A borrowed texture ring's depth is its texture
+	// count, so borrowed and other targets ignore this value.
 	RequestedTextureRingDepth uint32
-	// Producer synchronization for acquired texture frames. Defaults to
-	// MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or
-	// WGL texture target and a caller-graphics-thread driver. Other targets support
-	// only CPU completion and fail an unsupported request.
+	// Producer synchronization for acquired texture frames.
+	// MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or WGL texture target and a
+	// caller-graphics-thread driver. Other targets support only CPU completion and
+	// fail an unsupported request.
 	ProducerSyncKind GpuSyncKind
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake
@@ -4184,7 +4188,7 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 // See mln_resource_route in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRoute struct {
-	// The resource kinds to match.
+	// The resource kinds to match. Zero selects every kind.
 	Kinds ResourceKindFlag
 	Flags UrlMatchFlag
 	// The URL or glob pattern to compare.
@@ -4806,13 +4810,13 @@ type StyleImageOptions struct {
 	StretchY []ImageStretch
 	// Content box used when icon-text-fit applies.
 	Content *ImageContent
-	// Defaults to STRETCH_OR_SHRINK.
+	// Absent selects STRETCH_OR_SHRINK.
 	TextFitWidth *StyleImageTextFit
-	// Defaults to STRETCH_OR_SHRINK.
+	// Absent selects STRETCH_OR_SHRINK.
 	TextFitHeight *StyleImageTextFit
-	// Sprite pixel ratio. Defaults to 1.
+	// Sprite pixel ratio. Absent selects 1.
 	PixelRatio *float32
-	// Whether the image is a signed distance field icon. Defaults to false.
+	// Whether the image is a signed distance field icon. Absent selects false.
 	Sdf *bool
 }
 
@@ -5188,24 +5192,26 @@ func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingAren
 // See mln_vulkan_borrowed_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type VulkanBorrowedTextureDescriptor struct {
-	// Logical texture extent; physical_width and physical_height give the texture's
-	// size. A scale_factor that differs from the map's is accepted and logged as a
-	// warning.
+	// Logical texture extent. Required. physical_width and physical_height give the
+	// texture's size. A scale_factor that differs from the map's is accepted and
+	// logged as a warning.
 	Extent LogicalExtent
-	// Physical image width in device pixels. Must be positive. Defaults to 256.
+	// Physical image width in device pixels. Required.
 	PhysicalWidth uint32
-	// Physical image height in device pixels. Must be positive. Defaults to 256.
+	// Physical image height in device pixels. Required.
 	PhysicalHeight uint32
 	// Borrowed Vulkan context. All handles are required.
 	Context VulkanContextDescriptor
 	// The ring's images, one per slot, in slot order. Required.
 	Textures []VulkanBorrowedTexture
-	// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid.
+	// Backend-native VkFormat value of every image. Required, so
+	// VK_FORMAT_UNDEFINED is invalid.
 	Format uint32
 	// Backend-native VkImageLayout value expected at render-pass begin.
 	InitialLayout uint32
-	// Backend-native VkImageLayout value left after rendering succeeds. Defaults to
-	// 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+	// Backend-native VkImageLayout value left after rendering succeeds, such as
+	// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+	// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
 	FinalLayout uint32
 }
 
@@ -5310,8 +5316,8 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 // See mln_vulkan_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type VulkanOwnedTextureDescriptor struct {
-	// Logical texture extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical texture extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed Vulkan context. All handles are required.
 	Context VulkanContextDescriptor
@@ -5342,8 +5348,8 @@ func DefaultVulkanOwnedTextureDescriptor() VulkanOwnedTextureDescriptor {
 // See mln_vulkan_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type VulkanSurfaceDescriptor struct {
-	// Logical surface extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
+	// Logical surface extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed Vulkan context. All handles are required. The device must support
 	// VK_KHR_swapchain, and the queue family must support graphics and presentation

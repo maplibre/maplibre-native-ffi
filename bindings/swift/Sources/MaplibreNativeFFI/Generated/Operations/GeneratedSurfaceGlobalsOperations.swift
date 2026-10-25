@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns Metal surface descriptor defaults for this C API version.
+  /// Returns a zeroed Metal surface descriptor with size set for this C API
+  /// version. The caller still sets every required member.
   ///
   /// See `mln_metal_surface_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -14,7 +15,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns OpenGL surface descriptor defaults for this C API version.
+  /// Returns a zeroed OpenGL surface descriptor with size set for this C API
+  /// version. The caller still sets every required member.
   ///
   /// See `mln_opengl_surface_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -26,7 +28,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns Vulkan surface descriptor defaults for this C API version.
+  /// Returns a zeroed Vulkan surface descriptor with size set for this C API
+  /// version. The caller still sets every required member.
   ///
   /// See `mln_vulkan_surface_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

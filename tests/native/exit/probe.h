@@ -247,7 +247,9 @@ static inline mln_runtime probe_create_runtime(void) {
 static inline mln_map probe_create_map(mln_runtime runtime) {
   probe_latch latch;
   const mln_completion completion = probe_latch_completion(&latch);
-  const mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent =
+    (mln_logical_extent){.width = 256, .height = 256, .scale_factor = 1.0};
   mln_map map = MLN_HANDLE_NULL;
   probe_require(
     mln_runtime_create_map(runtime, &options, &map, &completion, NULL),

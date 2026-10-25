@@ -10,8 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical texture extent. A scale_factor that differs from the map's is
-/// accepted and logged as a warning.
+/// Logical texture extent. Required. A scale_factor that differs from the map's
+/// is accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Borrowed OpenGL context provider data. Shared ownership creates a context

@@ -94,6 +94,7 @@ static void attach_and_dispose_here(void* context) {
     mln_opengl_surface_descriptor_default();
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
+  descriptor.extent.scale_factor = 1.0;
   descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.webgl = (mln_webgl_context_descriptor){

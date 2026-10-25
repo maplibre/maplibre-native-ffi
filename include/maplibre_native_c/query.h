@@ -144,11 +144,11 @@ typedef struct mln_source_feature {
   mln_buffer_view source_layer_id;
 } mln_source_feature;
 
-/** Returns default rendered feature query options. */
+/** Returns zeroed rendered feature query options with size set. */
 MLN_API mln_rendered_feature_query_options
 mln_rendered_feature_query_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default source feature query options. */
+/** Returns zeroed source feature query options with size set. */
 MLN_API mln_source_feature_query_options
 mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
 

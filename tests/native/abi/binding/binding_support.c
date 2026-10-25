@@ -93,10 +93,11 @@ static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
 // it to an owner token.
 static mln_map create_untracked_map(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
+  const mln_map_options options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_runtime_create_map(runtime, NULL, &map, &completion.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_create_map(
+    runtime, &options, &map, &completion.descriptor, NULL
+  ));
   MLN_TEST_OK(mln_test_completion_settle(&completion));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   return map;

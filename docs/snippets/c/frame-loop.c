@@ -73,8 +73,7 @@ void run_one_frame(
   if (!*pending) return;
   *pending = false;
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_PRESENT |
-                 MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = ++receiver->next_frame_token;
   if (
     mln_render_session_request_frame(session, &demand, NULL) != MLN_STATUS_OK

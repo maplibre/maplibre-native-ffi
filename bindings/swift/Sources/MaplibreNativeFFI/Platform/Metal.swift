@@ -16,7 +16,7 @@
 
   public extension MetalOwnedTextureDescriptor {
     init(
-      extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
+      extent: LogicalExtent,
       context: MetalContextDescriptor,
       pixelFormat: MTLPixelFormat
     ) {
@@ -61,7 +61,7 @@
     /// A surface that draws into `layer`, which an accepted attach retains
     /// before it returns.
     init(
-      extent: LogicalExtent = MetalSurfaceDescriptor.default.extent,
+      extent: LogicalExtent,
       context: MetalContextDescriptor = MetalSurfaceDescriptor.default.context,
       layer: CAMetalLayer
     ) {

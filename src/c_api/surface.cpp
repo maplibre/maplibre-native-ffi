@@ -6,22 +6,30 @@
 
 auto mln_metal_surface_descriptor_default(void) noexcept
   -> mln_metal_surface_descriptor {
-  return mln::core::metal_surface_descriptor_default();
+  return mln_metal_surface_descriptor{
+    .size = sizeof(mln_metal_surface_descriptor)
+  };
 }
 
 auto mln_vulkan_surface_descriptor_default(void) noexcept
   -> mln_vulkan_surface_descriptor {
-  return mln::core::vulkan_surface_descriptor_default();
+  return mln_vulkan_surface_descriptor{
+    .size = sizeof(mln_vulkan_surface_descriptor)
+  };
 }
 
 auto mln_opengl_surface_descriptor_default(void) noexcept
   -> mln_opengl_surface_descriptor {
-  return mln::core::opengl_surface_descriptor_default();
+  return mln_opengl_surface_descriptor{
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
 }
 
 auto mln_webgpu_surface_descriptor_default(void) noexcept
   -> mln_webgpu_surface_descriptor {
-  return mln::core::webgpu_surface_descriptor_default();
+  return mln_webgpu_surface_descriptor{
+    .size = sizeof(mln_webgpu_surface_descriptor)
+  };
 }
 
 auto mln_map_attach_metal_surface(

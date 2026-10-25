@@ -123,7 +123,7 @@ static uint32_t render_frame(
 ) {
   static uint64_t next_token = 1;
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = flags;
+  demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
   demand.token = next_token++;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -352,7 +352,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
     MLN_TEST_OK(mln_acquired_frame_discard(frame, NULL));
   }
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 2000;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
@@ -405,7 +405,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   // Forced, since the map may have published nothing newer than the frame
   // above.
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 1000;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -461,7 +461,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   restore_fixture_context(fixture);
 
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 3000;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)

@@ -35,7 +35,7 @@ impl MapState {
         let map_options = MapOptions {
             initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
-            event_mask: RuntimeEventFlag::empty(),
+            event_mask: Some(RuntimeEventFlag::empty()),
             ..MapOptions::default()
         };
         let (map, ready) = match runtime.create_map(&map_options) {

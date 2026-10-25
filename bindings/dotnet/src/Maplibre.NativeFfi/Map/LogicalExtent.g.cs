@@ -10,13 +10,13 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Width">
-/// Width in UI pixels. Defaults to 256.
+/// Width in UI pixels.
 /// </param>
 /// <param name="Height">
-/// Height in UI pixels. Defaults to 256.
+/// Height in UI pixels.
 /// </param>
 /// <param name="ScaleFactor">
-/// Device pixels per UI pixel. Defaults to 1.0.
+/// Device pixels per UI pixel.
 /// </param>
 public readonly partial record struct LogicalExtent(uint Width, uint Height, double ScaleFactor)
 {

@@ -78,6 +78,7 @@ auto retarget_retains_submission(mln_map map) -> const char* {
     }
 
     auto descriptor = mln_metal_surface_descriptor_default();
+    descriptor.extent = {.width = 256, .height = 256, .scale_factor = 1.0};
     descriptor.context.device = (__bridge void*)device;
     descriptor.layer = (__bridge void*)initial_layer;
     auto options = mln_render_session_attach_options_default();

@@ -169,6 +169,14 @@ fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplib
 
 pub const denying_provider = maplibre.ResourceProvider{ .callback = denyResource };
 
+/// Map options with every required member set: a 256 by 256 initial extent
+/// at scale factor 1.
+pub fn mapOptions() maplibre.MapOptions {
+    var options = maplibre.mapOptionsDefault();
+    options.initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 };
+    return options;
+}
+
 pub const FixtureOptions = struct {
     asset_path: []const u8 = &.{},
     extent: maplibre.LogicalExtent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
@@ -196,7 +204,7 @@ pub const Fixture = struct {
         // A handler accepted before createMap receives the map's first events.
         try self.runtime.discarding().setEventHandler(.init(self, receiveEvents, null), null);
         try self.setProvider(denying_provider);
-        var map_options = maplibre.mapOptionsDefault();
+        var map_options = mapOptions();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
         const created = try self.runtime.createMap(map_options, null);
@@ -499,7 +507,7 @@ pub const OwnedTexture = struct {
     pub fn renderFrame(self: *OwnedTexture) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
-        try self.session.requestFrame(.{ .flags = .{}, .token = token }, null);
+        try self.session.requestFrame(.{ .flags = .{ .force = true }, .token = token }, null);
         const Context = struct { owner: *OwnedTexture, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {

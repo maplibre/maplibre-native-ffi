@@ -219,6 +219,8 @@ class FieldPlan:
     # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
     # a binding writes or derives rather than a member a host sets or reads.
     role: str = "value"
+    # Native rejects this member at zero, because no default suits every host.
+    required: bool = False
 
     @property
     def public(self) -> bool:
@@ -902,6 +904,7 @@ class Binder:
                             member_value,
                             presence,
                             role,
+                            item.metadata.get("required") == "true",
                         )
                     )
                 storage_roles = {}

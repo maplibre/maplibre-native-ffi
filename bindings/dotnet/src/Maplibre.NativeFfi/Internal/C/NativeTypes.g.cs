@@ -370,6 +370,7 @@ internal unsafe struct mln_logical_extent
 internal unsafe struct mln_map_options
 {
     public uint size;
+    public mln_map_option_field fields;
     public mln_logical_extent initial_extent;
     public mln_map_mode map_mode;
     public byte fast_pfor_enabled;
@@ -1359,7 +1360,7 @@ internal enum mln_feature_state_selector_field : uint
 
 internal enum mln_frame_demand_flag : uint
 {
-    MLN_FRAME_DEMAND_IF_NEEDED = 1,
+    MLN_FRAME_DEMAND_FORCE = 1,
     MLN_FRAME_DEMAND_PRESENT = 2,
     MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
 }
@@ -1452,6 +1453,11 @@ internal enum mln_map_mode : uint
     MLN_MAP_MODE_CONTINUOUS = 0,
     MLN_MAP_MODE_STATIC = 1,
     MLN_MAP_MODE_TILE = 2,
+}
+
+internal enum mln_map_option_field : uint
+{
+    MLN_MAP_OPTION_EVENT_MASK = 1,
 }
 
 internal enum mln_map_tile_option_field : uint

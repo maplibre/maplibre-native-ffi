@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns default custom geometry source options.
+  /// Returns zeroed custom geometry source options with size set.
   ///
   /// See `mln_custom_geometry_source_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -19,7 +19,7 @@ public extension Maplibre {
     ) }
   }
 
-  /// Returns default custom MVT vector source options.
+  /// Returns zeroed custom MVT vector source options with size set.
   ///
   /// See `mln_custom_mvt_vector_source_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -53,7 +53,7 @@ public extension Maplibre {
     } result: { try GeojsonSourceDataHandle(adopting: value0) }
   }
 
-  /// Returns default GeoJSON source options.
+  /// Returns zeroed GeoJSON source options with size set.
   ///
   /// See `mln_geojson_source_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -63,7 +63,8 @@ public extension Maplibre {
     }
   }
 
-  /// Returns a default premultiplied RGBA8 image descriptor.
+  /// Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
+  /// caller still sets every required member.
   ///
   /// See `mln_premultiplied_rgba8_image_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -75,7 +76,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default runtime style image options.
+  /// Returns zeroed runtime style image options with size set.
   ///
   /// See `mln_style_image_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -85,7 +86,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default global style transition options.
+  /// Returns zeroed global style transition options with size set.
   ///
   /// See `mln_style_transition_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

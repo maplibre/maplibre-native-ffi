@@ -545,7 +545,7 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	receive(t, ran, "the cancel callback")
 	awaitCondition(t, "the cancel callback's release", func() bool { return rootCount(held.bindingOwner) == 0 })
 
-	other := createMap(t, f.runtime, DefaultMapOptions())
+	other := createMap(t, f.runtime, testMapOptions())
 	if _, err := other.SetStyleUrl("custom://discarded.json"); err != nil {
 		t.Fatal(err)
 	}

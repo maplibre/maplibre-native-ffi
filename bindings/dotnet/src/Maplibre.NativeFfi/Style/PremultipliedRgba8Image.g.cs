@@ -29,16 +29,23 @@ public readonly record struct PremultipliedRgba8Image
         this.Pixels = Pixels;
     }
 
+    /// <summary>
+    /// Image width in pixels. Required.
+    /// </summary>
     public uint Width { get; init; }
+
+    /// <summary>
+    /// Image height in pixels. Required.
+    /// </summary>
     public uint Height { get; init; }
 
     /// <summary>
-    /// Bytes per image row. Must be at least width * 4.
+    /// Bytes per image row. Required, and at least width * 4.
     /// </summary>
     public uint Stride { get; init; }
 
     /// <summary>
-    /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+    /// Premultiplied RGBA8 pixels. Required.
     /// </summary>
     public ImmutableArray<byte> Pixels
     {

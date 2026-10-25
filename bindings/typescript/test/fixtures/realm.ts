@@ -4,6 +4,7 @@
 import process from "node:process";
 
 import { cVersion, runtimeCreate } from "../../src/index.ts";
+import { mapOptions } from "../support/fixture.ts";
 import { execute } from "../support/harness.ts";
 import { postToParent, realmData } from "../support/realm-child.ts";
 import {
@@ -29,7 +30,7 @@ type Request =
  */
 async function exit(): Promise<never> {
   const runtime = runtimeCreate();
-  const { map, ready } = runtime.createMap();
+  const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   await map.setStyleJson(emptyStyle());
   process.on("exit", () => postToParent({ exited: true }));

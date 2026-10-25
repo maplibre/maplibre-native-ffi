@@ -208,31 +208,39 @@ auto add_callback_source(
 
 auto mln_geojson_source_options_default(void) noexcept
   -> mln_geojson_source_options {
-  return mln::core::geojson_source_options_default();
+  return mln_geojson_source_options{.size = sizeof(mln_geojson_source_options)};
 }
 
 auto mln_custom_geometry_source_options_default(void) noexcept
   -> mln_custom_geometry_source_options {
-  return mln::core::custom_geometry_source_options_default();
+  return mln_custom_geometry_source_options{
+    .size = sizeof(mln_custom_geometry_source_options)
+  };
 }
 
 auto mln_custom_mvt_vector_source_options_default(void) noexcept
   -> mln_custom_mvt_vector_source_options {
-  return mln::core::custom_mvt_vector_source_options_default();
+  return mln_custom_mvt_vector_source_options{
+    .size = sizeof(mln_custom_mvt_vector_source_options)
+  };
 }
 
 auto mln_premultiplied_rgba8_image_default(void) noexcept
   -> mln_premultiplied_rgba8_image {
-  return mln::core::premultiplied_rgba8_image_default();
+  return mln_premultiplied_rgba8_image{
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
 }
 
 auto mln_style_image_options_default(void) noexcept -> mln_style_image_options {
-  return mln::core::style_image_options_default();
+  return mln_style_image_options{.size = sizeof(mln_style_image_options)};
 }
 
 auto mln_style_transition_options_default(void) noexcept
   -> mln_style_transition_options {
-  return mln::core::style_transition_options_default();
+  return mln_style_transition_options{
+    .size = sizeof(mln_style_transition_options)
+  };
 }
 auto mln_map_set_style_url(
   mln_map map, mln_buffer_view url, const mln_completion* completion,

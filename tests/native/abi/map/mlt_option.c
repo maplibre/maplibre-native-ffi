@@ -95,7 +95,7 @@ static void render_recorded_tile(
     out->runtime, &provider, &completion.descriptor, NULL
   ));
 
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;

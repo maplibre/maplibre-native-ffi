@@ -38,7 +38,7 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   atomic_init(&probe.status, MLN_STATUS_INVALID_STATE);
   mln_completion completion = probed_completion(&probe);
 
-  const mln_map_options options = mln_map_options_default();
+  const mln_map_options options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
   MLN_TEST_OK(
     mln_runtime_create_map(runtime, &options, &map, &completion, NULL)
@@ -54,7 +54,7 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
 static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   callback_probe probe = {0};
   mln_completion completion = probed_completion(&probe);
-  const mln_map_options options = mln_map_options_default();
+  const mln_map_options options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
 
   MLN_TEST_INVALID(

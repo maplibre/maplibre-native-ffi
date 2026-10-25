@@ -86,7 +86,7 @@ void main() {
 
   test('a refused close leaves the handle usable for a later close', () async {
     final runtime = runtimeCreate(runtimeOptionsDefault());
-    final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+    final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
     addTearDown(() async {
       await closeIfLive(map.close);
       await closeIfLive(runtime.close);

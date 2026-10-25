@@ -48,8 +48,10 @@ static mln_test_graphics* shared_graphics = NULL;
 static bool attach_fence_sync = false;
 #endif
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+// MTLPixelFormatRGBA8Unorm, the format a fixture attaches with by default.
+#define DEFAULT_METAL_PIXEL_FORMAT UINT64_C(70)
 // Set only while mln_test_render_fixture_create_metal_owned_texture()
-// attaches; zero leaves the descriptor's default.
+// attaches; zero selects DEFAULT_METAL_PIXEL_FORMAT.
 static uint64_t attach_pixel_format = 0;
 #endif
 
@@ -201,7 +203,8 @@ bool mln_test_backend_attach(
     mln_metal_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
-  if (attach_pixel_format != 0) descriptor.pixel_format = attach_pixel_format;
+  descriptor.pixel_format =
+    attach_pixel_format != 0 ? attach_pixel_format : DEFAULT_METAL_PIXEL_FORMAT;
   *out_status = mln_map_attach_metal_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );

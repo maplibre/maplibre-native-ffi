@@ -92,109 +92,6 @@ auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #endif
 }
 
-auto opengl_context_descriptor_default() noexcept
-  -> mln_opengl_context_descriptor {
-  auto result = mln_opengl_context_descriptor{
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
-    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
-    .data = {},
-  };
-#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
-  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
-  result.data.wgl = mln_wgl_context_descriptor{
-    .device_context = nullptr,
-    .share_context = nullptr,
-    .get_proc_address = nullptr,
-  };
-#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
-  result.data.egl = mln_egl_context_descriptor{
-    .display = nullptr,
-    .config = nullptr,
-    .share_context = nullptr,
-    .client_api = MLN_OPENGL_CLIENT_API_UNSPECIFIED,
-    .get_proc_address = nullptr,
-  };
-#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
-  result.data.webgl = mln_webgl_context_descriptor{
-    .kind = MLN_WEBGL_CONTEXT_EXISTING,
-    .context = 0,
-    .canvas_selector = {},
-  };
-#endif
-  return result;
-}
-
-auto opengl_owned_texture_descriptor_default() noexcept
-  -> mln_opengl_owned_texture_descriptor {
-  return mln_opengl_owned_texture_descriptor{
-    .size = sizeof(mln_opengl_owned_texture_descriptor),
-    .extent =
-      mln_logical_extent{
-        .width = 256,
-        .height = 256,
-        .scale_factor = 1.0,
-      },
-    .context = opengl_context_descriptor_default(),
-  };
-}
-
-auto opengl_borrowed_texture_descriptor_default() noexcept
-  -> mln_opengl_borrowed_texture_descriptor {
-  return mln_opengl_borrowed_texture_descriptor{
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor),
-    .extent =
-      mln_logical_extent{
-        .width = 256,
-        .height = 256,
-        .scale_factor = 1.0,
-      },
-    .physical_width = 256,
-    .physical_height = 256,
-    .context = opengl_context_descriptor_default(),
-    .textures = nullptr,
-    .texture_count = 0,
-    .target = 0,
-  };
-}
-
-auto webgpu_surface_descriptor_default() noexcept
-  -> mln_webgpu_surface_descriptor {
-  return mln_webgpu_surface_descriptor{
-    .size = sizeof(mln_webgpu_surface_descriptor),
-    .extent =
-      mln_logical_extent{
-        .width = 256,
-        .height = 256,
-        .scale_factor = 1.0,
-      },
-    .context =
-      mln_webgpu_context_descriptor{
-        .instance = nullptr,
-        .device = nullptr,
-        .queue = nullptr,
-      },
-    .surface = nullptr,
-    .format = 0,
-  };
-}
-
-auto opengl_surface_descriptor_default() noexcept
-  -> mln_opengl_surface_descriptor {
-  return mln_opengl_surface_descriptor{
-    .size = sizeof(mln_opengl_surface_descriptor),
-    .extent =
-      mln_logical_extent{
-        .width = 256,
-        .height = 256,
-        .scale_factor = 1.0,
-      },
-    .context = opengl_context_descriptor_default(),
-    .surface = nullptr,
-  };
-}
-
 // The instance and queue are optional: no session kind needs the instance, and
 // a null queue means the device's default queue.
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
@@ -1226,8 +1123,7 @@ auto arm_still_image_demand_locked(
     session.demands.push_back(
       std::make_shared<const mln_frame_demand>(mln_frame_demand{
         .size = sizeof(mln_frame_demand),
-        .flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_PRESENT |
-                 MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
+        .flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
         .token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE,
       })
     );
@@ -3000,7 +2896,7 @@ auto run_frame_demand(
   };
   const auto waits_for_update =
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
-  if ((demand->flags & MLN_FRAME_DEMAND_IF_NEEDED) != 0) {
+  if ((demand->flags & MLN_FRAME_DEMAND_FORCE) == 0) {
     auto unchanged = false;
     {
       const auto lock = std::scoped_lock{session->control_mutex};
@@ -3285,7 +3181,7 @@ auto render_session_request_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_flags =
-    static_cast<uint32_t>(MLN_FRAME_DEMAND_IF_NEEDED) |
+    static_cast<uint32_t>(MLN_FRAME_DEMAND_FORCE) |
     static_cast<uint32_t>(MLN_FRAME_DEMAND_PRESENT) |
     static_cast<uint32_t>(MLN_FRAME_DEMAND_WAIT_FOR_UPDATE);
   if ((demand->flags & ~known_flags) != 0) {
@@ -3294,12 +3190,9 @@ auto render_session_request_frame(
   }
   if (
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0 &&
-    (demand->flags & MLN_FRAME_DEMAND_IF_NEEDED) == 0
+    (demand->flags & MLN_FRAME_DEMAND_FORCE) != 0
   ) {
-    set_thread_error(
-      "a frame demand that waits for a map update must also render only if "
-      "needed"
-    );
+    set_thread_error("a frame demand that waits for a map update cannot force");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (demand->token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE) {
@@ -3320,7 +3213,7 @@ auto render_session_request_frame(
   }
   const auto supersedes =
     [&](const std::shared_ptr<const mln_frame_demand>& pending) {
-      return (demand->flags & MLN_FRAME_DEMAND_IF_NEEDED) != 0 &&
+      return (demand->flags & MLN_FRAME_DEMAND_FORCE) == 0 &&
              pending->flags == demand->flags &&
              pending->token != MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
     };

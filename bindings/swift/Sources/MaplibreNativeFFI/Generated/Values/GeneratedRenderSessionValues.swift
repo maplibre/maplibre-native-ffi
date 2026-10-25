@@ -8,8 +8,8 @@ import Foundation
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FrameDemand: Equatable, Hashable, Sendable {
-  /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
-  /// `MLN_FRAME_DEMAND_IF_NEEDED`.
+  /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
+  /// newer map update exists, without presenting.
   public var flags: FrameDemandFlag
   /// Host identity returned with the terminal frame result. Any value except
   /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
@@ -51,13 +51,13 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  /// Render only when a newer map update exists.
-  public static let ifNeeded: FrameDemandFlag = .init(rawValue: 1)
+  /// Render even when no map update is newer than the last rendered one.
+  public static let force: FrameDemandFlag = .init(rawValue: 1)
   /// Present the rendered frame on a target that supports presentation. A
   /// presenting target whose demand clears this bit still renders and keeps
   /// whatever it presented last. Ignored by targets without presentation.
   public static let present: FrameDemandFlag = .init(rawValue: 2)
-  /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+  /// Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
   /// `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the
   /// map's next update, a target replacement, or an applied resize. A waiting
   /// demand holds no ring slot. A later demand with the same flags supersedes
@@ -212,8 +212,8 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// result does not cause a map update, so the host demands again when the
   /// target can be ready, such as after a paced delay.
   public static let targetNotReady: RenderResult = .init(rawValue: 2)
-  /// A newer IF_NEEDED demand with the same flags replaced this demand. A still
-  /// image's demand is never replaced, and never replaces one.
+  /// A newer demand with the same flags, neither of them forced, replaced this
+  /// demand. A still image's demand is never replaced, and never replaces one.
   public static let superseded: RenderResult = .init(rawValue: 3)
   public var description: String {
     switch rawValue {

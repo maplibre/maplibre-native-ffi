@@ -157,8 +157,7 @@ void render_session_close(render_session* session) {
 app_error render_session_request_frame(render_session* session, bool force) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags =
-    (force ? 0
-           : MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) |
+    (force ? MLN_FRAME_DEMAND_FORCE : MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) |
     (session->presents ? MLN_FRAME_DEMAND_PRESENT : 0);
   demand.token = ++session->next_frame_token;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};

@@ -93,6 +93,9 @@ static void surface_with_unknown_ownership(void* call) {
 static void surface_with_unknown_platform(void* call) {
   surface_of(call)->context.platform = 7;
 }
+static void surface_with_unspecified_platform(void* call) {
+  surface_of(call)->context.platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED;
+}
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 // A dedicated context joins no share group, so naming one contradicts it.
 static void dedicated_surface_with_share_context(void* call) {
@@ -116,6 +119,9 @@ static void owned_without_egl_display(void* call) {
   owned_of(call)->context.data.egl.display = NULL;
 }
 #endif
+static void borrowed_without_target(void* call) {
+  borrowed_of(call)->target = 0;
+}
 static void borrowed_without_texture(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.opengl[0].texture = 0;
@@ -202,6 +208,8 @@ static void opengl_attach_rejects_malformed_calls(void) {
      MLN_STATUS_INVALID_ARGUMENT, "ownership is unknown"},
     {"unknown platform", surface_with_unknown_platform,
      MLN_STATUS_INVALID_ARGUMENT, "platform is invalid"},
+    {"unspecified platform", surface_with_unspecified_platform,
+     MLN_STATUS_INVALID_ARGUMENT, "platform is invalid"},
 #if defined(MLN_FFI_TEST_OPENGL_WEBGL)
     {"a surface beside a WebGL context", webgl_surface_with_surface_handle,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -245,6 +253,8 @@ static void opengl_attach_rejects_malformed_calls(void) {
     MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
     MLN_TEST_BORROWED_CASES(opengl_borrowed),
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"zero target", borrowed_without_target, MLN_STATUS_INVALID_ARGUMENT,
+     "target must be specified"},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
 #if !defined(MLN_FFI_TEST_BACKEND_OPENGL)

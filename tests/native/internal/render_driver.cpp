@@ -398,7 +398,7 @@ void an_unavailable_drawable_releases_its_slot_for_a_retry() {
     mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
   );
   auto demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
+  demand.flags = 0;
   demand.token = 9103;
   MLN_TEST_OK(request_frame(fixture, demand));
   batch = wait_for_results(fixture);
@@ -455,7 +455,7 @@ void publish_an_update(UpdateDuringAttempt& update) {
 void an_update_during_a_failed_still_image_attempt_retries_it() {
   auto fixture = Fixture{};
   fixture.runtime = mln_test_create_runtime();
-  auto options = mln_map_options_default();
+  auto options = mln_test_map_options();
   options.initial_extent =
     mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
@@ -491,7 +491,7 @@ void an_idle_demand_reports_a_failed_backend_activation() {
   ));
   install_frame_failure(fixture, FrameFailure::Activation);
   auto demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 9104;
   MLN_TEST_OK(request_frame(fixture, demand));
   const auto batch = wait_for_results(fixture);
@@ -538,7 +538,7 @@ void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   mln_test_completion_destroy(&resize);
   mln_render_frame_batch_release(wait_for_results(fixture));
   auto demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
+  demand.flags = 0;
   demand.token = 9003;
   MLN_TEST_OK(request_frame(fixture, demand));
   const auto batch = wait_for_results(fixture);
@@ -639,9 +639,9 @@ void a_barrier_waits_for_an_ordered_operation_after_a_running_demand() {
   TEST_ASSERT_TRUE(maintenance_first);
 }
 
-// A newer if-needed demand supersedes the earlier one. Forced demands render
+// A newer unforced demand supersedes the earlier one. Forced demands render
 // independently while preserving the target and map generations.
-void if_needed_demands_supersede_and_forced_demands_render() {
+void unforced_demands_supersede_and_forced_demands_render() {
   auto fixture = Fixture{};
   create_fixture(fixture);
   auto blocker = DriverBlocker{};
@@ -649,7 +649,7 @@ void if_needed_demands_supersede_and_forced_demands_render() {
   auto first = mln_frame_demand_default();
   first.token = 101;
   auto forced = first;
-  forced.flags = 0;
+  forced.flags = MLN_FRAME_DEMAND_FORCE;
   forced.token = 102;
   auto newest = first;
   newest.token = 103;
@@ -828,7 +828,7 @@ void concurrent_resizes_publish_matching_map_and_driver_extents() {
 // can hold open.
 void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
   auto demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
   MLN_TEST_OK(request_frame(fixture, demand));
 }
@@ -1069,7 +1069,7 @@ struct SupersedingRequest {
 void request_superseding_frame(void* argument) {
   auto& request = *static_cast<SupersedingRequest*>(argument);
   auto demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
+  demand.flags = 0;
   demand.token = 122;
   request.status = request_frame(*request.fixture, demand);
 }
@@ -1111,7 +1111,7 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
     drained = MLN_HANDLE_NULL;
   }
   auto first = mln_frame_demand_default();
-  first.flags = MLN_FRAME_DEMAND_IF_NEEDED;
+  first.flags = 0;
   first.token = 121;
   MLN_TEST_OK(request_frame(fixture, first));
   points.hold(SyncPoint::RenderFrameWakeDeferred);
@@ -1354,7 +1354,7 @@ void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
 
 auto request_waiting(const Fixture& fixture, uint64_t token) -> mln_status {
   auto demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   return request_frame(fixture, demand);
 }
@@ -1641,7 +1641,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
   const auto held = latest_update_generation(fixture.map);
 
   auto forced = mln_frame_demand_default();
-  forced.flags = 0;
+  forced.flags = MLN_FRAME_DEMAND_FORCE;
   forced.token = 155;
   MLN_TEST_OK(request_frame(fixture, forced));
   auto batch = wait_for_results(fixture);
@@ -1692,7 +1692,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_hook_replacement_waits_for_the_running_hook);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
-  RUN_TEST(if_needed_demands_supersede_and_forced_demands_render);
+  RUN_TEST(unforced_demands_supersede_and_forced_demands_render);
   RUN_TEST(supersession_preserves_a_forced_demand_after_a_resize);
   RUN_TEST(scheduler_service_preserves_a_forced_demand_after_a_resize);
   RUN_TEST(concurrent_resizes_publish_matching_map_and_driver_extents);

@@ -30,7 +30,7 @@ public readonly record struct HttpHeaderRule
     }
 
     /// <summary>
-    /// The resource kinds to match.
+    /// The resource kinds to match. Zero selects every kind.
     /// </summary>
     public ResourceKindFlag Kinds { get; init; }
     public UrlMatchFlag Flags { get; init; }

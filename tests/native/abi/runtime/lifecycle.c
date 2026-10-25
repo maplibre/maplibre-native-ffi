@@ -55,7 +55,7 @@ static void expect_runtime_calls_reject(
   mln_runtime handle, mln_status expected
 ) {
   const mln_completion discard = mln_test_discard_completion();
-  const mln_map_options map_options = mln_map_options_default();
+  const mln_map_options map_options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
   uint64_t mask = 0;
   MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
@@ -101,11 +101,24 @@ static void map_options_with_unknown_mode(void* descriptor) {
   ((mln_map_options*)descriptor)->map_mode = 999;
 }
 
+static void map_options_with_unknown_field(void* descriptor) {
+  ((mln_map_options*)descriptor)->fields = 1U << 31U;
+}
+
+// The initial extent is required, so the zeroed default options are rejected.
+static void map_options_without_extent(void* descriptor) {
+  *(mln_map_options*)descriptor = mln_map_options_default();
+}
+
 static const mln_test_validation_case map_creation_cases[] = {
   {"undersized", map_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
    "mln_map_options.size"},
   {"unknown map mode", map_options_with_unknown_mode,
    MLN_STATUS_INVALID_ARGUMENT, "map_mode"},
+  {"unknown field", map_options_with_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
+   "mln_map_options.fields"},
+  {"zero initial extent", map_options_without_extent,
+   MLN_STATUS_INVALID_ARGUMENT, "initial extent"},
 };
 
 static mln_status create_map_from(
@@ -129,7 +142,7 @@ static mln_status create_map_from(
 
 static void map_creation_validates_its_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  const mln_map_options defaults = mln_map_options_default();
+  const mln_map_options defaults = mln_test_map_options();
   mln_test_run_validation_table(
     map_creation_cases,
     sizeof(map_creation_cases) / sizeof(*map_creation_cases), &defaults,
@@ -139,10 +152,16 @@ static void map_creation_validates_its_options(void) {
 }
 
 // The map comes back through out_map, which must point to the null handle.
+// Null options carry no initial extent, so creation rejects them too.
 static void map_creation_checks_its_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  const mln_map_options options = mln_map_options_default();
+  const mln_map_options options = mln_test_map_options();
   const mln_completion discard = mln_test_discard_completion();
+  mln_map rejected = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(
+    mln_runtime_create_map(runtime, NULL, &rejected, &discard, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, rejected);
   MLN_TEST_INVALID(
     mln_runtime_create_map(runtime, &options, NULL, &discard, NULL)
   );
@@ -227,8 +246,9 @@ static void create_on_temporary_thread(void* argument) {
   if (probe->status != MLN_STATUS_OK) return;
 
   mln_test_completion create_map = mln_test_completion_default(0);
+  const mln_map_options map_options = mln_test_map_options();
   probe->status = mln_runtime_create_map(
-    probe->runtime, NULL, &probe->map, &create_map.descriptor, NULL
+    probe->runtime, &map_options, &probe->map, &create_map.descriptor, NULL
   );
   if (probe->status == MLN_STATUS_OK) {
     probe->status = mln_test_completion_settle(&create_map);
@@ -337,7 +357,8 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
   uint64_t mask = 0;
   MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
@@ -439,7 +460,8 @@ static void release_runtime_from_map_completion(
 static void a_map_release_completion_can_release_its_runtime(void) {
   const mln_runtime runtime = create_untracked_runtime();
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  const mln_map_options map_options = mln_test_map_options();
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   mln_test_completion runtime_close = mln_test_completion_default(0);
   release_parent parent = {
     .runtime = runtime,

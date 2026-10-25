@@ -153,7 +153,10 @@ export interface RuntimeFixture {
   openStyledMap(style?: unknown, options?: MapOptions): Promise<MapHandle>;
 }
 
-export const extent = { width: 64, height: 64, scaleFactor: 1 };
+/** The map options that a test starts from: a 64 by 64 extent at scale 1. */
+export const mapOptions: MapOptions = {
+  initialExtent: { width: 64, height: 64, scaleFactor: 1 },
+};
 
 /**
  * Creates a runtime that a teardown closes, with its events on an event
@@ -174,14 +177,14 @@ export async function openRuntime(
     events,
     awaitEvent: (matches, what) => events.awaitEvent(matches, what),
     awaitEventType: (type, source) => events.awaitEventType(type, source),
-    async openMap(mapOptions = { initialExtent: extent }) {
-      const { map, ready } = runtime.createMap(mapOptions);
+    async openMap(options = mapOptions) {
+      const { map, ready } = runtime.createMap(options);
       teardown(() => closeIfLive(() => map.close()));
       await bounded(ready, "map creation");
       return map;
     },
-    async openStyledMap(style = emptyStyle(), mapOptions) {
-      const map = await fixture.openMap(mapOptions);
+    async openStyledMap(style = emptyStyle(), options) {
+      const map = await fixture.openMap(options);
       await bounded(map.setStyleJson(style), "a command");
       return map;
     },

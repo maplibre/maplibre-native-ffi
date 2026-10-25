@@ -50,7 +50,15 @@ Follow these rules, which keep the ABI open to growth:
 - A struct passed by pointer begins with `uint32_t size`, and new members go at
   its end. Small value types, such as coordinates and IDs, carry no size and
   never change; a change adds a new type.
-- An input struct whose defaults are not all zero has `mln_<struct>_default()`.
+- A zeroed input struct is the default, as in sokol_gfx: each member means "use
+  the default" at zero, so a caller sets only `size` and the members it cares
+  about. A member that no default suits for every host, such as an extent or a
+  native handle, is required instead: native rejects its zero, and the member
+  carries `MLN_BINDING("required=true")` and states "Required." in its comment.
+  A presence mask, tag, size, reserved, or count member is never required, and
+  neither is a masked member, whose absence is its default. The
+  `mln_<struct>_default()` functions still exist and return only the zeroed
+  struct with its sizes set, until bindings stop calling them.
 - An optional member has its own bit in the struct's `fields` mask. Text is the
   exception: empty text means absent, and text has a bit only where the empty
   string is a value of its own, as a feature ID is.
@@ -66,8 +74,9 @@ Follow these rules, which keep the ABI open to growth:
   it.
 
 `MLN_BINDING` annotations state only what the C type cannot, such as which
-parameter counts an array. Copy them from a similar declaration; the generator
-rejects an annotation that restates a default.
+parameter counts an array, or which struct member is `required`. Copy them from
+a similar declaration; the generator rejects an annotation that restates a
+default.
 
 A function that only some platforms' builds can use, such as one that takes a
 Metal object, lists those platforms in `platforms=`, as `mln_android_init()`

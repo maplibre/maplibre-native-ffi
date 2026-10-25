@@ -838,18 +838,6 @@ auto custom_mvt_vector_source_options_default() noexcept
   };
 }
 
-auto premultiplied_rgba8_image_default() noexcept
-  -> mln_premultiplied_rgba8_image {
-  return mln_premultiplied_rgba8_image{
-    .size = sizeof(mln_premultiplied_rgba8_image),
-    .width = 0,
-    .height = 0,
-    .stride = 0,
-    .pixels = nullptr,
-    .byte_length = 0
-  };
-}
-
 auto style_image_options_default() noexcept -> mln_style_image_options {
   return mln_style_image_options{
     .size = sizeof(mln_style_image_options),

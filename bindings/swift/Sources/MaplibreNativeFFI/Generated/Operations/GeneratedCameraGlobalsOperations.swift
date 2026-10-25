@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns empty animation options initialized for this C API version.
+  /// Returns zeroed animation options.
   ///
   /// See `mln_animation_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -14,7 +14,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns empty map bound options initialized for this C API version.
+  /// Returns zeroed map bound options with size set for this C API version.
   ///
   /// See `mln_bound_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -22,7 +22,7 @@ public extension Maplibre {
     try nativeDirect { _ in BoundOptions(raw: mln_bound_options_default()) }
   }
 
-  /// Returns an empty relative camera update initialized for this API version.
+  /// Returns a zeroed relative camera update with size set for this version.
   ///
   /// See `mln_camera_delta_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -30,7 +30,7 @@ public extension Maplibre {
     try nativeDirect { _ in try CameraDelta(raw: mln_camera_delta_default()) }
   }
 
-  /// Returns empty camera fitting options initialized for this C API version.
+  /// Returns zeroed camera fitting options with size set for this version.
   ///
   /// See `mln_camera_fit_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -40,7 +40,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns empty camera options initialized for this C API version.
+  /// Returns zeroed camera options with size set for this C API version.
   ///
   /// See `mln_camera_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -48,7 +48,8 @@ public extension Maplibre {
     try nativeDirect { _ in CameraOptions(raw: mln_camera_options_default()) }
   }
 
-  /// Returns an empty atomic camera update initialized for this API version.
+  /// Returns a zeroed atomic camera update, with its size and its camera's size
+  /// set for this C API version.
   ///
   /// See `mln_camera_update_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -56,7 +57,7 @@ public extension Maplibre {
     try nativeDirect { _ in try CameraUpdate(raw: mln_camera_update_default()) }
   }
 
-  /// Returns empty free camera options initialized for this C API version.
+  /// Returns zeroed free camera options with size set for this C API version.
   ///
   /// See `mln_free_camera_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -66,7 +67,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns empty tile tuning options initialized for this C API version.
+  /// Returns zeroed tile tuning options with size set for this C API version.
   ///
   /// See `mln_map_tile_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -76,7 +77,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns empty viewport options initialized for this C API version.
+  /// Returns zeroed viewport options with size set for this C API version.
   ///
   /// See `mln_map_viewport_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -86,7 +87,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns empty axonometric rendering options initialized for this C API
+  /// Returns zeroed axonometric rendering options with size set for this C API
   /// version.
   ///
   /// See `mln_projection_mode_default` in the

@@ -39,22 +39,22 @@ public sealed record StyleImageOptions
     public ImageContent? Content { get; init; }
 
     /// <summary>
-    /// Defaults to STRETCH_OR_SHRINK.
+    /// Absent selects STRETCH_OR_SHRINK.
     /// </summary>
     public StyleImageTextFit? TextFitWidth { get; init; }
 
     /// <summary>
-    /// Defaults to STRETCH_OR_SHRINK.
+    /// Absent selects STRETCH_OR_SHRINK.
     /// </summary>
     public StyleImageTextFit? TextFitHeight { get; init; }
 
     /// <summary>
-    /// Sprite pixel ratio. Defaults to 1.
+    /// Sprite pixel ratio. Absent selects 1.
     /// </summary>
     public float? PixelRatio { get; init; }
 
     /// <summary>
-    /// Whether the image is a signed distance field icon. Defaults to false.
+    /// Whether the image is a signed distance field icon. Absent selects false.
     /// </summary>
     public bool? Sdf { get; init; }
     public static StyleImageOptions Default

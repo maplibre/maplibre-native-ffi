@@ -158,21 +158,21 @@ typedef enum mln_gpu_sync_kind : uint32_t {
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
-  /** Defaults to MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. */
-  mln_render_driver_kind driver;
+  /** Where the session's driver runs. Required. */
+  mln_render_driver_kind driver MLN_BINDING("required=true");
   /**
-   * Requested slot count of a session-owned texture ring, from one to
-   * MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of
-   * this value. A borrowed texture ring's depth is its texture count, so
-   * borrowed and other targets ignore this value. Defaults to 2, so the host
-   * can retain one frame while the session renders its replacement.
+   * Requested slot count of a session-owned texture ring, up to
+   * MLN_TEXTURE_RING_MAX_DEPTH. Zero selects 2, so the host can retain one
+   * frame while the session renders its replacement. Private targets grant
+   * one slot regardless of this value. A borrowed texture ring's depth is its
+   * texture count, so borrowed and other targets ignore this value.
    */
   uint32_t requested_texture_ring_depth;
   /**
-   * Producer synchronization for acquired texture frames. Defaults to
-   * MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared
-   * EGL or WGL texture target and a caller-graphics-thread driver. Other
-   * targets support only CPU completion and fail an unsupported request.
+   * Producer synchronization for acquired texture frames.
+   * MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or WGL texture target and a
+   * caller-graphics-thread driver. Other targets support only CPU completion
+   * and fail an unsupported request.
    */
   mln_gpu_sync_kind producer_sync_kind;
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
@@ -222,7 +222,10 @@ typedef struct mln_gpu_sync {
   uint64_t handle;
 } mln_gpu_sync;
 
-/** Returns CPU-complete synchronization for this C API version. */
+/**
+ * Returns zeroed synchronization with size set for this C API version, which
+ * is CPU completion.
+ */
 MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
 
 /** Metal backend context fields shared by Metal render targets. */
@@ -234,17 +237,17 @@ typedef struct mln_metal_context_descriptor {
 /** Vulkan backend context fields shared by Vulkan render targets. */
 typedef struct mln_vulkan_context_descriptor {
   /** Borrowed VkInstance. Required. */
-  void* instance;
+  void* instance MLN_BINDING("required=true");
   /** Borrowed VkPhysicalDevice. Required. */
-  void* physical_device;
+  void* physical_device MLN_BINDING("required=true");
   /** Borrowed VkDevice. Required. */
-  void* device;
+  void* device MLN_BINDING("required=true");
   /**
    * Borrowed graphics VkQueue. Required. The session's driver submits to it
    * from its own thread, so a host that uses the same queue passes
    * mln_render_session_attach_options.queue_lock at attach.
    */
-  void* graphics_queue;
+  void* graphics_queue MLN_BINDING("required=true");
   /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;
   /** PFN_vkGetInstanceProcAddr for the loader that created the instance. */
@@ -258,7 +261,7 @@ typedef struct mln_webgpu_context_descriptor {
   /** Borrowed WGPUInstance. Optional for texture targets. */
   void* instance;
   /** Borrowed WGPUDevice. Required. */
-  void* device;
+  void* device MLN_BINDING("required=true");
   /**
    * Borrowed WGPUQueue. Optional; null uses the device default queue. A
    * non-null queue must belong to device.
@@ -328,7 +331,7 @@ typedef struct mln_wgl_context_descriptor {
    * Borrowed HDC used to create the session context. Required. A dedicated
    * owned texture makes its context current on this HDC from its core worker.
    */
-  void* device_context;
+  void* device_context MLN_BINDING("required=true");
   /**
    * Borrowed HGLRC whose share group the session context joins. Required under
    * shared ownership. A dedicated session joins no share group, so it must be
@@ -348,13 +351,13 @@ typedef struct mln_egl_context_descriptor {
    * using it has detached or been destroyed. The host must not call
    * eglTerminate per session.
    */
-  void* display;
+  void* display MLN_BINDING("required=true");
   /**
    * Borrowed EGLConfig used to create the session context. Required.
    * OpenGL texture targets require EGL_SURFACE_TYPE to include
    * EGL_PBUFFER_BIT.
    */
-  void* config;
+  void* config MLN_BINDING("required=true");
   /**
    * Borrowed EGLContext whose share group the session context joins. Required
    * under shared ownership, where the session also takes its client API from
@@ -409,7 +412,7 @@ typedef union mln_opengl_context_descriptor_data {
 
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
-  /** WGL, EGL, or WebGL context provider. */
+  /** WGL, EGL, or WebGL context provider. Required. */
   mln_opengl_context_platform platform;
   /**
    * Whether the session shares its driver thread and graphics objects with the
@@ -421,8 +424,9 @@ typedef struct mln_opengl_context_descriptor {
 } mln_opengl_context_descriptor;
 
 /**
- * Returns attachment options initialized for this C API version, with each
- * field at its documented default.
+ * Returns zeroed attachment options with size set for this C API version.
+ *
+ * The caller still sets every required member.
  */
 MLN_API mln_render_session_attach_options
 mln_render_session_attach_options_default(void) MLN_NOEXCEPT;

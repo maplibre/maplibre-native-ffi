@@ -18,7 +18,7 @@ static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint64_t token, uint32_t flags
 ) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = flags;
+  demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
   demand.token = token;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)

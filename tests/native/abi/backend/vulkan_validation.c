@@ -55,6 +55,12 @@ static void borrowed_with_another_depth(void* call) {
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.physical_width = 0;
 }
+static void borrowed_without_format(void* call) {
+  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.format = 0;
+}
+static void borrowed_without_final_layout(void* call) {
+  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.final_layout = 0;
+}
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_vulkan_surface)
 MLN_TEST_ATTACH_SUBMITTER(
@@ -164,6 +170,10 @@ static void vulkan_attach_rejects_malformed_calls(void) {
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+    {"zero format", borrowed_without_format, MLN_STATUS_INVALID_ARGUMENT,
+     "format and final_layout"},
+    {"zero final layout", borrowed_without_final_layout,
+     MLN_STATUS_INVALID_ARGUMENT, "format and final_layout"},
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
     {"a well-formed descriptor with high handles", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},

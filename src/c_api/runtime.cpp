@@ -11,31 +11,15 @@
 #include "resources/resource_transform.hpp"
 
 auto mln_resource_route_default(void) noexcept -> mln_resource_route {
-  return mln_resource_route{
-    .size = sizeof(mln_resource_route),
-    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
-    .flags = 0,
-    .url = {}
-  };
+  return mln_resource_route{.size = sizeof(mln_resource_route)};
 }
 
 auto mln_http_header_rule_default(void) noexcept -> mln_http_header_rule {
-  return mln_http_header_rule{
-    .size = sizeof(mln_http_header_rule),
-    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
-    .flags = 0,
-    .url = {},
-    .headers = nullptr,
-    .header_count = 0
-  };
+  return mln_http_header_rule{.size = sizeof(mln_http_header_rule)};
 }
 
 auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
-  return mln_runtime_options{
-    .size = sizeof(mln_runtime_options),
-    .asset_path = {},
-    .cache_path = {},
-  };
+  return mln_runtime_options{.size = sizeof(mln_runtime_options)};
 }
 
 auto mln_runtime_create(

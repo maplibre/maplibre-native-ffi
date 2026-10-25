@@ -320,8 +320,15 @@ mln_map mln_test_create_map_with_options(
   return map;
 }
 
-mln_map mln_test_create_map(mln_runtime runtime) {
+mln_map_options mln_test_map_options(void) {
   mln_map_options options = mln_map_options_default();
+  options.initial_extent =
+    (mln_logical_extent){.width = 256, .height = 256, .scale_factor = 1.0};
+  return options;
+}
+
+mln_map mln_test_create_map(mln_runtime runtime) {
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
   return mln_test_create_map_with_options(runtime, &options);

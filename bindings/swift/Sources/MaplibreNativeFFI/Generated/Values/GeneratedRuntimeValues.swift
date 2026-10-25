@@ -56,6 +56,7 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
 /// See `mln_http_header` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeader: Equatable, Hashable, Sendable {
+  /// Header field name. Required.
   public var name: String
   public var value: String
   public static var `default`: Self {
@@ -91,7 +92,7 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderRule: Equatable, Hashable, Sendable {
-  /// The resource kinds to match.
+  /// The resource kinds to match. Zero selects every kind.
   public var kinds: ResourceKindFlag
   public var flags: UrlMatchFlag
   /// The URL or glob pattern to compare.
@@ -456,8 +457,8 @@ public struct ResourceKind: RawRepresentable, CustomStringConvertible,
 }
 
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
+/// `mln_resource_kind` value. Registration rejects unknown bits.
+/// `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
 ///
 /// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -854,7 +855,7 @@ public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRoute: Equatable, Hashable, Sendable {
-  /// The resource kinds to match.
+  /// The resource kinds to match. Zero selects every kind.
   public var kinds: ResourceKindFlag
   public var flags: UrlMatchFlag
   /// The URL or glob pattern to compare.

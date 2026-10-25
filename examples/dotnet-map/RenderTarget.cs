@@ -203,14 +203,12 @@ internal abstract class RenderTarget : IDisposable
     /// <summary>Demands a frame. A forced frame renders even when the map has no newer update.</summary>
     public void RequestFrame(bool force = false)
     {
-        FrameDemandFlag flags = force
-            ? 0
-            : FrameDemandFlag.IfNeeded | FrameDemandFlag.WaitForUpdate;
+        FrameDemandFlag flags = force ? FrameDemandFlag.Force : FrameDemandFlag.WaitForUpdate;
         if (Presents)
         {
             flags |= FrameDemandFlag.Present;
         }
-        Session.RequestFrame(FrameDemand.Default with { Flags = flags, Token = ++nextToken });
+        Session.RequestFrame(new FrameDemand(flags, ++nextToken));
     }
 
     /// <summary>

@@ -202,7 +202,8 @@ runtime.set_resource_provider(
     m.ResourceProvider(callback=lambda request, handle: None)
 ).result(10)
 m.log_set_callback(m.LogHandler(lambda severity, event, code, message: True))
-live = runtime.create_map().map
+options = m.MapOptions(initial_extent=m.LogicalExtent(256, 256, 1.0))
+live = runtime.create_map(options).map
 live.set_style_url("custom://never-answered.json")
 """
 

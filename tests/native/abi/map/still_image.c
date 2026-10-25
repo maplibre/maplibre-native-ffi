@@ -11,7 +11,7 @@
 #include "support/test_support.h"
 
 static mln_map create_map_in_mode(mln_runtime runtime, uint32_t map_mode) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent =
     (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = map_mode;
@@ -297,8 +297,7 @@ static void host_demands_and_a_still_image_demand_never_replace_each_other(
   render_until_tile_requested(&fixture, &held);
 
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_PRESENT |
-                 MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_ARGUMENT, mln_render_session_request_frame(

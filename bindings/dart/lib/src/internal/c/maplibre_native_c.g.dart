@@ -571,6 +571,8 @@ final class mln_logical_extent extends Struct {
 final class mln_map_options extends Struct {
   @Uint32()
   external int size;
+  @Uint32()
+  external int fields;
   external mln_logical_extent initial_extent;
   @Uint32()
   external int map_mode;
@@ -1743,7 +1745,7 @@ const MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM = 10;
 const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;
 
 // mln_frame_demand_flag
-const MLN_FRAME_DEMAND_IF_NEEDED = 1;
+const MLN_FRAME_DEMAND_FORCE = 1;
 const MLN_FRAME_DEMAND_PRESENT = 2;
 const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
@@ -1818,6 +1820,9 @@ const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
 const MLN_MAP_MODE_CONTINUOUS = 0;
 const MLN_MAP_MODE_STATIC = 1;
 const MLN_MAP_MODE_TILE = 2;
+
+// mln_map_option_field
+const MLN_MAP_OPTION_EVENT_MASK = 1;
 
 // mln_map_tile_option_field
 const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;

@@ -10,16 +10,16 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical texture extent. A scale_factor that differs from the map's is
-/// accepted and logged as a warning.
+/// Logical texture extent. Required. A scale_factor that differs from the map's
+/// is accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Metal backend context. device is required.
 /// </param>
 /// <param name="PixelFormat">
 /// Backend-native MTLPixelFormat value of the ring's textures: either
-/// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-/// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+/// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+/// returns RGBA8 for either format.
 /// </param>
 public readonly partial record struct MetalOwnedTextureDescriptor(
     LogicalExtent Extent,

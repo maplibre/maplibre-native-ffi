@@ -10,8 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Flags">
-/// A bitwise OR of <c>mln_frame_demand_flag</c> values. Defaults to
-/// <c>MLN_FRAME_DEMAND_IF_NEEDED</c>.
+/// A bitwise OR of <c>mln_frame_demand_flag</c> values. Zero renders only when
+/// a newer map update exists, without presenting.
 /// </param>
 /// <param name="Token">
 /// Host identity returned with the terminal frame result. Any value except

@@ -265,7 +265,7 @@ class FrameDemandFlag(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     """
 
-    IF_NEEDED = 1
+    FORCE = 1
     PRESENT = 2
     WAIT_FOR_UPDATE = 4
 
@@ -543,8 +543,8 @@ class ResourceKind(UnknownIntEnum):
 
 class ResourceKindFlag(IntFlag):
     """The resource kinds that a route or rule matches, one bit per
-    `mln_resource_kind` value. Registration requires at least one known bit.
-    `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
+    `mln_resource_kind` value. Registration rejects unknown bits.
+    `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
 
     See `mln_resource_kind_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -858,9 +858,9 @@ class AnimationOptions:
 
     velocity: float | None = None
     """Average fly velocity in screenfuls per second. Must be positive and
-    finite; defaults to 1.2 when omitted. A flight whose derived duration is
-    too long to represent fails its completion with
-    `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+    finite; absent selects 1.2. A flight whose derived duration is too long
+    to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An
+    explicit duration overrides velocity.
     """
 
     min_zoom: float | None = None
@@ -1392,7 +1392,7 @@ class FeatureStateSelector:
     """
 
     source_id: str
-    """Source ID. Required and borrowed for the duration of the call."""
+    """Source ID. Required. Borrowed for the duration of the call."""
 
     source_layer_id: str
     """Source layer ID, or empty for none. Required for vector-source
@@ -1429,8 +1429,8 @@ class FrameDemand:
     """
 
     flags: FrameDemandFlag = field(default_factory=lambda: FrameDemand.default().flags)
-    """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
-    `MLN_FRAME_DEMAND_IF_NEEDED`.
+    """A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
+    newer map update exists, without presenting.
     """
 
     token: int = field(default_factory=lambda: FrameDemand.default().token)
@@ -1485,16 +1485,16 @@ class GeojsonSourceOptions:
     """
 
     min_zoom: float | None = None
-    """Minimum tiling zoom. Defaults to 0."""
+    """Minimum tiling zoom. Absent selects 0."""
 
     max_zoom: float | None = None
-    """Maximum tiling zoom, an integer within \\[0, 24\\]. Defaults to 18."""
+    """Maximum tiling zoom, an integer within \\[0, 24\\]. Absent selects 18."""
 
     tolerance: float | None = None
-    """Douglas-Peucker simplification tolerance. Defaults to 0.375."""
+    """Douglas-Peucker simplification tolerance. Absent selects 0.375."""
 
     cluster_max_zoom: float | None = None
-    """Highest zoom that clusters points. Defaults to 17."""
+    """Highest zoom that clusters points. Absent selects 17."""
 
     cluster_properties: Any = field(
         default_factory=lambda: GeojsonSourceOptions.default().cluster_properties
@@ -1505,23 +1505,23 @@ class GeojsonSourceOptions:
     """
 
     buffer: int | None = None
-    """Tile buffer in pixels within \\[0, 512\\]. Defaults to 128."""
+    """Tile buffer in pixels within \\[0, 512\\]. Absent selects 128."""
 
     cluster_radius: int | None = None
-    """Cluster radius in pixels within \\[0, 4095\\]. Defaults to 50."""
+    """Cluster radius in pixels within \\[0, 4095\\]. Absent selects 50."""
 
     cluster_min_points: int | None = None
-    """Points required to form a cluster. Defaults to 2."""
+    """Points required to form a cluster. Absent selects 2."""
 
     line_metrics: bool | None = None
-    """Adds line distance metrics to line features. Defaults to false."""
+    """Adds line distance metrics to line features. Absent selects false."""
 
     cluster: bool | None = None
-    """Clusters point features. Defaults to false."""
+    """Clusters point features. Absent selects false."""
 
     synchronous_tiling: bool | None = None
     """Tiles the data for the next render update instead of in the background.
-    Defaults to false.
+    Absent selects false.
     """
 
     @classmethod
@@ -1580,6 +1580,7 @@ class HttpHeader:
     """
 
     name: str
+    """Header field name. Required."""
 
     value: str
 
@@ -1599,7 +1600,7 @@ class HttpHeaderRule:
     kinds: ResourceKindFlag = field(
         default_factory=lambda: HttpHeaderRule.default().kinds
     )
-    """The resource kinds to match."""
+    """The resource kinds to match. Zero selects every kind."""
 
     flags: UrlMatchFlag = field(default_factory=lambda: HttpHeaderRule.default().flags)
 
@@ -1760,15 +1761,15 @@ class LogicalExtent:
     """
 
     width: int = field(default_factory=lambda: LogicalExtent.default().width)
-    """Width in UI pixels. Defaults to 256."""
+    """Width in UI pixels."""
 
     height: int = field(default_factory=lambda: LogicalExtent.default().height)
-    """Height in UI pixels. Defaults to 256."""
+    """Height in UI pixels."""
 
     scale_factor: float = field(
         default_factory=lambda: LogicalExtent.default().scale_factor
     )
-    """Device pixels per UI pixel. Defaults to 1.0."""
+    """Device pixels per UI pixel."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1794,24 +1795,21 @@ class MapOptions:
     initial_extent: LogicalExtent = field(
         default_factory=lambda: MapOptions.default().initial_extent
     )
-    """Initial logical extent. Width and height must be nonzero, and
+    """Initial logical extent. Required. Width and height must be nonzero, and
     scale_factor must be finite and positive. scale_factor is fixed for the
     map's lifetime.
     """
 
     map_mode: MapMode = field(default_factory=lambda: MapOptions.default().map_mode)
-    """Defaults to `MLN_MAP_MODE_CONTINUOUS`."""
 
     fast_pfor_enabled: bool = field(
         default_factory=lambda: MapOptions.default().fast_pfor_enabled
     )
     """Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-    encodings. Defaults to false.
+    encodings.
     """
 
-    event_mask: RuntimeEventFlag = field(
-        default_factory=lambda: MapOptions.default().event_mask
-    )
+    event_mask: RuntimeEventFlag | None = None
     """Map-originated event types this map queues, as a bitwise OR of
     `mln_runtime_event_flag` values.
     """
@@ -1822,7 +1820,7 @@ class MapOptions:
             initial_extent=LogicalExtent._from_native(raw["initial_extent"]),
             map_mode=MapMode(raw["map_mode"]),
             fast_pfor_enabled=raw["fast_pfor_enabled"],
-            event_mask=RuntimeEventFlag(raw["event_mask"]),
+            event_mask=_maybe(RuntimeEventFlag, raw["event_mask"]),
         )
 
     @classmethod
@@ -2029,24 +2027,20 @@ class MetalBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent; physical_width and physical_height give the
-    texture's size. A scale_factor that differs from the map's is accepted
-    and logged as a warning.
+    """Logical texture extent. Required. physical_width and physical_height give
+    the texture's size. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
     """
 
     physical_width: int = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().physical_width
     )
-    """Physical texture width in device pixels. Must be positive. Defaults to
-    256.
-    """
+    """Physical texture width in device pixels. Required."""
 
     physical_height: int = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().physical_height
     )
-    """Physical texture height in device pixels. Must be positive. Defaults to
-    256.
-    """
+    """Physical texture height in device pixels. Required."""
 
     textures: Sequence[MetalBorrowedTexture] = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().textures
@@ -2101,8 +2095,8 @@ class MetalOwnedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: MetalOwnedTextureDescriptor.default().extent
     )
-    """Logical texture extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical texture extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: MetalContextDescriptor = field(
@@ -2114,8 +2108,8 @@ class MetalOwnedTextureDescriptor:
         default_factory=lambda: MetalOwnedTextureDescriptor.default().pixel_format
     )
     """Backend-native MTLPixelFormat value of the ring's textures: either
-    MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-    MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+    MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+    returns RGBA8 for either format.
     """
 
     @classmethod
@@ -2144,8 +2138,8 @@ class MetalSurfaceDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: MetalSurfaceDescriptor.default().extent
     )
-    """Logical surface extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical surface extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: MetalContextDescriptor = field(
@@ -2235,7 +2229,7 @@ class OfflineGeometryRegionDefinition:
     """Style URL. Copied during region creation."""
 
     geometry: Any
-    """UTF-8 GeoJSON Geometry bytes. Borrowed during region creation."""
+    """UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation."""
 
     min_zoom: float
 
@@ -2409,26 +2403,22 @@ class OpenglBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent; physical_width and physical_height give the
-    texture's size. A scale_factor that differs from the map's is accepted
-    and logged as a warning.
+    """Logical texture extent. Required. physical_width and physical_height give
+    the texture's size. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
     """
 
     physical_width: int = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().physical_width
     )
-    """Physical texture width in device pixels. Must be positive. Defaults to
-    256.
-    """
+    """Physical texture width in device pixels. Required."""
 
     physical_height: int = field(
         default_factory=lambda: (
             OpenglBorrowedTextureDescriptor.default().physical_height
         )
     )
-    """Physical texture height in device pixels. Must be positive. Defaults to
-    256.
-    """
+    """Physical texture height in device pixels. Required."""
 
     context: OpenglContextDescriptor = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().context
@@ -2445,7 +2435,7 @@ class OpenglBorrowedTextureDescriptor:
     target: int = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().target
     )
-    """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
+    """OpenGL texture target of every texture. Required: GL_TEXTURE_2D."""
 
     def __post_init__(self):
         object.__setattr__(self, "textures", _sequence(self.textures))
@@ -2518,8 +2508,8 @@ class OpenglOwnedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: OpenglOwnedTextureDescriptor.default().extent
     )
-    """Logical texture extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical texture extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: OpenglContextDescriptor = field(
@@ -2556,8 +2546,8 @@ class OpenglSurfaceDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: OpenglSurfaceDescriptor.default().extent
     )
-    """Logical surface extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical surface extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: OpenglContextDescriptor = field(
@@ -2659,20 +2649,22 @@ class PremultipliedRgba8Image:
     """
 
     width: int = field(default_factory=lambda: PremultipliedRgba8Image.default().width)
+    """Image width in pixels. Required."""
 
     height: int = field(
         default_factory=lambda: PremultipliedRgba8Image.default().height
     )
+    """Image height in pixels. Required."""
 
     stride: int = field(
         default_factory=lambda: PremultipliedRgba8Image.default().stride
     )
-    """Bytes per image row. Must be at least width \\* 4."""
+    """Bytes per image row. Required, and at least width \\* 4."""
 
     pixels: Buffer = field(
         default_factory=lambda: PremultipliedRgba8Image.default().pixels
     )
-    """Premultiplied RGBA8 pixels. Must not be null for a non-empty image."""
+    """Premultiplied RGBA8 pixels. Required."""
 
     def __post_init__(self):
         object.__setattr__(self, "pixels", _bytes(self.pixels))
@@ -2913,28 +2905,27 @@ class RenderSessionAttachOptions:
     driver: RenderDriverKind = field(
         default_factory=lambda: RenderSessionAttachOptions.default().driver
     )
-    """Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`."""
+    """Where the session's driver runs. Required."""
 
     requested_texture_ring_depth: int = field(
         default_factory=lambda: (
             RenderSessionAttachOptions.default().requested_texture_ring_depth
         )
     )
-    """Requested slot count of a session-owned texture ring, from one to
-    `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless
-    of this value. A borrowed texture ring's depth is its texture count, so
-    borrowed and other targets ignore this value. Defaults to 2, so the host
-    can retain one frame while the session renders its replacement.
+    """Requested slot count of a session-owned texture ring, up to
+    `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
+    frame while the session renders its replacement. Private targets grant
+    one slot regardless of this value. A borrowed texture ring's depth is its
+    texture count, so borrowed and other targets ignore this value.
     """
 
     producer_sync_kind: GpuSyncKind = field(
         default_factory=lambda: RenderSessionAttachOptions.default().producer_sync_kind
     )
-    """Producer synchronization for acquired texture frames. Defaults to
-    `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
-    shared EGL or WGL texture target and a caller-graphics-thread driver.
-    Other targets support only CPU completion and fail an unsupported
-    request.
+    """Producer synchronization for acquired texture frames.
+    `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+    and a caller-graphics-thread driver. Other targets support only CPU
+    completion and fail an unsupported request.
     """
 
     frame_wake: Wake | NativeWake = field(
@@ -3327,7 +3318,7 @@ class ResourceRoute:
     kinds: ResourceKindFlag = field(
         default_factory=lambda: ResourceRoute.default().kinds
     )
-    """The resource kinds to match."""
+    """The resource kinds to match. Zero selects every kind."""
 
     flags: UrlMatchFlag = field(default_factory=lambda: ResourceRoute.default().flags)
 
@@ -3936,16 +3927,16 @@ class StyleImageOptions:
     """Content box used when icon-text-fit applies."""
 
     text_fit_width: StyleImageTextFit | None = None
-    """Defaults to STRETCH_OR_SHRINK."""
+    """Absent selects STRETCH_OR_SHRINK."""
 
     text_fit_height: StyleImageTextFit | None = None
-    """Defaults to STRETCH_OR_SHRINK."""
+    """Absent selects STRETCH_OR_SHRINK."""
 
     pixel_ratio: float | None = None
-    """Sprite pixel ratio. Defaults to 1."""
+    """Sprite pixel ratio. Absent selects 1."""
 
     sdf: bool | None = None
-    """Whether the image is a signed distance field icon. Defaults to false."""
+    """Whether the image is a signed distance field icon. Absent selects false."""
 
     def __post_init__(self):
         object.__setattr__(self, "stretch_x", _sequence(self.stretch_x))
@@ -4283,24 +4274,22 @@ class VulkanBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent; physical_width and physical_height give the
-    texture's size. A scale_factor that differs from the map's is accepted
-    and logged as a warning.
+    """Logical texture extent. Required. physical_width and physical_height give
+    the texture's size. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
     """
 
     physical_width: int = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().physical_width
     )
-    """Physical image width in device pixels. Must be positive. Defaults to 256."""
+    """Physical image width in device pixels. Required."""
 
     physical_height: int = field(
         default_factory=lambda: (
             VulkanBorrowedTextureDescriptor.default().physical_height
         )
     )
-    """Physical image height in device pixels. Must be positive. Defaults to
-    256.
-    """
+    """Physical image height in device pixels. Required."""
 
     context: VulkanContextDescriptor = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().context
@@ -4315,8 +4304,8 @@ class VulkanBorrowedTextureDescriptor:
     format: int = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().format
     )
-    """Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-    invalid.
+    """Backend-native VkFormat value of every image. Required, so
+    VK_FORMAT_UNDEFINED is invalid.
     """
 
     initial_layout: int = field(
@@ -4327,8 +4316,9 @@ class VulkanBorrowedTextureDescriptor:
     final_layout: int = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().final_layout
     )
-    """Backend-native VkImageLayout value left after rendering succeeds.
-    Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+    """Backend-native VkImageLayout value left after rendering succeeds, such as
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+    VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     """
 
     def __post_init__(self):
@@ -4412,8 +4402,8 @@ class VulkanOwnedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: VulkanOwnedTextureDescriptor.default().extent
     )
-    """Logical texture extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical texture extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: VulkanContextDescriptor = field(
@@ -4446,8 +4436,8 @@ class VulkanSurfaceDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: VulkanSurfaceDescriptor.default().extent
     )
-    """Logical surface extent. A scale_factor that differs from the map's is
-    accepted and logged as a warning.
+    """Logical surface extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
     """
 
     context: VulkanContextDescriptor = field(

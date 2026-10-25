@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record FeatureStateSelector
 {
     /// <summary>
-    /// Source ID. Required and borrowed for the duration of the call.
+    /// Source ID. Required. Borrowed for the duration of the call.
     /// </summary>
     public required string SourceId { get; init; }
 

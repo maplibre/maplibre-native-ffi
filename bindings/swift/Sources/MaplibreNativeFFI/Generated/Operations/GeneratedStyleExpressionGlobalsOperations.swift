@@ -23,7 +23,7 @@ public extension Maplibre {
     } result: { try StyleExpressionHandle(adopting: value0) }
   }
 
-  /// Returns default style expression inputs, which set no input.
+  /// Returns zeroed style expression inputs with size set, which set no input.
   ///
   /// See `mln_style_expression_inputs_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -33,7 +33,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default style expression options.
+  /// Returns zeroed style expression options with size set.
   ///
   /// See `mln_style_expression_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

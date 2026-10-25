@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns default rendered feature query options.
+  /// Returns zeroed rendered feature query options with size set.
   ///
   /// See `mln_rendered_feature_query_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -18,7 +18,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default source feature query options.
+  /// Returns zeroed source feature query options with size set.
   ///
   /// See `mln_source_feature_query_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).

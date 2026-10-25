@@ -1,5 +1,7 @@
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
+import '../support/fixture.dart';
+
 const _style = {
   'version': 8,
   'sources': <String, Object?>{},
@@ -25,7 +27,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
       callback: (_, request) => request.close(),
     ),
   );
-  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await ready;
   await map.setStyleJson(_style);
   await map.addCustomGeometrySource(

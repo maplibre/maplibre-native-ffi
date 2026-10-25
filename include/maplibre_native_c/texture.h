@@ -21,41 +21,39 @@ extern "C" {
 typedef struct mln_metal_owned_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Metal backend context. device is required. */
   mln_metal_context_descriptor context;
   /**
    * Backend-native MTLPixelFormat value of the ring's textures: either
-   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-   * MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+   * returns RGBA8 for either format.
    */
-  uint64_t pixel_format;
+  uint64_t pixel_format MLN_BINDING("required=true");
 } mln_metal_owned_texture_descriptor;
 
 /** One caller-owned Metal texture of a borrowed texture ring. */
 typedef struct mln_metal_borrowed_texture {
   /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
-  void* texture;
+  void* texture MLN_BINDING("required=true");
 } mln_metal_borrowed_texture;
 
 /** Metal attachment options for a borrowed texture target. */
 typedef struct mln_metal_borrowed_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
-  mln_logical_extent extent;
-  /** Physical texture width in device pixels. Must be positive. Defaults to
-   * 256. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. Must be positive. Defaults to
-   * 256. */
-  uint32_t physical_height;
+  mln_logical_extent extent MLN_BINDING("required=true");
+  /** Physical texture width in device pixels. Required. */
+  uint32_t physical_width MLN_BINDING("required=true");
+  /** Physical texture height in device pixels. Required. */
+  uint32_t physical_height MLN_BINDING("required=true");
   /**
    * The ring's textures, one per slot, in slot order. Required.
    *
@@ -67,7 +65,7 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * single-sample. A mismatch is rejected.
    */
   const mln_metal_borrowed_texture* textures
-    MLN_BINDING("length=texture_count");
+    MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of textures, which is the ring depth, from one to
    * MLN_TEXTURE_RING_MAX_DEPTH. A replacement keeps the count the session
@@ -108,10 +106,10 @@ typedef struct mln_metal_texture_frame {
 typedef struct mln_vulkan_owned_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
 } mln_vulkan_owned_texture_descriptor;
@@ -125,31 +123,27 @@ typedef struct mln_vulkan_borrowed_texture {
    * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Include VK_IMAGE_USAGE_SAMPLED_BIT
    * when the host will sample from the image after rendering.
    */
-  mln_vulkan_non_dispatchable_handle image;
+  mln_vulkan_non_dispatchable_handle image MLN_BINDING("required=true");
   /**
    * Borrowed VkImageView for image. Required. The view must be a 2D color view
    * that matches image and the descriptor's format.
    */
-  mln_vulkan_non_dispatchable_handle image_view;
+  mln_vulkan_non_dispatchable_handle image_view MLN_BINDING("required=true");
 } mln_vulkan_borrowed_texture;
 
 /** Vulkan attachment options for a borrowed texture target. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
-  mln_logical_extent extent;
-  /**
-   * Physical image width in device pixels. Must be positive. Defaults to 256.
-   */
-  uint32_t physical_width;
-  /**
-   * Physical image height in device pixels. Must be positive. Defaults to 256.
-   */
-  uint32_t physical_height;
+  mln_logical_extent extent MLN_BINDING("required=true");
+  /** Physical image width in device pixels. Required. */
+  uint32_t physical_width MLN_BINDING("required=true");
+  /** Physical image height in device pixels. Required. */
+  uint32_t physical_height MLN_BINDING("required=true");
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
   /**
@@ -165,7 +159,7 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * and physical_height. The session does not validate those dimensions.
    */
   const mln_vulkan_borrowed_texture* textures
-    MLN_BINDING("length=texture_count");
+    MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of images, which is the ring depth, from one to
    * MLN_TEXTURE_RING_MAX_DEPTH. A replacement keeps the count the session
@@ -173,10 +167,10 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    */
   size_t texture_count;
   /**
-   * Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-   * invalid.
+   * Backend-native VkFormat value of every image. Required, so
+   * VK_FORMAT_UNDEFINED is invalid.
    */
-  uint32_t format;
+  uint32_t format MLN_BINDING("required=true");
   /**
    * Backend-native VkImageLayout value expected at render-pass begin.
    *
@@ -191,10 +185,11 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    */
   uint32_t initial_layout;
   /**
-   * Backend-native VkImageLayout value left after rendering succeeds. Defaults
-   * to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+   * Backend-native VkImageLayout value left after rendering succeeds, such as
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+   * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
-  uint32_t final_layout;
+  uint32_t final_layout MLN_BINDING("required=true");
 } mln_vulkan_borrowed_texture_descriptor;
 
 /** Vulkan frame acquired from a texture ring. */
@@ -235,10 +230,10 @@ typedef struct mln_vulkan_texture_frame {
 typedef struct mln_opengl_owned_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context
    * whose texture frames the host can acquire. Dedicated EGL, WGL, or
@@ -251,24 +246,22 @@ typedef struct mln_opengl_owned_texture_descriptor {
 /** One caller-owned OpenGL texture of a borrowed texture ring. */
 typedef struct mln_opengl_borrowed_texture {
   /** Borrowed OpenGL texture object name. Required. */
-  uint32_t texture;
+  uint32_t texture MLN_BINDING("required=true");
 } mln_opengl_borrowed_texture;
 
 /** OpenGL attachment options for a borrowed texture target. */
 typedef struct mln_opengl_borrowed_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
-  mln_logical_extent extent;
-  /** Physical texture width in device pixels. Must be positive. Defaults to
-   * 256. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. Must be positive. Defaults to
-   * 256. */
-  uint32_t physical_height;
+  mln_logical_extent extent MLN_BINDING("required=true");
+  /** Physical texture width in device pixels. Required. */
+  uint32_t physical_width MLN_BINDING("required=true");
+  /** Physical texture height in device pixels. Required. */
+  uint32_t physical_height MLN_BINDING("required=true");
   /**
    * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
@@ -286,25 +279,25 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * dimensions.
    */
   const mln_opengl_borrowed_texture* textures
-    MLN_BINDING("length=texture_count");
+    MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of textures, which is the ring depth, from one to
    * MLN_TEXTURE_RING_MAX_DEPTH. A replacement keeps the count the session
    * attached with.
    */
   size_t texture_count;
-  /** OpenGL texture target of every texture. Must be GL_TEXTURE_2D. */
-  uint32_t target;
+  /** OpenGL texture target of every texture. Required: GL_TEXTURE_2D. */
+  uint32_t target MLN_BINDING("required=true");
 } mln_opengl_borrowed_texture_descriptor;
 
 /** WebGPU attachment options for an owned texture target. */
 typedef struct mln_webgpu_owned_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is
-   * accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
    */
-  mln_logical_extent extent;
+  mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
 } mln_webgpu_owned_texture_descriptor;
@@ -319,27 +312,27 @@ typedef struct mln_webgpu_borrowed_texture {
    * dimensions and format must match the descriptor. Include TextureBinding
    * usage when the host will sample from the texture after rendering.
    */
-  void* texture;
+  void* texture MLN_BINDING("required=true");
   /**
    * Borrowed WGPUTextureView for texture. Required. The view must be a 2D
    * color view compatible with texture and the descriptor's format.
    */
-  void* texture_view;
+  void* texture_view MLN_BINDING("required=true");
 } mln_webgpu_borrowed_texture;
 
 /** WebGPU attachment options for a borrowed texture target. */
 typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t size;
   /**
-   * Logical texture extent; physical_width and physical_height give the
-   * texture's size. A scale_factor that differs from the map's is accepted and
-   * logged as a warning.
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
    */
-  mln_logical_extent extent;
-  /** Physical texture width in device pixels. Defaults to 256. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. Defaults to 256. */
-  uint32_t physical_height;
+  mln_logical_extent extent MLN_BINDING("required=true");
+  /** Physical texture width in device pixels. Required. */
+  uint32_t physical_width MLN_BINDING("required=true");
+  /** Physical texture height in device pixels. Required. */
+  uint32_t physical_height MLN_BINDING("required=true");
   /**
    * Borrowed WebGPU context. device is required. Rendering is submitted
    * through context.queue or that device's default queue.
@@ -353,7 +346,7 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    * or until abandon returns. The textures are distinct.
    */
   const mln_webgpu_borrowed_texture* textures
-    MLN_BINDING("length=texture_count");
+    MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of textures, which is the ring depth, from one to
    * MLN_TEXTURE_RING_MAX_DEPTH. A replacement keeps the count the session
@@ -361,10 +354,10 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    */
   size_t texture_count;
   /**
-   * Backend-native WGPUTextureFormat value of every texture. Undefined is
-   * invalid.
+   * Backend-native WGPUTextureFormat value of every texture. Required, so
+   * Undefined is invalid.
    */
-  uint32_t format;
+  uint32_t format MLN_BINDING("required=true");
 } mln_webgpu_borrowed_texture_descriptor;
 
 /** WebGPU frame acquired from a texture ring. */
@@ -457,49 +450,57 @@ typedef struct mln_texture_readback_result {
 } mln_texture_readback_result;
 
 /**
- * Returns Metal owned-texture descriptor defaults for this C API version.
+ * Returns a zeroed Metal owned-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns Metal borrowed-texture descriptor defaults for this C API version.
+ * Returns a zeroed Metal borrowed-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_metal_borrowed_texture_descriptor
 mln_metal_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns Vulkan owned-texture descriptor defaults for this C API version.
+ * Returns a zeroed Vulkan owned-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_vulkan_owned_texture_descriptor
 mln_vulkan_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns Vulkan borrowed-texture descriptor defaults for this C API version.
+ * Returns a zeroed Vulkan borrowed-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_vulkan_borrowed_texture_descriptor
 mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns OpenGL owned-texture descriptor defaults for this C API version.
+ * Returns a zeroed OpenGL owned-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_opengl_owned_texture_descriptor
 mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns OpenGL borrowed-texture descriptor defaults for this C API version.
+ * Returns a zeroed OpenGL borrowed-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns WebGPU owned-texture descriptor defaults for this C API version.
+ * Returns a zeroed WebGPU owned-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_webgpu_owned_texture_descriptor
 mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns WebGPU borrowed-texture descriptor defaults for this C API version.
+ * Returns a zeroed WebGPU borrowed-texture descriptor with size set
+ * for this C API version. The caller still sets every required member.
  */
 MLN_API mln_webgpu_borrowed_texture_descriptor
 mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;

@@ -584,7 +584,7 @@ typedef struct mln_runtime_event_handler {
 /**
  * The resource kinds that a route or rule matches, one bit per
  * mln_resource_kind value.
- * Registration requires at least one known bit. MLN_RESOURCE_KIND_FLAG_ALL
+ * Registration rejects unknown bits. MLN_RESOURCE_KIND_FLAG_ALL, like zero,
  * selects every resource kind.
  */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_flag : uint32_t {
@@ -652,19 +652,23 @@ typedef uint32_t mln_url_match_flags;
  */
 typedef struct mln_resource_route {
   uint32_t size;
-  /** The resource kinds to match. */
+  /** The resource kinds to match. Zero selects every kind. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
   /** The URL or glob pattern to compare. */
   mln_buffer_view url;
 } mln_resource_route;
 
-/** Returns an exact-match route for every resource kind. */
+/**
+ * Returns a zeroed route with size set for this C API version: an exact match
+ * of the empty URL for every resource kind.
+ */
 MLN_API mln_resource_route mln_resource_route_default(void) MLN_NOEXCEPT;
 
 /** One HTTP header that a header rule supplies. */
 typedef struct mln_http_header {
-  mln_buffer_view name;
+  /** Header field name. Required. */
+  mln_buffer_view name MLN_BINDING("required=true");
   mln_buffer_view value;
 } mln_http_header;
 
@@ -679,7 +683,7 @@ typedef struct mln_http_header {
  */
 typedef struct mln_http_header_rule {
   uint32_t size;
-  /** The resource kinds to match. */
+  /** The resource kinds to match. Zero selects every kind. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
   /** The URL or glob pattern to compare. */
@@ -692,7 +696,9 @@ typedef struct mln_http_header_rule {
   size_t header_count;
 } mln_http_header_rule;
 
-/** Returns an exact-match header rule for every resource kind, with no headers.
+/**
+ * Returns a zeroed header rule with size set for this C API version: an exact
+ * match of the empty URL for every resource kind, with no headers.
  */
 MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
 
@@ -1073,7 +1079,7 @@ typedef struct mln_resource_provider {
 );
 
 /**
- * Returns runtime options initialized for this C API version.
+ * Returns zeroed runtime options with size set for this C API version.
  */
 MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
@@ -1135,8 +1141,8 @@ MLN_API mln_status mln_runtime_create(
  *   are set, release_user_data is set in queue mode, queue is an invalid
  *   handle, a route is invalid, or completion is invalid. A route is invalid
  *   when routes is null with a nonzero route_count, its size is too small, its
- *   url is null, or its kinds are zero or hold unknown bits,
- *   or its flags hold an unknown bit; the diagnostic names the route's index.
+ *   url is null, its kinds hold an unknown bit, or its flags hold an unknown
+ *   bit; the diagnostic names the route's index.
  * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
  *   runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
@@ -1423,9 +1429,9 @@ MLN_API void mln_resource_transform_request_release(
  *   a callback comes with rules, a rules
  *   transform carries user_data or release_user_data, a rule is invalid, or
  *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, its size is too small, its url is null, its kinds are zero or
- * hold unknown bits, its flags hold an unknown bit, its headers are null with a
- * nonzero header_count, or a header breaks a rule of
+ *   rule_count, its size is too small, its url is null, its kinds hold an
+ *   unknown bit, its flags hold an unknown bit, its headers are null with a
+ *   nonzero header_count, or a header breaks a rule of
  *   mln_http_header_transform_response_set_header(). The diagnostic names the
  *   rule's index and never includes a header value.
  * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP

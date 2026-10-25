@@ -12,9 +12,9 @@ namespace Maplibre.NativeFfi;
 public enum FrameDemandFlag : uint
 {
     /// <summary>
-    /// Render only when a newer map update exists.
+    /// Render even when no map update is newer than the last rendered one.
     /// </summary>
-    IfNeeded = 1,
+    Force = 1,
 
     /// <summary>
     /// Present the rendered frame on a target that supports presentation. A
@@ -24,7 +24,7 @@ public enum FrameDemandFlag : uint
     Present = 2,
 
     /// <summary>
-    /// With <c>MLN_FRAME_DEMAND_IF_NEEDED</c>, a demand that would finish with
+    /// Without <c>MLN_FRAME_DEMAND_FORCE</c>, a demand that would finish with
     /// <c>MLN_RENDER_RESULT_NO_UPDATE</c> waits instead, and runs again after
     /// the map's next update, a target replacement, or an applied resize. A
     /// waiting demand holds no ring slot. A later demand with the same flags

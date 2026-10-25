@@ -90,7 +90,7 @@ auto create_runtime() -> mln_runtime {
 auto create_map(mln_runtime runtime) -> mln_map {
   auto result = Result{};
   const auto completion = descriptor(result);
-  auto options = mln_map_options_default();
+  auto options = mln_test_map_options();
   options.map_mode = MLN_MAP_MODE_STATIC;
   auto map = mln_map{MLN_HANDLE_NULL};
   MLN_TEST_OK(
@@ -192,8 +192,9 @@ void failed_creation_releases_parent_reservation() {
   auto map = mln_map{MLN_HANDLE_NULL};
   {
     const auto faults = AllocationFaults{};
+    const auto map_options = mln_test_map_options();
     status =
-      mln_runtime_create_map(runtime, nullptr, &map, &completion, nullptr);
+      mln_runtime_create_map(runtime, &map_options, &map, &completion, nullptr);
   }
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
@@ -213,8 +214,9 @@ void disposal_waits_for_a_creating_child() {
   auto result = Result{};
   const auto completion = descriptor(result);
   auto map = mln_map{MLN_HANDLE_NULL};
+  const auto map_options = mln_test_map_options();
   MLN_TEST_OK(
-    mln_runtime_create_map(runtime, nullptr, &map, &completion, nullptr)
+    mln_runtime_create_map(runtime, &map_options, &map, &completion, nullptr)
   );
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
   live.reset();
@@ -844,8 +846,9 @@ void map_query_admission_failure_releases_its_map_lease() {
     const auto runtime = create_runtime();
     auto creation = mln_test_completion_default(0);
     auto map = mln_map{MLN_HANDLE_NULL};
+    const auto map_options = mln_test_map_options();
     MLN_TEST_OK(mln_runtime_create_map(
-      runtime, nullptr, &map, &creation.descriptor, nullptr
+      runtime, &map_options, &map, &creation.descriptor, nullptr
     ));
     MLN_TEST_OK(mln_test_completion_settle(&creation));
     auto transition = mln_test_transition_end{};

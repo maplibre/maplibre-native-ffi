@@ -6,14 +6,6 @@ struct mln_render_session_object;
 
 namespace mln::core {
 
-auto metal_surface_descriptor_default() noexcept
-  -> mln_metal_surface_descriptor;
-auto vulkan_surface_descriptor_default() noexcept
-  -> mln_vulkan_surface_descriptor;
-auto opengl_surface_descriptor_default() noexcept
-  -> mln_opengl_surface_descriptor;
-auto webgpu_surface_descriptor_default() noexcept
-  -> mln_webgpu_surface_descriptor;
 // Validate descriptor shape even in unsupported builds, so malformed input
 // reports the same error on every backend. Provider support is checked only
 // where an OpenGL context can be created.

@@ -119,7 +119,7 @@ internal class RenderSessionFixture(
 
   private fun requestForcedFrame(): ULong {
     val token = nextToken++
-    session.requestFrame(FrameDemand(flags = FrameDemandFlag.NONE, token = token))
+    session.requestFrame(FrameDemand(flags = FrameDemandFlag.FORCE, token = token))
     return token
   }
 

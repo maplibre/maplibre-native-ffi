@@ -3,7 +3,7 @@
 // process ends when the script does.
 
 import { RuntimeEventType, runtimeCreate } from "../../src/index.ts";
-import { listen, styleRoute } from "../support/fixture.ts";
+import { listen, mapOptions, styleRoute } from "../support/fixture.ts";
 import { emptyStyle } from "../support/styles.ts";
 
 const runtime = runtimeCreate();
@@ -12,7 +12,7 @@ await runtime.setResourceProvider({
   routes: [styleRoute("open://style.json")],
   callback() {},
 });
-const { map, ready } = runtime.createMap();
+const { map, ready } = runtime.createMap(mapOptions);
 await ready;
 await map.setStyleJson(emptyStyle());
 await map.addCustomGeometrySource("custom", { fetchTile() {} });

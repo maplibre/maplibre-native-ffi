@@ -385,7 +385,7 @@ export class TestSession {
       const token = ++this.#token;
       this.session.requestFrame({
         token,
-        flags: FrameDemandFlag.ifNeeded | FrameDemandFlag.waitForUpdate,
+        flags: FrameDemandFlag.waitForUpdate,
       });
       const result = await this.#until(
         () => takeResult(this.session, token),

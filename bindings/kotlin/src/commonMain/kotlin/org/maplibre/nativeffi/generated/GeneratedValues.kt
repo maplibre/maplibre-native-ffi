@@ -184,14 +184,14 @@ public value class FrameDemandFlag(public val rawValue: UInt) {
     flagLabel(
       rawValue.toULong(),
       "NONE",
-      listOf(1uL to "IF_NEEDED", 2uL to "PRESENT", 4uL to "WAIT_FOR_UPDATE"),
+      listOf(1uL to "FORCE", 2uL to "PRESENT", 4uL to "WAIT_FOR_UPDATE"),
     )
 
   public companion object {
     /** No flags. */
     public val NONE: FrameDemandFlag = FrameDemandFlag(0u)
-    /** Render only when a newer map update exists. */
-    public val IF_NEEDED: FrameDemandFlag = FrameDemandFlag(1u)
+    /** Render even when no map update is newer than the last rendered one. */
+    public val FORCE: FrameDemandFlag = FrameDemandFlag(1u)
     /**
      * Present the rendered frame on a target that supports presentation. A presenting target whose
      * demand clears this bit still renders and keeps whatever it presented last. Ignored by targets
@@ -199,7 +199,7 @@ public value class FrameDemandFlag(public val rawValue: UInt) {
      */
     public val PRESENT: FrameDemandFlag = FrameDemandFlag(2u)
     /**
-     * With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+     * Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
      * `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the map's next update, a
      * target replacement, or an applied resize. A waiting demand holds no ring slot. A later demand
      * with the same flags supersedes it, a barrier ends its wait with
@@ -761,8 +761,8 @@ public value class RenderResult(public val rawValue: UInt) {
      */
     public val TARGET_NOT_READY: RenderResult = RenderResult(2u)
     /**
-     * A newer IF_NEEDED demand with the same flags replaced this demand. A still image's demand is
-     * never replaced, and never replaces one.
+     * A newer demand with the same flags, neither of them forced, replaced this demand. A still
+     * image's demand is never replaced, and never replaces one.
      */
     public val SUPERSEDED: RenderResult = RenderResult(3u)
   }
@@ -899,8 +899,8 @@ public value class ResourceKind(public val rawValue: UInt) {
 
 /**
  * The resource kinds that a route or rule matches, one bit per `mln_resource_kind` value.
- * Registration requires at least one known bit. `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource
- * kind.
+ * Registration rejects unknown bits. `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every
+ * resource kind.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
@@ -1880,11 +1880,11 @@ public data class Camera(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class LogicalExtent(
-  /** Width in UI pixels. Defaults to 256. */
+  /** Width in UI pixels. */
   public val width: UInt = LogicalExtent.default.width,
-  /** Height in UI pixels. Defaults to 256. */
+  /** Height in UI pixels. */
   public val height: UInt = LogicalExtent.default.height,
-  /** Device pixels per UI pixel. Defaults to 1.0. */
+  /** Device pixels per UI pixel. */
   public val scaleFactor: Double = LogicalExtent.default.scaleFactor,
 ) {
   public companion object {
@@ -2258,9 +2258,9 @@ public data class AnimationOptions(
    */
   public val durationMs: Double? = null,
   /**
-   * Average fly velocity in screenfuls per second. Must be positive and finite; defaults to 1.2
-   * when omitted. A flight whose derived duration is too long to represent fails its completion
-   * with `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+   * Average fly velocity in screenfuls per second. Must be positive and finite; absent selects 1.2.
+   * A flight whose derived duration is too long to represent fails its completion with
+   * `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
    */
   public val velocity: Double? = null,
   /** Peak zoom for flyTo transitions. */
@@ -2428,7 +2428,10 @@ public data class CanonicalTileId(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class FrameDemand(
-  /** A bitwise OR of `mln_frame_demand_flag` values. Defaults to `MLN_FRAME_DEMAND_IF_NEEDED`. */
+  /**
+   * A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a newer map update
+   * exists, without presenting.
+   */
   public val flags: FrameDemandFlag = FrameDemand.default.flags,
   /**
    * Host identity returned with the terminal frame result. Any value except
@@ -2488,13 +2491,13 @@ public data class FreeCameraOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class GeojsonSourceOptions(
-  /** Minimum tiling zoom. Defaults to 0. */
+  /** Minimum tiling zoom. Absent selects 0. */
   public val minZoom: Double? = null,
-  /** Maximum tiling zoom, an integer within &#91;0, 24&#93;. Defaults to 18. */
+  /** Maximum tiling zoom, an integer within &#91;0, 24&#93;. Absent selects 18. */
   public val maxZoom: Double? = null,
-  /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */
+  /** Douglas-Peucker simplification tolerance. Absent selects 0.375. */
   public val tolerance: Double? = null,
-  /** Highest zoom that clusters points. Defaults to 17. */
+  /** Highest zoom that clusters points. Absent selects 17. */
   public val clusterMaxZoom: Double? = null,
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
@@ -2502,17 +2505,19 @@ public data class GeojsonSourceOptions(
    * for the call.
    */
   public val clusterProperties: String = GeojsonSourceOptions.default.clusterProperties,
-  /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
+  /** Tile buffer in pixels within &#91;0, 512&#93;. Absent selects 128. */
   public val buffer: UInt? = null,
-  /** Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50. */
+  /** Cluster radius in pixels within &#91;0, 4095&#93;. Absent selects 50. */
   public val clusterRadius: UInt? = null,
-  /** Points required to form a cluster. Defaults to 2. */
+  /** Points required to form a cluster. Absent selects 2. */
   public val clusterMinPoints: UInt? = null,
-  /** Adds line distance metrics to line features. Defaults to false. */
+  /** Adds line distance metrics to line features. Absent selects false. */
   public val lineMetrics: Boolean? = null,
-  /** Clusters point features. Defaults to false. */
+  /** Clusters point features. Absent selects false. */
   public val cluster: Boolean? = null,
-  /** Tiles the data for the next render update instead of in the background. Defaults to false. */
+  /**
+   * Tiles the data for the next render update instead of in the background. Absent selects false.
+   */
   public val synchronousTiling: Boolean? = null,
 ) {
   public companion object {
@@ -2529,6 +2534,7 @@ public data class GeojsonSourceOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeader(
+  /** Header field name. Required. */
   public val name: String = "",
   public val value: String = "",
 )
@@ -2540,7 +2546,7 @@ public data class HttpHeader(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderRule(
-  /** The resource kinds to match. */
+  /** The resource kinds to match. Zero selects every kind. */
   public val kinds: ResourceKindFlag = HttpHeaderRule.default.kinds,
   public val flags: UrlMatchFlag = HttpHeaderRule.default.flags,
   /** The URL or glob pattern to compare. */
@@ -2577,21 +2583,17 @@ public data class ProjectedMeters(
  */
 public data class MapOptions(
   /**
-   * Initial logical extent. Width and height must be nonzero, and scale_factor must be finite and
-   * positive. scale_factor is fixed for the map's lifetime.
+   * Initial logical extent. Required. Width and height must be nonzero, and scale_factor must be
+   * finite and positive. scale_factor is fixed for the map's lifetime.
    */
   public val initialExtent: LogicalExtent = MapOptions.default.initialExtent,
-  /** Defaults to `MLN_MAP_MODE_CONTINUOUS`. */
   public val mapMode: MapMode = MapOptions.default.mapMode,
-  /**
-   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings. Defaults to
-   * false.
-   */
+  /** Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings. */
   public val fastPforEnabled: Boolean = MapOptions.default.fastPforEnabled,
   /**
    * Map-originated event types this map queues, as a bitwise OR of `mln_runtime_event_flag` values.
    */
-  public val eventMask: RuntimeEventFlag = MapOptions.default.eventMask,
+  public val eventMask: RuntimeEventFlag? = null,
 ) {
   public companion object {
     internal val default: MapOptions by lazy { GeneratedApi.mapOptionsDefault() }
@@ -2637,13 +2639,13 @@ public data class MetalBorrowedTexture(
  */
 public data class MetalBorrowedTextureDescriptor(
   /**
-   * Logical texture extent; physical_width and physical_height give the texture's size. A
+   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
    */
   public val extent: LogicalExtent = MetalBorrowedTextureDescriptor.default.extent,
-  /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
+  /** Physical texture width in device pixels. Required. */
   public val physicalWidth: UInt = MetalBorrowedTextureDescriptor.default.physicalWidth,
-  /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
+  /** Physical texture height in device pixels. Required. */
   public val physicalHeight: UInt = MetalBorrowedTextureDescriptor.default.physicalHeight,
   /** The ring's textures, one per slot, in slot order. Required. */
   public val textures: List<MetalBorrowedTexture> = MetalBorrowedTextureDescriptor.default.textures,
@@ -2674,16 +2676,15 @@ public data class MetalContextDescriptor(
  */
 public data class MetalOwnedTextureDescriptor(
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
   /** Metal backend context. device is required. */
   public val context: MetalContextDescriptor = MetalOwnedTextureDescriptor.default.context,
   /**
    * Backend-native MTLPixelFormat value of the ring's textures: either MTLPixelFormatRGBA8Unorm or
-   * MTLPixelFormatBGRA8Unorm. Defaults to MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for
-   * either format.
+   * MTLPixelFormatBGRA8Unorm. Required. Readback returns RGBA8 for either format.
    */
   public val pixelFormat: ULong = MetalOwnedTextureDescriptor.default.pixelFormat,
 ) {
@@ -2702,8 +2703,8 @@ public data class MetalOwnedTextureDescriptor(
  */
 public data class MetalSurfaceDescriptor(
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = MetalSurfaceDescriptor.default.extent,
   /** Metal backend context. device is optional for Metal surfaces. */
@@ -2848,13 +2849,13 @@ public data class OpenglBorrowedTexture(
  */
 public data class OpenglBorrowedTextureDescriptor(
   /**
-   * Logical texture extent; physical_width and physical_height give the texture's size. A
+   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
    */
   public val extent: LogicalExtent = OpenglBorrowedTextureDescriptor.default.extent,
-  /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
+  /** Physical texture width in device pixels. Required. */
   public val physicalWidth: UInt = OpenglBorrowedTextureDescriptor.default.physicalWidth,
-  /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
+  /** Physical texture height in device pixels. Required. */
   public val physicalHeight: UInt = OpenglBorrowedTextureDescriptor.default.physicalHeight,
   /**
    * Borrowed OpenGL context provider data. The textures must belong to this context or a context in
@@ -2864,7 +2865,7 @@ public data class OpenglBorrowedTextureDescriptor(
   /** The ring's textures, one per slot, in slot order. Required. */
   public val textures: List<OpenglBorrowedTexture> =
     OpenglBorrowedTextureDescriptor.default.textures,
-  /** OpenGL texture target of every texture. Must be GL_TEXTURE_2D. */
+  /** OpenGL texture target of every texture. Required: GL_TEXTURE_2D. */
   public val target: UInt = OpenglBorrowedTextureDescriptor.default.target,
 ) {
   public companion object {
@@ -2882,8 +2883,8 @@ public data class OpenglBorrowedTextureDescriptor(
  */
 public data class OpenglOwnedTextureDescriptor(
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = OpenglOwnedTextureDescriptor.default.extent,
   /**
@@ -2908,8 +2909,8 @@ public data class OpenglOwnedTextureDescriptor(
  */
 public data class OpenglSurfaceDescriptor(
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = OpenglSurfaceDescriptor.default.extent,
   /** Borrowed OpenGL context provider data. */
@@ -2934,11 +2935,13 @@ public data class OpenglSurfaceDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class PremultipliedRgba8Image(
+  /** Image width in pixels. Required. */
   public val width: UInt = PremultipliedRgba8Image.default.width,
+  /** Image height in pixels. Required. */
   public val height: UInt = PremultipliedRgba8Image.default.height,
-  /** Bytes per image row. Must be at least width &#42; 4. */
+  /** Bytes per image row. Required, and at least width &#42; 4. */
   public val stride: UInt = PremultipliedRgba8Image.default.stride,
-  /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
+  /** Premultiplied RGBA8 pixels. Required. */
   public val pixels: ByteArray = PremultipliedRgba8Image.default.pixels,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(width, height, stride, pixels)
@@ -2963,21 +2966,20 @@ public data class PremultipliedRgba8Image(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class RenderSessionAttachOptions(
-  /** Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. */
+  /** Where the session's driver runs. Required. */
   public val driver: RenderDriverKind = RenderSessionAttachOptions.default.driver,
   /**
-   * Requested slot count of a session-owned texture ring, from one to `MLN_TEXTURE_RING_MAX_DEPTH`.
-   * Private targets grant one slot regardless of this value. A borrowed texture ring's depth is its
-   * texture count, so borrowed and other targets ignore this value. Defaults to 2, so the host can
-   * retain one frame while the session renders its replacement.
+   * Requested slot count of a session-owned texture ring, up to `MLN_TEXTURE_RING_MAX_DEPTH`. Zero
+   * selects 2, so the host can retain one frame while the session renders its replacement. Private
+   * targets grant one slot regardless of this value. A borrowed texture ring's depth is its texture
+   * count, so borrowed and other targets ignore this value.
    */
   public val requestedTextureRingDepth: UInt =
     RenderSessionAttachOptions.default.requestedTextureRingDepth,
   /**
-   * Producer synchronization for acquired texture frames. Defaults to `MLN_GPU_SYNC_CPU_COMPLETE`.
-   * `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target and a
-   * caller-graphics-thread driver. Other targets support only CPU completion and fail an
-   * unsupported request.
+   * Producer synchronization for acquired texture frames. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
+   * shared EGL or WGL texture target and a caller-graphics-thread driver. Other targets support
+   * only CPU completion and fail an unsupported request.
    */
   public val producerSyncKind: GpuSyncKind = RenderSessionAttachOptions.default.producerSyncKind,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
@@ -3026,7 +3028,7 @@ public data class RenderedFeatureQueryOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRoute(
-  /** The resource kinds to match. */
+  /** The resource kinds to match. Zero selects every kind. */
   public val kinds: ResourceKindFlag = ResourceRoute.default.kinds,
   public val flags: UrlMatchFlag = ResourceRoute.default.flags,
   /** The URL or glob pattern to compare. */
@@ -3194,13 +3196,13 @@ public data class StyleImageOptions(
   public val stretchY: List<ImageStretch>? = null,
   /** Content box used when icon-text-fit applies. */
   public val content: ImageContent? = null,
-  /** Defaults to STRETCH_OR_SHRINK. */
+  /** Absent selects STRETCH_OR_SHRINK. */
   public val textFitWidth: StyleImageTextFit? = null,
-  /** Defaults to STRETCH_OR_SHRINK. */
+  /** Absent selects STRETCH_OR_SHRINK. */
   public val textFitHeight: StyleImageTextFit? = null,
-  /** Sprite pixel ratio. Defaults to 1. */
+  /** Sprite pixel ratio. Absent selects 1. */
   public val pixelRatio: Float? = null,
-  /** Whether the image is a signed distance field icon. Defaults to false. */
+  /** Whether the image is a signed distance field icon. Absent selects false. */
   public val sdf: Boolean? = null,
 ) {
   public companion object {
@@ -3286,26 +3288,26 @@ public data class VulkanBorrowedTexture(
  */
 public data class VulkanBorrowedTextureDescriptor(
   /**
-   * Logical texture extent; physical_width and physical_height give the texture's size. A
+   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
    */
   public val extent: LogicalExtent = VulkanBorrowedTextureDescriptor.default.extent,
-  /** Physical image width in device pixels. Must be positive. Defaults to 256. */
+  /** Physical image width in device pixels. Required. */
   public val physicalWidth: UInt = VulkanBorrowedTextureDescriptor.default.physicalWidth,
-  /** Physical image height in device pixels. Must be positive. Defaults to 256. */
+  /** Physical image height in device pixels. Required. */
   public val physicalHeight: UInt = VulkanBorrowedTextureDescriptor.default.physicalHeight,
   /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor = VulkanBorrowedTextureDescriptor.default.context,
   /** The ring's images, one per slot, in slot order. Required. */
   public val textures: List<VulkanBorrowedTexture> =
     VulkanBorrowedTextureDescriptor.default.textures,
-  /** Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid. */
+  /** Backend-native VkFormat value of every image. Required, so VK_FORMAT_UNDEFINED is invalid. */
   public val format: UInt = VulkanBorrowedTextureDescriptor.default.format,
   /** Backend-native VkImageLayout value expected at render-pass begin. */
   public val initialLayout: UInt = VulkanBorrowedTextureDescriptor.default.initialLayout,
   /**
-   * Backend-native VkImageLayout value left after rendering succeeds. Defaults to 5,
-   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+   * Backend-native VkImageLayout value left after rendering succeeds, such as
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
   public val finalLayout: UInt = VulkanBorrowedTextureDescriptor.default.finalLayout,
 ) {
@@ -3324,8 +3326,8 @@ public data class VulkanBorrowedTextureDescriptor(
  */
 public data class VulkanOwnedTextureDescriptor(
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = VulkanOwnedTextureDescriptor.default.extent,
   /** Borrowed Vulkan context. All handles are required. */
@@ -3346,8 +3348,8 @@ public data class VulkanOwnedTextureDescriptor(
  */
 public data class VulkanSurfaceDescriptor(
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = VulkanSurfaceDescriptor.default.extent,
   /**
@@ -3407,13 +3409,13 @@ public data class WebgpuBorrowedTexture(
  */
 public data class WebgpuBorrowedTextureDescriptor(
   /**
-   * Logical texture extent; physical_width and physical_height give the texture's size. A
+   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
    * scale_factor that differs from the map's is accepted and logged as a warning.
    */
   public val extent: LogicalExtent = WebgpuBorrowedTextureDescriptor.default.extent,
-  /** Physical texture width in device pixels. Defaults to 256. */
+  /** Physical texture width in device pixels. Required. */
   public val physicalWidth: UInt = WebgpuBorrowedTextureDescriptor.default.physicalWidth,
-  /** Physical texture height in device pixels. Defaults to 256. */
+  /** Physical texture height in device pixels. Required. */
   public val physicalHeight: UInt = WebgpuBorrowedTextureDescriptor.default.physicalHeight,
   /**
    * Borrowed WebGPU context. device is required. Rendering is submitted through context.queue or
@@ -3423,7 +3425,7 @@ public data class WebgpuBorrowedTextureDescriptor(
   /** The ring's textures, one per slot, in slot order. Required. */
   public val textures: List<WebgpuBorrowedTexture> =
     WebgpuBorrowedTextureDescriptor.default.textures,
-  /** Backend-native WGPUTextureFormat value of every texture. Undefined is invalid. */
+  /** Backend-native WGPUTextureFormat value of every texture. Required, so Undefined is invalid. */
   public val format: UInt = WebgpuBorrowedTextureDescriptor.default.format,
 ) {
   public companion object {
@@ -3441,8 +3443,8 @@ public data class WebgpuBorrowedTextureDescriptor(
  */
 public data class WebgpuOwnedTextureDescriptor(
   /**
-   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = WebgpuOwnedTextureDescriptor.default.extent,
   /** Borrowed WebGPU context. device is required. */
@@ -3463,8 +3465,8 @@ public data class WebgpuOwnedTextureDescriptor(
  */
 public data class WebgpuSurfaceDescriptor(
   /**
-   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical surface extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent = WebgpuSurfaceDescriptor.default.extent,
   /** Borrowed WebGPU context. device is required. */
@@ -3505,7 +3507,7 @@ public data class CameraQueryResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class FeatureStateSelector(
-  /** Source ID. Required and borrowed for the duration of the call. */
+  /** Source ID. Required. Borrowed for the duration of the call. */
   public val sourceId: String = "",
   /** Source layer ID, or empty for none. Required for vector-source disambiguation. */
   public val sourceLayerId: String = "",
@@ -3882,7 +3884,7 @@ public data class OfflineTilePyramidRegionDefinition(
 public data class OfflineGeometryRegionDefinition(
   /** Style URL. Copied during region creation. */
   public val styleUrl: String = "",
-  /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
+  /** UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation. */
   public val geometry: String = "",
   public val minZoom: Double = 0.0,
   /** Maximum zoom. Positive infinity lets each tile source use its own maximum zoom. */

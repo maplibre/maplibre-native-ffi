@@ -263,30 +263,30 @@ public typealias CustomSourceFetchTileCallback =
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
-  /// Minimum tiling zoom. Defaults to 0.
+  /// Minimum tiling zoom. Absent selects 0.
   public var minZoom: Double?
-  /// Maximum tiling zoom, an integer within \[0, 24\]. Defaults to 18.
+  /// Maximum tiling zoom, an integer within \[0, 24\]. Absent selects 18.
   public var maxZoom: Double?
-  /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
+  /// Douglas-Peucker simplification tolerance. Absent selects 0.375.
   public var tolerance: Double?
-  /// Highest zoom that clusters points. Defaults to 17.
+  /// Highest zoom that clusters points. Absent selects 17.
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
   /// whose members follow the MapLibre Style Spec clusterProperties form, or
   /// empty for none. The UTF-8 bytes are borrowed for the call.
   public var clusterProperties: String
-  /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
+  /// Tile buffer in pixels within \[0, 512\]. Absent selects 128.
   public var buffer: UInt32?
-  /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
+  /// Cluster radius in pixels within \[0, 4095\]. Absent selects 50.
   public var clusterRadius: UInt32?
-  /// Points required to form a cluster. Defaults to 2.
+  /// Points required to form a cluster. Absent selects 2.
   public var clusterMinPoints: UInt32?
-  /// Adds line distance metrics to line features. Defaults to false.
+  /// Adds line distance metrics to line features. Absent selects false.
   public var lineMetrics: Bool?
-  /// Clusters point features. Defaults to false.
+  /// Clusters point features. Absent selects false.
   public var cluster: Bool?
   /// Tiles the data for the next render update instead of in the background.
-  /// Defaults to false.
+  /// Absent selects false.
   public var synchronousTiling: Bool?
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_geojson_source_options_default))
@@ -479,11 +479,13 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
+  /// Image width in pixels. Required.
   public var width: UInt32
+  /// Image height in pixels. Required.
   public var height: UInt32
-  /// Bytes per image row. Must be at least width \* 4.
+  /// Bytes per image row. Required, and at least width \* 4.
   public var stride: UInt32
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+  /// Premultiplied RGBA8 pixels. Required.
   public var pixels: Data
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_premultiplied_rgba8_image_default))
@@ -628,13 +630,13 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   public var stretchY: [ImageStretch]?
   /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
-  /// Defaults to STRETCH_OR_SHRINK.
+  /// Absent selects STRETCH_OR_SHRINK.
   public var textFitWidth: StyleImageTextFit?
-  /// Defaults to STRETCH_OR_SHRINK.
+  /// Absent selects STRETCH_OR_SHRINK.
   public var textFitHeight: StyleImageTextFit?
-  /// Sprite pixel ratio. Defaults to 1.
+  /// Sprite pixel ratio. Absent selects 1.
   public var pixelRatio: Float?
-  /// Whether the image is a signed distance field icon. Defaults to false.
+  /// Whether the image is a signed distance field icon. Absent selects false.
   public var sdf: Bool?
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_style_image_options_default))

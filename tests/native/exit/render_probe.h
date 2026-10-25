@@ -117,7 +117,11 @@ typedef struct probe_session {
 static inline void probe_request_frame(mln_render_session session) {
   probe_require(
     mln_render_session_request_frame(
-      session, &(mln_frame_demand){.size = sizeof(mln_frame_demand)}, NULL
+      session,
+      &(mln_frame_demand){
+        .size = sizeof(mln_frame_demand), .flags = MLN_FRAME_DEMAND_FORCE
+      },
+      NULL
     ),
     "requesting a frame"
   );

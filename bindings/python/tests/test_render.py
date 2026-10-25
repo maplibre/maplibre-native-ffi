@@ -146,8 +146,7 @@ class OwnedTexture:
                 map_mode=mln.MapMode.CONTINUOUS,
                 initial_extent=mln.LogicalExtent(WIDTH, HEIGHT, 1.0),
             )
-            options = replace(
-                mln.RenderSessionAttachOptions.default(),
+            options = mln.RenderSessionAttachOptions(
                 driver=driver,
                 frame_wake=frame_wake(self.frames.notify),
                 driver_work_wake=mln.Wake(self._work.set),
@@ -258,13 +257,10 @@ class OwnedTexture:
         token = self._next_token
         self._next_token += 1
         session.request_frame(
-            replace(
-                mln.FrameDemand.default(),
-                flags=(
-                    mln.FrameDemandFlag.IF_NEEDED | mln.FrameDemandFlag.WAIT_FOR_UPDATE
-                )
+            mln.FrameDemand(
+                flags=mln.FrameDemandFlag.WAIT_FOR_UPDATE
                 if wait_for_update
-                else mln.FrameDemandFlag(0),
+                else mln.FrameDemandFlag.FORCE,
                 token=token,
             )
         )
@@ -556,7 +552,7 @@ def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
     frames = _NativeCode(user_data=0x5EED)
     driver = _default_driver(backend)
     with OwnedTexture(harness, backend, driver, frame_wake=frames.wake) as target:
-        options = mln.RenderSessionAttachOptions.default()
+        options = mln.RenderSessionAttachOptions(driver=driver)
         target.render()
         # Native code calls the function pointer with the context unchanged.
         assert frames.called.wait(TIMEOUT)
@@ -640,7 +636,7 @@ def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> N
             ),
         ):
             target._attach(
-                replace(mln.RenderSessionAttachOptions.default(), queue_lock=lock)
+                mln.RenderSessionAttachOptions(driver=driver, queue_lock=lock)
             )
     assert host.releases == [host.user_data]
 

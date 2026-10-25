@@ -227,6 +227,7 @@ bool mln_test_dedicated_texture_create(
     mln_opengl_owned_texture_descriptor_default();
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
+  descriptor.extent.scale_factor = 1.0;
   descriptor.context = dedicated_context(state);
   fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   fixture->backend_state = state;

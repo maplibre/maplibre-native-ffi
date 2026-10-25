@@ -386,7 +386,7 @@ static void jump_to(mln_map map, double longitude, double zoom) {
 // unwrapped ones keep in the visible copy. Single and batch conversions agree.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 1024;
   options.initial_extent.height = 512;
   mln_map map = mln_test_create_map_with_options(runtime, &options);

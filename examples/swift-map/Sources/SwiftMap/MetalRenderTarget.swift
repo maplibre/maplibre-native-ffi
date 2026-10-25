@@ -144,7 +144,7 @@ final class MetalRenderTarget {
   /// update, which a retry after a frame that missed the layer needs.
   func requestFrame(force: Bool = false) throws {
     nextToken += 1
-    var flags: FrameDemandFlag = force ? [] : [.ifNeeded, .waitForUpdate]
+    var flags: FrameDemandFlag = force ? [.force] : [.waitForUpdate]
     if case .nativeSurface = kind {
       flags.insert(.present)
     }

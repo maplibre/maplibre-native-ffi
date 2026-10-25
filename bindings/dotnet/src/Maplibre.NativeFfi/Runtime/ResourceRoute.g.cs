@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Kinds">
-/// The resource kinds to match.
+/// The resource kinds to match. Zero selects every kind.
 /// </param>
 /// <param name="Url">
 /// The URL or glob pattern to compare.

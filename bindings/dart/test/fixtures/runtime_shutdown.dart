@@ -5,6 +5,7 @@ import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
+import '../support/fixture.dart';
 import '../support/graphics.dart';
 
 Future<void> closeRuntimes() async {
@@ -12,7 +13,7 @@ Future<void> closeRuntimes() async {
     await Future.wait(
       List.generate(2, (_) async {
         final runtime = runtimeCreate(runtimeOptionsDefault());
-        final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+        final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
         await ready;
         try {
           await runtime.close();
@@ -40,7 +41,7 @@ const _emptyStyle = {
 /// shutdown to finalize.
 Future<void> abandonHandles() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await ready;
   await map.setStyleJson(_emptyStyle);
   print('ABANDONED_HANDLES');
@@ -127,7 +128,7 @@ Future<void> exitWithLiveCallbacks() async {
       },
     ),
   );
-  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await ready;
   await map.setStyleUrl('shutdown://style');
   await served.future;

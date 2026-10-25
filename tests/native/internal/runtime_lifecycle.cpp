@@ -68,8 +68,9 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
 
   auto create_map = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};
+  const auto map_options = mln_test_map_options();
   MLN_TEST_OK(mln_runtime_create_map(
-    waiting, nullptr, &map, &create_map.descriptor, nullptr
+    waiting, &map_options, &map, &create_map.descriptor, nullptr
   ));
   MLN_TEST_OK(mln_test_completion_settle(&create_map));
   auto map_close = mln_test_completion_default(0);
@@ -117,8 +118,9 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   const auto runtime = create_runtime();
   auto creation = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};
+  const auto map_options = mln_test_map_options();
   MLN_TEST_OK(mln_runtime_create_map(
-    runtime, nullptr, &map, &creation.descriptor, nullptr
+    runtime, &map_options, &map, &creation.descriptor, nullptr
   ));
   MLN_TEST_OK(mln_test_completion_settle(&creation));
   auto transition = mln_test_transition_end{};

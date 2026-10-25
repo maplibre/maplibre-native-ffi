@@ -13,7 +13,7 @@ import {
 } from "../src/index.ts";
 import { native } from "../src/internal/addon.ts";
 import { query, run } from "../src/internal/completions.ts";
-import { extent, openRuntime } from "./support/fixture.ts";
+import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, test } from "./support/harness.ts";
 import { pendingCompletions } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
@@ -109,8 +109,8 @@ function aborted(signal: AbortSignal): Promise<never> {
 test("a wait that is abandoned leaves its completion to arrive later", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openMap({
+    ...mapOptions,
     mapMode: MapMode.staticValue,
-    initialExtent: extent,
   });
   await bounded(map.setStyleJson(emptyStyle()), "a command");
 

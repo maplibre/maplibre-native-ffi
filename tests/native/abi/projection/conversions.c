@@ -26,7 +26,7 @@ static mln_lat_lng coordinate_for(
 // back to the coordinates they came from.
 static void conversions_agree_singly_and_in_batches_and_invert(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 200;
   options.initial_extent.height = 100;
   mln_map map = mln_test_create_map_with_options(runtime, &options);

@@ -101,7 +101,7 @@ pub const Session = struct {
         self.next_token += 1;
         var diagnostic: maplibre.Diagnostic = .{};
         (self.handle.?).requestFrame(.{
-            .flags = .{ .if_needed = !force, .wait_for_update = !force, .present = self.presents },
+            .flags = .{ .force = force, .wait_for_update = !force, .present = self.presents },
             .token = self.next_token,
         }, &diagnostic) catch |err| {
             diagnostics.logError("frame demand failed", err, &diagnostic);

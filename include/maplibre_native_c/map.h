@@ -187,33 +187,45 @@ typedef enum mln_map_mode : uint32_t {
 } mln_map_mode;
 /** Logical extent in UI pixels and the device-pixel scale. */
 typedef struct mln_logical_extent {
-  /** Width in UI pixels. Defaults to 256. */
+  /** Width in UI pixels. */
   uint32_t width;
-  /** Height in UI pixels. Defaults to 256. */
+  /** Height in UI pixels. */
   uint32_t height;
-  /** Device pixels per UI pixel. Defaults to 1.0. */
+  /** Device pixels per UI pixel. */
   double scale_factor;
 } mln_logical_extent;
 
-/** Returns a 256 by 256 logical extent with one device pixel per UI pixel. */
+/**
+ * Returns a zeroed logical extent, which every function that takes an extent
+ * rejects.
+ */
 MLN_API mln_logical_extent mln_logical_extent_default(void) MLN_NOEXCEPT;
+
+/** Field mask values for mln_map_options. */
+typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
+  MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
+} mln_map_option_field;
+
+/** A set of mln_map_option_field bits. */
+typedef uint32_t mln_map_option_fields;
 
 /** Options used when creating a map. */
 typedef struct mln_map_options {
   uint32_t size;
+  mln_map_option_fields fields;
   /**
-   * Initial logical extent. Width and height must be nonzero, and scale_factor
-   * must be finite and positive. scale_factor is fixed for the map's lifetime.
+   * Initial logical extent. Required. Width and height must be nonzero, and
+   * scale_factor must be finite and positive. scale_factor is fixed for the
+   * map's lifetime.
    *
    * After creation, only mln_map_resize() changes the width and height. A
    * render session submits it to size the map to its target.
    */
-  mln_logical_extent initial_extent;
-  /** Defaults to MLN_MAP_MODE_CONTINUOUS. */
+  mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-   * encodings. Defaults to false.
+   * encodings.
    *
    * Enable this on maps that read vector sources created with
    * MLN_STYLE_VECTOR_TILE_ENCODING_MLT from a tile set that uses FastPFOR. It
@@ -226,14 +238,15 @@ typedef struct mln_map_options {
    * Map-originated event types this map queues, as a bitwise OR of
    * mln_runtime_event_flag values.
    *
-   * This field is always read. MLN_RUNTIME_EVENT_FLAG_ALL selects every event
-   * type this library reports, and MLN_RUNTIME_EVENT_FLAG_NONE queues none.
-   * Defaults to MLN_RUNTIME_EVENT_FLAG_ALL.
+   * Absent selects every event type. Present, MLN_RUNTIME_EVENT_FLAG_ALL
+   * selects every event type this library reports, and
+   * MLN_RUNTIME_EVENT_FLAG_NONE queues none.
    *
    * The mask applies throughout construction, including the camera events that
    * MapLibre reports while it initializes the map's size.
    */
-  mln_runtime_event_flags event_mask;
+  mln_runtime_event_flags event_mask
+    MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_EVENT_MASK");
 } mln_map_options;
 
 /**
@@ -393,7 +406,7 @@ typedef struct mln_animation_options {
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_DURATION");
   /**
    * Average fly velocity in screenfuls per second. Must be positive and finite;
-   * defaults to 1.2 when omitted. A flight whose derived duration is too long
+   * absent selects 1.2. A flight whose derived duration is too long
    * to represent fails its completion with MLN_STATUS_NATIVE_ERROR. An
    * explicit duration overrides velocity.
    */
@@ -593,8 +606,8 @@ typedef uint32_t mln_feature_state_selector_fields;
 typedef struct mln_feature_state_selector {
   uint32_t size;
   mln_feature_state_selector_fields fields;
-  /** Source ID. Required and borrowed for the duration of the call. */
-  mln_buffer_view source_id;
+  /** Source ID. Required. Borrowed for the duration of the call. */
+  mln_buffer_view source_id MLN_BINDING("required=true");
   /**
    * Source layer ID, or empty for none. Required for vector-source
    * disambiguation.
@@ -652,8 +665,10 @@ typedef struct mln_offline_tile_pyramid_region_definition {
 typedef struct mln_offline_geometry_region_definition {
   /** Style URL. Copied during region creation. */
   mln_buffer_view style_url;
-  /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
-  mln_buffer_view geometry MLN_BINDING("encoding=json");
+  /**
+   * UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
+   */
+  mln_buffer_view geometry MLN_BINDING("encoding=json;required=true");
   double min_zoom;
   /**
    * Maximum zoom. Positive infinity lets each tile source use its own maximum
@@ -1134,7 +1149,9 @@ typedef struct mln_camera_query_result {
 } mln_camera_query_result;
 
 /**
- * Returns map options initialized for this C API version.
+ * Returns zeroed map options with size set for this C API version.
+ *
+ * The caller still sets every required member.
  */
 MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 

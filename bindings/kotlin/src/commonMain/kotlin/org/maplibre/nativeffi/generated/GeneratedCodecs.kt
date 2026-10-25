@@ -874,10 +874,15 @@ internal fun NativeCall.writeResourceRequestCancelHandler(
 
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
   writeU32(target, 40.toUInt())
+  var fields = 0u
   putLogicalExtent(target + 8, value.initialExtent)
   writeU32(target + 24, value.mapMode.rawValue)
   writeBool(target + 28, value.fastPforEnabled)
-  writeU64(target + 32, value.eventMask.rawValue)
+  value.eventMask?.let {
+    fields = fields or 1u
+    writeU64(target + 32, it.rawValue)
+  }
+  writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
@@ -1248,13 +1253,15 @@ internal fun readLogicalExtent(source: Long): LogicalExtent =
     scaleFactor = readF64(source + 8),
   )
 
-internal fun readMapOptions(source: Long): MapOptions =
-  MapOptions(
+internal fun readMapOptions(source: Long): MapOptions {
+  val fields = readU32(source + 4)
+  return MapOptions(
     initialExtent = readLogicalExtent(source + 8),
     mapMode = MapMode(readU32(source + 24)),
     fastPforEnabled = readBool(source + 28),
-    eventMask = RuntimeEventFlag(readU64(source + 32)),
+    eventMask = if ((fields and 1u) != 0u) RuntimeEventFlag(readU64(source + 32)) else null,
   )
+}
 
 internal fun readMapTileOptions(source: Long): MapTileOptions {
   val fields = readU32(source + 4)

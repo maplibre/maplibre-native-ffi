@@ -1390,11 +1390,13 @@ napi_value mln_ts_read_map_options(
         mln_ts_bool(env, source->fast_pfor_enabled)
       ))
     return NULL;
-  if (!mln_ts_set(
-        env, result, "eventMask",
-        mln_ts_u64(env, (uint64_t)(source->event_mask))
-      ))
-    return NULL;
+  if ((source->fields & MLN_MAP_OPTION_EVENT_MASK) != 0) {
+    if (!mln_ts_set(
+          env, result, "eventMask",
+          mln_ts_u64(env, (uint64_t)(source->event_mask))
+        ))
+      return NULL;
+  }
   return result;
 }
 
@@ -5603,6 +5605,7 @@ bool mln_ts_write_map_options(
       if (!mln_ts_read_u64(call, member, &number, child)) return false;
       out->event_mask = (mln_runtime_event_flags)number;
     }
+    out->fields |= MLN_MAP_OPTION_EVENT_MASK;
   }
   return true;
 }

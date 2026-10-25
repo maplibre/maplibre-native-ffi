@@ -335,16 +335,16 @@ typedef struct mln_style_layer_info {
 typedef struct mln_geojson_source_options {
   uint32_t size;
   mln_geojson_source_option_fields fields;
-  /** Minimum tiling zoom. Defaults to 0. */
+  /** Minimum tiling zoom. Absent selects 0. */
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM");
-  /** Maximum tiling zoom, an integer within [0, 24]. Defaults to 18. */
+  /** Maximum tiling zoom, an integer within [0, 24]. Absent selects 18. */
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM");
-  /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */
+  /** Douglas-Peucker simplification tolerance. Absent selects 0.375. */
   double tolerance
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_TOLERANCE");
-  /** Highest zoom that clusters points. Defaults to 17. */
+  /** Highest zoom that clusters points. Absent selects 17. */
   double cluster_max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
   /**
@@ -353,20 +353,20 @@ typedef struct mln_geojson_source_options {
    * empty for none. The UTF-8 bytes are borrowed for the call.
    */
   mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
-  /** Tile buffer in pixels within [0, 512]. Defaults to 128. */
+  /** Tile buffer in pixels within [0, 512]. Absent selects 128. */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_BUFFER");
-  /** Cluster radius in pixels within [0, 4095]. Defaults to 50. */
+  /** Cluster radius in pixels within [0, 4095]. Absent selects 50. */
   uint32_t cluster_radius
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS");
-  /** Points required to form a cluster. Defaults to 2. */
+  /** Points required to form a cluster. Absent selects 2. */
   uint32_t cluster_min_points
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS");
-  /** Adds line distance metrics to line features. Defaults to false. */
+  /** Adds line distance metrics to line features. Absent selects false. */
   bool line_metrics
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS");
   /**
-   * Clusters point features. Defaults to false.
+   * Clusters point features. Absent selects false.
    *
    * Clustering applies to feature collections whose every feature carries point
    * geometry. mln_geojson_source_data_create() rejects a bare geometry, a
@@ -376,7 +376,7 @@ typedef struct mln_geojson_source_options {
   bool cluster MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER");
   /**
    * Tiles the data for the next render update instead of in the background.
-   * Defaults to false.
+   * Absent selects false.
    *
    * A rendered frame may still wait for tile layout.
    * mln_map_set_geojson_source_synchronous_tiling() overrides this at runtime.
@@ -529,12 +529,15 @@ typedef struct mln_custom_mvt_vector_source_options {
 /** Caller-owned premultiplied RGBA8 image pixels. */
 typedef struct mln_premultiplied_rgba8_image {
   uint32_t size;
-  uint32_t width;
-  uint32_t height;
-  /** Bytes per image row. Must be at least width * 4. */
-  uint32_t stride;
-  /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
-  const uint8_t* pixels MLN_BINDING("length=byte_length;encoding=bytes");
+  /** Image width in pixels. Required. */
+  uint32_t width MLN_BINDING("required=true");
+  /** Image height in pixels. Required. */
+  uint32_t height MLN_BINDING("required=true");
+  /** Bytes per image row. Required, and at least width * 4. */
+  uint32_t stride MLN_BINDING("required=true");
+  /** Premultiplied RGBA8 pixels. Required. */
+  const uint8_t* pixels
+    MLN_BINDING("length=byte_length;encoding=bytes;required=true");
   /** Available bytes at pixels. */
   size_t byte_length;
 } mln_premultiplied_rgba8_image;
@@ -564,16 +567,17 @@ typedef struct mln_style_image_options {
   /** Content box used when icon-text-fit applies. */
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_CONTENT");
-  /** Defaults to STRETCH_OR_SHRINK. */
+  /** Absent selects STRETCH_OR_SHRINK. */
   mln_style_image_text_fit text_fit_width
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH");
-  /** Defaults to STRETCH_OR_SHRINK. */
+  /** Absent selects STRETCH_OR_SHRINK. */
   mln_style_image_text_fit text_fit_height
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT");
-  /** Sprite pixel ratio. Defaults to 1. */
+  /** Sprite pixel ratio. Absent selects 1. */
   float pixel_ratio
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO");
-  /** Whether the image is a signed distance field icon. Defaults to false. */
+  /** Whether the image is a signed distance field icon. Absent selects false.
+   */
   bool sdf MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_SDF");
 } mln_style_image_options;
 
@@ -669,27 +673,30 @@ typedef struct mln_style_transition_options {
   );
 } mln_style_transition_options;
 
-/** Returns default GeoJSON source options. */
+/** Returns zeroed GeoJSON source options with size set. */
 MLN_API mln_geojson_source_options
 mln_geojson_source_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default custom geometry source options. */
+/** Returns zeroed custom geometry source options with size set. */
 MLN_API mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default custom MVT vector source options. */
+/** Returns zeroed custom MVT vector source options with size set. */
 MLN_API mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default(void) MLN_NOEXCEPT;
 
-/** Returns a default premultiplied RGBA8 image descriptor. */
+/**
+ * Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
+ * caller still sets every required member.
+ */
 MLN_API mln_premultiplied_rgba8_image
 mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
 
-/** Returns default runtime style image options. */
+/** Returns zeroed runtime style image options with size set. */
 MLN_API mln_style_image_options
 mln_style_image_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default global style transition options. */
+/** Returns zeroed global style transition options with size set. */
 MLN_API mln_style_transition_options
 mln_style_transition_options_default(void) MLN_NOEXCEPT;
 

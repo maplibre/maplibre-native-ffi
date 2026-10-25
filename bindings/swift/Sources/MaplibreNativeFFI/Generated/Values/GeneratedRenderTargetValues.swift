@@ -401,18 +401,18 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
-  /// Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+  /// Where the session's driver runs. Required.
   public var driver: RenderDriverKind
-  /// Requested slot count of a session-owned texture ring, from one to
-  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless of
-  /// this value. A borrowed texture ring's depth is its texture count, so
-  /// borrowed and other targets ignore this value. Defaults to 2, so the host
-  /// can retain one frame while the session renders its replacement.
+  /// Requested slot count of a session-owned texture ring, up to
+  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
+  /// frame while the session renders its replacement. Private targets grant one
+  /// slot regardless of this value. A borrowed texture ring's depth is its
+  /// texture count, so borrowed and other targets ignore this value.
   public var requestedTextureRingDepth: UInt32
-  /// Producer synchronization for acquired texture frames. Defaults to
-  /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared
-  /// EGL or WGL texture target and a caller-graphics-thread driver. Other
-  /// targets support only CPU completion and fail an unsupported request.
+  /// Producer synchronization for acquired texture frames.
+  /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+  /// and a caller-graphics-thread driver. Other targets support only CPU
+  /// completion and fail an unsupported request.
   public var producerSyncKind: GpuSyncKind
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake

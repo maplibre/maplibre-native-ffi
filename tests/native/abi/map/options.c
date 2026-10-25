@@ -454,8 +454,7 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
 
 static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
-  options.initial_extent = mln_logical_extent_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 512;
   options.initial_extent.scale_factor = 1.1;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
@@ -653,12 +652,12 @@ static void generations_increase_across_submitting_threads(void) {
 // rejected before any map exists.
 static void map_creation_rejects_a_degenerate_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 0;
   mln_map map = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "initial extent"));
-  options = mln_map_options_default();
+  options = mln_test_map_options();
   options.initial_extent.scale_factor = INFINITY;
   MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);

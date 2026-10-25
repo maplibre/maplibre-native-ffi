@@ -127,15 +127,15 @@ final class ConstrainMode extends _Enum {
 final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   const FrameDemandFlag.fromRawValue(super.rawValue);
 
-  /// Render only when a newer map update exists.
-  static const ifNeeded = FrameDemandFlag.fromRawValue(1);
+  /// Render even when no map update is newer than the last rendered one.
+  static const force = FrameDemandFlag.fromRawValue(1);
 
   /// Present the rendered frame on a target that supports presentation. A
   /// presenting target whose demand clears this bit still renders and keeps
   /// whatever it presented last. Ignored by targets without presentation.
   static const present = FrameDemandFlag.fromRawValue(2);
 
-  /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+  /// Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
   /// `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the
   /// map's next update, a target replacement, or an applied resize. A waiting
   /// demand holds no ring slot. A later demand with the same flags supersedes
@@ -156,7 +156,7 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   @override
   String toString() => _describe('FrameDemandFlag', const {
     0: 'none',
-    1: 'ifNeeded',
+    1: 'force',
     2: 'present',
     4: 'waitForUpdate',
   });
@@ -588,8 +588,8 @@ final class RenderResult extends _Enum {
   /// target can be ready, such as after a paced delay.
   static const targetNotReady = RenderResult.fromRawValue(2);
 
-  /// A newer IF_NEEDED demand with the same flags replaced this demand. A still
-  /// image's demand is never replaced, and never replaces one.
+  /// A newer demand with the same flags, neither of them forced, replaced this
+  /// demand. A still image's demand is never replaced, and never replaces one.
   static const superseded = RenderResult.fromRawValue(3);
   @override
   String toString() => switch (rawValue) {
@@ -701,8 +701,8 @@ final class ResourceKind extends _Enum {
 }
 
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
+/// `mln_resource_kind` value. Registration rejects unknown bits.
+/// `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
 ///
 /// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1572,13 +1572,13 @@ final class LogicalExtent extends _Value {
       height = height ?? logicalExtentDefault().height,
       scaleFactor = scaleFactor ?? logicalExtentDefault().scaleFactor;
 
-  /// Width in UI pixels. Defaults to 256.
+  /// Width in UI pixels.
   final int width;
 
-  /// Height in UI pixels. Defaults to 256.
+  /// Height in UI pixels.
   final int height;
 
-  /// Device pixels per UI pixel. Defaults to 1.0.
+  /// Device pixels per UI pixel.
   final double scaleFactor;
 
   /// A copy of this value with the given members replaced.
@@ -1964,9 +1964,9 @@ final class AnimationOptions extends _Value {
   final double? durationMs;
 
   /// Average fly velocity in screenfuls per second. Must be positive and
-  /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
-  /// too long to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`.
-  /// An explicit duration overrides velocity.
+  /// finite; absent selects 1.2. A flight whose derived duration is too long to
+  /// represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+  /// duration overrides velocity.
   final double? velocity;
 
   /// Peak zoom for flyTo transitions.
@@ -2445,8 +2445,8 @@ final class FrameDemand extends _Value {
     : flags = flags ?? frameDemandDefault().flags,
       token = token ?? frameDemandDefault().token;
 
-  /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
-  /// `MLN_FRAME_DEMAND_IF_NEEDED`.
+  /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
+  /// newer map update exists, without presenting.
   final FrameDemandFlag flags;
 
   /// Host identity returned with the terminal frame result. Any value except
@@ -2552,16 +2552,16 @@ final class GeojsonSourceOptions extends _Value {
     this.synchronousTiling,
   });
 
-  /// Minimum tiling zoom. Defaults to 0.
+  /// Minimum tiling zoom. Absent selects 0.
   final double? minZoom;
 
-  /// Maximum tiling zoom, an integer within \[0, 24\]. Defaults to 18.
+  /// Maximum tiling zoom, an integer within \[0, 24\]. Absent selects 18.
   final double? maxZoom;
 
-  /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
+  /// Douglas-Peucker simplification tolerance. Absent selects 0.375.
   final double? tolerance;
 
-  /// Highest zoom that clusters points. Defaults to 17.
+  /// Highest zoom that clusters points. Absent selects 17.
   final double? clusterMaxZoom;
 
   /// Cluster aggregation expressions keyed by property name, as a JSON object
@@ -2569,23 +2569,23 @@ final class GeojsonSourceOptions extends _Value {
   /// empty for none. The UTF-8 bytes are borrowed for the call.
   final Object? clusterProperties;
 
-  /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
+  /// Tile buffer in pixels within \[0, 512\]. Absent selects 128.
   final int? buffer;
 
-  /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
+  /// Cluster radius in pixels within \[0, 4095\]. Absent selects 50.
   final int? clusterRadius;
 
-  /// Points required to form a cluster. Defaults to 2.
+  /// Points required to form a cluster. Absent selects 2.
   final int? clusterMinPoints;
 
-  /// Adds line distance metrics to line features. Defaults to false.
+  /// Adds line distance metrics to line features. Absent selects false.
   final bool? lineMetrics;
 
-  /// Clusters point features. Defaults to false.
+  /// Clusters point features. Absent selects false.
   final bool? cluster;
 
   /// Tiles the data for the next render update instead of in the background.
-  /// Defaults to false.
+  /// Absent selects false.
   final bool? synchronousTiling;
 
   /// A copy of this value with the given members replaced.
@@ -2653,6 +2653,8 @@ final class GeojsonSourceOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class HttpHeader extends _Value {
   const HttpHeader({this.name = '', this.value = ''});
+
+  /// Header field name. Required.
   final String name;
   final String value;
 
@@ -2681,7 +2683,7 @@ final class HttpHeaderRule extends _Value {
        url = url ?? httpHeaderRuleDefault().url,
        headers = List.unmodifiable(headers ?? httpHeaderRuleDefault().headers);
 
-  /// The resource kinds to match.
+  /// The resource kinds to match. Zero selects every kind.
   final ResourceKindFlag kinds;
   final UrlMatchFlag flags;
 
@@ -2778,13 +2780,17 @@ final class PremultipliedRgba8Image extends _Value {
        pixels = Uint8List.fromList(
          pixels ?? premultipliedRgba8ImageDefault().pixels,
        ).asUnmodifiableView();
+
+  /// Image width in pixels. Required.
   final int width;
+
+  /// Image height in pixels. Required.
   final int height;
 
-  /// Bytes per image row. Must be at least width \* 4.
+  /// Bytes per image row. Required, and at least width \* 4.
   final int stride;
 
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+  /// Premultiplied RGBA8 pixels. Required.
   final Uint8List pixels;
 
   /// A copy of this value with the given members replaced.
@@ -2852,17 +2858,15 @@ final class MetalBorrowedTextureDescriptor extends _Value {
          textures ?? metalBorrowedTextureDescriptorDefault().textures,
        );
 
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   final LogicalExtent extent;
 
-  /// Physical texture width in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture width in device pixels. Required.
   final int physicalWidth;
 
-  /// Physical texture height in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture height in device pixels. Required.
   final int physicalHeight;
 
   /// The ring's textures, one per slot, in slot order. Required.
@@ -2990,17 +2994,17 @@ final class RenderSessionAttachOptions extends _Value {
   /// caller-graphics-thread driver.
   final RenderDriverKind driver;
 
-  /// Requested slot count of a session-owned texture ring, from one to
-  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless of
-  /// this value. A borrowed texture ring's depth is its texture count, so
-  /// borrowed and other targets ignore this value. Defaults to 2, so the host
-  /// can retain one frame while the session renders its replacement.
+  /// Requested slot count of a session-owned texture ring, up to
+  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
+  /// frame while the session renders its replacement. Private targets grant one
+  /// slot regardless of this value. A borrowed texture ring's depth is its
+  /// texture count, so borrowed and other targets ignore this value.
   final int requestedTextureRingDepth;
 
-  /// Producer synchronization for acquired texture frames. Defaults to
-  /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared
-  /// EGL or WGL texture target and a caller-graphics-thread driver. Other
-  /// targets support only CPU completion and fail an unsupported request.
+  /// Producer synchronization for acquired texture frames.
+  /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+  /// and a caller-graphics-thread driver. Other targets support only CPU
+  /// completion and fail an unsupported request.
   final GpuSyncKind producerSyncKind;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.
@@ -3087,16 +3091,16 @@ final class MetalOwnedTextureDescriptor extends _Value {
        pixelFormat =
            pixelFormat ?? metalOwnedTextureDescriptorDefault().pixelFormat;
 
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Metal backend context. device is required.
   final MetalContextDescriptor context;
 
   /// Backend-native MTLPixelFormat value of the ring's textures: either
-  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
-  /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+  /// returns RGBA8 for either format.
   final int pixelFormat;
 
   /// A copy of this value with the given members replaced.
@@ -3133,8 +3137,8 @@ final class MetalSurfaceDescriptor extends _Value {
        context = context ?? metalSurfaceDescriptorDefault().context,
        layer = layer ?? metalSurfaceDescriptorDefault().layer;
 
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Metal backend context. device is optional for Metal surfaces.
@@ -3407,17 +3411,15 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
        ),
        target = target ?? openglBorrowedTextureDescriptorDefault().target;
 
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   final LogicalExtent extent;
 
-  /// Physical texture width in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture width in device pixels. Required.
   final int physicalWidth;
 
-  /// Physical texture height in device pixels. Must be positive. Defaults to
-  /// 256.
+  /// Physical texture height in device pixels. Required.
   final int physicalHeight;
 
   /// Borrowed OpenGL context provider data. The textures must belong to this
@@ -3427,7 +3429,7 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// The ring's textures, one per slot, in slot order. Required.
   final List<OpenglBorrowedTexture> textures;
 
-  /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
+  /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
   final int target;
 
   /// A copy of this value with the given members replaced.
@@ -3478,8 +3480,8 @@ final class OpenglOwnedTextureDescriptor extends _Value {
   }) : extent = extent ?? openglOwnedTextureDescriptorDefault().extent,
        context = context ?? openglOwnedTextureDescriptorDefault().context;
 
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
@@ -3517,8 +3519,8 @@ final class OpenglSurfaceDescriptor extends _Value {
        context = context ?? openglSurfaceDescriptorDefault().context,
        surface = surface ?? openglSurfaceDescriptorDefault().surface;
 
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data.
@@ -3690,15 +3692,15 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
        finalLayout =
            finalLayout ?? vulkanBorrowedTextureDescriptorDefault().finalLayout;
 
-  /// Logical texture extent; physical_width and physical_height give the
-  /// texture's size. A scale_factor that differs from the map's is accepted and
-  /// logged as a warning.
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
   final LogicalExtent extent;
 
-  /// Physical image width in device pixels. Must be positive. Defaults to 256.
+  /// Physical image width in device pixels. Required.
   final int physicalWidth;
 
-  /// Physical image height in device pixels. Must be positive. Defaults to 256.
+  /// Physical image height in device pixels. Required.
   final int physicalHeight;
 
   /// Borrowed Vulkan context. All handles are required.
@@ -3707,15 +3709,16 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// The ring's images, one per slot, in slot order. Required.
   final List<VulkanBorrowedTexture> textures;
 
-  /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-  /// invalid.
+  /// Backend-native VkFormat value of every image. Required, so
+  /// VK_FORMAT_UNDEFINED is invalid.
   final int format;
 
   /// Backend-native VkImageLayout value expected at render-pass begin.
   final int initialLayout;
 
-  /// Backend-native VkImageLayout value left after rendering succeeds. Defaults
-  /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+  /// Backend-native VkImageLayout value left after rendering succeeds, such as
+  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
+  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
   final int finalLayout;
 
   /// A copy of this value with the given members replaced.
@@ -3774,8 +3777,8 @@ final class VulkanOwnedTextureDescriptor extends _Value {
   }) : extent = extent ?? vulkanOwnedTextureDescriptorDefault().extent,
        context = context ?? vulkanOwnedTextureDescriptorDefault().context;
 
-  /// Logical texture extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Borrowed Vulkan context. All handles are required.
@@ -3810,8 +3813,8 @@ final class VulkanSurfaceDescriptor extends _Value {
        context = context ?? vulkanSurfaceDescriptorDefault().context,
        surface = surface ?? vulkanSurfaceDescriptorDefault().surface;
 
-  /// Logical surface extent. A scale_factor that differs from the map's is
-  /// accepted and logged as a warning.
+  /// Logical surface extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
   /// Borrowed Vulkan context. All handles are required. The device must support
@@ -3871,7 +3874,7 @@ final class FeatureStateSelector extends _Value {
     this.stateKey = '',
   });
 
-  /// Source ID. Required and borrowed for the duration of the call.
+  /// Source ID. Required. Borrowed for the duration of the call.
   final String sourceId;
 
   /// Source layer ID, or empty for none. Required for vector-source
@@ -4405,26 +4408,24 @@ final class MapOptions extends _Value {
     LogicalExtent? initialExtent,
     MapMode? mapMode,
     bool? fastPforEnabled,
-    RuntimeEventFlag? eventMask,
+    this.eventMask,
   }) : initialExtent = initialExtent ?? mapOptionsDefault().initialExtent,
        mapMode = mapMode ?? mapOptionsDefault().mapMode,
-       fastPforEnabled = fastPforEnabled ?? mapOptionsDefault().fastPforEnabled,
-       eventMask = eventMask ?? mapOptionsDefault().eventMask;
+       fastPforEnabled = fastPforEnabled ?? mapOptionsDefault().fastPforEnabled;
 
-  /// Initial logical extent. Width and height must be nonzero, and scale_factor
-  /// must be finite and positive. scale_factor is fixed for the map's lifetime.
+  /// Initial logical extent. Required. Width and height must be nonzero, and
+  /// scale_factor must be finite and positive. scale_factor is fixed for the
+  /// map's lifetime.
   final LogicalExtent initialExtent;
-
-  /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   final MapMode mapMode;
 
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-  /// encodings. Defaults to false.
+  /// encodings.
   final bool fastPforEnabled;
 
   /// Map-originated event types this map queues, as a bitwise OR of
   /// `mln_runtime_event_flag` values.
-  final RuntimeEventFlag eventMask;
+  final RuntimeEventFlag? eventMask;
 
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
@@ -4482,16 +4483,16 @@ final class StyleImageOptions extends _Value {
   /// Content box used when icon-text-fit applies.
   final ImageContent? content;
 
-  /// Defaults to STRETCH_OR_SHRINK.
+  /// Absent selects STRETCH_OR_SHRINK.
   final StyleImageTextFit? textFitWidth;
 
-  /// Defaults to STRETCH_OR_SHRINK.
+  /// Absent selects STRETCH_OR_SHRINK.
   final StyleImageTextFit? textFitHeight;
 
-  /// Sprite pixel ratio. Defaults to 1.
+  /// Sprite pixel ratio. Absent selects 1.
   final double? pixelRatio;
 
-  /// Whether the image is a signed distance field icon. Defaults to false.
+  /// Whether the image is a signed distance field icon. Absent selects false.
   final bool? sdf;
 
   /// A copy of this value with the given members replaced.
@@ -5007,7 +5008,7 @@ final class ResourceRoute extends _Value {
       flags = flags ?? resourceRouteDefault().flags,
       url = url ?? resourceRouteDefault().url;
 
-  /// The resource kinds to match.
+  /// The resource kinds to match. Zero selects every kind.
   final ResourceKindFlag kinds;
   final UrlMatchFlag flags;
 
@@ -5142,7 +5143,7 @@ final class OfflineGeometryRegionDefinition extends _Value {
   /// Style URL. Copied during region creation.
   final String styleUrl;
 
-  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+  /// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
   final Object? geometry;
   final double minZoom;
 

@@ -10,8 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical surface extent. A scale_factor that differs from the map's is
-/// accepted and logged as a warning.
+/// Logical surface extent. Required. A scale_factor that differs from the map's
+/// is accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Metal backend context. device is optional for Metal surfaces.

@@ -30,7 +30,7 @@ void mln_test_render_request_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -217,7 +217,7 @@ bool mln_test_render_until_idle(
       }
     }
     mln_frame_demand demand = mln_frame_demand_default();
-    demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
+    demand.flags = 0;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
