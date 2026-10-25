@@ -12,7 +12,7 @@ public sealed class CallbackLifetimeTests
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
-        var (added, accepted) = AddCapturingSource(fixture.Map, new CustomGeometrySourceOptions());
+        var (added, accepted) = AddCapturingSource(fixture.Map);
         await added;
         Assert.True(Gc.IsAlive(accepted));
 
@@ -29,17 +29,13 @@ public sealed class CallbackLifetimeTests
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (Task<CommandCompletion> Added, WeakReference Captured) AddCapturingSource(
-        MapHandle map,
-        CustomGeometrySourceOptions options
+        MapHandle map
     )
     {
         var captured = new object();
         var added = map.AddCustomGeometrySourceAsync(
             "custom",
-            options with
-            {
-                FetchTile = _ => GC.KeepAlive(captured),
-            }
+            new CustomGeometrySourceOptions { FetchTile = _ => GC.KeepAlive(captured) }
         );
         return (added, new WeakReference(captured));
     }

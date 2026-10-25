@@ -75,23 +75,17 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
   /// Receives each record.
-  public var callback: LogCallback?
-  public init(callback: LogCallback? = nil) {
+  public var callback: LogCallback
+  public init(callback: @escaping LogCallback) {
     self.callback = callback
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_log_handler {
     var raw = mln_log_handler()
     raw.size = UInt32(MemoryLayout<mln_log_handler>.size)
-    raw.callback = callback == nil ? nil : invokeLogHandlerCallback
-    if callback != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.callback = invokeLogHandlerCallback
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -106,12 +100,12 @@ private func invokeLogHandlerCallback(
   guard let user_data else { return false }
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
     .takeUnretainedValue()
-  do { return try box.value.callback?(
+  do { return try box.value.callback(
     LogSeverity(rawValue: severity.rawValue),
     LogEvent(rawValue: event.rawValue),
     code,
     NativeString.copyUTF8(data: message.data, size: message.size)
-  ) ?? false } catch {
+  ) } catch {
     reportToStandardError(
       "mln_log_callback failed and native received its fallback: \(error)\n"
     ); return false

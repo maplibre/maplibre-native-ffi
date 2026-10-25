@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
+from ..semantic import required_callbacks
 from .rust_dynamic_values import dynamic
 from .zig import doc, identifier
 from .zig_values import field_default
@@ -333,6 +334,28 @@ def declaration(values, value):
         if not value.registration or value.native in values.bound.returned
         else ""
     )
+    required = required_callbacks(value)
+    if copy and required:
+        from .zig_callbacks import callback_type
+
+        if any("allocator" in line for line in captures):
+            raise ModelError(
+                [f"Zig: {value.native}: a default with required callbacks allocates"]
+            )
+        # A copy holds no callbacks, so the default's caller passes the
+        # required ones.
+        taken = "".join(
+            f", {identifier(f.name)}: {callback_type(values, f)}" for f in required
+        )
+        unused = (
+            "" if any("raw." in line for line in captures) else "        _ = raw;\n"
+        )
+        copy = f"""    fn fromDefault(raw: c.{value.native}{taken}) {typ} {{
+{unused}        return .{{
+{chr(10).join(captures)}
+        }};
+    }}
+"""
     encoder = (
         f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{
         var raw = {initial};

@@ -2322,7 +2322,7 @@ typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class CustomGeometrySourceOptions {
   const CustomGeometrySourceOptions({
-    this.fetchTile,
+    required this.fetchTile,
     this.cancelTile,
     this.minZoom,
     this.maxZoom,
@@ -2334,7 +2334,7 @@ final class CustomGeometrySourceOptions {
   });
 
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  final CustomSourceFetchTileCallback? fetchTile;
+  final CustomSourceFetchTileCallback fetchTile;
 
   /// Optional best-effort tile cancel callback. Null in queue mode.
   final CustomSourceCancelTileCallback? cancelTile;
@@ -2353,14 +2353,14 @@ final class CustomGeometrySourceOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class CustomMvtVectorSourceOptions {
   const CustomMvtVectorSourceOptions({
-    this.fetchTile,
+    required this.fetchTile,
     this.cancelTile,
     this.minZoom,
     this.maxZoom,
   });
 
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  final CustomSourceFetchTileCallback? fetchTile;
+  final CustomSourceFetchTileCallback fetchTile;
 
   /// Optional best-effort tile cancel callback. Null in queue mode.
   final CustomSourceCancelTileCallback? cancelTile;
@@ -5528,13 +5528,15 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);
 
-/// Runtime and map event delivery. Set either callback or queue.
+/// Runtime and map event delivery. Exactly one of callback and queue is set.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeEventHandler {
-  const RuntimeEventHandler({this.callback});
-  final RuntimeEventCallback? callback;
+  const RuntimeEventHandler({required this.callback});
+
+  /// Receives each event batch.
+  final RuntimeEventCallback callback;
 }
 
 /// HTTP header transform state: a callback, or native header rules.

@@ -69,8 +69,8 @@ class ZigEmitterTests(unittest.TestCase):
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = zig.generate(real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
-            "?*const fn (context: ?*anyopaque, events: []const RuntimeEvent) "
-            "anyerror!void",
+            "*const fn (context: ?*anyopaque, events: []const RuntimeEvent) "
+            "anyerror!void,",
             source,
         )
         self.assertNotIn("EventBatchView", source)
@@ -78,8 +78,8 @@ class ZigEmitterTests(unittest.TestCase):
     def test_a_callback_names_its_arguments_and_returns_a_bool_result(self):
         source = zig.generate(real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
-            '@"callback": ?*const fn (context: ?*anyopaque, severity: LogSeverity, '
-            "event: LogEvent, code: i64, message: []const u8) anyerror!bool = null,",
+            '@"callback": *const fn (context: ?*anyopaque, severity: LogSeverity, '
+            "event: LogEvent, code: i64, message: []const u8) anyerror!bool,",
             source,
         )
         # The log callback's failure is false, which an error answers.

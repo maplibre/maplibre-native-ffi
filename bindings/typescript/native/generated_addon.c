@@ -609,13 +609,11 @@ static napi_value mln_ts_export_mln_map_add_custom_geometry_source(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   arg_options = mln_custom_geometry_source_options_default();
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-    if (!mln_ts_write_custom_geometry_source_options(
-          call, call->argv[2], &arg_options, "options"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
+  if (!mln_ts_write_custom_geometry_source_options(
+        call, call->argv[2], &arg_options, "options"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -653,13 +651,11 @@ static napi_value mln_ts_export_mln_map_add_custom_mvt_vector_source(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   arg_options = mln_custom_mvt_vector_source_options_default();
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-    if (!mln_ts_write_custom_mvt_vector_source_options(
-          call, call->argv[2], &arg_options, "options"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
+  if (!mln_ts_write_custom_mvt_vector_source_options(
+        call, call->argv[2], &arg_options, "options"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -6212,14 +6208,12 @@ static napi_value mln_ts_export_mln_runtime_set_event_handler(
   }
   memset(&arg_handler, 0, sizeof arg_handler);
   arg_handler.size = sizeof arg_handler;
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
-    if (!mln_ts_read_registration(
-          call, call->argv[1], &arg_handler.user_data, &arg_handler.queue,
-          "handler"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
+  if (!mln_ts_read_registration(
+        call, call->argv[1], &arg_handler.user_data, &arg_handler.queue,
+        "handler"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion

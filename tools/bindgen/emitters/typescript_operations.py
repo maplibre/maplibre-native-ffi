@@ -155,6 +155,8 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         lines = [f"{result}{call};", commit]
         if result:
             lines.append("return result;")
+    elif entry.completes:
+        lines = [f"return {{ ...{call}, {', '.join(entry.completes)} }};"]
     else:
         lines = [f"return {call};" if entry.returns != "void" else f"{call};"]
     if entry.registrations:

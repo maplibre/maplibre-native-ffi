@@ -24,6 +24,7 @@ from tools.bindgen.semantic import (
     enum_member_prefix,
     output_member,
     public_stem,
+    required_callbacks,
 )
 
 from . import dotnet_native
@@ -1338,7 +1339,22 @@ def emit(api: Api | BoundApi) -> Emission:
         directory = directory_for(record.location.path)
         plan = values.record(name)
         declaration = values.declaration(plan)
-        if plan.default:
+        required = [
+            (values.public_type(f.value), member(camel(f.name)))
+            for f in required_callbacks(plan)
+        ]
+        if plan.default and required:
+            # A copy holds no callbacks, so the default takes the required ones.
+            default = (
+                f"    public static {public_type(name)} Default("
+                + ", ".join(f"{typ} {local}" for typ, local in required)
+                + ")\n    {\n"
+                "        using var call = NativeCall.Enter(null);\n"
+                f"        return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}(), "
+                + ", ".join(local for _, local in required)
+                + ");\n    }\n"
+            )
+        elif plan.default:
             default = (
                 f"    public static {public_type(name)} Default\n    {{\n"
                 "        get\n        {\n"
@@ -1346,6 +1362,7 @@ def emit(api: Api | BoundApi) -> Emission:
                 f"            return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
                 "        }\n    }\n"
             )
+        if plan.default:
             if declaration.rstrip().endswith(";"):
                 declaration = declaration.rstrip()[:-1] + "\n{\n" + default + "}\n"
             else:

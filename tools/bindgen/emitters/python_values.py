@@ -584,10 +584,13 @@ class Values:
         extra_methods="",
         copied=True,
         registration=False,
+        required=(),
     ):
         """The Rust copy and the Python class of one record.
 
         A record that native never returns, `copied=False`, has neither copy.
+        A copy holds no callbacks, so the copy and the default of a
+        registration take its `required` callbacks.
         """
         name = plan.native
         rust, python = [], []
@@ -658,16 +661,19 @@ class Values:
                 f'        object.__setattr__(self, "{member}", {helper}(self.{member}))\n'
                 for member, helper in normalized
             )
+        taken = "".join(f", {member}" for member in required)
         if copied:
             python[-1] += (
-                "\n    @classmethod\n    def _from_native(cls, raw):\n        return cls("
-                + ", ".join(public_copies)
+                f"\n    @classmethod\n    def _from_native(cls, raw{taken}):\n        return cls("
+                + ", ".join(
+                    [*(f"{member}={member}" for member in required), *public_copies]
+                )
                 + ")\n"
             )
         python[-1] += extra_methods
         if name in self.defaults:
             python[-1] += (
-                f"\n    @classmethod\n    def default(cls):\n        from . import _native\n        return cls._from_native(_native._default_{name.removeprefix('mln_')}())\n"
+                f"\n    @classmethod\n    def default(cls{taken}):\n        from . import _native\n        return cls._from_native(_native._default_{name.removeprefix('mln_')}(){taken})\n"
             )
         if not copied or name not in self.outputs:
             return "", "\n".join(python)

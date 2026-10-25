@@ -288,11 +288,12 @@ internal static unsafe class GeneratedValues
     }
 
     internal static CustomGeometrySourceOptions CopyCustomGeometrySourceOptions(
-        mln_custom_geometry_source_options value
+        mln_custom_geometry_source_options value,
+        CustomSourceFetchTileCallback fetchTile
     ) =>
         new()
         {
-            FetchTile = default,
+            FetchTile = fetchTile,
             CancelTile = default,
             MinZoom = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM)
                 ? value.min_zoom
@@ -413,11 +414,12 @@ internal static unsafe class GeneratedValues
     }
 
     internal static CustomMvtVectorSourceOptions CopyCustomMvtVectorSourceOptions(
-        mln_custom_mvt_vector_source_options value
+        mln_custom_mvt_vector_source_options value,
+        CustomSourceFetchTileCallback fetchTile
     ) =>
         new()
         {
-            FetchTile = default,
+            FetchTile = fetchTile,
             CancelTile = default,
             MinZoom = value.fields.HasFlag(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
                 ? value.min_zoom

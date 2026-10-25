@@ -421,7 +421,7 @@ typedef struct mln_custom_geometry_source_options {
   uint32_t size;
   mln_custom_geometry_source_option_fields fields;
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
-  mln_custom_source_fetch_tile_callback fetch_tile MLN_BINDING("nullable=true");
+  mln_custom_source_fetch_tile_callback fetch_tile;
   /** Optional best-effort tile cancel callback. Null in queue mode. */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
@@ -481,7 +481,7 @@ typedef struct mln_custom_mvt_vector_source_options {
   uint32_t size;
   mln_custom_mvt_vector_source_option_fields fields;
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
-  mln_custom_source_fetch_tile_callback fetch_tile MLN_BINDING("nullable=true");
+  mln_custom_source_fetch_tile_callback fetch_tile;
   /** Optional best-effort tile cancel callback. Null in queue mode. */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");

@@ -93,8 +93,14 @@ export interface NativeOperations {
   mln_camera_fit_options_default(): CameraFitOptions;
   mln_camera_options_default(): CameraOptions;
   mln_camera_update_default(): CameraUpdate;
-  mln_custom_geometry_source_options_default(): CustomGeometrySourceOptions;
-  mln_custom_mvt_vector_source_options_default(): CustomMvtVectorSourceOptions;
+  mln_custom_geometry_source_options_default(): Omit<
+    CustomGeometrySourceOptions,
+    "fetchTile"
+  >;
+  mln_custom_mvt_vector_source_options_default(): Omit<
+    CustomMvtVectorSourceOptions,
+    "fetchTile"
+  >;
   mln_frame_demand_default(): FrameDemand;
   mln_free_camera_options_default(): FreeCameraOptions;
   mln_geojson_source_data_create(
@@ -120,13 +126,13 @@ export interface NativeOperations {
   mln_map_add_custom_geometry_source(
     map: bigint,
     sourceId: string,
-    options: CustomGeometrySourceOptions | undefined,
+    options: CustomGeometrySourceOptions,
     completion: number | undefined,
   ): void;
   mln_map_add_custom_mvt_vector_source(
     map: bigint,
     sourceId: string,
-    options: CustomMvtVectorSourceOptions | undefined,
+    options: CustomMvtVectorSourceOptions,
     completion: number | undefined,
   ): void;
   mln_map_add_geojson_source_data(
@@ -776,7 +782,7 @@ export interface NativeOperations {
   ): void;
   mln_runtime_set_event_handler(
     runtime: bigint,
-    handler: RuntimeEventHandler | undefined,
+    handler: RuntimeEventHandler,
     completion: number | undefined,
   ): void;
   mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventFlag): void;

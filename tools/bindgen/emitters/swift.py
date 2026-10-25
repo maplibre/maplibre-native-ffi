@@ -12,8 +12,10 @@ from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
 from tools.bindgen.semantic import (
     BoundApi,
+    DefaultSupport,
     OperationPlan,
     output_member,
+    required_callbacks,
 )
 
 # The condition that selects each platform the package builds for.
@@ -272,6 +274,23 @@ def operation(
     target = ""
     if plan.scoped_receiver:
         target = "owner: self"
+    required = (
+        required_callbacks(plan.result)
+        if isinstance(plan.support, DefaultSupport) and plan.result
+        else ()
+    )
+    if required:
+        from .swift_callbacks import alias
+
+        # The native default holds no callbacks, so its caller passes the
+        # required ones.
+        declarations = [
+            *declarations,
+            *(
+                f"{identifier(camel(f.name))}: @escaping {alias(value_types.bound.callbacks[f.value.native])}"
+                for f in required
+            ),
+        ]
     signature = f"{modifier}func {method}({', '.join(declarations)})"
     if discard:
         call = native_call(
@@ -412,6 +431,15 @@ def operation(
             value_types.add(plan.result)
             result = value_types.public(plan.result)
             copied = decode(value_types, plan.result, call)
+            if required:
+                copied = (
+                    copied.removesuffix(")")
+                    + "".join(
+                        f", {identifier(camel(f.name))}: {identifier(camel(f.name))}"
+                        for f in required
+                    )
+                    + ")"
+                )
             return (
                 f"""{doc_comment}{signature} throws -> {result} {{
   try nativeDirect({target}) {{ arena in {copied} }}

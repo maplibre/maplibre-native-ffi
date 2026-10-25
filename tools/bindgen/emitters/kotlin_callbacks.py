@@ -44,6 +44,7 @@ from dataclasses import dataclass, replace
 from .. import async_hosts, docs
 from ..model import CType
 from ..protocol import COMPLETION
+from ..semantic import required_callbacks
 from .kotlin_values import Unsupported, doc, identifier, name, owner_class
 
 # The split lowerings: the threaded targets' forms, and Kotlin/Wasm's.
@@ -498,16 +499,7 @@ def argument(value, expression):
 
 def check_decode(value):
     """Rejects callback values that native cannot hand back to Kotlin."""
-    if value.registration:
-        if any(
-            not field.value.nullable
-            for field in value.fields
-            if field.name in value.registration.callbacks
-        ):
-            raise Unsupported(
-                "callback descriptor output has no host callback identity"
-            )
-    elif value.response:
+    if value.response:
         raise Unsupported("a callback response is valid only during its callback")
 
 
@@ -1029,10 +1021,12 @@ def writer(value, values, public):
 
 
 def read_function(value, values):
-    """Copy a registration's native default, whose callbacks are unset."""
+    """Copy a registration's native default, whose callbacks are unset. The
+    reader takes the required callbacks, which the copy cannot hold."""
     public_name = name(value.native)
     omitted = omitted_fields(value, values)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+    required = required_callbacks(value)
     locals = []
     for field in value.fields:
         if field.role == "presence_mask":
@@ -1044,6 +1038,9 @@ def read_function(value, values):
     for member, _typ, field in values.members(value):
         if field.name in omitted:
             continue
+        if field in required:
+            arguments.append(f"{member} = {member}")
+            continue
         if field in callbacks:
             arguments.append(f"{member} = null")
             continue
@@ -1052,13 +1049,19 @@ def read_function(value, values):
             decoded = f"if ({values.present('source', value, field.presence.mask, field.presence.bit)}) {decoded} else null"
         arguments.append(f"{member} = {decoded}")
     body = f"{public_name}({', '.join(arguments)})"
+    parameters = ", ".join(
+        [
+            "source: Long",
+            *(f"{identifier(f.name)}: {values.public(f.value)}" for f in required),
+        ]
+    )
     if locals:
         return (
-            f"internal fun {values.read(value)}(source: Long): {public_name} {{\n  "
+            f"internal fun {values.read(value)}({parameters}): {public_name} {{\n  "
             + "\n  ".join(locals)
             + f"\n  return {body}\n}}"
         )
-    return f"internal fun {values.read(value)}(source: Long): {public_name} = {body}"
+    return f"internal fun {values.read(value)}({parameters}): {public_name} = {body}"
 
 
 def operation(plan, values, native):

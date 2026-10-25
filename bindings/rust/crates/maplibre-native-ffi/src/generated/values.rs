@@ -647,7 +647,7 @@ pub struct CustomGeometrySourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     ///
     /// The callback receives (`tile_id`).
-    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
+    pub fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
     ///
     /// The callback receives (`tile_id`).
@@ -660,12 +660,6 @@ pub struct CustomGeometrySourceOptions {
     pub clip: Option<bool>,
     pub wrap: Option<bool>,
 }
-impl Default for CustomGeometrySourceOptions {
-    fn default() -> Self {
-        maplibre_core::require_abi_version();
-        convert::native_default(unsafe { sys::mln_custom_geometry_source_options_default() })
-    }
-}
 impl std::fmt::Debug for CustomGeometrySourceOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CustomGeometrySourceOptions")
@@ -673,25 +667,49 @@ impl std::fmt::Debug for CustomGeometrySourceOptions {
     }
 }
 impl CustomGeometrySourceOptions {
-    pub fn with_fetch_tile<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
-    {
-        self.fetch_tile = Some(std::sync::Arc::new(callback));
-        self
-    }
-    pub fn new<F>(callback: F) -> Self
-    where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
-    {
-        Self::default().with_fetch_tile(callback)
-    }
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
         F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
+    }
+    pub fn new<F>(fetch_tile: F) -> Self
+    where
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+    {
+        maplibre_core::require_abi_version();
+        unsafe {
+            Self::from_default(
+                sys::mln_custom_geometry_source_options_default(),
+                std::sync::Arc::new(fetch_tile),
+            )
+        }
+        .expect("native default must be valid")
+    }
+    /// Copies a native default, whose callbacks are unset, with the required ones.
+    pub(crate) unsafe fn from_default(
+        raw: sys::mln_custom_geometry_source_options,
+        fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
+    ) -> Result<Self> {
+        Ok(Self {
+            fetch_tile,
+            cancel_tile: None,
+            min_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
+            tolerance: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0)
+                .then_some(raw.tolerance),
+            tile_size: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0)
+                .then_some(raw.tile_size),
+            buffer: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0)
+                .then_some(raw.buffer),
+            clip: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0)
+                .then_some(raw.clip),
+            wrap: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0)
+                .then_some(raw.wrap),
+        })
     }
     unsafe extern "C" fn fetch_tile_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -701,7 +719,7 @@ impl CustomGeometrySourceOptions {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
-            callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
+            (state.fetch_tile)(unsafe { from_native(tile_id) }?);
             Ok(())
         })
     }
@@ -724,10 +742,7 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
             unsafe { sys::mln_custom_geometry_source_options_default() };
         raw.fields = 0;
         raw.size = std::mem::size_of::<sys::mln_custom_geometry_source_options>() as _;
-        raw.fetch_tile = self
-            .fetch_tile
-            .as_ref()
-            .map(|_| Self::fetch_tile_trampoline as _);
+        raw.fetch_tile = Some(Self::fetch_tile_trampoline as _);
         raw.cancel_tile = self
             .cancel_tile
             .as_ref()
@@ -768,29 +783,6 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceOptions {
-    /// Copies a native default, whose callbacks are unset.
-    unsafe fn from_native(raw: sys::mln_custom_geometry_source_options) -> Result<Self> {
-        Ok(Self {
-            fetch_tile: None,
-            cancel_tile: None,
-            min_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0)
-                .then_some(raw.min_zoom),
-            max_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0)
-                .then_some(raw.max_zoom),
-            tolerance: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0)
-                .then_some(raw.tolerance),
-            tile_size: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0)
-                .then_some(raw.tile_size),
-            buffer: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0)
-                .then_some(raw.buffer),
-            clip: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0)
-                .then_some(raw.clip),
-            wrap: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0)
-                .then_some(raw.wrap),
-        })
-    }
-}
 
 /// Options for custom MVT vector sources.
 ///
@@ -801,19 +793,13 @@ pub struct CustomMvtVectorSourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     ///
     /// The callback receives (`tile_id`).
-    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
+    pub fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
     ///
     /// The callback receives (`tile_id`).
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
-}
-impl Default for CustomMvtVectorSourceOptions {
-    fn default() -> Self {
-        maplibre_core::require_abi_version();
-        convert::native_default(unsafe { sys::mln_custom_mvt_vector_source_options_default() })
-    }
 }
 impl std::fmt::Debug for CustomMvtVectorSourceOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -822,25 +808,39 @@ impl std::fmt::Debug for CustomMvtVectorSourceOptions {
     }
 }
 impl CustomMvtVectorSourceOptions {
-    pub fn with_fetch_tile<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
-    {
-        self.fetch_tile = Some(std::sync::Arc::new(callback));
-        self
-    }
-    pub fn new<F>(callback: F) -> Self
-    where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
-    {
-        Self::default().with_fetch_tile(callback)
-    }
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
         F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
+    }
+    pub fn new<F>(fetch_tile: F) -> Self
+    where
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+    {
+        maplibre_core::require_abi_version();
+        unsafe {
+            Self::from_default(
+                sys::mln_custom_mvt_vector_source_options_default(),
+                std::sync::Arc::new(fetch_tile),
+            )
+        }
+        .expect("native default must be valid")
+    }
+    /// Copies a native default, whose callbacks are unset, with the required ones.
+    pub(crate) unsafe fn from_default(
+        raw: sys::mln_custom_mvt_vector_source_options,
+        fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
+    ) -> Result<Self> {
+        Ok(Self {
+            fetch_tile,
+            cancel_tile: None,
+            min_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
+        })
     }
     unsafe extern "C" fn fetch_tile_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -850,7 +850,7 @@ impl CustomMvtVectorSourceOptions {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
-            callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
+            (state.fetch_tile)(unsafe { from_native(tile_id) }?);
             Ok(())
         })
     }
@@ -876,10 +876,7 @@ impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSour
             unsafe { sys::mln_custom_mvt_vector_source_options_default() };
         raw.fields = 0;
         raw.size = std::mem::size_of::<sys::mln_custom_mvt_vector_source_options>() as _;
-        raw.fetch_tile = self
-            .fetch_tile
-            .as_ref()
-            .map(|_| Self::fetch_tile_trampoline as _);
+        raw.fetch_tile = Some(Self::fetch_tile_trampoline as _);
         raw.cancel_tile = self
             .cancel_tile
             .as_ref()
@@ -898,19 +895,6 @@ impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSour
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
-    /// Copies a native default, whose callbacks are unset.
-    unsafe fn from_native(raw: sys::mln_custom_mvt_vector_source_options) -> Result<Self> {
-        Ok(Self {
-            fetch_tile: None,
-            cancel_tile: None,
-            min_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0)
-                .then_some(raw.min_zoom),
-            max_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0)
-                .then_some(raw.max_zoom),
-        })
     }
 }
 
@@ -1731,14 +1715,13 @@ impl Default for LogEvent {
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct LogHandler {
     /// Receives each record.
     ///
     /// The callback receives (`severity`, `event`, `code`, `message`).
-    pub callback: Option<
+    pub callback:
         std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static>,
-    >,
 }
 impl std::fmt::Debug for LogHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1746,18 +1729,13 @@ impl std::fmt::Debug for LogHandler {
     }
 }
 impl LogHandler {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static,
-    {
-        self.callback = Some(std::sync::Arc::new(callback));
-        self
-    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static,
     {
-        Self::default().with_callback(callback)
+        Self {
+            callback: std::sync::Arc::new(callback),
+        }
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -1770,7 +1748,7 @@ impl LogHandler {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_log_callback", false, || {
-            let value = callback::require(&state.callback)?(
+            let value = (state.callback)(
                 LogSeverity::from_raw(severity),
                 LogEvent::from_raw(event),
                 code,
@@ -1784,10 +1762,7 @@ impl ToNative<sys::mln_log_handler> for LogHandler {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_log_handler> {
         let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
-        raw.callback = self
-            .callback
-            .as_ref()
-            .map(|_| Self::callback_trampoline as _);
+        raw.callback = Some(Self::callback_trampoline as _);
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -3823,14 +3798,13 @@ impl Default for ResourcePriority {
 ///
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ResourceProvider {
     /// Answers each request that the routes leave to the provider.
     ///
     /// The callback receives (`request`, `handle`).
-    pub callback: Option<
+    pub callback:
         std::sync::Arc<dyn Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static>,
-    >,
     /// The requests that reach the provider; empty to claim every request.
     pub routes: Vec<ResourceRoute>,
 }
@@ -3840,18 +3814,14 @@ impl std::fmt::Debug for ResourceProvider {
     }
 }
 impl ResourceProvider {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static,
-    {
-        self.callback = Some(std::sync::Arc::new(callback));
-        self
-    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static,
     {
-        Self::default().with_callback(callback)
+        Self {
+            callback: std::sync::Arc::new(callback),
+            routes: Default::default(),
+        }
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -3863,10 +3833,7 @@ impl ResourceProvider {
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_provider_callback", (), || {
             let handle = ResourceRequestHandle::adopt(handle, None)?;
-            callback::require(&state.callback)?(
-                unsafe { convert::copy_reference(request) }?,
-                handle,
-            );
+            (state.callback)(unsafe { convert::copy_reference(request) }?, handle);
             Ok(())
         })
     }
@@ -3875,10 +3842,7 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_provider> {
         let mut raw: sys::mln_resource_provider = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_provider>() as _;
-        raw.callback = self
-            .callback
-            .as_ref()
-            .map(|_| Self::callback_trampoline as _);
+        raw.callback = Some(Self::callback_trampoline as _);
         raw.routes = convert::array(&self.routes, arena)?;
         raw.route_count = convert::count(self.routes.len())?;
         if !(raw.callback.is_none()) {
@@ -3914,10 +3878,10 @@ impl FromNative<sys::mln_resource_range> for ResourceRange {
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ResourceRequestCancelHandler {
     /// Required in callback mode; null in queue mode.
-    pub callback: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
+    pub callback: std::sync::Arc<dyn Fn() + Send + Sync + 'static>,
 }
 impl std::fmt::Debug for ResourceRequestCancelHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -3926,18 +3890,13 @@ impl std::fmt::Debug for ResourceRequestCancelHandler {
     }
 }
 impl ResourceRequestCancelHandler {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        self.callback = Some(std::sync::Arc::new(callback));
-        self
-    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn() + Send + Sync + 'static,
     {
-        Self::default().with_callback(callback)
+        Self {
+            callback: std::sync::Arc::new(callback),
+        }
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -3947,7 +3906,7 @@ impl ResourceRequestCancelHandler {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_request_cancel_callback", (), || {
-            callback::require(&state.callback)?();
+            (state.callback)();
             Ok(())
         })
     }
@@ -3959,10 +3918,7 @@ impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCance
     ) -> Result<sys::mln_resource_request_cancel_handler> {
         let mut raw: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
-        raw.callback = self
-            .callback
-            .as_ref()
-            .map(|_| Self::callback_trampoline as _);
+        raw.callback = Some(Self::callback_trampoline as _);
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4130,15 +4086,13 @@ impl Default for ResourceStoragePolicy {
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ResourceTransform {
     /// Required in callback mode; null in queue mode.
     ///
     /// The callback receives (`kind`, `url`, `request`).
-    pub callback: Option<
-        std::sync::Arc<
-            dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
-        >,
+    pub callback: std::sync::Arc<
+        dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
     >,
 }
 impl std::fmt::Debug for ResourceTransform {
@@ -4147,18 +4101,13 @@ impl std::fmt::Debug for ResourceTransform {
     }
 }
 impl ResourceTransform {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
-    {
-        self.callback = Some(std::sync::Arc::new(callback));
-        self
-    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
     {
-        Self::default().with_callback(callback)
+        Self {
+            callback: std::sync::Arc::new(callback),
+        }
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -4171,7 +4120,7 @@ impl ResourceTransform {
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_transform_callback", (), || {
             let request = ResourceTransformRequestHandle::adopt(request, None)?;
-            callback::require(&state.callback)?(
+            (state.callback)(
                 ResourceKind::from_raw(kind),
                 unsafe { maplibre_core::string::borrow_string_view(url) }?,
                 request,
@@ -4184,10 +4133,7 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform> {
         let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
-        raw.callback = self
-            .callback
-            .as_ref()
-            .map(|_| Self::callback_trampoline as _);
+        raw.callback = Some(Self::callback_trampoline as _);
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4309,14 +4255,16 @@ pub struct RuntimeEventFlag: u64 {
 }
 }
 
-/// Runtime and map event delivery. Set either callback or queue.
+/// Runtime and map event delivery. Exactly one of callback and queue is set.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct RuntimeEventHandler {
+    /// Receives each event batch.
+    ///
     /// The callback receives (`events`).
-    pub callback: Option<std::sync::Arc<dyn Fn(Vec<RuntimeEvent>) + Send + Sync + 'static>>,
+    pub callback: std::sync::Arc<dyn Fn(Vec<RuntimeEvent>) + Send + Sync + 'static>,
 }
 impl std::fmt::Debug for RuntimeEventHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4325,18 +4273,13 @@ impl std::fmt::Debug for RuntimeEventHandler {
     }
 }
 impl RuntimeEventHandler {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(Vec<RuntimeEvent>) + Send + Sync + 'static,
-    {
-        self.callback = Some(std::sync::Arc::new(callback));
-        self
-    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn(Vec<RuntimeEvent>) + Send + Sync + 'static,
     {
-        Self::default().with_callback(callback)
+        Self {
+            callback: std::sync::Arc::new(callback),
+        }
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -4346,7 +4289,7 @@ impl RuntimeEventHandler {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_runtime_event_callback", (), || {
-            callback::require(&state.callback)?({
+            (state.callback)({
                 let view = unsafe { events.as_ref() }
                     .ok_or_else(|| Error::invalid_argument("null record value"))?;
                 unsafe { convert::copy_strided(view.events, view.event_count, view.event_size) }?
@@ -4359,10 +4302,7 @@ impl ToNative<sys::mln_runtime_event_handler> for RuntimeEventHandler {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_event_handler> {
         let mut raw: sys::mln_runtime_event_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_runtime_event_handler>() as _;
-        raw.callback = self
-            .callback
-            .as_ref()
-            .map(|_| Self::callback_trampoline as _);
+        raw.callback = Some(Self::callback_trampoline as _);
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };

@@ -525,32 +525,26 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
   /// Answers each request that the routes leave to the provider.
-  public var callback: ResourceProviderCallback?
+  public var callback: ResourceProviderCallback
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: ResourceProviderCallback? = nil,
+    callback: @escaping ResourceProviderCallback,
     routes: [ResourceRoute] = []
   ) {
     self.callback = callback
     self.routes = routes
   }
 
-  public static var `default`: Self {
-    Self()
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_provider {
     var raw = mln_resource_provider()
     raw.size = UInt32(MemoryLayout<mln_resource_provider>.size)
-    raw.callback = callback == nil ? nil : invokeResourceProviderCallback
+    raw.callback = invokeResourceProviderCallback
     raw.routes = try arena
       .array(routes.map { try $0.nativeValue(arena: arena) })
     raw.route_count = try NativeInputArena.count(routes.count)
-    if callback != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -565,7 +559,7 @@ private func invokeResourceProviderCallback(
     .fromOpaque(user_data).takeUnretainedValue()
   guard let ownedHandle = try? ResourceRequestHandle(adopting: handle)
   else { mln_resource_request_release(handle); return }
-  do { try box.value.callback?(
+  do { try box.value.callback(
     NativeInputArena.copyArray(request, count: 1)
       .map { try ResourceRequestInfo(raw: $0) }[0],
     ownedHandle
@@ -625,13 +619,9 @@ public typealias ResourceRequestCancelCallback = @Sendable () -> Void
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestCancelHandler: Sendable {
   /// Required in callback mode; null in queue mode.
-  public var callback: ResourceRequestCancelCallback?
-  public init(callback: ResourceRequestCancelCallback? = nil) {
+  public var callback: ResourceRequestCancelCallback
+  public init(callback: @escaping ResourceRequestCancelCallback) {
     self.callback = callback
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -639,13 +629,9 @@ public struct ResourceRequestCancelHandler: Sendable {
   {
     var raw = mln_resource_request_cancel_handler()
     raw.size = UInt32(MemoryLayout<mln_resource_request_cancel_handler>.size)
-    raw
-      .callback = callback == nil ? nil :
-      invokeResourceRequestCancelHandlerCallback
-    if callback != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.callback = invokeResourceRequestCancelHandlerCallback
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -657,7 +643,7 @@ private func invokeResourceRequestCancelHandlerCallback(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<ResourceRequestCancelHandler>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.callback?()
+  box.value.callback()
 }
 
 public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
@@ -929,23 +915,17 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
   /// Required in callback mode; null in queue mode.
-  public var callback: ResourceTransformCallback?
-  public init(callback: ResourceTransformCallback? = nil) {
+  public var callback: ResourceTransformCallback
+  public init(callback: @escaping ResourceTransformCallback) {
     self.callback = callback
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_transform {
     var raw = mln_resource_transform()
     raw.size = UInt32(MemoryLayout<mln_resource_transform>.size)
-    raw.callback = callback == nil ? nil : invokeResourceTransformCallback
-    if callback != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.callback = invokeResourceTransformCallback
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -962,7 +942,7 @@ private func invokeResourceTransformCallback(
   guard let ownedRequest =
     try? ResourceTransformRequestHandle(adopting: request)
   else { mln_resource_transform_request_release(request); return }
-  do { try box.value.callback?(
+  do { try box.value.callback(
     ResourceKind(rawValue: kind.rawValue),
     NativeString.copyUTF8(data: url.data, size: url.size),
     ownedRequest
@@ -1157,18 +1137,15 @@ public struct RuntimeEventFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let all: RuntimeEventFlag = .init(rawValue: 1_048_574)
 }
 
-/// Runtime and map event delivery. Set either callback or queue.
+/// Runtime and map event delivery. Exactly one of callback and queue is set.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventHandler: Sendable {
-  public var callback: RuntimeEventCallback?
-  public init(callback: RuntimeEventCallback? = nil) {
+  /// Receives each event batch.
+  public var callback: RuntimeEventCallback
+  public init(callback: @escaping RuntimeEventCallback) {
     self.callback = callback
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -1176,11 +1153,9 @@ public struct RuntimeEventHandler: Sendable {
   {
     var raw = mln_runtime_event_handler()
     raw.size = UInt32(MemoryLayout<mln_runtime_event_handler>.size)
-    raw.callback = callback == nil ? nil : invokeRuntimeEventHandlerCallback
-    if callback != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.callback = invokeRuntimeEventHandlerCallback
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -1194,7 +1169,7 @@ private func invokeRuntimeEventHandlerCallback(
     .fromOpaque(user_data).takeUnretainedValue()
   do {
     try box.value
-      .callback?(NativeInputArena.copyArray(events, count: 1)
+      .callback(NativeInputArena.copyArray(events, count: 1)
         .map { try NativeInputArena.copyStrided(
           $0.events,
           count: $0.event_count,

@@ -122,7 +122,7 @@ public sealed class ResourceTransformTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         // The provider passes the style through to the online source, which waits for the answer.
-        var deny = NativeFixture.DenyingProvider.Callback!;
+        var deny = NativeFixture.DenyingProvider.Callback;
         await using var fixture = await NativeFixture.CreateAsync(
             provider: new ResourceProvider
             {

@@ -8,7 +8,7 @@ from dataclasses import replace
 from .. import async_hosts, docs
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
-from ..semantic import BoundApi, ValuePlan, enum_member_prefix
+from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_callbacks
 
 SCALARS = {
     "bool": ("bool", "Bool"),
@@ -449,7 +449,7 @@ class Values:
             # Native never returns callbacks. A registration's own default
             # copies its other fields, and any other copy leaves it unset.
             if value.native in self.bound.returned:
-                return f"_read{public}({expression})"
+                return f"_read{public}({', '.join([expression, *(identifier(f.name) for f in required_callbacks(value))])})"
             if value.nullable:
                 return "null"
             if (
@@ -759,12 +759,22 @@ class Values:
             + "    return _NativeRegistration(result, registered.reject, arena.releaseAll);\n"
             + "  } catch (_) {\n    registration?.reject();\n    arena.releaseAll();\n    rethrow;\n  }\n}\n"
         )
+        # A copy holds no callbacks, so the reader takes the required ones.
+        required = [
+            (identifier(f.name), self.public(f.value))
+            for f in required_callbacks(value)
+        ]
         reader = (
-            f"{public} _read{public}(raw.{value.native} source) => {public}("
+            f"{public} _read{public}(raw.{value.native} source"
+            + "".join(f", {typ} {name}" for name, typ in required)
+            + f") => {public}("
             + ", ".join(
-                f"{name}: {self.copy(field.value, 'source.' + field.name)}"
-                for name, _, field in self.members(value)
-                if field.name not in names
+                [f"{name}: {name}" for name, _ in required]
+                + [
+                    f"{name}: {self.copy(field.value, 'source.' + field.name)}"
+                    for name, _, field in self.members(value)
+                    if field.name not in names
+                ]
             )
             + ");\n"
             if value.native in self.bound.returned

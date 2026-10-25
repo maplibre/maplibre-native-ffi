@@ -13,5 +13,5 @@ namespace Maplibre.NativeFfi;
 /// Required in callback mode; null in queue mode.
 /// </param>
 public readonly partial record struct ResourceRequestCancelHandler(
-    ResourceRequestCancelCallback? Callback
+    ResourceRequestCancelCallback Callback
 );

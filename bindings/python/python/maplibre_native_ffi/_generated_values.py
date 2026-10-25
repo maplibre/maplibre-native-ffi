@@ -1190,7 +1190,7 @@ class CustomGeometrySourceOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    fetch_tile: CustomSourceFetchTileCallback | None = None
+    fetch_tile: CustomSourceFetchTileCallback
     cancel_tile: CustomSourceCancelTileCallback | None = None
     min_zoom: float | None = None
 
@@ -1207,8 +1207,9 @@ class CustomGeometrySourceOptions:
     wrap: bool | None = None
 
     @classmethod
-    def _from_native(cls, raw):
+    def _from_native(cls, raw, fetch_tile):
         return cls(
+            fetch_tile=fetch_tile,
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
             tolerance=raw["tolerance"],
@@ -1220,7 +1221,6 @@ class CustomGeometrySourceOptions:
 
     def _invoke_fetch_tile(self, tile_id):
         callback = self.fetch_tile
-        assert callback is not None
         return callback(CanonicalTileId._from_native(tile_id))
 
     def _invoke_cancel_tile(self, tile_id):
@@ -1229,10 +1229,12 @@ class CustomGeometrySourceOptions:
         return callback(CanonicalTileId._from_native(tile_id))
 
     @classmethod
-    def default(cls):
+    def default(cls, fetch_tile):
         from . import _native
 
-        return cls._from_native(_native._default_custom_geometry_source_options())
+        return cls._from_native(
+            _native._default_custom_geometry_source_options(), fetch_tile
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1243,19 +1245,20 @@ class CustomMvtVectorSourceOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    fetch_tile: CustomSourceFetchTileCallback | None = None
+    fetch_tile: CustomSourceFetchTileCallback
     cancel_tile: CustomSourceCancelTileCallback | None = None
     min_zoom: float | None = None
 
     max_zoom: float | None = None
 
     @classmethod
-    def _from_native(cls, raw):
-        return cls(min_zoom=raw["min_zoom"], max_zoom=raw["max_zoom"])
+    def _from_native(cls, raw, fetch_tile):
+        return cls(
+            fetch_tile=fetch_tile, min_zoom=raw["min_zoom"], max_zoom=raw["max_zoom"]
+        )
 
     def _invoke_fetch_tile(self, tile_id):
         callback = self.fetch_tile
-        assert callback is not None
         return callback(CanonicalTileId._from_native(tile_id))
 
     def _invoke_cancel_tile(self, tile_id):
@@ -1264,10 +1267,12 @@ class CustomMvtVectorSourceOptions:
         return callback(CanonicalTileId._from_native(tile_id))
 
     @classmethod
-    def default(cls):
+    def default(cls, fetch_tile):
         from . import _native
 
-        return cls._from_native(_native._default_custom_mvt_vector_source_options())
+        return cls._from_native(
+            _native._default_custom_mvt_vector_source_options(), fetch_tile
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1702,11 +1707,10 @@ class LogHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
 
-    callback: LogCallback | None = None
+    callback: LogCallback
 
     def _invoke_callback(self, severity, event, code, message):
         callback = self.callback
-        assert callback is not None
         return callback(LogSeverity(severity), LogEvent(event), code, message)
 
 
@@ -3158,7 +3162,7 @@ class ResourceProvider:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: ResourceProviderCallback | None = None
+    callback: ResourceProviderCallback
     routes: Sequence[ResourceRoute] = ()
     """The requests that reach the provider; empty to claim every request."""
 
@@ -3167,7 +3171,6 @@ class ResourceProvider:
 
     def _invoke_callback(self, request, handle):
         callback = self.callback
-        assert callback is not None
         handle = _wrap_response(handle, "ResourceRequestHandle")
         try:
             return callback(ResourceRequestInfo._from_native(request), handle)
@@ -3203,11 +3206,10 @@ class ResourceRequestCancelHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: ResourceRequestCancelCallback | None = None
+    callback: ResourceRequestCancelCallback
 
     def _invoke_callback(self):
         callback = self.callback
-        assert callback is not None
         return callback()
 
 
@@ -3346,11 +3348,10 @@ class ResourceTransform:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: ResourceTransformCallback | None = None
+    callback: ResourceTransformCallback
 
     def _invoke_callback(self, kind, url, request):
         callback = self.callback
-        assert callback is not None
         request = _wrap_response(request, "ResourceTransformRequestHandle")
         try:
             return callback(ResourceKind(kind), url, request)
@@ -3425,17 +3426,16 @@ class RuntimeEvent:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventHandler:
-    """Runtime and map event delivery. Set either callback or queue.
+    """Runtime and map event delivery. Exactly one of callback and queue is set.
 
     See `mln_runtime_event_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: RuntimeEventCallback | None = None
+    callback: RuntimeEventCallback
 
     def _invoke_callback(self, events):
         callback = self.callback
-        assert callback is not None
         return callback(tuple(RuntimeEvent._from_native(item) for item in events))
 
 

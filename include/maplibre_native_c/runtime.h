@@ -558,7 +558,7 @@ typedef void (*mln_runtime_event_callback)(
 );
 
 /**
- * Runtime and map event delivery. Set either callback or queue.
+ * Runtime and map event delivery. Exactly one of callback and queue is set.
  *
  * Callback mode borrows the events for the call and releases user_data after
  * replacement, clear, or runtime teardown. Queue mode copies events into
@@ -568,7 +568,12 @@ typedef void (*mln_runtime_event_callback)(
  */
 typedef struct mln_runtime_event_handler {
   uint32_t size;
-  mln_runtime_event_callback callback MLN_BINDING("nullable=true");
+  /**
+   * Receives each event batch.
+   *
+   * Required in callback mode; null in queue mode.
+   */
+  mln_runtime_event_callback callback;
   void* user_data MLN_BINDING("kind=context");
   mln_user_data_release release_user_data;
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");

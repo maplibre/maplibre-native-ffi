@@ -4256,7 +4256,7 @@ public data class CustomGeometrySourceOptions(
   public val clip: Boolean? = null,
   public val wrap: Boolean? = null,
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
-  public val fetchTile: CustomSourceFetchTileCallback? = null,
+  public val fetchTile: CustomSourceFetchTileCallback,
   /** Optional best-effort tile cancel callback. Null in queue mode. */
   public val cancelTile: CustomSourceCancelTileCallback? = null,
 )
@@ -4301,7 +4301,7 @@ public data class CustomMvtVectorSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
-  public val fetchTile: CustomSourceFetchTileCallback? = null,
+  public val fetchTile: CustomSourceFetchTileCallback,
   /** Optional best-effort tile cancel callback. Null in queue mode. */
   public val cancelTile: CustomSourceCancelTileCallback? = null,
 )
@@ -4413,13 +4413,14 @@ public fun interface ResourceRequestCancelCallback {
 }
 
 /**
- * Runtime and map event delivery. Set either callback or queue.
+ * Runtime and map event delivery. Exactly one of callback and queue is set.
  *
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventHandler(
-  public val callback: RuntimeEventCallback? = null,
+  /** Receives each event batch. */
+  public val callback: RuntimeEventCallback,
 )
 
 /**

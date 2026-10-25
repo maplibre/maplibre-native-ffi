@@ -9,7 +9,7 @@ retains callback roots, and decodes outputs and completion results.
 from dataclasses import replace
 
 from ..names import camel, pascal
-from ..semantic import output_member
+from ..semantic import DefaultSupport, output_member, required_callbacks
 from .zig import (
     DIAGNOSTIC_PARAMETER,
     failure,
@@ -125,6 +125,12 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         return view_operation(plan, values, method)
     if plan.drain:
         return drain_operation(plan, values, method)
+    if (
+        isinstance(plan.support, DefaultSupport)
+        and plan.result
+        and required_callbacks(plan.result)
+    ):
+        return default_with_callbacks(plan, values)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
     owned_outputs = {p.parameter: p for p in plan.owned_outputs}
@@ -423,6 +429,24 @@ def consume(function, receiver, body, return_type, infallible=False, release=Tru
         f"{receiver}.closed = true;",
         "return released;",
     ]
+
+
+def default_with_callbacks(plan, values):
+    """A record default that takes the callbacks its copy cannot hold."""
+    from .zig_callbacks import callback_type
+
+    values.add(plan.result)
+    typ = values.public(plan.result)
+    required = required_callbacks(plan.result)
+    parameters = ", ".join(
+        f"{identifier(f.name)}: {callback_type(values, f)}" for f in required
+    )
+    arguments = "".join(f", {identifier(f.name)}" for f in required)
+    return (
+        f"pub fn {function_name(plan, values)}({parameters}) status.Error!{typ} {{\n"
+        "    try status.validateAbiVersion(null);\n"
+        f"    return {typ}.fromDefault(c.{plan.name}(){arguments});\n}}\n"
+    )
 
 
 def view_operation(plan, values, method=False):

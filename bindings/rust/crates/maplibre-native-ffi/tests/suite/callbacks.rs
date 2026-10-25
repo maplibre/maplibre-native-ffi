@@ -160,7 +160,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
 
     // A transform that panics drops its request, which keeps its URL instead
     // of leaving MapLibre waiting.
-    let deny = denying_provider().callback.unwrap();
+    let deny = denying_provider().callback;
     wait_for(
         fixture
             .runtime()
@@ -245,7 +245,7 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
     let fixture = Fixture::new();
     let (sender, requests) = mpsc::channel();
     let sender = Mutex::new(sender);
-    let deny = denying_provider().callback.unwrap();
+    let deny = denying_provider().callback;
     wait_for(
         fixture
             .runtime()
@@ -419,7 +419,7 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
     let fixture = Fixture::new();
     let (sender, requests) = mpsc::channel();
     let sender = Mutex::new(sender);
-    let deny = denying_provider().callback.unwrap();
+    let deny = denying_provider().callback;
     wait_for(
         fixture
             .runtime()

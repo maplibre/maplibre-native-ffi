@@ -9,6 +9,7 @@ the record keeps its value semantics, and the native registration is affine.
 from dataclasses import replace
 
 from .. import async_hosts, docs
+from ..semantic import required_callbacks
 from .python_values import (
     enum_type,
     field_name,
@@ -140,7 +141,11 @@ def sources(values, plan):
             for p in parameters
             if p.value.kind == "handle" and p.value.ownership == "owned"
         ]
-        fields.append(f"    {name}: {public_name(callback.native)} | None = None")
+        required = not field.value.nullable
+        fields.append(
+            f"    {name}: {public_name(callback.native)}"
+            + ("" if required else " | None = None")
+        )
         signature = ", ".join(["self"] + [p.name for p in parameters])
         arguments = ", ".join(
             p.name if p in owned else values.facade_copy(p.value, p.name)
@@ -155,7 +160,9 @@ def sources(values, plan):
             closes = "".join(f"            {p.name}.close()\n" for p in owned)
             invoke = f"try:\n            return callback({arguments})\n        except BaseException:\n{closes}            raise"
         methods.append(
-            f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n{wraps}        {invoke}\n"
+            f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n"
+            + ("" if required else "        assert callback is not None\n")
+            + f"{wraps}        {invoke}\n"
         )
         native_parameters = ", ".join(
             f"{'_' if p.name == callback.borrowed_owner else ''}{rust_field(p.name)}: {ffi_type(p.value)}"
@@ -241,6 +248,7 @@ def sources(values, plan):
         # default leaves them at None.
         copied=plan.native in values.api.returned,
         registration=True,
+        required=[f.name for f in required_callbacks(plan)],
     )
     rust.append(record_rust)
     python.append(record_python + native_class)

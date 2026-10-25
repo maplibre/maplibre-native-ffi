@@ -101,7 +101,7 @@ func installProvider(
   try await runtime.setResourceProvider(ResourceProvider(
     callback: { request, handle in
       guard request.requestedUrl == url else {
-        return deny.callback!(request, handle)
+        return deny.callback(request, handle)
       }
       do { try body(handle) }
       catch {

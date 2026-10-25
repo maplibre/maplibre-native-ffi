@@ -104,11 +104,13 @@ public object GeneratedApi {
    * See `mln_custom_geometry_source_options_default` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun customGeometrySourceOptionsDefault(): CustomGeometrySourceOptions =
+  public fun customGeometrySourceOptionsDefault(
+    fetchTile: CustomSourceFetchTileCallback,
+  ): CustomGeometrySourceOptions =
     nativeCall(null, null) {
       val out = sized(w(72, 88), 8)
       C.mln_custom_geometry_source_options_default(out)
-      readCustomGeometrySourceOptions(out)
+      readCustomGeometrySourceOptions(out, fetchTile)
     }
 
   /**
@@ -117,11 +119,13 @@ public object GeneratedApi {
    * See `mln_custom_mvt_vector_source_options_default` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun customMvtVectorSourceOptionsDefault(): CustomMvtVectorSourceOptions =
+  public fun customMvtVectorSourceOptionsDefault(
+    fetchTile: CustomSourceFetchTileCallback,
+  ): CustomMvtVectorSourceOptions =
     nativeCall(null, null) {
       val out = sized(w(56, 64), 8)
       C.mln_custom_mvt_vector_source_options_default(out)
-      readCustomMvtVectorSourceOptions(out)
+      readCustomMvtVectorSourceOptions(out, fetchTile)
     }
 
   /**

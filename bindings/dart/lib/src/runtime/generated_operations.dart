@@ -702,13 +702,10 @@ _prepareCustomGeometrySourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
       result.ref.wrap = value.wrap!;
     }
-    if (value.fetchTile == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
           (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile!,
+            value.fetchTile,
             batch,
             index,
             delivery,
@@ -734,7 +731,9 @@ _prepareCustomGeometrySourceOptions(
 
 CustomGeometrySourceOptions _readCustomGeometrySourceOptions(
   raw.mln_custom_geometry_source_options source,
+  CustomSourceFetchTileCallback fetchTile,
 ) => CustomGeometrySourceOptions(
+  fetchTile: fetchTile,
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
   tolerance: source.tolerance,
@@ -762,13 +761,10 @@ _prepareCustomMvtVectorSourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
-    if (value.fetchTile == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
           (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile!,
+            value.fetchTile,
             batch,
             index,
             delivery,
@@ -794,7 +790,9 @@ _prepareCustomMvtVectorSourceOptions(
 
 CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
   raw.mln_custom_mvt_vector_source_options source,
+  CustomSourceFetchTileCallback fetchTile,
 ) => CustomMvtVectorSourceOptions(
+  fetchTile: fetchTile,
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
 );
@@ -2652,12 +2650,9 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
   try {
     final result = arena<raw.mln_runtime_event_handler>();
     result.ref.size = sizeOf<raw.mln_runtime_event_handler>();
-    if (value.callback == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
-          _deliverRuntimeEventCallback(value.callback!, batch, index, delivery),
+          _deliverRuntimeEventCallback(value.callback, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -3115,20 +3110,24 @@ CameraUpdate cameraUpdateDefault() {
 ///
 /// See `mln_custom_geometry_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-CustomGeometrySourceOptions customGeometrySourceOptionsDefault() {
+CustomGeometrySourceOptions customGeometrySourceOptionsDefault(
+  CustomSourceFetchTileCallback fetchTile,
+) {
   ensureAbiVersion();
   final nativeResult = raw.mln_custom_geometry_source_options_default();
-  return _readCustomGeometrySourceOptions(nativeResult);
+  return _readCustomGeometrySourceOptions(nativeResult, fetchTile);
 }
 
 /// Returns default custom MVT vector source options.
 ///
 /// See `mln_custom_mvt_vector_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault() {
+CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault(
+  CustomSourceFetchTileCallback fetchTile,
+) {
   ensureAbiVersion();
   final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
-  return _readCustomMvtVectorSourceOptions(nativeResult);
+  return _readCustomMvtVectorSourceOptions(nativeResult, fetchTile);
 }
 
 /// Returns a zero-token, render-if-needed, nonpresenting frame demand.

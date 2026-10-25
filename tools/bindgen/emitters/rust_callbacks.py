@@ -1,5 +1,6 @@
 """Retained callback descriptors and scoped responses."""
 
+from ..semantic import required_callbacks
 from .rust import Unsupported, doc, identifier, is_text, native_call, native_identifier
 from .rust_dynamic_values import decode, encode
 
@@ -197,26 +198,57 @@ def trampoline(values, callback, name, host, state="Self"):
     ), public
 
 
+def required_parameters(values, value):
+    """The (name, function bound) of each callback that a registration
+    requires, which its constructor and its default take."""
+    return [
+        (
+            identifier(field.name),
+            callback_function(values, values.bound.callbacks[field.value.native]),
+        )
+        for field in required_callbacks(value)
+    ]
+
+
+def callback_function(values, callback):
+    """The closure bound of a host callback."""
+    signature = ", ".join(
+        callback_parameter_type(values, p) for p in callback.arguments
+    )
+    output, raw, _converted = callback_output(values, callback)
+    returns = "" if raw == "()" else f" -> {output}"
+    return f"Fn({signature}){returns} + Send + Sync + 'static"
+
+
 def declaration(values, value):
     name = values.name(value)
     raw = f"sys::{value.native}"
     fields, writes, copies, trampolines, constructors = [], [], [], [], []
+    required = {f.name for f in required_callbacks(value)}
     for index, (field, callback) in enumerate(callbacks(values, value)):
         public = identifier(field.name)
-        arguments = callback.arguments
-        signature = ", ".join(callback_parameter_type(values, p) for p in arguments)
-        code, output = trampoline(
+        code, _output = trampoline(
             values,
             callback,
             f"{public}_trampoline",
-            f"callback::require(&state.{public})?",
+            f"(state.{public})"
+            if field.name in required
+            else f"callback::require(&state.{public})?",
         )
         trampolines.append(code)
-        returns = "" if output == "()" else f" -> {output}"
-        function = f"Fn({signature}){returns} + Send + Sync + 'static"
-        fields.append(
-            f"{callback_doc(doc(values.bound, f'{value.native}.{field.name}', '    '), callback, '    ')}    pub {public}: Option<std::sync::Arc<dyn {function}>>,"
+        function = callback_function(values, callback)
+        stored = f"std::sync::Arc<dyn {function}>"
+        summary = callback_doc(
+            doc(values.bound, f"{value.native}.{field.name}", "    "), callback, "    "
         )
+        if field.name in required:
+            fields.append(f"{summary}    pub {public}: {stored},")
+            writes.append(
+                f"raw.{native_identifier(field.name)} = Some(Self::{public}_trampoline as _);"
+            )
+            copies.append(f"{public},")
+            continue
+        fields.append(f"{summary}    pub {public}: Option<{stored}>,")
         writes.append(
             f"raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"
         )
@@ -224,7 +256,7 @@ def declaration(values, value):
         constructors.append(
             f"pub fn with_{field.name}<F>(mut self, callback: F) -> Self where F: {function} {{ self.{public} = Some(std::sync::Arc::new(callback)); self }}"
         )
-        if index == 0:
+        if index == 0 and not required:
             constructors.append(
                 f"pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{field.name}(callback) }}"
             )
@@ -280,14 +312,68 @@ def declaration(values, value):
     )
     default = (
         f"impl Default for {name} {{ fn default() -> Self {{ maplibre_core::require_abi_version(); convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
-        if value.default
+        if value.default and not required
         else ""
     )
+    parameters = required_parameters(values, value)
+    if parameters:
+        # A registration that requires a callback has no default value: its
+        # constructor takes each required callback, and a native default
+        # supplies the other fields.
+        types = (
+            ["F"]
+            if len(parameters) == 1
+            else [f"F{index}" for index in range(len(parameters))]
+        )
+        generics = ", ".join(types)
+        bounds = ", ".join(
+            f"{typ}: {function}"
+            for typ, (_, function) in zip(types, parameters, strict=True)
+        )
+        arguments = ", ".join(
+            f"{public}: {typ}"
+            for typ, (public, _) in zip(types, parameters, strict=True)
+        )
+        shared = ", ".join(f"std::sync::Arc::new({public})" for public, _ in parameters)
+        if value.default:
+            body = f'maplibre_core::require_abi_version(); unsafe {{ Self::from_default(sys::{value.default}(), {shared}) }}.expect("native default must be valid")'
+        else:
+            # Each other member starts unset or empty.
+            body = (
+                "Self { "
+                + " ".join(
+                    f"{identifier(field.name)}: std::sync::Arc::new({identifier(field.name)}),"
+                    if field.name in required
+                    else f"{identifier(field.name)}: None,"
+                    if field.name in value.registration.callbacks
+                    else f"{identifier(field.name)}: Default::default(),"
+                    for field in value.fields
+                    if field.public or field.name in value.registration.callbacks
+                )
+                + " }"
+            )
+        constructors.append(
+            f"pub fn new<{generics}>({arguments}) -> Self where {bounds} {{ {body} }}"
+        )
     user_data = native_identifier(value.registration.user_data)
     release = native_identifier(value.registration.release)
+    returned = value.native in values.bound.returned
+    if parameters and returned:
+        # A copy holds no callbacks, so the default's caller passes the
+        # required ones.
+        stored = ", ".join(
+            f"{public}: std::sync::Arc<dyn {function}>"
+            for public, function in parameters
+        )
+        constructors.append(
+            "/// Copies a native default, whose callbacks are unset, with the required ones.\n"
+            f"    pub(crate) unsafe fn from_default(raw: {raw}, {stored}) -> Result<Self> {{ Ok(Self {{ "
+            + " ".join(copies)
+            + " }) }"
+        )
     return (
         doc(values.bound, value.native)
-        + f"#[derive(Clone{', Default' if not value.default else ''})]\n"
+        + f"#[derive(Clone{', Default' if not value.default and not parameters else ''})]\n"
         f"pub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
@@ -313,7 +399,7 @@ def declaration(values, value):
             + "        Ok(Self {\n"
             + "".join(f"            {line}\n" for line in copies)
             + "        })\n    }\n}\n"
-            if value.native in values.bound.returned
+            if returned and not parameters
             else ""
         )
     )

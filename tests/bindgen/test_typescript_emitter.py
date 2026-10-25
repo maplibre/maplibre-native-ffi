@@ -228,6 +228,33 @@ class TypeScriptEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", values)
 
+    def test_a_registration_without_its_queue_requires_each_non_nullable_callback(
+        self,
+    ):
+        # The realm sets the delivery queue itself, so a host cannot leave out
+        # a callback that C requires in callback mode. A callback that C marks
+        # nullable stays optional.
+        generated = typescript.generate(self.api)
+        values = generated["bindings/typescript/src/generated_values.ts"]
+        operations = generated["bindings/typescript/src/generated_operations.ts"]
+        self.assertIn(
+            "setEventHandler(handler: RuntimeEventHandler): Promise<CommandCompletion>",
+            operations,
+        )
+        self.assertNotIn("handler?: RuntimeEventHandler", operations)
+        self.assertIn("  fetchTile: (tileId: CanonicalTileId) => void;", values)
+        self.assertIn("  cancelTile?: (tileId: CanonicalTileId) => void;", values)
+        self.assertIn("  endHandler?: CameraTransitionHandler;", values)
+        # The native default holds no callback, so its caller passes the one
+        # that the record requires.
+        self.assertIn(
+            "export function customGeometrySourceOptionsDefault(fetchTile: "
+            'CustomGeometrySourceOptions["fetchTile"]): CustomGeometrySourceOptions {\n'
+            "  return { ...native.mln_custom_geometry_source_options_default(), "
+            "fetchTile };\n}",
+            operations,
+        )
+
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
         # attachment, so only the categories that return synchronously can

@@ -17,9 +17,11 @@ from ..model import Api
 from ..names import type_name
 from ..semantic import (
     BoundApi,
+    DefaultSupport,
     OperationPlan,
     OwnedOutputPlan,
     output_member,
+    required_callbacks,
 )
 from .typescript_native_values import NativeValues
 from .typescript_values import (
@@ -67,6 +69,9 @@ class Lowered:
     discardable: bool = False
     # The C statement that releases a drained batch after its slice is copied.
     drained: str | None = None
+    # The required callbacks that a record default takes from its caller,
+    # since the native copy holds none.
+    completes: list[str] = field(default_factory=list)
     c_locals: list[str] = field(default_factory=list)
     c_body: list[str] = field(default_factory=list)
 
@@ -575,6 +580,15 @@ def lower_function(
     elif result_value is not None:
         body.append(f"call->result = {natives.to_js(result_value, 'result')};")
         lowered.native_result = lowered.returns = values.ts(result_value)
+        required = required_callbacks(result_value)
+        if isinstance(plan.support, DefaultSupport) and required:
+            lowered.completes = [identifier(f.name) for f in required]
+            lowered.parameters = [
+                (name, f'{lowered.returns}["{name}"]', None)
+                for name in lowered.completes
+            ]
+            omitted = " | ".join(f'"{name}"' for name in lowered.completes)
+            lowered.native_result = f"Omit<{lowered.returns}, {omitted}>"
     if lowered.absent:
         lowered.native_result += " | undefined"
         if not lowered.drained:

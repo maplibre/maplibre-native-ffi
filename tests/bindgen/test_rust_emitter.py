@@ -125,7 +125,7 @@ class RustEmitterTests(unittest.TestCase):
         # A closure bound cannot name its arguments, so the field's doc does.
         self.assertIn(
             "    /// The callback receives (`severity`, `event`, `code`, `message`).\n"
-            "    pub callback: Option<",
+            "    pub callback: std::sync::Arc<dyn ",
             values,
         )
         self.assertIn("Fn(LogSeverity, LogEvent, i64, &str) -> bool", values)

@@ -676,11 +676,28 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif plan.result:
             value_types.add(plan.result, "out")
             public = value_types.public(plan.result)
-            output = (
-                f"convert::native_default({value_local})"
+            from .rust_callbacks import required_parameters
+
+            required = (
+                required_parameters(value_types, plan.result)
                 if plan.result.kind == "record" and plan.result.default == function.name
-                else decode(value_types, plan.result, value_local)
+                else []
             )
+            if required:
+                # A copy holds no callbacks, so the caller passes the
+                # required ones.
+                signature += [
+                    f"{name}: std::sync::Arc<dyn {bound}>" for name, bound in required
+                ]
+                output = (
+                    f"unsafe {{ {public}::from_default({value_local}, "
+                    + ", ".join(name for name, _ in required)
+                    + ') }.expect("native default must be valid")'
+                )
+            elif plan.result.kind == "record" and plan.result.default == function.name:
+                output = f"convert::native_default({value_local})"
+            else:
+                output = decode(value_types, plan.result, value_local)
             ending = [
                 f"let {value_local} = {call_local}.run({closure} {native});",
                 f"Ok({output})",

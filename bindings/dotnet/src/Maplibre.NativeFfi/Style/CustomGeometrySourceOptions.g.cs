@@ -14,7 +14,7 @@ public sealed record CustomGeometrySourceOptions
     /// <summary>
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     /// </summary>
-    public CustomSourceFetchTileCallback? FetchTile { get; init; }
+    public required CustomSourceFetchTileCallback FetchTile { get; init; }
 
     /// <summary>
     /// Optional best-effort tile cancel callback. Null in queue mode.
@@ -27,14 +27,13 @@ public sealed record CustomGeometrySourceOptions
     public uint? Buffer { get; init; }
     public bool? Clip { get; init; }
     public bool? Wrap { get; init; }
-    public static CustomGeometrySourceOptions Default
+
+    public static CustomGeometrySourceOptions Default(CustomSourceFetchTileCallback fetchTile)
     {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCustomGeometrySourceOptions(
-                NativeMethods.mln_custom_geometry_source_options_default()
-            );
-        }
+        using var call = NativeCall.Enter(null);
+        return GeneratedValues.CopyCustomGeometrySourceOptions(
+            NativeMethods.mln_custom_geometry_source_options_default(),
+            fetchTile
+        );
     }
 }

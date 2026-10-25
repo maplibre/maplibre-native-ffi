@@ -4508,26 +4508,19 @@ bool mln_ts_write_custom_geometry_source_options(
   napi_value member;
   char child[256];
   (void)child;
-  bool present = true;
   if (!mln_ts_member(call, value, "fetchTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "fetchTile");
-  if (mln_ts_is_absent(call, member)) {
-    present = false;
-  } else {
-    if (!mln_ts_read_function(call, member, child)) return false;
-  }
+  if (!mln_ts_read_function(call, member, child)) return false;
   if (!mln_ts_member(call, value, "cancelTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "cancelTile");
   if (mln_ts_is_absent(call, member)) {
   } else {
     if (!mln_ts_read_function(call, member, child)) return false;
   }
-  if (present) {
-    if (!mln_ts_read_registration(
-          call, value, &(*out).user_data, &(*out).queue, path
-        ))
-      return false;
-  }
+  if (!mln_ts_read_registration(
+        call, value, &(*out).user_data, &(*out).queue, path
+      ))
+    return false;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
   if (!mln_ts_is_absent(call, member)) {
@@ -4610,26 +4603,19 @@ bool mln_ts_write_custom_mvt_vector_source_options(
   napi_value member;
   char child[256];
   (void)child;
-  bool present = true;
   if (!mln_ts_member(call, value, "fetchTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "fetchTile");
-  if (mln_ts_is_absent(call, member)) {
-    present = false;
-  } else {
-    if (!mln_ts_read_function(call, member, child)) return false;
-  }
+  if (!mln_ts_read_function(call, member, child)) return false;
   if (!mln_ts_member(call, value, "cancelTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "cancelTile");
   if (mln_ts_is_absent(call, member)) {
   } else {
     if (!mln_ts_read_function(call, member, child)) return false;
   }
-  if (present) {
-    if (!mln_ts_read_registration(
-          call, value, &(*out).user_data, &(*out).queue, path
-        ))
-      return false;
-  }
+  if (!mln_ts_read_registration(
+        call, value, &(*out).user_data, &(*out).queue, path
+      ))
+    return false;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
   if (!mln_ts_is_absent(call, member)) {

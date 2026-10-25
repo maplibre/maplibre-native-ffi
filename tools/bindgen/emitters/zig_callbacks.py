@@ -4,6 +4,7 @@ import re
 
 from ..model import ModelError
 from ..names import camel
+from ..semantic import required_callbacks
 from .zig import identifier
 from .zig_dynamic_values import decode
 
@@ -37,6 +38,7 @@ def parts(values, value):
     )
     registration = value.registration
     public = values.public(value)
+    required = {f.name for f in required_callbacks(value)}
     constructors = []
     root_type = f"callbacks.Registration({public})"
     for field in value.fields:
@@ -52,10 +54,6 @@ def parts(values, value):
             else values.public(plan.result)
         )
         argument_types = [values.public(p.value) for p in parameters]
-        named = "".join(
-            f", {parameter_name(p.name)}: {t}"
-            for p, t in zip(parameters, argument_types, strict=True)
-        )
         summary = (
             "    /// An error that names a native status, such as\n"
             "    /// error.InvalidArgument, answers native that status. Any other\n"
@@ -63,19 +61,20 @@ def parts(values, value):
             if plan.status
             else ""
         )
-        fields.append(
-            f"{summary}    {local}: ?*const fn (context: ?*anyopaque{named}) anyerror!{result} = null,"
-        )
-        constructors.append((local, argument_types, result))
-        captures.append(f"            .{local} = null,")
-        writes.append(
-            f"        raw.{local} = if (self.{local} != null) {local}Trampoline else null;"
-        )
         # Quoted identifiers cannot be extended into another identifier.
         trampoline = identifier(field.name + "Trampoline")
-        writes[-1] = (
-            f"        raw.{local} = if (self.{local} != null) {trampoline} else null;"
-        )
+        typ = callback_type(values, field)
+        if field.name in required:
+            fields.append(f"{summary}    {local}: {typ},")
+            captures.append(f"            .{local} = {local},")
+            writes.append(f"        raw.{local} = {trampoline};")
+        else:
+            fields.append(f"{summary}    {local}: ?{typ} = null,")
+            captures.append(f"            .{local} = null,")
+            writes.append(
+                f"        raw.{local} = if (self.{local} != null) {trampoline} else null;"
+            )
+        constructors.append((local, argument_types, result, field.name in required))
         fallback = (
             "return;"
             if plan.result.ctype.kind == "void"
@@ -137,7 +136,7 @@ def parts(values, value):
         else:
             action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
         ownership_setup = "var ownership_transferred = false; " if owned else ""
-        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) anyerror!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {ownership_setup}{''.join(owned)}"
+        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) anyerror!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local}{'' if field.name in required else f' orelse {{ {fallback} }}'}; {scope} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
         used = set(
@@ -166,12 +165,14 @@ def parts(values, value):
         trampolines.append(
             f"    fn {trampoline}({trampoline_signature}) callconv(.c) marshal.CallbackResult(c.{plan.native}) {{ return struct {{ {body} }}.invoke({args}) catch |err| {{ {report} {fallback} }}; }}"
         )
-    empty = " and ".join(
-        f"self.{identifier(name)} == null" for name in registration.callbacks
-    )
-    writes.append(
-        f"        if (!({empty})) {{ const retained = try roots.retain({public}, self); raw.{identifier(registration.user_data)} = retained; raw.{identifier(registration.release)} = {root_type}.releaseNative; }}"
-    )
+    root = f"const retained = try roots.retain({public}, self); raw.{identifier(registration.user_data)} = retained; raw.{identifier(registration.release)} = {root_type}.releaseNative;"
+    if required:
+        writes.append(f"        {root}")
+    else:
+        empty = " and ".join(
+            f"self.{identifier(name)} == null" for name in registration.callbacks
+        )
+        writes.append(f"        if (!({empty})) {{ {root} }}")
     trampolines.append(constructor(public, constructors))
     return fields, writes, captures, trampolines
 
@@ -259,6 +260,20 @@ RESERVED = frozenset(
 )
 
 
+def callback_type(values, field):
+    """The function pointer type of a registration's callback field."""
+    plan = values.bound.callbacks[field.value.native]
+    result = (
+        "void"
+        if plan.result.ctype.kind == "void" or plan.status
+        else values.public(plan.result)
+    )
+    named = "".join(
+        f", {parameter_name(p.name)}: {values.public(p.value)}" for p in plan.arguments
+    )
+    return f"*const fn (context: ?*anyopaque{named}) anyerror!{result}"
+
+
 def parameter_name(name):
     """A callback argument's name in a function type: its C name, quoted only
     when Zig reserves it."""
@@ -289,21 +304,27 @@ def borrow(value, source):
 
 def constructor(public, callbacks):
     """`init`, which erases a typed context pointer for each callback."""
-    parameters = "".join(f"comptime {local}: anytype, " for local, _, _ in callbacks)
+    parameters = "".join(f"comptime {local}: anytype, " for local, *_ in callbacks)
     members = []
-    for local, argument_types, result in callbacks:
+    for local, argument_types, result, required in callbacks:
         arguments = [
             f"argument_{index}: {typ}" for index, typ in enumerate(argument_types)
         ]
         forwarded = "".join(
             f", argument_{index}" for index in range(len(argument_types))
         )
+        unset = "" if required else f"if (@TypeOf({local}) == @TypeOf(null)) null else "
         members.append(
-            f".{local} = if (@TypeOf({local}) == @TypeOf(null)) null else struct {{ fn call(erased: ?*anyopaque{''.join(', ' + a for a in arguments)}) anyerror!{result} {{ return {local}(@as(Context, @ptrCast(@alignCast(erased.?))){forwarded}); }} }}.call,"
+            f".{local} = {unset}struct {{ fn call(erased: ?*anyopaque{''.join(', ' + a for a in arguments)}) anyerror!{result} {{ return {local}(@as(Context, @ptrCast(@alignCast(erased.?))){forwarded}); }} }}.call,"
         )
+    unset = (
+        "pass null to leave an optional one unset"
+        if any(required for *_, required in callbacks)
+        else "pass null to leave one unset"
+    )
     return f"""    /// Builds a `{public}` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; {unset}.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, {parameters}comptime release: ?fn (@TypeOf(context)) void) {public} {{

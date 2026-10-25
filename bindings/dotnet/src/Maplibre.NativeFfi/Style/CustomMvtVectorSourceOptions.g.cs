@@ -14,7 +14,7 @@ public sealed record CustomMvtVectorSourceOptions
     /// <summary>
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     /// </summary>
-    public CustomSourceFetchTileCallback? FetchTile { get; init; }
+    public required CustomSourceFetchTileCallback FetchTile { get; init; }
 
     /// <summary>
     /// Optional best-effort tile cancel callback. Null in queue mode.
@@ -22,14 +22,13 @@ public sealed record CustomMvtVectorSourceOptions
     public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
-    public static CustomMvtVectorSourceOptions Default
+
+    public static CustomMvtVectorSourceOptions Default(CustomSourceFetchTileCallback fetchTile)
     {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCustomMvtVectorSourceOptions(
-                NativeMethods.mln_custom_mvt_vector_source_options_default()
-            );
-        }
+        using var call = NativeCall.Enter(null);
+        return GeneratedValues.CopyCustomMvtVectorSourceOptions(
+            NativeMethods.mln_custom_mvt_vector_source_options_default(),
+            fetchTile
+        );
     }
 }

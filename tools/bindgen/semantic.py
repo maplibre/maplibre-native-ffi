@@ -208,6 +208,23 @@ class FieldPlan:
         return self.role not in CONTROL_ROLES
 
 
+def required_callbacks(value: ValuePlan) -> tuple[FieldPlan, ...]:
+    """The callbacks that a registration requires of its host.
+
+    A callback that C does not mark nullable is required whenever the host
+    leaves the delivery queue unset, which every binding's public shape does. A
+    copy from native, such as a record default, holds none of them, so a
+    binding takes them from the caller of the record's default.
+    """
+    if not value.registration:
+        return ()
+    return tuple(
+        f
+        for f in value.fields
+        if f.name in value.registration.callbacks and not f.value.nullable
+    )
+
+
 @dataclass(frozen=True)
 class ParameterPlan:
     name: str

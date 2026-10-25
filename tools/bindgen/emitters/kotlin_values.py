@@ -12,7 +12,7 @@ from dataclasses import replace
 
 from .. import docs
 from ..names import camel, pascal
-from ..semantic import enum_member_prefix
+from ..semantic import enum_member_prefix, required_callbacks
 from .kotlin_abi import Abi, LayoutError, width_expression
 
 
@@ -810,6 +810,10 @@ class Values:
             return "null" if value.nullable else f"{name(value.native)}()"
         if value.kind == "record":
             reader = self.read(value)
+            if value.registration:
+                # The caller of the record's default names its required
+                # callbacks, which a copy cannot hold.
+                return f"{reader}({', '.join([address, *(identifier(f.name) for f in required_callbacks(value))])})"
             return (
                 f"{reader}({address}, {scope})"
                 if value.native in self.views and scope

@@ -160,15 +160,11 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
     writeBool(target + w(57, 65), it)
   }
   writeU32(target + 4, fields)
-  if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
   val queue = HostDelivery.queue
   if (queue != 0L) writeI64(target + w(64, 80), queue)
   else {
-    writeAddress(
-      target + 8,
-      if (value.fetchTile == null) 0L else UpcallStubs.customGeometrySourceOptionsFetchTile,
-    )
+    writeAddress(target + 8, UpcallStubs.customGeometrySourceOptionsFetchTile)
     writeAddress(
       target + w(12, 16),
       if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
@@ -195,15 +191,11 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
     writeF64(target + w(32, 40), it)
   }
   writeU32(target + 4, fields)
-  if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
   val queue = HostDelivery.queue
   if (queue != 0L) writeI64(target + w(48, 56), queue)
   else {
-    writeAddress(
-      target + 8,
-      if (value.fetchTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsFetchTile,
-    )
+    writeAddress(target + 8, UpcallStubs.customMvtVectorSourceOptionsFetchTile)
     writeAddress(
       target + w(12, 16),
       if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
@@ -914,7 +906,6 @@ internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefini
 
 internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEventHandler) {
   writeU32(target, w(24, 40).toUInt())
-  if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
   val queue = HostDelivery.queue
   if (queue != 0L) writeI64(target + w(16, 32), queue)
@@ -1174,10 +1165,13 @@ internal fun readCameraUpdate(source: Long): CameraUpdate =
     gesturePhase = GesturePhase(readU32(source + w(224, 232))),
   )
 
-internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySourceOptions {
+internal fun readCustomGeometrySourceOptions(
+  source: Long,
+  fetchTile: CustomSourceFetchTileCallback,
+): CustomGeometrySourceOptions {
   val fields = readU32(source + 4)
   return CustomGeometrySourceOptions(
-    fetchTile = null,
+    fetchTile = fetchTile,
     cancelTile = null,
     minZoom = if ((fields and 1u) != 0u) readF64(source + w(24, 32)) else null,
     maxZoom = if ((fields and 2u) != 0u) readF64(source + w(32, 40)) else null,
@@ -1189,10 +1183,13 @@ internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySource
   )
 }
 
-internal fun readCustomMvtVectorSourceOptions(source: Long): CustomMvtVectorSourceOptions {
+internal fun readCustomMvtVectorSourceOptions(
+  source: Long,
+  fetchTile: CustomSourceFetchTileCallback,
+): CustomMvtVectorSourceOptions {
   val fields = readU32(source + 4)
   return CustomMvtVectorSourceOptions(
-    fetchTile = null,
+    fetchTile = fetchTile,
     cancelTile = null,
     minZoom = if ((fields and 1u) != 0u) readF64(source + w(24, 32)) else null,
     maxZoom = if ((fields and 2u) != 0u) readF64(source + w(32, 40)) else null,

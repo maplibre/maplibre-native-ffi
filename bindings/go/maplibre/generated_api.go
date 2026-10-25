@@ -4229,11 +4229,14 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 }
 
 // RuntimeEventHandler corresponds to mln_runtime_event_handler. Runtime and map
-// event delivery. Set either callback or queue.
+// event delivery. Exactly one of callback and queue is set.
 //
 // See mln_runtime_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventHandler struct{ Callback func(events []RuntimeEvent) }
+type RuntimeEventHandler struct {
+	// Receives each event batch.
+	Callback func(events []RuntimeEvent)
+}
 
 func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C.mln_runtime_event_handler {
 	raw := C.mln_runtime_event_handler{}

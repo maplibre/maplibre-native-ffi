@@ -207,7 +207,7 @@ pub fn denying_provider() -> ResourceProvider {
 
 /// A resource provider that serves `body` at `url` and denies everything else.
 pub fn serving_provider(url: &'static str, body: &'static str) -> ResourceProvider {
-    let deny = denying_provider().callback.unwrap();
+    let deny = denying_provider().callback;
     ResourceProvider::new(move |request, handle| {
         if request.requested_url != url {
             return deny(request, handle);

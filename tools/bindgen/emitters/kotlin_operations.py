@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..semantic import output_member
+from ..semantic import DefaultSupport, output_member, required_callbacks
 from .kotlin_values import Unsupported, identifier, is_text, name, owner_name
 
 EXECUTIONS = {
@@ -413,6 +413,16 @@ def operation(plan, values, native, *, discard=False):
 
 def immediate(plan, values, native):
     method, params, _inputs, result, result_type = signature(plan, values)
+    if isinstance(plan.support, DefaultSupport) and result:
+        # The native default holds no callbacks, so its caller passes the
+        # required ones, which the copy then names.
+        params = [
+            *params,
+            *(
+                (identifier(f.name), values.public(f.value))
+                for f in required_callbacks(result)
+            ),
+        ]
     arguments = call_arguments(plan, values)
     setup, decoded = [], None
     if plan.outputs:

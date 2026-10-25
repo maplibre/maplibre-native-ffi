@@ -60,7 +60,7 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(
-            "type RuntimeEventHandler struct { Callback func(events []RuntimeEvent) }",
+            "Callback func(events []RuntimeEvent)",
             source,
         )
         self.assertNotIn("EventBatchView", source)

@@ -78,7 +78,7 @@ struct GlobalStateTests {
       try await fixture.runtime.setResourceProvider(ResourceProvider(
         callback: { request, handle in
           guard [refused, broken].contains(request.requestedUrl) else {
-            return deny.callback!(request, handle)
+            return deny.callback(request, handle)
           }
           try? handle.passThrough()
         }

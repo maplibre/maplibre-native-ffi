@@ -2046,7 +2046,7 @@ pub const ConstrainMode = enum(u32) {
 pub const CustomGeometrySourceOptions = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    fetch_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
+    fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void,
     cancel_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
@@ -2066,22 +2066,18 @@ pub const CustomGeometrySourceOptions = struct {
         marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
         marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP, &raw.clip, self.clip);
         marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, self.wrap);
-        raw.fetch_tile = if (self.fetch_tile != null) fetch_tileTrampoline else null;
+        raw.fetch_tile = fetch_tileTrampoline;
         raw.cancel_tile = if (self.cancel_tile != null) cancel_tileTrampoline else null;
-        if (!(self.fetch_tile == null and self.cancel_tile == null)) {
-            const retained = try roots.retain(CustomGeometrySourceOptions, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(CustomGeometrySourceOptions).releaseNative;
-        }
+        const retained = try roots.retain(CustomGeometrySourceOptions, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(CustomGeometrySourceOptions).releaseNative;
         return raw;
     }
     fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callbacks.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
-                const host = state.value.fetch_tile orelse {
-                    return;
-                };
+                const host = state.value.fetch_tile;
                 try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
@@ -2105,7 +2101,7 @@ pub const CustomGeometrySourceOptions = struct {
     }
     /// Builds a `CustomGeometrySourceOptions` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime fetch_tile: anytype, comptime cancel_tile: anytype, comptime release: ?fn (@TypeOf(context)) void) CustomGeometrySourceOptions {
@@ -2118,7 +2114,7 @@ pub const CustomGeometrySourceOptions = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .fetch_tile = if (@TypeOf(fetch_tile) == @TypeOf(null)) null else struct {
+            .fetch_tile = struct {
                 fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
                     return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
                 }
@@ -2130,12 +2126,11 @@ pub const CustomGeometrySourceOptions = struct {
             }.call,
         };
     }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_custom_geometry_source_options) status.Error!CustomGeometrySourceOptions {
-        _ = allocator;
+    fn fromDefault(raw: c.mln_custom_geometry_source_options, fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) CustomGeometrySourceOptions {
         return .{
             .context = null,
             .release_context = null,
-            .fetch_tile = null,
+            .fetch_tile = fetch_tile,
             .cancel_tile = null,
             .min_zoom = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
             .max_zoom = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
@@ -2155,7 +2150,7 @@ pub const CustomGeometrySourceOptions = struct {
 pub const CustomMvtVectorSourceOptions = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    fetch_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
+    fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void,
     cancel_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
@@ -2165,22 +2160,18 @@ pub const CustomMvtVectorSourceOptions = struct {
         raw.size = @sizeOf(c.mln_custom_mvt_vector_source_options);
         marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
         marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
-        raw.fetch_tile = if (self.fetch_tile != null) fetch_tileTrampoline else null;
+        raw.fetch_tile = fetch_tileTrampoline;
         raw.cancel_tile = if (self.cancel_tile != null) cancel_tileTrampoline else null;
-        if (!(self.fetch_tile == null and self.cancel_tile == null)) {
-            const retained = try roots.retain(CustomMvtVectorSourceOptions, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(CustomMvtVectorSourceOptions).releaseNative;
-        }
+        const retained = try roots.retain(CustomMvtVectorSourceOptions, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(CustomMvtVectorSourceOptions).releaseNative;
         return raw;
     }
     fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callbacks.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
-                const host = state.value.fetch_tile orelse {
-                    return;
-                };
+                const host = state.value.fetch_tile;
                 try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
@@ -2204,7 +2195,7 @@ pub const CustomMvtVectorSourceOptions = struct {
     }
     /// Builds a `CustomMvtVectorSourceOptions` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime fetch_tile: anytype, comptime cancel_tile: anytype, comptime release: ?fn (@TypeOf(context)) void) CustomMvtVectorSourceOptions {
@@ -2217,7 +2208,7 @@ pub const CustomMvtVectorSourceOptions = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .fetch_tile = if (@TypeOf(fetch_tile) == @TypeOf(null)) null else struct {
+            .fetch_tile = struct {
                 fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
                     return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
                 }
@@ -2229,12 +2220,11 @@ pub const CustomMvtVectorSourceOptions = struct {
             }.call,
         };
     }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_custom_mvt_vector_source_options) status.Error!CustomMvtVectorSourceOptions {
-        _ = allocator;
+    fn fromDefault(raw: c.mln_custom_mvt_vector_source_options, fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) CustomMvtVectorSourceOptions {
         return .{
             .context = null,
             .release_context = null,
-            .fetch_tile = null,
+            .fetch_tile = fetch_tile,
             .cancel_tile = null,
             .min_zoom = if (raw.fields & c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
             .max_zoom = if (raw.fields & c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
@@ -2836,25 +2826,21 @@ pub const LogEvent = enum(u32) {
 pub const LogHandler = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (context: ?*anyopaque, severity: LogSeverity, event: LogEvent, code: i64, message: []const u8) anyerror!bool = null,
+    callback: *const fn (context: ?*anyopaque, severity: LogSeverity, event: LogEvent, code: i64, message: []const u8) anyerror!bool,
     pub fn toNative(self: LogHandler, roots: *callbacks.Roots) status.Error!c.mln_log_handler {
         var raw = std.mem.zeroes(c.mln_log_handler);
         raw.size = @sizeOf(c.mln_log_handler);
-        raw.callback = if (self.callback != null) callbackTrampoline else null;
-        if (!(self.callback == null)) {
-            const retained = try roots.retain(LogHandler, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(LogHandler).releaseNative;
-        }
+        raw.callback = callbackTrampoline;
+        const retained = try roots.retain(LogHandler, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(LogHandler).releaseNative;
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), native_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) callconv(.c) marshal.CallbackResult(c.mln_log_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) anyerror!marshal.CallbackResult(c.mln_log_callback) {
                 const state = callbacks.Registration(LogHandler).get(callback_arg_0);
-                const host = state.value.callback orelse {
-                    return false;
-                };
+                const host = state.value.callback;
                 const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try marshal.borrowView(callback_arg_4)) catch |err| {
                     callbacks.reportError("mln_log_callback", err);
                     return false;
@@ -2868,7 +2854,7 @@ pub const LogHandler = struct {
     }
     /// Builds a `LogHandler` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) LogHandler {
@@ -2881,7 +2867,7 @@ pub const LogHandler = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
+            .callback = struct {
                 fn call(erased: ?*anyopaque, argument_0: LogSeverity, argument_1: LogEvent, argument_2: i64, argument_3: []const u8) anyerror!bool {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2, argument_3);
                 }
@@ -4508,7 +4494,7 @@ pub const ResourcePriority = enum(u32) {
 pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (context: ?*anyopaque, request: ResourceRequestInfo, handle: ResourceRequest) anyerror!void = null,
+    callback: *const fn (context: ?*anyopaque, request: ResourceRequestInfo, handle: ResourceRequest) anyerror!void,
     /// The requests that reach the provider; empty to claim every request.
     routes: []const ResourceRoute = &.{},
     pub fn toNative(self: ResourceProvider, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.mln_resource_provider {
@@ -4520,21 +4506,17 @@ pub const ResourceProvider = struct {
             break :blk items.ptr;
         };
         raw.route_count = std.math.cast(@TypeOf(raw.route_count), self.routes.len) orelse return error.InvalidArgument;
-        raw.callback = if (self.callback != null) callbackTrampoline else null;
-        if (!(self.callback == null)) {
-            const retained = try roots.retain(ResourceProvider, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(ResourceProvider).releaseNative;
-        }
+        raw.callback = callbackTrampoline;
+        const retained = try roots.retain(ResourceProvider, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(ResourceProvider).releaseNative;
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_provider_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_resource_provider_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_resource_provider_callback, 2)) callconv(.c) marshal.CallbackResult(c.mln_resource_provider_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_provider_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_provider_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_provider_callback, 2)) anyerror!marshal.CallbackResult(c.mln_resource_provider_callback) {
                 const state = callbacks.Registration(ResourceProvider).get(callback_arg_0);
-                const host = state.value.callback orelse {
-                    return;
-                };
+                const host = state.value.callback;
                 var ownership_transferred = false;
                 var owned_handle = ResourceRequest.adopt(callback_arg_2);
                 defer if (!ownership_transferred) {
@@ -4553,7 +4535,7 @@ pub const ResourceProvider = struct {
     }
     /// Builds a `ResourceProvider` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) ResourceProvider {
@@ -4566,7 +4548,7 @@ pub const ResourceProvider = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
+            .callback = struct {
                 fn call(erased: ?*anyopaque, argument_0: ResourceRequestInfo, argument_1: ResourceRequest) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1);
                 }
@@ -4599,25 +4581,21 @@ pub const ResourceRange = struct {
 pub const ResourceRequestCancelHandler = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (context: ?*anyopaque) anyerror!void = null,
+    callback: *const fn (context: ?*anyopaque) anyerror!void,
     pub fn toNative(self: ResourceRequestCancelHandler, roots: *callbacks.Roots) status.Error!c.mln_resource_request_cancel_handler {
         var raw = std.mem.zeroes(c.mln_resource_request_cancel_handler);
         raw.size = @sizeOf(c.mln_resource_request_cancel_handler);
-        raw.callback = if (self.callback != null) callbackTrampoline else null;
-        if (!(self.callback == null)) {
-            const retained = try roots.retain(ResourceRequestCancelHandler, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(ResourceRequestCancelHandler).releaseNative;
-        }
+        raw.callback = callbackTrampoline;
+        const retained = try roots.retain(ResourceRequestCancelHandler, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(ResourceRequestCancelHandler).releaseNative;
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 1)) anyerror!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
                 const state = callbacks.Registration(ResourceRequestCancelHandler).get(callback_arg_0);
-                const host = state.value.callback orelse {
-                    return;
-                };
+                const host = state.value.callback;
                 _ = callback_arg_1;
                 try host(state.value.context);
             }
@@ -4628,7 +4606,7 @@ pub const ResourceRequestCancelHandler = struct {
     }
     /// Builds a `ResourceRequestCancelHandler` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) ResourceRequestCancelHandler {
@@ -4641,7 +4619,7 @@ pub const ResourceRequestCancelHandler = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
+            .callback = struct {
                 fn call(erased: ?*anyopaque) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
@@ -4789,25 +4767,21 @@ pub const ResourceStoragePolicy = enum(u32) {
 pub const ResourceTransform = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (context: ?*anyopaque, kind: ResourceKind, url: []const u8, request: ResourceTransformRequest) anyerror!void = null,
+    callback: *const fn (context: ?*anyopaque, kind: ResourceKind, url: []const u8, request: ResourceTransformRequest) anyerror!void,
     pub fn toNative(self: ResourceTransform, roots: *callbacks.Roots) status.Error!c.mln_resource_transform {
         var raw = std.mem.zeroes(c.mln_resource_transform);
         raw.size = @sizeOf(c.mln_resource_transform);
-        raw.callback = if (self.callback != null) callbackTrampoline else null;
-        if (!(self.callback == null)) {
-            const retained = try roots.retain(ResourceTransform, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(ResourceTransform).releaseNative;
-        }
+        raw.callback = callbackTrampoline;
+        const retained = try roots.retain(ResourceTransform, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(ResourceTransform).releaseNative;
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_transform_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_resource_transform_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_resource_transform_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_resource_transform_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_resource_transform_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_transform_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_transform_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_transform_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_resource_transform_callback, 3)) anyerror!marshal.CallbackResult(c.mln_resource_transform_callback) {
                 const state = callbacks.Registration(ResourceTransform).get(callback_arg_0);
-                const host = state.value.callback orelse {
-                    return;
-                };
+                const host = state.value.callback;
                 var ownership_transferred = false;
                 var owned_request = ResourceTransformRequest.adopt(callback_arg_3);
                 defer if (!ownership_transferred) {
@@ -4823,7 +4797,7 @@ pub const ResourceTransform = struct {
     }
     /// Builds a `ResourceTransform` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) ResourceTransform {
@@ -4836,7 +4810,7 @@ pub const ResourceTransform = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
+            .callback = struct {
                 fn call(erased: ?*anyopaque, argument_0: ResourceKind, argument_1: []const u8, argument_2: ResourceTransformRequest) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
@@ -4930,32 +4904,28 @@ pub const RuntimeEventFlag = struct {
     pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
 };
 
-/// Runtime and map event delivery. Set either callback or queue.
+/// Runtime and map event delivery. Exactly one of callback and queue is set.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventHandler = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (context: ?*anyopaque, events: []const RuntimeEvent) anyerror!void = null,
+    callback: *const fn (context: ?*anyopaque, events: []const RuntimeEvent) anyerror!void,
     pub fn toNative(self: RuntimeEventHandler, roots: *callbacks.Roots) status.Error!c.mln_runtime_event_handler {
         var raw = std.mem.zeroes(c.mln_runtime_event_handler);
         raw.size = @sizeOf(c.mln_runtime_event_handler);
-        raw.callback = if (self.callback != null) callbackTrampoline else null;
-        if (!(self.callback == null)) {
-            const retained = try roots.retain(RuntimeEventHandler, self);
-            raw.user_data = retained;
-            raw.release_user_data = callbacks.Registration(RuntimeEventHandler).releaseNative;
-        }
+        raw.callback = callbackTrampoline;
+        const retained = try roots.retain(RuntimeEventHandler, self);
+        raw.user_data = retained;
+        raw.release_user_data = callbacks.Registration(RuntimeEventHandler).releaseNative;
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_runtime_event_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_runtime_event_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_runtime_event_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_runtime_event_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_runtime_event_callback, 1)) anyerror!marshal.CallbackResult(c.mln_runtime_event_callback) {
                 const state = callbacks.Registration(RuntimeEventHandler).get(callback_arg_0);
-                const host = state.value.callback orelse {
-                    return;
-                };
+                const host = state.value.callback;
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
@@ -4978,7 +4948,7 @@ pub const RuntimeEventHandler = struct {
     }
     /// Builds a `RuntimeEventHandler` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave one unset.
+    /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) RuntimeEventHandler {
@@ -4991,7 +4961,7 @@ pub const RuntimeEventHandler = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
+            .callback = struct {
                 fn call(erased: ?*anyopaque, argument_0: []const RuntimeEvent) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
                 }
@@ -6449,16 +6419,18 @@ pub fn cameraUpdateDefault(allocator: std.mem.Allocator) status.Error!OwnedValue
 ///
 /// See `mln_custom_geometry_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn customGeometrySourceOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CustomGeometrySourceOptions) {
-    return call.direct("mln_custom_geometry_source_options_default", .none, {}, OwnedValue(CustomGeometrySourceOptions), allocator, .{});
+pub fn customGeometrySourceOptionsDefault(fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) status.Error!CustomGeometrySourceOptions {
+    try status.validateAbiVersion(null);
+    return CustomGeometrySourceOptions.fromDefault(c.mln_custom_geometry_source_options_default(), fetch_tile);
 }
 
 /// Returns default custom MVT vector source options.
 ///
 /// See `mln_custom_mvt_vector_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CustomMvtVectorSourceOptions) {
-    return call.direct("mln_custom_mvt_vector_source_options_default", .none, {}, OwnedValue(CustomMvtVectorSourceOptions), allocator, .{});
+pub fn customMvtVectorSourceOptionsDefault(fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) status.Error!CustomMvtVectorSourceOptions {
+    try status.validateAbiVersion(null);
+    return CustomMvtVectorSourceOptions.fromDefault(c.mln_custom_mvt_vector_source_options_default(), fetch_tile);
 }
 
 /// Returns a zero-token, render-if-needed, nonpresenting frame demand.

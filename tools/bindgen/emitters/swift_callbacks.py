@@ -3,6 +3,8 @@
 from dataclasses import replace
 
 from .. import docs
+from ..model import ModelError
+from ..semantic import required_callbacks
 from .swift import SCALARS, camel, doc, identifier, name
 
 
@@ -94,12 +96,21 @@ def raw_type(type_):
     )
 
 
+def unsupported_default(plan, field):
+    message = (
+        f"{plan.native}.{field.name}: a registration that requires a callback "
+        "takes no native default for a field without presence"
+    )
+    raise ModelError([message])
+
+
 def descriptor(values, plan):
     from .swift_dynamic_values import decode, encode, zero
 
     registration = plan.registration
     public = values.public(plan)
     callbacks = set(registration.callbacks)
+    required = {f.name for f in required_callbacks(plan)}
     fields, arguments, assignments, materialize, defaults = [], [], [], [], []
     for field in plan.fields:
         local = identifier(camel(field.name))
@@ -117,7 +128,18 @@ def descriptor(values, plan):
             continue
         if not field.public:
             continue
-        if field.name in callbacks:
+        if field.name in required:
+            typ = alias(values.bound.callbacks[field.value.native])
+            fields.append(
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: {typ}"
+            )
+            arguments.append(f"{local}: @escaping {typ}")
+            assignments.append(f"    self.{local} = {local}")
+            defaults.append(f"    self.{local} = {local}")
+            materialize.append(
+                f"    raw.{identifier(field.name)} = invoke{public}{name(field.name)}"
+            )
+        elif field.name in callbacks:
             callback = values.bound.callbacks[field.value.native]
             typ = alias(callback)
             fields.append(
@@ -138,7 +160,13 @@ def descriptor(values, plan):
             arguments.append(
                 f"{local}: {typ} = "
                 + (
-                    f"{public}.default.{local}"
+                    # A registration that requires a callback has no default
+                    # value, so an omitted field leaves the native default.
+                    "nil"
+                    if required and optional
+                    else unsupported_default(plan, field)
+                    if required and plan.default
+                    else f"{public}.default.{local}"
                     if plan.default
                     else zero(field.value, typ)
                 )
@@ -160,9 +188,16 @@ def descriptor(values, plan):
                     f"    raw.{identifier(field.name)} = {encode(values, field.value, local)}"
                 )
     initial = f"{plan.default}()" if plan.default else f"{plan.native}()"
-    root_needed = " || ".join(
-        f"{identifier(camel(field))} != nil" for field in registration.callbacks
+    root = (
+        f"    raw.{registration.user_data} = arena.callback(self)\n"
+        f"    raw.{registration.release} = releaseGeneratedCallback"
     )
+    if not required:
+        root_needed = " || ".join(
+            f"{identifier(camel(field))} != nil" for field in registration.callbacks
+        )
+        root = f"    if {root_needed} {{\n" + root.replace("    ", "      ") + "\n    }"
+
     sized = (
         f"\n    raw.size = UInt32(MemoryLayout<{plan.native}>.size)"
         if any(field.role == "size" for field in plan.fields)
@@ -170,16 +205,27 @@ def descriptor(values, plan):
     )
     # Native returns a registration only as its own default, so a registration
     # without one has no copy.
+    # A registration that requires a callback has no default value, and its
+    # copy takes the required callbacks.
+    taken = "".join(
+        f", {identifier(camel(f.name))}: @escaping {alias(values.bound.callbacks[f.value.native])}"
+        for f in required_callbacks(plan)
+    )
     copy = (
-        f"""  public static var `default`: Self {{ try! Self(raw: nativeDefault({plan.default})) }}
-  init(raw: {plan.native}) throws {{
+        (
+            ""
+            if required
+            else f"  public static var `default`: Self {{ try! Self(raw: nativeDefault({plan.default})) }}\n"
+        )
+        + f"""  init(raw: {plan.native}{taken}) throws {{
 {chr(10).join(defaults)}
   }}
 """
         if plan.native in values.bound.returned
+        else ""
+        if required
         else "  public static var `default`: Self { Self() }\n"
     )
-    rooted = "self"
     stored = public
     declarations = f"""{doc(values.bound, plan.native)}public struct {public}: Sendable {{
 {chr(10).join(fields)}
@@ -189,10 +235,7 @@ def descriptor(values, plan):
 {copy}  func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
     var raw = {initial}{sized}
 {chr(10).join(materialize)}
-    if {root_needed} {{
-      raw.{registration.user_data} = arena.callback({rooted})
-      raw.{registration.release} = releaseGeneratedCallback
-    }}
+{root}
     return raw
   }}
 }}
@@ -248,10 +291,13 @@ def descriptor(values, plan):
                 arguments.append("nil")
             setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(handle)}(adopting: {identifier(parameter.name)}) else {{ {handle.release}({', '.join(arguments)}); {fail or 'return'} }}\n"
         value = "box.value"
-        call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}?({args})"
+        optional = "" if field.name in required else "?"
+        call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}{optional}({args})"
         invoke = (
             f"{call}"
             if result == "Void" or callback.status
+            else f"return {call}"
+            if not optional
             else f"return {call} ?? {callback.failure}{suffix}"
         )
         if callback.status:

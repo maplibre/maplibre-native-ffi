@@ -13,14 +13,17 @@ from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import (
     BoundApi,
+    DefaultSupport,
     OperationPlan,
     output_member,
+    required_callbacks,
 )
 
 from .dart_values import (
     Unsupported,
     Values,
     doc,
+    identifier,
     owner_names,
 )
 
@@ -371,6 +374,13 @@ def lower_function(
     if not plan.completion:
         if not status_return and plan.result:
             values.check(plan.result)
+            if isinstance(plan.support, DefaultSupport):
+                # The native default holds no callbacks, so its caller passes
+                # the required ones, which the copy then names.
+                signature.extend(
+                    f"{values.public(f.value)} {identifier(f.name)}"
+                    for f in required_callbacks(plan.result)
+                )
             returns.insert(
                 0,
                 (values.public(plan.result), values.copy(plan.result, "nativeResult")),

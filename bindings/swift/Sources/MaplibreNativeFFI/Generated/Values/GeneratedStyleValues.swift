@@ -47,7 +47,7 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: CustomSourceFetchTileCallback?
+  public var fetchTile: CustomSourceFetchTileCallback
   /// Optional best-effort tile cancel callback. Null in queue mode.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
@@ -58,15 +58,15 @@ public struct CustomGeometrySourceOptions: Sendable {
   public var clip: Bool?
   public var wrap: Bool?
   public init(
-    fetchTile: CustomSourceFetchTileCallback? = nil,
+    fetchTile: @escaping CustomSourceFetchTileCallback,
     cancelTile: CustomSourceCancelTileCallback? = nil,
-    minZoom: Double? = CustomGeometrySourceOptions.default.minZoom,
-    maxZoom: Double? = CustomGeometrySourceOptions.default.maxZoom,
-    tolerance: Double? = CustomGeometrySourceOptions.default.tolerance,
-    tileSize: UInt32? = CustomGeometrySourceOptions.default.tileSize,
-    buffer: UInt32? = CustomGeometrySourceOptions.default.buffer,
-    clip: Bool? = CustomGeometrySourceOptions.default.clip,
-    wrap: Bool? = CustomGeometrySourceOptions.default.wrap
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clip: Bool? = nil,
+    wrap: Bool? = nil
   ) {
     self.fetchTile = fetchTile
     self.cancelTile = cancelTile
@@ -79,12 +79,11 @@ public struct CustomGeometrySourceOptions: Sendable {
     self.wrap = wrap
   }
 
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_custom_geometry_source_options_default))
-  }
-
-  init(raw: mln_custom_geometry_source_options) throws {
-    fetchTile = nil
+  init(
+    raw: mln_custom_geometry_source_options,
+    fetchTile: @escaping CustomSourceFetchTileCallback
+  ) throws {
+    self.fetchTile = fetchTile
     cancelTile = nil
     minZoom = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
       .rawValue != 0 ? raw.min_zoom : nil
@@ -107,9 +106,7 @@ public struct CustomGeometrySourceOptions: Sendable {
   {
     var raw = mln_custom_geometry_source_options_default()
     raw.size = UInt32(MemoryLayout<mln_custom_geometry_source_options>.size)
-    raw
-      .fetch_tile = fetchTile == nil ? nil :
-      invokeCustomGeometrySourceOptionsFetchTile
+    raw.fetch_tile = invokeCustomGeometrySourceOptionsFetchTile
     raw
       .cancel_tile = cancelTile == nil ? nil :
       invokeCustomGeometrySourceOptionsCancelTile
@@ -141,10 +138,8 @@ public struct CustomGeometrySourceOptions: Sendable {
       raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP.rawValue; raw
         .wrap = item
     }
-    if fetchTile != nil || cancelTile != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -156,7 +151,7 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.fetchTile?(CanonicalTileId(raw: tile_id))
+  box.value.fetchTile(CanonicalTileId(raw: tile_id))
 }
 
 private func invokeCustomGeometrySourceOptionsCancelTile(
@@ -175,16 +170,16 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: CustomSourceFetchTileCallback?
+  public var fetchTile: CustomSourceFetchTileCallback
   /// Optional best-effort tile cancel callback. Null in queue mode.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
   public init(
-    fetchTile: CustomSourceFetchTileCallback? = nil,
+    fetchTile: @escaping CustomSourceFetchTileCallback,
     cancelTile: CustomSourceCancelTileCallback? = nil,
-    minZoom: Double? = CustomMvtVectorSourceOptions.default.minZoom,
-    maxZoom: Double? = CustomMvtVectorSourceOptions.default.maxZoom
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil
   ) {
     self.fetchTile = fetchTile
     self.cancelTile = cancelTile
@@ -192,12 +187,11 @@ public struct CustomMvtVectorSourceOptions: Sendable {
     self.maxZoom = maxZoom
   }
 
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_custom_mvt_vector_source_options_default))
-  }
-
-  init(raw: mln_custom_mvt_vector_source_options) throws {
-    fetchTile = nil
+  init(
+    raw: mln_custom_mvt_vector_source_options,
+    fetchTile: @escaping CustomSourceFetchTileCallback
+  ) throws {
+    self.fetchTile = fetchTile
     cancelTile = nil
     minZoom = raw.fields & MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
       .rawValue != 0 ? raw.min_zoom : nil
@@ -210,9 +204,7 @@ public struct CustomMvtVectorSourceOptions: Sendable {
   {
     var raw = mln_custom_mvt_vector_source_options_default()
     raw.size = UInt32(MemoryLayout<mln_custom_mvt_vector_source_options>.size)
-    raw
-      .fetch_tile = fetchTile == nil ? nil :
-      invokeCustomMvtVectorSourceOptionsFetchTile
+    raw.fetch_tile = invokeCustomMvtVectorSourceOptionsFetchTile
     raw
       .cancel_tile = cancelTile == nil ? nil :
       invokeCustomMvtVectorSourceOptionsCancelTile
@@ -224,10 +216,8 @@ public struct CustomMvtVectorSourceOptions: Sendable {
       raw.fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
         .max_zoom = item
     }
-    if fetchTile != nil || cancelTile != nil {
-      raw.user_data = arena.callback(self)
-      raw.release_user_data = releaseGeneratedCallback
-    }
+    raw.user_data = arena.callback(self)
+    raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
@@ -239,7 +229,7 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.fetchTile?(CanonicalTileId(raw: tile_id))
+  box.value.fetchTile(CanonicalTileId(raw: tile_id))
 }
 
 private func invokeCustomMvtVectorSourceOptionsCancelTile(

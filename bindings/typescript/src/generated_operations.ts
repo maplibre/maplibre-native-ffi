@@ -188,8 +188,10 @@ export function cameraUpdateDefault(): CameraUpdate {
  * See `mln_custom_geometry_source_options_default` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-export function customGeometrySourceOptionsDefault(): CustomGeometrySourceOptions {
-  return native.mln_custom_geometry_source_options_default();
+export function customGeometrySourceOptionsDefault(
+  fetchTile: CustomGeometrySourceOptions["fetchTile"],
+): CustomGeometrySourceOptions {
+  return { ...native.mln_custom_geometry_source_options_default(), fetchTile };
 }
 
 /**
@@ -198,8 +200,13 @@ export function customGeometrySourceOptionsDefault(): CustomGeometrySourceOption
  * See `mln_custom_mvt_vector_source_options_default` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-export function customMvtVectorSourceOptionsDefault(): CustomMvtVectorSourceOptions {
-  return native.mln_custom_mvt_vector_source_options_default();
+export function customMvtVectorSourceOptionsDefault(
+  fetchTile: CustomMvtVectorSourceOptions["fetchTile"],
+): CustomMvtVectorSourceOptions {
+  return {
+    ...native.mln_custom_mvt_vector_source_options_default(),
+    fetchTile,
+  };
 }
 
 /**
@@ -920,7 +927,7 @@ export class MapHandle extends Owner {
    */
   addCustomGeometrySource(
     sourceId: string,
-    options?: CustomGeometrySourceOptions,
+    options: CustomGeometrySourceOptions,
   ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
@@ -943,7 +950,7 @@ export class MapHandle extends Owner {
    */
   addCustomMvtVectorSource(
     sourceId: string,
-    options?: CustomMvtVectorSourceOptions,
+    options: CustomMvtVectorSourceOptions,
   ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
@@ -2443,7 +2450,7 @@ export class MapHandleDiscarding {
    */
   addCustomGeometrySource(
     sourceId: string,
-    options?: CustomGeometrySourceOptions,
+    options: CustomGeometrySourceOptions,
   ): void {
     withRegistrations((registrations) => {
       native.mln_map_add_custom_geometry_source(
@@ -2464,7 +2471,7 @@ export class MapHandleDiscarding {
    */
   addCustomMvtVectorSource(
     sourceId: string,
-    options?: CustomMvtVectorSourceOptions,
+    options: CustomMvtVectorSourceOptions,
   ): void {
     withRegistrations((registrations) => {
       native.mln_map_add_custom_mvt_vector_source(
@@ -4219,7 +4226,7 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setEventHandler(handler?: RuntimeEventHandler): Promise<CommandCompletion> {
+  setEventHandler(handler: RuntimeEventHandler): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
         native.mln_runtime_set_event_handler(this.id, handler, completion);
@@ -4434,7 +4441,7 @@ export class RuntimeHandleDiscarding {
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setEventHandler(handler?: RuntimeEventHandler): void {
+  setEventHandler(handler: RuntimeEventHandler): void {
     withRegistrations((registrations) => {
       native.mln_runtime_set_event_handler(this.#owner.id, handler, undefined);
       registrations.commit(rootsOf(this.#owner));
@@ -4837,7 +4844,6 @@ defineDeliveries({
   // MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE
   [7]: (target, payload) => {
     const callback = (target as CustomGeometrySourceOptions).fetchTile;
-    if (callback === undefined) return;
     const [tileId] = [payload.tileId] as Parameters<
       NonNullable<CustomGeometrySourceOptions["fetchTile"]>
     >;

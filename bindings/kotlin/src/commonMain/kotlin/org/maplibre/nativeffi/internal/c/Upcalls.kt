@@ -30,8 +30,7 @@ internal object Upcalls {
       userData,
       false,
     ) { value ->
-      val invoke = value.fetchTile ?: return@upcall false
-      invoke(readCanonicalTileId(tileId))
+      value.fetchTile(readCanonicalTileId(tileId))
       true
     }
     Unit
@@ -58,8 +57,7 @@ internal object Upcalls {
       userData,
       false,
     ) { value ->
-      val invoke = value.fetchTile ?: return@upcall false
-      invoke(readCanonicalTileId(tileId))
+      value.fetchTile(readCanonicalTileId(tileId))
       true
     }
     Unit
@@ -95,8 +93,7 @@ internal object Upcalls {
   @JvmStatic
   fun runtimeEventHandlerCallback(userData: Long, events: Long): Unit = run {
     upcall<RuntimeEventHandler, Boolean>("mln_runtime_event_callback", userData, false) { value ->
-      val invoke = value.callback ?: return@upcall false
-      invoke(readEventBatchView(events))
+      value.callback(readEventBatchView(events))
       true
     }
     Unit

@@ -316,7 +316,7 @@ export interface CustomGeometrySourceOptions {
   /**
    * Tile fetch callback. Required in callback mode; null in queue mode.
    */
-  fetchTile?: (tileId: CanonicalTileId) => void;
+  fetchTile: (tileId: CanonicalTileId) => void;
   /**
    * Optional best-effort tile cancel callback. Null in queue mode.
    */
@@ -340,7 +340,7 @@ export interface CustomMvtVectorSourceOptions {
   /**
    * Tile fetch callback. Required in callback mode; null in queue mode.
    */
-  fetchTile?: (tileId: CanonicalTileId) => void;
+  fetchTile: (tileId: CanonicalTileId) => void;
   /**
    * Optional best-effort tile cancel callback. Null in queue mode.
    */
@@ -2334,7 +2334,7 @@ export const RuntimeEventFlag = {
 export type RuntimeEventFlag = bigint;
 
 /**
- * Runtime and map event delivery. Set either callback or queue.
+ * Runtime and map event delivery. Exactly one of callback and queue is set.
  *
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

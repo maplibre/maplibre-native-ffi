@@ -12,4 +12,4 @@ namespace Maplibre.NativeFfi;
 /// <param name="Callback">
 /// Required in callback mode; null in queue mode.
 /// </param>
-public readonly partial record struct ResourceTransform(ResourceTransformCallback? Callback);
+public readonly partial record struct ResourceTransform(ResourceTransformCallback Callback);

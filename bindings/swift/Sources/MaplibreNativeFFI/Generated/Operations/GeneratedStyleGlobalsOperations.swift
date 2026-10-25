@@ -8,28 +8,30 @@ public extension Maplibre {
   ///
   /// See `mln_custom_geometry_source_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func customGeometrySourceOptionsDefault() throws
+  static func customGeometrySourceOptionsDefault(
+    fetchTile: @escaping CustomSourceFetchTileCallback
+  ) throws
     -> CustomGeometrySourceOptions
   {
-    try nativeDirect { _ in
-      try CustomGeometrySourceOptions(
-        raw: mln_custom_geometry_source_options_default()
-      )
-    }
+    try nativeDirect { _ in try CustomGeometrySourceOptions(
+      raw: mln_custom_geometry_source_options_default(),
+      fetchTile: fetchTile
+    ) }
   }
 
   /// Returns default custom MVT vector source options.
   ///
   /// See `mln_custom_mvt_vector_source_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func customMvtVectorSourceOptionsDefault() throws
+  static func customMvtVectorSourceOptionsDefault(
+    fetchTile: @escaping CustomSourceFetchTileCallback
+  ) throws
     -> CustomMvtVectorSourceOptions
   {
-    try nativeDirect { _ in
-      try CustomMvtVectorSourceOptions(
-        raw: mln_custom_mvt_vector_source_options_default()
-      )
-    }
+    try nativeDirect { _ in try CustomMvtVectorSourceOptions(
+      raw: mln_custom_mvt_vector_source_options_default(),
+      fetchTile: fetchTile
+    ) }
   }
 
   /// Prepares GeoJSON source data for installation on a map.

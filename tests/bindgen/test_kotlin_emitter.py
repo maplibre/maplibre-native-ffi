@@ -302,7 +302,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("public operator fun invoke(events: List<RuntimeEvent>)", values)
         self.assertNotIn("EventBatchView", values)
         self.assertIn(
-            "invoke(readEventBatchView(events))",
+            "value.callback(readEventBatchView(events))",
             outputs[
                 "src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt"
             ],

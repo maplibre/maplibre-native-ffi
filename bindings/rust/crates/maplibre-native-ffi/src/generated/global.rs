@@ -104,22 +104,28 @@ pub fn camera_update_default() -> CameraUpdate {
 ///
 /// See `mln_custom_geometry_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn custom_geometry_source_options_default() -> CustomGeometrySourceOptions {
+pub fn custom_geometry_source_options_default(
+    fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
+) -> CustomGeometrySourceOptions {
     let mut call = Call::global();
     maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_custom_geometry_source_options_default() });
-    convert::native_default(value)
+    unsafe { CustomGeometrySourceOptions::from_default(value, fetch_tile) }
+        .expect("native default must be valid")
 }
 
 /// Returns default custom MVT vector source options.
 ///
 /// See `mln_custom_mvt_vector_source_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn custom_mvt_vector_source_options_default() -> CustomMvtVectorSourceOptions {
+pub fn custom_mvt_vector_source_options_default(
+    fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
+) -> CustomMvtVectorSourceOptions {
     let mut call = Call::global();
     maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_custom_mvt_vector_source_options_default() });
-    convert::native_default(value)
+    unsafe { CustomMvtVectorSourceOptions::from_default(value, fetch_tile) }
+        .expect("native default must be valid")
 }
 
 /// Returns a zero-token, render-if-needed, nonpresenting frame demand.

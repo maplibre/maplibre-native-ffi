@@ -9,7 +9,13 @@ from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
 from ..names import camel, pascal
-from ..semantic import BoundApi, FieldPlan, ValuePlan, enum_member_prefix
+from ..semantic import (
+    BoundApi,
+    FieldPlan,
+    ValuePlan,
+    enum_member_prefix,
+    required_callbacks,
+)
 
 # JSON is text, so it takes and returns a string as UTF-8 text does.
 TEXT_ENCODINGS = frozenset({"utf8", "json"})
@@ -221,7 +227,7 @@ class Values:
         if plan.kind == "handle":
             return pascal(plan.handle.stem) + "Handle"
         if plan.kind == "callback":
-            return public_name(plan.native) + "?"
+            return public_name(plan.native) + ("?" if plan.nullable else "")
         if plan.kind == "native_pointer":
             return "NativePointer"
         if plan.kind == "scalar":
@@ -521,6 +527,10 @@ class Values:
                 expression = (
                     f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
                 )
+            elif plan.registration and field in required_callbacks(plan):
+                # A copy holds no callbacks, so its caller passes the
+                # required ones.
+                expression = member(camel(field.name))
             elif field.value.registration or (
                 plan.registration and field.value.kind == "callback"
             ):
@@ -596,6 +606,10 @@ class Values:
             ", byte* record = null, nuint recordSize = 0"
             if plan.native in self.strided_records
             else ""
+        )
+        extra += "".join(
+            f", {self.public_type(field.value)} {member(camel(field.name))}"
+            for field in required_callbacks(plan)
         )
         return (
             f"    private static {public_name(plan.native)} Copy{public_name(plan.native)}({plan.native} value{extra}) => {copied};\n"
@@ -1228,6 +1242,7 @@ class Values:
                     if not field.presence
                     and (
                         type_ in {"string", "byte[]"}
+                        or (field.value.kind == "callback" and not type_.endswith("?"))
                         or (
                             field.value.kind == "record"
                             and any(
