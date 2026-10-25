@@ -194,12 +194,19 @@ def generate(bound: BoundApi) -> dict[str, str]:
         f"internal readonly record struct {raw_handle(handle)}(ulong Value) : IMlnHandle;\n"
         for _, handle in sorted(bound.handles.items())
     )
+    version = bound.source.c_version
+    constants = (
+        ""
+        if version is None
+        else f"    internal const uint MLN_C_VERSION = {version};\n\n"
+    )
     return {
         "Internal/C/NativeMethods.g.cs": (
             HEADER
             + "using System.Runtime.InteropServices;\n\n"
             + "namespace Maplibre.NativeFfi.Internal.C;\n\n"
             + "internal static unsafe partial class NativeMethods\n{\n"
+            + constants
             + functions
             + "}\n"
         ),

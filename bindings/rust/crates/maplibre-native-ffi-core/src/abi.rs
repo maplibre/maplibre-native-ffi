@@ -2,7 +2,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
 
-pub const EXPECTED_C_ABI_VERSION: u32 = 0;
+pub const EXPECTED_C_ABI_VERSION: u32 = sys::MLN_C_VERSION;
 
 /// Fails when the linked library has another C ABI version. Every entry point
 /// that takes no handle calls this, or [`require_abi_version`], first.

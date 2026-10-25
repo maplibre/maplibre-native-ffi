@@ -554,6 +554,11 @@ def render_operations(bound, values: Values, lowered: list[Lowered]):
         + interface_text
         + "}\n"
     )
+    if (version := bound.source.c_version) is not None:
+        native += (
+            "\n/** The C ABI contract version of the headers this binding was generated from. */\n"
+            f"export const MLN_C_VERSION = {version};\n"
+        )
     return {
         "bindings/typescript/src/generated_operations.ts": operations,
         "bindings/typescript/src/generated_native.ts": native,

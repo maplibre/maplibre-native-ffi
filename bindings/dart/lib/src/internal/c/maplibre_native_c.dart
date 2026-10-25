@@ -8,7 +8,7 @@ import '../status/status.dart';
 import 'maplibre_native_c.g.dart' as generated;
 
 /// C ABI contract version supported by this generated binding.
-const int expectedCAbiVersion = 0;
+const int expectedCAbiVersion = generated.MLN_C_VERSION;
 
 /// The diagnostic that every status-returning call made from this isolate
 /// fills.

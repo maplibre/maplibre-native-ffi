@@ -205,6 +205,14 @@ typedef struct mln_buffer_view {
 typedef void (*mln_user_data_release)(void* user_data);
 
 /**
+ * The C ABI contract version these headers declare.
+ *
+ * A host compares it with mln_c_version() to detect a library built from
+ * headers of another ABI version.
+ */
+#define MLN_C_VERSION 0u
+
+/**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
  * and will increment on each SemVer major release.
  */
@@ -221,14 +229,6 @@ MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 // Helpers for C callers. Each binding has its own, so the generator skips
 // these.
 #ifndef MLN_BINDGEN
-
-/**
- * The C ABI contract version these headers declare.
- *
- * A host compares it with mln_c_version() to detect a library built from
- * headers of another ABI version.
- */
-#define MLN_C_VERSION 0u
 
 /**
  * Returns a view of a null-terminated string, excluding the null byte.

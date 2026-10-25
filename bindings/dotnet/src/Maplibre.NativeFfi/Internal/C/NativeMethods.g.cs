@@ -5,6 +5,8 @@ namespace Maplibre.NativeFfi.Internal.C;
 
 internal static unsafe partial class NativeMethods
 {
+    internal const uint MLN_C_VERSION = 0;
+
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_discard(
         MlnAcquiredFrame frame,

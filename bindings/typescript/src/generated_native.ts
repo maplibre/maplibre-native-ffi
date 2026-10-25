@@ -843,3 +843,6 @@ export interface NativeOperations {
   mln_acquired_frame_view_begin(handle: bigint): bigint;
   mln_acquired_frame_view_end(scope: bigint): void;
 }
+
+/** The C ABI contract version of the headers this binding was generated from. */
+export const MLN_C_VERSION = 0;

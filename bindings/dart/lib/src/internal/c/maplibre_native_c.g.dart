@@ -7,6 +7,8 @@ import 'dart:ffi';
 
 import 'native_asset.dart';
 
+const int MLN_C_VERSION = 0;
+
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_batch = Uint64;
 typedef mln_delivery_queue = Uint64;

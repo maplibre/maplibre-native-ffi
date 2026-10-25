@@ -3,7 +3,7 @@ const std = @import("std");
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 
-pub const expected_c_abi_version: u32 = 0;
+pub const expected_c_abi_version: u32 = c.MLN_C_VERSION;
 
 const generated = @import("generated_status.zig");
 pub const NativeStatusError = generated.NativeStatusError;

@@ -148,8 +148,9 @@ typedef struct mln_completion {
 typedef unsigned long long mln_runtime;
 
 #ifdef MLN_PROTOCOL_ABI_VERSION
-// The C ABI version query, for a probe that compiles a binding's handwritten
-// runtime, which checks the version before its first call.
+// The C ABI version and its query, for a probe that compiles a binding's
+// handwritten runtime, which checks the version before its first call.
+#define MLN_C_VERSION 0u
 uint32_t mln_c_version(void);
 #endif
 

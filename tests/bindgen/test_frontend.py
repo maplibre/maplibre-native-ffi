@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import parse, protocol_header
+from support import parse, parse_sources, protocol_header
 
 from tools.bindgen.frontend import parse_headers
 from tools.bindgen.model import ModelError
@@ -22,7 +22,7 @@ class FrontendTests(unittest.TestCase):
                 'public = ["public.h"]\nruntime = ["runtime.h"]\n'
             )
             (root / "public.h").write_text(
-                "#pragma once\n"
+                "#pragma once\n#define MLN_C_VERSION 0u\n"
                 + protocol_header(
                     "mln_status public_operation(mln_diagnostic *out_diagnostic);\n"
                 )
@@ -54,6 +54,21 @@ class FrontendTests(unittest.TestCase):
             )
             self.assertEqual(api.runtime_exports, ("runtime_operation",))
             self.assertEqual(api.runtime_types, ("runtime_kind",))
+
+    def test_reads_the_abi_version_macro_and_requires_it_of_the_real_headers(self):
+        version = parse_sources({"api.h": "#define MLN_C_VERSION 7u\n"}).c_version
+        self.assertEqual(version, 7)
+        self.assertIsNone(parse_sources({"api.h": "#define OTHER 1\n"}).c_version)
+        with self.assertRaisesRegex(ModelError, "MLN_C_VERSION must be an integer"):
+            parse_sources({"api.h": "#define MLN_C_VERSION (1 + 1)\n"})
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "binding-interfaces.toml").write_text(
+                'public = ["public.h"]\nruntime = ["public.h"]\n'
+            )
+            (root / "public.h").write_text("#pragma once\n" + protocol_header(""))
+            with self.assertRaisesRegex(ModelError, "no header defines MLN_C_VERSION"):
+                parse_headers(root)
 
     def test_preserves_aliases_qualifiers_callbacks_and_nested_layout(self):
         api = self.parse("""

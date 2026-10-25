@@ -39,6 +39,8 @@ CursorKind: Any = cindex.CursorKind
 TypeKind: Any = cindex.TypeKind
 
 ANNOTATION_PREFIX = "mln:"
+# The macro that names the ABI version the headers declare.
+C_VERSION = "MLN_C_VERSION"
 # Source that may separate a doc comment from the start of its declaration,
 # spelled backward: whitespace, an annotation macro, which takes only string
 # literals, or the `typedef` before a tag. Matching the reversed source at a
@@ -325,12 +327,15 @@ class Extractor:
         functions: dict[str, Function] = {}
         enums: dict[str, Enum] = {}
         typedefs: dict[str, Typedef] = {}
+        c_version: int | None = None
         for cursor in unit.cursor.get_children():
             if not self.owned(cursor):
                 continue
             kind = cursor.kind
             name = cursor.spelling
-            if kind == CursorKind.FUNCTION_DECL:
+            if kind == CursorKind.MACRO_DEFINITION and name == C_VERSION:
+                c_version = self.c_version(cursor)
+            elif kind == CursorKind.FUNCTION_DECL:
                 arguments = list(cursor.get_arguments())
                 diagnostic = bool(arguments) and is_diagnostic_type(arguments[-1].type)
                 if diagnostic:
@@ -397,6 +402,7 @@ class Extractor:
                 )
             elif kind not in (
                 CursorKind.MACRO_DEFINITION,
+                CursorKind.MACRO_INSTANTIATION,
                 CursorKind.INCLUSION_DIRECTIVE,
             ):
                 self.errors.append(
@@ -409,7 +415,18 @@ class Extractor:
             records=tuple(self.records[name] for name in sorted(self.records)),
             enums=tuple(enums[name] for name in sorted(enums)),
             typedefs=tuple(typedefs[name] for name in sorted(typedefs)),
+            c_version=c_version,
         )
+
+    def c_version(self, cursor: cindex.Cursor) -> int | None:
+        tokens = [token.spelling for token in cursor.get_tokens()][1:]
+        match = re.fullmatch(r"(\d+)[uU]?", "".join(tokens))
+        if match is None:
+            self.errors.append(
+                f"{self.location(cursor)}: {C_VERSION} must be an integer literal"
+            )
+            return None
+        return int(match.group(1))
 
 
 def parse_headers(
@@ -471,7 +488,11 @@ def extract_headers(
         *clang_args,
     ]
     unit = cindex.Index.create().parse(
-        filename, args=arguments, unsaved_files=[(filename, source)]
+        filename,
+        args=arguments,
+        unsaved_files=[(filename, source)],
+        # Keeps macro definitions in the AST, for MLN_C_VERSION.
+        options=cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD,
     )
     diagnostics = [
         str(diagnostic).replace(str(include_directory) + os.sep, "")
@@ -482,6 +503,8 @@ def extract_headers(
         raise ModelError(diagnostics)
     api = Extractor(include_directory).extract(unit)
     if classify_interfaces:
+        if api.c_version is None:
+            raise ModelError([f"{include_directory}: no header defines {C_VERSION}"])
         manifest_path = include_directory / "binding-interfaces.toml"
         try:
             manifest = tomllib.loads(manifest_path.read_text())

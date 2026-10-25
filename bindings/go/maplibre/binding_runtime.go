@@ -19,7 +19,7 @@ import (
 	"weak"
 )
 
-const bindingCABIVersion = 0
+const bindingCABIVersion = C.MLN_C_VERSION
 
 // A native library with another C ABI version would misread every struct this
 // binding passes, so loading one fails before any call can reach it.

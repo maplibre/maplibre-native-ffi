@@ -110,6 +110,8 @@ class Api:
     typedefs: tuple[Typedef, ...]
     runtime_exports: tuple[str, ...] = ()
     runtime_types: tuple[str, ...] = ()
+    # MLN_C_VERSION, the ABI version the headers declare, when they define it.
+    c_version: int | None = None
 
     @property
     def public_functions(self) -> tuple[Function, ...]:

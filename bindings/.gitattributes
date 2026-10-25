@@ -223,6 +223,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RuntimeHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/StyleExpressionHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/CVersion.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/RuntimeLayouts.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt linguist-generated=true
 /kotlin/src/jvmAndroidMain/kotlin/org/maplibre/nativeffi/generated/GeneratedJvmAndroidOperations.kt linguist-generated=true

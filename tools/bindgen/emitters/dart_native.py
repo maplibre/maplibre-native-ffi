@@ -203,6 +203,8 @@ def generate(bound: BoundApi) -> str:
     records = "\n".join(declarations.record(record) for record in api.records)
     enums = "\n".join(declarations.enum(enum.name) for enum in api.enums)
     functions = "\n".join(declarations.function(function) for function in api.functions)
+    version = bound.source.c_version
+    constants = "" if version is None else f"const int MLN_C_VERSION = {version};\n\n"
     return (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"
         "// ignore_for_file: camel_case_types, constant_identifier_names, non_constant_identifier_names\n"
@@ -210,6 +212,7 @@ def generate(bound: BoundApi) -> str:
         "library;\n\n"
         "import 'dart:ffi';\n\n"
         "import 'native_asset.dart';\n\n"
+        + constants
         + handles
         + "\n"
         + callbacks

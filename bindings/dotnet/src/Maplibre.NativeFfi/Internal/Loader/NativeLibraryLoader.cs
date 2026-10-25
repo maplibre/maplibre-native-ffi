@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi.Internal.Loader;
 
 internal static class NativeLibraryLoader
 {
-    internal const uint ExpectedAbiVersion = 0;
+    internal const uint ExpectedAbiVersion = NativeMethods.MLN_C_VERSION;
 
     private static readonly object Gate = new();
     private static bool installed;

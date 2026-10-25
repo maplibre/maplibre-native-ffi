@@ -1,6 +1,6 @@
 internal import MaplibreNativeC
 
-let expectedCAbiVersion: UInt32 = 0
+let expectedCAbiVersion: UInt32 = MLN_C_VERSION
 
 /// The loaded library's C ABI version check.
 ///

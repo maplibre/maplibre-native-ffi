@@ -223,6 +223,7 @@
     "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RuntimeHandle.kt",
     "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/StyleExpressionHandle.kt",
     "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",
+    "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/CVersion.kt",
     "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/RuntimeLayouts.kt",
     "bindings/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt",
     "bindings/kotlin/src/jvmAndroidMain/kotlin/org/maplibre/nativeffi/generated/GeneratedJvmAndroidOperations.kt",

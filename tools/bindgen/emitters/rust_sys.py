@@ -192,6 +192,8 @@ class Declarations:
 
     def render(self) -> str:
         items = []
+        if self.api.c_version is not None:
+            items.append(f"pub const MLN_C_VERSION: u32 = {self.api.c_version};")
         for enum in self.api.enums:
             if enum.name not in self.used:
                 continue

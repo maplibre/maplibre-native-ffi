@@ -1,6 +1,6 @@
 // The loaded Node-API addon, which an entry point binds before any call.
 
-import type { NativeOperations } from "../generated_native.ts";
+import { MLN_C_VERSION, type NativeOperations } from "../generated_native.ts";
 import { AbiVersionMismatchError } from "./errors.ts";
 
 /**
@@ -75,7 +75,7 @@ export let native: Addon = undefined as never;
 export let hooks: HostHooks = {};
 
 /** The C ABI version that this binding was generated for. */
-export const EXPECTED_C_ABI_VERSION = 0;
+export const EXPECTED_C_ABI_VERSION = MLN_C_VERSION;
 
 /**
  * Checks the C ABI version of the addon's embedded library before any other

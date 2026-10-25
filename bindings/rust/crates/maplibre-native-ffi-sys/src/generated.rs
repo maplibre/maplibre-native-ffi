@@ -1,6 +1,7 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+pub const MLN_C_VERSION: u32 = 0;
 pub type mln_ambient_cache_operation = u32;
 pub const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE: mln_ambient_cache_operation = 1;
 pub const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE: mln_ambient_cache_operation = 2;
