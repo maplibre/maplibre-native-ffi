@@ -518,10 +518,6 @@ fn completion_value<T: Copy>(result: &sys::mln_completion_result) -> PyResult<T>
     Ok(unsafe { result.value.cast::<T>().read_unaligned() })
 }
 
-fn invalid_argument_error(diagnostic: impl Into<String>) -> PyErr {
-    map_error(Error::new(Status::InvalidArgument, diagnostic))
-}
-
 fn invalid_state_error(diagnostic: impl Into<String>) -> PyErr {
     map_error(Error::new(Status::InvalidState, diagnostic))
 }

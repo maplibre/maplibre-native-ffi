@@ -134,11 +134,6 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.state().handle.raw()
     }
 
-    /// Hold off close until borrowed result storage has been copied.
-    fn read(&self) -> PyResult<maplibre_core::handle::NativeRead<Self::Native>> {
-        self.state().handle.read().map_err(map_error)
-    }
-
     /// Takes the handle for a consuming call; an idempotent close skips a released handle.
     fn reserve(&self, idempotent: bool) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
         let state = self.state();

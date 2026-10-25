@@ -408,12 +408,7 @@ class Values:
             return f"storage.json({expr}, {str(member).lower()})?"
         if plan.kind == "buffer":
             if plan.length == "nul":
-                converted = f"storage.c_string({expr})?"
-                return (
-                    f"if {expr}.is_none() {{ std::ptr::null() }} else {{ {converted} }}"
-                    if optional(plan)
-                    else converted
-                )
+                self.fail(plan, "terminated text needs a view")
             converted = (
                 f"storage.buffer({expr}, {str(plan.encoding == 'utf8').lower()})?"
             )
@@ -427,22 +422,11 @@ class Values:
             return converted
         if plan.kind == "record":
             return f"generated_input_{plan.native}(&{expr}, storage)?"
-        if plan.kind == "reference" and plan.element:
-            inner = self.input(plan.element, expr, scope=scope)
-            body = f"{{ let value = {inner}; storage.keep_one(value) }}"
-            return (
-                f"if {expr}.is_none() {{ std::ptr::null() }} else {{ {body} }}"
-                if plan.nullable
-                else body
-            )
         if plan.kind == "array" and plan.element:
             inner = self.input(plan.element, "item", scope=scope)
-            if plan.ctype.kind == "array":
-                return f'generated_items(&{expr}, |item| {ok(inner)})?.try_into().map_err(|_| invalid_argument_error("wrong fixed array length"))?'
-            if plan.length and plan.length.isdigit():
-                check = f'if items.len() != {plan.length} {{ return Err(invalid_argument_error("wrong fixed array length")); }}'
-            else:
-                check = f"{scope}.{rust_field(plan.length or 'count')} = generated_length(items.len())?;"
+            if plan.ctype.kind == "array" or (plan.length and plan.length.isdigit()):
+                self.fail(plan, "fixed-length array input")
+            check = f"{scope}.{rust_field(plan.length or 'count')} = generated_length(items.len())?;"
             body = f"{{ let items = generated_items(&{expr}, |item| {ok(inner)})?; {check} storage.keep_array(items) }}"
             if plan.nullable:
                 return f"if {expr}.is_none() {{ std::ptr::null() }} else {{ {body} }}"

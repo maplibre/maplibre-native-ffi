@@ -291,13 +291,10 @@ def operation(
                 setup.append(
                     f"        let {local}_values = generated_items({local}, |item| {ok(converted)})?;"
                 )
-                arguments[parameter.name] = f"{local}_values.as_ptr()"
                 if value.length and value.length.isdigit():
-                    setup.append(
-                        f'        if {local}_values.len() != {value.length} {{ return Err(invalid_argument_error("wrong fixed array length")); }}'
-                    )
-                else:
-                    arguments[value.length] = f"{local}_values.len()"
+                    raise unsupported(function, "fixed-length array input")
+                arguments[parameter.name] = f"{local}_values.as_ptr()"
+                arguments[value.length] = f"{local}_values.len()"
             elif value.kind == "reference" and value.element:
                 converted = values.input(value.element, local + ".clone()")
                 if value.nullable:

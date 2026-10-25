@@ -54,16 +54,8 @@ impl<'py> GeneratedInputStorage<'py> {
         self.buffer(text, true)
     }
 
-    fn c_string(&mut self, value: Bound<'py, PyAny>) -> PyResult<*const c_char> {
-        self.storage
-            .c_string(value.extract::<&str>()?)
-            .map_err(map_error)
-    }
     fn keep_array<T: 'static>(&mut self, values: Vec<T>) -> *const T {
         self.storage.array(values)
-    }
-    fn keep_one<T: 'static>(&mut self, value: T) -> *const T {
-        self.storage.store(value)
     }
 }
 
