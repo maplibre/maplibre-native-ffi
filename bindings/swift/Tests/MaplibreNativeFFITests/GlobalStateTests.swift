@@ -67,7 +67,7 @@ struct GlobalStateTests {
   /// which is reported to standard error.
   @Test func aHeaderTransformFailsDeliberatelyWithAStatusAndReportsABug(
   ) async throws {
-    let capture = try StandardErrorCapture()
+    let capture = ReportCapture()
     defer { capture.finish() }
     // The URLs name a loopback port that nothing serves, so each request fails
     // after the header transform without leaving the machine.
