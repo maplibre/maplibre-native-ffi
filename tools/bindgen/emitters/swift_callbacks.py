@@ -139,7 +139,7 @@ def descriptor(values, plan):
     # Native returns a registration only as its own default, so a registration
     # without one has no copy.
     copy = (
-        f"""  public static var `default`: Self {{ try! Self(raw: {initial}) }}
+        f"""  public static var `default`: Self {{ try! Self(raw: nativeDefault({plan.default})) }}
   init(raw: {plan.native}) throws {{
 {chr(10).join(defaults)}
   }}

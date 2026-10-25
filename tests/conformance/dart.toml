@@ -6,9 +6,10 @@
 [cases]
 "ERR-01" = "bindings/dart/test/internal_support_test.dart::native statuses map to their exceptions and keep unknown codes"
 # The test covers the mismatch error only. That the check runs before any
-# other call rests on the generated entry points, each of which calls
-# ensureAbiVersion() first; no library with another ABI version is at hand to
-# load in its place.
+# other call rests on the generated entry points without a handle, value
+# defaults among them, each of which calls ensureAbiVersion() first; every other
+# entry point needs a handle that one of those created. No library with another
+# ABI version is at hand to load in its place.
 "ERR-02" = "bindings/dart/test/internal_support_test.dart::ABI mismatch has a stable public error category"
 "ERR-03" = "bindings/dart/test/render_test.dart::a drain before any demand returns no batch"
 "LIFE-01" = "bindings/dart/test/lifecycle_test.dart::repeated asynchronous release reaches native"

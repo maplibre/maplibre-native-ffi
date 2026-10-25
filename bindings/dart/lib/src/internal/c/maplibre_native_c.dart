@@ -59,7 +59,7 @@ bool _abiVersionChecked = false;
 /// Call this as the first statement of any public entry point that can reach C
 /// without a handle this isolate already created: the statics on [Maplibre],
 /// and the types built to cross isolates. Everything else is reachable only
-/// through such an entry point. The status checkers call it as a backstop.
+/// through such an entry point.
 void ensureAbiVersion() {
   if (_abiVersionChecked) {
     return;

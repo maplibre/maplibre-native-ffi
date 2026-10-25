@@ -9,7 +9,7 @@ pub mod memory;
 pub mod ptr;
 pub mod report;
 pub mod string;
-pub use abi::{EXPECTED_C_ABI_VERSION, validate_abi_version};
+pub use abi::{EXPECTED_C_ABI_VERSION, require_abi_version, validate_abi_version};
 pub mod status;
 pub use error::{Error, Result, check};
 pub use status::Status;

@@ -258,7 +258,7 @@ def declaration(values, value):
         for field, _ in callbacks(values, value)
     )
     default = (
-        f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
+        f"impl Default for {name} {{ fn default() -> Self {{ maplibre_core::require_abi_version(); convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
         if value.default
         else ""
     )

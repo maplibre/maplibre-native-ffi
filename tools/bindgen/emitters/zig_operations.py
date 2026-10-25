@@ -312,6 +312,10 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
                 else f"return {values.capture(plan.result, native_call)};"
             ]
             infallible = True
+            if mode == "none":
+                # A call without a handle can be a program's first, and with
+                # no error channel it panics on another C ABI version.
+                body.insert(0, "status.requireAbiVersion();")
     else:
         if not function.diagnostic:
             raise failure(function, "status result requires a diagnostic parameter")

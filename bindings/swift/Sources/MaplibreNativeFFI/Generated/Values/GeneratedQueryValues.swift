@@ -71,7 +71,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   public var filter: Data?
   public static var `default`: Self {
-    try! Self(raw: mln_rendered_feature_query_options_default())
+    try! Self(raw: nativeDefault(mln_rendered_feature_query_options_default))
   }
 
   public init(
@@ -317,7 +317,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   public var filter: Data?
   public static var `default`: Self {
-    try! Self(raw: mln_source_feature_query_options_default())
+    try! Self(raw: nativeDefault(mln_source_feature_query_options_default))
   }
 
   public init(

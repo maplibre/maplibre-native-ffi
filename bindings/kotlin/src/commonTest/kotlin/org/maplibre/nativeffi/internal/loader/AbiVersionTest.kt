@@ -18,7 +18,7 @@ class AbiVersionTest {
 
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1, error.actualVersion)
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
-    assertEquals(Status.NATIVE_ERROR, error.status)
+    assertEquals(Status.UNSUPPORTED, error.status)
     assertTrue(error.diagnostic.contains("expected ${Maplibre.EXPECTED_C_ABI_VERSION}"))
   }
 }

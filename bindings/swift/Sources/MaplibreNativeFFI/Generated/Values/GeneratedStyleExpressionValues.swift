@@ -55,7 +55,7 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   /// expression reports any other ID as unavailable.
   public var availableImages: [String]
   public static var `default`: Self {
-    try! Self(raw: mln_style_expression_inputs_default())
+    try! Self(raw: nativeDefault(mln_style_expression_inputs_default))
   }
 
   public init(
@@ -164,7 +164,7 @@ public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
   /// asserts it. Without it, the expression keeps the type it infers.
   public var expectedType: StyleExpressionType?
   public static var `default`: Self {
-    Self(raw: mln_style_expression_options_default())
+    Self(raw: nativeDefault(mln_style_expression_options_default))
   }
 
   public init(expectedType: StyleExpressionType? = StyleExpressionOptions

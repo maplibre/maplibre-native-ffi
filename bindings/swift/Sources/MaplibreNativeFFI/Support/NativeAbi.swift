@@ -14,10 +14,7 @@ enum NativeAbi {
   /// Throws when the loaded library has another C ABI version.
   ///
   /// Every generated entry point without a receiver calls this first, and
-  /// every other entry point needs a handle that one of those created. A
-  /// value's generated `default` reads its native defaults without this
-  /// check, so on a mismatched library a program that builds a value first
-  /// reads that struct before its first call throws.
+  /// every other entry point needs a handle that one of those created.
   static func ensureCompatible() throws {
     if let loadedMismatch {
       throw loadedMismatch
@@ -33,4 +30,15 @@ enum NativeAbi {
       actual: actual
     )
   }
+}
+
+/// Reads a value's native defaults after the C ABI version check. A value's
+/// `default` has no error channel, so a library with another version traps.
+func nativeDefault<Raw>(_ read: () -> Raw) -> Raw {
+  do {
+    try NativeAbi.ensureCompatible()
+  } catch {
+    preconditionFailure(String(describing: error))
+  }
+  return read()
 }

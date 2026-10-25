@@ -14,7 +14,7 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   /// Host identity returned with the terminal frame result.
   public var token: UInt64
   public static var `default`: Self {
-    Self(raw: mln_frame_demand_default())
+    Self(raw: nativeDefault(mln_frame_demand_default))
   }
 
   public init(

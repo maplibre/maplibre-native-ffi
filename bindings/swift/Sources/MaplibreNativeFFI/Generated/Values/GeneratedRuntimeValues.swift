@@ -128,7 +128,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   /// `mln_http_header_transform_response_set_header()` does.
   public var headers: [HttpHeader]
   public static var `default`: Self {
-    try! Self(raw: mln_http_header_rule_default())
+    try! Self(raw: nativeDefault(mln_http_header_rule_default))
   }
 
   public init(
@@ -875,7 +875,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   /// The URL or glob pattern to compare.
   public var url: String
   public static var `default`: Self {
-    try! Self(raw: mln_resource_route_default())
+    try! Self(raw: nativeDefault(mln_resource_route_default))
   }
 
   public init(
@@ -1476,7 +1476,7 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// Cache database path. Copied during runtime creation.
   public var cachePath: String?
   public static var `default`: Self {
-    try! Self(raw: mln_runtime_options_default())
+    try! Self(raw: nativeDefault(mln_runtime_options_default))
   }
 
   public init(

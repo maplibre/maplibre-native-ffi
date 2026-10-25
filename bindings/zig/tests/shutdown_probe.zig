@@ -23,7 +23,6 @@ fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
 
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
-    try maplibre.validateAbiVersion(null);
     try maplibre.logSetCallback(.{ .callback = consumeLog }, null);
 
     var options = try maplibre.runtimeOptionsDefault(allocator);

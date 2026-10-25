@@ -1,3 +1,4 @@
+const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 // Analyzing every non-generic generated function and method checks that the
@@ -18,16 +19,16 @@ comptime {
     _ = @import("rendering.zig");
 }
 
+// The suite links the library the way the package does, through build.zig, and
+// the library it loads passes the C ABI version check that a call without a
+// handle runs.
+test "package loads a library with the supported C ABI version" {
+    try std.testing.expectEqual(@as(u32, 0), maplibre.cVersion());
+}
+
 fn analyzeFunctions(comptime Container: type) void {
     for (@typeInfo(Container).@"struct".decl_names) |decl| {
         const value = @field(Container, decl);
         if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
     }
-}
-
-// The suite links the library the way the package does, through build.zig, and
-// the library it loads reports the C ABI version this binding expects.
-test "package validates the supported C ABI version" {
-    var diagnostic: maplibre.Diagnostic = .{};
-    try maplibre.validateAbiVersion(&diagnostic);
 }

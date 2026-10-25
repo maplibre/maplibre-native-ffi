@@ -362,7 +362,6 @@ pub const CommandCompletion = completion.CommandCompletion;
 pub const Error = status.Error;
 pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
-pub const validateAbiVersion = status.validateAbiVersion;
 
 """
     source = docs + prefix + runtime + "\n".join([*owners, *chunks, *variants])

@@ -50,7 +50,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [MetalBorrowedTexture]
   public static var `default`: Self {
-    try! Self(raw: mln_metal_borrowed_texture_descriptor_default())
+    try! Self(raw: nativeDefault(mln_metal_borrowed_texture_descriptor_default))
   }
 
   public init(
@@ -110,7 +110,7 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
   public var pixelFormat: UInt64
   public static var `default`: Self {
-    Self(raw: mln_metal_owned_texture_descriptor_default())
+    Self(raw: nativeDefault(mln_metal_owned_texture_descriptor_default))
   }
 
   public init(
@@ -254,7 +254,9 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   public var target: UInt32
   public static var `default`: Self {
-    try! Self(raw: mln_opengl_borrowed_texture_descriptor_default())
+    try! Self(
+      raw: nativeDefault(mln_opengl_borrowed_texture_descriptor_default)
+    )
   }
 
   public init(
@@ -322,7 +324,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// readback.
   public var context: OpenglContextDescriptor
   public static var `default`: Self {
-    try! Self(raw: mln_opengl_owned_texture_descriptor_default())
+    try! Self(raw: nativeDefault(mln_opengl_owned_texture_descriptor_default))
   }
 
   public init(
@@ -551,7 +553,9 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
   public var finalLayout: UInt32
   public static var `default`: Self {
-    try! Self(raw: mln_vulkan_borrowed_texture_descriptor_default())
+    try! Self(
+      raw: nativeDefault(mln_vulkan_borrowed_texture_descriptor_default)
+    )
   }
 
   public init(
@@ -625,7 +629,7 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
   public static var `default`: Self {
-    Self(raw: mln_vulkan_owned_texture_descriptor_default())
+    Self(raw: nativeDefault(mln_vulkan_owned_texture_descriptor_default))
   }
 
   public init(

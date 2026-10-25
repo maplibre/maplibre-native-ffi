@@ -8,7 +8,7 @@
 # The test injects another version into the check. Each generated entry point
 # without a receiver calls NativeAbi.ensureCompatible() first, which the
 # generator's Swift probe checks against a stub that reports another version.
-# A value's generated default reads native defaults without the check.
+# A value's generated default, which has no error channel, traps instead.
 "ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
 "ERR-03" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aDrainBeforeAnyDemandReturnsNil"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::synchronousCloseIsIdempotentAndAsyncReleaseReachesNative"

@@ -84,7 +84,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   /// Bit pattern of the GLsync pointer.
   public var object: UInt64
   public static var `default`: Self {
-    Self(raw: mln_gpu_sync_default())
+    Self(raw: nativeDefault(mln_gpu_sync_default))
   }
 
   public init(
@@ -421,7 +421,7 @@ public struct RenderSessionAttachOptions: Sendable {
   /// `MLN_STATUS_UNSUPPORTED`.
   public var queueLock: QueueLock
   public static var `default`: Self {
-    try! Self(raw: mln_render_session_attach_options_default())
+    try! Self(raw: nativeDefault(mln_render_session_attach_options_default))
   }
 
   public init(

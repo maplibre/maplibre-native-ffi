@@ -186,7 +186,10 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         text_storage: []u8 = &.{},
         text_length: usize = 0,
 
-        fn begin(receiver: ReceiverType, allocator: Allocator) Error!Self {
+        fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!Self {
+            // A call that takes no handle can be a program's first, so it
+            // checks the C ABI version before anything reaches C.
+            if (access == .none) try status.validateAbiVersion(diagnostic);
             if (access == .scoped) try callback.checkScoped(@intFromPtr(receiver.native));
             return .{
                 .receiver = receiver,
@@ -396,7 +399,7 @@ fn invokeInner(
     args: anytype,
 ) Error!Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     var native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
@@ -430,7 +433,7 @@ fn invokeUnlessInner(
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     const present = try status.callUnless(@field(c, name), native, diagnostic, absent);
@@ -465,7 +468,7 @@ fn invokeDeclinableInner(
 ) Error!bool {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
@@ -483,7 +486,7 @@ pub fn direct(
     args: anytype,
 ) Error!T {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, null);
     defer op.end();
     const native = try op.arguments(args);
     if (T == void) {
@@ -534,7 +537,7 @@ fn submitInner(
 ) Error!Submitted(Copy, @TypeOf(args)) {
     const Allocator = @TypeOf(allocator);
     const Op = Operation(name, access, @TypeOf(receiver), Allocator, @TypeOf(args));
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     const function = @field(c, name);
@@ -578,7 +581,7 @@ fn discardInner(
     args: anytype,
 ) Error!void {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator);
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);

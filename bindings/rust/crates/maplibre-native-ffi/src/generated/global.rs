@@ -14,6 +14,7 @@ pub unsafe fn android_init(
     context: *mut std::ffi::c_void,
 ) -> Result<()> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_android_init(jni_env, context, out_diagnostic)
     })?;
@@ -26,6 +27,7 @@ pub unsafe fn android_init(
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn animation_options_default() -> AnimationOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_animation_options_default() });
     convert::native_default(value)
 }
@@ -36,6 +38,7 @@ pub fn animation_options_default() -> AnimationOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn bound_options_default() -> BoundOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_bound_options_default() });
     convert::native_default(value)
 }
@@ -47,6 +50,7 @@ pub fn bound_options_default() -> BoundOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn c_version() -> u32 {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_c_version() });
     value
 }
@@ -58,6 +62,7 @@ pub fn c_version() -> u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn camera_delta_default() -> CameraDelta {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_camera_delta_default() });
     convert::native_default(value)
 }
@@ -68,6 +73,7 @@ pub fn camera_delta_default() -> CameraDelta {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn camera_fit_options_default() -> CameraFitOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_camera_fit_options_default() });
     convert::native_default(value)
 }
@@ -78,6 +84,7 @@ pub fn camera_fit_options_default() -> CameraFitOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn camera_options_default() -> CameraOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_camera_options_default() });
     convert::native_default(value)
 }
@@ -88,6 +95,7 @@ pub fn camera_options_default() -> CameraOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn camera_update_default() -> CameraUpdate {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_camera_update_default() });
     convert::native_default(value)
 }
@@ -98,6 +106,7 @@ pub fn camera_update_default() -> CameraUpdate {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn custom_geometry_source_options_default() -> CustomGeometrySourceOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_custom_geometry_source_options_default() });
     convert::native_default(value)
 }
@@ -108,6 +117,7 @@ pub fn custom_geometry_source_options_default() -> CustomGeometrySourceOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn custom_mvt_vector_source_options_default() -> CustomMvtVectorSourceOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_custom_mvt_vector_source_options_default() });
     convert::native_default(value)
 }
@@ -118,6 +128,7 @@ pub fn custom_mvt_vector_source_options_default() -> CustomMvtVectorSourceOption
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn frame_demand_default() -> FrameDemand {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_frame_demand_default() });
     convert::native_default(value)
 }
@@ -128,6 +139,7 @@ pub fn frame_demand_default() -> FrameDemand {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn free_camera_options_default() -> FreeCameraOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_free_camera_options_default() });
     convert::native_default(value)
 }
@@ -157,6 +169,7 @@ pub fn geojson_source_data_create(
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn geojson_source_options_default() -> GeojsonSourceOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_geojson_source_options_default() });
     convert::native_default(value)
 }
@@ -167,6 +180,7 @@ pub fn geojson_source_options_default() -> GeojsonSourceOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn gpu_sync_default() -> GpuSync {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_gpu_sync_default() });
     convert::native_default(value)
 }
@@ -178,6 +192,7 @@ pub fn gpu_sync_default() -> GpuSync {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn http_header_rule_default() -> HttpHeaderRule {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_http_header_rule_default() });
     convert::native_default(value)
 }
@@ -188,6 +203,7 @@ pub fn http_header_rule_default() -> HttpHeaderRule {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
     let meters = call.input(&meters)?;
     call.status(|_, out_diagnostic| unsafe {
@@ -202,6 +218,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn log_clear_callback() -> Result<()> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_clear_callback(out_diagnostic) })?;
     Ok(())
 }
@@ -213,6 +230,7 @@ pub fn log_clear_callback() -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn log_set_async_severity_mask(mask: LogSeverityMask) -> Result<()> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_log_set_async_severity_mask(mask.bits(), out_diagnostic)
     })?;
@@ -225,6 +243,7 @@ pub fn log_set_async_severity_mask(mask: LogSeverityMask) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn log_set_callback(handler: LogHandler) -> Result<()> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     let handler = call.reference(&handler)?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
     Ok(())
@@ -236,6 +255,7 @@ pub fn log_set_callback(handler: LogHandler) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn logical_extent_default() -> LogicalExtent {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_logical_extent_default() });
     convert::native_default(value)
 }
@@ -246,6 +266,7 @@ pub fn logical_extent_default() -> LogicalExtent {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     let mut out_width: u32 = Default::default();
     let mut out_height: u32 = Default::default();
     let extent = call.input(&extent)?;
@@ -266,6 +287,7 @@ pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)>
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn map_options_default() -> MapOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_map_options_default() });
     convert::native_default(value)
 }
@@ -292,6 +314,7 @@ pub fn map_projection_create(view: &MapView) -> Result<MapProjectionHandle> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn map_tile_options_default() -> MapTileOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_map_tile_options_default() });
     convert::native_default(value)
 }
@@ -302,6 +325,7 @@ pub fn map_tile_options_default() -> MapTileOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn map_viewport_options_default() -> MapViewportOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_map_viewport_options_default() });
     convert::native_default(value)
 }
@@ -313,6 +337,7 @@ pub fn map_viewport_options_default() -> MapViewportOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn metal_borrowed_texture_descriptor_default() -> MetalBorrowedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_metal_borrowed_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -323,6 +348,7 @@ pub fn metal_borrowed_texture_descriptor_default() -> MetalBorrowedTextureDescri
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn metal_owned_texture_descriptor_default() -> MetalOwnedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_metal_owned_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -333,6 +359,7 @@ pub fn metal_owned_texture_descriptor_default() -> MetalOwnedTextureDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn metal_surface_descriptor_default() -> MetalSurfaceDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_metal_surface_descriptor_default() });
     convert::native_default(value)
 }
@@ -343,6 +370,7 @@ pub fn metal_surface_descriptor_default() -> MetalSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn network_get_status() -> Result<NetworkStatus> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     let mut out_status: u32 = Default::default();
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_network_get_status(&mut out_status, out_diagnostic)
@@ -356,6 +384,7 @@ pub fn network_get_status() -> Result<NetworkStatus> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn network_set_status(status: NetworkStatus) -> Result<()> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_network_set_status(status.as_raw(), out_diagnostic)
     })?;
@@ -369,6 +398,7 @@ pub fn network_set_status(status: NetworkStatus) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn opengl_borrowed_texture_descriptor_default() -> OpenglBorrowedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -379,6 +409,7 @@ pub fn opengl_borrowed_texture_descriptor_default() -> OpenglBorrowedTextureDesc
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn opengl_owned_texture_descriptor_default() -> OpenglOwnedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_opengl_owned_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -389,6 +420,7 @@ pub fn opengl_owned_texture_descriptor_default() -> OpenglOwnedTextureDescriptor
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn opengl_supported_context_provider_mask() -> OpenglContextProviderFlag {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_opengl_supported_context_provider_mask() });
     OpenglContextProviderFlag::from_bits_retain(value)
 }
@@ -399,6 +431,7 @@ pub fn opengl_supported_context_provider_mask() -> OpenglContextProviderFlag {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn opengl_surface_descriptor_default() -> OpenglSurfaceDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_opengl_surface_descriptor_default() });
     convert::native_default(value)
 }
@@ -410,6 +443,7 @@ pub fn opengl_surface_descriptor_default() -> OpenglSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
 pub fn plugin_get_register_function_v1() -> sys::mln_plugin_register_function_v1 {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_plugin_get_register_function_v1() });
     value
 }
@@ -420,6 +454,7 @@ pub fn plugin_get_register_function_v1() -> sys::mln_plugin_register_function_v1
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn premultiplied_rgba8_image_default() -> PremultipliedRgba8Image {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_premultiplied_rgba8_image_default() });
     convert::native_default(value)
 }
@@ -430,6 +465,7 @@ pub fn premultiplied_rgba8_image_default() -> PremultipliedRgba8Image {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeters> {
     let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
     let mut out_meters: sys::mln_projected_meters = unsafe { std::mem::zeroed() };
     let coordinate = call.input(&coordinate)?;
     call.status(|_, out_diagnostic| unsafe {
@@ -445,6 +481,7 @@ pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeter
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn projection_mode_default() -> ProjectionMode {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_projection_mode_default() });
     convert::native_default(value)
 }
@@ -456,6 +493,7 @@ pub fn projection_mode_default() -> ProjectionMode {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn render_session_attach_options_default() -> RenderSessionAttachOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_render_session_attach_options_default() });
     convert::native_default(value)
 }
@@ -466,6 +504,7 @@ pub fn render_session_attach_options_default() -> RenderSessionAttachOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub fn rendered_feature_query_options_default() -> RenderedFeatureQueryOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_rendered_feature_query_options_default() });
     convert::native_default(value)
 }
@@ -476,6 +515,7 @@ pub fn rendered_feature_query_options_default() -> RenderedFeatureQueryOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resource_route_default() -> ResourceRoute {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_resource_route_default() });
     convert::native_default(value)
 }
@@ -501,6 +541,7 @@ pub fn runtime_create(options: &RuntimeOptions) -> Result<RuntimeHandle> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn runtime_options_default() -> RuntimeOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_runtime_options_default() });
     convert::native_default(value)
 }
@@ -511,6 +552,7 @@ pub fn runtime_options_default() -> RuntimeOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub fn source_feature_query_options_default() -> SourceFeatureQueryOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_source_feature_query_options_default() });
     convert::native_default(value)
 }
@@ -540,6 +582,7 @@ pub fn style_expression_create(
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub fn style_expression_inputs_default() -> StyleExpressionInputs {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_style_expression_inputs_default() });
     convert::native_default(value)
 }
@@ -550,6 +593,7 @@ pub fn style_expression_inputs_default() -> StyleExpressionInputs {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub fn style_expression_options_default() -> StyleExpressionOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_style_expression_options_default() });
     convert::native_default(value)
 }
@@ -560,6 +604,7 @@ pub fn style_expression_options_default() -> StyleExpressionOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn style_image_options_default() -> StyleImageOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_style_image_options_default() });
     convert::native_default(value)
 }
@@ -570,6 +615,7 @@ pub fn style_image_options_default() -> StyleImageOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn style_transition_options_default() -> StyleTransitionOptions {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_style_transition_options_default() });
     convert::native_default(value)
 }
@@ -580,6 +626,7 @@ pub fn style_transition_options_default() -> StyleTransitionOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn supported_render_backend_mask() -> RenderBackendFlag {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_supported_render_backend_mask() });
     RenderBackendFlag::from_bits_retain(value)
 }
@@ -591,6 +638,7 @@ pub fn supported_render_backend_mask() -> RenderBackendFlag {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn vulkan_borrowed_texture_descriptor_default() -> VulkanBorrowedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -601,6 +649,7 @@ pub fn vulkan_borrowed_texture_descriptor_default() -> VulkanBorrowedTextureDesc
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn vulkan_owned_texture_descriptor_default() -> VulkanOwnedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_vulkan_owned_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -611,6 +660,7 @@ pub fn vulkan_owned_texture_descriptor_default() -> VulkanOwnedTextureDescriptor
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn vulkan_surface_descriptor_default() -> VulkanSurfaceDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_vulkan_surface_descriptor_default() });
     convert::native_default(value)
 }
@@ -622,6 +672,7 @@ pub fn vulkan_surface_descriptor_default() -> VulkanSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn webgpu_borrowed_texture_descriptor_default() -> WebgpuBorrowedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -632,6 +683,7 @@ pub fn webgpu_borrowed_texture_descriptor_default() -> WebgpuBorrowedTextureDesc
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn webgpu_owned_texture_descriptor_default() -> WebgpuOwnedTextureDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_webgpu_owned_texture_descriptor_default() });
     convert::native_default(value)
 }
@@ -642,6 +694,7 @@ pub fn webgpu_owned_texture_descriptor_default() -> WebgpuOwnedTextureDescriptor
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn webgpu_surface_descriptor_default() -> WebgpuSurfaceDescriptor {
     let mut call = Call::global();
+    maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_webgpu_surface_descriptor_default() });
     convert::native_default(value)
 }

@@ -85,7 +85,7 @@ void mln_query_release(mln_query query);
                 "absent_value",
                 "owned_argument",
             ),
-            defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
+            defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),
         )
         api = parse_sources({"api.h": header})
         validate(api)

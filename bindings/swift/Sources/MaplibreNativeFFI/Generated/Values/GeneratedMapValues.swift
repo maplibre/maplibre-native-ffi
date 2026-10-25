@@ -25,7 +25,7 @@ public struct AnimationOptions: Sendable {
   /// Reports the end of the command's transitions. Disabled by default.
   public var endHandler: CameraTransitionHandler
   public static var `default`: Self {
-    try! Self(raw: mln_animation_options_default())
+    try! Self(raw: nativeDefault(mln_animation_options_default))
   }
 
   public init(
@@ -105,7 +105,7 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   public var minPitch: Double?
   public var maxPitch: Double?
   public static var `default`: Self {
-    Self(raw: mln_bound_options_default())
+    Self(raw: nativeDefault(mln_bound_options_default))
   }
 
   public init(
@@ -183,7 +183,7 @@ public struct CameraDelta: Sendable {
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
   public static var `default`: Self {
-    try! Self(raw: mln_camera_delta_default())
+    try! Self(raw: nativeDefault(mln_camera_delta_default))
   }
 
   public init(
@@ -256,7 +256,7 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   public var bearing: Double?
   public var pitch: Double?
   public static var `default`: Self {
-    Self(raw: mln_camera_fit_options_default())
+    Self(raw: nativeDefault(mln_camera_fit_options_default))
   }
 
   public init(
@@ -311,7 +311,7 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   public var roll: Double?
   public var fieldOfView: Double?
   public static var `default`: Self {
-    Self(raw: mln_camera_options_default())
+    Self(raw: nativeDefault(mln_camera_options_default))
   }
 
   public init(
@@ -535,7 +535,7 @@ public struct CameraUpdate: Sendable {
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
   public static var `default`: Self {
-    try! Self(raw: mln_camera_update_default())
+    try! Self(raw: nativeDefault(mln_camera_update_default))
   }
 
   public init(
@@ -752,7 +752,7 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   public var position: Vec3?
   public var orientation: Quaternion?
   public static var `default`: Self {
-    Self(raw: mln_free_camera_options_default())
+    Self(raw: nativeDefault(mln_free_camera_options_default))
   }
 
   public init(
@@ -899,7 +899,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
-    Self(raw: mln_logical_extent_default())
+    Self(raw: nativeDefault(mln_logical_extent_default))
   }
 
   public init(
@@ -993,7 +993,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// `mln_runtime_event_mask` values.
   public var eventMask: RuntimeEventMask
   public static var `default`: Self {
-    Self(raw: mln_map_options_default())
+    Self(raw: nativeDefault(mln_map_options_default))
   }
 
   public init(
@@ -1115,7 +1115,7 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   /// One of `mln_tile_lod_mode`.
   public var lodMode: TileLodMode?
   public static var `default`: Self {
-    Self(raw: mln_map_tile_options_default())
+    Self(raw: nativeDefault(mln_map_tile_options_default))
   }
 
   public init(
@@ -1245,7 +1245,7 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   public var viewportMode: ViewportMode?
   public var frustumOffset: EdgeInsets?
   public static var `default`: Self {
-    Self(raw: mln_map_viewport_options_default())
+    Self(raw: nativeDefault(mln_map_viewport_options_default))
   }
 
   public init(
@@ -1621,7 +1621,7 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
   /// Y-skew factor of the axonometric transform.
   public var ySkew: Double?
   public static var `default`: Self {
-    Self(raw: mln_projection_mode_default())
+    Self(raw: nativeDefault(mln_projection_mode_default))
   }
 
   public init(

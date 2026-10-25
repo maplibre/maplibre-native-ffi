@@ -30,7 +30,6 @@ pub const CommandCompletion = completion.CommandCompletion;
 pub const Error = status.Error;
 pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
-pub const validateAbiVersion = status.validateAbiVersion;
 
 /// A rendered frame that a render session lends until its release.
 ///
@@ -6508,6 +6507,7 @@ pub fn animationOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedV
 /// See `mln_bound_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn boundOptionsDefault() BoundOptions {
+    status.requireAbiVersion();
     return BoundOptions.fromNative(c.mln_bound_options_default());
 }
 
@@ -6517,6 +6517,7 @@ pub fn boundOptionsDefault() BoundOptions {
 /// See `mln_c_version` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn cVersion() u32 {
+    status.requireAbiVersion();
     return c.mln_c_version();
 }
 
@@ -6533,6 +6534,7 @@ pub fn cameraDeltaDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(
 /// See `mln_camera_fit_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn cameraFitOptionsDefault() CameraFitOptions {
+    status.requireAbiVersion();
     return CameraFitOptions.fromNative(c.mln_camera_fit_options_default());
 }
 
@@ -6541,6 +6543,7 @@ pub fn cameraFitOptionsDefault() CameraFitOptions {
 /// See `mln_camera_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn cameraOptionsDefault() CameraOptions {
+    status.requireAbiVersion();
     return CameraOptions.fromNative(c.mln_camera_options_default());
 }
 
@@ -6573,6 +6576,7 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
 /// See `mln_frame_demand_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn frameDemandDefault() FrameDemand {
+    status.requireAbiVersion();
     return FrameDemand.fromNative(c.mln_frame_demand_default());
 }
 
@@ -6581,6 +6585,7 @@ pub fn frameDemandDefault() FrameDemand {
 /// See `mln_free_camera_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn freeCameraOptionsDefault() FreeCameraOptions {
+    status.requireAbiVersion();
     return FreeCameraOptions.fromNative(c.mln_free_camera_options_default());
 }
 
@@ -6605,6 +6610,7 @@ pub fn geojsonSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!Ow
 /// See `mln_gpu_sync_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn gpuSyncDefault() GpuSync {
+    status.requireAbiVersion();
     return GpuSync.fromNative(c.mln_gpu_sync_default());
 }
 
@@ -6653,6 +6659,7 @@ pub fn logSetCallback(handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic)
 /// See `mln_logical_extent_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn logicalExtentDefault() LogicalExtent {
+    status.requireAbiVersion();
     return LogicalExtent.fromNative(c.mln_logical_extent_default());
 }
 
@@ -6670,6 +6677,7 @@ pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostic
 /// See `mln_map_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn mapOptionsDefault() MapOptions {
+    status.requireAbiVersion();
     return MapOptions.fromNative(c.mln_map_options_default());
 }
 
@@ -6687,6 +6695,7 @@ pub fn mapProjectionCreate(view: MapView, diagnostic: ?*diagnostics.Diagnostic) 
 /// See `mln_map_tile_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapTileOptionsDefault() MapTileOptions {
+    status.requireAbiVersion();
     return MapTileOptions.fromNative(c.mln_map_tile_options_default());
 }
 
@@ -6695,6 +6704,7 @@ pub fn mapTileOptionsDefault() MapTileOptions {
 /// See `mln_map_viewport_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapViewportOptionsDefault() MapViewportOptions {
+    status.requireAbiVersion();
     return MapViewportOptions.fromNative(c.mln_map_viewport_options_default());
 }
 
@@ -6711,6 +6721,7 @@ pub fn metalBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) statu
 /// See `mln_metal_owned_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn metalOwnedTextureDescriptorDefault() MetalOwnedTextureDescriptor {
+    status.requireAbiVersion();
     return MetalOwnedTextureDescriptor.fromNative(c.mln_metal_owned_texture_descriptor_default());
 }
 
@@ -6719,6 +6730,7 @@ pub fn metalOwnedTextureDescriptorDefault() MetalOwnedTextureDescriptor {
 /// See `mln_metal_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn metalSurfaceDescriptorDefault() MetalSurfaceDescriptor {
+    status.requireAbiVersion();
     return MetalSurfaceDescriptor.fromNative(c.mln_metal_surface_descriptor_default());
 }
 
@@ -6759,6 +6771,7 @@ pub fn openglOwnedTextureDescriptorDefault(allocator: std.mem.Allocator) status.
 /// See `mln_opengl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn openglSupportedContextProviderMask() OpenglContextProviderFlag {
+    status.requireAbiVersion();
     return OpenglContextProviderFlag.fromNative(c.mln_opengl_supported_context_provider_mask());
 }
 
@@ -6775,6 +6788,7 @@ pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
 pub fn pluginGetRegisterFunctionV1() c.mln_plugin_register_function_v1 {
+    status.requireAbiVersion();
     return c.mln_plugin_get_register_function_v1();
 }
 
@@ -6800,6 +6814,7 @@ pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic: ?*diagnostics.Di
 /// See `mln_projection_mode_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn projectionModeDefault() ProjectionMode {
+    status.requireAbiVersion();
     return ProjectionMode.fromNative(c.mln_projection_mode_default());
 }
 
@@ -6873,6 +6888,7 @@ pub fn styleExpressionInputsDefault(allocator: std.mem.Allocator) status.Error!O
 /// See `mln_style_expression_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub fn styleExpressionOptionsDefault() StyleExpressionOptions {
+    status.requireAbiVersion();
     return StyleExpressionOptions.fromNative(c.mln_style_expression_options_default());
 }
 
@@ -6889,6 +6905,7 @@ pub fn styleImageOptionsDefault(allocator: std.mem.Allocator) status.Error!Owned
 /// See `mln_style_transition_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn styleTransitionOptionsDefault() StyleTransitionOptions {
+    status.requireAbiVersion();
     return StyleTransitionOptions.fromNative(c.mln_style_transition_options_default());
 }
 
@@ -6897,6 +6914,7 @@ pub fn styleTransitionOptionsDefault() StyleTransitionOptions {
 /// See `mln_supported_render_backend_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn supportedRenderBackendMask() RenderBackendFlag {
+    status.requireAbiVersion();
     return RenderBackendFlag.fromNative(c.mln_supported_render_backend_mask());
 }
 
@@ -6913,6 +6931,7 @@ pub fn vulkanBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) stat
 /// See `mln_vulkan_owned_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn vulkanOwnedTextureDescriptorDefault() VulkanOwnedTextureDescriptor {
+    status.requireAbiVersion();
     return VulkanOwnedTextureDescriptor.fromNative(c.mln_vulkan_owned_texture_descriptor_default());
 }
 
@@ -6921,6 +6940,7 @@ pub fn vulkanOwnedTextureDescriptorDefault() VulkanOwnedTextureDescriptor {
 /// See `mln_vulkan_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn vulkanSurfaceDescriptorDefault() VulkanSurfaceDescriptor {
+    status.requireAbiVersion();
     return VulkanSurfaceDescriptor.fromNative(c.mln_vulkan_surface_descriptor_default());
 }
 

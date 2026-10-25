@@ -337,7 +337,7 @@ def declaration(values, value):
     )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
-  public static var `default`: Self {{ {f"try! Self(raw: {initial})" if value.default else "Self()"} }}
+  public static var `default`: Self {{ {f"try! Self(raw: nativeDefault({value.default}))" if value.default else "Self()"} }}
 {chr(10).join(constructors)}
   public init({", ".join(args)}) {{
 {chr(10).join(init)}

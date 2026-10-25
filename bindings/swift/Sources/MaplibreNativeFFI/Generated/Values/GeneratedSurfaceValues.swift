@@ -16,7 +16,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   public var layer: NativePointer
   public static var `default`: Self {
-    Self(raw: mln_metal_surface_descriptor_default())
+    Self(raw: nativeDefault(mln_metal_surface_descriptor_default))
   }
 
   public init(
@@ -59,7 +59,7 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// binding.
   public var surface: NativePointer
   public static var `default`: Self {
-    try! Self(raw: mln_opengl_surface_descriptor_default())
+    try! Self(raw: nativeDefault(mln_opengl_surface_descriptor_default))
   }
 
   public init(
@@ -111,7 +111,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed VkSurfaceKHR bit pattern. Required.
   public var surface: UInt64
   public static var `default`: Self {
-    Self(raw: mln_vulkan_surface_descriptor_default())
+    Self(raw: nativeDefault(mln_vulkan_surface_descriptor_default))
   }
 
   public init(

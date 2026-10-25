@@ -80,7 +80,7 @@ public struct CustomGeometrySourceOptions: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_custom_geometry_source_options_default())
+    try! Self(raw: nativeDefault(mln_custom_geometry_source_options_default))
   }
 
   init(raw: mln_custom_geometry_source_options) throws {
@@ -193,7 +193,7 @@ public struct CustomMvtVectorSourceOptions: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_custom_mvt_vector_source_options_default())
+    try! Self(raw: nativeDefault(mln_custom_mvt_vector_source_options_default))
   }
 
   init(raw: mln_custom_mvt_vector_source_options) throws {
@@ -284,7 +284,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Defaults to false.
   public var synchronousTiling: Bool?
   public static var `default`: Self {
-    try! Self(raw: mln_geojson_source_options_default())
+    try! Self(raw: nativeDefault(mln_geojson_source_options_default))
   }
 
   public init(
@@ -486,7 +486,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   public var pixels: Data
   public static var `default`: Self {
-    try! Self(raw: mln_premultiplied_rgba8_image_default())
+    try! Self(raw: nativeDefault(mln_premultiplied_rgba8_image_default))
   }
 
   public init(
@@ -633,7 +633,7 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   /// Whether the image is a signed distance field icon. Defaults to false.
   public var sdf: Bool?
   public static var `default`: Self {
-    try! Self(raw: mln_style_image_options_default())
+    try! Self(raw: nativeDefault(mln_style_image_options_default))
   }
 
   public init(
@@ -1052,7 +1052,7 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   /// Whether symbol placement changes cross-fade.
   public var enablePlacementTransitions: Bool?
   public static var `default`: Self {
-    Self(raw: mln_style_transition_options_default())
+    Self(raw: nativeDefault(mln_style_transition_options_default))
   }
 
   public init(

@@ -751,8 +751,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             if receiver
             else f"let {mutable}{call_local} = Call::global();"
         ]
-        if plan.owned_outputs and receiver is None:
-            body.append("maplibre_core::validate_abi_version()?;")
         body += [*prelude, *setup, *ending]
     returns = f" -> Result<{public}>"
     # A call with no status and an infallible conversion returns its value.
@@ -766,6 +764,15 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         if public == "()":
             body.pop()
             returns = ""
+    # An entry point that takes no handle can be a program's first call, so it
+    # checks the C ABI version before anything reaches C.
+    if receiver is None and not consuming:
+        body.insert(
+            1,
+            "maplibre_core::validate_abi_version()?;"
+            if returns.startswith(" -> Result")
+            else "maplibre_core::require_abi_version();",
+        )
 
     def has_pointer(value):
         return (

@@ -195,7 +195,8 @@ class Values:
                     f"    {raw} = {self.native(field.value, 'self.' + local)}"
                 )
         initial = f"{value.default}()" if value.default else f"{value.native}()"
-        default = f"  public static var `default`: Self {{ Self(raw: {initial}) }}"
+        stored = f"nativeDefault({value.default})" if value.default else initial
+        default = f"  public static var `default`: Self {{ Self(raw: {stored}) }}"
         encoder = (
             f"""  func nativeValue() -> {value.native} {{
     var raw = {initial}

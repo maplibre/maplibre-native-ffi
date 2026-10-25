@@ -5,7 +5,10 @@
 
 [cases]
 "ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
-"ERR-02" = { na = "The binding checks the linked ABI version at creation; a mismatched library cannot be substituted in this statically linked suite" }
+# The test covers the mismatch error only. Each generated entry point without a
+# handle, value defaults among them, checks first; the suite links the archive
+# statically, so no library with another ABI version can load in its place.
+"ERR-02" = "bindings/rust/crates/maplibre-native-ffi-core/src/abi.rs::another_c_abi_version_is_rejected_as_unsupported"
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
 "LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_reaches_native"
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"

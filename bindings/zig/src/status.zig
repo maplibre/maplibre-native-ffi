@@ -90,8 +90,18 @@ pub fn callUnless(
     return nativeStatusError(raw_status);
 }
 
+/// Fails when the loaded library has another C ABI version. Every entry point
+/// that takes no handle checks this, or `requireAbiVersion`, first; every other
+/// entry point needs a handle that one of those created.
 pub fn validateAbiVersion(diagnostic: ?*diagnostics.Diagnostic) Error!void {
     return validateAbiVersionValue(c.mln_c_version(), expected_c_abi_version, diagnostic);
+}
+
+/// Panics when the loaded library has another C ABI version, for an entry
+/// point with no error channel, such as a value's native default.
+pub fn requireAbiVersion() void {
+    var diagnostic: diagnostics.Diagnostic = .{};
+    validateAbiVersion(&diagnostic) catch @panic(diagnostic.message());
 }
 
 fn validateAbiVersionValue(
@@ -107,7 +117,7 @@ fn validateAbiVersionValue(
         "unsupported MapLibre Native C ABI version: expected {d}, got {d}",
         .{ expected, actual },
     ) catch "unsupported MapLibre Native C ABI version";
-    record(diagnostic, null, message);
+    record(diagnostic, c.MLN_STATUS_UNSUPPORTED, message);
     return error.AbiVersionMismatch;
 }
 
@@ -180,6 +190,6 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
 test "ABI version validation reports mismatch diagnostics" {
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &diagnostic));
-    try std.testing.expectEqual(null, diagnostic.status);
+    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_UNSUPPORTED), @backingInt(diagnostic.status.?));
     try std.testing.expect(std.mem.indexOf(u8, diagnostic.message(), "expected 0, got 1") != null);
 }
