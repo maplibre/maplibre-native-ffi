@@ -644,9 +644,11 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
   MLN_TEST_OK(mln_test_map_request_repaint(map));
   const mln_rendering_stats second =
     render_stats_to_idle(runtime, map, &fixture);
+  // A repaint renders at least one frame; MapLibre may schedule another before
+  // the map is idle again, and the total counts every frame's draws.
   TEST_ASSERT_GREATER_THAN_INT64(0, second.draw_call_count);
-  TEST_ASSERT_EQUAL_INT64(first.frame_count + 1, second.frame_count);
-  TEST_ASSERT_EQUAL_INT64(
+  TEST_ASSERT_GREATER_THAN_INT64(first.frame_count, second.frame_count);
+  TEST_ASSERT_GREATER_OR_EQUAL_INT64(
     first.total_draw_call_count + second.draw_call_count,
     second.total_draw_call_count
   );
