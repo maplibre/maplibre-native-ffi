@@ -16,7 +16,6 @@ import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.CameraUpdateMode
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.withMap
 
 /** Camera end handlers, which a command carries two records deep in its input. */
@@ -38,11 +37,11 @@ class CameraEndHandlerTest {
               endHandler = CameraTransitionHandler { ended.complete(it) },
             ),
         )
-      map.updateCamera(update).awaitCommitted()
+      map.updateCamera(update).await()
       assertEquals(base + 1, roots.rootCountForTesting())
 
       // Native runs the handler once, and releases it, when the identity is cancelled.
-      map.cancelCameraTransition(ULong.MAX_VALUE).awaitCommitted()
+      map.cancelCameraTransition(ULong.MAX_VALUE).await()
       val end = ended.awaitWithin("the end handler")
       assertEquals(CameraTransitionOutcome.CANCELLED, end.outcome)
       assertNotEquals(0uL, end.generation)

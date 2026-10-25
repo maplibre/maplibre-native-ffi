@@ -19,7 +19,7 @@
 "LIFE-06" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aHandleIdNamesItsEventsAndOutlivesClose"
 "COMP-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aCompletionDeliversOnceAndAFailedConversionIsDisposed"
 "COMP-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aRejectedSubmissionFreesItsCompletionState"
-"COMP-04" = { na = "Swift applies decision 1 of #993 first: a failed or cancelled command throws MaplibreError, which CompletionTests.swift::aFailedCommandThrowsItsStatusAndGeneration covers" }
+"COMP-04" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aFailedCommandThrowsItsStatusAndGeneration"
 "COMP-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::cancellingAWaitEndsItAndDisposesTheLateResult"
 "COMP-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::discardedCommandsAreFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationIsRootedUntilNativeReleasesIt"

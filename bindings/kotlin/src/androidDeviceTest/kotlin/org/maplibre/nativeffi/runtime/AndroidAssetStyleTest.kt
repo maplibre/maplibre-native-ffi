@@ -109,7 +109,7 @@ class AndroidAssetStyleTest {
       provider = localFilesProvider(),
       runtimeOptions = runtimeOptions(assetPath),
     ) {
-      assertCommitted(map.setStyleUrl(styleUrl).awaitWithin("the style command"))
+      map.setStyleUrl(styleUrl).awaitWithin("the style command")
       // A failed load reports MAP_LOADING_FAILED instead, so fail fast on it with its message.
       val loaded =
         runtimeFixture.awaitEvent("the style $styleUrl to load") {

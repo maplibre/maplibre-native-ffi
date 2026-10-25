@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.internal.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
@@ -29,22 +28,26 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
  * releases it, or on a target with a [HostDelivery] queue, until the page delivers the result. A
  * conversion reads the `mln_completion_result` at the address it receives, which stays valid only
  * while the conversion runs. Each submission call throws the mapped status error when native
- * rejects it synchronously.
+ * rejects it synchronously. A result with a status other than OK, including a failed or cancelled
+ * command, completes the [Deferred] exceptionally with [MaplibreException].
  */
 internal object CompletionBridge {
-  private class State<T>(
-    private val convert: (Long) -> T,
-    private val acceptErrorStatus: Boolean,
-  ) {
+  private class State<T>(private val convert: (Long) -> T) {
     val deferred = CompletableDeferred<T>()
 
     fun complete(result: Long) {
       try {
         val status = readI32(result + CompletionResultLayout.STATUS)
-        if (status == Status.OK.rawValue || acceptErrorStatus) {
+        if (status == Status.OK.rawValue) {
           deferred.complete(convert(result))
         } else {
-          deferred.completeExceptionally(MaplibreException(Status(status), diagnostic(result)))
+          deferred.completeExceptionally(
+            MaplibreException(
+              Status(status),
+              diagnostic(result),
+              readU64(result + CompletionResultLayout.GENERATION),
+            ),
+          )
         }
       } catch (failure: Throwable) {
         deferred.completeExceptionally(failure)
@@ -52,21 +55,8 @@ internal object CompletionBridge {
     }
   }
 
-  fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> =
-    submitInternal(arena, convert, false, call)
-
-  fun unit(arena: NativeArena, call: (Long) -> Unit): Deferred<Unit> = submit(arena, {}, call)
-
-  fun command(arena: NativeArena, call: (Long) -> Unit): Deferred<CommandCompletion> =
-    submitInternal(arena, ::commandCompletion, true, call)
-
-  private fun <T> submitInternal(
-    arena: NativeArena,
-    convert: (Long) -> T,
-    acceptErrorStatus: Boolean,
-    call: (Long) -> Unit,
-  ): Deferred<T> {
-    val state = State(convert, acceptErrorStatus)
+  fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> {
+    val state = State(convert)
     val token = NativeRoots.retain(state)
     try {
       val completion = arena.allocate(CompletionLayout.SIZEOF)
@@ -90,6 +80,11 @@ internal object CompletionBridge {
     return state.deferred
   }
 
+  fun unit(arena: NativeArena, call: (Long) -> Unit): Deferred<Unit> = submit(arena, {}, call)
+
+  fun command(arena: NativeArena, call: (Long) -> Unit): Deferred<CommandCompletion> =
+    submit(arena, ::commandCompletion, call)
+
   /** Delivers the result that native passes to the `mln_completion_callback`. */
   fun complete(userData: Long, result: Long) {
     (NativeRoots.get(userData) as? State<*>)?.complete(result)
@@ -102,11 +97,8 @@ internal object CompletionBridge {
 
   private fun commandCompletion(result: Long): CommandCompletion =
     CommandCompletion(
-      CommandDisposition(readU32(result + CompletionResultLayout.DISPOSITION)),
       readU64(result + CompletionResultLayout.GENERATION),
       readU64(result + CompletionResultLayout.RENDER_UPDATE_GENERATION),
-      Status(readI32(result + CompletionResultLayout.STATUS)),
-      diagnostic(result),
     )
 
   private fun diagnostic(result: Long): String =

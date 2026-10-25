@@ -1,6 +1,9 @@
 namespace Maplibre.NativeFfi;
 
-/// <summary>A native or binding status failure.</summary>
+/// <summary>
+/// A native status and the diagnostic that native copied for it. A failed or cancelled command
+/// faults its task with this exception.
+/// </summary>
 public class MaplibreException : Exception
 {
     public MaplibreException(Status status, string diagnostic)
@@ -15,4 +18,10 @@ public class MaplibreException : Exception
 
     public Status Status { get; }
     public string Diagnostic { get; }
+
+    /// <summary>
+    /// The map snapshot generation that a failed or cancelled map command published, and zero for
+    /// any other failure.
+    /// </summary>
+    public ulong Generation { get; init; }
 }

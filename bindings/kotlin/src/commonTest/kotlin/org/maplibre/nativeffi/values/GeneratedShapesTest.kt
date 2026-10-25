@@ -36,7 +36,6 @@ import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readCString
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -101,7 +100,7 @@ class GeneratedShapesTest {
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = "a\u0000b")
-      map.setFeatureState(withNul, """{"hover":true}""".encodeToByteArray()).awaitCommitted()
+      map.setFeatureState(withNul, """{"hover":true}""".encodeToByteArray()).await()
       assertEquals(
         """{"hover":true}""",
         map.getFeatureState(withNul).awaitWithin("the state").decodeToString(),
@@ -120,7 +119,7 @@ class GeneratedShapesTest {
   fun presenceFieldsRoundTripSetAndAbsentValues() = runSuspendTest {
     withMap {
       val camera = CameraOptions(center = LatLng(12.0, 34.0), zoom = 4.0, bearing = 25.0)
-      map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
+      map.updateCamera(CameraUpdate(camera = camera)).await()
       val snapshot = map.getSnapshot().view.camera
       assertEquals(12.0, assertNotNull(snapshot.center).latitude, 1e-6)
       assertEquals(34.0, assertNotNull(snapshot.center).longitude, 1e-6)
@@ -129,17 +128,15 @@ class GeneratedShapesTest {
       assertNull(snapshot.anchor)
 
       // An update that sets only the zoom leaves every other field where it was.
-      map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).awaitCommitted()
+      map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).await()
       val updated = map.getSnapshot().view.camera
       assertEquals(6.0, assertNotNull(updated.zoom), 1e-6)
       assertEquals(25.0, assertNotNull(updated.bearing), 1e-6)
 
       // A selector's optional state key narrows a removal to one member.
       val selector = FeatureStateSelector("source", featureId = "feature")
-      map
-        .setFeatureState(selector, """{"hover":true,"radius":2}""".encodeToByteArray())
-        .awaitCommitted()
-      map.removeFeatureState(selector.copy(stateKey = "hover")).awaitCommitted()
+      map.setFeatureState(selector, """{"hover":true,"radius":2}""".encodeToByteArray()).await()
+      map.removeFeatureState(selector.copy(stateKey = "hover")).await()
       assertEquals(
         """{"radius":2}""",
         map.getFeatureState(selector).awaitWithin("the state").decodeToString(),
@@ -164,7 +161,7 @@ class GeneratedShapesTest {
         }
       }
       val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
-      map.setStyleImage("image", image, StyleImageOptions()).awaitCommitted()
+      map.setStyleImage("image", image, StyleImageOptions()).await()
       // The submission copies the rows out of the padded stride, and the readback is unpadded.
       val copied = map.getStyleImage("image").awaitWithin("the image")
       assertContentEquals(expected, copied?.pixels)
@@ -200,8 +197,8 @@ class GeneratedShapesTest {
             animation = animation,
           ),
         )
-        .awaitCommitted()
-      map.cancelCameraTransition(ULong.MAX_VALUE).awaitCommitted()
+        .await()
+      map.cancelCameraTransition(ULong.MAX_VALUE).await()
       assertEquals(
         CameraTransitionOutcome.CANCELLED,
         ended.awaitWithin("the end handler").outcome,
@@ -214,7 +211,7 @@ class GeneratedShapesTest {
     withMap {
       map
         .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(10.0, 20.0), zoom = 3.0)))
-        .awaitCommitted()
+        .await()
       val coordinates = mutableListOf(LatLng(10.0, 20.0), LatLng(12.0, 21.0))
       val expected = map.cameraForLatLngs(coordinates.toList(), null).awaitWithin("the camera fit")
       val pending = map.cameraForLatLngs(coordinates, null)
@@ -224,7 +221,7 @@ class GeneratedShapesTest {
       val style = EMPTY_STYLE_JSON.encodeToByteArray()
       val loading = map.setStyleJson(style)
       style.fill(0)
-      loading.awaitCommitted()
+      loading.await()
       awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
     }
   }

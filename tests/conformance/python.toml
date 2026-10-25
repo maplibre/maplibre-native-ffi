@@ -15,7 +15,7 @@
 "LIFE-06" = "bindings/python/tests/test_lifecycle.py::test_a_handle_id_names_its_events_and_outlives_close"
 "COMP-01" = "bindings/python/tests/test_future.py::test_callbacks_run_once_in_order_and_a_failed_conversion_releases_its_value"
 "COMP-02" = "bindings/python/tests/test_completions.py::test_a_rejected_submission_frees_its_future"
-"COMP-04" = { na = "Python applies decision 1 of #993 first: a failed or cancelled command raises MaplibreError, which test_completions.py::test_a_failed_command_raises_its_status_and_generation covers" }
+"COMP-04" = "bindings/python/tests/test_completions.py::test_a_failed_command_raises_its_status_and_generation"
 "COMP-05" = "bindings/python/tests/test_completions.py::test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner"
 "COMP-06" = "bindings/python/tests/test_completions.py::test_discarded_commands_are_fenced_and_sync_rejection_raises"
 "CB-01" = "bindings/python/tests/test_callbacks.py::test_a_registration_is_rooted_until_native_releases_it"

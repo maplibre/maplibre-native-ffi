@@ -18,7 +18,6 @@ import org.maplibre.nativeffi.generated.setHttpHeaderTransform
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.assertCommitted
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -82,10 +81,8 @@ class ThreadedCallbackTest {
     withMap {
       // The provider passes the style through to the HTTP client, which runs the header transform
       // before it tries a port that nothing serves.
-      assertCommitted(
-        runtime.setResourceProvider(passingThrough(HTTP_STYLE_URL)).awaitWithin("the provider"),
-      )
-      assertCommitted(runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform"))
+      runtime.setResourceProvider(passingThrough(HTTP_STYLE_URL)).awaitWithin("the provider")
+      runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
       map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
       val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
       assertEquals(null, inside, "setting a header inside the callback is allowed")
@@ -93,9 +90,7 @@ class ThreadedCallbackTest {
       assertFailsWith<IllegalStateException> {
         escaped!!.setHeader("X-Test", "1")
       }
-      assertCommitted(
-        runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear"),
-      )
+      runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")
     }
   }
 

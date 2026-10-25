@@ -7,10 +7,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 use crate::Status;
 
+/// A failure that native or this binding reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    Status { status: Status, diagnostic: String },
-    AbiVersionMismatch { expected: u32, actual: u32 },
+    /// A native status and the diagnostic that native copied for it.
+    Status {
+        status: Status,
+        diagnostic: String,
+        /// The map snapshot generation that a failed or cancelled map command
+        /// published, and zero for any other failure.
+        generation: u64,
+    },
+    AbiVersionMismatch {
+        expected: u32,
+        actual: u32,
+    },
 }
 
 impl Error {
@@ -18,6 +29,7 @@ impl Error {
         Self::Status {
             status,
             diagnostic: diagnostic.into(),
+            generation: 0,
         }
     }
 
@@ -46,12 +58,23 @@ impl Error {
             Self::AbiVersionMismatch { .. } => "C ABI version mismatch",
         }
     }
+
+    /// The map snapshot generation that a failed or cancelled map command
+    /// published, and zero for any other failure.
+    pub fn generation(&self) -> u64 {
+        match self {
+            Self::Status { generation, .. } => *generation,
+            Self::AbiVersionMismatch { .. } => 0,
+        }
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Status { status, diagnostic } => write!(f, "{status}: {diagnostic}"),
+            Self::Status {
+                status, diagnostic, ..
+            } => write!(f, "{status}: {diagnostic}"),
             Self::AbiVersionMismatch { expected, actual } => write!(
                 f,
                 "unsupported MapLibre Native C ABI version {actual}; expected {expected}"

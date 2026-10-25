@@ -26,7 +26,7 @@
 "LIFE-06" = "bindings/go/maplibre/lifecycle_test.go::TestHandleIdNamesItsEventsAndOutlivesClose"
 "COMP-01" = "bindings/go/maplibre/completion_test.go::TestCompletionDeliversExactlyOnce"
 "COMP-02" = "bindings/go/maplibre/completion_test.go::TestRejectedSubmissionFreesItsCompletionState"
-"COMP-04" = { na = "Go applies decision 1 of #993 first: a failed or cancelled command returns an *Error from Await, which completion_test.go::TestFailedCommandReturnsItsError covers" }
+"COMP-04" = "bindings/go/maplibre/completion_test.go::TestFailedCommandReturnsItsError"
 "COMP-05" = "bindings/go/maplibre/completion_test.go::TestAwaitEndsWithItsContext"
 "COMP-06" = "bindings/go/maplibre/completion_test.go::TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError"
 "CB-01" = "bindings/go/maplibre/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"

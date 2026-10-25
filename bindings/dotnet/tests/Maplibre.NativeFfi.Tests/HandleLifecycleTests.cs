@@ -183,8 +183,7 @@ public sealed class HandleLifecycleTests
         Gc.Collect();
 
         Assert.True(runtime.IsAlive);
-        var completion = await map.SetStyleJsonAsync(NativeFixture.EmptyStyle);
-        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        await map.SetStyleJsonAsync(NativeFixture.EmptyStyle);
         await map.CloseAsync();
         await ((RuntimeHandle)runtime.Target!).CloseAsync();
     }

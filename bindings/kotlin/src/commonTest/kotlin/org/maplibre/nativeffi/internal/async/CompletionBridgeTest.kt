@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.assertFailsWithStatus
+import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.readLatLng
@@ -13,7 +14,6 @@ import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readStrided
-import org.maplibre.nativeffi.internal.memory.readU64
 import org.maplibre.nativeffi.internal.memory.writeAddress
 import org.maplibre.nativeffi.internal.memory.writeF64
 import org.maplibre.nativeffi.internal.memory.writeI32
@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.internal.memory.writeSize
 import org.maplibre.nativeffi.internal.memory.writeU32
 import org.maplibre.nativeffi.internal.memory.writeU64
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * A completion submitted through the completion bridge, which the test delivers and releases by
@@ -71,11 +72,9 @@ private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredC
   return HandDeliveredCompletion(deferred, callback, userData, release)
 }
 
-private fun generation(result: Long): ULong = readU64(result + CompletionResultLayout.GENERATION)
-
-/** A completion whose value is its result's generation. */
-internal fun handDeliveredGeneration(): HandDeliveredCompletion<ULong> = capture { call ->
-  NativeArena().use { arena -> CompletionBridge.submit(arena, ::generation, call) }
+/** A command completion. */
+private fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
+  NativeArena().use { arena -> CompletionBridge.command(arena, call) }
 }
 
 /** The completion bridge and its upcall stubs, driven without native. */
@@ -140,11 +139,34 @@ class CompletionBridgeTest {
   }
 
   @Test
-  fun aFailedStatusBecomesItsExceptionWithTheDiagnostic() = runSuspendTest {
-    val completion = handDeliveredGeneration()
-    completion.deliver(Status.INVALID_ARGUMENT.rawValue, 0u, "the zoom is out of range")
-    completion.release()
-    val failure = assertFailsWithStatus(Status.INVALID_ARGUMENT) { completion.deferred.await() }
-    assertEquals("the zoom is out of range", failure.diagnostic)
+  fun aFailedOrCancelledCommandFailsWithItsStatusDiagnosticAndGeneration() = runSuspendTest {
+    val failed = handDeliveredCommand()
+    failed.deliver(
+      Status.NOT_FOUND.rawValue,
+      9u,
+      "the source does not exist",
+      CommandDisposition.FAILED.rawValue,
+    )
+    failed.release()
+    val failure = assertFailsWithStatus(Status.NOT_FOUND) { failed.deferred.await() }
+    assertEquals("the source does not exist", failure.diagnostic)
+    assertEquals(9uL, failure.generation)
+
+    val cancelled = handDeliveredCommand()
+    cancelled.deliver(
+      Status.CANCELLED.rawValue,
+      0u,
+      "asynchronous work was abandoned",
+      CommandDisposition.CANCELLED.rawValue,
+    )
+    cancelled.release()
+    val cancellation = assertFailsWithStatus(Status.CANCELLED) { cancelled.deferred.await() }
+    assertEquals("asynchronous work was abandoned", cancellation.diagnostic)
+    assertEquals(0uL, cancellation.generation)
+
+    val committed = handDeliveredCommand()
+    committed.deliver(Status.OK.rawValue, 4u)
+    committed.release()
+    assertEquals(CommandCompletion(4u, 0u), committed.deferred.await())
   }
 }

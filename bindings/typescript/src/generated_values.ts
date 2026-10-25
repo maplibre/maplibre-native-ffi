@@ -284,9 +284,8 @@ export interface CanonicalTileId {
  */
 export const CommandDisposition = {
   committed: 0,
-  superseded: 1,
-  failed: 2,
-  cancelled: 3,
+  failed: 1,
+  cancelled: 2,
 } as const;
 /** One of the CommandDisposition values, or a value this binding does not know. */
 export type CommandDisposition =

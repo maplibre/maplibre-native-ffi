@@ -122,17 +122,15 @@ public value class CommandDisposition(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "COMMITTED"
-      1u -> "SUPERSEDED"
-      2u -> "FAILED"
-      3u -> "CANCELLED"
+      1u -> "FAILED"
+      2u -> "CANCELLED"
       else -> "CommandDisposition($rawValue)"
     }
 
   public companion object {
     public val COMMITTED: CommandDisposition = CommandDisposition(0u)
-    public val SUPERSEDED: CommandDisposition = CommandDisposition(1u)
-    public val FAILED: CommandDisposition = CommandDisposition(2u)
-    public val CANCELLED: CommandDisposition = CommandDisposition(3u)
+    public val FAILED: CommandDisposition = CommandDisposition(1u)
+    public val CANCELLED: CommandDisposition = CommandDisposition(2u)
   }
 }
 

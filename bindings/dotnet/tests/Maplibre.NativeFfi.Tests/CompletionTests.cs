@@ -138,16 +138,46 @@ public sealed class CompletionTests
         return (error, new WeakReference(captured));
     }
 
+    // Native fails a command it accepted, and the test plays native's part for a cancelled one,
+    // which a live map cannot produce on demand.
     [Fact]
-    public async Task AFailedCommandArrivesAsItsDisposition()
+    public async Task AFailedOrCancelledCommandFaultsWithItsStatusAndGeneration()
     {
-        await using var fixture = await NativeFixture.WithEmptyStyleAsync();
+        await using var fixture = await NativeFixture.CreateAsync();
+        var committed = await fixture.Map.SetStyleJsonAsync(NativeFixture.EmptyStyle);
 
-        var completion = await fixture.Map.RemoveStyleSourceAsync("missing");
+        var failed = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture.Map.RemoveStyleSourceAsync("missing")
+        );
+        Assert.Equal(Status.NotFound, failed.Status);
+        Assert.NotEmpty(failed.Diagnostic);
+        Assert.True(failed.Generation > committed.Generation);
 
-        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-        Assert.Equal((int)Status.NotFound, completion.RawStatus);
-        Assert.NotEmpty(completion.Diagnostic);
+        var cancelled = await Assert.ThrowsAsync<MaplibreException>(DeliverCancelledCommand);
+        Assert.Equal(Status.Cancelled, cancelled.Status);
+        Assert.Equal("abandoned", cancelled.Diagnostic);
+        Assert.Equal(9UL, cancelled.Generation);
+    }
+
+    private static unsafe Task<CommandCompletion> DeliverCancelledCommand()
+    {
+        mln_completion completion;
+        NativeCompletion.StartCommand(&completion, out var pending);
+        var task = pending.Submitted(mln_status.MLN_STATUS_OK);
+        fixed (byte* diagnostic = "abandoned"u8)
+        {
+            var result = new mln_completion_result
+            {
+                size = (uint)sizeof(mln_completion_result),
+                status = (int)mln_status.MLN_STATUS_CANCELLED,
+                disposition = (uint)mln_command_disposition.MLN_COMMAND_DISPOSITION_CANCELLED,
+                generation = 9,
+                diagnostic = new mln_buffer_view { data = diagnostic, size = 9 },
+            };
+            completion.callback(completion.user_data, &result);
+        }
+        completion.release_user_data(completion.user_data);
+        return task;
     }
 
     // A still image on a static map with no session stays pending until the map closes, so every

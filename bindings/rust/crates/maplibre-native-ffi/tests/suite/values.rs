@@ -43,8 +43,7 @@ fn host_strings_use_views_and_native_lent_strings_decode() {
     // would make it invalid JSON if native read past the length.
     let padded = format!("{BACKGROUND_STYLE_JSON}, trailing bytes");
     let document = &padded.as_bytes()[..BACKGROUND_STYLE_JSON.len()];
-    let loaded = wait_for(fixture.map().set_style_json(document));
-    assert_eq!(loaded.disposition, CommandDisposition::Committed);
+    wait_for(fixture.map().set_style_json(document));
     assert_eq!(
         wait_for(fixture.map().get_loaded_style_json()),
         BACKGROUND_STYLE_JSON.as_bytes()
@@ -82,8 +81,7 @@ fn presence_fields_keep_a_present_zero_apart_from_an_absent_value() {
         delay_ms: None,
         enable_placement_transitions: Some(false),
     };
-    let applied = wait_for(fixture.map().set_style_transition_options(&options));
-    assert_eq!(applied.disposition, CommandDisposition::Committed);
+    wait_for(fixture.map().set_style_transition_options(&options));
     let read_back = wait_for(fixture.map().get_style_transition_options());
     assert_eq!(read_back, options);
     assert_eq!(read_back.duration_ms, Some(0.0));
@@ -140,14 +138,8 @@ fn array_inputs_are_copied_when_they_are_submitted() {
     // The caller may reuse its arrays as soon as the calls return.
     coordinates.fill(LatLng::new(9.0, 9.0));
     image.pixels.fill(0);
-    assert_eq!(
-        wait_for(Ok(added_source)).disposition,
-        CommandDisposition::Committed
-    );
-    assert_eq!(
-        wait_for(Ok(added_image)).disposition,
-        CommandDisposition::Committed
-    );
+    wait_for(Ok(added_source));
+    wait_for(Ok(added_image));
 
     assert_eq!(
         wait_for(fixture.map().get_image_source_coordinates("image")),

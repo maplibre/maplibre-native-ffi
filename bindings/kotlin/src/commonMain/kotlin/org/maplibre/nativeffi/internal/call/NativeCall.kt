@@ -231,8 +231,8 @@ internal fun nativeUnit(
   }
 
 /**
- * Submits an ordered command. A rejected submission throws; a terminal failure arrives as data in
- * its completion.
+ * Submits an ordered command. A rejected submission throws; a failed or cancelled command completes
+ * its `Deferred` exceptionally.
  */
 internal fun nativeCommand(
   owner: Any?,

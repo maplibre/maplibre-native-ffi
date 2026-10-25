@@ -10,8 +10,6 @@ import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.ScreenBox
 import org.maplibre.nativeffi.generated.ScreenPoint
 import org.maplibre.nativeffi.generated.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.assertCommitted
-import org.maplibre.nativeffi.runtime.awaitCommitted
 
 /**
  * Renders one point feature per entry of [properties], with ids `case-0`, `case-1`, and so on, and
@@ -37,8 +35,8 @@ internal suspend fun assertFilterSelects(
     val map = mapFixture.map
     map
       .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 0.0), zoom = 2.0)))
-      .awaitCommitted()
-    assertCommitted(complete(map.setStyleJson(style.encode())))
+      .await()
+    complete(map.setStyleJson(style.encode()))
     // The still image waits for the source to load and the layer to render.
     renderStill()
 

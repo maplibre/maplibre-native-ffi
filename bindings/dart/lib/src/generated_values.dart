@@ -89,15 +89,13 @@ final class CameraUpdateMode extends _Enum {
 final class CommandDisposition extends _Enum {
   const CommandDisposition.fromRawValue(super.rawValue);
   static const committed = CommandDisposition.fromRawValue(0);
-  static const superseded = CommandDisposition.fromRawValue(1);
-  static const failed = CommandDisposition.fromRawValue(2);
-  static const cancelled = CommandDisposition.fromRawValue(3);
+  static const failed = CommandDisposition.fromRawValue(1);
+  static const cancelled = CommandDisposition.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
     0 => 'CommandDisposition.committed',
-    1 => 'CommandDisposition.superseded',
-    2 => 'CommandDisposition.failed',
-    3 => 'CommandDisposition.cancelled',
+    1 => 'CommandDisposition.failed',
+    2 => 'CommandDisposition.cancelled',
     _ => 'CommandDisposition($rawValue)',
   };
 }

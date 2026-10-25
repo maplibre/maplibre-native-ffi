@@ -23,7 +23,7 @@
 "LIFE-06" = "bindings/dart/test/lifecycle_test.dart::a handle id names its events and outlives close"
 "COMP-01" = "bindings/dart/test/completion_test.dart::a completion delivers once and reports a value that fails to convert"
 "COMP-02" = "bindings/dart/test/completion_test.dart::a submission native rejects frees its completion state"
-"COMP-04" = { na = "Dart applies decision 1 of #993 first: a failed or cancelled command fails its future with MaplibreException, which completion_test.dart::a failed command fails its future with its status and generation covers" }
+"COMP-04" = "bindings/dart/test/completion_test.dart::a failed command fails its future with its status and generation"
 "COMP-05" = "bindings/dart/test/completion_test.dart::a wait that times out leaves its completion to arrive later"
 "COMP-06" = "bindings/dart/test/completion_test.dart::discarded commands are fenced and synchronous rejection throws"
 "CB-01" = "bindings/dart/test/queue_registration_test.dart::a callback root is released by a removal, a map close, or a refusal"

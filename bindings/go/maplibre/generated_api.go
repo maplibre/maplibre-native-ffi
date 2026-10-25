@@ -127,10 +127,9 @@ func (value CameraUpdateMode) String() string {
 type CommandDisposition uint32
 
 const (
-	CommandDispositionCommitted  CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_COMMITTED)
-	CommandDispositionSuperseded CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_SUPERSEDED)
-	CommandDispositionFailed     CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_FAILED)
-	CommandDispositionCancelled  CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_CANCELLED)
+	CommandDispositionCommitted CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_COMMITTED)
+	CommandDispositionFailed    CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_FAILED)
+	CommandDispositionCancelled CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_CANCELLED)
 )
 
 func (value CommandDisposition) String() string {
@@ -138,10 +137,8 @@ func (value CommandDisposition) String() string {
 	case 0:
 		return "CommandDispositionCommitted"
 	case 1:
-		return "CommandDispositionSuperseded"
-	case 2:
 		return "CommandDispositionFailed"
-	case 3:
+	case 2:
 		return "CommandDispositionCancelled"
 	}
 	return fmt.Sprintf("CommandDisposition(%d)", value)

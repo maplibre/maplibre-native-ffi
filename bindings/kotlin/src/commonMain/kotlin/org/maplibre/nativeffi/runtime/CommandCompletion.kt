@@ -1,10 +1,12 @@
 package org.maplibre.nativeffi.runtime
 
-import org.maplibre.nativeffi.generated.CommandDisposition
-import org.maplibre.nativeffi.generated.Status
-
 /**
- * Terminal metadata for one accepted ordered command.
+ * The generations that one committed ordered command published.
+ *
+ * A command's `Deferred` completes with this value only when the command commits. When the command
+ * fails or native cancels it, the `Deferred` completes exceptionally with a
+ * [org.maplibre.nativeffi.error.MaplibreException] that carries the status, the diagnostic, and the
+ * generation the command published.
  *
  * Unless the caller cancels it first, the command's `Deferred` completes inside its native
  * completion, after the runtime event handler has returned from the events the command raised, so
@@ -14,11 +16,8 @@ import org.maplibre.nativeffi.generated.Status
  * thread, while native still runs the command.
  */
 public data class CommandCompletion(
-  public val disposition: CommandDisposition,
   /** Map snapshot generation that a map command published, or zero for a runtime command. */
   public val generation: ULong,
   /** The first map render update that includes the command, or zero when [generation] is zero. */
   public val renderUpdateGeneration: ULong,
-  public val status: Status,
-  public val diagnostic: String,
 )

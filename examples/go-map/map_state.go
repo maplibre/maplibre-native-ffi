@@ -41,10 +41,17 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
+	// A style that fails to apply leaves nothing to render, so its command is
+	// awaited. The camera commands are fire-and-forget, and native logs any
+	// that fails.
+	var loaded *maplibre.Future[maplibre.CommandCompletion]
 	if smoke {
-		_, err = mapHandle.SetStyleJson([]byte(smokeStyle))
+		loaded, err = mapHandle.SetStyleJson([]byte(smokeStyle))
 	} else {
-		_, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
+		loaded, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
+	}
+	if err == nil {
+		_, err = loaded.Await(context.Background())
 	}
 	if err != nil {
 		_ = state.Close()
@@ -55,8 +62,7 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 		Center: &maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194},
 		Zoom:   &zoom, Bearing: &bearing, Pitch: &pitch,
 	}
-	_, err = mapHandle.UpdateCamera(maplibre.CameraUpdate{Camera: initialCamera})
-	if err != nil {
+	if err = mapHandle.Discarding().UpdateCamera(maplibre.CameraUpdate{Camera: initialCamera}); err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("camera jump failed: %w", err)
 	}
@@ -91,7 +97,7 @@ func (state *runtimeMapState) Close() error {
 // cancelTransitions ends any running camera transition, so a starting gesture
 // takes over from it rather than fighting it.
 func (state *runtimeMapState) cancelTransitions() error {
-	if _, err := state.mapRef.CancelTransitions(); err != nil {
+	if err := state.mapRef.Discarding().CancelTransitions(); err != nil {
 		return fmt.Errorf("camera transition cancel failed: %w", err)
 	}
 	return nil
@@ -106,26 +112,23 @@ func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
 }
 
 func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
-	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+	return state.mapRef.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		Offset: &maplibre.ScreenPoint{X: dx, Y: dy}, Animation: animationOptions(durationMS),
 	})
-	return err
 }
 
 func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
-	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+	return state.mapRef.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		Scale: &scale, Anchor: &anchor, Animation: animationOptions(durationMS),
 	})
-	return err
 }
 
 // adjustOrientation adds bearing and pitch degrees in one delta. A nil value
 // leaves that component unchanged.
 func (state *runtimeMapState) adjustOrientation(bearing, pitch, durationMS *float64) error {
-	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+	return state.mapRef.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		Bearing: bearing, Pitch: pitch, Animation: animationOptions(durationMS),
 	})
-	return err
 }
 
 func (state *runtimeMapState) resetOrientation(durationMS float64) error {
@@ -134,7 +137,7 @@ func (state *runtimeMapState) resetOrientation(durationMS float64) error {
 }
 
 func (state *runtimeMapState) updateCamera(update maplibre.CameraUpdate) error {
-	if _, err := state.mapRef.UpdateCamera(update); err != nil {
+	if err := state.mapRef.Discarding().UpdateCamera(update); err != nil {
 		return fmt.Errorf("camera update failed: %w", err)
 	}
 	return nil

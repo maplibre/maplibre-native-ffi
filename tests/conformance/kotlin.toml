@@ -65,7 +65,7 @@
 "LIFE-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aHandleIdNamesItsEventsAndOutlivesRelease"
 "COMP-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/async/CompletionBridgeTest.kt::aCompletionConvertsOnceAndAConversionFailureFailsItsDeferred"
 "COMP-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aSubmissionNativeRejectsLeavesNoCompletionBehind"
-"COMP-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aFailedCommandArrivesAsDataRatherThanAnException"
+"COMP-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aFailedCommandFailsItsDeferredWithItsStatusAndGeneration"
 "COMP-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::waitingOnACompletionTimesOutOrIsCancelledWithoutEndingIt"
 "COMP-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aDiscardedCommandIsFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelCallbackIsRootedUntilNativeReleasesIt"

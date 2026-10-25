@@ -6,14 +6,20 @@ using Maplibre.NativeFfi.Internal.Status;
 
 namespace Maplibre.NativeFfi;
 
-/// <summary>The terminal outcome of an accepted ordered command.</summary>
-public readonly record struct CommandCompletion(
-    CommandDisposition Disposition,
-    ulong Generation,
-    ulong RenderUpdateGeneration,
-    int RawStatus,
-    string Diagnostic
-);
+/// <summary>
+/// The success value of an ordered command, which its task holds once the command committed. A
+/// failed or cancelled command faults its task with a <see cref="MaplibreException" /> that
+/// carries its status, diagnostic, and generation instead.
+/// </summary>
+/// <param name="Generation">
+/// The map snapshot generation that the command published, or zero for a command that is not a
+/// map command.
+/// </param>
+/// <param name="RenderUpdateGeneration">
+/// The first map render update that includes the command, or zero when
+/// <paramref name="Generation" /> is zero.
+/// </param>
+public readonly record struct CommandCompletion(ulong Generation, ulong RenderUpdateGeneration);
 
 internal unsafe delegate T CompletionConverter<T>(mln_completion_result* result);
 
@@ -91,7 +97,7 @@ internal static unsafe class NativeCompletion
     )
         where TNative : unmanaged => result->value == null ? null : Array(result, copy);
 
-    /// <summary>Starts a command completion, which reports a failure as its disposition.</summary>
+    /// <summary>Starts a command completion, whose task holds the command's generations.</summary>
     internal static mln_completion* StartCommand(
         mln_completion* completion,
         out Pending<CommandCompletion> pending
@@ -99,14 +105,10 @@ internal static unsafe class NativeCompletion
         Start(
             completion,
             static result => new CommandCompletion(
-                (CommandDisposition)result->disposition,
                 result->generation,
-                result->render_update_generation,
-                result->status,
-                ValueStructs.CopyUtf8View(result->diagnostic)
+                result->render_update_generation
             ),
-            out pending,
-            acceptErrorStatus: true
+            out pending
         );
 
     /// <summary>Starts a completion that carries no value.</summary>
@@ -127,11 +129,10 @@ internal static unsafe class NativeCompletion
     internal static mln_completion* Start<T>(
         mln_completion* completion,
         CompletionConverter<T> convert,
-        out Pending<T> pending,
-        bool acceptErrorStatus = false
+        out Pending<T> pending
     )
     {
-        var state = new State<T>(convert, acceptErrorStatus);
+        var state = new State<T>(convert);
         var root = GCHandle.Alloc(state);
         *completion = new mln_completion
         {
@@ -197,15 +198,13 @@ internal static unsafe class NativeCompletion
     internal sealed class State<T> : StateBase
     {
         private readonly CompletionConverter<T> convert;
-        private readonly bool acceptErrorStatus;
         private readonly TaskCompletionSource<T> source = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
 
-        internal State(CompletionConverter<T> convert, bool acceptErrorStatus)
+        internal State(CompletionConverter<T> convert)
         {
             this.convert = convert;
-            this.acceptErrorStatus = acceptErrorStatus;
         }
 
         internal Task<T> Task => source.Task;
@@ -215,10 +214,11 @@ internal static unsafe class NativeCompletion
             T value;
             try
             {
-                if (!acceptErrorStatus && result->status != (int)mln_status.MLN_STATUS_OK)
+                if (result->status != (int)mln_status.MLN_STATUS_OK)
                     NativeStatus.Check(
                         result->status,
-                        ValueStructs.CopyUtf8View(result->diagnostic)
+                        ValueStructs.CopyUtf8View(result->diagnostic),
+                        result->generation
                     );
                 value = convert(result);
             }

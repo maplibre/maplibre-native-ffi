@@ -71,16 +71,14 @@ public sealed class GeneratedValueTests
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
         // A source ID crosses as an explicit-length view, so an embedded NUL is part of the ID.
-        var added = await fixture.Map.AddStyleSourceJsonAsync("before\0after", EmptyGeoJsonSource);
-        Assert.Equal(CommandDisposition.Committed, added.Disposition);
+        await fixture.Map.AddStyleSourceJsonAsync("before\0after", EmptyGeoJsonSource);
         Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after"));
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
         // An omitted optional ID crosses as the empty view, which appends the layer.
-        var appended = await fixture.Map.AddStyleLayerJsonAsync(
+        await fixture.Map.AddStyleLayerJsonAsync(
             """{"id":"last","type":"background"}"""u8.ToArray()
         );
-        Assert.Equal(CommandDisposition.Committed, appended.Disposition);
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.
         var error = Assert.Throws<MaplibreException>(() =>

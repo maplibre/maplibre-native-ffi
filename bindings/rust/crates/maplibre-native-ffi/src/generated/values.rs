@@ -604,9 +604,8 @@ native_enum! {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
 pub enum CommandDisposition: u32 {
     Committed = 0,
-    Superseded = 1,
-    Failed = 2,
-    Cancelled = 3,
+    Failed = 1,
+    Cancelled = 2,
 } Unknown
 }
 impl Default for CommandDisposition {

@@ -13,7 +13,7 @@ public sealed class CallbackLifetimeTests
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
         var (added, accepted) = AddCapturingSource(fixture.Map, new CustomGeometrySourceOptions());
-        Assert.Equal(CommandDisposition.Committed, (await added).Disposition);
+        await added;
         Assert.True(Gc.IsAlive(accepted));
 
         // Removing the source is what makes native release the registration.
@@ -73,7 +73,7 @@ public sealed class CallbackLifetimeTests
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
         var ends = new System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd>();
         var (started, captured) = StartCapturingEase(fixture.Map, ends);
-        Assert.Equal(CommandDisposition.Committed, (await started).Disposition);
+        await started;
         Assert.True(Gc.IsAlive(captured));
 
         // The handler runs before the cancellation completes.
@@ -158,13 +158,12 @@ public sealed class CallbackLifetimeTests
         var map = runtime.CreateMap(NativeFixture.SmallMap);
         map.Ready.GetAwaiter().GetResult();
         map.SetStyleJsonAsync(NativeFixture.EmptyStyle).GetAwaiter().GetResult();
-        var added = map.AddCustomGeometrySourceAsync(
+        map.AddCustomGeometrySourceAsync(
                 "captured-map",
                 new CustomGeometrySourceOptions { FetchTile = _ => GC.KeepAlive(map) }
             )
             .GetAwaiter()
             .GetResult();
-        Assert.Equal(CommandDisposition.Committed, added.Disposition);
         return new WeakReference(map);
     }
 }

@@ -2054,9 +2054,8 @@ pub const CanonicalTileId = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
 pub const CommandDisposition = enum(u32) {
     committed = 0,
-    superseded = 1,
-    failed = 2,
-    cancelled = 3,
+    failed = 1,
+    cancelled = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;

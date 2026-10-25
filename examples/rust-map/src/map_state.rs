@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase,
-    LatLng, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeHandle, RuntimeOptions,
-    ScreenPoint,
+    LatLng, MapHandle, MapMode, MapOptions, NativeFuture, RuntimeEventMask, RuntimeHandle,
+    RuntimeOptions, ScreenPoint,
 };
 
 use crate::render_target::extent;
@@ -46,15 +46,7 @@ impl MapState {
                 return Err(message.into());
             }
         };
-        let ready = ready
-            .wait(Duration::from_secs(30))
-            .unwrap_or_else(|_| {
-                Err(maplibre_native_ffi::Error::new(
-                    maplibre_native_ffi::Status::NotReady,
-                    "map creation timed out",
-                ))
-            })
-            .map_err(|error| format!("map creation failed: {error}"));
+        let ready = wait(ready).map_err(|error| format!("map creation failed: {error}"));
         // The map is ours from the call, so a failed creation still closes it.
         let mut state = Self { map, runtime };
         if let Err(mut message) = ready.and_then(|()| {
@@ -169,13 +161,17 @@ impl MapState {
     }
 
     fn configure(&mut self) -> Result<(), Box<dyn Error>> {
-        if crate::smoke_test() {
-            self.map
-                .discarding()
-                .set_style_json(SMOKE_STYLE_JSON.as_bytes())?;
+        // A style that fails to apply leaves nothing to render, so its command
+        // is awaited. The commands after it are fire-and-forget, and native
+        // logs any that fails.
+        let style = if crate::smoke_test() {
+            self.map.set_style_json(SMOKE_STYLE_JSON.as_bytes())
         } else {
-            self.map.discarding().set_style_url(STYLE_URL)?;
-        }
+            self.map.set_style_url(STYLE_URL)
+        };
+        style
+            .and_then(wait)
+            .map_err(|error| format!("style load failed: {error}"))?;
         let camera = CameraOptions {
             center: Some(LatLng::new(37.7749, -122.4194)),
             zoom: Some(13.0),
@@ -191,6 +187,16 @@ impl MapState {
         self.map.discarding().request_repaint()?;
         Ok(())
     }
+}
+
+/// Waits for a startup operation, which the runtime's own thread completes.
+fn wait<T>(operation: NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
+    operation.wait(Duration::from_secs(30)).unwrap_or_else(|_| {
+        Err(maplibre_native_ffi::Error::new(
+            maplibre_native_ffi::Status::NotReady,
+            "timed out",
+        ))
+    })
 }
 
 fn animation(duration_ms: f64) -> AnimationOptions {

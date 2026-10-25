@@ -121,15 +121,10 @@ impl<'a, H: NativeHandle> Call<'a, H> {
     }
 
     pub(crate) fn command(
-        mut self,
+        self,
         submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let native = self.native;
-        let future = completion::submit_command(|completion, diagnostic| {
-            submit(native, completion, diagnostic)
-        })?;
-        self.arena.accept_registrations();
-        Ok(future)
+        self.complete(submit, completion::command)
     }
 
     pub(crate) fn discard(

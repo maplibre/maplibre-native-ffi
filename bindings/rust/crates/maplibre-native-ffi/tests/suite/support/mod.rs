@@ -443,10 +443,7 @@ impl Fixture {
     pub fn load_style(&self, style_json: &str) {
         let loaded = self.map().set_style_json(style_json.as_bytes()).unwrap();
         self.await_event_type(RuntimeEventType::MapStyleLoaded);
-        assert_eq!(
-            wait_for(Ok(loaded)).disposition,
-            CommandDisposition::Committed
-        );
+        wait_for(Ok(loaded));
     }
 }
 

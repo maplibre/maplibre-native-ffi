@@ -13,15 +13,18 @@ use crate::convert::{FromNative, from_native};
 use crate::handle::lock;
 use crate::{Error, Result};
 
-/// Metadata reported when an ordered command commits.
+/// The generations that a committed command published, which are zero unless
+/// it is a map command.
+///
+/// A command's future resolves to an [`Error`] instead when the command fails
+/// or is cancelled, carrying its status, diagnostic, and generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandCompletion {
-    pub disposition: crate::CommandDisposition,
+    /// The map snapshot generation that the command published.
     pub generation: u64,
-    /// The first map render update that includes the command.
+    /// The first map render update that includes the command; compare it with
+    /// a rendered frame's `map_update_generation`.
     pub render_update_generation: u64,
-    pub raw_status: i32,
-    pub diagnostic: String,
 }
 
 struct State<T> {
@@ -35,10 +38,12 @@ type Converter<T> = Box<dyn FnOnce(&sys::mln_completion_result) -> Result<T> + S
 struct Bridge<T> {
     state: Arc<State<T>>,
     convert: Mutex<Option<Converter<T>>>,
-    accept_error_status: bool,
 }
 
 /// A one-shot native completion exposed as a Rust future.
+///
+/// The future resolves to an [`Error`] when the operation fails, which for a
+/// command means it failed or was cancelled.
 ///
 /// Native has accepted the operation by the time the call that returns this
 /// future returns, and runs it whether or not anything awaits the result.
@@ -107,7 +112,7 @@ unsafe extern "C" fn complete<T>(
     let bridge = unsafe { &*user_data.cast::<Bridge<T>>() };
     // SAFETY: completion result is borrowed for this callback.
     let raw = unsafe { &*result };
-    let converted = if raw.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
+    let converted = if raw.status == sys::MLN_STATUS_OK {
         match lock(&bridge.convert).take() {
             Some(convert) => match catch_unwind(AssertUnwindSafe(|| convert(raw))) {
                 Ok(result) => result,
@@ -126,10 +131,11 @@ unsafe extern "C" fn complete<T>(
             )),
         }
     } else {
-        Err(Error::from_status_and_diagnostic(
-            raw.status,
-            copy_diagnostic(raw),
-        ))
+        Err(Error::Status {
+            status: crate::Status::from_raw(raw.status),
+            diagnostic: copy_diagnostic(raw),
+            generation: raw.generation,
+        })
     };
     *lock(&bridge.state.result) = Some(converted);
     bridge.state.ready.notify_all();
@@ -153,27 +159,9 @@ unsafe extern "C" fn release<T>(user_data: *mut c_void) {
 }
 
 /// Submits one native operation whose completion carries a value or nothing.
-/// A failed completion resolves the future as an error.
+/// A failed completion, including a command that fails or is cancelled,
+/// resolves the future as an error.
 pub(crate) fn submit<T, S, C>(submit: S, convert: C) -> Result<NativeFuture<T>>
-where
-    T: Send + 'static,
-    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-    C: FnOnce(&sys::mln_completion_result) -> Result<T> + Send + 'static,
-{
-    submit_with(submit, convert, false)
-}
-
-/// Submits one ordered command whose completion reports its own disposition
-/// and status, so a rejected command resolves the future rather than failing
-/// it.
-pub(crate) fn submit_command<S>(submit: S) -> Result<NativeFuture<CommandCompletion>>
-where
-    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-{
-    submit_with(submit, command, true)
-}
-
-fn submit_with<T, S, C>(submit: S, convert: C, accept_error_status: bool) -> Result<NativeFuture<T>>
 where
     T: Send + 'static,
     S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
@@ -187,7 +175,6 @@ where
     let bridge = Box::new(Bridge {
         state: Arc::clone(&state),
         convert: Mutex::new(Some(Box::new(convert))),
-        accept_error_status,
     });
     let bridge = Box::into_raw(bridge);
     let completion = sys::mln_completion {
@@ -218,11 +205,8 @@ pub(crate) fn unit(result: &sys::mln_completion_result) -> Result<()> {
 pub(crate) fn command(result: &sys::mln_completion_result) -> Result<CommandCompletion> {
     unit(result)?;
     Ok(CommandCompletion {
-        disposition: crate::CommandDisposition::from_raw(result.disposition),
         generation: result.generation,
         render_update_generation: result.render_update_generation,
-        raw_status: result.status,
-        diagnostic: copy_diagnostic(result),
     })
 }
 
@@ -321,20 +305,24 @@ mod tests {
         release_user_data: sys::mln_user_data_release,
     }
 
+    /// A completion result with `status` and nothing else.
+    fn result(status: sys::mln_status) -> sys::mln_completion_result {
+        // SAFETY: an all-zero completion result is a valid empty result.
+        let mut result = unsafe { std::mem::zeroed::<sys::mln_completion_result>() };
+        result.size = std::mem::size_of::<sys::mln_completion_result>() as u32;
+        result.status = status;
+        result
+    }
+
     impl AcceptedSubmission {
         fn deliver(&self, status: sys::mln_status) {
+            self.deliver_result(&result(status));
+        }
+
+        fn deliver_result(&self, result: &sys::mln_completion_result) {
             // SAFETY: the descriptor owns user_data from acceptance through
             // release, and this is the one completion it delivers.
-            let mut result = unsafe { std::mem::zeroed::<sys::mln_completion_result>() };
-            result.size = std::mem::size_of::<sys::mln_completion_result>() as u32;
-            result.status = status;
-            result.disposition = if status == sys::MLN_STATUS_OK {
-                sys::MLN_COMMAND_DISPOSITION_COMMITTED
-            } else {
-                sys::MLN_COMMAND_DISPOSITION_FAILED
-            };
-            // SAFETY: as above.
-            unsafe { self.callback.unwrap()(self.user_data, &result) };
+            unsafe { self.callback.unwrap()(self.user_data, result) };
         }
 
         fn release(&self) {
@@ -346,13 +334,13 @@ mod tests {
 
     /// Accepts a submission without calling native, returning the future and
     /// the descriptor native would own.
-    fn accept<T, C>(convert: C, accept_error_status: bool) -> (NativeFuture<T>, AcceptedSubmission)
+    fn accept<T, C>(convert: C) -> (NativeFuture<T>, AcceptedSubmission)
     where
         T: Send + 'static,
         C: FnOnce(&sys::mln_completion_result) -> Result<T> + Send + 'static,
     {
         let mut accepted = None;
-        let future = submit_with(
+        let future = submit(
             |completion, _| {
                 // SAFETY: submit borrows a complete descriptor for this call.
                 let completion = unsafe { &*completion };
@@ -364,7 +352,6 @@ mod tests {
                 sys::MLN_STATUS_OK
             },
             convert,
-            accept_error_status,
         )
         .unwrap();
         (future, accepted.unwrap())
@@ -387,7 +374,7 @@ mod tests {
             }
         }
 
-        let (future, accepted) = accept(unit, false);
+        let (future, accepted) = accept(unit);
         let waker = Arc::new(CountingWaker(AtomicUsize::new(0)));
         let context_waker = Waker::from(Arc::clone(&waker));
         let mut context = Context::from_waker(&context_waker);
@@ -453,13 +440,10 @@ mod tests {
     fn a_panicking_converter_completes_with_an_error_before_native_release() {
         let dropped = Arc::new(AtomicBool::new(false));
         let probe = DropProbe(Arc::clone(&dropped));
-        let (future, accepted) = accept(
-            move |_| -> Result<()> {
-                let _probe = probe;
-                panic!("converter panic");
-            },
-            false,
-        );
+        let (future, accepted) = accept(move |_| -> Result<()> {
+            let _probe = probe;
+            panic!("converter panic");
+        });
         accepted.deliver(sys::MLN_STATUS_OK);
         assert_eq!(
             completed(future).unwrap_err().status(),
@@ -471,7 +455,7 @@ mod tests {
 
     #[test]
     fn a_wait_gives_the_future_back_until_native_completes_it() {
-        let (future, accepted) = accept(unit, false);
+        let (future, accepted) = accept(unit);
 
         // Nothing has completed, so the wait ends without a result.
         let future = future.wait(Duration::ZERO).unwrap_err();
@@ -482,21 +466,48 @@ mod tests {
     }
 
     #[test]
-    fn a_command_reports_a_rejection_while_other_operations_fail() {
-        // A command's completion carries its own disposition and status, so a
-        // rejected command resolves rather than failing the future.
-        let (command, accepted) = accept(super::command, true);
-        accepted.deliver(sys::MLN_STATUS_INVALID_ARGUMENT);
-        let completion = completed(command).unwrap();
-        assert_eq!(completion.disposition, crate::CommandDisposition::Failed);
-        assert_eq!(completion.raw_status, sys::MLN_STATUS_INVALID_ARGUMENT);
-        accepted.release();
+    fn a_failed_or_cancelled_command_fails_its_wait_with_its_status_diagnostic_and_generation() {
+        let diagnostic = b"style parse failed";
+        let mut failed = result(sys::MLN_STATUS_INVALID_ARGUMENT);
+        failed.disposition = sys::MLN_COMMAND_DISPOSITION_FAILED;
+        failed.generation = 7;
+        failed.diagnostic = sys::mln_buffer_view {
+            data: diagnostic.as_ptr().cast(),
+            size: diagnostic.len(),
+        };
+        let mut cancelled = result(sys::MLN_STATUS_CANCELLED);
+        cancelled.disposition = sys::MLN_COMMAND_DISPOSITION_CANCELLED;
+        for (delivered, status, diagnostic, generation) in [
+            (
+                failed,
+                crate::Status::InvalidArgument,
+                "style parse failed",
+                7,
+            ),
+            (cancelled, crate::Status::Cancelled, "", 0),
+        ] {
+            let (future, accepted) = accept(command);
+            accepted.deliver_result(&delivered);
+            let error = completed(future).unwrap_err();
+            assert_eq!(error.status(), status);
+            assert_eq!(error.diagnostic(), diagnostic);
+            assert_eq!(error.generation(), generation);
+            accepted.release();
+        }
 
-        // Every other operation reports a failed completion as an error.
-        let (operation, accepted) = accept(unit, false);
-        accepted.deliver(sys::MLN_STATUS_INVALID_ARGUMENT);
-        let error = completed(operation).unwrap_err();
-        assert_eq!(error.status(), crate::Status::InvalidArgument);
+        // Only a committed command resolves, with the generations it published.
+        let mut committed = result(sys::MLN_STATUS_OK);
+        committed.generation = 8;
+        committed.render_update_generation = 3;
+        let (future, accepted) = accept(command);
+        accepted.deliver_result(&committed);
+        assert_eq!(
+            completed(future).unwrap(),
+            CommandCompletion {
+                generation: 8,
+                render_update_generation: 3,
+            }
+        );
         accepted.release();
     }
 
@@ -504,7 +515,7 @@ mod tests {
     fn a_wait_times_out_and_a_dropped_future_leaves_native_its_bridge() {
         let dropped = Arc::new(AtomicBool::new(false));
         let probe = DropProbe(Arc::clone(&dropped));
-        let (future, accepted) = accept(move |_| Ok(probe), false);
+        let (future, accepted) = accept(move |_| Ok(probe));
 
         // Nothing has completed, so a bounded wait gives up.
         let future = future.wait(Duration::ZERO).unwrap_err();

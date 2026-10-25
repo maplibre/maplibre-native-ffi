@@ -21,8 +21,6 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.assertCommitted
-import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
 
@@ -94,9 +92,7 @@ class HandleLifecycleTest {
     // stays usable.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     runtime.getEventMask()
-    assertCommitted(
-      runtime.clearResourceTransform().awaitWithin("a command on the refused runtime"),
-    )
+    runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")
@@ -155,7 +151,7 @@ class HandleLifecycleTest {
     RuntimeFixture.use {
       val (map, ready) = runtime.createMap(smallMapOptions())
       ready.awaitWithin("the map")
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
+      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).await()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
       assertEquals(map.id, event.source)
       map.release().awaitWithin("the map release")
@@ -172,7 +168,7 @@ class HandleLifecycleTest {
       // runtime is still reachable through its map.
       assertTrue(awaitCollected(unreferencedObject()), "the collector never ran")
       assertFalse(runtime.isCleared, "a live map let its runtime be collected")
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
+      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).await()
     } finally {
       map.release().awaitWithin("the map release")
       (runtime.value as RuntimeHandle?)?.release()?.awaitWithin("the runtime release")

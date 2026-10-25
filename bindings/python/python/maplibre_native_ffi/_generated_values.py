@@ -241,9 +241,8 @@ class CommandDisposition(UnknownIntEnum):
     """
 
     COMMITTED = 0
-    SUPERSEDED = 1
-    FAILED = 2
-    CANCELLED = 3
+    FAILED = 1
+    CANCELLED = 2
 
 
 class ConstrainMode(UnknownIntEnum):

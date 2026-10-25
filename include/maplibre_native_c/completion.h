@@ -18,9 +18,8 @@ extern "C" {
 /** Terminal dispositions reported by command completions. */
 typedef enum mln_command_disposition : uint32_t {
   MLN_COMMAND_DISPOSITION_COMMITTED = 0,
-  MLN_COMMAND_DISPOSITION_SUPERSEDED = 1,
-  MLN_COMMAND_DISPOSITION_FAILED = 2,
-  MLN_COMMAND_DISPOSITION_CANCELLED = 3,
+  MLN_COMMAND_DISPOSITION_FAILED = 1,
+  MLN_COMMAND_DISPOSITION_CANCELLED = 2,
 } mln_command_disposition;
 
 /**

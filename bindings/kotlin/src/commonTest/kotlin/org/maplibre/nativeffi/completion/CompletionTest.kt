@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.completion
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -28,8 +29,6 @@ import org.maplibre.nativeffi.internal.call.nativeUnit
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.awaitCommitted
-import org.maplibre.nativeffi.runtime.awaitFailed
 import org.maplibre.nativeffi.withMap
 
 /** How a native completion reaches Kotlin as a Deferred. */
@@ -83,7 +82,7 @@ class CompletionTest {
         .setEventHandler(
           RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it.type) } },
         )
-        .awaitCommitted()
+        .await()
       val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()
       val style = map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray())
       // The handler runs inside native's completion, after the callbacks for the command's events.
@@ -96,11 +95,15 @@ class CompletionTest {
   }
 
   @Test
-  fun aFailedCommandArrivesAsDataRatherThanAnException() = runSuspendTest {
+  fun aFailedCommandFailsItsDeferredWithItsStatusAndGeneration() = runSuspendTest {
     withMap {
       loadStyle()
-      // awaitFailed returns the FAILED disposition with its status and diagnostic.
-      map.removeStyleSource("missing").awaitFailed(Status.NOT_FOUND)
+      val failure =
+        assertFailsWithStatus(Status.NOT_FOUND) { map.removeStyleSource("missing").await() }
+      assertTrue(failure.diagnostic.isNotEmpty(), "a failed command carries its diagnostic")
+      // The command ran and published the generation the map now reports.
+      assertNotEquals(0uL, failure.generation)
+      assertEquals(map.getSnapshot().generation, failure.generation)
     }
   }
 

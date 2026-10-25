@@ -20,7 +20,7 @@
 # Completions
 "COMP-01" = "A completion delivers exactly once, and a value that fails to convert is reported"
 "COMP-02" = "A submission the native side rejects frees the binding's completion state"
-"COMP-04" = "A failed command disposition arrives as data, not as an error"
+"COMP-04" = "A failed or cancelled command fails its wait with the binding's error, carrying its status, diagnostic, and generation"
 "COMP-05" = "Waiting on a completion can time out or be cancelled in the language's idiom"
 "COMP-06" = "A discarded command applies its change and a later command completion on the same map fences it; a synchronously rejected discarded command raises the binding's error"
 

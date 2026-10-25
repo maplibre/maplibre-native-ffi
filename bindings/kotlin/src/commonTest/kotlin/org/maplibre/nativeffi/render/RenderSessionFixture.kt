@@ -26,7 +26,6 @@ import org.maplibre.nativeffi.generated.RenderSessionState
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
-import org.maplibre.nativeffi.runtime.assertCommitted
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
@@ -92,7 +91,7 @@ internal class RenderSessionFixture(
 
   /** Loads [json] as the map's style, servicing the session while the command runs. */
   suspend fun setStyle(json: String) {
-    assertCommitted(complete(mapFixture.map.setStyleJson(json.encodeToByteArray()), "the style"))
+    complete(mapFixture.map.setStyleJson(json.encodeToByteArray()), "the style")
   }
 
   /** Renders the still image [still] owes a static map, and waits for it to complete. */
