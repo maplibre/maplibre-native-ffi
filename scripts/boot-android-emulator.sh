@@ -210,7 +210,10 @@ else
   echo "Started Android emulator $avd_name as process $pid at $serial."
 fi
 
-for ((attempt = 0; attempt < 600; attempt++)); do
+# A check can wait on a call that misses its deadline, so the wait is bounded by
+# the clock rather than by the number of checks.
+deadline=$((SECONDS + 600))
+while ((SECONDS < deadline)); do
   if serial=$(ready_serial); then
     echo "Android emulator $avd_name is ready at $serial."
     exit 0

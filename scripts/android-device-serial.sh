@@ -18,14 +18,21 @@ avd_name="api-$api-$abi"
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 [[ -x "$adb" ]] || exit 1
 
+# A call to an emulator that is still booting can block indefinitely, and a
+# boot waits by asking again, so each call that misses its deadline answers
+# that no emulator is ready yet.
+bounded_adb() {
+  perl -e 'alarm shift; exec @ARGV' 30 "$adb" "$@" </dev/null 2>/dev/null
+}
+
 # Whoever started the emulator, its console names the AVD it runs.
 while read -r serial _; do
   [[ "$serial" == emulator-* ]] || continue
-  if [[ "$("$adb" -s "$serial" emu avd name </dev/null 2>/dev/null | sed -n 's/\r$//;1p')" == "$avd_name" ]] &&
-    "$adb" -s "$serial" shell getprop sys.boot_completed </dev/null 2>/dev/null |
+  if [[ "$(bounded_adb -s "$serial" emu avd name | sed -n 's/\r$//;1p')" == "$avd_name" ]] &&
+    bounded_adb -s "$serial" shell getprop sys.boot_completed |
     tr -d '\r' | grep -qx 1; then
     printf '%s\n' "$serial"
     exit 0
   fi
-done < <("$adb" devices | tr -d '\r')
+done < <(bounded_adb devices | tr -d '\r')
 exit 1
