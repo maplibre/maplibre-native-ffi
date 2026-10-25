@@ -21,11 +21,16 @@ final NativeFinalizer _ownerFinalizer = NativeFinalizer(
 /// shuts down, so the warning is a best-effort report.
 final Finalizer<String> _leakReporter = Finalizer((message) {
   try {
+    leakReportObserver?.call(message);
     stderr.writeln(message);
   } catch (_) {
     // A report has nowhere to go once standard error fails.
   }
 });
+
+/// Sees each leak report before it is written to standard error. Tests read
+/// reports here instead of overriding standard error.
+void Function(String message)? leakReportObserver;
 
 const _createOwnerToken = raw.mln_binding_owner_token_create;
 

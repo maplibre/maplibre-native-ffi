@@ -2,11 +2,11 @@
 // owner it reclaims.
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
+import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:test/test.dart';
 
@@ -69,25 +69,6 @@ bool _runtimeIsLive(int runtime) => withNativeArena((arena) {
       raw.MLN_STATUS_OK;
 });
 
-/// Collects what the binding writes to standard error.
-final class _CapturedStderr implements Stdout {
-  final lines = <String>[];
-
-  @override
-  void writeln([Object? object = '']) => lines.add('$object');
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-final class _StderrOverrides extends IOOverrides {
-  _StderrOverrides(this._stderr);
-  final Stdout _stderr;
-
-  @override
-  Stdout get stderr => _stderr;
-}
-
 final class _WakeReceiver {
   final calls = StreamController<void>();
 
@@ -113,11 +94,11 @@ Future<void> _collectUnrootedObjects() {
 
 void main() {
   // Capture the leak reports from tests that abandon owners.
-  late _CapturedStderr errors;
+  late List<String> leaks;
   setUp(() {
-    errors = _CapturedStderr();
-    IOOverrides.global = _StderrOverrides(errors);
-    addTearDown(() => IOOverrides.global = null);
+    leaks = [];
+    leakReportObserver = leaks.add;
+    addTearDown(() => leakReportObserver = null);
   });
 
   test(
@@ -132,7 +113,7 @@ void main() {
       // runtime without any Dart code on the stack. The binding's Dart
       // finalizer reports the leak afterwards, from the event loop.
       await collectGarbageUntil(
-        () => runtime.target == null && errors.lines.contains(leak),
+        () => runtime.target == null && leaks.contains(leak),
         'the abandoned runtime and its leak report',
       );
       expect(_runtimeIsLive(identity), isFalse);

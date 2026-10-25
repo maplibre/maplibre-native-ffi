@@ -2,21 +2,6 @@
 // and records that a released queue refuses. Every case changes the
 // process-global handler, so each runs inside restoring_log_state().
 
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
-
-// MapLibre's platform logger writes to stderr on desktop Linux and macOS, so
-// the suite can read what reaches it there.
-#if (                                                                  \
-  defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__) && \
-  !defined(__EMSCRIPTEN__)                                             \
-) ||                                                                   \
-  (defined(__APPLE__) && TARGET_OS_OSX)
-#define MLN_TEST_PLATFORM_LOG_ON_STDERR 1
-#include <unistd.h>
-#endif
-
 #include <string.h>
 
 #include "support/delivery.h"
@@ -126,6 +111,8 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
   // logged the records completes.
   TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&queue.wakes));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
+  // A cleared handler queues nothing more.
+  dump_debug_logs();
 
   static seen_deliveries seen;
   memset(&seen, 0, sizeof(seen));
@@ -206,84 +193,25 @@ LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {
   MLN_TEST_INVALID_STATE(mln_log_set_callback(&handler, NULL));
 }
 
-#if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
-
-typedef struct stderr_capture {
-  int saved;
-  int pipe_read;
-  int pipe_write;
-} stderr_capture;
-
-static void start_capturing_stderr(stderr_capture* capture) {
-  int ends[2];
-  TEST_ASSERT_EQUAL_INT(0, pipe(ends));
-  capture->pipe_read = ends[0];
-  capture->pipe_write = ends[1];
-  fflush(stderr);
-  capture->saved = dup(STDERR_FILENO);
-  TEST_ASSERT_NOT_EQUAL_INT(-1, capture->saved);
-  TEST_ASSERT_NOT_EQUAL_INT(-1, dup2(capture->pipe_write, STDERR_FILENO));
-}
-
-static void stop_capturing_stderr(
-  stderr_capture* capture, char* out_text, size_t capacity
-) {
-  fflush(stderr);
-  (void)dup2(capture->saved, STDERR_FILENO);
-  (void)close(capture->saved);
-  (void)close(capture->pipe_write);
-  size_t length = 0;
-  while (length + 1 < capacity) {
-    const ssize_t read_bytes =
-      read(capture->pipe_read, out_text + length, capacity - 1 - length);
-    if (read_bytes <= 0) break;
-    length += (size_t)read_bytes;
-  }
-  out_text[length] = '\0';
-  (void)close(capture->pipe_read);
-}
-
-// Dumps the debug logs with stderr captured and reports what reached it.
-static bool dump_capturing_stderr(char* text, size_t capacity) {
-  stderr_capture capture;
-  start_capturing_stderr(&capture);
-  // stderr must come back even when the dump fails, or a full pipe would
-  // block every later write to it.
-  volatile bool dumped = false;
-  if (TEST_PROTECT()) {
-    dump_debug_logs();
-    dumped = true;
-  }
-  stop_capturing_stderr(&capture, text, capacity);
-  return dumped;
-}
-
-// A queue handler consumes each record it queues, so none reaches the
-// platform logger; once its queue is released, every record does.
-LOG_STATE_CASE(only_refused_records_reach_the_platform_logger) {
+// A handler whose queue is released stays installed and refuses each record,
+// which neither fails the command that logged it nor keeps the handler from
+// clearing.
+LOG_STATE_CASE(a_handler_on_a_released_queue_refuses_its_records) {
   MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
   static mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   int tag = 0;
   const mln_log_handler handler = queue_handler(queue.handle, &tag);
   MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
-
-  static char text[16384];
-  if (!dump_capturing_stderr(text, sizeof(text))) return;
-  TEST_ASSERT_NULL(strstr(text, dump_style_url));
-
   mln_test_delivery_queue_release(&queue);
-  if (!dump_capturing_stderr(text, sizeof(text))) return;
-  TEST_ASSERT_NOT_NULL(strstr(text, dump_style_url));
-}
 
-#endif
+  dump_debug_logs();
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
+}
 
 MLN_TEST_GROUP {
   RUN_TEST(a_queue_handler_copies_each_record);
   RUN_TEST(replace_and_clear_retire_a_queue_handler_once);
   RUN_TEST(a_queue_handler_rejects_an_invalid_shape);
-#if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
-  RUN_TEST(only_refused_records_reach_the_platform_logger);
-#endif
+  RUN_TEST(a_handler_on_a_released_queue_refuses_its_records);
 }

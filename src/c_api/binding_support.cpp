@@ -1,8 +1,11 @@
 #define MLN_BUILDING_C
 
 #include <cstdint>
-#include <cstdio>
 #include <memory>
+#include <string>
+
+#include <mln/util/event.hpp>
+#include <mln/util/logging.hpp>
 
 #include "maplibre_native_c/binding_support.h"
 
@@ -84,12 +87,14 @@ extern "C" MLN_API void mln_binding_owner_finalize(void* token) noexcept {
         )
       : dispose_handle(owner->handle);
   if (status != MLN_STATUS_OK) {
-    static_cast<void>(std::fprintf(
-      stderr,
-      "maplibre_native_ffi: owner finalization failed for handle %llu "
-      "(status %d)\n",
-      static_cast<unsigned long long>(owner->handle), static_cast<int>(status)
-    ));
+    try {
+      mln::Log::Error(
+        mln::Event::General, "owner finalization failed for handle " +
+                               std::to_string(owner->handle) + " (status " +
+                               std::to_string(status) + ")"
+      );
+    } catch (...) {
+    }
   }
 }
 

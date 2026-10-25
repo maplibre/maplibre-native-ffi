@@ -46,7 +46,9 @@ MLN_API void mln_binding_owner_token_destroy(
  *
  * A render session's retirement keeps its graphics resources until process
  * exit and makes no graphics call after the one in flight. Other behavior
- * follows mln_render_session_dispose().
+ * follows mln_render_session_dispose(). A disposal that fails is logged as an
+ * MLN_LOG_SEVERITY_ERROR record in MLN_LOG_EVENT_GENERAL that names the handle
+ * and status.
  */
 MLN_API void mln_binding_owner_finalize(
   void* token MLN_BINDING("kind=context")

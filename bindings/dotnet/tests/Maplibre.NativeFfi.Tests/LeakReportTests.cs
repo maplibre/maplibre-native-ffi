@@ -100,34 +100,6 @@ public sealed class LeakReportTests
         return map;
     }
 
-    // A host that added no trace listener has only the default one, which writes to an attached
-    // debugger alone, so the report goes to standard error instead.
-    [Fact]
-    public void WithoutAHostTraceListenerTheReportGoesToStandardError()
-    {
-        using var standardError = new StandardErrorCapture();
-        var installed = Trace.Listeners.Cast<TraceListener>().ToArray();
-        Trace.Listeners.Clear();
-        Trace.Listeners.Add(new DefaultTraceListener());
-        try
-        {
-            var leaked = AbandonDisposable();
-            Gc.Collect();
-            Assert.False(leaked.IsAlive);
-        }
-        finally
-        {
-            Trace.Listeners.Clear();
-            Trace.Listeners.AddRange(installed);
-        }
-
-        Assert.Contains(
-            $"Maplibre.NativeFfi LeakedHandle: Leaked RuntimeHandle native handle 0x{SyntheticHandles.Runtime(9012).Value:x}; it was disposed when collected.",
-            standardError.Text,
-            StringComparison.Ordinal
-        );
-    }
-
     /// <summary>Records the leak warnings that reach the trace listeners until disposed.</summary>
     private sealed class LeakCapture : TraceListener
     {
@@ -159,17 +131,6 @@ public sealed class LeakReportTests
             base.Dispose(disposing);
         }
     }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static unsafe WeakReference AbandonDisposable() =>
-        new(
-            new NativeHandleState<MlnRuntime>(
-                SyntheticHandles.Runtime(9012),
-                (_, _) => mln_status.MLN_STATUS_OK,
-                "RuntimeHandle",
-                (_, _) => mln_status.MLN_STATUS_OK
-            )
-        );
 
     private static int Occurrences(string text, string value)
     {

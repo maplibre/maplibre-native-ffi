@@ -40,8 +40,8 @@ struct GlobalStateTests {
     }
   }
 
-  /// A callback's thrown error is reported to standard error, native receives
-  /// the callback's fallback, and the runtime keeps working.
+  /// A callback's thrown error is reported, native receives the callback's
+  /// fallback, and the runtime keeps working.
   @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
     let capture = ReportCapture()
     defer { capture.finish() }

@@ -132,7 +132,63 @@ static void an_owner_token_disposes_its_owner_only_when_finalized(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct finalization_failure_probe {
+  atomic_uint errors;
+  uint32_t severity;
+  uint32_t event;
+  char message[256];
+} finalization_failure_probe;
+
+static uint32_t record_finalization_failure(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)code;
+  finalization_failure_probe* probe = user_data;
+  if (message != NULL && strstr(message, "owner finalization failed") != NULL) {
+    probe->severity = severity;
+    probe->event = event;
+    snprintf(probe->message, sizeof(probe->message), "%s", message);
+    atomic_fetch_add(&probe->errors, 1);
+  }
+  return 1;
+}
+
+// Finalizing a token whose owner no longer exists reports the failed disposal
+// to the log callback, since no caller can receive its status.
+static void a_failed_finalization_logs_one_error(void) {
+  static finalization_failure_probe probe;
+  memset(&probe, 0, sizeof(probe));
+  atomic_init(&probe.errors, 0);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_untracked_map(runtime);
+  void* token = mln_binding_owner_token_create(map);
+  TEST_ASSERT_NOT_NULL(token);
+  mln_test_destroy_map(map);
+
+  // Error records are synchronous under the default async mask.
+  const mln_log_handler handler = {
+    .size = sizeof(mln_log_handler),
+    .callback = record_finalization_failure,
+    .user_data = &probe,
+  };
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+  mln_binding_owner_finalize(token);
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
+
+  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.errors));
+  TEST_ASSERT_EQUAL_UINT32(MLN_LOG_SEVERITY_ERROR, probe.severity);
+  TEST_ASSERT_EQUAL_UINT32(MLN_LOG_EVENT_GENERAL, probe.event);
+  char expected[64];
+  snprintf(
+    expected, sizeof(expected), "handle %llu (status ", (unsigned long long)map
+  );
+  TEST_ASSERT_NOT_NULL(strstr(probe.message, expected));
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(dart_wakes_post_zero_per_wake_and_one_on_release);
   RUN_TEST(an_owner_token_disposes_its_owner_only_when_finalized);
+  RUN_TEST(a_failed_finalization_logs_one_error);
 }

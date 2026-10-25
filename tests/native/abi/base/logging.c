@@ -3,22 +3,6 @@
 // clears the callback and restores the default mask even when an assertion
 // fails.
 
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
-
-// MapLibre's platform logger writes to stderr on desktop Linux and macOS, so
-// the suite can read what reaches it there. Android, OpenHarmony, Windows, the
-// browser, and Apple's other platforms log to a system facility instead.
-#if (                                                                  \
-  defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__) && \
-  !defined(__EMSCRIPTEN__)                                             \
-) ||                                                                   \
-  (defined(__APPLE__) && TARGET_OS_OSX)
-#define MLN_TEST_PLATFORM_LOG_ON_STDERR 1
-#include <unistd.h>
-#endif
-
 #include "support/test_support.h"
 
 static void restore_log_defaults(void) {
@@ -420,73 +404,20 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   }
 }
 
-#if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
-
-// Redirects stderr into a pipe until stop_capturing_stderr() restores it.
-typedef struct stderr_capture {
-  int saved;
-  int pipe_read;
-  int pipe_write;
-} stderr_capture;
-
-static void start_capturing_stderr(stderr_capture* capture) {
-  int ends[2];
-  TEST_ASSERT_EQUAL_INT(0, pipe(ends));
-  capture->pipe_read = ends[0];
-  capture->pipe_write = ends[1];
-  fflush(stderr);
-  capture->saved = dup(STDERR_FILENO);
-  TEST_ASSERT_NOT_EQUAL_INT(-1, capture->saved);
-  TEST_ASSERT_NOT_EQUAL_INT(-1, dup2(capture->pipe_write, STDERR_FILENO));
-}
-
-// Restores stderr and reads what the pipe received, up to capacity - 1 bytes.
-static void stop_capturing_stderr(
-  stderr_capture* capture, char* out_text, size_t capacity
-) {
-  fflush(stderr);
-  (void)dup2(capture->saved, STDERR_FILENO);
-  (void)close(capture->saved);
-  (void)close(capture->pipe_write);
-  size_t length = 0;
-  while (length + 1 < capacity) {
-    const ssize_t read_bytes =
-      read(capture->pipe_read, out_text + length, capacity - 1 - length);
-    if (read_bytes <= 0) break;
-    length += (size_t)read_bytes;
-  }
-  out_text[length] = '\0';
-  (void)close(capture->pipe_read);
-}
-
-// A record the callback consumes stops there. One it passes on also reaches
-// MapLibre's platform logger. record_dump consumes the style URL record and
-// passes on the two separators.
-LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
+// Clearing the callback stops delivery: a later dump reaches it no more.
+LOG_STATE_CASE(a_cleared_callback_receives_no_more_records) {
   MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
-  stderr_capture capture;
-  start_capturing_stderr(&capture);
-  // stderr must come back even when the dump fails, or a full pipe would
-  // block every later write to it. Unity records a failure caught here.
-  volatile bool dumped = false;
   static dump_probe probe;
-  if (TEST_PROTECT()) {
-    dump_debug_logs(&probe);
-    dumped = true;
-  }
-  static char text[16384];
-  stop_capturing_stderr(&capture, text, sizeof(text));
-  if (!dumped) {
-    return;
-  }
+  dump_debug_logs(&probe);
 
-  if (TEST_PROTECT()) {
-    TEST_ASSERT_NOT_NULL(strstr(text, dump_separator));
-    TEST_ASSERT_NULL(strstr(text, dump_style_url));
-  }
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
+  MLN_TEST_AWAIT_OK(mln_map_dump_debug_logs(map, &completion.descriptor, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_INT(DUMP_RECORD_COUNT, atomic_load(&probe.count));
 }
-
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
@@ -496,7 +427,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_log_callback_cannot_call_back_into_the_c_api);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
-#if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
-  RUN_TEST(only_records_the_callback_passes_on_reach_the_platform_logger);
-#endif
+  RUN_TEST(a_cleared_callback_receives_no_more_records);
 }

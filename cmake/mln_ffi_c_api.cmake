@@ -279,6 +279,7 @@ function(mln_ffi_add_c_api_library target)
   if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     mln_ffi_add_c_api_framework(${target}_framework
                                 ${MLN_FFI_C_API_OBJECT_TARGET})
+    mln_ffi_configure_coverage_library(${target}_framework)
   endif()
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
