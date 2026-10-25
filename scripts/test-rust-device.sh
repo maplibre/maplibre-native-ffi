@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Cross-compiles the Rust binding tests for an Android preset or OpenHarmony x64
-# preset and runs them in the matching emulator, one executable per crate.
+# Cross-compiles the Rust binding tests for an Android, OpenHarmony x64, or iOS
+# simulator preset and runs them in the matching emulator or simulator, one
+# executable per crate.
 set -euo pipefail
 
-preset=${1:?usage: test-rust-device.sh <android|ohos preset>}
+preset=${1:?usage: test-rust-device.sh <android|ohos|ios-simulator preset>}
 
 case "$preset" in
   android-arm64-*)
@@ -25,8 +26,9 @@ case "$preset" in
     echo "The OpenHarmony emulator runs an x64 guest; check $preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
     exit 2
     ;;
+  ios-simulator-*) ;;
   *)
-    echo "Not an Android or OpenHarmony preset: $preset" >&2
+    echo "Not an Android, OpenHarmony, or iOS simulator preset: $preset" >&2
     exit 2
     ;;
 esac
@@ -68,6 +70,18 @@ while IFS= read -r test_binary || [[ -n "$test_binary" ]]; do
     test_binaries+=("$test_binary")
   fi
 done <"$test_manifest"
+if [[ "$preset" == ios-simulator-* ]]; then
+  # The simulator reads the host's file system, so the test binaries locate the
+  # C API library in the install as the host suite does. simctl passes each
+  # SIMCTL_CHILD_ variable to the process without the prefix.
+  export SIMCTL_CHILD_DYLD_LIBRARY_PATH="$native_install_dir/lib"
+  mise run //:ios-simulator:boot
+  for test_binary in ${test_binaries[@]+"${test_binaries[@]}"}; do
+    "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      "$test_binary" "$timeout_seconds"
+  done
+  exit 0
+fi
 if [[ "$preset" == android-* ]]; then
   emulator_args=()
   if [[ "$preset" == android-x64-egl ]]; then

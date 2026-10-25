@@ -258,6 +258,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/swift:build {preset}",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
+                f"mise run //bindings/rust:build {preset}",
             ]
         )
     elif target_platform == "ios-simulator":
@@ -267,6 +268,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/swift:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
                 f"mise run //bindings/dart:test:ios {preset}",
+                f"mise run //bindings/rust:test {preset}",
             ]
         )
     elif target_platform == "ios-maccatalyst":

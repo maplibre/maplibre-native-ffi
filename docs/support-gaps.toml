@@ -157,12 +157,6 @@ status = "path-known"
 reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
 
 [[gap]]
-language = "rust"
-platform = "ios"
-status = "path-known"
-reason = "Add Apple target and device artifact selection to the build and test tasks, and a simulator runner."
-
-[[gap]]
 language = "swift"
 platform = "android"
 status = "path-known"
