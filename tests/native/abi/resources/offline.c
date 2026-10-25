@@ -576,11 +576,7 @@ static void offline_database_merge_rejects_what_names_no_database_file(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT,
       mln_runtime_merge_offline_regions(
-        runtime,
-        (mln_buffer_view){
-          .data = unreadable_paths[index],
-          .size = strlen(unreadable_paths[index])
-        },
+        runtime, mln_buffer_view_from_cstr(unreadable_paths[index]),
         &completion, MLN_TEST_DIAGNOSTIC
       ),
       unreadable_paths[index]

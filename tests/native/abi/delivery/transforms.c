@@ -427,11 +427,11 @@ static void header_rules_match_the_rewritten_url(void) {
   // rules compared the URL before rewriting.
   const mln_http_header_rule header_rules[] = {
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
-     .url = {.data = original, .size = strlen(original)},
+     .url = mln_buffer_view_from_cstr(original),
      .headers = &original_header,
      .header_count = 1},
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
-     .url = {.data = rewritten, .size = strlen(rewritten)},
+     .url = mln_buffer_view_from_cstr(rewritten),
      .headers = &rewritten_header,
      .header_count = 1},
   };

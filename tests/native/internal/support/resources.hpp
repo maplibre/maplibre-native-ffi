@@ -82,8 +82,7 @@ inline auto start_offline_download(mln_runtime runtime, const char* style_url)
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data = {
       .tile_pyramid = {
-        .style_url =
-          (mln_buffer_view){.data = style_url, .size = strlen(style_url)},
+        .style_url = mln_buffer_view_from_cstr(style_url),
         .bounds =
           {
             .southwest = {.latitude = 1.0, .longitude = 2.0},
