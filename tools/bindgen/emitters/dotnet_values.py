@@ -841,7 +841,7 @@ class Values:
             "registration. Native code releases the context of a call that it accepts,",
             "and the binding calls the release for a call that native code does not",
             "accept. A later call that carries the registration throws an",
-            'invalid-state <see cref="Error.MaplibreException"/> before it reaches',
+            'invalid-state <see cref="MaplibreException"/> before it reaches',
             "native code.",
             "</remarks>",
             *(
