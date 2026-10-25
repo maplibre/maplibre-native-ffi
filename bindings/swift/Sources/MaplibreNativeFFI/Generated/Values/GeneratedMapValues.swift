@@ -447,14 +447,21 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   }
 }
 
+/// Receives the end of one camera command's transitions.
+///
+/// See `mln_camera_transition_end_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public typealias CameraTransitionEndCallback =
+  @Sendable (_ end: CameraTransitionEnd) -> Void
+
 /// Callback or queue state that one camera command copies to report the end of
 /// its transitions.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionHandler: Sendable {
-  public var callback: (@Sendable (CameraTransitionEnd) -> Void)?
-  public init(callback: (@Sendable (CameraTransitionEnd) -> Void)? = nil) {
+  public var callback: CameraTransitionEndCallback?
+  public init(callback: CameraTransitionEndCallback? = nil) {
     self.callback = callback
   }
 

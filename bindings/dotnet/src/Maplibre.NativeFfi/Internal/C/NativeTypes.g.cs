@@ -335,7 +335,7 @@ internal unsafe struct mln_lat_lng_bounds
 internal unsafe struct mln_log_handler
 {
     public uint size;
-    public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback;
+    public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, byte> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;

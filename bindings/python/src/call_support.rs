@@ -270,6 +270,30 @@ fn generated_report_panic(payload: Box<dyn std::any::Any + Send>) {
     });
 }
 
+/// The status that native receives from a status callback that raised. A
+/// raised `MaplibreError` whose status is not OK is a deliberate failure, which
+/// native receives without a report. Any other exception is reported and
+/// answers `failure`.
+fn generated_callback_status(
+    py: Python<'_>,
+    error: PyErr,
+    failure: sys::mln_status,
+) -> sys::mln_status {
+    if error.is_instance_of::<py_errors::MaplibreError>(py) {
+        let status = error
+            .value(py)
+            .getattr("status")
+            .and_then(|status| status.extract::<sys::mln_status>());
+        if let Ok(status) = status
+            && status != sys::MLN_STATUS_OK
+        {
+            return status;
+        }
+    }
+    generated_report_unraisable(py, error);
+    failure
+}
+
 /// Reports an exception that a native callback raised to `sys.unraisablehook`.
 /// The callback scope keeps finalization off the native callback stack.
 fn generated_report_unraisable(py: Python<'_>, error: PyErr) {

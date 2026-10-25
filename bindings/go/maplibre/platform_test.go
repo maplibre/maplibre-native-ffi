@@ -38,7 +38,7 @@ func TestProcessExitsCleanlyWithLiveHandles(t *testing.T) {
 }
 
 func exitWithLiveHandles(t *testing.T) {
-	if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }}); err != nil {
+	if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}

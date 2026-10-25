@@ -55,6 +55,11 @@ def validate(values, plan):
         callback = values.api.callbacks[field.value.native]
         if not callback.context:
             values.fail(plan, "callback requires an explicit context parameter")
+        if any(
+            public_name(n) == public_name(callback.native)
+            for n in values.api.public_values
+        ):
+            values.fail(plan, "the callback protocol collides with a record")
         for parameter in callback.arguments:
             response = parameter.value.unwrapped
             if parameter.direction != "in" and not response.response:
@@ -126,16 +131,7 @@ def sources(values, plan):
             for p in parameters
             if p.value.kind == "handle" and p.value.ownership == "owned"
         ]
-        types = ", ".join(
-            OWNERS[p.value.native] if p in owned else values.type(p.value)
-            for p in parameters
-        )
-        result_type = (
-            "None"
-            if callback.result.native == "void"
-            else values.type(callback.result) + " | None"
-        )
-        fields.append(f"    {name}: Callable[[{types}], {result_type}] | None = None")
+        fields.append(f"    {name}: {public_name(callback.native)} | None = None")
         signature = ", ".join(["self"] + [p.name for p in parameters])
         arguments = ", ".join(
             p.name if p in owned else values.facade_copy(p.value, p.name)
@@ -190,13 +186,6 @@ def sources(values, plan):
         )
         if len(parameters) == 1:
             copied += ","
-        # A callback that returns None answers zero, which is OK for a
-        # status and "not consumed" for a log record.
-        result = (
-            "Ok(())"
-            if callback.result.native == "void"
-            else f"if result.is_none() {{ Ok(0) }} else {{ result.extract::<{ffi_type(callback.result)}>() }}"
-        )
         failure = (
             "()"
             if callback.result.native == "void"
@@ -206,6 +195,16 @@ def sources(values, plan):
                 else callback.failure
             )
         )
+        call = f"callback.bind(py).call1(({copied}))"
+        if callback.result.native == "void":
+            body = f"let _result = {call}?;\n        Ok(())"
+        elif callback.status:
+            # A status callback returns nothing on success and raises to fail.
+            body = f"match {call} {{ Ok(_) => Ok(sys::MLN_STATUS_OK), Err(error) => Ok(generated_callback_status(py, error, {failure})) }}"
+        else:
+            # A callback that returns None answers its failure value, which is
+            # "not consumed" for a log record.
+            body = f"let result = {call}?;\n        if result.is_none() {{ Ok({failure}) }} else {{ result.extract::<{ffi_type(callback.result)}>() }}"
         returns = (
             ""
             if callback.result.native == "void"
@@ -216,8 +215,7 @@ def sources(values, plan):
     let outcome = generated_invoke(|| {{ {unadopted}{"" if unadopted and failure == "()" else failure} }}, |py| {{
         {scope}
         let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({failure}); }};
-        let {"_result" if callback.result.native == "void" else "result"} = callback.bind(py).call1(({copied}))?;
-        {result}
+        {body}
     }});
     outcome
 }}
@@ -295,3 +293,63 @@ def native_sources(plan):
         + "        return value\n"
     )
     return method, cls
+
+
+def protocol_sources(values):
+    """The Protocol of each callback type that a registration holds, whose
+    positional-only parameters keep the C names, so any callable of the same
+    shape satisfies it."""
+    from .python import OWNERS
+
+    natives = sorted(
+        {
+            next(f for f in plan.fields if f.name == name).value.native
+            for plan in values.records.values()
+            if plan.registration
+            for name in plan.registration.callbacks
+        }
+    )
+    classes = []
+    for native in natives:
+        callback = values.api.callbacks[native]
+        parameters = "".join(
+            f", {field_name(p.name)}: "
+            + (
+                OWNERS[p.value.native]
+                if p.value.kind == "handle" and p.value.ownership == "owned"
+                else values.type(p.value)
+            )
+            for p in callback.arguments
+        )
+        if callback.result.native == "void":
+            result, notes = "None", ()
+        elif callback.status:
+            result = "None"
+            fallback = callback.failure.removeprefix("MLN_STATUS_")
+            note = (
+                "Return to succeed. Raising a `MaplibreError` whose status is not "
+                "`Status.OK` fails the call with that status. Any other exception "
+                f"fails it with `Status.{fallback}` and is reported to "
+                "`sys.unraisablehook`."
+            )
+            notes = (note,)
+        else:
+            result = values.type(callback.result) + " | None"
+            note = (
+                f"Returning None answers `{failure_literal(callback)}`, as does "
+                "an exception, which is reported to `sys.unraisablehook`."
+            )
+            notes = (note,)
+        classes.append(
+            f"class {public_name(native)}(Protocol):\n"
+            + docs.docstring(values.api.doc(native), "    ", notes)
+            + f"\n    def __call__(self{parameters}, /) -> {result}: ...\n"
+        )
+    return "\n\n".join(classes)
+
+
+def failure_literal(callback):
+    """The failure value as Python spells it."""
+    if callback.failure in {"true", "false"}:
+        return callback.failure.capitalize()
+    return callback.failure

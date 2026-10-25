@@ -67,6 +67,56 @@ struct GlobalStateTests {
     }
   }
 
+  /// A header transform that throws a `MaplibreError` with a failure status
+  /// fails on purpose, so nothing is reported. Any other thrown error is a bug,
+  /// which is reported to standard error.
+  @Test func aHeaderTransformFailsDeliberatelyWithAStatusAndReportsABug(
+  ) async throws {
+    let capture = try StandardErrorCapture()
+    defer { capture.finish() }
+    // The URLs name a loopback port that nothing serves, so each request fails
+    // after the header transform without leaving the machine.
+    let refused = "http://127.0.0.1:1/refused.json"
+    let broken = "http://127.0.0.1:1/broken.json"
+    try await withMapFixture { fixture in
+      let deny = denyingProvider()
+      try await fixture.runtime.setResourceProvider(ResourceProvider(
+        callback: { request, handle in
+          guard [refused, broken].contains(request.requestedUrl) else {
+            return deny.callback!(request, handle)
+          }
+          try? handle.passThrough()
+        }
+      ))
+      try await fixture.runtime.setHttpHeaderTransform(
+        HttpHeaderTransform(callback: { _, url, _ in
+          if url == refused {
+            throw MaplibreError(
+              status: .invalidArgument,
+              diagnostic: "the transform refused"
+            )
+          }
+          if url == broken {
+            throw MaplibreError(
+              status: .ok,
+              diagnostic: "the transform failed without a status"
+            )
+          }
+        })
+      )
+      for url in [refused, broken] {
+        try await fixture.map.setStyleUrl(url)
+        let failure = try await fixture
+          .awaitEvent("the request to fail") { $0.type == .mapLoadingFailed }
+        #expect(failure != nil)
+      }
+    }
+    await awaitCondition("the bug's report") {
+      capture.text.contains("the transform failed without a status")
+    }
+    #expect(!capture.text.contains("the transform refused"))
+  }
+
   /// Abandoned handles are disposed on a worker and reported once to standard
   /// error.
   @Test func anAbandonedHandleIsDisposedOffTheCallbackStackAndReported(
@@ -103,7 +153,7 @@ private func recordingHandler(
   return LogHandler { severity, _, _, _ in
     withExtendedLifetime(sentinel) {}
     records.update { $0.append(severity) }
-    return 1
+    return true
   }
 }
 

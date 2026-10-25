@@ -16,7 +16,7 @@ internal object WasmUpcalls {
     event: Int,
     code: Long,
     message: Long,
-  ): Int = run {
+  ): Boolean = run {
     upcall<QueuedLogHandler, Boolean>("mln_log_callback", userData, false) { value ->
       value.callback(
         LogSeverity(severity.toUInt()),
@@ -26,6 +26,6 @@ internal object WasmUpcalls {
       )
       true
     }
-    1
+    true
   }
 }

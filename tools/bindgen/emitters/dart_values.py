@@ -1072,7 +1072,10 @@ class Values:
             public = public_name(value.native)
             if value.kind == "callback":
                 callback = self.bound.callbacks[value.native]
-                parameters = ", ".join(self.public(p.value) for p in callback.arguments)
+                parameters = ", ".join(
+                    f"{self.public(p.value)} {identifier(p.name)}"
+                    for p in callback.arguments
+                )
                 declarations.append(f"typedef {public} = void Function({parameters});")
                 if callback.delivery:
                     conversions.append(self.render_delivery(callback))

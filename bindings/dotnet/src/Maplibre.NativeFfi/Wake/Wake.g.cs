@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_wake</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct Wake(Action? Callback)
+public readonly partial record struct Wake(WakeCallback? Callback)
 {
     /// <summary>
     /// Creates a native registration from C functions and a context that the

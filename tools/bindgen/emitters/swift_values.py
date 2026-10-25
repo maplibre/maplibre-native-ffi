@@ -19,9 +19,9 @@ class Values:
         if specialized:
             return specialized
         if value.kind == "callback":
-            from .swift_callbacks import closure_type
+            from .swift_callbacks import alias
 
-            return "(" + closure_type(self, self.bound.callbacks[value.native]) + ")?"
+            return alias(self.bound.callbacks[value.native]) + "?"
         if value.kind == "handle":
             from .swift_ownership import owner_name
 
@@ -73,10 +73,19 @@ class Values:
         self.public(value)
         if value.kind == "callback":
             callback = self.bound.callbacks[value.native]
+            if any(
+                name(native.removeprefix("mln_"))
+                == name(value.native.removeprefix("mln_"))
+                for native in self.bound.public_values
+            ):
+                raise ModelError(
+                    [f"Swift: {value.native}: the type alias collides with a value"]
+                )
             for parameter in callback.arguments:
                 self.add(parameter.value)
             if callback.result.native != "void":
                 self.add(callback.result)
+            self.used[value.native] = value
             return
         if value.kind == "enum":
             self.used[value.native] = value
@@ -139,6 +148,10 @@ class Values:
             from .swift_callbacks import descriptor
 
             return descriptor(self, value)
+        if value.kind == "callback":
+            from .swift_callbacks import declaration
+
+            return declaration(self, value)
         if value.kind == "union":
             variants = "\n".join(
                 f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({self.public(field.value)})"

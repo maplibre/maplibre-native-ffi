@@ -10,8 +10,8 @@ import Foundation
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 public struct Wake: Sendable {
-  public var callback: (@Sendable () -> Void)?
-  public init(callback: (@Sendable () -> Void)? = nil) {
+  public var callback: WakeCallback?
+  public init(callback: WakeCallback? = nil) {
     self.callback = callback
   }
 
@@ -36,3 +36,9 @@ private func invokeWakeCallback(user_data: UnsafeMutableRawPointer?) {
     .takeUnretainedValue()
   box.value.callback?()
 }
+
+/// Schedules service by the receiver that owns a queue or driver.
+///
+/// See `mln_wake_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+public typealias WakeCallback = @Sendable () -> Void

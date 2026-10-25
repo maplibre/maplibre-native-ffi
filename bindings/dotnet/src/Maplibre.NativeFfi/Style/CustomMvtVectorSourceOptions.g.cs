@@ -14,12 +14,12 @@ public sealed record CustomMvtVectorSourceOptions
     /// <summary>
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     /// </summary>
-    public Action<CanonicalTileId>? FetchTile { get; init; }
+    public CustomSourceFetchTileCallback? FetchTile { get; init; }
 
     /// <summary>
     /// Optional best-effort tile cancel callback. Null in queue mode.
     /// </summary>
-    public Action<CanonicalTileId>? CancelTile { get; init; }
+    public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
     public static CustomMvtVectorSourceOptions Default

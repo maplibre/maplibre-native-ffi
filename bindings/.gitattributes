@@ -12,6 +12,7 @@
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Logging/LogCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs linguist-generated=true
@@ -24,6 +25,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/CameraOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraQueryResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionEnd.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionEndCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionOutcome.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraUpdate.g.cs linguist-generated=true
@@ -88,6 +90,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextOwnership.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextProviderFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/QueueLock.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderTarget/QueueLockCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderDriverKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionAttachOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionCapabilities.g.cs linguist-generated=true
@@ -101,6 +104,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeader.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderRule.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/Maplibre.Operations.g.cs linguist-generated=true
@@ -115,7 +119,9 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceLoadingMethod.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestInfo.g.cs linguist-generated=true
@@ -124,9 +130,11 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRoute.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs linguist-generated=true
@@ -145,6 +153,8 @@
 /dotnet/src/Maplibre.NativeFfi/Style/CanonicalTileId.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomGeometrySourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomMvtVectorSourceOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Style/CustomSourceCancelTileCallback.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Style/CustomSourceFetchTileCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/GeojsonSourceDataHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/GeojsonSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/ImageContent.g.cs linguist-generated=true
@@ -189,6 +199,7 @@
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/Wake.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Wake/WakeCallback.g.cs linguist-generated=true
 /generated-coverage.json linguist-generated=true
 /go/maplibre/generated_api.go linguist-generated=true
 /go/maplibre/generated_api_android.go linguist-generated=true

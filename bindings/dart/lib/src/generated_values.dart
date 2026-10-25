@@ -1974,7 +1974,7 @@ final class CameraTransitionEnd extends _Value {
 ///
 /// See `mln_camera_transition_end_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd);
+typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd end);
 
 /// Callback or queue state that one camera command copies to report the end of
 /// its transitions.
@@ -2319,14 +2319,14 @@ final class CanonicalTileId extends _Value {
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId);
+typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
 
 /// Cancels a request for one tile of a custom geometry or custom MVT vector
 /// source, best effort.
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId);
+typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
 
 /// Options for custom geometry sources.
 ///
@@ -2688,7 +2688,13 @@ final class ProjectedMeters extends _Value {
 ///
 /// See `mln_log_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
+typedef LogCallback =
+    void Function(
+      LogSeverity severity,
+      LogEvent event,
+      int code,
+      String message,
+    );
 
 /// Process-global log callback or queue state.
 ///
@@ -5578,7 +5584,7 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 ///
 /// See `mln_runtime_event_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-typedef RuntimeEventCallback = void Function(List<RuntimeEvent>);
+typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);
 
 /// Runtime and map event delivery. Set either callback or queue.
 ///
@@ -5692,7 +5698,7 @@ final class ResourceRequestInfo extends _Value {
 /// See `mln_resource_provider_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceProviderCallback =
-    void Function(ResourceRequestInfo, ResourceRequestHandle);
+    void Function(ResourceRequestInfo request, ResourceRequestHandle handle);
 
 /// Resource provider state.
 ///
@@ -5716,7 +5722,11 @@ final class ResourceProvider {
 /// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceTransformCallback =
-    void Function(ResourceKind, String, ResourceTransformRequestHandle);
+    void Function(
+      ResourceKind kind,
+      String url,
+      ResourceTransformRequestHandle request,
+    );
 
 /// Resource transform state.
 ///

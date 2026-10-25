@@ -1642,7 +1642,7 @@ pub type mln_log_callback = Option<
         event: u32,
         code: i64,
         message: *const std::ffi::c_char,
-    ) -> u32,
+    ) -> bool,
 >;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

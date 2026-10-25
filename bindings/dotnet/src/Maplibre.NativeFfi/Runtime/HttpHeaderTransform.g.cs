@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public readonly record struct HttpHeaderTransform
 {
     public HttpHeaderTransform(
-        Action<ResourceKind, string, HttpHeaderTransformResponse>? Callback,
+        HttpHeaderTransformCallback? Callback,
         ImmutableArray<HttpHeaderRule> Rules
     )
     {
@@ -23,7 +23,7 @@ public readonly record struct HttpHeaderTransform
     /// <summary>
     /// The callback, or null to apply rules.
     /// </summary>
-    public Action<ResourceKind, string, HttpHeaderTransformResponse>? Callback { get; init; }
+    public HttpHeaderTransformCallback? Callback { get; init; }
 
     /// <summary>
     /// Header rules for a transform without a callback; empty with one.

@@ -160,7 +160,7 @@ fn kill(id: u32) {
 fn exit_with_live_handles_and_callbacks() -> ! {
     let fixture = Fixture::new();
     fixture.load_style(BACKGROUND_STYLE_JSON);
-    log_set_callback(LogHandler::new(|_, _, _, _| 1)).unwrap();
+    log_set_callback(LogHandler::new(|_, _, _, _| true)).unwrap();
     let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     std::mem::forget((fixture, projection));
     std::process::exit(0);

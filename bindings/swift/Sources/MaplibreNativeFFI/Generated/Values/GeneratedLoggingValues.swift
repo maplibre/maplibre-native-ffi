@@ -3,6 +3,19 @@
 internal import MaplibreNativeC
 import Foundation
 
+/// Receives a MapLibre Native log record.
+///
+/// A thrown error answers `false` and is reported to standard error.
+///
+/// See `mln_log_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+public typealias LogCallback = @Sendable (
+  _ severity: LogSeverity,
+  _ event: LogEvent,
+  _ code: Int64,
+  _ message: String
+) throws -> Bool
+
 /// Log event categories emitted by MapLibre Native.
 ///
 /// See `mln_log_event` in the
@@ -62,11 +75,8 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
   /// Receives each record.
-  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
-    -> UInt32)?
-  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,
-                                    String) throws -> UInt32)? = nil)
-  {
+  public var callback: LogCallback?
+  public init(callback: LogCallback? = nil) {
     self.callback = callback
   }
 
@@ -92,8 +102,8 @@ private func invokeLogHandlerCallback(
   event: UInt32,
   code: Int64,
   message: UnsafePointer<CChar>?
-) -> UInt32 {
-  guard let user_data else { return 0 }
+) -> Bool {
+  guard let user_data else { return false }
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
     .takeUnretainedValue()
   do { return try box.value.callback?(
@@ -101,10 +111,10 @@ private func invokeLogHandlerCallback(
     LogEvent(rawValue: event),
     code,
     NativeString.copyCString(message)
-  ) ?? 0 } catch {
+  ) ?? false } catch {
     reportToStandardError(
       "mln_log_callback failed and native received its fallback: \(error)\n"
-    ); return 0
+    ); return false
   }
 }
 

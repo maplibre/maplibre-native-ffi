@@ -1418,6 +1418,10 @@ def callback_result_errors(
     signature = typedef.type.pointee
     enum = typedef.metadata.get("enum")
     result = signature.result
+    if result is not None and result.canonical in {"bool", "_Bool"}:
+        if value in {"true", "false"}:
+            return []
+        return [f"{context}: {key} of a bool callback must be true or false"]
     if enum is None and result is not None:
         named = result.declaration or ""
         enum = (

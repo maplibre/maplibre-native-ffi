@@ -3452,7 +3452,7 @@ static mln_jni_upcall mln_jni_releaseRoot_upcall = {
 };
 static mln_jni_upcall mln_jni_logHandlerCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/ThreadedUpcalls", "logHandlerCallback",
-  "(JIIJJ)I", NULL
+  "(JIIJJ)Z", NULL
 };
 static mln_jni_upcall mln_jni_httpHeaderTransformCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
@@ -3523,7 +3523,7 @@ static void mln_jni_releaseRoot(void* userData) {
   mln_jni_upcall_void(&mln_jni_releaseRoot_upcall, arguments);
 }
 
-static uint32_t mln_jni_logHandlerCallback(
+static bool mln_jni_logHandlerCallback(
   void* userData, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -3534,9 +3534,11 @@ static uint32_t mln_jni_logHandlerCallback(
     {.j = (jlong)code},
     {.j = MLN_JNI_ADDRESS(message)}
   };
-  jint result = 0;
-  mln_jni_upcall_int(&mln_jni_logHandlerCallback_upcall, arguments, &result);
-  return (uint32_t)result;
+  jboolean result = false;
+  mln_jni_upcall_boolean(
+    &mln_jni_logHandlerCallback_upcall, arguments, &result
+  );
+  return (bool)result;
 }
 
 static mln_status mln_jni_httpHeaderTransformCallback(

@@ -52,8 +52,19 @@ def parts(values, value):
             else values.public(plan.result)
         )
         argument_types = [values.public(p.value) for p in parameters]
+        named = "".join(
+            f", {parameter_name(p.name)}: {t}"
+            for p, t in zip(parameters, argument_types, strict=True)
+        )
+        summary = (
+            "    /// An error that names a native status, such as\n"
+            "    /// error.InvalidArgument, answers native that status. Any other\n"
+            f"    /// error is logged and answers {plan.failure}.\n"
+            if plan.status
+            else ""
+        )
         fields.append(
-            f"    {local}: ?*const fn (?*anyopaque{''.join(', ' + t for t in argument_types)}) anyerror!{result} = null,"
+            f"{summary}    {local}: ?*const fn (context: ?*anyopaque{named}) anyerror!{result} = null,"
         )
         constructors.append((local, argument_types, result))
         captures.append(f"            .{local} = null,")
@@ -68,7 +79,7 @@ def parts(values, value):
         fallback = (
             "return;"
             if plan.result.ctype.kind == "void"
-            else f"return {plan.failure if plan.failure.isdigit() else 'c.' + plan.failure};"
+            else f"return {failure_value(plan)};"
             if plan.failure not in {None, "contain"}
             else "return std.mem.zeroes(marshal.CallbackResult(c." + plan.native + "));"
         )
@@ -122,7 +133,7 @@ def parts(values, value):
         if plan.result.ctype.kind == "void":
             action = f"try {call}; {transfer}"
         elif plan.status:
-            action = f"{call} catch |err| {{ {report} return status.rawStatus(err); }}; {transfer}return c.MLN_STATUS_OK;"
+            action = f"{call} catch |err| {{ if (status.rawStatus(err)) |deliberate| return deliberate; {report} return {failure_value(plan)}; }}; {transfer}return c.MLN_STATUS_OK;"
         else:
             action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
         ownership_setup = "var ownership_transferred = false; " if owned else ""
@@ -163,6 +174,106 @@ def parts(values, value):
     )
     trampolines.append(constructor(public, constructors))
     return fields, writes, captures, trampolines
+
+
+# Words that a Zig identifier cannot spell without `@"..."`: keywords and
+# primitive values and types.
+RESERVED = frozenset(
+    {
+        "addrspace",
+        "align",
+        "allowzero",
+        "and",
+        "anyframe",
+        "anytype",
+        "asm",
+        "break",
+        "callconv",
+        "catch",
+        "comptime",
+        "const",
+        "continue",
+        "defer",
+        "else",
+        "enum",
+        "errdefer",
+        "error",
+        "export",
+        "extern",
+        "fn",
+        "for",
+        "if",
+        "inline",
+        "linksection",
+        "noalias",
+        "noinline",
+        "nosuspend",
+        "opaque",
+        "or",
+        "orelse",
+        "packed",
+        "pub",
+        "resume",
+        "return",
+        "struct",
+        "suspend",
+        "switch",
+        "test",
+        "threadlocal",
+        "try",
+        "union",
+        "unreachable",
+        "var",
+        "volatile",
+        "while",
+        "anyerror",
+        "anyopaque",
+        "bool",
+        "comptime_float",
+        "comptime_int",
+        "false",
+        "noreturn",
+        "null",
+        "true",
+        "type",
+        "undefined",
+        "void",
+        "isize",
+        "usize",
+        "c_char",
+        "c_short",
+        "c_ushort",
+        "c_int",
+        "c_uint",
+        "c_long",
+        "c_ulong",
+        "c_longlong",
+        "c_ulonglong",
+        "c_longdouble",
+        "f16",
+        "f32",
+        "f64",
+        "f80",
+        "f128",
+    }
+)
+
+
+def parameter_name(name):
+    """A callback argument's name in a function type: its C name, quoted only
+    when Zig reserves it."""
+    if name in RESERVED or re.fullmatch(r"[iu]\d+", name):
+        return identifier(name)
+    return name
+
+
+def failure_value(plan):
+    """The Zig value of a callback's `failure=`: a literal, such as a scalar
+    result's integer or boolean, or else a C constant."""
+    failure = plan.failure
+    if plan.result.kind == "scalar" or failure.lstrip("-").isdigit():
+        return failure
+    return "c." + failure
 
 
 def borrow(value, source):

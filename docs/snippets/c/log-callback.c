@@ -24,7 +24,7 @@ static const char* category_name(uint32_t event) {
 }
 
 // #region callback
-static uint32_t forward_to_host(
+static bool forward_to_host(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -33,9 +33,9 @@ static uint32_t forward_to_host(
 
   host_log((int)severity, category_name(event), message);
 
-  // Non-zero consumes the record. Return zero instead to let MapLibre's own
+  // True consumes the record. Return false instead to let MapLibre's own
   // platform logger print it as well.
-  return 1;
+  return true;
 }
 // #endregion callback
 

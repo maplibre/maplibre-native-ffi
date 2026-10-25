@@ -1,5 +1,8 @@
 """Render Swift callback descriptors from registration metadata."""
 
+from dataclasses import replace
+
+from .. import docs
 from .swift import SCALARS, camel, doc, identifier, name
 
 
@@ -16,19 +19,50 @@ def throws(callback):
     return callback.result.native != "void"
 
 
+def alias(callback):
+    """The public type alias of a callback type."""
+    return name(callback.native.removeprefix("mln_"))
+
+
 def closure_type(values, callback):
-    parameters = [values.public(parameter.value) for parameter in callback.arguments]
+    """The closure type, whose parameter names document the C parameters,
+    since a Swift function type takes no argument labels."""
+    parameters = [
+        f"_ {identifier(camel(parameter.name))}: {values.public(parameter.value)}"
+        for parameter in callback.arguments
+    ]
+    # A status callback returns nothing and throws to fail.
     result = (
         "Void"
-        if callback.result.native == "void"
-        or any(
-            parameter.value.element and parameter.value.element.response
-            for parameter in callback.parameters
-        )
+        if callback.result.native == "void" or callback.status
         else values.public(callback.result)
     )
     effect = " throws" if throws(callback) else ""
     return f"@Sendable ({', '.join(parameters)}){effect} -> {result}"
+
+
+def declaration(values, value):
+    """The public type alias of a callback value."""
+    callback = values.bound.callbacks[value.native]
+    if callback.status:
+        fallback = camel(callback.failure.removeprefix("MLN_STATUS_").lower())
+        note = (
+            "Returning succeeds. Throwing a `MaplibreError` whose status is not "
+            "`Status.ok` fails the call with that status. Any other thrown error "
+            f"fails it with `Status.{fallback}` and is reported to standard "
+            "error."
+        )
+    elif throws(callback):
+        note = (
+            f"A thrown error answers `{callback.failure}` and is reported to "
+            "standard error."
+        )
+    else:
+        note = None
+    found = values.bound.doc(value.native)
+    if found is not None and note:
+        found = replace(found, notes=(*found.notes, note))
+    return f"{docs.line_comment(found)}public typealias {alias(callback)} = {closure_type(values, callback)}\n"
 
 
 def raw_type(type_):
@@ -87,11 +121,11 @@ def descriptor(values, plan):
             continue
         if field.name in callbacks:
             callback = values.bound.callbacks[field.value.native]
-            typ = closure_type(values, callback)
+            typ = alias(callback)
             fields.append(
-                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: ({typ})?"
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: {typ}?"
             )
-            arguments.append(f"{local}: ({typ})? = nil")
+            arguments.append(f"{local}: {typ}? = nil")
             assignments.append(f"    self.{local} = {local}")
             defaults.append(f"    self.{local} = nil")
             materialize.append(
@@ -199,7 +233,8 @@ def descriptor(values, plan):
         # A failure that names a constant of a C enum converts to the raw
         # integer result; a numeric failure is that result already.
         numeric = bool(callback.failure) and callback.failure.lstrip("-").isdigit()
-        suffix = "" if typed_enum or numeric else ".rawValue"
+        boolean = callback.failure in {"true", "false"}
+        suffix = "" if typed_enum or numeric or boolean else ".rawValue"
         fail = "" if result == "Void" else f"return {callback.failure}{suffix}"
         setup = "".join(
             f"  guard let {identifier(parameter.name)} else {{ {fail or 'return'} }}\n  let response{name(parameter.name)} = {values.public(parameter.value.element)}(pointer: {identifier(parameter.name)})\n  defer {{ response{name(parameter.name)}.expire() }}\n"
@@ -218,28 +253,35 @@ def descriptor(values, plan):
         call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}?({args})"
         invoke = (
             f"{call}"
-            if result == "Void" or responses
+            if result == "Void" or callback.status
             else f"return {call} ?? {callback.failure}{suffix}"
         )
-
-        if responses:
+        if callback.status:
+            # A status callback succeeds by returning and fails by throwing.
             invoke += f"; return MLN_STATUS_OK{suffix}"
-        if owned:
-            # The synchronous release of a handle whose release is also its
-            # dispose is the dispose.
-            fail = " ".join(
-                f"try? owned{name(p.name)}.dispose();"
-                if p.value.handle.dispose_completion
-                else f"owned{name(p.name)}.close();"
-                if values.bound.source.functions_by_name[
-                    p.value.handle.release
-                ].return_type.kind
-                == "void"
-                else f"try? owned{name(p.name)}.close();"
-                for p in owned
-            ) + (" " + fail if fail else "")
+        # The synchronous release of a handle whose release is also its
+        # dispose is the dispose.
+        disposal = "".join(
+            f"try? owned{name(p.name)}.dispose(); "
+            if p.value.handle.dispose_completion
+            else f"owned{name(p.name)}.close(); "
+            if values.bound.source.functions_by_name[
+                p.value.handle.release
+            ].return_type.kind
+            == "void"
+            else f"try? owned{name(p.name)}.close(); "
+            for p in owned
+        )
+        fail = disposal + fail
+        # A thrown MaplibreError with a failing status is a deliberate failure,
+        # which native receives without a report.
+        deliberate = (
+            f" catch let error as MaplibreError where error.status != .ok {{ {disposal}return mln_status(rawValue: error.status.rawValue) }}"
+            if callback.status
+            else ""
+        )
         body = (
-            f'  do {{ {invoke} }} catch {{ reportToStandardError("{callback.native} failed and native received its fallback: \\(error)\\n"); {fail} }}'
+            f'  do {{ {invoke} }}{deliberate} catch {{ reportToStandardError("{callback.native} failed and native received its fallback: \\(error)\\n"); {fail} }}'
             if "try " in invoke
             else f"  {invoke}"
         )

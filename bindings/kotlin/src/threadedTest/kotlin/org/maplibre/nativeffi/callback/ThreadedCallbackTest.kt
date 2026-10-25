@@ -35,7 +35,7 @@ class ThreadedCallbackTest {
         LogHandler { _, event, _, _ ->
           if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
           // Leave the record to MapLibre's own logger as well.
-          0u
+          false
         },
       )
       assertEquals(base + 1, roots.rootCountForTesting())

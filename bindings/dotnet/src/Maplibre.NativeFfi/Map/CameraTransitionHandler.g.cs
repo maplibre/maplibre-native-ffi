@@ -11,5 +11,5 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 public readonly partial record struct CameraTransitionHandler(
-    Action<CameraTransitionEnd>? Callback
+    CameraTransitionEndCallback? Callback
 );

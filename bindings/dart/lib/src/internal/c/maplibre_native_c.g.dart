@@ -53,7 +53,7 @@ typedef mln_http_header_transform_callbackFunction =
     );
 typedef mln_log_callback = Pointer<NativeFunction<mln_log_callbackFunction>>;
 typedef mln_log_callbackFunction =
-    Uint32 Function(
+    Bool Function(
       Pointer<Void> user_data,
       Uint32 severity,
       Uint32 event,

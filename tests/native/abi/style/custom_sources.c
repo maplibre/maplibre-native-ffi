@@ -558,7 +558,7 @@ static void a_cancelled_tile_is_fetched_when_required_again(void) {
 static atomic_bool tile_error_logged;
 static char tile_error_fragment[64];
 
-static uint32_t record_tile_error(
+static bool record_tile_error(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -571,7 +571,7 @@ static uint32_t record_tile_error(
   ) {
     mln_test_flag_set(&tile_error_logged);
   }
-  return 0;
+  return false;
 }
 
 static bool tile_error_reported(void* context) {

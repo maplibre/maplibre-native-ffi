@@ -16,7 +16,7 @@ pub fn fromRaw(raw: i32) NativeStatusError {
         else => error.UnknownStatus,
     };
 }
-pub fn toRaw(err: anyerror) c.mln_status {
+pub fn toRaw(err: anyerror) ?c.mln_status {
     return switch (err) {
         error.InvalidArgument => c.MLN_STATUS_INVALID_ARGUMENT,
         error.InvalidState => c.MLN_STATUS_INVALID_STATE,
@@ -28,6 +28,6 @@ pub fn toRaw(err: anyerror) c.mln_status {
         error.TargetLost => c.MLN_STATUS_TARGET_LOST,
         error.NotReady => c.MLN_STATUS_NOT_READY,
         error.NotFound => c.MLN_STATUS_NOT_FOUND,
-        else => c.MLN_STATUS_NATIVE_ERROR,
+        else => null,
     };
 }

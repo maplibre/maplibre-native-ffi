@@ -56,9 +56,9 @@ const LogProbe = struct {
     saw_parse_error: support.Flag = .{},
     releases: support.Counter = .{},
 
-    fn record(self: *LogProbe, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!u32 {
+    fn record(self: *LogProbe, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!bool {
         if (severity == .@"error" and event == .parse_style and message.len != 0) self.saw_parse_error.set();
-        return 1;
+        return true;
     }
 
     fn released(self: *LogProbe) void {

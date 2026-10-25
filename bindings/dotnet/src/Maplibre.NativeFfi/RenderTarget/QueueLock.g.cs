@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_queue_lock</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct QueueLock(Action? Lock, Action? Unlock)
+public readonly partial record struct QueueLock(QueueLockCallback? Lock, QueueLockCallback? Unlock)
 {
     /// <summary>
     /// Creates a native registration from C functions and a context that the

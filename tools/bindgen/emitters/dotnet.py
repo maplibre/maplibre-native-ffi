@@ -1355,6 +1355,26 @@ def emit(api: Api | BoundApi) -> Emission:
         files[f"{directory}/{public_type(name)}.g.cs"] = (
             HEADER + f"namespace {NAMESPACE};\n\n" + doc(bound, name) + declaration
         )
+    delegates = sorted(
+        {
+            next(field for field in plan.fields if field.name == name).value.native
+            for plan in map(values.record, used_records)
+            if plan.registration
+            for name in plan.registration.callbacks
+        }
+    )
+    for native in delegates:
+        directory = directory_for(api.typedefs_by_name[native].location.path)
+        found = bound.doc(native)
+        note = values.delegate_note(native)
+        if found is not None and note:
+            found = replace(found, notes=(*found.notes, note))
+        files[f"{directory}/{public_type(native)}.g.cs"] = (
+            HEADER
+            + f"namespace {NAMESPACE};\n\n"
+            + docs.xml_comment(found)
+            + values.delegate(native)
+        )
     for enum in api.enums:
         if enum.name not in enum_names:
             continue

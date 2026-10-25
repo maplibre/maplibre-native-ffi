@@ -13,7 +13,7 @@ internal actual object UpcallStubs {
     Ffm.upcall(
       ThreadedUpcalls::class.java,
       "logHandlerCallback",
-      JAVA_INT,
+      JAVA_BOOLEAN,
       JAVA_LONG,
       JAVA_INT,
       JAVA_INT,

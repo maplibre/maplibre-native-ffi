@@ -556,6 +556,9 @@ class Values:
             record_rust, record_python = self.record_sources(plan)
             rust.append(record_rust)
             python.append(record_python)
+        from . import python_callbacks
+
+        python.append(python_callbacks.protocol_sources(self))
         return "\n".join(rust) + "\n" + self.input_sources(), "\n".join(python)
 
     def record_sources(

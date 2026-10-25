@@ -32,7 +32,7 @@ internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   GeneratedApi.logSetCallback(
     LogHandler { _, event, _, _ ->
       callback(event)
-      1u
+      true
     },
   )
 }

@@ -229,6 +229,72 @@ func TestCallbackPanicReportIsContained(t *testing.T) {
 	bindingReportCallbackPanic("mln_wake_callback", "wake failed")
 }
 
+// A status callback's failure Status, bare or in an *Error, reaches native
+// unlogged, since the host fails on purpose; any other error is logged and
+// answers the callback's failure.
+func TestCallbackErrorAnswersADeliberateStatusAndLogsOthers(t *testing.T) {
+	logged := make(chan string, 16)
+	previous := slog.Default()
+	slog.SetDefault(slog.New(callbackFailureLogHandler(logged)))
+	defer slog.SetDefault(previous)
+	for _, tc := range []struct {
+		err    error
+		want   Status
+		logged bool
+	}{
+		{nil, StatusOk, false},
+		{&Error{Status: StatusInvalidArgument, Diagnostic: "refused"}, StatusInvalidArgument, false},
+		{fmt.Errorf("wrapped: %w", &Error{Status: StatusBusy}), StatusBusy, false},
+		{StatusBusy, StatusBusy, false},
+		{fmt.Errorf("wrapped: %w", StatusNotFound), StatusNotFound, false},
+		{StatusOk, StatusNativeError, true},
+		{errors.New("no status"), StatusNativeError, true},
+		{&Error{Status: StatusOk}, StatusNativeError, true},
+	} {
+		if got := bindingCallbackStatus("probe_callback", tc.err, StatusNativeError); got != tc.want {
+			t.Errorf("bindingCallbackStatus(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+		select {
+		case message := <-logged:
+			if !tc.logged {
+				t.Errorf("bindingCallbackStatus(%v) logged %q", tc.err, message)
+			}
+		default:
+			if tc.logged {
+				t.Errorf("bindingCallbackStatus(%v) logged nothing", tc.err)
+			}
+		}
+	}
+}
+
+// callbackFailureLogHandler sends the error of each logged failure of
+// probe_callback.
+type callbackFailureLogHandler chan<- string
+
+func (callbackFailureLogHandler) Enabled(context.Context, slog.Level) bool   { return true }
+func (handler callbackFailureLogHandler) WithAttrs([]slog.Attr) slog.Handler { return handler }
+func (handler callbackFailureLogHandler) WithGroup(string) slog.Handler      { return handler }
+
+func (handler callbackFailureLogHandler) Handle(_ context.Context, record slog.Record) error {
+	if record.Level != slog.LevelError || record.Message != "maplibre: callback failed" {
+		return nil
+	}
+	var callback, failure string
+	record.Attrs(func(attr slog.Attr) bool {
+		switch attr.Key {
+		case "callback":
+			callback = attr.Value.String()
+		case "error":
+			failure = fmt.Sprint(attr.Value.Any())
+		}
+		return true
+	})
+	if callback == "probe_callback" {
+		offer(handler, failure)
+	}
+	return nil
+}
+
 type failingPanicLogHandler struct{ slog.Handler }
 
 func (failingPanicLogHandler) Enabled(context.Context, slog.Level) bool { return true }
@@ -370,14 +436,14 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
 	responses := make(chan *HttpHeaderTransformResponseScope, 1)
-	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) Status {
+	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) error {
 		foreign := make(chan error, 1)
 		go func() { foreign <- response.SetHeader("X-Test", "1") }()
 		if err := <-foreign; !errors.Is(err, StatusInvalidState) {
 			failures.add("SetHeader from another goroutine = %v, want StatusInvalidState", err)
 		}
 		offer(responses, response)
-		return StatusOk
+		return nil
 	}})))
 	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
 	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
@@ -434,7 +500,7 @@ func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
 	t.Cleanup(func() { _ = LogClearCallback() })
 	baseline := globalRoots()
 	for range 2 {
-		if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }}); err != nil {
+		if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
 			t.Fatal(err)
 		}
 		if live := globalRoots() - baseline; live != 1 {

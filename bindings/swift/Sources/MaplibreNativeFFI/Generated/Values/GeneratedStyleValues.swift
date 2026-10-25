@@ -47,9 +47,9 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: (@Sendable (CanonicalTileId) -> Void)?
+  public var fetchTile: CustomSourceFetchTileCallback?
   /// Optional best-effort tile cancel callback. Null in queue mode.
-  public var cancelTile: (@Sendable (CanonicalTileId) -> Void)?
+  public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
   public var tolerance: Double?
@@ -58,8 +58,8 @@ public struct CustomGeometrySourceOptions: Sendable {
   public var clip: Bool?
   public var wrap: Bool?
   public init(
-    fetchTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
-    cancelTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
+    fetchTile: CustomSourceFetchTileCallback? = nil,
+    cancelTile: CustomSourceCancelTileCallback? = nil,
     minZoom: Double? = CustomGeometrySourceOptions.default.minZoom,
     maxZoom: Double? = CustomGeometrySourceOptions.default.maxZoom,
     tolerance: Double? = CustomGeometrySourceOptions.default.tolerance,
@@ -175,14 +175,14 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: (@Sendable (CanonicalTileId) -> Void)?
+  public var fetchTile: CustomSourceFetchTileCallback?
   /// Optional best-effort tile cancel callback. Null in queue mode.
-  public var cancelTile: (@Sendable (CanonicalTileId) -> Void)?
+  public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
   public init(
-    fetchTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
-    cancelTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
+    fetchTile: CustomSourceFetchTileCallback? = nil,
+    cancelTile: CustomSourceCancelTileCallback? = nil,
     minZoom: Double? = CustomMvtVectorSourceOptions.default.minZoom,
     maxZoom: Double? = CustomMvtVectorSourceOptions.default.maxZoom
   ) {
@@ -251,6 +251,21 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
+
+/// Cancels a request for one tile of a custom geometry or custom MVT vector
+/// source, best effort.
+///
+/// See `mln_custom_source_cancel_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomSourceCancelTileCallback =
+  @Sendable (_ tileId: CanonicalTileId) -> Void
+
+/// Requests one tile of a custom geometry or custom MVT vector source.
+///
+/// See `mln_custom_source_fetch_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomSourceFetchTileCallback =
+  @Sendable (_ tileId: CanonicalTileId) -> Void
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.

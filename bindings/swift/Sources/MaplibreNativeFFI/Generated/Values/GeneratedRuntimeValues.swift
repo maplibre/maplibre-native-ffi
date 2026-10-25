@@ -147,16 +147,11 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderTransform: Sendable {
   /// The callback, or null to apply rules.
-  public var callback: (@Sendable (
-    ResourceKind,
-    String,
-    HttpHeaderTransformResponse
-  ) throws -> Void)?
+  public var callback: HttpHeaderTransformCallback?
   /// Header rules for a transform without a callback; empty with one.
   public var rules: [HttpHeaderRule]
   public init(
-    callback: (@Sendable (ResourceKind, String,
-                          HttpHeaderTransformResponse) throws -> Void)? = nil,
+    callback: HttpHeaderTransformCallback? = nil,
     rules: [HttpHeaderRule] = []
   ) {
     self.callback = callback
@@ -199,12 +194,30 @@ private func invokeHttpHeaderTransformCallback(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
     responseOutResponse
-  ); return MLN_STATUS_OK } catch {
+  ); return MLN_STATUS_OK } catch let error as MaplibreError
+    where error
+    .status !=
+    .ok { return mln_status(rawValue: error.status.rawValue) } catch
+  {
     reportToStandardError(
       "mln_http_header_transform_callback failed and native received its fallback: \(error)\n"
     ); return MLN_STATUS_NATIVE_ERROR
   }
 }
+
+/// Adds end-to-end headers to one outgoing HTTP request attempt.
+///
+/// Returning succeeds. Throwing a `MaplibreError` whose status is not
+/// `Status.ok` fails the call with that status. Any other thrown error fails it
+/// with `Status.nativeError` and is reported to standard error.
+///
+/// See `mln_http_header_transform_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public typealias HttpHeaderTransformCallback = @Sendable (
+  _ kind: ResourceKind,
+  _ url: String,
+  _ outResponse: HttpHeaderTransformResponse
+) throws -> Void
 
 public final class HttpHeaderTransformResponse: @unchecked Sendable {
   private let pointer: UnsafeMutablePointer<mln_http_header_transform_response>
@@ -513,15 +526,11 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
   /// Answers each request that the routes leave to the provider.
-  public var callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
-    -> Void)?
+  public var callback: ResourceProviderCallback?
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: (
-      @Sendable (ResourceRequestInfo, ResourceRequestHandle) -> Void
-    )? =
-      nil,
+    callback: ResourceProviderCallback? = nil,
     routes: [ResourceRoute] = []
   ) {
     self.callback = callback
@@ -569,6 +578,15 @@ private func invokeResourceProviderCallback(
   }
 }
 
+/// Intercepts a network resource request.
+///
+/// See `mln_resource_provider_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public typealias ResourceProviderCallback = @Sendable (
+  _ request: ResourceRequestInfo,
+  _ handle: ResourceRequestHandle
+) -> Void
+
 /// Inclusive byte range of a resource request.
 ///
 /// See `mln_resource_range` in the
@@ -596,14 +614,20 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
   }
 }
 
+/// Reports that MapLibre cancelled a C API resource provider request.
+///
+/// See `mln_resource_request_cancel_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public typealias ResourceRequestCancelCallback = @Sendable () -> Void
+
 /// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestCancelHandler: Sendable {
   /// Required in callback mode; null in queue mode.
-  public var callback: (@Sendable () -> Void)?
-  public init(callback: (@Sendable () -> Void)? = nil) {
+  public var callback: ResourceRequestCancelCallback?
+  public init(callback: ResourceRequestCancelCallback? = nil) {
     self.callback = callback
   }
 
@@ -904,16 +928,8 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
   /// Required in callback mode; null in queue mode.
-  public var callback: (@Sendable (
-    ResourceKind,
-    String,
-    ResourceTransformRequestHandle
-  ) -> Void)?
-  public init(callback: (@Sendable (
-    ResourceKind,
-    String,
-    ResourceTransformRequestHandle
-  ) -> Void)? = nil) {
+  public var callback: ResourceTransformCallback?
+  public init(callback: ResourceTransformCallback? = nil) {
     self.callback = callback
   }
 
@@ -956,6 +972,16 @@ private func invokeResourceTransformCallback(
       .close()
   }
 }
+
+/// Asks the host for the URL of one network resource request.
+///
+/// See `mln_resource_transform_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public typealias ResourceTransformCallback = @Sendable (
+  _ kind: ResourceKind,
+  _ url: String,
+  _ request: ResourceTransformRequestHandle
+) -> Void
 
 public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
@@ -1075,13 +1101,20 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 }
 
+/// Receives selected events after their snapshots have been published.
+///
+/// See `mln_runtime_event_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public typealias RuntimeEventCallback = @Sendable (_ events: [RuntimeEvent])
+  -> Void
+
 /// Runtime and map event delivery. Set either callback or queue.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventHandler: Sendable {
-  public var callback: (@Sendable ([RuntimeEvent]) -> Void)?
-  public init(callback: (@Sendable ([RuntimeEvent]) -> Void)? = nil) {
+  public var callback: RuntimeEventCallback?
+  public init(callback: RuntimeEventCallback? = nil) {
     self.callback = callback
   }
 

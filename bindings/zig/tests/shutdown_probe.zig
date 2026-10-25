@@ -6,8 +6,8 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
-fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, _: []const u8) maplibre.Error!u32 {
-    return 1;
+fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, _: []const u8) maplibre.Error!bool {
+    return true;
 }
 
 fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!void {

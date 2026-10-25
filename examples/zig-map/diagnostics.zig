@@ -14,7 +14,7 @@ pub fn logError(
     std.debug.print(": {s}\n", .{details.message()});
 }
 
-pub fn logRecord(_: ?*anyopaque, severity: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!u32 {
+pub fn logRecord(_: ?*anyopaque, severity: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!bool {
     std.debug.print("[{s}] {s}\n", .{ @tagName(severity), message });
-    return 1;
+    return true;
 }

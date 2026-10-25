@@ -29,9 +29,9 @@ class _Retiring:
         self.called = threading.Event()
         self.retired = threading.Event()
 
-    def __call__(self, *_: object) -> int:
+    def __call__(self, *_: object) -> bool:
         self.called.set()
-        return 1
+        return True
 
     def __del__(self) -> None:
         self.retired.set()
@@ -234,9 +234,9 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         kind: mln.ResourceKind,
         url: str,
         response: mln.HttpHeaderTransformResponseScope,
-    ) -> mln.Status:
+    ) -> None:
         if url != style:
-            return mln.Status.OK
+            return
         worker = threading.Thread(
             target=refused, args=(lambda: response.set_header("X-Test", "other"),)
         )
@@ -244,7 +244,6 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         worker.join(TIMEOUT)
         response.set_header("X-Test", "inside")
         scopes.append(response)
-        return mln.Status.OK
 
     def pass_through(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
@@ -270,6 +269,43 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     # Passing a request through consumed its handle.
     assert len(passed_through) == 1
     assert passed_through[0].is_closed
+
+
+def test_a_header_transform_fails_deliberately_with_a_status_and_reports_a_bug(
+    harness: Harness, map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The URLs name a loopback port that nothing serves, so each request fails
+    # after the header transform without leaving the machine.
+    refused = mln.MaplibreError(mln.Status.INVALID_ARGUMENT, "the transform refused")
+    broken = mln.MaplibreError(mln.Status.OK, "the transform failed without a status")
+    raised = {
+        "http://127.0.0.1:1/refused.json": refused,
+        "http://127.0.0.1:1/broken.json": broken,
+    }
+    reports: list[typing.Any] = []
+    monkeypatch.setattr(sys, "unraisablehook", reports.append)
+
+    def transform(
+        kind: mln.ResourceKind,
+        url: str,
+        response: mln.HttpHeaderTransformResponseScope,
+    ) -> None:
+        if url in raised:
+            raise raised[url]
+
+    result(
+        harness.runtime.set_http_header_transform(
+            mln.HttpHeaderTransform(callback=transform)
+        )
+    )
+    for url in raised:
+        harness.routes[url] = lambda request, handle: handle.pass_through()
+        map_handle.set_style_url(url)
+        harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
+    result(harness.runtime.clear_http_header_transform())
+
+    # A failure status is deliberate, so only the error without one is reported.
+    assert [report.exc_value for report in reports] == [broken]
 
 
 def test_a_transform_request_is_answered_from_another_thread_after_its_callback(

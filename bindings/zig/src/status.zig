@@ -139,7 +139,8 @@ pub fn errorFromRawStatus(raw_status: i32) NativeStatusError!void {
 
 const nativeStatusError = generated.fromRaw;
 
-/// The status that reports `err` to native code.
+/// The native status that `err` names, or null for an error outside
+/// `NativeStatusError`.
 pub const rawStatus = generated.toRaw;
 
 test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
@@ -157,10 +158,12 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     };
     inline for (table) |row| {
         try std.testing.expectError(row[1], errorFromRawStatus(row[0]));
-        try std.testing.expectEqual(@as(c.mln_status, row[0]), rawStatus(row[1]));
+        try std.testing.expectEqual(@as(?c.mln_status, row[0]), rawStatus(row[1]));
     }
-    // A host callback's error that has no native status reports a native error.
-    try std.testing.expectEqual(@as(c.mln_status, c.MLN_STATUS_NATIVE_ERROR), rawStatus(error.OutOfMemory));
+    // An error that names no native status, such as a host callback's own,
+    // maps to none.
+    try std.testing.expectEqual(@as(?c.mln_status, null), rawStatus(error.OutOfMemory));
+    try std.testing.expectEqual(@as(?c.mln_status, null), rawStatus(error.UnknownStatus));
 
     // A status the binding does not name keeps its code and the call's message.
     var diagnostic: diagnostics.Diagnostic = .{};

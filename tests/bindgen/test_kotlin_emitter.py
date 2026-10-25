@@ -345,6 +345,34 @@ class KotlinLayoutTests(unittest.TestCase):
                     callback = values.bound.callbacks[site.callback]
                     self.assertIsNotNone(callback.delivery)
 
+    def test_callback_results_answer_native_in_their_c_types(self):
+        outputs = kotlin.generate(real_api())
+        threaded = outputs[
+            "src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/ThreadedUpcalls.kt"
+        ]
+        # A bool callback answers with a Boolean, and fails with false.
+        self.assertIn(
+            'upcall<LogHandler, Boolean>("mln_log_callback", userData, false)',
+            threaded,
+        )
+        # A status callback returns nothing and throws to fail, so its site
+        # answers success itself and maps a throw to a status.
+        self.assertIn(
+            'statusUpcall<HttpHeaderTransform>("mln_http_header_transform_callback", '
+            "userData, -5)",
+            threaded,
+        )
+        callbacks = outputs[
+            "src/threadedMain/kotlin/org/maplibre/nativeffi/generated/GeneratedThreadedCallbacks.kt"
+        ]
+        self.assertIn("message: String): Boolean\n", callbacks)
+        self.assertIn("outResponse: HttpHeaderTransformResponse)\n", callbacks)
+        # Kotlin/Wasm's queue form answers native's queue result.
+        wasm = outputs[
+            "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt"
+        ]
+        self.assertIn("readCString(message)); true }; true }", wasm)
+
     def test_native_registrations_mirror_their_c_records(self):
         _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(
             real_api()

@@ -96,6 +96,23 @@ bool mln_jni_upcall_long(
   return true;
 }
 
+bool mln_jni_upcall_boolean(
+  mln_jni_upcall* upcall, const jvalue* arguments, jboolean* result
+) {
+  JNIEnv* env = mln_jni_thread_env();
+  if (env == NULL) {
+    return false;
+  }
+  jboolean value = (*env)->CallStaticBooleanMethodA(
+    env, upcall->type, upcall->method, arguments
+  );
+  if (!mln_jni_upcall_returned(env, upcall)) {
+    return false;
+  }
+  *result = value;
+  return true;
+}
+
 // org.maplibre.nativeffi.internal.memory.NativeMemory. Accesses go through
 // memcpy, which the compiler lowers to one load or store, so a caller's
 // alignment never matters.

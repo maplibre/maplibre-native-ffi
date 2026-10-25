@@ -817,6 +817,10 @@ internal static unsafe class GeneratedValues
             }
             return mln_status.MLN_STATUS_OK;
         }
+        catch (MaplibreException error) when ((mln_status)error.Status != mln_status.MLN_STATUS_OK)
+        {
+            return (mln_status)error.Status;
+        }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_http_header_transform_callback", error);
@@ -891,7 +895,7 @@ internal static unsafe class GeneratedValues
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static uint InvokeLogHandlerCallback(
+    private static byte InvokeLogHandlerCallback(
         void* user_data,
         uint severity,
         uint @event,
@@ -903,18 +907,22 @@ internal static unsafe class GeneratedValues
         {
             var answer = ((LogHandler)NativeCallbackRoot.Value(user_data)).Callback;
             return answer is null
-                ? 0
-                : (uint)answer(
-                    (LogSeverity)severity,
-                    (LogEvent)@event,
-                    code,
-                    NativeCallScope.CopyCString(message)
+                ? (byte)0
+                : (byte)(
+                    answer(
+                        (LogSeverity)severity,
+                        (LogEvent)@event,
+                        code,
+                        NativeCallScope.CopyCString(message)
+                    )
+                        ? 1
+                        : 0
                 );
         }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_log_callback", error);
-            return 0;
+            return (byte)0;
         }
     }
 

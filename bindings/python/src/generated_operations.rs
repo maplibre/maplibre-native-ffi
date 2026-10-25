@@ -698,7 +698,7 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
                 return Ok(sys::MLN_STATUS_NATIVE_ERROR);
             };
-            let result = callback.bind(py).call1((
+            match callback.bind(py).call1((
                 generated_value(py, kind)?,
                 unsafe { generated_c_string(py, url, false) }?,
                 Py::new(
@@ -708,11 +708,13 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
                         scope: callback_scope.scope(),
                     },
                 )?,
-            ))?;
-            if result.is_none() {
-                Ok(0)
-            } else {
-                result.extract::<sys::mln_status>()
+            )) {
+                Ok(_) => Ok(sys::MLN_STATUS_OK),
+                Err(error) => Ok(generated_callback_status(
+                    py,
+                    error,
+                    sys::MLN_STATUS_NATIVE_ERROR,
+                )),
             }
         },
     );
@@ -770,12 +772,12 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     event: sys::mln_log_event,
     code: i64,
     message: *const std::ffi::c_char,
-) -> u32 {
+) -> bool {
     let outcome = generated_invoke(
-        || 0,
+        || false,
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(0);
+                return Ok(false);
             };
             let result = callback.bind(py).call1((
                 generated_value(py, severity)?,
@@ -784,9 +786,9 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
                 unsafe { generated_c_string(py, message, false) }?,
             ))?;
             if result.is_none() {
-                Ok(0)
+                Ok(false)
             } else {
-                result.extract::<u32>()
+                result.extract::<bool>()
             }
         },
     );

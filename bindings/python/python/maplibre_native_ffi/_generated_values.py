@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Buffer, Callable, Sequence
+from collections.abc import Buffer, Sequence
 from dataclasses import dataclass, field
 from enum import IntFlag
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from ._enum import UnknownIntEnum
 from ._operation import _wrap_response
@@ -1119,7 +1119,7 @@ class CameraTransitionHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    callback: Callable[[CameraTransitionEnd], None] | None = None
+    callback: CameraTransitionEndCallback | None = None
 
     def _invoke_callback(self, end):
         callback = self.callback
@@ -1191,8 +1191,8 @@ class CustomGeometrySourceOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    fetch_tile: Callable[[CanonicalTileId], None] | None = None
-    cancel_tile: Callable[[CanonicalTileId], None] | None = None
+    fetch_tile: CustomSourceFetchTileCallback | None = None
+    cancel_tile: CustomSourceCancelTileCallback | None = None
     min_zoom: float | None = None
 
     max_zoom: float | None = None
@@ -1244,8 +1244,8 @@ class CustomMvtVectorSourceOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    fetch_tile: Callable[[CanonicalTileId], None] | None = None
-    cancel_tile: Callable[[CanonicalTileId], None] | None = None
+    fetch_tile: CustomSourceFetchTileCallback | None = None
+    cancel_tile: CustomSourceCancelTileCallback | None = None
     min_zoom: float | None = None
 
     max_zoom: float | None = None
@@ -1593,10 +1593,7 @@ class HttpHeaderTransform:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: (
-        Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status | None]
-        | None
-    ) = None
+    callback: HttpHeaderTransformCallback | None = None
     rules: Sequence[HttpHeaderRule] = ()
     """Header rules for a transform without a callback; empty with one."""
 
@@ -1700,7 +1697,7 @@ class LogHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
 
-    callback: Callable[[LogSeverity, LogEvent, int, str], int | None] | None = None
+    callback: LogCallback | None = None
 
     def _invoke_callback(self, severity, event, code, message):
         callback = self.callback
@@ -2744,8 +2741,8 @@ class QueueLock:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    lock: Callable[[], None] | None = None
-    unlock: Callable[[], None] | None = None
+    lock: QueueLockCallback | None = None
+    unlock: QueueLockCallback | None = None
 
     def _invoke_lock(self):
         callback = self.lock
@@ -3166,7 +3163,7 @@ class ResourceProvider:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: Callable[[ResourceRequestInfo, ResourceRequestHandle], None] | None = None
+    callback: ResourceProviderCallback | None = None
     routes: Sequence[ResourceRoute] = ()
     """The requests that reach the provider; empty to claim every request."""
 
@@ -3211,7 +3208,7 @@ class ResourceRequestCancelHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: Callable[[], None] | None = None
+    callback: ResourceRequestCancelCallback | None = None
 
     def _invoke_callback(self):
         callback = self.callback
@@ -3354,9 +3351,7 @@ class ResourceTransform:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: (
-        Callable[[ResourceKind, str, ResourceTransformRequestHandle], None] | None
-    ) = None
+    callback: ResourceTransformCallback | None = None
 
     def _invoke_callback(self, kind, url, request):
         callback = self.callback
@@ -3443,7 +3438,7 @@ class RuntimeEventHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: Callable[[tuple[RuntimeEvent, ...]], None] | None = None
+    callback: RuntimeEventCallback | None = None
 
     def _invoke_callback(self, events):
         callback = self.callback
@@ -4552,7 +4547,7 @@ class Wake:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
     """
 
-    callback: Callable[[], None] | None = None
+    callback: WakeCallback | None = None
 
     def _invoke_callback(self):
         callback = self.callback
@@ -4655,3 +4650,135 @@ class WglContextDescriptor:
             share_context=raw["share_context"],
             get_proc_address=raw["get_proc_address"],
         )
+
+
+class CameraTransitionEndCallback(Protocol):
+    """Receives the end of one camera command's transitions.
+
+    See `mln_camera_transition_end_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    def __call__(self, end: CameraTransitionEnd, /) -> None: ...
+
+
+class CustomSourceCancelTileCallback(Protocol):
+    """Cancels a request for one tile of a custom geometry or custom MVT vector
+    source, best effort.
+
+    See `mln_custom_source_cancel_tile_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
+    def __call__(self, tile_id: CanonicalTileId, /) -> None: ...
+
+
+class CustomSourceFetchTileCallback(Protocol):
+    """Requests one tile of a custom geometry or custom MVT vector source.
+
+    See `mln_custom_source_fetch_tile_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
+    def __call__(self, tile_id: CanonicalTileId, /) -> None: ...
+
+
+class HttpHeaderTransformCallback(Protocol):
+    """Adds end-to-end headers to one outgoing HTTP request attempt.
+
+    See `mln_http_header_transform_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+    Return to succeed. Raising a `MaplibreError` whose status is not
+    `Status.OK` fails the call with that status. Any other exception fails it
+    with `Status.NATIVE_ERROR` and is reported to `sys.unraisablehook`.
+    """
+
+    def __call__(
+        self,
+        kind: ResourceKind,
+        url: str,
+        out_response: HttpHeaderTransformResponseScope,
+        /,
+    ) -> None: ...
+
+
+class LogCallback(Protocol):
+    """Receives a MapLibre Native log record.
+
+    See `mln_log_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+
+    Returning None answers `False`, as does an exception, which is reported
+    to `sys.unraisablehook`.
+    """
+
+    def __call__(
+        self, severity: LogSeverity, event: LogEvent, code: int, message: str, /
+    ) -> bool | None: ...
+
+
+class QueueLockCallback(Protocol):
+    """Takes or returns the host's lock on the queue that a session shares with
+    it. Native code relies on the lock being held or released when the call
+    returns.
+
+    See `mln_queue_lock_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    def __call__(self, /) -> None: ...
+
+
+class ResourceProviderCallback(Protocol):
+    """Intercepts a network resource request.
+
+    See `mln_resource_provider_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    def __call__(
+        self, request: ResourceRequestInfo, handle: ResourceRequestHandle, /
+    ) -> None: ...
+
+
+class ResourceRequestCancelCallback(Protocol):
+    """Reports that MapLibre cancelled a C API resource provider request.
+
+    See `mln_resource_request_cancel_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    def __call__(self, /) -> None: ...
+
+
+class ResourceTransformCallback(Protocol):
+    """Asks the host for the URL of one network resource request.
+
+    See `mln_resource_transform_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    def __call__(
+        self, kind: ResourceKind, url: str, request: ResourceTransformRequestHandle, /
+    ) -> None: ...
+
+
+class RuntimeEventCallback(Protocol):
+    """Receives selected events after their snapshots have been published.
+
+    See `mln_runtime_event_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    def __call__(self, events: tuple[RuntimeEvent, ...], /) -> None: ...
+
+
+class WakeCallback(Protocol):
+    """Schedules service by the receiver that owns a queue or driver.
+
+    See `mln_wake_callback` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+    """
+
+    def __call__(self, /) -> None: ...

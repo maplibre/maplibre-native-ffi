@@ -98,6 +98,40 @@ def callback_output(values, callback):
     raise Unsupported(f"{callback.native}: callback result requires a native copy")
 
 
+def failure_value(callback):
+    """The Rust value of a callback's `failure=`: a literal, such as a scalar
+    result's integer or boolean, or else a `sys` constant."""
+    failure = callback.failure
+    if failure in {None, "contain"}:
+        return "Default::default()"
+    if callback.result.kind == "scalar" or failure.lstrip("-").isdigit():
+        return failure
+    return f"sys::{failure}"
+
+
+def callback_doc(summary, callback, indent):
+    """A callback field's doc, which names the arguments that a closure bound
+    cannot, and how a status callback's error reaches native."""
+    paragraphs = []
+    if callback.arguments:
+        names = ", ".join(f"`{p.name}`" for p in callback.arguments)
+        paragraphs.append([f"The callback receives ({names})."])
+    if callback.status:
+        paragraphs.append(
+            [
+                "An `Err` of `Error::Status` with a failure status answers native",
+                "that status. Any other error, or a panic, reaches the reporter and",
+                f"answers `{callback.failure}`.",
+            ]
+        )
+    lines = [summary] if summary else []
+    for paragraph in paragraphs:
+        if lines:
+            lines.append(f"{indent}///\n")
+        lines.extend(f"{indent}/// {line}\n" for line in paragraph)
+    return "".join(lines)
+
+
 def trampoline(values, callback, name, host, state="Self"):
     """One `unsafe extern "C"` function that runs a registration's callback.
 
@@ -139,32 +173,19 @@ def trampoline(values, callback, name, host, state="Self"):
     public, raw, converted = callback_output(values, callback)
     returns = "" if raw == "()" else f" -> {raw}"
     context = locals_by_name[callback.context]
-    host = f"{adoptions}{host}({copies})"
     if callback.status:
-        failure = (
-            f"sys::{callback.failure}"
-            if callback.failure not in {None, "contain"}
-            else "Default::default()"
-        )
-        run = (
-            f'callback::invoke_status("{callback.native}", {failure}, || {{ {host} }})'
-        )
+        # The outer result carries a failure to convert the arguments, and the
+        # inner one host code's result.
+        host = f"{adoptions}Ok({host}({copies}))"
+        run = f'callback::invoke_status("{callback.native}", {failure_value(callback)}, || {{ {host} }})'
     else:
-        fallback = (
-            "()"
-            if raw == "()"
-            else f"sys::{callback.failure}"
-            if callback.failure not in {None, "contain"}
-            and not callback.failure.isdigit()
-            else callback.failure
-            if callback.failure and callback.failure.isdigit()
-            else "Default::default()"
-        )
+        host = f"{adoptions}{host}({copies})"
         body = (
             f"{{ {host}; Ok(()) }}"
             if raw == "()"
             else f"{{ let value = {host}; Ok({converted}) }}"
         )
+        fallback = "()" if raw == "()" else failure_value(callback)
         run = f'callback::invoke("{callback.native}", {fallback}, || {body})'
     return (
         f'unsafe extern "C" fn {name}({raw_arguments}){returns} {{\n'
@@ -194,7 +215,7 @@ def declaration(values, value):
         returns = "" if output == "()" else f" -> {output}"
         function = f"Fn({signature}){returns} + Send + Sync + 'static"
         fields.append(
-            f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {public}: Option<std::sync::Arc<dyn {function}>>,"
+            f"{callback_doc(doc(values.bound, f'{value.native}.{field.name}', '    '), callback, '    ')}    pub {public}: Option<std::sync::Arc<dyn {function}>>,"
         )
         writes.append(
             f"raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"

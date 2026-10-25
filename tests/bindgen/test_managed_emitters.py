@@ -344,7 +344,13 @@ mln_status mln_map_set_hooks(mln_map map, const mln_hooks *hooks, mln_diagnostic
         )
         values = Values(api)
         plans = [values.record(name) for name in ("mln_ping", "mln_hold", "mln_tally")]
-        declarations = "\n".join(values.declaration(plan) for plan in plans)
+        declarations = "\n".join(
+            [values.declaration(plan) for plan in plans]
+            + [
+                values.delegate(f"mln_{name}_callback")
+                for name in ("ping", "hold", "tally")
+            ]
+        )
         methods = "\n".join(
             values.callback_methods(plan) + values.encoder(plan) for plan in plans
         )

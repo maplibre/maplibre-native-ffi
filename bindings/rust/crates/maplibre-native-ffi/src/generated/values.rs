@@ -438,6 +438,7 @@ impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Clone, Default)]
 pub struct CameraTransitionHandler {
+    /// The callback receives (`end`).
     pub callback: Option<std::sync::Arc<dyn Fn(CameraTransitionEnd) + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for CameraTransitionHandler {
@@ -645,8 +646,12 @@ impl Default for ConstrainMode {
 #[derive(Clone)]
 pub struct CustomGeometrySourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
+    ///
+    /// The callback receives (`tile_id`).
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
+    ///
+    /// The callback receives (`tile_id`).
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -795,8 +800,12 @@ impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourc
 #[derive(Clone)]
 pub struct CustomMvtVectorSourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
+    ///
+    /// The callback receives (`tile_id`).
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
+    ///
+    /// The callback receives (`tile_id`).
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -1440,6 +1449,12 @@ impl FromNative<sys::mln_http_header_rule> for HttpHeaderRule {
 #[derive(Clone, Default)]
 pub struct HttpHeaderTransform {
     /// The callback, or null to apply rules.
+    ///
+    /// The callback receives (`kind`, `url`, `out_response`).
+    ///
+    /// An `Err` of `Error::Status` with a failure status answers native
+    /// that status. Any other error, or a panic, reaches the reporter and
+    /// answers `MLN_STATUS_NATIVE_ERROR`.
     pub callback: Option<
         std::sync::Arc<
             dyn Fn(ResourceKind, &str, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
@@ -1490,11 +1505,11 @@ impl HttpHeaderTransform {
             "mln_http_header_transform_callback",
             sys::MLN_STATUS_NATIVE_ERROR,
             || {
-                callback::require(&state.callback)?(
+                Ok(callback::require(&state.callback)?(
                     ResourceKind::from_raw(kind),
                     unsafe { maplibre_core::string::borrow_c_string(url) }?,
                     &mut HttpHeaderTransformResponse::new(out_response)?,
-                )
+                ))
             },
         )
     }
@@ -1734,8 +1749,10 @@ impl Default for LogEvent {
 #[derive(Clone, Default)]
 pub struct LogHandler {
     /// Receives each record.
+    ///
+    /// The callback receives (`severity`, `event`, `code`, `message`).
     pub callback: Option<
-        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static>,
+        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static>,
     >,
 }
 impl std::fmt::Debug for LogHandler {
@@ -1746,14 +1763,14 @@ impl std::fmt::Debug for LogHandler {
 impl LogHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static,
+        F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static,
+        F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -1763,11 +1780,11 @@ impl LogHandler {
         event: u32,
         code: i64,
         message: *const std::ffi::c_char,
-    ) -> u32 {
+    ) -> bool {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_log_callback", 0, || {
+        callback::invoke("mln_log_callback", false, || {
             let value = callback::require(&state.callback)?(
                 LogSeverity::from_raw(severity),
                 LogEvent::from_raw(event),
@@ -3857,6 +3874,8 @@ impl Default for ResourcePriority {
 #[derive(Clone, Default)]
 pub struct ResourceProvider {
     /// Answers each request that the routes leave to the provider.
+    ///
+    /// The callback receives (`request`, `handle`).
     pub callback: Option<
         std::sync::Arc<dyn Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static>,
     >,
@@ -4162,6 +4181,8 @@ impl Default for ResourceStoragePolicy {
 #[derive(Clone, Default)]
 pub struct ResourceTransform {
     /// Required in callback mode; null in queue mode.
+    ///
+    /// The callback receives (`kind`, `url`, `request`).
     pub callback: Option<
         std::sync::Arc<
             dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
@@ -4310,6 +4331,7 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct RuntimeEventHandler {
+    /// The callback receives (`events`).
     pub callback: Option<std::sync::Arc<dyn Fn(Vec<RuntimeEvent>) + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for RuntimeEventHandler {

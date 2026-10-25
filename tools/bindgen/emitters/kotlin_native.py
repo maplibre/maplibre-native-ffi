@@ -720,7 +720,9 @@ class NativeShims:
                     )
                 c_result = "void"
             else:
-                width = "long" if site.result_carrier == "Long" else "int"
+                width = {"Long": "long", "Boolean": "boolean"}.get(
+                    site.result_carrier, "int"
+                )
                 body = (
                     f"{JNI_TYPE[site.result_carrier]} result = {site.failure};\n"
                     f"  mln_jni_upcall_{width}({upcall}, {array}, &result);\n"

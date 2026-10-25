@@ -28,13 +28,12 @@ internal actual object UpcallStubs {
       code: Long,
       message: CPointer<ByteVar>? ->
       ThreadedUpcalls.logHandlerCallback(
-          userData.toLong(),
-          severity.toInt(),
-          event.toInt(),
-          code,
-          message.toLong(),
-        )
-        .toUInt()
+        userData.toLong(),
+        severity.toInt(),
+        event.toInt(),
+        code,
+        message.toLong(),
+      )
     }
     .toLong()
   actual val httpHeaderTransformCallback: Long =

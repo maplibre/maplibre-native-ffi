@@ -68,9 +68,9 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	if err := validateNativeRenderBackend(); err != nil {
 		return err
 	}
-	if err := maplibre.LogSetCallback(maplibre.LogHandler{Callback: func(severity maplibre.LogSeverity, event maplibre.LogEvent, code int64, message string) uint32 {
+	if err := maplibre.LogSetCallback(maplibre.LogHandler{Callback: func(severity maplibre.LogSeverity, event maplibre.LogEvent, code int64, message string) bool {
 		fmt.Printf("maplibre[%s/%s] %d: %s\n", logSeverity(severity), logEvent(event), code, message)
-		return 1
+		return true
 	}}); err != nil {
 		return err
 	}

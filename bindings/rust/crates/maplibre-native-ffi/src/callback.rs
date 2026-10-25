@@ -76,21 +76,25 @@ pub(crate) fn invoke<R>(
     }
 }
 
-/// Runs host code for the `callback` trampoline, which returns a status: an
-/// error's status when host code fails, and `failure` when it panics. Native
-/// treats any failure status as the callback's fallback, so an error is
-/// reported too.
+/// Runs host code for the `callback` trampoline, which returns a status.
+///
+/// `body` fails when the trampoline cannot convert its arguments, and
+/// otherwise returns host code's result. Host code that succeeds answers
+/// `MLN_STATUS_OK`, and one that fails with an [`Error::Status`] other than
+/// `Status::Ok` answers that status on purpose. Any other failure, a panic, or
+/// a conversion failure is a bug: it reaches the reporter and answers
+/// `failure`.
 pub(crate) fn invoke_status(
     callback: &'static str,
     failure: sys::mln_status,
-    body: impl FnOnce() -> Result<()>,
+    body: impl FnOnce() -> Result<Result<()>>,
 ) -> sys::mln_status {
     match run(body) {
-        Ok(Ok(())) => sys::MLN_STATUS_OK,
-        Ok(Err(error)) => {
-            let status = error.status().as_raw();
+        Ok(Ok(Ok(()))) => sys::MLN_STATUS_OK,
+        Ok(Ok(Err(Error::Status { status, .. }))) if status != crate::Status::Ok => status.as_raw(),
+        Ok(Ok(Err(error)) | Err(error)) => {
             report_error(callback, error);
-            status
+            failure
         }
         Err(payload) => {
             report_panic(callback, payload);
@@ -112,5 +116,37 @@ pub(crate) unsafe extern "C" fn release<S>(user_data: *mut c_void) {
         drop(unsafe { Box::from_raw(user_data.cast::<S>()) })
     })) {
         report_panic("mln_user_data_release", payload);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Status;
+
+    // A status that host code fails with on purpose reaches native; any other
+    // failure answers the callback's failure. The suite checks which reach
+    // the reporter, which is process-global.
+    #[test]
+    fn a_status_callback_answers_a_deliberate_status_and_fails_otherwise() {
+        let failure = sys::MLN_STATUS_NATIVE_ERROR;
+        let answer = |body: Box<dyn FnOnce() -> Result<Result<()>>>| {
+            invoke_status("probe_callback", failure, body)
+        };
+        assert_eq!(answer(Box::new(|| Ok(Ok(())))), sys::MLN_STATUS_OK);
+        let refused = Error::new(Status::Busy, "refused");
+        assert_eq!(answer(Box::new(|| Ok(Err(refused)))), sys::MLN_STATUS_BUSY);
+        for error in [
+            Error::new(Status::Ok, "no status"),
+            Error::abi_version_mismatch(1, 2),
+        ] {
+            assert_eq!(answer(Box::new(|| Ok(Err(error)))), failure);
+        }
+        let unconverted = Error::invalid_argument("unconverted");
+        assert_eq!(answer(Box::new(|| Err(unconverted))), failure);
+        assert_eq!(
+            answer(Box::new(|| std::panic::resume_unwind(Box::new("host bug")))),
+            failure
+        );
     }
 }

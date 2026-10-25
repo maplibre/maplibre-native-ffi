@@ -405,6 +405,7 @@ class Values:
                 continue
             from .go_callbacks import (
                 accepts_native,
+                callback_doc,
                 native_constructor,
                 plain,
                 registration_input,
@@ -428,7 +429,9 @@ class Values:
                         next(f.value.native for f in value.fields if f.name == member)
                     ]
                     fields.append(
-                        doc(self.api, f"{native}.{member}", None)
+                        callback_doc(
+                            doc(self.api, f"{native}.{member}", None), callback
+                        )
                         + f"{name(member)} {signature(self, callback)}"
                     )
                 if accepts_native(self, value):

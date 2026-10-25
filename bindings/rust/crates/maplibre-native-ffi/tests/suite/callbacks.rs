@@ -190,35 +190,43 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     // OpenHarmony and Emscripten have no HTTP header transforms.
     #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     {
-        // A header transform's error drops its headers, and the reporter receives
-        // it, since native keeps only a status.
-        let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
-        wait_for(fixture.runtime().clear_resource_provider());
-        wait_for(
-            fixture
-                .runtime()
-                .set_http_header_transform(HttpHeaderTransform::default().with_callback(
-                    |_, _, _| Err(Error::invalid_argument("the transform refused")),
-                )),
-        );
-        fixture
-            .map()
-            .discarding()
-            .set_style_url(&server.url("/style.json"))
-            .unwrap();
-        fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-        set_reporter(None);
-        // Other tests may run callbacks concurrently, so only this test's error
-        // counts.
+        // A header transform's error drops its headers. A failure status is
+        // deliberate, so native receives it unreported; an error without one is
+        // a bug, which the reporter receives.
         let refused = Error::invalid_argument("the transform refused");
-        let callbacks: Vec<_> = reports
+        let broken = Error::new(Status::Ok, "the transform failed without a status");
+        let deliberate = LoopbackServer::start("/refused.json", BACKGROUND_STYLE_JSON);
+        let buggy = LoopbackServer::start("/broken.json", BACKGROUND_STYLE_JSON);
+        wait_for(fixture.runtime().clear_resource_provider());
+        let (answer_refused, answer_broken) = (refused.clone(), broken.clone());
+        wait_for(fixture.runtime().set_http_header_transform(
+            HttpHeaderTransform::default().with_callback(move |_, url, _| {
+                Err(if url.ends_with("/refused.json") {
+                    answer_refused.clone()
+                } else {
+                    answer_broken.clone()
+                })
+            }),
+        ));
+        for url in [deliberate.url("/refused.json"), buggy.url("/broken.json")] {
+            fixture.map().discarding().set_style_url(&url).unwrap();
+            fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+        }
+        set_reporter(None);
+        // Other tests may run callbacks concurrently, so only this test's errors
+        // count.
+        let errors: Vec<_> = reports
             .try_iter()
             .filter_map(|report| match report {
-                Report::CallbackError { callback, error } if error == refused => Some(callback),
+                Report::CallbackError {
+                    callback: "mln_http_header_transform_callback",
+                    error,
+                } if error == refused || error == broken => Some(error),
                 _ => None,
             })
             .collect();
-        assert_eq!(callbacks, ["mln_http_header_transform_callback"]);
+        assert!(errors.contains(&broken), "{errors:?}");
+        assert!(!errors.contains(&refused), "{errors:?}");
 
         // The runtime keeps working.
         wait_for(fixture.runtime().clear_http_header_transform());
@@ -388,7 +396,7 @@ fn replacing_the_log_callback_releases_the_one_it_replaced() {
     let (first, first_released) = release_probe();
     log_set_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &first;
-        1
+        true
     }))
     .unwrap();
     assert!(first_released.try_recv().is_err());
@@ -396,7 +404,7 @@ fn replacing_the_log_callback_releases_the_one_it_replaced() {
     let (second, second_released) = release_probe();
     log_set_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &second;
-        1
+        true
     }))
     .unwrap();
     await_release(&first_released);

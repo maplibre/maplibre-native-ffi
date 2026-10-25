@@ -26,7 +26,7 @@ public data class LogHandler(
  *
  * Native code calls it on one of its own threads and waits for it to return.
  *
- * If it throws, native receives `0`, and the binding reports it as a `CallbackException`.
+ * If it throws, native receives `false`, and the binding reports it as a `CallbackException`.
  *
  * See `mln_log_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -37,7 +37,7 @@ public fun interface LogCallback {
     event: LogEvent,
     code: Long,
     message: String,
-  ): UInt
+  ): Boolean
 }
 
 /**
@@ -59,8 +59,9 @@ public data class HttpHeaderTransform(
  *
  * Native code calls it on one of its own threads and waits for it to return.
  *
- * If it throws, native receives `MLN_STATUS_NATIVE_ERROR`, and the binding reports it as a
- * `CallbackException`.
+ * It returns normally to succeed and throws a `MaplibreException` that carries a failure status to
+ * fail, and native receives that status. If it throws anything else, native receives
+ * `MLN_STATUS_NATIVE_ERROR`, and the binding reports it as a `CallbackException`.
  *
  * See `mln_http_header_transform_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

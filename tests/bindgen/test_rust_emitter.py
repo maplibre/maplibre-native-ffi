@@ -118,6 +118,35 @@ class RustEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", values)
 
+    def test_a_callback_documents_its_arguments_and_returns_a_bool_result(self):
+        values = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        # A closure bound cannot name its arguments, so the field's doc does.
+        self.assertIn(
+            "    /// The callback receives (`severity`, `event`, `code`, `message`).\n"
+            "    pub callback: Option<",
+            values,
+        )
+        self.assertIn("Fn(LogSeverity, LogEvent, i64, &str) -> bool", values)
+        self.assertIn('callback::invoke("mln_log_callback", false, ||', values)
+
+    def test_a_status_callback_separates_conversion_from_host_failure(self):
+        values = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        # A conversion's `?` fails the outer result, which is always reported;
+        # host code's result is the inner one.
+        self.assertIn(
+            '"mln_http_header_transform_callback", sys::MLN_STATUS_NATIVE_ERROR, '
+            "|| { Ok(callback::require(&state.callback)?(",
+            values,
+        )
+        self.assertIn(
+            "    /// An `Err` of `Error::Status` with a failure status answers native\n",
+            values,
+        )
+
     def test_a_dispose_with_a_completion_releases_and_disposes(self):
         api = parse(
             DISPOSE_WITH_COMPLETION, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",)

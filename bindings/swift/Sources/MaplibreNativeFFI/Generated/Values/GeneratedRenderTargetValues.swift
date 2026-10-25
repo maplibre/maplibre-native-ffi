@@ -325,12 +325,11 @@ public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_queue_lock` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct QueueLock: Sendable {
-  public var lock: (@Sendable () -> Void)?
-  public var unlock: (@Sendable () -> Void)?
-  public init(
-    lock: (@Sendable () -> Void)? = nil,
-    unlock: (@Sendable () -> Void)? = nil
-  ) {
+  public var lock: QueueLockCallback?
+  public var unlock: QueueLockCallback?
+  public init(lock: QueueLockCallback? = nil,
+              unlock: QueueLockCallback? = nil)
+  {
     self.lock = lock
     self.unlock = unlock
   }
@@ -364,6 +363,13 @@ private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
     .takeUnretainedValue()
   box.value.unlock?()
 }
+
+/// Takes or returns the host's lock on the queue that a session shares with it.
+/// Native code relies on the lock being held or released when the call returns.
+///
+/// See `mln_queue_lock_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public typealias QueueLockCallback = @Sendable () -> Void
 
 /// Execution placement for one render session.
 ///

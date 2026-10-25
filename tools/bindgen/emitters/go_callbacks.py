@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from .. import async_hosts
 from ..model import ModelError
-from .go import native_identifier
+from .go import GO_KEYWORDS, native_identifier
 from .go_values import name, public
 
 
@@ -35,12 +35,48 @@ def validate(values, plan):
             values.require(callback.result)
 
 
+def parameter_name(parameter):
+    """A callback argument's name in a func type: its C name in camel case."""
+    first, *rest = parameter.name.split("_")
+    label = first + "".join(name(part) for part in rest)
+    while label in GO_KEYWORDS:
+        label += "_"
+    return label
+
+
 def signature(values, callback):
-    args = [values.type(p.value) for p in callback.arguments]
+    args = [parameter_name(p) + " " + values.type(p.value) for p in callback.arguments]
     result = (
-        "" if callback.result.native == "void" else " " + values.type(callback.result)
+        ""
+        if callback.result.native == "void"
+        else " error"
+        if callback.status
+        else " " + values.type(callback.result)
     )
     return "func(" + ", ".join(args) + ")" + result
+
+
+def callback_doc(summary, callback):
+    """A callback field's doc, with how a status callback's error reaches
+    native."""
+    if not callback.status:
+        return summary
+    text = (
+        "A failure Status or an *Error with one, or an error that wraps "
+        "either, answers native that status. Any other error, or a panic, is "
+        f"logged and answers {callback.failure}."
+    )
+    lines = "".join(f"// {line}\n" for line in textwrap.wrap(text, 77))
+    return summary + "//\n" + lines if summary else lines
+
+
+def failure_value(callback):
+    """The Go value of a callback's `failure=`: a literal, such as a scalar
+    result's integer or boolean, or else a C constant."""
+    failure = callback.failure
+    if callback.result.kind == "scalar" or failure.lstrip("-").isdigit():
+        return failure
+    return "C." + failure
 
 
 def c_decl(value, identifier, mutable=False):
@@ -86,16 +122,7 @@ def sources(values, plan):
         go_ret = (
             "" if ret == "void" else " (result " + values.c_type(callback.result) + ")"
         )
-        failure = (
-            ""
-            if ret == "void"
-            else "result = "
-            + (
-                "C." + callback.failure
-                if callback.failure.startswith("MLN_")
-                else callback.failure
-            )
-        )
+        failure = "" if ret == "void" else "result = " + failure_value(callback)
         setup = [failure]
         copied = []
         # A handle the callback owns is adopted first; a callback that never
@@ -138,6 +165,8 @@ def sources(values, plan):
         setup.append(
             invoke
             if ret == "void"
+            else f'result = {values.c_type(callback.result)}(bindingCallbackStatus("{callback.native}", {invoke}, {failure_value(callback)}))'
+            if callback.status
             else f"result = {values.c_type(callback.result)}({invoke})"
         )
         go.append(

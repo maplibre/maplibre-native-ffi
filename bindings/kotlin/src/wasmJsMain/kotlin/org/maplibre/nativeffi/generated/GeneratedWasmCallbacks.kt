@@ -25,7 +25,7 @@ public data class QueuedLogHandler(
 
 /**
  * Receives a MapLibre Native log record. The page receives the call after native has answered it,
- * so the callback returns nothing, and native answers `1` as it does for a queue.
+ * so the callback returns nothing, and native answers `true` as it does for a queue.
  *
  * The page calls it when it drains the binding's delivery queue.
  *

@@ -56,9 +56,9 @@ class CallbackLogObserver final : public mln::Log::Observer {
 
     const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     return callback_(
-             user_data_, static_cast<std::uint32_t>(severity),
-             static_cast<std::uint32_t>(event), code, message.c_str()
-           ) != 0U;
+      user_data_, static_cast<std::uint32_t>(severity),
+      static_cast<std::uint32_t>(event), code, message.c_str()
+    );
   }
 
  private:
@@ -72,7 +72,7 @@ class CallbackLogObserver final : public mln::Log::Observer {
 auto queue_log_record(
   void* registration, std::uint32_t severity, std::uint32_t event,
   std::int64_t code, const char* message
-) noexcept -> std::uint32_t {
+) noexcept -> bool {
   const auto record = mln_log_delivery{
     .severity = severity,
     .event = event,
@@ -80,9 +80,7 @@ auto queue_log_record(
     .message = message,
   };
   return static_cast<const mln::delivery::QueuedRegistration*>(registration)
-             ->push<MLN_DELIVERY_TYPE_LOG_RECORD>(record)
-           ? 1U
-           : 0U;
+    ->push<MLN_DELIVERY_TYPE_LOG_RECORD>(record);
 }
 
 auto set_severity_async(

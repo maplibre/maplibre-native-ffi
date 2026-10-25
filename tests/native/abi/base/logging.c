@@ -40,7 +40,7 @@ static void restoring_log_state(void (*body)(void)) {
   static void name(void) { restoring_log_state(name##_body); } \
   static void name##_body(void)
 
-static uint32_t ignore_log_record(
+static bool ignore_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -49,7 +49,7 @@ static uint32_t ignore_log_record(
   (void)event;
   (void)code;
   (void)message;
-  return 0;
+  return false;
 }
 
 static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
@@ -145,7 +145,7 @@ typedef struct discarded_failure_probe {
   char message[256];
 } discarded_failure_probe;
 
-static uint32_t record_discarded_failure(
+static bool record_discarded_failure(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -157,7 +157,7 @@ static uint32_t record_discarded_failure(
     snprintf(probe->message, sizeof(probe->message), "%s", message);
     atomic_fetch_add(&probe->warnings, 1);
   }
-  return 1;
+  return true;
 }
 
 LOG_STATE_CASE(a_failed_discarded_command_logs_one_warning) {
@@ -192,7 +192,7 @@ typedef struct reentry_probe {
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } reentry_probe;
 
-static uint32_t clear_from_log_callback(
+static bool clear_from_log_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -208,7 +208,7 @@ static uint32_t clear_from_log_callback(
     );
     atomic_store(&probe->callback_status, status);
   }
-  return 1;
+  return true;
 }
 
 static void clear_from_log_release(void* user_data) {
@@ -295,13 +295,13 @@ static bool is_dump_record(const char* message) {
 }
 
 // Consumes every other record, so the verdict can only matter per record.
-static uint32_t record_dump(
+static bool record_dump(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
   dump_probe* probe = user_data;
   if (message == NULL || !is_dump_record(message)) {
-    return 0;
+    return false;
   }
   const int index = atomic_fetch_add(&probe->count, 1);
   if (index >= DUMP_RECORD_COUNT) {

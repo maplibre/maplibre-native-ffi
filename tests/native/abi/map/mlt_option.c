@@ -48,7 +48,7 @@ static void serve_recorded_tile(
 // outlives any registration a failing case leaves behind.
 static atomic_bool mlt_parse_warning_logged;
 
-static uint32_t record_mlt_parse_warning(
+static bool record_mlt_parse_warning(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -60,7 +60,7 @@ static uint32_t record_mlt_parse_warning(
   ) {
     mln_test_flag_set(&mlt_parse_warning_logged);
   }
-  return 0;
+  return false;
 }
 
 // One static map that loads one recorded tile through a provider.

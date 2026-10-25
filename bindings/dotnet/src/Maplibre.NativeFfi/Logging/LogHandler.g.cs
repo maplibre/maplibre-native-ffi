@@ -12,6 +12,4 @@ namespace Maplibre.NativeFfi;
 /// <param name="Callback">
 /// Receives each record.
 /// </param>
-public readonly partial record struct LogHandler(
-    Func<LogSeverity, LogEvent, long, string, uint>? Callback
-);
+public readonly partial record struct LogHandler(LogCallback? Callback);

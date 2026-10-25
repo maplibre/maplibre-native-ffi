@@ -60,9 +60,39 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(
-            "type RuntimeEventHandler struct { Callback func([]RuntimeEvent) }", source
+            "type RuntimeEventHandler struct { Callback func(events []RuntimeEvent) }",
+            source,
         )
         self.assertNotIn("EventBatchView", source)
+
+    def test_a_func_names_its_arguments_and_returns_a_bool_result(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "Callback func(severity LogSeverity, event LogEvent, code int64, "
+            "message string) bool",
+            source,
+        )
+        # The log callback's failure is false, which a panic answers too.
+        self.assertIn("(result C.bool) { result = false; ", source)
+
+    def test_a_status_callback_returns_an_error_that_the_trampoline_maps(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "Callback func(kind ResourceKind, url string, "
+            "outResponse *HttpHeaderTransformResponseScope) error",
+            source,
+        )
+        self.assertIn(
+            'result = C.mln_status(bindingCallbackStatus("mln_http_header_transform_callback", ',
+            source,
+        )
+        self.assertIn("), C.MLN_STATUS_NATIVE_ERROR))", source)
+        self.assertIn(
+            "// answers native that status. Any other error, or a panic, is logged and\n"
+            "// answers MLN_STATUS_NATIVE_ERROR.\n"
+            "Callback func(kind ResourceKind",
+            source,
+        )
 
     def test_wakes_and_synchronous_registrations_take_a_native_registration(self):
         # Every other registration takes only Go funcs, whose calls enter the

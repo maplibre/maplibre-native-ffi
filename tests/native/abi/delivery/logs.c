@@ -175,7 +175,7 @@ LOG_STATE_CASE(replace_and_clear_retire_a_queue_handler_once) {
   mln_test_delivery_queue_release(&queue);
 }
 
-static uint32_t ignore_log_record(
+static bool ignore_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -184,7 +184,7 @@ static uint32_t ignore_log_record(
   (void)event;
   (void)code;
   (void)message;
-  return 0;
+  return false;
 }
 
 LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {

@@ -260,6 +260,12 @@ def throw_note(value, values):
     report = "the binding reports it as a `CallbackException`"
     if callback.failure == "contain" or queued(value, values):
         return f"If it throws, {report}."
+    if status_callback(callback):
+        return (
+            "It returns normally to succeed and throws a `MaplibreException` that "
+            "carries a failure status to fail, and native receives that status. If "
+            f"it throws anything else, native receives `{callback.failure}`, and {report}."
+        )
     return f"If it throws, native receives `{callback.failure}`, and {report}."
 
 
@@ -595,13 +601,20 @@ def constant_number(symbol, values, what):
     return number
 
 
+def result_literal(callback, symbol, values, what):
+    """The Kotlin literal of a callback result constant, in the result's carrier."""
+    result = carrier(callback.result, values)
+    if result == "Boolean":
+        if symbol not in {"true", "false"}:
+            raise Unsupported(f"callback {what} {symbol} needs a bool constant")
+        return symbol
+    return number_literal(constant_number(symbol, values, what), result)
+
+
 def failure_literal(callback, values):
     if callback.result.native == "void":
         return "Unit"
-    return number_literal(
-        constant_number(callback.failure, values, "failure"),
-        carrier(callback.result, values),
-    )
+    return result_literal(callback, callback.failure, values, "failure")
 
 
 def callback_argument(parameter, values):
@@ -663,9 +676,12 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
             owned.append(local)
         else:
             arguments.append(callback_argument(parameter, values))
+    # A status callback's host callback returns nothing and throws to fail, so
+    # the runtime maps what it throws to a status.
+    runner = "statusUpcall" if status_callback(callback) else "upcall"
     invoke = f"value.{member}"
     if callback_value.nullable:
-        lines.insert(0, f"val invoke = {invoke} ?: return@upcall {failure}")
+        lines.insert(0, f"val invoke = {invoke} ?: return@{runner} {failure}")
         invoke = "invoke"
     invocation = f"{invoke}({', '.join(arguments)})"
     if any(callback_scoped(p.value) for p in callback.arguments):
@@ -681,8 +697,9 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
     else:
         lines.append(callback_result(callback.result, invocation, values))
     context = identifier(callback.context)
+    types = root_type if status_callback(callback) else f"{root_type}, {result}"
     body = (
-        f'upcall<{root_type}, {result}>("{callback.native}", {context}, {failure}) '
+        f'{runner}<{types}>("{callback.native}", {context}, {failure}) '
         f"{{ value -> {'; '.join(lines)} }}"
     )
     sites(values)[site_name] = Site(
@@ -715,9 +732,7 @@ def queued_site(
     answer = (
         "Unit"
         if callback.result.native == "void"
-        else number_literal(
-            constant_number(callback.queue_result, values, "queue result"), result
-        )
+        else result_literal(callback, callback.queue_result, values, "queue result")
     )
     adopted, owners, arguments = [], [], []
     for parameter in callback.arguments:
@@ -795,6 +810,7 @@ UPCALL_IMPORTS = (
     "import org.maplibre.nativeffi.internal.async.CompletionBridge\n"
     "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
     "import org.maplibre.nativeffi.internal.callback.contain\n"
+    "import org.maplibre.nativeffi.internal.callback.statusUpcall\n"
     "import org.maplibre.nativeffi.internal.callback.upcall\n"
     "import org.maplibre.nativeffi.internal.callback.withCallbackScope\n"
     "import org.maplibre.nativeffi.internal.memory.*\n"

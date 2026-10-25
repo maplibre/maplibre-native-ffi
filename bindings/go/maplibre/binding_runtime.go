@@ -7,6 +7,7 @@ package maplibre
 import "C"
 
 import (
+	"errors"
 	"log/slog"
 	"runtime"
 	"runtime/cgo"
@@ -383,6 +384,24 @@ func bindingReportCallbackPanic(callback string, failure any) {
 	// A panicking handler must not escape the trampoline either.
 	defer func() { _ = recover() }()
 	slog.Error("maplibre: callback panicked", "callback", callback, "panic", failure, "stack", string(debug.Stack()))
+}
+
+// bindingCallbackStatus is the status that the trampoline of the C callback
+// type named callback returns for host code's error. Nil answers StatusOk, and
+// a Status other than StatusOk that err is or wraps, such as an *Error's,
+// answers that status on purpose. Any other error is a bug: it is logged
+// through the default slog logger, as a panic is, and answers failure.
+func bindingCallbackStatus(callback string, err error, failure Status) Status {
+	if err == nil {
+		return StatusOk
+	}
+	// An *Error unwraps to its Status.
+	var deliberate Status
+	if errors.As(err, &deliberate) && deliberate != StatusOk {
+		return deliberate
+	}
+	slog.Error("maplibre: callback failed", "callback", callback, "error", err)
+	return failure
 }
 
 // Native threads enter the export below, so a panic must not cross cgo:

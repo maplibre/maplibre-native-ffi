@@ -7,7 +7,7 @@ func installCAPILogging() {
       print(
         "[MapLibre] severity=\(severity) event=\(event) code=\(code): \(message)"
       )
-      return 1
+      return true
     })
   } catch {
     print("log callback install failed: \(error)")

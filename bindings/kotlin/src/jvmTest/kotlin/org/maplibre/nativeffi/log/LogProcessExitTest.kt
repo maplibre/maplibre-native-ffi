@@ -54,7 +54,7 @@ object LogProcessExitProbe {
         if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {
           received.countDown()
         }
-        1u
+        true
       },
     )
     if (callbackState == "live") {

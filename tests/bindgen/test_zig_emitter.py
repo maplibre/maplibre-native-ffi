@@ -69,10 +69,39 @@ class ZigEmitterTests(unittest.TestCase):
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = zig.generate(real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
-            "?*const fn (?*anyopaque, []const RuntimeEvent) anyerror!void",
+            "?*const fn (context: ?*anyopaque, events: []const RuntimeEvent) "
+            "anyerror!void",
             source,
         )
         self.assertNotIn("EventBatchView", source)
+
+    def test_a_callback_names_its_arguments_and_returns_a_bool_result(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        self.assertIn(
+            '@"callback": ?*const fn (context: ?*anyopaque, severity: LogSeverity, '
+            "event: LogEvent, code: i64, message: []const u8) anyerror!bool = null,",
+            source,
+        )
+        # The log callback's failure is false, which an error answers.
+        self.assertIn(
+            'callbacks.reportError("mln_log_callback", err); return false; }', source
+        )
+
+    def test_a_status_callback_answers_a_named_status_and_reports_other_errors(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        self.assertIn(
+            "url: []const u8, out_response: HttpHeaderTransformResponse) "
+            "anyerror!void = null,",
+            source,
+        )
+        # An error that names a status fails on purpose, so only another error
+        # is reported, and it answers the failure.
+        self.assertIn(
+            "catch |err| { if (status.rawStatus(err)) |deliberate| return deliberate; "
+            'callbacks.reportError("mln_http_header_transform_callback", err); '
+            "return c.MLN_STATUS_NATIVE_ERROR; };",
+            source,
+        )
 
     def test_a_dispose_with_a_completion_releases_and_disposes(self):
         api = parse(

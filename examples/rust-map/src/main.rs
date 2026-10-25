@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     maplibre_native_ffi::log_set_callback(maplibre_native_ffi::LogHandler::new(
         |severity, event, code, message| {
             eprintln!("MapLibre {:?} {:?} {}: {}", severity, event, code, message);
-            1
+            true
         },
     ))?;
     struct ClearLogCallback;

@@ -104,7 +104,8 @@ class DartEmitterTests(unittest.TestCase):
     def test_a_callback_receives_its_slice_argument_as_a_list(self):
         values = dart.generate_values(real_api())
         self.assertIn(
-            "typedef RuntimeEventCallback = void Function(List<RuntimeEvent>);", values
+            "typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);",
+            values,
         )
         self.assertNotIn("EventBatchView", values)
         self.assertIn(

@@ -46,6 +46,64 @@ public sealed class ResourceTransformTests
         Assert.Throws<MaplibreException>(() => retained.SetHeader("X-Test", "late"));
     }
 
+    // A header transform returns to succeed and throws to fail. A thrown MaplibreException with a
+    // failing status is deliberate: native receives that status and nothing is reported. Any other
+    // exception is reported and answers the native-error fallback.
+    [Fact]
+    public unsafe void AHeaderTransformAnswersOkTheStatusItThrowsOrItsFallback()
+    {
+        Exception? thrown = null;
+        var reports = new List<Exception>();
+        // Other tests' callbacks may throw concurrently, so only this test's exceptions count.
+        EventHandler<CallbackExceptionEventArgs> record = (_, report) =>
+        {
+            if (ReferenceEquals(report.Exception, thrown))
+                lock (reports)
+                    reports.Add(report.Exception);
+        };
+        using var scope = new NativeCallScope();
+        var native = GeneratedValues.NativeHttpHeaderTransform(
+            new HttpHeaderTransform
+            {
+                Callback = (_, _, _) =>
+                {
+                    if (thrown is not null)
+                        throw thrown;
+                },
+            },
+            scope
+        );
+        var response = new mln_http_header_transform_response
+        {
+            size = (uint)sizeof(mln_http_header_transform_response),
+        };
+        var url = scope.CString("transform-test://style.json");
+        var responsePointer = &response;
+        mln_status Invoke(Exception? exception)
+        {
+            thrown = exception;
+            return native.callback(native.user_data, 1, url, responsePointer);
+        }
+
+        Maplibre.CallbackException += record;
+        try
+        {
+            Assert.Equal(mln_status.MLN_STATUS_OK, Invoke(null));
+            Assert.Equal(
+                mln_status.MLN_STATUS_INVALID_ARGUMENT,
+                Invoke(new MaplibreException(Status.InvalidArgument, "Deliberate."))
+            );
+            Assert.Empty(reports);
+            var succeeded = new MaplibreException(Status.Ok, "Not a failure.");
+            Assert.Equal(mln_status.MLN_STATUS_NATIVE_ERROR, Invoke(succeeded));
+            Assert.Same(succeeded, Assert.Single(reports));
+        }
+        finally
+        {
+            Maplibre.CallbackException -= record;
+        }
+    }
+
     [Fact]
     public async Task ATransformRequestIsAnsweredFromAnotherThreadAfterItsCallback()
     {

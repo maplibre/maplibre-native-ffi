@@ -1916,7 +1916,7 @@ func copyCameraTransitionEnd(raw C.mln_camera_transition_end) CameraTransitionEn
 //
 // See mln_camera_transition_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraTransitionHandler struct{ Callback func(CameraTransitionEnd) }
+type CameraTransitionHandler struct{ Callback func(end CameraTransitionEnd) }
 
 func nativeCameraTransitionHandler(input CameraTransitionHandler, arena *bindingArena) C.mln_camera_transition_handler {
 	raw := C.mln_camera_transition_handler{}
@@ -2004,9 +2004,9 @@ type CustomGeometrySourceOptions struct {
 	Clip      *bool
 	Wrap      *bool
 	// Tile fetch callback. Required in callback mode; null in queue mode.
-	FetchTile func(CanonicalTileId)
+	FetchTile func(tileId CanonicalTileId)
 	// Optional best-effort tile cancel callback. Null in queue mode.
-	CancelTile func(CanonicalTileId)
+	CancelTile func(tileId CanonicalTileId)
 }
 
 func copyCustomGeometrySourceOptions(raw C.mln_custom_geometry_source_options) CustomGeometrySourceOptions {
@@ -2058,9 +2058,9 @@ type CustomMvtVectorSourceOptions struct {
 	MinZoom *float64
 	MaxZoom *float64
 	// Tile fetch callback. Required in callback mode; null in queue mode.
-	FetchTile func(CanonicalTileId)
+	FetchTile func(tileId CanonicalTileId)
 	// Optional best-effort tile cancel callback. Null in queue mode.
-	CancelTile func(CanonicalTileId)
+	CancelTile func(tileId CanonicalTileId)
 }
 
 func copyCustomMvtVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options) CustomMvtVectorSourceOptions {
@@ -2458,7 +2458,11 @@ type HttpHeaderTransform struct {
 	// Header rules for a transform without a callback; empty with one.
 	Rules []HttpHeaderRule
 	// The callback, or null to apply rules.
-	Callback func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status
+	//
+	// A failure Status or an *Error with one, or an error that wraps either,
+	// answers native that status. Any other error, or a panic, is logged and
+	// answers MLN_STATUS_NATIVE_ERROR.
+	Callback func(kind ResourceKind, url string, outResponse *HttpHeaderTransformResponseScope) error
 }
 
 func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C.mln_http_header_transform {
@@ -2604,7 +2608,7 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 type LogHandler struct {
 	// Receives each record.
-	Callback func(LogSeverity, LogEvent, int64, string) uint32
+	Callback func(severity LogSeverity, event LogEvent, code int64, message string) bool
 }
 
 func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
@@ -4002,7 +4006,7 @@ type ResourceProvider struct {
 	// The requests that reach the provider; empty to claim every request.
 	Routes []ResourceRoute
 	// Answers each request that the routes leave to the provider.
-	Callback func(ResourceRequestInfo, *ResourceRequestHandle)
+	Callback func(request ResourceRequestInfo, handle *ResourceRequestHandle)
 }
 
 func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_resource_provider {
@@ -4196,7 +4200,7 @@ func DefaultResourceRoute() ResourceRoute { return copyResourceRoute(C.mln_resou
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransform struct {
 	// Required in callback mode; null in queue mode.
-	Callback func(ResourceKind, string, *ResourceTransformRequestHandle)
+	Callback func(kind ResourceKind, url string, request *ResourceTransformRequestHandle)
 }
 
 func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln_resource_transform {
@@ -4270,7 +4274,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 //
 // See mln_runtime_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventHandler struct{ Callback func([]RuntimeEvent) }
+type RuntimeEventHandler struct{ Callback func(events []RuntimeEvent) }
 
 func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C.mln_runtime_event_handler {
 	raw := C.mln_runtime_event_handler{}
@@ -8674,19 +8678,19 @@ func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTrans
 }
 
 //export mlnGo_mln_log_handler_callback
-func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
-	result = 0
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.bool) {
+	result = false
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_log_callback", failure)
-			result = 0
+			result = false
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[LogHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.uint32_t(callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), C.GoString(native_message)))
+	result = C.bool(callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), C.GoString(native_message)))
 	return
 }
 
@@ -8863,7 +8867,7 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.mln_status(callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &HttpHeaderTransformResponseScope{native: native_out_response, scope: scope}))
+	result = C.mln_status(bindingCallbackStatus("mln_http_header_transform_callback", callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &HttpHeaderTransformResponseScope{native: native_out_response, scope: scope}), C.MLN_STATUS_NATIVE_ERROR))
 	return
 }
 

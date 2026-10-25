@@ -48,6 +48,9 @@ bool mln_jni_upcall_int(
 bool mln_jni_upcall_long(
   mln_jni_upcall* upcall, const jvalue* arguments, jlong* result
 );
+bool mln_jni_upcall_boolean(
+  mln_jni_upcall* upcall, const jvalue* arguments, jboolean* result
+);
 
 // Defined by the generated shim: the natives of
 // org.maplibre.nativeffi.internal.c.C, the upcall methods, and, at the same

@@ -41,7 +41,7 @@ public sealed class LoggingTests
                 (_, _, _, _) =>
                 {
                     GC.KeepAlive(captured);
-                    return 0;
+                    return false;
                 }
             )
         );
@@ -52,12 +52,7 @@ public sealed class LoggingTests
     public unsafe void TheLogTrampolineCopiesUnknownValuesAndContainsExceptions()
     {
         (uint Severity, uint Event, long Code, string Message)? copied = null;
-        Func<LogSeverity, LogEvent, long, string, uint> callback = (
-            severity,
-            @event,
-            code,
-            message
-        ) =>
+        LogCallback callback = (severity, @event, code, message) =>
         {
             copied = ((uint)severity, (uint)@event, code, message);
             throw new FormatException("Host callback failed.");
@@ -65,7 +60,7 @@ public sealed class LoggingTests
         using var scope = new NativeCallScope();
         var handler = GeneratedValues.NativeLogHandler(new LogHandler(callback), scope);
 
-        Assert.Equal(0u, handler.callback(handler.user_data, 999, 998, 42, scope.CString("é")));
+        Assert.Equal(0, handler.callback(handler.user_data, 999, 998, 42, scope.CString("é")));
         Assert.Equal((999u, 998u, 42L, "é"), copied);
         _ = Maplibre.CVersion();
     }

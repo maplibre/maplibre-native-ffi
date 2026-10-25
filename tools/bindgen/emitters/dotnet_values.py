@@ -115,6 +115,11 @@ class Values:
             )
         if plan.kind == "callback":
             callback = self.bound.callbacks[plan.native]
+            if any(
+                public_name(name) == public_name(plan.native)
+                for name in self.bound.public_values
+            ):
+                raise Unsupported(f"{plan.native}: the delegate collides with a value")
             if callback.result.kind == "enum":
                 self.supported(callback.result)
             for parameter in callback.arguments:
@@ -218,16 +223,7 @@ class Values:
         if plan.kind == "handle":
             return pascal(plan.handle.stem) + "Handle"
         if plan.kind == "callback":
-            callback = self.bound.callbacks[plan.native]
-            arguments = [
-                self.public_type(parameter.value) for parameter in callback.arguments
-            ]
-            if callback.result.ctype.kind != "void" and not callback.status:
-                arguments.append(self.public_type(callback.result))
-                return "Func<" + ", ".join(arguments) + ">?"
-            return (
-                "Action" + ("<" + ", ".join(arguments) + ">" if arguments else "") + "?"
-            )
+            return public_name(plan.native) + "?"
         if plan.kind == "native_pointer":
             return "NativePointer"
         if plan.kind == "scalar":
@@ -243,6 +239,48 @@ class Values:
         if plan.native in self.bound.slices:
             return self.public_type(self.bound.slices[plan.native].value)
         return public_name(plan.native)
+
+    def delegate(self, native: str) -> str:
+        """The named delegate of a callback type, whose parameters keep the C
+        names. A status callback returns nothing and throws to fail."""
+        callback = self.bound.callbacks[native]
+        result = (
+            "void"
+            if callback.result.ctype.kind == "void" or callback.status
+            else self.public_type(callback.result)
+        )
+        parameters = ", ".join(
+            f"{self.public_type(parameter.value)} {member(camel(parameter.name))}"
+            for parameter in callback.arguments
+        )
+        return f"public delegate {result} {public_name(native)}({parameters});\n"
+
+    def delegate_note(self, native: str) -> str | None:
+        """How a callback type's delegate reports failure, or None when it
+        returns nothing."""
+        callback = self.bound.callbacks[native]
+        if callback.status:
+            fallback = pascal(callback.failure.removeprefix("MLN_STATUS_").lower())
+            return (
+                "Returning succeeds. Throwing a `MaplibreException` whose status "
+                "is not `Status.Ok` fails the call with that status. Any other "
+                f"exception fails it with `Status.{fallback}` and is reported to "
+                "`Maplibre.CallbackException`."
+            )
+        if callback.result.ctype.kind == "void":
+            return None
+        return (
+            f"A thrown exception answers `{callback.failure}` and is reported to "
+            "`Maplibre.CallbackException`."
+        )
+
+    def raw_failure(self, callback) -> str:
+        """The failure result as the trampoline returns it."""
+        if callback.failure in {"true", "false"}:
+            return f"(byte){int(callback.failure == 'true')}"
+        if callback.failure.startswith("MLN_"):
+            return self.constant(callback.failure)
+        return callback.failure
 
     def copy(self, plan: ValuePlan, expression: str, length: str | None = None) -> str:
         if plan.kind == "reference" and plan.element:
@@ -966,23 +1004,31 @@ class Values:
                 if callback.status
                 else ""
             )
-            failure_value = (
-                self.constant(callback.failure)
-                if callback.failure and callback.failure.startswith("MLN_")
-                else callback.failure
-            )
+            failure_value = "" if result_type == "void" else self.raw_failure(callback)
             failure = "" if result_type == "void" else f"return {failure_value};"
+            # A status callback fails by throwing. A thrown MaplibreException
+            # with a failing status is a deliberate failure, which native
+            # receives without a report.
+            deliberate = (
+                "        catch (MaplibreException error)\n"
+                f"            when (({result_type})error.Status != {self.constant('MLN_STATUS_OK')})\n"
+                f"        {{\n{disposals}            return ({result_type})error.Status;\n        }}\n"
+                if callback.status
+                else ""
+            )
             if result_type != "void" and not callback.status:
                 # A callback that answers with a value returns its failure value
                 # when the record leaves it unset.
+                answer = self.encode(callback.result, f"answer({converted})")
                 invoke = (
                     f"var answer = (({public_name(plan.native)}){root}).{pascal(name)}; "
-                    f"return answer is null ? {failure_value} : ({result_type})answer({converted});"
+                    f"return answer is null ? {failure_value} : {answer};"
                 )
             methods.append(
                 "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                 f"    private static {result_type} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
                 f"{declared}        try\n        {{\n{setup}{restriction}            {invoke}\n{success}        }}\n"
+                f"{deliberate}"
                 f'        catch (Exception error)\n        {{\n            NativeCallbackFailure.Report("{callback.native}", error);\n{disposals}            {failure}\n        }}\n    }}\n'
             )
         return "\n".join(methods)

@@ -97,7 +97,7 @@ internal static class Program
             || backends.HasFlag(RenderBackendFlag.Vulkan);
     }
 
-    private static uint PrintNativeLog(
+    private static bool PrintNativeLog(
         LogSeverity severity,
         LogEvent logEvent,
         long code,
@@ -105,7 +105,7 @@ internal static class Program
     )
     {
         Console.Error.WriteLine($"MapLibre {severity} {logEvent} {code}: {message}");
-        return 1;
+        return true;
     }
 
     private sealed record ParseResult(RenderTargetMode? Mode, bool ShowedHelp, bool Smoke);

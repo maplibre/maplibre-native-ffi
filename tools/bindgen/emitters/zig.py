@@ -352,6 +352,8 @@ pub const OwnedValue = marshal.OwnedValue;
         "//! Callback contexts stay valid until release_context runs after native retirement.\n"
         "//! GPU descriptors are borrowed only inside the scoped getter callback.\n"
         "//! Callback errors are logged through std.log; native receives the failure value.\n"
+        "//! A callback that returns a status answers native, unlogged, the status that\n"
+        "//! an error such as error.InvalidArgument names, since it fails on purpose.\n"
         "//! Text that a callback receives is borrowed from native until the callback returns.\n"
         "//! A function that serves only some targets is void on the others.\n"
     )
@@ -383,8 +385,8 @@ pub const NativeStatusError = error{{ {members}, UnknownStatus }};
 pub fn fromRaw(raw: i32) NativeStatusError {{
     return switch (raw) {{ {from_raw} else => error.UnknownStatus, }};
 }}
-pub fn toRaw(err: anyerror) c.mln_status {{
-    return switch (err) {{ {to_raw} else => c.MLN_STATUS_NATIVE_ERROR, }};
+pub fn toRaw(err: anyerror) ?c.mln_status {{
+    return switch (err) {{ {to_raw} else => null, }};
 }}
 """
     return files

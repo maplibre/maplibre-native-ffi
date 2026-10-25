@@ -25,6 +25,12 @@
 // Native code releases the context of a call that it accepts, and the binding
 // calls the release for any other call.
 //
+// A callback whose C type returns a status returns an error instead. Nil
+// answers [StatusOk], and a failure [Status] or an [*Error] with one, or an
+// error that wraps either, answers that status on purpose. Any other error is
+// a bug: the binding logs it with [log/slog.Error] on the default logger and
+// answers the callback's failure status.
+//
 // The binding recovers a callback's panic, returns the callback's failure value
 // to native, and logs the panic with [log/slog.Error] on the default logger. Go
 // cleanup disposes an owner that the host abandoned and logs it with
