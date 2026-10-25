@@ -153,11 +153,12 @@ MLN_API mln_source_feature_query_options
 mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Starts a rendered-feature query against the session's latest driver state.
+ * Starts a rendered-feature query against the last frame that the session
+ * rendered, so render after a camera or style change for a result that matches
+ * it.
  *
- * The query reads the last frame that the session rendered, so render after a
- * camera or style change for a result that matches it. The completion borrows
- * value_count mln_rendered_feature values, value_size bytes apart.
+ * The completion borrows value_count mln_rendered_feature values, value_size
+ * bytes apart.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
@@ -186,11 +187,11 @@ MLN_API mln_status mln_render_session_query_rendered_features(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a source-feature query against the session's latest driver state.
+ * Starts a source-feature query against the tiles that the source loaded for
+ * rendering, which it loads only while a visible layer uses it.
  *
- * The query covers only the tiles that the source loaded for rendering, and a
- * source loads tiles only while a visible layer uses it. The completion borrows
- * value_count mln_source_feature values, value_size bytes apart.
+ * The completion borrows value_count mln_source_feature values, value_size
+ * bytes apart.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.

@@ -243,8 +243,9 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Starts a rendered-feature query against the session's latest driver
-    /// state.
+    /// Starts a rendered-feature query against the last frame that the session
+    /// rendered, so render after a camera or style change for a result that
+    /// matches it.
     ///
     /// See `mln_render_session_query_rendered_features` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -270,7 +271,8 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Starts a source-feature query against the session's latest driver state.
+    /// Starts a source-feature query against the tiles that the source loaded
+    /// for rendering, which it loads only while a visible layer uses it.
     ///
     /// See `mln_render_session_query_source_features` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).

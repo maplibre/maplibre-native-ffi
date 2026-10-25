@@ -77,12 +77,13 @@ typedef void (*mln_completion_callback)(
 );
 
 /**
- * Callback or queue state for one asynchronous submission.
+ * Callback or queue state for one asynchronous submission. The completion may
+ * run, or its delivery be queued, before the submitting call returns.
  *
  * The struct itself is borrowed for the submission call. A non-null completion
  * sets exactly one of callback and queue. MLN_STATUS_OK transfers callback,
  * user_data, and release_user_data to the C API. The completion runs exactly
- * once and may run before the submission returns. The release callback runs
+ * once. The release callback runs
  * after the completion returns. A non-OK submission invokes neither callback
  * and leaves user_data owned by the caller.
  *

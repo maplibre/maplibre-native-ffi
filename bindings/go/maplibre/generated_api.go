@@ -7341,7 +7341,9 @@ func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba
 	}, completionCommand)
 }
 
-// SetStyleJson queues an inline style JSON command.
+// SetStyleJson queues an inline style JSON command. A committed command means
+// the map applied the JSON, not that the style loaded: style loading events
+// report the resource and parse results that follow.
 //
 // See mln_map_set_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -7404,7 +7406,9 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 	}, completionCommand)
 }
 
-// SetStyleUrl queues a style URL command.
+// SetStyleUrl queues a style URL command. A committed command means the map
+// accepted the URL, not that the style loaded: style loading events report the
+// network, decode, and parse results that follow.
 //
 // See mln_map_set_style_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -7651,8 +7655,9 @@ func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, fea
 	}, completionOf(copyViewText))
 }
 
-// QueryRenderedFeatures starts a rendered-feature query against the session's
-// latest driver state.
+// QueryRenderedFeatures starts a rendered-feature query against the last frame
+// that the session rendered, so render after a camera or style change for a
+// result that matches it.
 //
 // See mln_render_session_query_rendered_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
@@ -7662,8 +7667,9 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 	}, completionListOf(copyRenderedFeature))
 }
 
-// QuerySourceFeatures starts a source-feature query against the session's
-// latest driver state.
+// QuerySourceFeatures starts a source-feature query against the tiles that the
+// source loaded for rendering, which it loads only while a visible layer uses
+// it.
 //
 // See mln_render_session_query_source_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
@@ -7825,7 +7831,9 @@ func (receiver *ResourceRequestHandle) Close() error {
 }
 
 // SetCancelCallback registers a callback that runs when MapLibre cancels a C
-// API resource provider request.
+// API resource provider request. A request that is already cancelled registers
+// nothing and reports true through out_cancelled, and the caller handles that
+// cancellation itself.
 //
 // See mln_resource_request_set_cancel_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html

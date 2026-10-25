@@ -53,7 +53,9 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
   public fun release(): Unit = nativeClose(this, binding) { C.mln_resource_request_release(handle) }
 
   /**
-   * Registers a callback that runs when MapLibre cancels a C API resource provider request.
+   * Registers a callback that runs when MapLibre cancels a C API resource provider request. A
+   * request that is already cancelled registers nothing and reports true through out_cancelled, and
+   * the caller handles that cancellation itself.
    *
    * See `mln_resource_request_set_cancel_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

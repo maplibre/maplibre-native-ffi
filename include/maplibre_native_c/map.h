@@ -1468,11 +1468,12 @@ MLN_API mln_status
 mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
 /**
- * Queues a style URL command.
+ * Queues a style URL command. A committed command means the map accepted the
+ * URL, not that the style loaded: style loading events report the network,
+ * decode, and parse results that follow.
  *
  * The function copies url before returning acceptance. The completion reports
- * committed or failed application. Style loading events continue to report
- * network, decode, and parse results after a committed command.
+ * committed or failed application.
  *
  * The map's first loaded style moves the camera to the style's center, zoom,
  * bearing, and pitch, unless the host moved the camera first. Later style loads
@@ -1494,11 +1495,12 @@ MLN_API mln_status mln_map_set_style_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Queues an inline style JSON command.
+ * Queues an inline style JSON command. A committed command means the map
+ * applied the JSON, not that the style loaded: style loading events report the
+ * resource and parse results that follow.
  *
  * The function copies json before returning acceptance. The completion reports
- * committed or failed application. Style loading events continue to report
- * later resource and parse results after a committed command.
+ * committed or failed application.
  *
  * The map's first loaded style moves the camera to the style's center, zoom,
  * bearing, and pitch, unless the host moved the camera first. Later style loads

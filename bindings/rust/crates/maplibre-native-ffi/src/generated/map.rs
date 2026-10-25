@@ -1658,7 +1658,9 @@ impl MapHandle {
         })
     }
 
-    /// Queues an inline style JSON command.
+    /// Queues an inline style JSON command. A committed command means the map
+    /// applied the JSON, not that the style loaded: style loading events report
+    /// the resource and parse results that follow.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1773,7 +1775,9 @@ impl MapHandle {
         })
     }
 
-    /// Queues a style URL command.
+    /// Queues a style URL command. A committed command means the map accepted
+    /// the URL, not that the style loaded: style loading events report the
+    /// network, decode, and parse results that follow.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2581,7 +2585,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Queues an inline style JSON command.
+    /// Queues an inline style JSON command. A committed command means the map
+    /// applied the JSON, not that the style loaded: style loading events report
+    /// the resource and parse results that follow.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2682,7 +2688,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Queues a style URL command.
+    /// Queues a style URL command. A committed command means the map accepted
+    /// the URL, not that the style loaded: style loading events report the
+    /// network, decode, and parse results that follow.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

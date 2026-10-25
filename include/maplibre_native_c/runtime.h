@@ -1250,7 +1250,9 @@ MLN_API mln_status mln_resource_request_is_cancelled(
 
 /**
  * Registers a callback that runs when MapLibre cancels a C API resource
- * provider request.
+ * provider request. A request that is already cancelled registers nothing and
+ * reports true through out_cancelled, and the caller handles that cancellation
+ * itself.
  *
  * This function may be called from any thread while the provider still owns the
  * handle. A request accepts one registration: a later call fails and leaves the
@@ -1260,10 +1262,9 @@ MLN_API mln_status mln_resource_request_is_cancelled(
  * user_data, and release_user_data to the C API. The callback runs at most
  * once. The handler struct itself is borrowed for the call.
  *
- * A request that is already cancelled and not completed stores nothing and
- * reports true through out_cancelled. The caller keeps user_data and handles
- * the cancellation itself, and neither callback runs. Any other request reports
- * false. This function never invokes either callback.
+ * Only a request that is cancelled and not yet completed reports true. The
+ * caller then keeps user_data, and neither callback runs. Any other request
+ * reports false. This function never invokes either callback.
  *
  * mln_resource_request_release() waits for a cancel callback running on another
  * thread to return, so the callback and user_data are unused once release

@@ -47,7 +47,9 @@ public extension ResourceRequestHandle {
   }
 
   /// Registers a callback that runs when MapLibre cancels a C API resource
-  /// provider request.
+  /// provider request. A request that is already cancelled registers nothing
+  /// and reports true through out_cancelled, and the caller handles that
+  /// cancellation itself.
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

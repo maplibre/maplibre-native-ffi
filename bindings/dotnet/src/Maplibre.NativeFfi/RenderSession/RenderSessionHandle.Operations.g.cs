@@ -360,8 +360,9 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a rendered-feature query against the session's latest driver
-    /// state.
+    /// Starts a rendered-feature query against the last frame that the session
+    /// rendered, so render after a camera or style change for a result that
+    /// matches it.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_query_rendered_features</c> in the <see
@@ -397,7 +398,8 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a source-feature query against the session's latest driver state.
+    /// Starts a source-feature query against the tiles that the source loaded
+    /// for rendering, which it loads only while a visible layer uses it.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_query_source_features</c> in the <see
