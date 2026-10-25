@@ -3,9 +3,6 @@
 
 #include <maplibre_native_c.h>
 
-// #region node
-// #endregion node
-
 mln_status size_and_filter_by_magnitude(
   mln_map map, const char* layer_id, const mln_completion* property_completion,
   const mln_completion* filter_completion
