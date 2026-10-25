@@ -65,9 +65,8 @@ pub fn run() {
     assert_eq!(probe_read_level().unwrap(), None);
     assert_eq!(probe_read_level().unwrap(), Some(0.5));
 
-    // An owner releases its handle once.
+    // A release consumes its owner.
     let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7), None).unwrap();
     assert_eq!(map.id(), 7);
-    map.release().unwrap();
     map.release().unwrap();
 }

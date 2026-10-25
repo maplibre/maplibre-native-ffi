@@ -789,16 +789,15 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             raise Unsupported("consumption with outputs requires an owner transaction")
         if ending[0].startswith(f"{call_local}.status("):
             ending = [ending[0].removesuffix("?;")]
-        # A synchronous release is idempotent. An asynchronous one, and an
-        # answer that consumes its receiver, reach native, which reports a
-        # stale handle through the error channel.
-        close = "close_once" if public == "()" and plan.release else "close"
+        # The call takes the owner, and a refusal hands it back with the
+        # error, so no value outlives its handle.
+        signature[0] = "self"
         body = [
             *prelude,
-            f"self.inner.{close}(|{target}| {{",
+            f"self.inner.close(|{target}| {{",
             f"    let {mutable}{call_local} = Call::new({target});",
             *("    " + line for line in [*setup, *ending]),
-            "})",
+            "}).map_err(|error| (self, error))",
         ]
     else:
         receiver_self = "self.0" if discard else "self"
@@ -808,7 +807,11 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             else f"let {mutable}{call_local} = Call::global();"
         ]
         body += [*prelude, *setup, *ending]
-    returns = f" -> Result<{public}>"
+    returns = (
+        f" -> std::result::Result<{public}, (Self, Error)>"
+        if consuming
+        else f" -> Result<{public}>"
+    )
     # A call with no status and an infallible conversion returns its value.
     if (
         not consuming

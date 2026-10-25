@@ -133,13 +133,15 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn dispose(&self) -> Result<()> {
-        self.inner.close_once(|runtime| {
-            let mut call = Call::new(runtime);
-            call.status(|runtime, out_diagnostic| unsafe {
-                sys::mln_runtime_dispose(runtime, out_diagnostic)
+    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|runtime| {
+                let mut call = Call::new(runtime);
+                call.status(|runtime, out_diagnostic| unsafe {
+                    sys::mln_runtime_dispose(runtime, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Reports which runtime-scoped event types this runtime queues.
@@ -254,16 +256,18 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn release(&self) -> Result<NativeFuture<()>> {
-        self.inner.close(|runtime| {
-            let call = Call::new(runtime);
-            call.complete(
-                |runtime, completion, out_diagnostic| unsafe {
-                    sys::mln_runtime_release(runtime, completion, out_diagnostic)
-                },
-                completion::unit,
-            )
-        })
+    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+        self.inner
+            .close(|runtime| {
+                let call = Call::new(runtime);
+                call.complete(
+                    |runtime, completion, out_diagnostic| unsafe {
+                        sys::mln_runtime_release(runtime, completion, out_diagnostic)
+                    },
+                    completion::unit,
+                )
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Starts a MapLibre ambient cache maintenance operation for this runtime.

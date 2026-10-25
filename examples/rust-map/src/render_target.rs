@@ -231,9 +231,12 @@ impl Session {
     /// Releases the held frame, if any. A session resizes or takes a
     /// replacement ring only while the host holds none of its frames.
     pub fn release_held(&mut self) -> maplibre_native_ffi::Result<()> {
-        match self.held.take() {
-            Some(frame) => frame.release(None),
-            None => Ok(()),
+        match self.held.take().map(|frame| frame.release(None)) {
+            Some(Err((frame, error))) => {
+                self.held = Some(frame);
+                Err(error)
+            }
+            _ => Ok(()),
         }
     }
 
@@ -250,7 +253,7 @@ impl Session {
         }
         self.session
             .dispose()
-            .map_err(|error| Box::new(error) as Box<dyn StdError>)
+            .map_err(|(_, error)| Box::new(error) as Box<dyn StdError>)
     }
 
     /// Ends the session's graphics work at once, which completes any pending

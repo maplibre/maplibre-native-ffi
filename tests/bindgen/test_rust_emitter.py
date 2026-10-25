@@ -161,20 +161,20 @@ class RustEmitterTests(unittest.TestCase):
             "dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
             source,
         )
-        # The async release reaches native on a closed handle, and the sync
-        # dispose of a closed handle does nothing.
+        # Both consume the owner, and a refusal hands it back.
         self.assertIn(
-            "pub fn release(&self) -> Result<NativeFuture<()>> {\n"
+            "pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {\n"
             "        self.inner.close(|session| {",
             source,
         )
         self.assertIn("call.complete(", source)
         self.assertIn(
-            "pub fn dispose(&self) -> Result<()> {\n"
-            "        self.inner.close_once(|session| {",
+            "pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {\n"
+            "        self.inner.close(|session| {",
             source,
         )
         self.assertIn("call.discard(", source)
+        self.assertIn("}).map_err(|error| (self, error))", source)
 
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(

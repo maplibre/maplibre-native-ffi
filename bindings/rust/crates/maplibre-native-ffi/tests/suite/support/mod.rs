@@ -162,11 +162,17 @@ pub fn await_condition(what: &str, mut condition: impl FnMut() -> bool) {
     }
 }
 
-/// Blocks until a submitted operation completes and returns its value.
+/// Blocks until a submitted operation completes and returns its value. A
+/// refused release's error carries the handle, so `E` is generic.
 #[track_caller]
-pub fn wait_for<T>(submitted: Result<NativeFuture<T>>) -> T {
-    submitted
-        .expect("the submission failed")
+pub fn wait_for<T, E: std::fmt::Debug>(submitted: std::result::Result<NativeFuture<T>, E>) -> T {
+    wait_on(submitted.expect("the submission failed"))
+}
+
+/// Blocks until an accepted operation completes and returns its value.
+#[track_caller]
+pub fn wait_on<T>(future: NativeFuture<T>) -> T {
+    future
         .wait(timeout())
         .expect("the operation never completed")
         .expect("the operation failed")
@@ -344,7 +350,7 @@ pub fn ok_response(bytes: impl Into<Vec<u8>>) -> ResourceResponse {
 /// One runtime with a map, both released when the fixture drops, even when the
 /// test fails.
 pub struct Fixture {
-    runtime: Option<Arc<RuntimeHandle>>,
+    runtime: Option<RuntimeHandle>,
     map: Option<MapHandle>,
     events: Arc<Signal>,
     pending_events: Arc<Mutex<Vec<RuntimeEvent>>>,
@@ -375,16 +381,16 @@ impl Fixture {
             .unwrap();
         wait_for(runtime.set_resource_provider(denying_provider()));
         let (map, ready) = runtime.create_map(&map_options).unwrap();
-        wait_for(Ok(ready));
+        wait_on(ready);
         Self {
-            runtime: Some(Arc::new(runtime)),
+            runtime: Some(runtime),
             map: Some(map),
             events,
             pending_events,
         }
     }
 
-    pub fn runtime(&self) -> &Arc<RuntimeHandle> {
+    pub fn runtime(&self) -> &RuntimeHandle {
         self.runtime.as_ref().unwrap()
     }
 
@@ -393,7 +399,7 @@ impl Fixture {
     }
 
     /// Hands the runtime and map to a test that ends their lives itself.
-    pub fn into_parts(mut self) -> (Arc<RuntimeHandle>, MapHandle) {
+    pub fn into_parts(mut self) -> (RuntimeHandle, MapHandle) {
         (self.runtime.take().unwrap(), self.map.take().unwrap())
     }
 
@@ -440,7 +446,7 @@ impl Fixture {
     pub fn load_style(&self, style_json: &str) {
         let loaded = self.map().set_style_json(style_json).unwrap();
         self.await_event_type(RuntimeEventType::MapStyleLoaded);
-        wait_for(Ok(loaded));
+        wait_on(loaded);
     }
 }
 
@@ -460,10 +466,10 @@ impl Drop for Fixture {
             Err(_) => {}
         };
         if let Some(map) = self.map.take() {
-            release(map.release());
+            release(map.release().map_err(|(_, error)| error));
         }
         if let Some(runtime) = self.runtime.take() {
-            release(runtime.release());
+            release(runtime.release().map_err(|(_, error)| error));
         }
     }
 }
@@ -571,10 +577,17 @@ impl Session {
         self.drive(self.handle.read_texture().unwrap()).unwrap()
     }
 
-    /// Detaches and releases the session, and waits until it retires, after
-    /// which the host may destroy its graphics objects.
+    /// Releases the session and waits until it retires, after which the host
+    /// may destroy its graphics objects. Native rejects service calls on a
+    /// released session, so the wait services nothing.
+    pub fn release(self) {
+        let released = self.handle.release().unwrap();
+        drive(&self.wakes.signal, released, || {}).unwrap();
+    }
+
+    /// Detaches and releases the session.
     pub fn close(self) {
         self.drive(self.handle.detach().unwrap()).unwrap();
-        self.drive(self.handle.release().unwrap()).unwrap();
+        self.release();
     }
 }

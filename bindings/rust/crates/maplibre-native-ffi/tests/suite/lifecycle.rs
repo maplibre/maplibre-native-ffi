@@ -8,79 +8,44 @@ use maplibre_native_ffi::*;
 use crate::support::*;
 
 #[test]
-fn releasing_a_handle_twice_reaches_native() {
+fn a_handle_formats_its_id_and_dispose_consumes_it() {
     let (runtime, map) = Fixture::new().into_parts();
-    wait_for(map.release());
-    assert!(map.is_closed());
-    assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
-    wait_for(runtime.release());
-}
-
-#[test]
-fn a_disposed_handle_is_closed_and_a_second_dispose_does_nothing() {
-    let (runtime, map) = Fixture::new().into_parts();
-    assert!(!map.is_closed());
     assert_eq!(
         format!("{map:?}"),
-        format!("MapHandle(id=0x{:x}, closed=false)", map.id())
+        format!("MapHandle(id=0x{:x})", map.id())
     );
 
     map.dispose().unwrap();
-    assert!(map.is_closed());
-    map.dispose().unwrap();
-    assert_eq!(
-        format!("{map:?}"),
-        format!("MapHandle(id=0x{:x}, closed=true)", map.id())
-    );
-    // An asynchronous release still reaches native, which reports the stale
-    // handle.
-    assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
-
     // A runtime accepts its dispose while its disposed map retires.
     runtime.dispose().unwrap();
-    assert!(runtime.is_closed());
-    runtime.dispose().unwrap();
 }
 
 #[test]
-fn a_released_projection_is_closed_and_a_second_release_does_nothing() {
+fn a_projection_release_consumes_it() {
     let fixture = Fixture::new();
     let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
-    assert!(!projection.is_closed());
     assert_ne!(projection.id(), 0);
-
     projection.release().unwrap();
-    assert!(projection.is_closed());
-    projection.release().unwrap();
-    assert_eq!(
-        format!("{projection:?}"),
-        format!(
-            "MapProjectionHandle(id=0x{:x}, closed=true)",
-            projection.id()
-        )
-    );
 }
 
 #[test]
-fn a_handle_id_names_its_events_and_outlives_close() {
+fn a_handle_id_names_its_events() {
     let fixture = Fixture::new();
     let loaded = fixture.map().set_style_json(BACKGROUND_STYLE_JSON);
     let event = fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     wait_for(loaded);
     assert_eq!(event.source, fixture.map().id());
-    let (runtime, map) = fixture.into_parts();
-    wait_for(map.release());
     // A host routes events that it drains after close by the id it kept.
-    assert_eq!(map.id(), event.source);
-    wait_for(runtime.release());
+    assert_eq!(fixture.map().id(), event.source);
 }
 
 #[test]
 fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
     let (runtime, map) = Fixture::new().into_parts();
 
-    // A runtime refuses to close while one of its maps is live.
-    let error = runtime.release().unwrap_err();
+    // A runtime refuses to close while one of its maps is live, and hands
+    // itself back.
+    let (runtime, error) = runtime.release().unwrap_err();
     assert_eq!(error.status(), Status::InvalidState);
     wait_for(runtime.clear_resource_transform());
 
@@ -100,7 +65,6 @@ fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
     // Releasing the map drops the last hold on the runtime, which the
     // binding then disposes on this thread without a leak.
     wait_for(map.release());
-    drop(map);
 
     set_reporter(None);
     let leaked = leaks(&reports);

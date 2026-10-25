@@ -101,16 +101,18 @@ impl RenderSessionHandle {
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(&self) -> Result<NativeFuture<()>> {
-        self.inner.close(|session| {
-            let call = Call::new(session);
-            call.complete(
-                |session, completion, out_diagnostic| unsafe {
-                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
-                },
-                completion::unit,
-            )
-        })
+    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+        self.inner
+            .close(|session| {
+                let call = Call::new(session);
+                call.complete(
+                    |session, completion, out_diagnostic| unsafe {
+                        sys::mln_render_session_dispose(session, completion, out_diagnostic)
+                    },
+                    completion::unit,
+                )
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Consumes a session in any state and retires it, then runs completion, if
@@ -118,13 +120,15 @@ impl RenderSessionHandle {
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn dispose(&self) -> Result<()> {
-        self.inner.close_once(|session| {
-            let call = Call::new(session);
-            call.discard(|session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_dispose(session, completion, out_diagnostic)
+    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|session| {
+                let call = Call::new(session);
+                call.discard(|session, completion, out_diagnostic| unsafe {
+                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Drains every currently queued terminal frame result into an

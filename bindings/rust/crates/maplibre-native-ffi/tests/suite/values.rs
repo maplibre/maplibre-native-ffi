@@ -139,8 +139,8 @@ fn array_inputs_are_copied_when_they_are_submitted() {
     // The caller may reuse its arrays as soon as the calls return.
     coordinates.fill(LatLng::new(9.0, 9.0));
     image.pixels.fill(0);
-    wait_for(Ok(added_source));
-    wait_for(Ok(added_image));
+    wait_on(added_source);
+    wait_on(added_image);
 
     assert_eq!(
         wait_for(fixture.map().get_image_source_coordinates("image")),

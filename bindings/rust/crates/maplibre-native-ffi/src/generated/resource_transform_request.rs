@@ -19,25 +19,29 @@ impl ResourceTransformRequestHandle {
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(&self, url: &str) -> Result<()> {
-        self.inner.close(|request| {
-            let mut call = Call::new(request);
-            let url = call.input(&url)?;
-            call.status(|request, out_diagnostic| unsafe {
-                sys::mln_resource_transform_request_complete(request, url, out_diagnostic)
+    pub fn complete(self, url: &str) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|request| {
+                let mut call = Call::new(request);
+                let url = call.input(&url)?;
+                call.status(|request, out_diagnostic| unsafe {
+                    sys::mln_resource_transform_request_complete(request, url, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Releases a resource transform request without answering it.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close_once(|request| {
-            let mut call = Call::new(request);
-            call.run(|request| unsafe { sys::mln_resource_transform_request_release(request) });
-            Ok(())
-        })
+    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|request| {
+                let mut call = Call::new(request);
+                call.run(|request| unsafe { sys::mln_resource_transform_request_release(request) });
+                Ok(())
+            })
+            .map_err(|error| (self, error))
     }
 }

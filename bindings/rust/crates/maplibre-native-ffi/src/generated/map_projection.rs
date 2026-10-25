@@ -186,12 +186,14 @@ impl MapProjectionHandle {
     ///
     /// See `mln_map_projection_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close_once(|projection| {
-            let mut call = Call::new(projection);
-            call.run(|projection| unsafe { sys::mln_map_projection_release(projection) });
-            Ok(())
-        })
+    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|projection| {
+                let mut call = Call::new(projection);
+                call.run(|projection| unsafe { sys::mln_map_projection_release(projection) });
+                Ok(())
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Applies a camera update to a standalone projection.

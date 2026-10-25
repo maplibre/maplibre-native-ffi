@@ -55,11 +55,13 @@ impl StyleExpressionHandle {
     ///
     /// See `mln_style_expression_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close_once(|expression| {
-            let mut call = Call::new(expression);
-            call.run(|expression| unsafe { sys::mln_style_expression_release(expression) });
-            Ok(())
-        })
+    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|expression| {
+                let mut call = Call::new(expression);
+                call.run(|expression| unsafe { sys::mln_style_expression_release(expression) });
+                Ok(())
+            })
+            .map_err(|error| (self, error))
     }
 }

@@ -82,27 +82,18 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
         .expect("a rendered frame");
 
     let cpu_complete = GpuSync::default();
-    let (size, (frame_release, session_abandon)) = with_frame_view(&frame, || {
+    let (size, session_abandon) = with_frame_view(&frame, || {
         // Releasing a sibling frame leaves this view's texture alone.
         sibling.release(Some(&cpu_complete)).unwrap();
-        (
-            frame.release(None).unwrap_err().status(),
-            session.handle.abandon().unwrap_err().status(),
-        )
+        session.handle.abandon().unwrap_err().status()
     })
     .unwrap();
     assert_eq!(size, (32, 16));
-    // Native keeps the frame and its session busy while the view is open.
-    assert_eq!(frame_release, Status::Busy);
+    // Native keeps the session busy while the view is open.
     assert_eq!(session_abandon, Status::Busy);
 
-    // Once the view's scope ends, both close.
-    assert!(!frame.is_closed());
+    // Once the view's scope ends, the frame releases.
     frame.release(None).unwrap();
-    assert!(frame.is_closed() && sibling.is_closed());
-    // Either consuming call on a closed frame does nothing.
-    frame.release(None).unwrap();
-    frame.discard().unwrap();
     session.close();
 }
 
@@ -157,7 +148,7 @@ fn a_released_session_lets_the_host_destroy_its_graphics_objects() {
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     // The release completes once the attached session has retired, so the
     // device may go while the map stays open.
-    session.drive(session.handle.release().unwrap()).unwrap();
+    session.release();
     drop(graphics);
 }
 

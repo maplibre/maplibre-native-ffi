@@ -10,12 +10,13 @@
 # statically, so no library with another ABI version can load in its place.
 "ERR-02" = "bindings/rust/crates/maplibre-native-ffi-core/src/abi.rs::another_c_abi_version_is_rejected_as_unsupported"
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
-"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_reaches_native"
+"LIFE-01" = { na = "a release or dispose consumes its owner, so no second close compiles" }
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
 "LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
 "LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
 "LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops"
-"LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events_and_outlives_close"
+# A release consumes its owner, so a host keeps the id it read before close.
+"LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events"
 "COMP-01" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_panicking_converter_completes_with_an_error_before_native_release"
 "COMP-02" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_rejected_submission_frees_the_bridge_and_reports_the_status"
 "COMP-04" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_failed_or_cancelled_command_fails_its_wait_with_its_status_diagnostic_and_generation"

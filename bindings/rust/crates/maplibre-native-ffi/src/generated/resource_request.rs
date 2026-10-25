@@ -18,14 +18,16 @@ impl ResourceRequestHandle {
     ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
-        self.inner.close(|handle| {
-            let mut call = Call::new(handle);
-            let response = call.reference(&response)?;
-            call.status(|handle, out_diagnostic| unsafe {
-                sys::mln_resource_request_complete(handle, response, out_diagnostic)
+    pub fn complete(self, response: &ResourceResponse) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|handle| {
+                let mut call = Call::new(handle);
+                let response = call.reference(&response)?;
+                call.status(|handle, out_diagnostic| unsafe {
+                    sys::mln_resource_request_complete(handle, response, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Reports whether MapLibre has cancelled a C API resource provider
@@ -47,25 +49,29 @@ impl ResourceRequestHandle {
     ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn pass_through(&self) -> Result<()> {
-        self.inner.close(|handle| {
-            let mut call = Call::new(handle);
-            call.status(|handle, out_diagnostic| unsafe {
-                sys::mln_resource_request_pass_through(handle, out_diagnostic)
+    pub fn pass_through(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|handle| {
+                let mut call = Call::new(handle);
+                call.status(|handle, out_diagnostic| unsafe {
+                    sys::mln_resource_request_pass_through(handle, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Releases the provider's resource request handle without answering it.
     ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close_once(|handle| {
-            let mut call = Call::new(handle);
-            call.run(|handle| unsafe { sys::mln_resource_request_release(handle) });
-            Ok(())
-        })
+    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|handle| {
+                let mut call = Call::new(handle);
+                call.run(|handle| unsafe { sys::mln_resource_request_release(handle) });
+                Ok(())
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Registers a callback that runs when MapLibre cancels a C API resource

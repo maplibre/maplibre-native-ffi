@@ -123,24 +123,6 @@ impl<T: NativeHandle> HandleState<T> {
         result
     }
 
-    /// Runs `close` like `close_with`, but returns `Ok` without calling it once
-    /// ownership has ended, so a synchronous release is idempotent.
-    pub fn close_once(
-        self: &Arc<Self>,
-        close: impl FnOnce(T) -> crate::Result<()>,
-    ) -> crate::Result<()> {
-        let mut reservation = {
-            let mut state = lock(&self.state);
-            if state.released {
-                return Ok(());
-            }
-            self.reserve_locked(&mut state)?
-        };
-        close(self.raw())?;
-        reservation.commit();
-        Ok(())
-    }
-
     /// Transfers an unreleased handle to disposal and reports a refused disposal.
     /// The caller schedules this closure where its host can safely call native.
     pub fn finalizer(

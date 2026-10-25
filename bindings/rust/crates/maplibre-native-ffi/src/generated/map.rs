@@ -762,11 +762,15 @@ impl MapHandle {
     ///
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn dispose(&self) -> Result<()> {
-        self.inner.close_once(|map| {
-            let mut call = Call::new(map);
-            call.status(|map, out_diagnostic| unsafe { sys::mln_map_dispose(map, out_diagnostic) })
-        })
+    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|map| {
+                let mut call = Call::new(map);
+                call.status(|map, out_diagnostic| unsafe {
+                    sys::mln_map_dispose(map, out_diagnostic)
+                })
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Submits an ordered debug-log command.
@@ -1196,16 +1200,18 @@ impl MapHandle {
     ///
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn release(&self) -> Result<NativeFuture<()>> {
-        self.inner.close(|map| {
-            let call = Call::new(map);
-            call.complete(
-                |map, completion, out_diagnostic| unsafe {
-                    sys::mln_map_release(map, completion, out_diagnostic)
-                },
-                completion::unit,
-            )
-        })
+    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+        self.inner
+            .close(|map| {
+                let call = Call::new(map);
+                call.complete(
+                    |map, completion, out_diagnostic| unsafe {
+                        sys::mln_map_release(map, completion, out_diagnostic)
+                    },
+                    completion::unit,
+                )
+            })
+            .map_err(|error| (self, error))
     }
 
     /// Removes per-feature state from this map.

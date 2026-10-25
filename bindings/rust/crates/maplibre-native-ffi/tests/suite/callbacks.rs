@@ -268,13 +268,6 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
         handle
             .complete(&ok_response(BACKGROUND_STYLE_JSON))
             .unwrap();
-        // The accepted completion consumed the handle, so native refuses a
-        // second one.
-        assert!(handle.is_closed());
-        let error = handle
-            .complete(&ok_response(BACKGROUND_STYLE_JSON))
-            .unwrap_err();
-        assert_eq!(error.status(), Status::InvalidState);
     })
     .join()
     .unwrap();
@@ -307,11 +300,6 @@ fn a_transform_hands_its_request_to_another_thread_and_answers_later() {
     let request = requests.recv_timeout(timeout()).unwrap();
     std::thread::spawn(move || {
         request.complete(&rewritten).unwrap();
-        // The accepted completion consumed the request, so native refuses a
-        // second one.
-        assert!(request.is_closed());
-        let error = request.complete(&rewritten).unwrap_err();
-        assert_eq!(error.status(), Status::InvalidState);
     })
     .join()
     .unwrap();

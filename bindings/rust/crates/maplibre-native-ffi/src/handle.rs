@@ -53,10 +53,6 @@ impl<H: NativeHandle> OwnerState<H> {
         Some(Arc::clone(self) as Arc<dyn Any + Send + Sync>)
     }
 
-    pub(crate) fn is_closed(&self) -> bool {
-        self.handle.is_released()
-    }
-
     /// The raw id; native validates whether it still names a live handle.
     pub(crate) fn native(&self) -> H {
         self.handle.raw()
@@ -67,16 +63,9 @@ impl<H: NativeHandle> OwnerState<H> {
         Call::new(self.native())
     }
 
-    /// Consumes the handle through `close`, which native may refuse for a
-    /// handle that is already closed.
+    /// Consumes the handle through `close`, which native may refuse.
     pub(crate) fn close<R>(&self, close: impl FnOnce(H) -> Result<R>) -> Result<R> {
         self.handle.close_with(close)
-    }
-
-    /// Consumes the handle through a synchronous `close`, or does nothing once
-    /// the handle is closed.
-    pub(crate) fn close_once(&self, close: impl FnOnce(H) -> Result<()>) -> Result<()> {
-        self.handle.close_once(close)
     }
 }
 
@@ -104,13 +93,7 @@ macro_rules! native_owner {
         }
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(
-                    f,
-                    "{}(id={:#x}, closed={})",
-                    stringify!($name),
-                    self.id(),
-                    self.is_closed(),
-                )
+                write!(f, "{}(id={:#x})", stringify!($name), self.id())
             }
         }
         impl $name {
@@ -135,14 +118,6 @@ macro_rules! native_owner {
             $(#[$id_meta])*
             pub fn id(&self) -> u64 {
                 self.inner.id()
-            }
-
-            /// Returns whether this handle's ownership has ended: native accepted
-            /// its release, dispose, or discard, or the binding returned it to
-            /// native. A synchronous release or dispose of a closed handle
-            /// does nothing.
-            pub fn is_closed(&self) -> bool {
-                self.inner.is_closed()
             }
         }
     };

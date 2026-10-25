@@ -20,13 +20,15 @@ impl AcquiredFrameHandle {
     ///
     /// See `mln_acquired_frame_discard` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn discard(&self) -> Result<()> {
-        self.inner.close_once(|frame| {
-            let mut call = Call::new(frame);
-            call.status(|frame, out_diagnostic| unsafe {
-                sys::mln_acquired_frame_discard(frame, out_diagnostic)
+    pub fn discard(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|frame| {
+                let mut call = Call::new(frame);
+                call.status(|frame, out_diagnostic| unsafe {
+                    sys::mln_acquired_frame_discard(frame, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 
     /// Copies Metal-native metadata from an acquired frame.
@@ -172,13 +174,18 @@ impl AcquiredFrameHandle {
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(&self, consumer_completion: Option<&GpuSync>) -> Result<()> {
-        self.inner.close_once(|frame| {
-            let mut call = Call::new(frame);
-            let consumer_completion = call.optional_reference(consumer_completion.as_ref())?;
-            call.status(|frame, out_diagnostic| unsafe {
-                sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)
+    pub fn release(
+        self,
+        consumer_completion: Option<&GpuSync>,
+    ) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|frame| {
+                let mut call = Call::new(frame);
+                let consumer_completion = call.optional_reference(consumer_completion.as_ref())?;
+                call.status(|frame, out_diagnostic| unsafe {
+                    sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)
+                })
             })
-        })
+            .map_err(|error| (self, error))
     }
 }

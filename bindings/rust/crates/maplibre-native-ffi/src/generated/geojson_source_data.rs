@@ -18,11 +18,13 @@ impl GeojsonSourceDataHandle {
     ///
     /// See `mln_geojson_source_data_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close_once(|data| {
-            let mut call = Call::new(data);
-            call.run(|data| unsafe { sys::mln_geojson_source_data_release(data) });
-            Ok(())
-        })
+    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+        self.inner
+            .close(|data| {
+                let mut call = Call::new(data);
+                call.run(|data| unsafe { sys::mln_geojson_source_data_release(data) });
+                Ok(())
+            })
+            .map_err(|error| (self, error))
     }
 }
