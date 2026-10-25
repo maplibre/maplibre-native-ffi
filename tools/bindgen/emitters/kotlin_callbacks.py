@@ -756,7 +756,9 @@ def queued_site(
         statements = [*adopted, f"if (!{call}) {{ {released} }}"]
     else:
         statements = [call]
-    statements.append(answer)
+    # A void site's body converts to Unit, so only a result needs an answer.
+    if answer != "Unit":
+        statements.append(answer)
     body = "run { " + "; ".join(statements) + " }"
     sites(values)[site_name] = Site(
         site_name,

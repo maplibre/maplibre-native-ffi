@@ -399,7 +399,7 @@ class Values:
                                 f"  public infix fun or(other: {public}): {public} = {public}(rawValue or other.rawValue)",
                                 f"  public infix fun and(other: {public}): {public} = {public}(rawValue and other.rawValue)",
                                 f"  public operator fun contains(other: {public}): Boolean = (rawValue and other.rawValue) == other.rawValue",
-                                flag_label(value, prefix),
+                                flag_label(value, prefix, scalar),
                             ]
                             if bitmask
                             else [enum_label(public, value, prefix, scalar)]
@@ -1063,14 +1063,15 @@ def zero_constant(value):
     return "NONE" if value.enum_kind == "bitmask" else None
 
 
-def flag_label(value, prefix):
+def flag_label(value, prefix, scalar):
     """A `toString` that names a flag set's single-bit members and keeps unknown bits in hex."""
     bits = {}
     for native, number in value.enum_values:
         if number > 0 and number & (number - 1) == 0:
             bits.setdefault(number, native.removeprefix(prefix))
     flags = ", ".join(f'{number}uL to "{label}"' for number, label in bits.items())
-    return f'  override fun toString(): String = flagLabel(rawValue.toULong(), "{zero_constant(value)}", listOf({flags}))'
+    raw = "rawValue" if scalar == "ULong" else "rawValue.toULong()"
+    return f'  override fun toString(): String = flagLabel({raw}, "{zero_constant(value)}", listOf({flags}))'
 
 
 def enum_label(public, value, prefix, scalar):

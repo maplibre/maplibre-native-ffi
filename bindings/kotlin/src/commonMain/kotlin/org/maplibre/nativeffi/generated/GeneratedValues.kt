@@ -1063,7 +1063,7 @@ public value class RuntimeEventFlag(public val rawValue: ULong) {
 
   override fun toString(): String =
     flagLabel(
-      rawValue.toULong(),
+      rawValue,
       "NONE",
       listOf(
         2uL to "MAP_CAMERA_WILL_CHANGE",

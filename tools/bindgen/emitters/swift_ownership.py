@@ -54,7 +54,7 @@ def consumed(plan, owner, values):
     let arena = NativeInputArena()
     defer {{ withExtendedLifetime(arena) {{}} }}
     try handle.closeOnce({idempotent}) {{ live in
-      var raw = live.raw
+      {"var" if "&raw" in args else "let"} raw = live.raw
       {checked(native_call(function, *args))}
     }}
   }}

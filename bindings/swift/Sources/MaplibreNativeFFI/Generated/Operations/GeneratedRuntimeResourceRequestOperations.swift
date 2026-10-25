@@ -12,7 +12,7 @@ public extension ResourceRequestHandle {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     try handle.closeOnce(idempotent: false) { live in
-      var raw = live.raw
+      let raw = live.raw
       try checkStatus { diagnostic in try mln_resource_request_complete(
         raw,
         arena.store(response.nativeValue(arena: arena)),
@@ -78,7 +78,7 @@ public extension ResourceRequestHandle {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     try handle.closeOnce(idempotent: false) { live in
-      var raw = live.raw
+      let raw = live.raw
       try checkStatus { diagnostic in mln_resource_request_pass_through(
         raw,
         diagnostic

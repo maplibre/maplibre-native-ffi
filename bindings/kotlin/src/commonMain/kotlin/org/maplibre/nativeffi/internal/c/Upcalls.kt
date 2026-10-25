@@ -33,7 +33,6 @@ internal object Upcalls {
       value.fetchTile(readCanonicalTileId(tileId))
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -47,7 +46,6 @@ internal object Upcalls {
       invoke(readCanonicalTileId(tileId))
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -60,7 +58,6 @@ internal object Upcalls {
       value.fetchTile(readCanonicalTileId(tileId))
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -74,7 +71,6 @@ internal object Upcalls {
       invoke(readCanonicalTileId(tileId))
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -87,7 +83,6 @@ internal object Upcalls {
       value.callback()
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -96,7 +91,6 @@ internal object Upcalls {
       value.callback(readEventBatchView(events))
       true
     }
-    Unit
   }
 
   @JvmStatic
@@ -111,7 +105,6 @@ internal object Upcalls {
     ) {
       handleOwner.close()
     }
-    Unit
   }
 
   @JvmStatic
@@ -126,7 +119,6 @@ internal object Upcalls {
     ) {
       requestOwner.close()
     }
-    Unit
   }
 
   @JvmStatic
@@ -161,7 +153,6 @@ internal object Upcalls {
       invoke(readCameraTransitionEnd(end))
       true
     }
-    Unit
   }
 }
 

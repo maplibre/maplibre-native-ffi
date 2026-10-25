@@ -13,7 +13,7 @@ public extension ResourceTransformRequestHandle {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     try handle.closeOnce(idempotent: false) { live in
-      var raw = live.raw
+      let raw = live.raw
       try checkStatus { diagnostic in mln_resource_transform_request_complete(
         raw,
         arena.view(url),

@@ -67,7 +67,7 @@ public extension AcquiredFrameHandle {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     try handle.closeOnce { live in
-      var raw = live.raw
+      let raw = live.raw
       try checkStatus { diagnostic in mln_acquired_frame_release(
         raw,
         consumerCompletion.map { arena.store($0.nativeValue()) },
