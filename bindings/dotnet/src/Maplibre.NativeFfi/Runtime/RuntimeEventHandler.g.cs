@@ -9,4 +9,4 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event_handler</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct RuntimeEventHandler(Action<EventBatchView>? Callback);
+public readonly partial record struct RuntimeEventHandler(Action<RuntimeEvent[]>? Callback);

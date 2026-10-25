@@ -98,10 +98,12 @@ do {
   )
 }
 
-// A strided view decodes each plain record at the stride native reports.
+// A drain decodes each plain record at the stride native reports and releases
+// its batch, so the next drain reaches native, which has nothing queued.
 let ledger = try Maplibre.probeLedgerOpen()
-let readings = try ledger.get().readings.map(\.value)
+let readings = try ledger.drain().map(\.value)
 check(readings == [7, 9], "strided readings: \(readings)")
+try check(ledger.drain().isEmpty, "drained readings")
 try ledger.close()
 
 try check(Maplibre.probeReadLevel() == nil, "absent level")

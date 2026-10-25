@@ -282,17 +282,13 @@ function takeResult(
   token: bigint,
 ): RenderFrameResult | undefined {
   for (
-    let batch = session.drainFrameResults();
-    batch;
-    batch = session.drainFrameResults()
+    let results = session.drainFrameResults();
+    results.length > 0;
+    results = session.drainFrameResults()
   ) {
-    try {
-      const result = batch.get().results.find((item) => item.token === token);
-      if (result !== undefined) {
-        return result;
-      }
-    } finally {
-      batch.close();
+    const result = results.find((item) => item.token === token);
+    if (result !== undefined) {
+      return result;
     }
   }
   return undefined;

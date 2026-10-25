@@ -11,8 +11,59 @@ from tools.bindgen.emitters.go_callbacks import accepts_native
 from tools.bindgen.emitters.go_operations import lower
 from tools.bindgen.schema import validate
 
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
+
 
 class GoEmitterTests(unittest.TestCase):
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        validate(api)
+        source = go.generate(api)["generated_api.go"]
+        self.assertIn("func DrainReadings() ([]Reading, error) {", source)
+        # The copy runs only when native published a batch, and a deferred
+        # release frees the batch even if the copy panics.
+        self.assertIn(
+            "bindingGetUnless(bindingGlobal(), int32(C.MLN_STATUS_NOT_READY)", source
+        )
+        self.assertIn(
+            "}, func(arena *bindingArena) []Reading {\n"
+            "defer C.mln_reading_batch_release(outBatch)\n",
+            source,
+        )
+        # Neither the batch nor its view is public.
+        self.assertNotIn("ReadingBatchHandle", source)
+        self.assertNotIn("ReadingView", source)
+
+    def test_a_callback_receives_its_slice_argument_as_a_slice(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "type RuntimeEventHandler struct { Callback func([]RuntimeEvent) }", source
+        )
+        self.assertNotIn("EventBatchView", source)
+
     def test_wakes_and_synchronous_registrations_take_a_native_registration(self):
         # Every other registration takes only Go funcs, whose calls enter the
         # Go runtime.
@@ -63,7 +114,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
             for line in source.splitlines()
             if line.endswith("struct { *bindingOwner }")
         ]
-        self.assertEqual(len(owners), 10)
+        self.assertEqual(len(owners), 9)
         for owner in owners:
             for member in ("Id() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)

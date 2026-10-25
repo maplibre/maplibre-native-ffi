@@ -353,7 +353,6 @@ pub const OwnedValue = marshal.OwnedValue;
         "//! GPU descriptors are borrowed only inside the scoped getter callback.\n"
         "//! Callback errors are logged through std.log; native receives the failure value.\n"
         "//! Text that a callback receives is borrowed from native until the callback returns.\n"
-        "//! Synchronize batch release with getters that copy borrowed storage.\n"
         "//! A function that serves only some targets is void on the others.\n"
     )
     runtime = """

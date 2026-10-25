@@ -1368,15 +1368,6 @@ void mln_kw_mln_projection_mode_default(uintptr_t returned) {
   *(mln_projection_mode*)returned = mln_projection_mode_default();
 }
 
-int32_t mln_kw_mln_render_frame_batch_get(
-  int64_t batch, uintptr_t out_view, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_render_frame_batch_get(
-    (mln_render_frame_batch)batch, (mln_render_frame_batch_view*)out_view,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 void mln_kw_mln_render_frame_batch_release(int64_t batch) {
   mln_render_frame_batch_release((mln_render_frame_batch)batch);
 }
@@ -1441,11 +1432,12 @@ int32_t mln_kw_mln_render_session_dispose(
 }
 
 int32_t mln_kw_mln_render_session_drain_frame_results(
-  int64_t session, uintptr_t out_batch, uintptr_t out_diagnostic
+  int64_t session, uintptr_t out_batch, uintptr_t out_view,
+  uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_drain_frame_results(
     (mln_render_session)session, (mln_render_frame_batch*)out_batch,
-    (mln_diagnostic*)out_diagnostic
+    (mln_render_frame_batch_view*)out_view, (mln_diagnostic*)out_diagnostic
   );
 }
 

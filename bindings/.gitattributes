@@ -72,8 +72,6 @@
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FrameDemandFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchHandle.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderSessionHandle.Operations.g.cs linguist-generated=true
@@ -100,7 +98,6 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/WglContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeader.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderRule.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs linguist-generated=true
@@ -211,7 +208,6 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedMapOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedMapProjectionOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedOwnerDisposal.kt linguist-generated=true
-/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRenderFrameBatchOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRenderSessionOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceRequestOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceTransformRequestOperations.kt linguist-generated=true
@@ -221,7 +217,6 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeojsonSourceDataHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/MapHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/MapProjectionHandle.kt linguist-generated=true
-/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RenderFrameBatchHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RenderSessionHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceRequestHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceTransformRequestHandle.kt linguist-generated=true
@@ -265,7 +260,6 @@
 /rust/crates/maplibre-native-ffi/src/generated/map.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map_projection.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/mod.rs linguist-generated=true
-/rust/crates/maplibre-native-ffi/src/generated/render_frame_batch.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_session.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/resource_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/resource_transform_request.rs linguist-generated=true
@@ -289,7 +283,6 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionAcquiredFrameOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionGlobalsOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionRenderFrameBatchOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderTargetGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeGlobalsOperations.swift linguist-generated=true

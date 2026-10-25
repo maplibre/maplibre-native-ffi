@@ -13,6 +13,7 @@ from support import (
     parse,
     parse_sources,
     protocol_header,
+    real_api,
     require_tool,
 )
 
@@ -38,6 +39,32 @@ void mln_lease_close(mln_lease lease);
 """
 
 
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
+
+
 class DartEmitterTests(unittest.TestCase):
     def test_every_owner_has_the_same_handle_members(self):
         generated = dart.generate(parse(EVENT_SOURCE_AND_LEASE))
@@ -54,6 +81,36 @@ class DartEmitterTests(unittest.TestCase):
             "which runtime events report", generated.split("class MapHandle")[1]
         )
         self.assertIn("  /// The native handle id.\n  int get id", generated)
+
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        generated = dart.generate(api)
+        # The drain copies the slice, then releases the batch even if the copy
+        # throws, and nothing queued reads as an empty list.
+        self.assertIn("List<Reading> drainReadings() =>", generated)
+        self.assertIn("return const [];", generated)
+        self.assertIn(
+            "return _drain(outBatch.value, (batch) { raw.mln_reading_batch_release(batch); }, "
+            "() => _readReadingView(outView.ref));",
+            generated,
+        )
+        self.assertIn(
+            "List<Reading> _readReadingView(raw.mln_reading_view source) =>", generated
+        )
+        # Neither the batch nor its view is public.
+        self.assertNotIn("ReadingBatchHandle", generated)
+        self.assertNotIn("class ReadingView", dart.generate_values(api))
+
+    def test_a_callback_receives_its_slice_argument_as_a_list(self):
+        values = dart.generate_values(real_api())
+        self.assertIn(
+            "typedef RuntimeEventCallback = void Function(List<RuntimeEvent>);", values
+        )
+        self.assertNotIn("EventBatchView", values)
+        self.assertIn(
+            "callback(_readEventBatchView(payload.events.ref));",
+            dart.generate(real_api()),
+        )
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         dart_tool = require_tool(self, "dart", BINDING)

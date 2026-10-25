@@ -63,12 +63,10 @@ int pendingCompletionCountForTesting() =>
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_event_batch_view batch,
 ) {
-  final Object decoded =
-      _runtime.invoke(_symbol('_readEventBatchView', _runtime), [
-            batch,
-          ]).reflectee
-          as Object;
-  return _field(decoded, 'events') as List<RuntimeEvent>;
+  return _runtime.invoke(_symbol('_readEventBatchView', _runtime), [
+        batch,
+      ]).reflectee
+      as List<RuntimeEvent>;
 }
 
 List<LatLng> decodeLatLngListForTesting(raw.mln_completion_result result) {

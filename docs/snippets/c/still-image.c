@@ -196,14 +196,13 @@ void advance_still_image(still_image_job* job) {
     atomic_exchange_explicit(&job->frames_ready, false, memory_order_acq_rel)
   ) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    mln_render_frame_batch_view view = {.size = sizeof(view)};
     if (
-      mln_render_session_drain_frame_results(job->session, &batch, NULL) ==
-      MLN_STATUS_OK
+      mln_render_session_drain_frame_results(
+        job->session, &batch, &view, NULL
+      ) == MLN_STATUS_OK
     ) {
-      mln_render_frame_batch_view view = {.size = sizeof(view)};
-      const bool read =
-        mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK;
-      for (size_t index = 0; read && index < view.result_count; ++index) {
+      for (size_t index = 0; index < view.result_count; ++index) {
         const mln_render_frame_result* frame =
           (const mln_render_frame_result*)((const char*)view.results +
                                            index * view.result_size);

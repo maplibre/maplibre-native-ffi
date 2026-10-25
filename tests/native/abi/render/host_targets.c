@@ -190,7 +190,7 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY,
-    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
+    mln_test_drain_frame_results(fixture.session, &batch, NULL)
   );
   mln_test_render_release_frame(&first);
   batch = mln_test_render_wait_for_results(&fixture);

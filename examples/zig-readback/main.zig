@@ -211,17 +211,13 @@ fn renderStillImage(
         if (uses_caller_driver) _ = try session.serviceDriverWork(null);
         if (try still_image.poll()) return still_image.wait(null);
         var demand = false;
-        var results = try session.drainFrameResults(null);
-        if (results) |*batch| {
-            defer batch.deinit();
-            var view = try batch.get(allocator, null);
-            defer view.deinit();
-            for (view.value.results) |result| {
-                switch (result.disposition) {
-                    .rendered => demand = true,
-                    .superseded => {},
-                    else => return error.FrameNotRendered,
-                }
+        var results = try session.drainFrameResults(allocator, null);
+        defer results.deinit();
+        for (results.value) |result| {
+            switch (result.disposition) {
+                .rendered => demand = true,
+                .superseded => {},
+                else => return error.FrameNotRendered,
             }
         }
         if (demand) {

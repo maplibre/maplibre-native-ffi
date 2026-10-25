@@ -918,13 +918,7 @@ napi_value mln_ts_read_event_batch_view(
   napi_env env, const mln_event_batch_view* source, size_t size
 ) {
   (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "events", mln_ts_read_event_batch_view_events(env, source)
-      ))
-    return NULL;
-  return result;
+  return mln_ts_read_event_batch_view_events(env, source);
 }
 
 napi_value mln_ts_read_event_batch_view_events(
@@ -2306,14 +2300,7 @@ napi_value mln_ts_read_render_frame_batch_view(
   napi_env env, const mln_render_frame_batch_view* source, size_t size
 ) {
   (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "results",
-        mln_ts_read_render_frame_batch_view_results(env, source)
-      ))
-    return NULL;
-  return result;
+  return mln_ts_read_render_frame_batch_view_results(env, source);
 }
 
 napi_value mln_ts_read_render_frame_batch_view_results(

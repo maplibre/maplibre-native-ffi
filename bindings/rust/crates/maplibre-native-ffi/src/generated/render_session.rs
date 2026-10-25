@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) }), counted false;
+    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) });
     /// Returns the native handle value.
     fn id;
 }
@@ -102,7 +102,7 @@ impl RenderSessionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(&self) -> Result<NativeFuture<()>> {
         self.inner.close(|session| {
-            let call = Call::new(session, None);
+            let call = Call::new(session);
             call.complete(
                 |session, completion, out_diagnostic| unsafe {
                     sys::mln_render_session_dispose(session, completion, out_diagnostic)
@@ -119,7 +119,7 @@ impl RenderSessionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(&self) -> Result<()> {
         self.inner.close_once(|session| {
-            let call = Call::new(session, None);
+            let call = Call::new(session);
             call.discard(|session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_dispose(session, completion, out_diagnostic)
             })
@@ -127,23 +127,39 @@ impl RenderSessionHandle {
     }
 
     /// Drains every currently queued terminal frame result into an
-    /// independently owned batch. The records remain stable until the batch is
-    /// released.
+    /// independently owned batch and borrows its view. The records remain
+    /// stable until the batch is released.
     ///
     /// See `mln_render_session_drain_frame_results` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn drain_frame_results(&self) -> Result<Option<RenderFrameBatchHandle>> {
+    pub fn drain_frame_results(&self) -> Result<Vec<RenderFrameResult>> {
         let mut call = self.inner.call();
         let mut out_batch = sys::mln_render_frame_batch(0);
+        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         if !call.status_unless(
             sys::MLN_STATUS_NOT_READY,
             |session, out_diagnostic| unsafe {
-                sys::mln_render_session_drain_frame_results(session, &mut out_batch, out_diagnostic)
+                sys::mln_render_session_drain_frame_results(
+                    session,
+                    &mut out_batch,
+                    &mut out_view,
+                    out_diagnostic,
+                )
             },
         )? {
-            return Ok(None);
+            return Ok(Vec::new());
         }
-        Ok(Some(RenderFrameBatchHandle::adopt(out_batch, None)?))
+        // SAFETY: native published the batch to this call alone.
+        let _batch =
+            unsafe { crate::handle::Drained::new(out_batch, sys::mln_render_frame_batch_release) };
+        Ok(unsafe {
+            convert::copy_strided(
+                out_view.results,
+                out_view.result_count,
+                out_view.result_size,
+            )
+        }?)
     }
 
     /// Starts asynchronous renderer diagnostic-log emission.

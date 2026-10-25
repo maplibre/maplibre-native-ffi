@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .model import Api, CType, Function, ModelError
+from .names import type_name
 from .protocol import (
     BUFFER_VIEW,
     COMPLETION,
@@ -140,7 +141,9 @@ KINDS = {
             "delivery_queue",
         }
     ),
-    "typedef": frozenset({"handle", "callback_registration", "callback_response"}),
+    "typedef": frozenset(
+        {"handle", "callback_registration", "callback_response", "slice"}
+    ),
     "enum": frozenset({"bitmask"}),
 }
 
@@ -858,6 +861,15 @@ def validate(api: Api) -> None:
                     )
     for record in api.records:
         context = f"{record.location}: {record.name}"
+        # A slice record only carries one counted array, which bindings present
+        # in its place.
+        typedef = api.typedefs_by_name.get(record.name)
+        if (
+            typedef
+            and typedef.metadata.get("kind") == "slice"
+            and (sum("length" in field.metadata for field in record.fields) != 1)
+        ):
+            errors.append(f"{context}: kind=slice requires exactly one counted array")
         # A presence bit guards one member, so a value that several fields
         # describe together is a record embedded under that bit. An array's
         # count takes the array's presence and names no bit of its own.
@@ -1373,10 +1385,20 @@ def absence_errors(api: Api, function: Function, context: str) -> list[str]:
         errors.append(
             f"{context}: absent_on requires a status return without a completion"
         )
-    directions = [
-        parameter.metadata.get("direction", "in") for parameter in function.parameters
+    outputs = [
+        parameter
+        for parameter in function.parameters
+        if parameter.metadata.get("direction", "in") == "out"
     ]
-    if directions.count("out") != 1:
+    # A drain publishes its owned batch with a slice view of it, and the status
+    # reports both absent.
+    drain = len(outputs) == 2 and any(
+        (typedef := api.typedefs_by_name.get(type_name(p.type.pointee or p.type)))
+        is not None
+        and typedef.metadata.get("kind") == "slice"
+        for p in outputs
+    )
+    if len(outputs) != 1 and not drain:
         errors.append(f"{context}: absent_on requires exactly one output")
     statuses = {
         value.name: value.value

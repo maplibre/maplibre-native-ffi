@@ -153,14 +153,14 @@ class Host {
     check(mln_render_session_service_driver_work(session_, nullptr));
     for (;;) {
       auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
-      const auto status =
-        mln_render_session_drain_frame_results(session_, &batch, nullptr);
-      if (status == MLN_STATUS_NOT_READY) break;
-      check(status);
       auto results = mln_render_frame_batch_view{
         .size = sizeof(mln_render_frame_batch_view)
       };
-      check(mln_render_frame_batch_get(batch, &results, nullptr));
+      const auto status = mln_render_session_drain_frame_results(
+        session_, &batch, &results, nullptr
+      );
+      if (status == MLN_STATUS_NOT_READY) break;
+      check(status);
       for (size_t i = 0; i < results.result_count; ++i) {
         const auto* result = reinterpret_cast<const mln_render_frame_result*>(
           reinterpret_cast<const char*>(results.results) +

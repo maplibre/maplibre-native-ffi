@@ -63,9 +63,13 @@ test "optional fields and masks round-trip through presence bits" {
 
 // Native steps through a batch by the stride it reports, which may exceed the
 // record size the binding was built with, and a payload tag the binding does
-// not know decodes as `.unknown` with its raw value.
+// not know decodes as `.unknown` with its raw value. The event handler's
+// trampoline copies the batch for the host callback.
 test "a strided event batch with an unknown payload arm decodes without loss" {
-    const RawBatch = @typeInfo(@TypeOf(maplibre.EventBatchView.fromNative)).@"fn".param_types[1].?;
+    const Roots = @typeInfo(@typeInfo(@TypeOf(maplibre.RuntimeEventHandler.toNative)).@"fn".param_types[1].?).pointer.child;
+    const RawHandler = @typeInfo(@TypeOf(maplibre.RuntimeEventHandler.toNative)).@"fn".return_type.?;
+    const Callback = @typeInfo(@typeInfo(@FieldType(@typeInfo(RawHandler).error_union.payload, "callback")).optional.child).pointer.child;
+    const RawBatch = @typeInfo(@typeInfo(Callback).@"fn".param_types[1].?).pointer.child;
     const RawEvent = @typeInfo(@FieldType(RawBatch, "events")).pointer.child;
     const Record = extern struct { event: RawEvent, newer_fields: [24]u8 };
 
@@ -85,18 +89,31 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     raw.events = &records[0].event;
     raw.event_count = records.len;
 
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const view = try maplibre.EventBatchView.fromNative(arena.allocator(), raw);
-    try testing.expectEqual(@as(usize, 2), view.events.len);
-    try testing.expectEqual(@as(u32, 999), @backingInt(view.events[0].type));
-    try testing.expectEqual(@as(u64, 0xfeed_0000_0000_0001), view.events[0].source);
-    try testing.expectEqual(@as(u64, 0x1_0000_0002), view.events[0].generation);
-    try testing.expectEqual(@as(u32, 77), view.events[0].payload.unknown);
-    try testing.expectEqualStrings("future", view.events[0].message);
-    try testing.expectEqual(maplibre.RuntimeEventType.map_style_loaded, view.events[1].type);
-    try testing.expect(view.events[1].payload == .empty);
-    try testing.expectEqualStrings("loaded", view.events[1].message);
+    // The trampoline reports a callback error rather than returning it, so the
+    // probe keeps the outcome of its checks.
+    const Probe = struct {
+        checked: anyerror!void = error.NotDelivered,
+        fn receive(self: *@This(), events: []const maplibre.RuntimeEvent) anyerror!void {
+            self.checked = expectDecoded(events);
+        }
+        fn expectDecoded(events: []const maplibre.RuntimeEvent) !void {
+            try testing.expectEqual(@as(usize, 2), events.len);
+            try testing.expectEqual(@as(u32, 999), @backingInt(events[0].type));
+            try testing.expectEqual(@as(u64, 0xfeed_0000_0000_0001), events[0].source);
+            try testing.expectEqual(@as(u64, 0x1_0000_0002), events[0].generation);
+            try testing.expectEqual(@as(u32, 77), events[0].payload.unknown);
+            try testing.expectEqualStrings("future", events[0].message);
+            try testing.expectEqual(maplibre.RuntimeEventType.map_style_loaded, events[1].type);
+            try testing.expect(events[1].payload == .empty);
+            try testing.expectEqualStrings("loaded", events[1].message);
+        }
+    };
+    var probe = Probe{};
+    var roots: Roots = .{};
+    defer roots.deinit();
+    const handler = try maplibre.RuntimeEventHandler.init(&probe, Probe.receive, null).toNative(&roots);
+    handler.callback.?(handler.user_data, &raw);
+    try probe.checked;
 }
 
 // An enum value the binding does not name crosses unchanged, so native is the

@@ -270,7 +270,6 @@ type bindingState struct {
 	typeName string
 	raw      uint64
 	released atomic.Bool
-	reads    *sync.RWMutex
 	dispose  func(uint64)
 }
 
@@ -283,11 +282,8 @@ type bindingOwner struct {
 
 // bindingAdopt keeps cleanup state separate from the owner so that callback
 // cycles and children remain collectible.
-func bindingAdopt(raw uint64, parent any, typeName string, guarded bool, dispose func(uint64)) *bindingOwner {
+func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64)) *bindingOwner {
 	state := &bindingState{typeName: typeName, raw: raw, dispose: dispose}
-	if guarded {
-		state.reads = &sync.RWMutex{}
-	}
 	owner := &bindingOwner{state: state, parent: parent, roots: make(map[cgo.Handle]*bindingCallbackTicket)}
 	runtime.AddCleanup(owner, func(state *bindingState) {
 		if !state.released.Load() {

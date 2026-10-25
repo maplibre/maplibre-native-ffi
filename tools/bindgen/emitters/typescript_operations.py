@@ -135,6 +135,9 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
             lines.append(f"return handle === undefined ? undefined : {adopted};")
         else:
             lines.append(f"return {adopted};")
+    elif shape == "drain":
+        # Nothing queued reads as no elements.
+        lines = [f"return {call} ?? [];"]
     elif shape == "view":
         view = entry.plan.view
         scope = (

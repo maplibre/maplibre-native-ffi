@@ -15,7 +15,7 @@
 # object that has mln_c_version alone, so the check fails before the loader
 # could make any other call, which would throw a TypeError instead.
 "ERR-02" = "bindings/typescript/test/errors.test.ts::an addon with another C ABI version fails to load before any other call"
-"ERR-03" = "bindings/typescript/test/render.test.ts::a drain before any demand returns no batch"
+"ERR-03" = "bindings/typescript/test/render.test.ts::a drain before any demand returns no results"
 "LIFE-01" = "bindings/typescript/test/lifecycle.test.ts::repeated asynchronous release reaches native"
 "LIFE-02" = "bindings/typescript/test/lifecycle.test.ts::a refused close leaves the handle usable for a later close"
 "LIFE-03" = { na = "A realm runs on one thread and shares no objects with another realm, so no borrow of a handle can be in progress on another thread; the borrow within a realm is VIEW-01" }

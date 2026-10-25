@@ -9,6 +9,7 @@
 #include "style.h"
 
 #include "env.h"
+#include "frames.h"
 #include "render.h"
 #include "resources.h"
 #include "status.h"
@@ -41,15 +42,11 @@ static bool frame_arrived(void* context) {
   frame_wait* wait = context;
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   if (
-    mln_render_session_drain_frame_results(wait->session, &batch, NULL) !=
-    MLN_STATUS_OK
+    mln_test_drain_frame_results(wait->session, &batch, NULL) != MLN_STATUS_OK
   ) {
     return wait->found;
   }
-  mln_render_frame_batch_view view = {
-    .size = sizeof(mln_render_frame_batch_view)
-  };
-  (void)mln_render_frame_batch_get(batch, &view, NULL);
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   for (size_t index = 0; index < view.result_count; index += 1) {
     const mln_render_frame_result* result =
       (const mln_render_frame_result*)((const char*)view.results +

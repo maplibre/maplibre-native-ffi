@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tools.bindgen.semantic import BoundApi, HandlePlan
 
-from .rust import counted_owner, doc, native_call, pascal
+from .rust import doc, native_call, pascal
 
 
 def owner_name(native: str) -> str:
@@ -69,7 +69,6 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     else:
         call = native_call(dispose, arguments, diagnostic="out_diagnostic")
         finalize = f"|raw| maplibre_core::check(|out_diagnostic| unsafe {{ {call} }})"
-    counted = counted_owner(bound, native)
     must_use = ""
     if handle.release_inputs:
         release = handle.release.removeprefix(native + "_")
@@ -85,7 +84,7 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
         f"    /// Owns one `{native}` native handle.\n"
         + (f"    ///\n{summary}" if (summary := doc(bound, native, "    ")) else "")
         + f"{must_use}"
-        f"    pub struct {owner}({native}) dispose {finalize}, counted {str(counted).lower()};\n"
+        f"    pub struct {owner}({native}) dispose {finalize};\n"
         f"{id_doc}"
         "    fn id;\n"
         "}\n"

@@ -132,6 +132,9 @@ def decode(values, value, source, context="raw"):
         # Native never returns callbacks, so a copy leaves a registration
         # unset.
         return "nil" if value.nullable else f"{values.public(value)}()"
+    if value.native in values.bound.slices:
+        array = values.bound.slices[value.native]
+        return decode(values, array.value, f"{source}.{identifier(array.name)}", source)
     if value.kind == "enum":
         return f"{values.public(value)}(rawValue: {source}{'.rawValue' if value.ctype.canonical.startswith('enum ') else ''})"
     if value.kind == "native_pointer":

@@ -10,6 +10,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    parse,
     parse_sources,
     protocol_header,
     real_api,
@@ -41,6 +42,31 @@ GROUPS = (
     "completion_results",
 )
 DEFINES = ("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION")
+
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
 
 
 class TypeScriptEmitterTests(unittest.TestCase):
@@ -162,6 +188,45 @@ class TypeScriptEmitterTests(unittest.TestCase):
             self.assertIn("runtime events report as their", owner(name))
         for name in ("MapProjectionHandle", "RenderSessionHandle"):
             self.assertNotIn("readonly id", owner(name))
+
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        outputs = typescript.generate(
+            parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        )
+        operations = outputs["bindings/typescript/src/generated_operations.ts"]
+        # Nothing queued reads as an empty array.
+        self.assertIn(
+            "export function drainReadings(): readonly Reading[] {\n"
+            "  return native.mln_drain_readings() ?? [];\n}",
+            operations,
+        )
+        # The addon copies the slice, then releases the batch whether or not
+        # the copy succeeded.
+        addon = outputs["bindings/typescript/native/generated_addon.c"]
+        self.assertIn(
+            "call->result = mln_ts_read_reading_view(env, &(arg_out_view), sizeof(arg_out_view));\n"
+            "  mln_reading_batch_release(arg_out_batch);\n",
+            addon,
+        )
+        self.assertIn(
+            "return mln_ts_read_reading_view_readings(env, source);",
+            outputs["bindings/typescript/native/generated_values.c"],
+        )
+        # Neither the batch nor its view is public.
+        self.assertNotIn("ReadingBatch", operations)
+        self.assertNotIn(
+            "ReadingView", outputs["bindings/typescript/src/generated_values.ts"]
+        )
+
+    def test_a_callback_receives_its_slice_argument_as_a_list(self):
+        values = typescript.generate(self.api)[
+            "bindings/typescript/src/generated_values.ts"
+        ]
+        self.assertIn(
+            "export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;",
+            values,
+        )
+        self.assertNotIn("EventBatchView", values)
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an

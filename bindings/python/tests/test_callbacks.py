@@ -136,7 +136,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     receiver: dict[str, object] = {}
 
     def receive_events(
-        _: mln.EventBatchView, receiver: dict[str, object] = receiver
+        _: tuple[mln.RuntimeEvent, ...], receiver: dict[str, object] = receiver
     ) -> None:
         if receiver.get("runtime") is not None:
             woke.set()

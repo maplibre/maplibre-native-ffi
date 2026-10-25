@@ -11,17 +11,13 @@ import (
 	"unsafe"
 )
 
-// Borrowed outputs must be copied while the receiver is held. Input storage
-// and callback roots remain live until the native call settles.
+// Input storage and callback roots remain live until the native call settles.
 
 type bindingAccess uint8
 
 const (
 	bindingGlobalAccess bindingAccess = iota
 	bindingOwnerAccess
-	// The call leases the receiver and holds off its close, because the
-	// results borrow from it until they are copied.
-	bindingReadAccess
 	// Native consumes the receiver when the call succeeds.
 	bindingCloseAccess
 	// The call answers the receiver, which native consumes when the call
@@ -44,10 +40,6 @@ type bindingTarget struct {
 func bindingGlobal() bindingTarget { return bindingTarget{} }
 func bindingOwned(owner *bindingOwner) bindingTarget {
 	return bindingTarget{owner: owner, access: bindingOwnerAccess}
-}
-
-func bindingRead(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingReadAccess}
 }
 
 func bindingClosing(owner *bindingOwner) bindingTarget {
@@ -87,12 +79,6 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 			var zero T
 			return zero
 		}
-		if state.reads != nil {
-			if !state.reads.TryLock() {
-				panic(bindingFailure{newBindingError(StatusInvalidState, state.typeName+" is in use")})
-			}
-			defer state.reads.Unlock()
-		}
 		if target.access == bindingConsumeAccess {
 			state.released.Store(true)
 		}
@@ -100,10 +86,6 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 		state.released.Store(true)
 		arena.accept(owner)
 		return value
-	}
-	if target.access == bindingReadAccess {
-		state.reads.RLock()
-		defer state.reads.RUnlock()
 	}
 	value := call(arena, state.raw)
 	arena.accept(owner)

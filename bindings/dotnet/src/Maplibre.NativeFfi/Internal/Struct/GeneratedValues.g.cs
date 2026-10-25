@@ -532,12 +532,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static EventBatchView CopyEventBatchView(mln_event_batch_view value) =>
-        default(EventBatchView) with
-        {
-            EventsStorage = new(CopyEventBatchViewEvents(value)),
-        };
-
     internal static RuntimeEvent[] CopyEventBatchViewEvents(mln_event_batch_view value)
     {
         var count = checked((int)value.event_count);
@@ -1648,14 +1642,6 @@ internal static unsafe class GeneratedValues
     internal static RenderAbandonResult CopyRenderAbandonResult(mln_render_abandon_result value) =>
         new((RenderAbandonDisposition)value.disposition, value.quarantined_resource_count);
 
-    internal static RenderFrameBatchView CopyRenderFrameBatchView(
-        mln_render_frame_batch_view value
-    ) =>
-        default(RenderFrameBatchView) with
-        {
-            ResultsStorage = new(CopyRenderFrameBatchViewResults(value)),
-        };
-
     internal static RenderFrameResult[] CopyRenderFrameBatchViewResults(
         mln_render_frame_batch_view value
     )
@@ -2135,7 +2121,7 @@ internal static unsafe class GeneratedValues
         try
         {
             ((RuntimeEventHandler)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                CopyEventBatchView(NativeCallScope.Read(events))
+                CopyEventBatchViewEvents(NativeCallScope.Read(events))
             );
         }
         catch (Exception error)

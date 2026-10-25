@@ -4553,53 +4553,6 @@ static napi_value mln_ts_export_mln_projection_mode_default(
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_render_frame_batch_get(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_frame_batch arg_batch = 0;
-  mln_render_frame_batch_view arg_out_view;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "batch")) goto done;
-    arg_batch = (mln_render_frame_batch)number;
-  }
-  memset(&arg_out_view, 0, sizeof arg_out_view);
-  arg_out_view.size = sizeof arg_out_view;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_frame_batch_get(arg_batch, &arg_out_view, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_read_render_frame_batch_view(
-    env, &(arg_out_view), sizeof(arg_out_view)
-  );
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_frame_batch_release(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_frame_batch arg_batch = 0;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "batch")) goto done;
-    arg_batch = (mln_render_frame_batch)number;
-  }
-  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_render_frame_batch_release(arg_batch);
-  mln_ts_consume(call);
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_render_session_abandon(
   napi_env env, napi_callback_info info
 ) {
@@ -4797,6 +4750,7 @@ static napi_value mln_ts_export_mln_render_session_drain_frame_results(
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
   mln_render_frame_batch arg_out_batch = MLN_HANDLE_NULL;
+  mln_render_frame_batch_view arg_out_view;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -4805,14 +4759,19 @@ static napi_value mln_ts_export_mln_render_session_drain_frame_results(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
+  memset(&arg_out_view, 0, sizeof arg_out_view);
+  arg_out_view.size = sizeof arg_out_view;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_render_session_drain_frame_results(
-    arg_session, &arg_out_batch, &diagnostic
+    arg_session, &arg_out_batch, &arg_out_view, &diagnostic
   );
   if (status == MLN_STATUS_NOT_READY) goto done;
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_batch);
+  call->result = mln_ts_read_render_frame_batch_view(
+    env, &(arg_out_view), sizeof(arg_out_view)
+  );
+  mln_render_frame_batch_release(arg_out_batch);
 done:
   return mln_ts_end(call);
 }
@@ -7128,9 +7087,6 @@ static const mln_ts_export exports[] = {
   {"mln_projected_meters_for_lat_lng",
    mln_ts_export_mln_projected_meters_for_lat_lng},
   {"mln_projection_mode_default", mln_ts_export_mln_projection_mode_default},
-  {"mln_render_frame_batch_get", mln_ts_export_mln_render_frame_batch_get},
-  {"mln_render_frame_batch_release",
-   mln_ts_export_mln_render_frame_batch_release},
   {"mln_render_session_abandon", mln_ts_export_mln_render_session_abandon},
   {"mln_render_session_acquire_frame",
    mln_ts_export_mln_render_session_acquire_frame},

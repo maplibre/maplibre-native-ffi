@@ -102,18 +102,24 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeClose(this, binding) { check(C.mln_render_session_dispose(handle, 0L, diagnostic)) }
 
   /**
-   * Drains every currently queued terminal frame result into an independently owned batch. The
-   * records remain stable until the batch is released.
+   * Drains every currently queued terminal frame result into an independently owned batch and
+   * borrows its view. The records remain stable until the batch is released.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  public fun drainFrameResults(): RenderFrameBatchHandle? =
+  public fun drainFrameResults(): List<RenderFrameResult> =
     nativeCall(this, binding) {
-      val out = allocate(8, 8)
-      if (present(C.mln_render_session_drain_frame_results(handle, out, diagnostic), absent = -9))
-        adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
-      else null
+      val batch = allocate(8, 8)
+      val out = sized(w(16, 24), w(4, 8))
+      if (
+        present(
+          C.mln_render_session_drain_frame_results(handle, batch, out, diagnostic),
+          absent = -9,
+        )
+      )
+        drain(batch, { C.mln_render_frame_batch_release(it) }) { readRenderFrameBatchView(out) }
+      else emptyList()
     }
 
   /**

@@ -121,33 +121,6 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// A borrowed view of one owned frame-result batch.
-///
-/// See `mln_render_frame_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-public struct RenderFrameBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of result_count terminal frame results in completion order.
-  public var results: [RenderFrameResult]
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(results: [RenderFrameResult] = []) {
-    self.results = results
-  }
-
-  init(
-    raw: mln_render_frame_batch_view,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    results = try NativeInputArena.copyStrided(
-      raw.results,
-      count: raw.result_count,
-      stride: raw.result_size
-    ) { item, _ in RenderFrameResult(raw: item) }
-  }
-}
-
 /// Terminal result of one frame demand, held by an owned frame-result batch and
 /// copied by `mln_acquired_frame_get_result()`.
 ///

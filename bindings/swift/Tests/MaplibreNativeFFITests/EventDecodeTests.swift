@@ -30,33 +30,33 @@ import Testing
     source: 0x22
   )
 
-  let batch = try withSynthesizedEventBatch(
+  let events = try withSynthesizedEventBatch(
     events: [event, known],
     stride: stride,
     messages: ["opaque", "second"],
     payloadWindows: [0: window]
   ) { synthesized in
-    let batch = try EventBatchView(raw: synthesized.batch)
+    let events = try deliveredEvents(synthesized.batch)
     synthesized.records.copyBytes(
       from: repeatElement(UInt8(0xFF), count: synthesized.records.count)
     )
     synthesized.messages.copyBytes(
       from: repeatElement(UInt8(0xFF), count: synthesized.messages.count)
     )
-    return batch
+    return events
   }
 
-  let decoded = try #require(batch.events.first)
+  let decoded = try #require(events.first)
   #expect(decoded.type.rawValue == 0x4242)
   #expect(decoded.sourceType.rawValue == 9 && decoded.source == 0x77)
   #expect(decoded.generation == 0x1_0000_0005)
   #expect(decoded.code == -12)
   #expect(decoded.message == "opaque")
   #expect(decoded.payload == .unknown(0xBEEF, Data(window)))
-  #expect(batch.events.count == 2)
-  #expect(batch.events.last?.type.rawValue == 8)
-  #expect(batch.events.last?.source == 0x22)
-  #expect(batch.events.last?.message == "second")
+  #expect(events.count == 2)
+  #expect(events.last?.type.rawValue == 8)
+  #expect(events.last?.source == 0x22)
+  #expect(events.last?.message == "second")
 }
 
 /// A typed payload reads the union member its kind names.
@@ -70,12 +70,12 @@ import Testing
   frame.payload.render_frame.stats.frame_count = 21
   frame.payload.render_frame.stats.encoding_time = 0.5
 
-  let batch = try withSynthesizedEventBatch(
+  let events = try withSynthesizedEventBatch(
     events: [frame]
   ) { synthesized in
-    try EventBatchView(raw: synthesized.batch)
+    try deliveredEvents(synthesized.batch)
   }
-  let payloads = batch.events.map(\.payload)
+  let payloads = events.map(\.payload)
 
   guard case let .renderFrame(decodedFrame) = payloads[0] else {
     Issue.record("expected a render frame payload, got \(payloads[0])")

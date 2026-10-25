@@ -102,11 +102,11 @@ void main() {
     skip: _wglSkip,
   );
 
-  test('a drain before any demand returns no batch', () async {
+  test('a drain before any demand returns no results', () async {
     final map = await openRenderMap(_redStyleJson);
     final worker = await WorkerSession.attach(map);
-    // Native reports the drain as not ready, which reads as null.
-    expect(worker.session.drainFrameResults(), isNull);
+    // Native reports the drain as not ready, which reads as no results.
+    expect(worker.session.drainFrameResults(), isEmpty);
   }, skip: _wglSkip);
 
   test(

@@ -33,8 +33,8 @@ final class EventCopies: @unchecked Sendable {
   private let lock = NSLock()
   private var events: [RuntimeEvent] = []
 
-  func receive(_ batch: EventBatchView) {
-    lock.withLock { events.append(contentsOf: batch.events) }
+  func receive(_ events: [RuntimeEvent]) {
+    lock.withLock { self.events.append(contentsOf: events) }
     Pulse.shared.signal()
   }
 
@@ -74,8 +74,8 @@ final class MapFixture: Sendable {
       // Both commands run before the runtime creates the map, so its first
       // events and requests reach them without waiting for completion.
       try runtime.discarding
-        .setEventHandler(RuntimeEventHandler(callback: { batch in
-          events.receive(batch)
+        .setEventHandler(RuntimeEventHandler(callback: { received in
+          events.receive(received)
         }))
       try runtime.discarding
         .setResourceProvider(denyingProvider(routes: routes))

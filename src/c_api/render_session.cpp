@@ -63,19 +63,12 @@ auto mln_render_session_request_frame(
 
 auto mln_render_session_drain_frame_results(
   mln_render_session session, mln_render_frame_batch* out_batch,
-  mln_diagnostic* out_diagnostic
+  mln_render_frame_batch_view* out_view, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_drain_frame_results(session, out_batch);
-  });
-}
-
-auto mln_render_frame_batch_get(
-  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_frame_batch_get(batch, out_view);
+    return mln::core::render_session_drain_frame_results(
+      session, out_batch, out_view
+    );
   });
 }
 

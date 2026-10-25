@@ -555,7 +555,7 @@ typedef struct mln_event_batch_view {
     MLN_BINDING("length=event_count;stride=event_size");
   /** Number of events in events. */
   size_t event_count;
-} mln_event_batch_view;
+} mln_event_batch_view MLN_BINDING("kind=slice");
 
 /**
  * Receives selected events after their snapshots have been published.

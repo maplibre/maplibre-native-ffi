@@ -519,22 +519,6 @@ fn generated_copy_mln_egl_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_event_batch_view(
-    py: Python<'_>,
-    value: &sys::mln_event_batch_view,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "events",
-        generated_list(
-            py,
-            unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
-            |element| generated_copy_mln_runtime_event(py, &element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_frame_demand(
     py: Python<'_>,
     value: &sys::mln_frame_demand,
@@ -1444,24 +1428,6 @@ fn generated_copy_mln_render_abandon_result(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_render_frame_batch_view(
-    py: Python<'_>,
-    value: &sys::mln_render_frame_batch_view,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "results",
-        generated_list(
-            py,
-            unsafe {
-                generated_strided_values(value.results, value.result_count, value.result_size)?
-            },
-            |element| generated_copy_mln_render_frame_result(py, &element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_render_frame_result(
     py: Python<'_>,
     value: &sys::mln_render_frame_result,
@@ -1871,7 +1837,17 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
                 }
                 {
                     let referenced = unsafe { *events };
-                    generated_copy_mln_event_batch_view(py, &referenced)?
+                    generated_list(
+                        py,
+                        unsafe {
+                            generated_strided_values(
+                                referenced.events,
+                                referenced.event_count,
+                                referenced.event_size,
+                            )?
+                        },
+                        |element| generated_copy_mln_runtime_event(py, &element),
+                    )?
                 }
             },))?;
             Ok(())
@@ -8151,46 +8127,6 @@ impl MapProjectionHandle {
 }
 
 #[pymethods]
-impl RenderFrameBatchHandle {
-    #[pyo3(signature = ())]
-    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let read = self.read()?;
-        let handle = read.native;
-        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
-        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_render_frame_batch_get(handle, &mut out_view, diagnostic)
-            })
-        }?;
-        generated_copy_mln_render_frame_batch_view(py, &out_view)
-    }
-    #[pyo3(signature = ())]
-    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_render_frame_batch_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_render_frame_batch_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
 impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn abandon(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8304,15 +8240,34 @@ impl RenderSessionHandle {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
+        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         let result = unsafe {
             call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
-                sys::mln_render_session_drain_frame_results(handle, &mut out_batch, diagnostic)
+                sys::mln_render_session_drain_frame_results(
+                    handle,
+                    &mut out_batch,
+                    &mut out_view,
+                    diagnostic,
+                )
             })
         };
         if !result? {
-            return Ok(py.None());
+            return Ok(PyList::empty(py).into_any().unbind());
         }
-        unsafe { RenderFrameBatchHandle::adopt(py, out_batch, Vec::new()) }
+        let _out_batch =
+            GeneratedOwnedOutput::new(out_batch, generated_dispose_mln_render_frame_batch);
+        generated_list(
+            py,
+            unsafe {
+                generated_strided_values(
+                    out_view.results,
+                    out_view.result_count,
+                    out_view.result_size,
+                )?
+            },
+            |element| generated_copy_mln_render_frame_result(py, &element),
+        )
     }
     #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9571,14 +9526,6 @@ generated_owner!(
     false
 );
 generated_owner!(
-    RenderFrameBatchHandle,
-    "_RenderFrameBatchHandle",
-    mln_render_frame_batch,
-    Some(generated_dispose_mln_render_frame_batch),
-    None,
-    true
-);
-generated_owner!(
     RenderSessionHandle,
     "_RenderSessionHandle",
     mln_render_session,
@@ -9872,7 +9819,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeojsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
-    module.add_class::<RenderFrameBatchHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<ResourceTransformRequestHandle>()?;

@@ -3715,17 +3715,6 @@ public data class StyleSourceInfo(
   public val rasterEncoding: StyleRasterDemEncoding?,
 )
 
-/**
- * A borrowed view of one owned frame-result batch.
- *
- * See `mln_render_frame_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class RenderFrameBatchView(
-  /** Borrowed array of result_count terminal frame results in completion order. */
-  public val results: List<RenderFrameResult>,
-)
-
 public data class RenderAbandonResult(
   /** One `mln_render_abandon_disposition` value. */
   public val disposition: RenderAbandonDisposition,
@@ -4244,17 +4233,6 @@ public data class RuntimeEvent(
 )
 
 /**
- * A borrowed span of runtime events in one delivery.
- *
- * See `mln_event_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class EventBatchView(
-  /** Borrowed array of event_count events in queue order. */
-  public val events: List<RuntimeEvent>,
-)
-
-/**
  * Inclusive byte range of a resource request.
  *
  * See `mln_resource_range` in the
@@ -4557,7 +4535,7 @@ public data class RuntimeEventHandler(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public fun interface RuntimeEventCallback {
-  public operator fun invoke(events: EventBatchView)
+  public operator fun invoke(events: List<RuntimeEvent>)
 }
 
 /**

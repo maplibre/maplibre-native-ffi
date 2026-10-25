@@ -369,6 +369,10 @@ class Values:
             self.check_callback(value)
             self.used[value.native] = value
             return
+        if value.kind == "record" and value.native in self.bound.slices:
+            # A slice record reaches host code as its array alone.
+            self.check(self.bound.slices[value.native].value, direction)
+            return
         if value.kind == "record" and value.registration:
             entry = self.registration(value)
             if entry.form != "native":
@@ -454,6 +458,8 @@ class Values:
             return self.ts(value.element)
         if value.kind == "array":
             return f"readonly {self.ts(value.element)}[]"
+        if value.native in self.bound.slices:
+            return self.ts(self.bound.slices[value.native].value)
         if value.kind in {"record", "union", "callback"}:
             return public_name(value.native)
         raise Unsupported(f"{value.native}: no TypeScript type")

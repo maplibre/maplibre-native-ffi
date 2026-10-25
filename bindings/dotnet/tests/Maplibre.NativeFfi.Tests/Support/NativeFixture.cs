@@ -68,9 +68,9 @@ internal sealed class NativeFixture : IAsyncDisposable
             // Both commands run before the runtime creates the map, so its first events and
             // requests reach them without waiting for completion.
             runtime.Discarding.SetEventHandler(
-                new RuntimeEventHandler(batch =>
+                new RuntimeEventHandler(received =>
                 {
-                    foreach (var item in batch.Events)
+                    foreach (var item in received)
                         pendingEvents.Enqueue(item);
                     events.Release();
                 })

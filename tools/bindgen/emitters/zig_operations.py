@@ -127,6 +127,8 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         )
     if plan.view:
         return view_operation(plan, values, method)
+    if plan.drain:
+        return drain_operation(plan, values, method)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
     owned_outputs = {p.parameter: p for p in plan.owned_outputs}
@@ -443,3 +445,48 @@ def view_operation(plan, values, method=False):
     return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, {handle}, context, use, diagnostic);
 }}
 '''
+
+
+def drain_operation(plan, values, method=False):
+    """A drain, which returns a copy of its batch's slice and releases the
+    batch, so no owner holds it."""
+    drain = plan.drain
+    function = plan.function
+    receiver = plan.receiver
+    if not function.diagnostic or [p.name for p in function.parameters] != [
+        *([receiver] if receiver else []),
+        drain.batch.name,
+        drain.view.name,
+    ]:
+        raise failure(function, "a drain takes its receiver, batch, and view")
+    array = drain.slice.value
+    values.add(array)
+    item = values.public(array.element)
+    batch = element(drain.batch.value)
+    release = values.bound.handles[batch.native].release
+    if values.bound.source.functions_by_name[release].return_type.kind != "void":
+        raise failure(function, "a drained batch's release must not fail")
+    signature = ["allocator: std.mem.Allocator", DIAGNOSTIC_PARAMETER]
+    if receiver:
+        handle = values.public(next(p.value for p in plan.inputs if p.name == receiver))
+        signature.insert(0, f"{'self' if method else identifier(receiver)}: {handle}")
+    stride = f'"{array.stride}"' if array.stride else "null"
+    arguments = [
+        f'"{plan.name}"',
+        f".{access(plan)}",
+        ("self" if method else identifier(receiver)) if receiver else "{}",
+        item,
+        f'"{drain.slice.name}"',
+        f'"{array.length}"',
+        stride,
+        f"c.{release}",
+        "allocator",
+        "diagnostic",
+        f"c.{plan.absence.status}",
+    ]
+    name = method_name(plan) if method else camel(plan.name.removeprefix("mln_"))
+    return (
+        f"pub fn {name}({', '.join(signature)}) status.Error!OwnedValue([]const {item}) {{\n"
+        f"    return call.drain({', '.join(arguments)});\n"
+        "}\n"
+    )

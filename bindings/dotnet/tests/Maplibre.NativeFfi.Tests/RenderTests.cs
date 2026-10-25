@@ -37,7 +37,7 @@ public sealed class RenderTests
 
     [Theory]
     [MemberData(nameof(Backends))]
-    public void ADrainBeforeAnyDemandReturnsNull(TestGraphicsBackend backend)
+    public void ADrainBeforeAnyDemandReturnsNoValue(TestGraphicsBackend backend)
     {
         RenderFixture.Run(
             backend,
@@ -45,8 +45,9 @@ public sealed class RenderTests
             {
                 var session = fixture.Session;
                 fixture.Await(session.Ready, "the session to be ready");
-                // Native reports both calls as not ready, which reads as null.
-                Assert.Null(session.DrainFrameResults());
+                // Native reports both calls as not ready, which reads as no results and no
+                // frame.
+                Assert.Empty(session.DrainFrameResults());
                 Assert.Null(session.AcquireFrame());
             }
         );

@@ -371,8 +371,8 @@ impl Fixture {
         // A handler accepted before create_map receives the map's first events.
         runtime
             .discarding()
-            .set_event_handler(RuntimeEventHandler::new(move |batch| {
-                received.lock().unwrap().extend(batch.events);
+            .set_event_handler(RuntimeEventHandler::new(move |delivered| {
+                received.lock().unwrap().extend(delivered);
                 signal.raise();
             }))
             .unwrap();
@@ -554,16 +554,14 @@ impl Session {
         loop {
             let seen = self.wakes.signal.seen();
             self.service();
-            if let Some(batch) = self.handle.drain_frame_results().unwrap() {
-                let found = batch
-                    .get()
-                    .unwrap()
-                    .results
-                    .into_iter()
-                    .find(|result| result.token == token);
-                if let Some(result) = found {
-                    return result;
-                }
+            let found = self
+                .handle
+                .drain_frame_results()
+                .unwrap()
+                .into_iter()
+                .find(|result| result.token == token);
+            if let Some(result) = found {
+                return result;
             }
             self.wakes
                 .signal

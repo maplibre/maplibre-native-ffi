@@ -428,6 +428,10 @@ def operation(
 """,
                 owner,
             )
+        if plan.drain:
+            return drain(
+                plan, outputs, signature, doc_comment, target, call, value_types
+            ), owner
         output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
         capture, storage, types = [], [], []
         if text:
@@ -546,6 +550,47 @@ def operation(
             owner,
         )
     raise unsupported(function, "execution/handle lifecycle needs a supported rule")
+
+
+def drain(plan, outputs, signature, doc_comment, target, call, value_types):
+    """A drain returns a copy of its slice, and releases the batch that holds
+    it once the copy ends or fails. Nothing queued is an empty slice."""
+    from .swift_ownership import disposer_arguments
+
+    drain = plan.drain
+    view = drain.view.value.unwrapped
+    handle = drain.batch.value.unwrapped.handle
+    value_types.add(view)
+    index = {output.name: i for i, output in enumerate(outputs)}
+    batch, slice_view = (
+        f"value{index[drain.batch.name]}",
+        f"value{index[drain.view.name]}",
+    )
+    release = value_types.bound.source.functions_by_name[handle.release]
+    arguments = disposer_arguments(handle, release, batch)
+    if release.diagnostic:
+        arguments.append("nil")
+    released = f"{handle.release}({', '.join(arguments)})"
+    if release.return_type.kind != "void":
+        released = f"_ = {released}"
+    size = next(
+        (
+            f"\n  {slice_view}.{identifier(field.name)} = UInt32(MemoryLayout<{view.native}>.size)"
+            for field in view.fields
+            if field.role == "size"
+        ),
+        "",
+    )
+    invoke = f"nativeInvoke({target}{', ' if target else ''}absentOn: {plan.absence.status}) {{ raw, arena, diagnostic in {call} }}"
+    return f"""{doc_comment}{signature} throws -> {value_types.public(view)} {{
+  var {batch}: {handle.native} = 0
+  var {slice_view} = {view.native}(){size}
+  return try {invoke} result: {{
+    defer {{ {released} }}
+    return {value_types.copy(view, slice_view)}
+  }} ?? []
+}}
+"""
 
 
 def gated(plan: OperationPlan, code: str) -> str:

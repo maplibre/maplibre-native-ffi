@@ -9,7 +9,7 @@ native_owner! {
     /// See `mln_acquired_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     #[must_use = "`AcquiredFrameHandle` must be released with `AcquiredFrameHandle::release`"]
-    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_discard(raw, out_diagnostic) }), counted false;
+    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_discard(raw, out_diagnostic) });
     /// Returns the native handle value.
     fn id;
 }
@@ -22,7 +22,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn discard(&self) -> Result<()> {
         self.inner.close_once(|frame| {
-            let mut call = Call::new(frame, None);
+            let mut call = Call::new(frame);
             call.status(|frame, out_diagnostic| unsafe {
                 sys::mln_acquired_frame_discard(frame, out_diagnostic)
             })
@@ -174,7 +174,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(&self, consumer_completion: Option<&GpuSync>) -> Result<()> {
         self.inner.close_once(|frame| {
-            let mut call = Call::new(frame, None);
+            let mut call = Call::new(frame);
             let consumer_completion = call.optional_reference(consumer_completion.as_ref())?;
             call.status(|frame, out_diagnostic| unsafe {
                 sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)

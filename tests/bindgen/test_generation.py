@@ -3,7 +3,7 @@
 import re
 import unittest
 
-from support import parse, protocol_groups, real_api
+from support import parse, protocol_groups
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import (
@@ -34,13 +34,6 @@ PROTOCOL_GAPS = {
 
 
 class GenerationTests(unittest.TestCase):
-    def test_go_guards_only_owner_outputs_copied_after_native_returns(self):
-        from tools.bindgen.emitters.go_operations import needs_read
-
-        api = compile_api(real_api())
-        guarded = {plan.name for plan in api.operations if needs_read(plan)}
-        self.assertEqual(guarded, {"mln_render_frame_batch_get"})
-
     def parse(self, source, *, owned_map=False):
         api = parse(
             source,
@@ -136,6 +129,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
         for group in protocol_groups():
             api = parse(groups=(group,))
             validate(api)
+            bound = compile_api(api)
             for emitter in EMITTERS:
                 language = emitter.__name__.rsplit(".", 1)[-1]
                 with self.subTest(group=group, emitter=language):
@@ -146,11 +140,18 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                         coverage["unsupported"],
                     )
                     # No declaration disappears without a reason. Support
-                    # functions back the generated values that call them.
+                    # functions back the generated values that call them, and
+                    # a generated drain releases its own batch.
+                    released = {
+                        bound.handles[plan.drain.batch.value.unwrapped.native].release
+                        for plan in bound.operations
+                        if plan.drain and plan.name in coverage["generated"]
+                    }
                     self.assertEqual(
                         set(coverage["generated"])
                         | set(coverage["unsupported"])
-                        | set(coverage.get("support", ())),
+                        | set(coverage.get("support", ()))
+                        | released,
                         {function.name for function in api.public_functions},
                     )
 

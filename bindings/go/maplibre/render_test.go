@@ -182,19 +182,11 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 // result drains the frame results and reports the disposition of token's.
 func (r *renderFixture) result(t *testing.T, token uint64) (RenderResult, bool) {
 	t.Helper()
-	batch, err := r.session.DrainFrameResults()
+	results, err := r.session.DrainFrameResults()
 	if err != nil {
 		t.Fatalf("DrainFrameResults: %v", err)
 	}
-	if batch == nil {
-		return 0, false
-	}
-	defer batch.Close()
-	view, err := batch.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, result := range view.Results {
+	for _, result := range results {
 		if result.Token == token {
 			return result.Disposition, true
 		}
@@ -236,12 +228,12 @@ func TestCloseRetiresAnAttachedSession(t *testing.T) {
 }
 
 // Before any demand, no frame result is queued and no frame has rendered,
-// which native reports as not ready and the binding returns as nil.
+// which native reports as not ready and the binding returns as empty and nil.
 func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
-	if batch, err := r.session.DrainFrameResults(); batch != nil || err != nil {
-		t.Fatalf("DrainFrameResults = %v, %v; want nil, nil", batch, err)
+	if results, err := r.session.DrainFrameResults(); len(results) != 0 || err != nil {
+		t.Fatalf("DrainFrameResults = %v, %v; want empty, nil", results, err)
 	}
 	if frame, err := r.session.AcquireFrame(); frame != nil || err != nil {
 		t.Fatalf("AcquireFrame = %v, %v; want nil, nil", frame, err)

@@ -59,10 +59,10 @@ class OwnedTextureSessionTest {
   }
 
   @Test
-  fun aDrainBeforeAnyDemandReturnsNull() = runSuspendTest {
+  fun aDrainBeforeAnyDemandReturnsNoResults() = runSuspendTest {
     withOwnedTexture {
-      // Native reports both calls as not ready, which reads as null.
-      assertNull(session.drainFrameResults())
+      // Native reports both calls as not ready, which read as no results and no frame.
+      assertEquals(emptyList(), session.drainFrameResults())
       assertNull(session.acquireFrame())
     }
   }

@@ -476,7 +476,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NOT_READY,
-    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
+    mln_test_drain_frame_results(fixture->session, &batch, NULL)
   );
 
   mln_test_completion completion = mln_test_completion_default(0);

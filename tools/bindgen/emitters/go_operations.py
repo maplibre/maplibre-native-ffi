@@ -105,7 +105,9 @@ def copies_borrowed(value):
     return any(copies_borrowed(field.value) for field in value.fields)
 
 
-def needs_read(plan):
+def borrows_receiver(plan):
+    """Whether an immediate receiver call copies output that borrows the
+    receiver's storage, which a concurrent close would free."""
     return bool(
         plan.receiver
         and not plan.completion
@@ -230,6 +232,12 @@ def operation(plan, values, *, discard=False, dispose=False):
             outputs.append((p, p.value, local))
             continue
         value = element(p.value)
+        if plan.drain and p.name == plan.drain.batch.name:
+            # The drain copies the batch's view and releases the batch, so no
+            # owner holds it.
+            setup.append(f"var {local} {values.c_type(value)}")
+            arguments[p.name] = "&" + local
+            continue
         values.require(value)
         if p.sized_by:
             # Native writes one element per input element into Go memory that
@@ -301,8 +309,10 @@ def operation(plan, values, *, discard=False, dispose=False):
         access = "Consuming"
     elif plan.consumes:
         access = "Closing" if plan.release else "Answering"
-    elif needs_read(plan):
-        access = "Read"
+    elif borrows_receiver(plan):
+        raise ModelError(
+            [f"{plan.name}: output that borrows its receiver needs a read guard"]
+        )
     else:
         access = "Owned"
     if plan.scoped_receiver:
@@ -432,7 +442,14 @@ def operation(plan, values, *, discard=False, dispose=False):
     else:
         check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
         if plan.absence:
-            if outputs[0][1].kind != "handle":
+            if plan.drain:
+                # Released even if the copy fails.
+                batch = element(plan.drain.batch.value)
+                release = values.api.handles[batch.native].release
+                adoptions.insert(
+                    0, f"defer C.{release}({labels[plan.drain.batch.name]})"
+                )
+            elif outputs[0][1].kind != "handle":
                 returned = "*" + returned
                 adoptions.append(f"value := {converted}")
                 converted = "&value"

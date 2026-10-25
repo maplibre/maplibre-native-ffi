@@ -21,10 +21,6 @@ internal object GeneratedOwnerDisposal {
     C.mln_map_projection_release(handle)
   }
 
-  fun renderFrameBatch(handle: Long) {
-    C.mln_render_frame_batch_release(handle)
-  }
-
   fun renderSession(handle: Long) {
     NativeDiagnostics.check { diagnostic -> C.mln_render_session_dispose(handle, 0L, diagnostic) }
   }

@@ -59,7 +59,65 @@ mln_status mln_session_dispose(mln_session session, const mln_completion *comple
 """
 
 
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
+
+
 class RustEmitterTests(unittest.TestCase):
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        validate(api)
+        generated = rust.generate(api)
+        prefix = "crates/maplibre-native-ffi/src/generated/"
+        source = generated[prefix + "global.rs"]
+        self.assertIn("pub fn drain_readings() -> Result<Vec<Reading>> {", source)
+        # Nothing queued reads as empty. Otherwise the batch's guard releases
+        # it once the copy returns, whether or not the copy succeeds.
+        self.assertIn("    return Ok(Vec::new());", source)
+        self.assertIn(
+            "let _batch = unsafe { crate::handle::Drained::new(out_batch, "
+            "sys::mln_reading_batch_release) };\n"
+            "        Ok(unsafe { convert::copy_strided(out_view.readings, "
+            "out_view.reading_count, out_view.reading_size) }?)",
+            source,
+        )
+        # Neither the batch nor its view is public.
+        self.assertNotIn(prefix + "reading_batch.rs", generated)
+        self.assertNotIn("ReadingView", generated[prefix + "values.rs"])
+
+    def test_a_callback_receives_its_slice_argument_as_a_vec(self):
+        values = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        self.assertIn("Fn(Vec<RuntimeEvent>) + Send + Sync", values)
+        self.assertIn(
+            "convert::copy_strided(view.events, view.event_count, view.event_size)",
+            values,
+        )
+        self.assertNotIn("EventBatchView", values)
+
     def test_a_dispose_with_a_completion_releases_and_disposes(self):
         api = parse(
             DISPOSE_WITH_COMPLETION, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",)

@@ -223,25 +223,41 @@ public sealed unsafe partial class RenderSessionHandle
 
     /// <summary>
     /// Drains every currently queued terminal frame result into an
-    /// independently owned batch. The records remain stable until the batch is
-    /// released.
+    /// independently owned batch and borrows its view. The records remain
+    /// stable until the batch is released.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_drain_frame_results</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public RenderFrameBatchHandle? DrainFrameResults()
+    public RenderFrameResult[] DrainFrameResults()
     {
         using var call = Enter(this);
         MlnRenderFrameBatch outBatch = default;
+        var outView = new mln_render_frame_batch_view
+        {
+            size = (uint)sizeof(mln_render_frame_batch_view),
+        };
         if (
             !Present(
-                NativeMethods.mln_render_session_drain_frame_results(Handle, &outBatch, Diagnostic),
+                NativeMethods.mln_render_session_drain_frame_results(
+                    Handle,
+                    &outBatch,
+                    &outView,
+                    Diagnostic
+                ),
                 mln_status.MLN_STATUS_NOT_READY
             )
         )
-            return null;
-        return RenderFrameBatchHandle.Adopt(outBatch);
+            return [];
+        try
+        {
+            return CopyRenderFrameBatchViewResults(outView);
+        }
+        finally
+        {
+            NativeMethods.mln_render_frame_batch_release(outBatch);
+        }
     }
 
     /// <summary>

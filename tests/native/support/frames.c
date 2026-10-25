@@ -46,9 +46,8 @@ typedef struct results_wait {
 // Holds once a drain yields results.
 static bool results_ready(void* context) {
   results_wait* wait = context;
-  const mln_status status = mln_render_session_drain_frame_results(
-    wait->fixture->session, &wait->batch, NULL
-  );
+  const mln_status status =
+    mln_test_drain_frame_results(wait->fixture->session, &wait->batch, NULL);
   wait->failed = status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY;
   return status != MLN_STATUS_NOT_READY;
 }
@@ -65,9 +64,8 @@ typedef struct result_list_wait {
 static bool result_list_ready(void* context) {
   result_list_wait* wait = context;
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  const mln_status status = mln_render_session_drain_frame_results(
-    wait->fixture->session, &batch, NULL
-  );
+  const mln_status status =
+    mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
   if (status == MLN_STATUS_NOT_READY) return false;
   if (status != MLN_STATUS_OK) {
     wait->failed = true;
@@ -108,17 +106,47 @@ void mln_test_render_wait_for_result_list(
   TEST_ASSERT_EQUAL_size_t(count, wait.received);
 }
 
-mln_render_frame_batch_view mln_test_render_batch_view(
-  mln_render_frame_batch batch
+// The views of recent drains, by batch. A case holds few batches at once.
+static struct {
+  mln_render_frame_batch batch;
+  mln_render_frame_batch_view view;
+} drained_views[64];
+static size_t next_drained_view = 0;
+
+mln_status mln_test_drain_frame_results(
+  mln_render_session session, mln_render_frame_batch* out_batch,
+  mln_diagnostic* out_diagnostic
 ) {
   mln_render_frame_batch_view view = {
     .size = sizeof(mln_render_frame_batch_view)
   };
-  MLN_TEST_OK(mln_render_frame_batch_get(batch, &view, NULL));
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT32(
-    sizeof(mln_render_frame_result), view.result_size
+  const mln_status status = mln_render_session_drain_frame_results(
+    session, out_batch, &view, out_diagnostic
   );
-  return view;
+  if (status == MLN_STATUS_OK) {
+    const size_t slot =
+      next_drained_view++ % (sizeof(drained_views) / sizeof(*drained_views));
+    drained_views[slot].batch = *out_batch;
+    drained_views[slot].view = view;
+  }
+  return status;
+}
+
+mln_render_frame_batch_view mln_test_render_batch_view(
+  mln_render_frame_batch batch
+) {
+  for (size_t index = 0; index < sizeof(drained_views) / sizeof(*drained_views);
+       index += 1) {
+    if (drained_views[index].batch == batch && batch != MLN_HANDLE_NULL) {
+      const mln_render_frame_batch_view view = drained_views[index].view;
+      TEST_ASSERT_GREATER_OR_EQUAL_UINT32(
+        sizeof(mln_render_frame_result), view.result_size
+      );
+      return view;
+    }
+  }
+  TEST_FAIL_MESSAGE("the batch did not come from mln_test_drain_frame_results");
+  return (mln_render_frame_batch_view){0};
 }
 
 const mln_render_frame_result* mln_test_render_view_result(

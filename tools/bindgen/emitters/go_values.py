@@ -57,7 +57,15 @@ class Values:
     def fail(self, value, reason):
         raise ModelError([f"Go: {value.native}: {reason}"])
 
+    def slice(self, value):
+        """The array field of a `kind=slice` record, which Go presents as a
+        slice in place of the record."""
+        return self.api.slices.get(value.native) if value.kind == "record" else None
+
     def require(self, value, input=False):
+        if array := self.slice(value):
+            self.require(array.value, input)
+            return
         if value.response:
             self.records[value.native] = value
             return
@@ -102,6 +110,8 @@ class Values:
             self.fail(value, f"unsupported value kind {value.kind}")
 
     def type(self, value, optional=True):
+        if array := self.slice(value):
+            return self.type(array.value, optional)
         if value.response:
             return "*" + public(value.native) + "Scope"
         if value.kind == "scalar":
@@ -163,6 +173,10 @@ class Values:
             return f"{self.type(value)}({expr})"
         if value.kind == "native_pointer":
             return f"uintptr(unsafe.Pointer({expr}))"
+        if array := self.slice(value):
+            return self.copy(
+                array.value, f"{expr}.{native_identifier(array.name)}", expr
+            )
         if value.kind == "record":
             return f"copy{public(value.native)}({expr})"
         if value.kind == "reference":

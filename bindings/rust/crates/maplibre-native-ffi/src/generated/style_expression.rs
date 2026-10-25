@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_style_expression` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct StyleExpressionHandle(mln_style_expression) dispose |raw| { unsafe { sys::mln_style_expression_release(raw) }; Ok(()) }, counted false;
+    pub struct StyleExpressionHandle(mln_style_expression) dispose |raw| { unsafe { sys::mln_style_expression_release(raw) }; Ok(()) };
     /// Returns the native handle value.
     fn id;
 }
@@ -57,7 +57,7 @@ impl StyleExpressionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
     pub fn release(&self) -> Result<()> {
         self.inner.close_once(|expression| {
-            let mut call = Call::new(expression, None);
+            let mut call = Call::new(expression);
             call.run(|expression| unsafe { sys::mln_style_expression_release(expression) });
             Ok(())
         })

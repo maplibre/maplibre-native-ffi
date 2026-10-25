@@ -158,9 +158,8 @@ static bool transition_ended(void* context) {
   render_wait* wait = context;
   if (wait->demand_pending) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    const mln_status drained = mln_render_session_drain_frame_results(
-      wait->fixture->session, &batch, NULL
-    );
+    const mln_status drained =
+      mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
     if (drained == MLN_STATUS_NOT_READY) {
       return false;
     }
@@ -204,7 +203,7 @@ static bool settled_result(void* context) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_test_render_fixture* fixture = context;
   if (
-    mln_render_session_drain_frame_results(fixture->session, &batch, NULL) !=
+    mln_test_drain_frame_results(fixture->session, &batch, NULL) !=
     MLN_STATUS_OK
   ) {
     return false;

@@ -442,6 +442,62 @@ fn invokeUnlessInner(
     return try op.outputs(allocator);
 }
 
+/// Calls a drain, which publishes an owned batch and a borrowed view of it.
+/// Copies the view's `items` array, whose length is its `count` field and whose
+/// records step by its `stride` field, into `Item` values. Releases the batch
+/// even if the copy fails, and returns the copy, which is empty when native
+/// returns `absent` and publishes no batch.
+pub fn drain(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    comptime Item: type,
+    comptime items: []const u8,
+    comptime count: []const u8,
+    comptime stride: ?[]const u8,
+    comptime release: anytype,
+    allocator: std.mem.Allocator,
+    diagnostic: ?*Diagnostic,
+    comptime absent: i32,
+) Error!marshal.OwnedValue([]const Item) {
+    status.begin(diagnostic);
+    return status.propagate(diagnostic, drainInner(name, access, receiver, Item, items, count, stride, release, allocator, diagnostic, absent));
+}
+
+fn drainInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    comptime Item: type,
+    comptime items: []const u8,
+    comptime count: []const u8,
+    comptime stride: ?[]const u8,
+    comptime release: anytype,
+    allocator: std.mem.Allocator,
+    diagnostic: ?*Diagnostic,
+    comptime absent: i32,
+) Error!marshal.OwnedValue([]const Item) {
+    const function = @field(c, name);
+    const offset: usize = if (access == .none) 0 else 1;
+    const Batch = @typeInfo(Param(function, offset)).pointer.child;
+    const View = @typeInfo(Param(function, offset + 1)).pointer.child;
+    const Record = @typeInfo(@FieldType(View, items)).pointer.child;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    errdefer arena.deinit();
+    const drained = try invokeUnlessInner(name, access, receiver, null, diagnostic, absent, .{ out(Batch), sizedOut(View) }) orelse
+        return .{ .arena = arena, .value = &.{} };
+    defer release(drained[0]);
+    const view = drained[1];
+    const length = @field(view, count);
+    const step = if (stride) |field| @field(view, field) else @sizeOf(Record);
+    const copied = try arena.allocator().alloc(Item, length);
+    for (copied, 0..) |*item, index| {
+        const native = try marshal.stridedAt(Record, @field(view, items), length, step, index);
+        item.* = try marshal.decode(Item, native, .{ .allocator = arena.allocator() });
+    }
+    return .{ .arena = arena, .value = copied };
+}
+
 /// Calls a status-returning native function like `invoke` whose one output
 /// reports, when true, that native kept nothing from the call's registration.
 /// The roots of a declined registration release with the call, and the call

@@ -73,13 +73,15 @@ test "a caller-driven session is serviced from a thread the test spawns" {
 }
 
 // Before any demand, native reports the drain and the acquire as not ready,
-// which reads as null.
+// which read as empty and as null.
 test "a drain before any demand returns no batch" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
-    try testing.expect(try owned.session.drainFrameResults(null) == null);
+    var results = try owned.session.drainFrameResults(testing.allocator, null);
+    defer results.deinit();
+    try testing.expectEqual(@as(usize, 0), results.value.len);
     try testing.expect(try owned.session.acquireFrame(null) == null);
 }
 

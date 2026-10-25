@@ -5,7 +5,6 @@ package maplibre
 import (
 	"errors"
 	"math"
-	"sync"
 	"testing"
 	"unsafe"
 )
@@ -95,39 +94,5 @@ func TestExportsRecoverFromPanics(t *testing.T) {
 	mlnGoCallbackRelease(stale)
 	if got := receive(t, panics, "the release's panic log"); got != (callbackPanic{"mlnGoCallbackRelease", "runtime/cgo: misuse of an invalid Handle"}) {
 		t.Fatalf("release panic log = %+v", got)
-	}
-}
-
-// A copied batch output remains valid until its decoder returns, including
-// while another goroutine attempts to release its owner.
-func TestBatchCopyHoldsOffClose(t *testing.T) {
-	owner := bindingAdopt(71, nil, "batch", true, func(uint64) {})
-	entered, release, copied := make(chan struct{}), make(chan struct{}), make(chan error, 1)
-	var once sync.Once
-	unblock := func() { once.Do(func() { close(release) }) }
-	defer unblock()
-	go func() {
-		_, err := bindingDirect(bindingRead(owner), func(*bindingArena, uint64) struct{} {
-			close(entered)
-			<-release
-			return struct{}{}
-		})
-		copied <- err
-	}()
-	receive(t, entered, "the batch decoder")
-	_, err := bindingDirect(bindingClosing(owner), func(*bindingArena, uint64) struct{} {
-		t.Error("release reached native during the borrowed copy")
-		return struct{}{}
-	})
-	if !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("Close during copy = %v", err)
-	}
-	unblock()
-	if err := receive(t, copied, "the copied batch"); err != nil {
-		t.Fatal(err)
-	}
-	_, err = bindingDirect(bindingClosing(owner), func(*bindingArena, uint64) struct{} { return struct{}{} })
-	if err != nil {
-		t.Fatal(err)
 	}
 }

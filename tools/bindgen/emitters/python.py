@@ -25,7 +25,7 @@ from tools.bindgen.semantic import (
     output_member,
 )
 
-from .python_values import Values, ok, public_name, scalar_type
+from .python_values import Values, ok, public_name, rust_field, scalar_type
 
 SCALARS = {
     "double": ("f64", "float"),
@@ -572,7 +572,9 @@ def operation(
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
             body.append(
-                "        if !result? { return Ok(py.None()); }"
+                "        if !result? { return Ok(PyList::empty(py).into_any().unbind()); }"
+                if plan.drain
+                else "        if !result? { return Ok(py.None()); }"
                 if absence
                 else "        result?;"
             )
@@ -590,7 +592,24 @@ def operation(
         public_result = "None"
         native_result = "Any"
         expression = f"self._native.{name}({', '.join(python_arguments)})"
-        if not outputs:
+        if plan.drain:
+            # The batch releases when this frame ends, after the copy or as
+            # the copy fails.
+            drain = plan.drain
+            batch = drain.batch.value.unwrapped
+            values.disposed.add(batch.native)
+            body.append(
+                f"        let _{drain.batch.name} = GeneratedOwnedOutput::new({drain.batch.name}, generated_dispose_{batch.native});"
+            )
+            copied = values.copy(
+                drain.slice.value,
+                f"{drain.view.name}.{rust_field(drain.slice.name)}",
+                scope=drain.view.name,
+            )
+            body.append(f"        {ok(copied)}")
+            public_result = values.type(drain.slice.value)
+            expression = values.facade_copy(drain.slice.value, expression)
+        elif not outputs:
             body.append("        Ok(py.None())")
         elif len(outputs) == 1:
             output, value = outputs[0]

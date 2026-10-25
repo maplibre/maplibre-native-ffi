@@ -206,10 +206,10 @@ pub const Fixture = struct {
         return self;
     }
 
-    fn receiveEvents(self: *Fixture, batch: maplibre.EventBatchView) maplibre.Error!void {
+    fn receiveEvents(self: *Fixture, events: []const maplibre.RuntimeEvent) maplibre.Error!void {
         std.Io.Threaded.mutexLockUncancelable(&self.event_mutex);
         defer self.event_mutex.unlock(testing.io);
-        for (batch.events) |event| {
+        for (events) |event| {
             var arena = std.heap.ArenaAllocator.init(testing.allocator);
             errdefer arena.deinit();
             var copy = event;
@@ -505,11 +505,9 @@ pub const OwnedTexture = struct {
         try self.wakes.waitUntil(&context, struct {
             fn ready(ctx: *Context) anyerror!bool {
                 try ctx.owner.service();
-                var batch = try ctx.owner.session.drainFrameResults(null) orelse return false;
-                defer batch.deinit();
-                var view = try batch.get(testing.allocator, null);
-                defer view.deinit();
-                for (view.value.results) |result| {
+                var results = try ctx.owner.session.drainFrameResults(testing.allocator, null);
+                defer results.deinit();
+                for (results.value) |result| {
                     if (result.token == ctx.token) ctx.result = result;
                 }
                 return ctx.result != null;

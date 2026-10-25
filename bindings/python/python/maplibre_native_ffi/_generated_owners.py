@@ -6,7 +6,6 @@ from ._generated_operations import (
     _HttpHeaderTransformResponseScopeOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
-    _RenderFrameBatchHandleOperations,
     _RenderSessionHandleOperations,
     _ResourceRequestHandleOperations,
     _ResourceTransformRequestHandleOperations,
@@ -128,32 +127,6 @@ class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "MapProjectionHandle"
-
-    def __init__(self):
-        raise TypeError("native handles are returned by their owning operations")
-
-    @classmethod
-    def _from_native(cls, native, parent=None):
-        owner = cls.__new__(cls)
-        owner._native = native
-        owner._parent = parent
-        return owner
-
-    @property
-    def id(self) -> int:
-        """The native handle value. It stays readable after close."""
-        return int(self._native.id)
-
-
-class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, ScopedHandleMixin):
-    """An owned batch of frame results from one drain.
-
-    See `mln_render_frame_batch` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    """
-
-    __module__ = "maplibre_native_ffi"
-    _handle_name = "RenderFrameBatchHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

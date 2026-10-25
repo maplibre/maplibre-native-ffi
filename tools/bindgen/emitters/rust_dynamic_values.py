@@ -21,7 +21,15 @@ def dynamic(value):
     )
 
 
+def slice_of(values, value):
+    """The array field of a `kind=slice` record, which Rust presents as a
+    `Vec` in place of the record."""
+    return values.bound.slices.get(value.native) if value.kind == "record" else None
+
+
 def public(values, value):
+    if array := slice_of(values, value):
+        return values.public(array.value)
     if value.kind == "buffer":
         result = "String" if value.encoding == "utf8" else "Vec<u8>"
     elif value.kind == "array":
@@ -101,6 +109,12 @@ def decode(values, value, source, context="raw"):
         if value.buffer_form != "view" and value.length != "nul":
             return f"unsafe {{ convert::counted({source}, {count(value, context)}) }}?"
         return TRAIT_COPY.format(source)
+    if array := slice_of(values, value):
+        place = f"{source}.{native_identifier(array.name)}"
+        return decode(values, array.value, place, source)
+    if value.kind == "reference" and slice_of(values, value.element):
+        view = decode(values, value.element, "view")
+        return f'{{ let view = unsafe {{ {source}.as_ref() }}.ok_or_else(|| Error::invalid_argument("null record value"))?; {view} }}'
     if value.kind == "reference":
         return f"unsafe {{ convert::copy_reference({source}) }}?"
     if value.kind == "array":

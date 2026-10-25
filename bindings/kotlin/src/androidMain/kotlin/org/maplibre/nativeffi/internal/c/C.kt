@@ -1046,13 +1046,6 @@ internal actual object C {
 
   @CriticalNative @JvmStatic actual external fun mln_projection_mode_default(returned: Long): Unit
 
-  @JvmStatic
-  actual external fun mln_render_frame_batch_get(
-    batch: Long,
-    outView: Long,
-    outDiagnostic: Long,
-  ): Int
-
   @JvmStatic actual external fun mln_render_frame_batch_release(batch: Long): Unit
 
   @JvmStatic
@@ -1106,6 +1099,7 @@ internal actual object C {
   actual external fun mln_render_session_drain_frame_results(
     session: Long,
     outBatch: Long,
+    outView: Long,
     outDiagnostic: Long,
   ): Int
 

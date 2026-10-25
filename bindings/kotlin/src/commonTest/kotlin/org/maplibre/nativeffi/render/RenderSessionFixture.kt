@@ -113,10 +113,7 @@ internal class RenderSessionFixture(
     return token
   }
 
-  private fun drainResults(): List<RenderFrameResult> {
-    val batch = session.drainFrameResults() ?: return emptyList()
-    return batch.use { it.get().results }
-  }
+  private fun drainResults(): List<RenderFrameResult> = session.drainFrameResults()
 
   /**
    * Services driver work on the graphics thread, when the caller drives the session, and checks

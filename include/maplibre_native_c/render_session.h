@@ -158,7 +158,7 @@ typedef struct mln_render_frame_result {
  * A borrowed view of one owned frame-result batch.
  *
  * Step through results by result_size. The results pointer remains valid until
- * the frame-batch handle is released.
+ * the frame-batch handle is released. Bindings present the results alone.
  */
 typedef struct mln_render_frame_batch_view {
   uint32_t size;
@@ -174,7 +174,7 @@ typedef struct mln_render_frame_batch_view {
     MLN_BINDING("length=result_count;stride=result_size");
   /** Number of results in results. */
   size_t result_count;
-} mln_render_frame_batch_view;
+} mln_render_frame_batch_view MLN_BINDING("kind=slice");
 
 /** Any-thread render-session snapshot. */
 typedef struct mln_render_session_snapshot {
@@ -286,17 +286,20 @@ MLN_API mln_status mln_render_session_request_frame(
 
 /**
  * Drains every currently queued terminal frame result into an independently
- * owned batch. The records remain stable until the batch is released.
+ * owned batch and borrows its view. The records remain stable until the batch
+ * is released.
  *
  * Returns:
  * - MLN_STATUS_OK when a batch holding at least one result is published in
- *   *out_batch.
+ *   *out_batch and its view in *out_view.
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, the diagnostic
- *   message is empty, and the caller drains again after the next frame wake.
- *   Bindings return their language's empty form instead of an error.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
- *   is null or does not point to the null handle.
+ *   *out_batch and *out_view are left unchanged, no batch is allocated, the
+ *   diagnostic message is empty, and the caller drains again after the next
+ *   frame wake. Bindings return their language's empty form instead of an
+ *   error.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, out_batch
+ *   is null or does not point to the null handle, or out_view is null or
+ *   out_view->size is too small.
  * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
@@ -304,21 +307,6 @@ MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
   mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Borrows the result view stored by an owned frame-result batch.
- *
- * Returns:
- * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
- *   null or out_view->size is too small.
- * - MLN_STATUS_INVALID_STATE when batch has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
-MLN_API mln_status mln_render_frame_batch_get(
-  mln_render_frame_batch batch,
   mln_render_frame_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

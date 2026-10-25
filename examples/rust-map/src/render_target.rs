@@ -194,12 +194,8 @@ impl Session {
 
     /// Drains every queued frame result.
     pub fn drain_results(&mut self) -> maplibre_native_ffi::Result<FrameResults> {
-        let Some(batch) = self.session.drain_frame_results()? else {
-            return Ok(FrameResults::default());
-        };
-        let view = batch.get()?;
         let mut results = FrameResults::default();
-        for result in view.results {
+        for result in self.session.drain_frame_results()? {
             match result.disposition {
                 RenderResult::Rendered => {
                     results.rendered = true;

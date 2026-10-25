@@ -97,3 +97,19 @@ func withSynthesizedEventBatch<Result>(
     }
   }
 }
+
+/// Delivers `batch` through a runtime event handler's native callback, as
+/// native does, and returns the events that the handler received.
+func deliveredEvents(_ batch: mln_event_batch_view) throws -> [RuntimeEvent] {
+  final class Received: @unchecked Sendable {
+    var events: [RuntimeEvent]?
+  }
+  let received = Received()
+  let arena = NativeInputArena()
+  let handler = try RuntimeEventHandler { received.events = $0 }
+    .nativeValue(arena: arena)
+  var batch = batch
+  let callback = try #require(handler.callback)
+  callback(handler.user_data, &batch)
+  return try #require(received.events)
+}

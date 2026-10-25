@@ -131,7 +131,7 @@ def owner_members(owner: str, event_source: bool) -> str:
 def lower(api):
     from .go_callbacks import sources as callback_sources
     from .go_operations import lower as lower_operations
-    from .go_operations import needs_read, operation
+    from .go_operations import operation
 
     bound = compile_api(api, TARGETS)
     values, lowered, generated, unsupported = lower_operations(bound)
@@ -145,15 +145,10 @@ def lower(api):
     for value in bound.public_values.values():
         if value.kind == "enum" or value.default:
             values.require(value, input=value.kind == "record")
-    guarded = {
-        next(p.value.unwrapped.native for p in op.inputs if p.name == op.receiver)
-        for op in bound.operations
-        if needs_read(op)
-    }
     owners = []
     used_support = set()
     sources = event_sources(bound.source)
-    for native, handle in sorted(bound.handles.items()):
+    for native, handle in sorted(bound.public_handles.items()):
         if handle.dispose in bound.source.runtime_exports:
             continue
         owner = values.owner(native)
@@ -182,7 +177,7 @@ def lower(api):
         )
         owners.append(
             doc(bound, native, owner)
-            + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",{str(native in guarded).lower()},func(raw uint64){{ {dispose} }})}}; return owner }}\n'
+            + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
             f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
             + owner_members(owner, native in sources)
         )

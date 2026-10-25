@@ -47,6 +47,9 @@ class Values:
             )
             if public:
                 return public
+        if value.native in self.bound.slices:
+            # A slice record is presented as its array alone.
+            return self.public(self.bound.slices[value.native].value)
         if value.kind == "union":
             if value.native.startswith("@"):
                 parent, field = next(
@@ -92,6 +95,9 @@ class Values:
             self.used[value.native] = value
             return
         if value.kind != "record":
+            return
+        if value.native in self.bound.slices:
+            self.add(self.bound.slices[value.native].value)
             return
         for field in value.fields:
             if not field.public:

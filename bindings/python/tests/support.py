@@ -128,8 +128,8 @@ class Harness:
             mln.ResourceProvider(callback=self._provide)
         )
 
-    def _receive_events(self, batch: mln.EventBatchView) -> None:
-        self._pending.extend(batch.events)
+    def _receive_events(self, events: tuple[mln.RuntimeEvent, ...]) -> None:
+        self._pending.extend(events)
         self.events.notify()
 
     def _provide(

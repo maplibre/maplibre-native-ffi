@@ -163,17 +163,12 @@ func (driver *callerDriver) HandleWakes() (bool, error) {
 // retry follows after about one refresh. The retry is forced, because a frame
 // that missed the window consumed its update.
 func (driver *callerDriver) drainFrameResults() (bool, error) {
-	batch, err := driver.session.DrainFrameResults()
-	if err != nil || batch == nil {
-		return false, err
-	}
-	defer batch.Close()
-	view, err := batch.Get()
+	results, err := driver.session.DrainFrameResults()
 	if err != nil {
 		return false, err
 	}
 	rendered, retry := false, false
-	for _, result := range view.Results {
+	for _, result := range results {
 		switch result.Disposition {
 		case maplibre.RenderResultRendered:
 			rendered = true

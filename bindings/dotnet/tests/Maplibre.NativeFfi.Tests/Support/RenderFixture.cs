@@ -222,13 +222,7 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
-    private IReadOnlyList<RenderFrameResult> DrainFrames()
-    {
-        using var batch = Session.DrainFrameResults();
-        if (batch is null)
-            return [];
-        return batch.Get().Results;
-    }
+    private IReadOnlyList<RenderFrameResult> DrainFrames() => Session.DrainFrameResults();
 
     /// <summary>Attaches an owned texture target of the fixture's backend to its map.</summary>
     internal RenderSessionHandle Attach(RenderSessionAttachOptions options)

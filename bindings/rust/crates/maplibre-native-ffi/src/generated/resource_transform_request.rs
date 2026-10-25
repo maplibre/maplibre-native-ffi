@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_resource_transform_request` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct ResourceTransformRequestHandle(mln_resource_transform_request) dispose |raw| { unsafe { sys::mln_resource_transform_request_release(raw) }; Ok(()) }, counted false;
+    pub struct ResourceTransformRequestHandle(mln_resource_transform_request) dispose |raw| { unsafe { sys::mln_resource_transform_request_release(raw) }; Ok(()) };
     /// Returns the native handle value.
     fn id;
 }
@@ -21,7 +21,7 @@ impl ResourceTransformRequestHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(&self, url: &str) -> Result<()> {
         self.inner.close(|request| {
-            let mut call = Call::new(request, None);
+            let mut call = Call::new(request);
             let url = call.input(&url)?;
             call.status(|request, out_diagnostic| unsafe {
                 sys::mln_resource_transform_request_complete(request, url, out_diagnostic)
@@ -35,7 +35,7 @@ impl ResourceTransformRequestHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn release(&self) -> Result<()> {
         self.inner.close_once(|request| {
-            let mut call = Call::new(request, None);
+            let mut call = Call::new(request);
             call.run(|request| unsafe { sys::mln_resource_transform_request_release(request) });
             Ok(())
         })

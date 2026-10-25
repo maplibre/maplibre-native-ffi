@@ -159,6 +159,7 @@ def lower_function(
         else {}
     )
     attach_output = None
+    drained = None
     signature, optional, setup, args, returns = (
         [],
         [],
@@ -227,6 +228,12 @@ def lower_function(
             if output.kind != "reference" or not output.element:
                 raise Unsupported("output needs one initialized native storage value")
             output = output.element
+            if plan.drain and parameter.name == plan.drain.batch.name:
+                # The drain releases the batch once it copies the slice.
+                setup.append(f"final {local} = arena<Uint64>();")
+                args.append(local)
+                drained = local
+                continue
             owned = next(
                 (o for o in plan.owned_outputs if o.parameter == parameter.name), None
             )
@@ -376,10 +383,20 @@ def lower_function(
             if returns
             else None
         )
-        if plan.absence:
+        if plan.drain:
+            release = values.bound.source.functions_by_name[
+                plan.drain.batch.value.element.handle.release
+            ]
+            if release.diagnostic or release.return_type.kind != "void":
+                raise Unsupported("a drained batch needs a void release")
+            result = (
+                f"_drain({drained}.value, (batch) {{ {native_call(release, ['batch'])}; }}, "
+                f"() => {result})"
+            )
+        elif plan.absence:
             public += "?"
         body = setup + [
-            f"if (!_present({call}, raw.{plan.absence.status})) {{ return null; }}"
+            f"if (!_present({call}, raw.{plan.absence.status})) {{ return {'const []' if plan.drain else 'null'}; }}"
             if plan.absence
             else f"_check({call});"
             if status_return
@@ -693,7 +710,7 @@ def generate(api: Api | BoundApi) -> str:
     bound = values.bound
     _, conversions = values.render()
     parts = re.split(
-        r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|\w+) _(?:write|read|prepare|deliver)\w+\()",
+        r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|List<\w+>|\w+) _(?:write|read|prepare|deliver)\w+\()",
         conversions,
     )
     conversion_map = {}

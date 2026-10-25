@@ -137,6 +137,10 @@ class Values:
             return
         if plan.kind != "record":
             self.fail(plan, f"{plan.kind} requires a value adapter")
+        if plan.native in self.api.slices:
+            # A slice record is presented as its array alone.
+            self.supported(self.api.slices[plan.native].value, input=input)
+            return
         if plan.registration:
             from . import python_callbacks
 
@@ -171,6 +175,8 @@ class Values:
                 if scalar_type(plan) in {"f32", "f64"}
                 else "int"
             )
+        elif plan.native in self.api.slices:
+            return self.type(self.api.slices[plan.native].value, input=input)
         elif plan.kind in {"record", "enum"}:
             result = public_name(plan.native) + ("Scope" if plan.response else "")
             if plan.registration and async_hosts.accepts_native(self.api, plan):
@@ -292,6 +298,11 @@ class Values:
                 )
                 return optional_copy(present, body)
             return body
+        if plan.native in self.api.slices:
+            array = self.api.slices[plan.native]
+            return self.copy(
+                array.value, f"{expr}.{rust_field(array.name)}", scope=expr
+            )
         if plan.kind == "record":
             reference = expr[2:-1] if expr.startswith("(*") else f"&{expr}"
             return f"generated_copy_{plan.native}(py, {reference})?"
@@ -345,6 +356,8 @@ class Values:
             return f"_copy_variant({expr}, {{{variants}}}, {plan.empty_variant[1] if plan.empty_variant else None!r})"
         if plan.response:
             return f"_wrap_response({expr}, {public_name(plan.native) + 'Scope'!r})"
+        if plan.native in self.api.slices:
+            return self.facade_copy(self.api.slices[plan.native].value, expr)
         if plan.kind == "record":
             return f"{public_name(plan.native)}._from_native({expr})"
         if plan.kind == "enum":

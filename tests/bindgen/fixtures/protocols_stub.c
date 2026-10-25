@@ -137,8 +137,16 @@ mln_status mln_probe_read_level(
 }
 
 // Two readings with a stride wider than mln_probe_reading, as a later C API
-// version that appended a member reports them.
+// version that appended a member reports them. The first drain publishes them,
+// and a later drain finds nothing queued once the binding released the batch.
 void mln_probe_ledger_release(mln_probe_ledger ledger) { (void)ledger; }
+
+static unsigned int probe_reading_batches = 0;
+static bool probe_reading_batch_held = false;
+
+void mln_probe_reading_batch_release(mln_probe_reading_batch batch) {
+  if (batch == 11) probe_reading_batch_held = false;
+}
 
 mln_status mln_probe_ledger_open(
   mln_probe_ledger* out_ledger, mln_diagnostic* out_diagnostic
@@ -148,14 +156,21 @@ mln_status mln_probe_ledger_open(
   return MLN_STATUS_OK;
 }
 
-mln_status mln_probe_ledger_get(
-  mln_probe_ledger ledger, mln_probe_reading_view* out_view,
-  mln_diagnostic* out_diagnostic
+mln_status mln_probe_ledger_drain(
+  mln_probe_ledger ledger, mln_probe_reading_batch* out_batch,
+  mln_probe_reading_view* out_view, mln_diagnostic* out_diagnostic
 ) {
   if (ledger != 7) return fail(out_diagnostic, "unknown ledger");
+  if (out_batch == NULL || *out_batch != 0) {
+    return fail(out_diagnostic, "out_batch is not the null handle");
+  }
   if (out_view == NULL || out_view->size < sizeof(*out_view)) {
     return fail(out_diagnostic, "out_view is undersized");
   }
+  if (probe_reading_batch_held) {
+    return fail(out_diagnostic, "the last batch is not released");
+  }
+  if (probe_reading_batches++ > 0) return MLN_STATUS_NOT_READY;
   typedef struct wide_reading {
     mln_probe_reading reading;
     uint64_t appended;
@@ -170,6 +185,8 @@ mln_status mln_probe_ledger_get(
     .readings = &readings[0].reading,
     .reading_count = 2,
   };
+  *out_batch = 11;
+  probe_reading_batch_held = true;
   return MLN_STATUS_OK;
 }
 

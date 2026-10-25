@@ -8,7 +8,15 @@ from .zig import doc, identifier
 from .zig_values import field_default
 
 
+def slice_of(values, value):
+    """The array field of a `kind=slice` record, which Zig presents as a slice
+    in place of the record."""
+    return values.bound.slices.get(value.native) if value.kind == "record" else None
+
+
 def public(values, value):
+    if array := slice_of(values, value):
+        return values.public(array.value)
     if value.kind == "buffer":
         typ = "[]const u8"
     elif value.kind == "array":
@@ -114,6 +122,8 @@ def decode(values, value, source, context="raw"):
         # Native never returns callbacks, so a copy leaves a registration
         # unset.
         return "null" if value.nullable else ".{}"
+    if array := slice_of(values, value):
+        return decode(values, array.value, f"{source}.{identifier(array.name)}", source)
     optional = value.nullable or value.optional == "empty"
     if value.kind in {"buffer", "array", "reference"} and optional:
         absent = (
@@ -133,6 +143,9 @@ def decode(values, value, source, context="raw"):
             )
             source = f".{{ .data = {source}, .size = {count} }}"
         return f"try marshal.copyView(allocator, {source})"
+    if value.kind == "reference" and slice_of(values, value.element):
+        view = decode(values, value.element, "slice_view")
+        return f"slice: {{ const slice_view = ({source} orelse return error.NativeError).*; break :slice {view}; }}"
     if value.kind == "reference":
         return decode(
             values,

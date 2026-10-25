@@ -20,8 +20,6 @@ mod map;
 pub use map::*;
 mod map_projection;
 pub use map_projection::*;
-mod render_frame_batch;
-pub use render_frame_batch::*;
 mod render_session;
 pub use render_session::*;
 mod resource_request;
@@ -43,8 +41,6 @@ static_assertions::assert_impl_all!(GeojsonSourceDataHandle: Send, Sync);
 static_assertions::assert_impl_all!(MapHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(MapProjectionHandle: Send, Sync);
-#[cfg(test)]
-static_assertions::assert_impl_all!(RenderFrameBatchHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(RenderSessionHandle: Send, Sync);
 #[cfg(test)]

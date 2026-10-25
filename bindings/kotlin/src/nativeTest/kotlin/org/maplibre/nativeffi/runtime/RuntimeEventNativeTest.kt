@@ -45,7 +45,7 @@ class RuntimeEventNativeTest {
       view.events = bytes.reinterpret()
       view.event_count = STRIDED_EVENT_COUNT.convert()
       // The decoded batch owns copies, so overwriting the source afterwards changes nothing.
-      readEventBatchView(view.ptr.toLong()).events.also {
+      readEventBatchView(view.ptr.toLong()).also {
         memset(bytes, 0, (stride * STRIDED_EVENT_COUNT).convert())
         memset(messages, 0, STRIDED_MESSAGES.size.convert())
       }

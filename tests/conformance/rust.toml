@@ -12,7 +12,7 @@
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
 "LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_reaches_native"
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
-"LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_batch_read_on_another_thread_holds_off_release"
+"LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
 "LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
 "LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops"
 "LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events_and_outlives_close"

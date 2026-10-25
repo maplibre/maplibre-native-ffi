@@ -21,7 +21,7 @@ pub(crate) struct OwnerState<H: NativeHandle> {
 }
 
 impl<H: NativeHandle> OwnerState<H> {
-    /// Takes ownership of `raw` with its disposer and borrowed-output guard.
+    /// Takes ownership of `raw` with its disposer.
     ///
     /// # Safety
     ///
@@ -30,11 +30,10 @@ impl<H: NativeHandle> OwnerState<H> {
     pub(crate) unsafe fn adopt(
         raw: H,
         native: &'static str,
-        counted: bool,
         dispose: fn(H) -> Result<()>,
         parent: Parent,
     ) -> Result<Arc<Self>> {
-        let handle = Arc::new(HandleState::new(raw, native, counted)?);
+        let handle = Arc::new(HandleState::new(raw, native, false)?);
         Ok(Arc::new(Self {
             handle,
             dispose,
@@ -65,15 +64,7 @@ impl<H: NativeHandle> OwnerState<H> {
 
     /// Prepares a call on the raw handle.
     pub(crate) fn call(&self) -> Call<'_, H> {
-        Call::new(self.native(), None)
-    }
-
-    /// Admits a call whose results borrow the handle's storage, and holds off
-    /// close until the call ends.
-    pub(crate) fn read(&self) -> Result<Call<'_, H>> {
-        let read = self.handle.read()?;
-        let native = read.native;
-        Ok(Call::new(native, Some(read)))
+        Call::new(self.native())
     }
 
     /// Consumes the handle through `close`, which native may refuse for a
@@ -103,7 +94,7 @@ impl<H: NativeHandle> Drop for OwnerState<H> {
 macro_rules! native_owner {
     (
         $(#[$meta:meta])*
-        pub struct $name:ident($native:ident) dispose $dispose:expr, counted $counted:expr;
+        pub struct $name:ident($native:ident) dispose $dispose:expr;
         $(#[$id_meta:meta])*
         fn id;
     ) => {
@@ -134,7 +125,6 @@ macro_rules! native_owner {
                     $crate::handle::OwnerState::adopt(
                         raw,
                         stringify!($native),
-                        $counted,
                         dispose,
                         parent,
                     )
@@ -159,6 +149,30 @@ macro_rules! native_owner {
 }
 
 pub(crate) use native_owner;
+
+/// A batch that a drain published, which drop releases once its view is
+/// copied, whether or not the copy succeeds.
+pub(crate) struct Drained<H: Copy> {
+    raw: H,
+    release: unsafe extern "C" fn(H),
+}
+
+impl<H: Copy> Drained<H> {
+    /// # Safety
+    ///
+    /// Native must have published `raw` to this caller, and `release` must be
+    /// its release, which nothing else calls.
+    pub(crate) unsafe fn new(raw: H, release: unsafe extern "C" fn(H)) -> Self {
+        Self { raw, release }
+    }
+}
+
+impl<H: Copy> Drop for Drained<H> {
+    fn drop(&mut self) {
+        // SAFETY: `new` received the only claim on the batch.
+        unsafe { (self.release)(self.raw) }
+    }
+}
 
 pub(crate) fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|p| p.into_inner())

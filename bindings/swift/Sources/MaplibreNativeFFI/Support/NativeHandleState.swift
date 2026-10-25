@@ -6,15 +6,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private var closed = false
   private let parent: AnyObject?
   let value: Handle
-  private let protectsCopies: Bool
-  private var readers = 0
-  private var releasing = false
 
   init(
     typeName: String,
     handle: Handle,
-    parent: AnyObject? = nil,
-    protectsCopies: Bool = false
+    parent: AnyObject? = nil
   ) throws {
     guard !handle.isNull else {
       throw MaplibreError
@@ -23,7 +19,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     self.typeName = typeName
     self.parent = parent
     value = handle
-    self.protectsCopies = protectsCopies
   }
 
   deinit {
@@ -40,21 +35,8 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     lock.withLock { closed }
   }
 
-  /// Batch getters lend memory beyond the native call, until the copy ends.
   func withHandle<T>(_ body: (Handle) throws -> T) throws -> T {
-    if protectsCopies {
-      try lock.withLock {
-        guard !releasing
-        else { throw MaplibreError.invalidState("Batch is in use") }
-        readers += 1
-      }
-    }
-    defer {
-      if protectsCopies {
-        lock.withLock { readers -= 1 }
-      }
-    }
-    return try body(value)
+    try body(value)
   }
 
   var description: String {
@@ -62,9 +44,8 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     return "\(typeName)(id=0x\(String(value.raw, radix: 16)), closed=\(closed))"
   }
 
-  /// Closes a handle that guards no copies, so only `destroy` could fail.
-  func closeUnguarded(_ destroy: (Handle) -> Void) {
-    precondition(!protectsCopies, "\(typeName) guards copies")
+  /// Closes a handle whose `destroy` can't fail.
+  func closeInfallibly(_ destroy: (Handle) -> Void) {
     try! closeOnce(destroy)
   }
 
@@ -72,21 +53,9 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     idempotent: Bool = true,
     _ destroy: (Handle) throws -> Void
   ) throws {
-    let shouldClose = try lock.withLock {
-      if protectsCopies, readers != 0 || releasing {
-        throw MaplibreError.invalidState("Batch is in use")
-      }
-      if idempotent, closed {
-        return false
-      }
-      releasing = protectsCopies
-      return true
-    }
+    let shouldClose = lock.withLock { !(idempotent && closed) }
     guard shouldClose else { return }
-    defer {
-      lock.withLock { releasing = false }
-      withExtendedLifetime(parent) {}
-    }
+    defer { withExtendedLifetime(parent) {} }
     try destroy(value)
     lock.withLock { closed = true }
   }

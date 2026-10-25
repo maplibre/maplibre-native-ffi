@@ -159,6 +159,12 @@ class Values:
             raise Unsupported(
                 f"{plan.native}: {plan.kind} requires another value renderer"
             )
+        if plan.native in self.bound.slices:
+            # A slice record is presented as its array alone, which a copier
+            # reads from the record.
+            self.supported(self.bound.slices[plan.native].value)
+            self.plans[plan.native] = plan
+            return
         names = [name for name, _ in self.members(plan)]
         if (
             len(names) != len(set(names))
@@ -234,6 +240,8 @@ class Values:
             return base + ("?" if plan.nullable or plan.optional else "")
         if plan.kind == "array" and plan.element:
             return self.public_type(plan.element) + "[]"
+        if plan.native in self.bound.slices:
+            return self.public_type(self.bound.slices[plan.native].value)
         return public_name(plan.native)
 
     def copy(self, plan: ValuePlan, expression: str, length: str | None = None) -> str:
@@ -263,6 +271,17 @@ class Values:
                 return f"NativeCallScope.CopyArray<{native}>({expression}, (nuint)({length}))"
             element = self.copy(plan.element, "item")
             return f"NativeCallScope.CopyArray<{native}, {public}>({expression}, (nuint)({length}), static item => {element})"
+        if plan.native in self.bound.slices:
+            array = self.bound.slices[plan.native]
+            if array.value.stride:
+                return (
+                    f"Copy{public_name(plan.native)}{pascal(array.name)}({expression})"
+                )
+            return self.copy(
+                array.value,
+                f"{expression}.{member(array.name)}",
+                f"{expression}.{member(array.value.length)}",
+            )
         if plan.kind == "buffer":
             if plan.length == "nul":
                 return (
@@ -461,6 +480,8 @@ class Values:
     def decoder(self, plan: ValuePlan) -> str:
         if plan.response:
             return ""
+        if plan.native in self.bound.slices:
+            return self.array_copiers(plan)
         values = []
         members = self.members(plan)
         for name, field in members:
@@ -544,7 +565,14 @@ class Values:
             if plan.native in self.strided_records
             else ""
         )
-        declaration = f"    private static {public_name(plan.native)} Copy{public_name(plan.native)}({plan.native} value{extra}) => {copied};\n"
+        return (
+            f"    private static {public_name(plan.native)} Copy{public_name(plan.native)}({plan.native} value{extra}) => {copied};\n"
+            + self.array_copiers(plan)
+        )
+
+    def array_copiers(self, plan: ValuePlan) -> str:
+        """Copies each strided array of a record, stepping by its stride."""
+        declaration = ""
         for field in self.fields(plan):
             array = field.value
             if not array.stride or not array.element:

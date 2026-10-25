@@ -167,6 +167,11 @@ class Values:
             raise Unsupported(
                 f"{value.native}: {value.kind} requires another Dart value rule"
             )
+        if value.native in self.bound.slices:
+            # A slice record reaches host code as its list alone.
+            self.check(self.bound.slices[value.native].value)
+            self.used[value.native] = value
+            return
         unions = [f for f in self.fields(value) if f.value.kind == "union"]
         if unions:
             if len(unions) != 1 or not unions[0].presence or not unions[0].presence.tag:
@@ -270,6 +275,8 @@ class Values:
                 if value.kind == "enum"
                 else self.scalar(value)[0]
             )
+        elif value.native in self.bound.slices:
+            name = self.public(self.bound.slices[value.native].value)
         elif value.kind in {"record", "callback"}:
             name = public_name(value.native)
         elif value.kind == "reference":
@@ -1089,6 +1096,15 @@ class Values:
                 declaration, conversion = self.render_rules_registration(value)
                 declarations.append(declaration)
                 conversions.append(conversion)
+                continue
+            if value.native in self.bound.slices:
+                field = self.bound.slices[value.native]
+                capture = self.copy(
+                    field.value, f"source.{field.name}", f"source.{field.value.length}"
+                )
+                conversions.append(
+                    f"{self.public(value)} _read{public}(raw.{value.native} source) => {capture};\n"
+                )
                 continue
             union = next((f for f in value.fields if f.value.kind == "union"), None)
             if union:

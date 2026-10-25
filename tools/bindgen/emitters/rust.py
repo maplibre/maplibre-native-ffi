@@ -263,7 +263,8 @@ def _map(rule: str, copied: str) -> str:
 
 
 def reads_receiver(plan: OperationPlan) -> bool:
-    """An immediate receiver call copies borrowed output without a native view scope."""
+    """An immediate receiver call copies borrowed output without a native view
+    scope, which the Python binding guards."""
     from .rust_dynamic_values import dynamic
 
     def borrowed(value):
@@ -329,7 +330,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     if receiver is not None and receiver not in value_types.owners:
         raise Unsupported(f"receiver {receiver} needs a generated runtime adapter")
     module = value_types.owners[receiver] if receiver else "global"
-    read = reads_receiver(plan)
     parameters = function.parameters[1:] if receiver else function.parameters
     names = {parameter.name: local_name(parameter.name) for parameter in parameters}
     # Parameters keep their C names, so a local the body binds steps aside.
@@ -535,6 +535,22 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 setup.append(f"let {local} = {call_local}.reference(&{local})?;")
             uses_call = True
             args.append(local)
+        elif plan.drain and parameter.name == plan.drain.batch.name:
+            # The drain copies the batch's view and releases the batch, so no
+            # owner holds it.
+            batch = plan.drain.batch.value.unwrapped
+            prelude.append(f"let mut {local} = sys::{batch.native}(0);")
+            args.append(f"&mut {local}")
+        elif plan.drain and parameter.name == plan.drain.view.name:
+            value = plan.drain.view.value.unwrapped
+            public = value_types.add(value, "out")
+            raw_type = ctype(pointee)
+            prelude += [
+                f"let mut {local}: sys::{raw_type} = unsafe {{ std::mem::zeroed() }};",
+                f"{local}.size = std::mem::size_of::<sys::{raw_type}>() as _;",
+            ]
+            args.append(f"&mut {local}")
+            outputs.append((public, decode(value_types, value, local)))
         elif parameter.name in output_plans:
             output = output_plans[parameter.name]
             value = output.value
@@ -587,7 +603,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 continue
             value_types.add(value, "out")
             public = value_types.public(value)
-            if dynamic(value) and not read:
+            if dynamic(value):
                 raise Unsupported("borrowed output record needs its native owner scope")
             raw_type = ctype(pointee)
             initial = (
@@ -677,7 +693,25 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 else f"{call_local}.status({closure} {native})?;",
                 f"Ok({output})",
             ]
-            if plan.absence:
+            if plan.drain:
+                batch = plan.drain.batch.value.unwrapped
+                release = value_types.bound.handles[batch.native].release
+                if (
+                    value_types.bound.source.functions_by_name[release].return_type.kind
+                    != "void"
+                ):
+                    raise Unsupported(
+                        f"{release}: a drained batch's release must not fail"
+                    )
+                ending = [
+                    f"if !{call_local}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
+                    "    return Ok(Vec::new());",
+                    "}",
+                    "// SAFETY: native published the batch to this call alone.",
+                    f"let _batch = unsafe {{ crate::handle::Drained::new({names[plan.drain.batch.name]}, sys::{release}) }};",
+                    f"Ok({output})",
+                ]
+            elif plan.absence:
                 if parent_line:
                     prelude.remove(parent_line)
                 ending = [
@@ -740,14 +774,14 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         body = [
             *prelude,
             f"self.inner.{close}(|{target}| {{",
-            f"    let {mutable}{call_local} = Call::new({target}, None);",
+            f"    let {mutable}{call_local} = Call::new({target});",
             *("    " + line for line in [*setup, *ending]),
             "})",
         ]
     else:
         receiver_self = "self.0" if discard else "self"
         body = [
-            f"let {mutable}{call_local} = {receiver_self}.inner.{'read()?' if read else 'call()'};"
+            f"let {mutable}{call_local} = {receiver_self}.inner.call();"
             if receiver
             else f"let {mutable}{call_local} = Call::global();"
         ]

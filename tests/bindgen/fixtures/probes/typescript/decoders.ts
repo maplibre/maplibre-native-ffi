@@ -52,7 +52,9 @@ assert.deepEqual([...unknown.bytes.subarray(16)], Array(8).fill(0xcd));
 map.close();
 
 // Records that native code steps through by a wider stride than the binding
-// compiled keep their values.
+// compiled keep their values. The drain releases its batch, so the next drain
+// reaches native, which has nothing queued.
 const ledger = probeLedgerOpen();
-assert.deepEqual(ledger.get(), { readings: [{ value: 7n }, { value: 9n }] });
+assert.deepEqual(ledger.drain(), [{ value: 7n }, { value: 9n }]);
+assert.deepEqual(ledger.drain(), []);
 ledger.close();

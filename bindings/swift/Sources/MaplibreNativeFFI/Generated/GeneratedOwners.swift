@@ -209,58 +209,6 @@ public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
-struct NativeRenderFrameBatchHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_render_frame_batch_release(raw); return true
-  }
-}
-
-/// An owned batch of frame results from one drain.
-///
-/// See `mln_render_frame_batch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
-  let handle: NativeHandleState<NativeRenderFrameBatchHandle>
-  init(adopting raw: mln_render_frame_batch) throws {
-    handle = try NativeHandleState(
-      typeName: "RenderFrameBatchHandle",
-      handle: NativeRenderFrameBatchHandle(raw: raw),
-      protectsCopies: true
-    )
-  }
-
-  /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (
-    lhs: RenderFrameBatchHandle,
-    rhs: RenderFrameBatchHandle
-  ) -> Bool {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
-}
-
 struct NativeRenderSessionHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_render_session_dispose(

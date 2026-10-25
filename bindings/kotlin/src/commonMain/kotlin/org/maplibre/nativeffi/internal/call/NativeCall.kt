@@ -69,6 +69,19 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
     scope?.accept(owner)
   }
 
+  /**
+   * Copies the drained batch whose handle native wrote to [batch] with [copy], then releases the
+   * batch through [release], even when [copy] throws.
+   */
+  inline fun <T> drain(batch: Long, release: (Long) -> Unit, copy: () -> T): T {
+    val owned = readI64(batch)
+    try {
+      return copy()
+    } finally {
+      release(owned)
+    }
+  }
+
   /** Adopts the owned handle that native wrote to [out], disposing it if [create] fails. */
   fun <T> adopt(out: Long, dispose: (Long) -> Unit, create: (Long) -> T): T =
     adoptOwned(readI64(out), dispose, create)

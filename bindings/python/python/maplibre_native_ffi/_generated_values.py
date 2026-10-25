@@ -1343,24 +1343,6 @@ class EglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class EventBatchView:
-    """A borrowed span of runtime events in one delivery.
-
-    See `mln_event_batch_view` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    events: tuple[RuntimeEvent, ...]
-    """Borrowed array of event_count events in queue order."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            events=tuple(RuntimeEvent._from_native(item) for item in raw["events"])
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
     """Feature-state source, feature, and key selector.
 
@@ -2832,28 +2814,6 @@ class RenderAbandonResult:
 
 
 @dataclass(frozen=True, slots=True)
-class RenderFrameBatchView:
-    """A borrowed view of one owned frame-result batch.
-
-    See `mln_render_frame_batch_view` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    """
-
-    results: tuple[RenderFrameResult, ...]
-    """Borrowed array of result_count terminal frame results in completion
-    order.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            results=tuple(
-                RenderFrameResult._from_native(item) for item in raw["results"]
-            )
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class RenderFrameResult:
     """Terminal result of one frame demand, held by an owned frame-result batch
     and copied by `mln_acquired_frame_get_result()`.
@@ -3483,12 +3443,12 @@ class RuntimeEventHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: Callable[[EventBatchView], None] | None = None
+    callback: Callable[[tuple[RuntimeEvent, ...]], None] | None = None
 
     def _invoke_callback(self, events):
         callback = self.callback
         assert callback is not None
-        return callback(EventBatchView._from_native(events))
+        return callback(tuple(RuntimeEvent._from_native(item) for item in events))
 
 
 @dataclass(frozen=True, slots=True)

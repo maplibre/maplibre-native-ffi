@@ -130,6 +130,9 @@ class Values:
 
     def add(self, value):
         self.public(value)
+        if array := self.bound.slices.get(value.native):
+            # A slice record presents only its array.
+            return self.add(array.value)
         if value.registration:
             from .zig_callbacks import add
 

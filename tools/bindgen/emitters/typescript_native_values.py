@@ -470,6 +470,12 @@ class NativeValues:
             return name
         prototype = f"napi_value {name}(napi_env env, const {value.native}* source, size_t size)"
         self.functions[name] = (prototype, "")
+        if value.native in self.values.bound.slices:
+            # A slice record converts to its array alone.
+            array = self.array_reader(value, self.values.bound.slices[value.native])
+            body = f"  (void)size;\n  return {array}(env, source);"
+            self.functions[name] = (prototype, body)
+            return name
         lines = [
             "  (void)size;",
             "  napi_value result = mln_ts_object(env);",

@@ -30,6 +30,7 @@ LOCALS = {
     "completion",
     "diagnostic",
     "out",
+    "batch",
     "raw",
     "holder",
     "registrations",
@@ -156,6 +157,10 @@ def signature(plan, values):
     )
     if plan.caller_sized_text:
         result_type, result = "ByteArray", None
+    elif plan.drain:
+        result = plan.drain.view.value.unwrapped
+        values.check(result)
+        result_type = values.public(result)
     elif len(plan.outputs) > 1:
         result_type = outputs_signature(plan, values)
         result = None
@@ -380,6 +385,8 @@ def operation(plan, values, native, *, discard=False):
     text = plan.caller_sized_text
     if text:
         return caller_sized_text(plan, values, native, text)
+    if plan.drain:
+        return drain(plan, values, native)
     if len(plan.outputs) > 1:
         return multiple_outputs(plan, values, native)
     if plan.view:
@@ -504,6 +511,32 @@ def multiple_outputs(plan, values, native):
     helper = call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
+
+
+def drain(plan, values, native):
+    """A drain that copies its batch's slice and releases the batch, or returns
+    an empty list when nothing is queued."""
+    method, params, _inputs, result, result_type = signature(plan, values)
+    batch, view = plan.drain.batch, plan.drain.view
+    handle = batch.value.unwrapped.handle
+    slot = next(
+        p.type.pointee for p in plan.function.parameters if p.name == batch.name
+    )
+    allocation, decoded = output_storage(result, values)
+    storage = {batch.name: "batch", view.name: "out"}
+    arguments = call_arguments(plan, values) + [storage[p.name] for p in plan.outputs]
+    function = values.bound.source.functions_by_name[handle.release]
+    if function.diagnostic or function.return_type.kind != "void":
+        raise Unsupported("a drained batch needs a void release")
+    release = native.call(function, ["it"])
+    body = (
+        f"val batch = {values.storage(slot)}; val out = {allocation}; "
+        f"if ({native.present(plan, arguments)}) "
+        f"drain(batch, {{ {release} }}) {{ {decoded.replace('{out}', 'out')} }} "
+        "else emptyList()"
+    )
+    head = f"  public fun {method}({declaration(params)}): {result_type} ="
+    return f"{head} {call_helper(plan)} {{ {encodings(plan)}{body} }}\n"
 
 
 def disposal_method(handle):
@@ -695,7 +728,7 @@ def view(plan, values, native):
 def owner_disposal(bound, native):
     """The any-thread disposal of every public handle, for leak cleanup."""
     lines = []
-    for handle in bound.handles.values():
+    for handle in bound.public_handles.values():
         if not handle.cleanup or handle.cleanup in bound.source.runtime_exports:
             continue
         method = name(handle.native)

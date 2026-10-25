@@ -46,7 +46,6 @@ import type {
   ProjectionMode,
   RenderAbandonResult,
   RenderBackendFlag,
-  RenderFrameBatchView,
   RenderFrameResult,
   RenderSessionAttachOptions,
   RenderSessionCapabilities,
@@ -597,11 +596,6 @@ export interface NativeOperations {
     coordinate: LatLng | undefined,
   ): ProjectedMeters;
   mln_projection_mode_default(): ProjectionMode;
-  mln_render_frame_batch_get(batch: bigint): RenderFrameBatchView;
-  mln_render_frame_batch_release(
-    batch: bigint,
-    token: object | undefined,
-  ): void;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
   mln_render_session_acquire_frame(session: bigint): bigint | undefined;
   mln_render_session_attach_options_default(): RenderSessionAttachOptions;
@@ -613,7 +607,9 @@ export interface NativeOperations {
     token: object | undefined,
     completion: number | undefined,
   ): void;
-  mln_render_session_drain_frame_results(session: bigint): bigint | undefined;
+  mln_render_session_drain_frame_results(
+    session: bigint,
+  ): readonly RenderFrameResult[] | undefined;
   mln_render_session_dump_debug_logs(session: bigint, completion: number): void;
   mln_render_session_get_capabilities(
     session: bigint,

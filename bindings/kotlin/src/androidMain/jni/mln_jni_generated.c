@@ -1696,16 +1696,6 @@ static void mln_projection_mode_default_jni(
   mln_projection_mode_default_critical(returned);
 }
 
-static jint mln_render_frame_batch_get_jni(
-  JNIEnv* env, jclass type, jlong batch, jlong out_view, jlong out_diagnostic
-) {
-  return (jint)mln_render_frame_batch_get(
-    (mln_render_frame_batch)batch,
-    MLN_JNI_POINTER(mln_render_frame_batch_view*, out_view),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static void mln_render_frame_batch_release_jni(
   JNIEnv* env, jclass type, jlong batch
 ) {
@@ -1789,20 +1779,22 @@ static jint mln_render_session_dispose_jni(
 }
 
 static jint mln_render_session_drain_frame_results_critical(
-  jlong session, jlong out_batch, jlong out_diagnostic
+  jlong session, jlong out_batch, jlong out_view, jlong out_diagnostic
 ) {
   return (jint)mln_render_session_drain_frame_results(
     (mln_render_session)session,
     MLN_JNI_POINTER(mln_render_frame_batch*, out_batch),
+    MLN_JNI_POINTER(mln_render_frame_batch_view*, out_view),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_drain_frame_results_jni(
-  JNIEnv* env, jclass type, jlong session, jlong out_batch, jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong session, jlong out_batch, jlong out_view,
+  jlong out_diagnostic
 ) {
   return mln_render_session_drain_frame_results_critical(
-    session, out_batch, out_diagnostic
+    session, out_batch, out_view, out_diagnostic
   );
 }
 
@@ -2860,8 +2852,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_projection_mode_default", "(J)V",
    (void*)mln_projection_mode_default_jni},
-  {"mln_render_frame_batch_get", "(JJJ)I",
-   (void*)mln_render_frame_batch_get_jni},
   {"mln_render_frame_batch_release", "(J)V",
    (void*)mln_render_frame_batch_release_jni},
   {"mln_render_session_abandon", "(JJJ)I",
@@ -2877,7 +2867,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
   {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
-  {"mln_render_session_drain_frame_results", "(JJJ)I",
+  {"mln_render_session_drain_frame_results", "(JJJJ)I",
    (void*)mln_render_session_drain_frame_results_jni},
   {"mln_render_session_dump_debug_logs", "(JJJ)I",
    (void*)mln_render_session_dump_debug_logs_jni},
@@ -3294,8 +3284,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_projection_mode_default", "(J)V",
    (void*)mln_projection_mode_default_critical},
-  {"mln_render_frame_batch_get", "(JJJ)I",
-   (void*)mln_render_frame_batch_get_jni},
   {"mln_render_frame_batch_release", "(J)V",
    (void*)mln_render_frame_batch_release_jni},
   {"mln_render_session_abandon", "(JJJ)I",
@@ -3311,7 +3299,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
   {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
-  {"mln_render_session_drain_frame_results", "(JJJ)I",
+  {"mln_render_session_drain_frame_results", "(JJJJ)I",
    (void*)mln_render_session_drain_frame_results_critical},
   {"mln_render_session_dump_debug_logs", "(JJJ)I",
    (void*)mln_render_session_dump_debug_logs_jni},

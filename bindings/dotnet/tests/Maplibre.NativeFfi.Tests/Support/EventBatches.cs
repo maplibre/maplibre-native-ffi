@@ -40,7 +40,7 @@ internal static unsafe class EventBatches
                 events = (mln_runtime_event*)recordBytes,
                 event_count = eventCount,
             };
-            return GeneratedValues.CopyEventBatchView(batch).Events;
+            return GeneratedValues.CopyEventBatchViewEvents(batch);
         }
     }
 

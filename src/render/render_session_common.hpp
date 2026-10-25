@@ -1200,10 +1200,8 @@ auto render_session_request_frame(
 auto render_session_service_driver_work(mln_render_session session)
   -> mln_status;
 auto render_session_drain_frame_results(
-  mln_render_session session, mln_render_frame_batch* out_batch
-) -> mln_status;
-auto render_frame_batch_get(
-  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view
+  mln_render_session session, mln_render_frame_batch* out_batch,
+  mln_render_frame_batch_view* out_view
 ) -> mln_status;
 auto render_frame_batch_release(mln_render_frame_batch batch) noexcept -> void;
 auto render_session_acquire_frame(

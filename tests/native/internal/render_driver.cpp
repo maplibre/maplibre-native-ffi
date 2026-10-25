@@ -758,7 +758,7 @@ struct PublishedFrame {
 // Holds once a frame result is published, keeping the batch it drained.
 auto frame_published(void* context) -> bool {
   auto& published = *static_cast<PublishedFrame*>(context);
-  return mln_render_session_drain_frame_results(
+  return mln_test_drain_frame_results(
            published.fixture->render.session, &published.batch, nullptr
          ) == MLN_STATUS_OK;
 }
@@ -1021,9 +1021,9 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   // Results already queued would leave the frame wake pending, so the
   // superseding request would owe no wake.
   auto drained = mln_render_frame_batch{MLN_HANDLE_NULL};
-  while (mln_render_session_drain_frame_results(
-           fixture.render.session, &drained, nullptr
-         ) == MLN_STATUS_OK) {
+  while (
+    mln_test_drain_frame_results(fixture.render.session, &drained, nullptr) ==
+    MLN_STATUS_OK) {
     mln_render_frame_batch_release(drained);
     drained = MLN_HANDLE_NULL;
   }
@@ -1064,9 +1064,9 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
     wakes_before, atomic_load(&fixture.render.frame_wakes)
   );
   auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_render_session_drain_frame_results(
-    fixture.render.session, &batch, nullptr
-  ));
+  MLN_TEST_OK(
+    mln_test_drain_frame_results(fixture.render.session, &batch, nullptr)
+  );
   TEST_ASSERT_EQUAL_size_t(2, mln_test_render_batch_view(batch).result_count);
   const auto superseded = batch_result(batch, 0);
   const auto stranded = batch_result(batch, 1);
@@ -1338,7 +1338,7 @@ void probe_results(void* context, const mln_completion_result*) {
   auto& probe = *static_cast<MaintenanceProbe*>(context);
   auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
   probe.results_queued =
-    mln_render_session_drain_frame_results(probe.session, &batch, nullptr) ==
+    mln_test_drain_frame_results(probe.session, &batch, nullptr) ==
     MLN_STATUS_OK;
   if (probe.results_queued) mln_render_frame_batch_release(batch);
   probe.done = true;

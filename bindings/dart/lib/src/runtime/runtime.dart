@@ -172,6 +172,16 @@ T _adoptOwned<T>(int handle, T Function() adopt, void Function(int) dispose) {
   }
 }
 
+/// Copies a drained batch with [copy], then releases the batch [handle]
+/// through [release], even when [copy] throws.
+T _drain<T>(int handle, void Function(int) release, T Function() copy) {
+  try {
+    return copy();
+  } finally {
+    release(handle);
+  }
+}
+
 final class NativeAdoptionFailure implements Exception {
   NativeAdoptionFailure(
     this.adoptionError,

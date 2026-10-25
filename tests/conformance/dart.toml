@@ -11,7 +11,7 @@
 # entry point needs a handle that one of those created. No library with another
 # ABI version is at hand to load in its place.
 "ERR-02" = "bindings/dart/test/internal_support_test.dart::ABI mismatch has a stable public error category"
-"ERR-03" = "bindings/dart/test/render_test.dart::a drain before any demand returns no batch"
+"ERR-03" = "bindings/dart/test/render_test.dart::a drain before any demand returns no results"
 "LIFE-01" = "bindings/dart/test/lifecycle_test.dart::repeated asynchronous release reaches native"
 "LIFE-02" = "bindings/dart/test/lifecycle_test.dart::a refused close leaves the handle usable for a later close"
 "LIFE-03" = { na = "An isolate runs on one thread at a time and shares no objects with another isolate, so no borrow of a handle can be in progress on another thread; the borrow within an isolate is VIEW-01" }

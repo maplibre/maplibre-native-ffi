@@ -115,19 +115,30 @@ public extension RenderSessionHandle {
   }
 
   /// Drains every currently queued terminal frame result into an independently
-  /// owned batch. The records remain stable until the batch is released.
+  /// owned batch and borrows its view. The records remain stable until the
+  /// batch is released.
   ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func drainFrameResults() throws -> RenderFrameBatchHandle? {
+  func drainFrameResults() throws -> [RenderFrameResult] {
     var value0: mln_render_frame_batch = 0
+    var value1 = mln_render_frame_batch_view()
+    value1.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
     return try nativeInvoke(absentOn: MLN_STATUS_NOT_READY) { raw, _, diagnostic in
       mln_render_session_drain_frame_results(
         raw,
         &value0,
+        &value1,
         diagnostic
       )
-    } result: { try RenderFrameBatchHandle(adopting: value0) }
+    } result: {
+      defer { mln_render_frame_batch_release(value0) }
+      return try NativeInputArena.copyStrided(
+        value1.results,
+        count: value1.result_count,
+        stride: value1.result_size
+      ) { item, _ in RenderFrameResult(raw: item) }
+    } ?? []
   }
 
   /// Starts asynchronous renderer diagnostic-log emission.

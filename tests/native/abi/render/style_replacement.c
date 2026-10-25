@@ -74,9 +74,8 @@ static bool note_settlement(const mln_runtime_event* event, void* context) {
 
 static void drain_requested_frame(replacement_wait* wait) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  const mln_status status = mln_render_session_drain_frame_results(
-    wait->fixture->session, &batch, NULL
-  );
+  const mln_status status =
+    mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
   if (status == MLN_STATUS_OK) {
     const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
     TEST_ASSERT_EQUAL_size_t(1, view.result_count);

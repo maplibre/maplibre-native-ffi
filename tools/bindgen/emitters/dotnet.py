@@ -225,10 +225,10 @@ def checked_call(function: Function, arguments: str) -> str:
     return f"Check({native_call(function, arguments, 'Diagnostic')});"
 
 
-def present_call(plan: OperationPlan, arguments: str) -> str:
-    """Returns null for the absence status, and checks every other status."""
+def present_call(plan: OperationPlan, arguments: str, absent: str = "null") -> str:
+    """Returns `absent` for the absence status, and checks every other status."""
     call = native_call(plan.function, arguments, "Diagnostic")
-    return f"if (!Present({call}, mln_status.{plan.absence.status})) return null;"
+    return f"if (!Present({call}, mln_status.{plan.absence.status})) return {absent};"
 
 
 def submitted(function: Function, args: list[str], start: str) -> list[str]:
@@ -592,6 +592,11 @@ def emit_operation(
             raise Unsupported("asynchronous output requires a completion value")
         if plan.completion and parameter.name == plan.completion.parameter:
             args.append("completion")
+        elif plan.drain and parameter.name == plan.drain.batch.name:
+            prologue.append(
+                f"{raw_handle(plan.drain.batch.value.unwrapped.handle)} {name} = default;"
+            )
+            args.append(f"&{name}")
         elif parameter.name in {owner.parameter for owner in plan.owned_outputs}:
             owner = next(
                 owner
@@ -795,19 +800,7 @@ def emit_operation(
         if parameters[index].rsplit(" ", 1)[1] not in omittable:
             break
         parameters[index] += " = null"
-    reads = bool(
-        handle_plan
-        and handle_plan.native == "mln_render_frame_batch"
-        and not asynchronous
-        and outputs
-        and function.name != handle_plan.release
-    )
-    if reads:
-        entry = ["using var read = state.Read(this);"]
-        if scoped:
-            entry.append("using var scope = new NativeCallScope();")
-        args[0] = "read.Handle"
-    elif (scoped or asynchronous) and not plan.scoped_receiver:
+    if (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [f"using var scope = new NativeCallScope({owner_expression});"]
     else:
         entry = [f"using var call = Enter({owner_expression});"]
@@ -859,7 +852,26 @@ def emit_operation(
             ),
             records | values.plans.keys(),
         )
-    if immediate_owners:
+    if plan.drain:
+        # The drain copies its slice, and releases the batch that holds it
+        # once the copy ends or fails. Nothing queued is an empty slice.
+        if scoped or len(outputs) != 1:
+            raise Unsupported("a drain requires one slice and no native scope")
+        result_type, copied = outputs[0]
+        batch = plan.drain.batch.value.unwrapped.handle
+        release = api.functions_by_name[batch.release]
+        body = prologue + [
+            present_call(plan, arguments, "[]"),
+            "try",
+            "{",
+            f"    return {copied};",
+            "}",
+            "finally",
+            "{",
+            f"    {native_call(release, disposer_arguments(batch, release, camel(plan.drain.batch.name)), 'null')};",
+            "}",
+        ]
+    elif immediate_owners:
         if len(immediate_owners) != 1:
             raise Unsupported("multiple owned outputs require a generated aggregate")
         owner, local, native = immediate_owners[0]
@@ -1070,7 +1082,12 @@ def emit(api: Api | BoundApi) -> Emission:
         for plan in bound.operations
         if plan.function.name in supported
         for handle in (
-            [owner.handle for owner in plan.owned_outputs]
+            [
+                owner.handle
+                for owner in plan.owned_outputs
+                # A drain releases its batch itself.
+                if not (plan.drain and owner.parameter == plan.drain.batch.name)
+            ]
             + (
                 [plan.result.handle]
                 if plan.result
@@ -1144,7 +1161,7 @@ def emit(api: Api | BoundApi) -> Emission:
                 "Ready = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
             )
         constructor.append(
-            f"state = new(handle, {destroy}, nameof({owner}), Abandon{', protectsCopies: true' if handle.native == 'mln_render_frame_batch' else ''}{', retainedParent: parent' if handle.parent else ''});"
+            f"state = new(handle, {destroy}, nameof({owner}), Abandon{', retainedParent: parent' if handle.parent else ''});"
         )
         declarations = (
             "".join(f"    {field}\n" for field in fields)
@@ -1317,6 +1334,8 @@ def emit(api: Api | BoundApi) -> Emission:
         + "}\n"
     )
     for name in sorted(used_records):
+        if name in bound.slices:
+            continue
         record = api.records_by_name[name]
         directory = directory_for(record.location.path)
         plan = values.record(name)

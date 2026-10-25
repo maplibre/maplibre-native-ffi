@@ -160,12 +160,12 @@ private func attachOwnedTextureSession(
 #endif
 
 /// Before any demand, native reports the drain and the acquire as not ready,
-/// which reads as nil.
-@Test func aDrainBeforeAnyDemandReturnsNil() async throws {
+/// which reads as no results and no frame.
+@Test func aDrainBeforeAnyDemandReturnsNoValue() async throws {
   try await withOwnedTextureSession { rendered in
-    let batch = try rendered.session.drainFrameResults()
+    let results = try rendered.session.drainFrameResults()
     let frame = try rendered.session.acquireFrame()
-    #expect(batch == nil)
+    #expect(results.isEmpty)
     #expect(frame == nil)
   }
 }

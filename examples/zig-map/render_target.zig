@@ -112,11 +112,9 @@ pub const Session = struct {
     /// Drains every queued frame result.
     pub fn drainResults(self: *Session) !FrameResults {
         var results: FrameResults = .{};
-        var batch = try (self.handle.?).drainFrameResults(null) orelse return results;
-        defer batch.deinit();
-        var view = try batch.get(std.heap.smp_allocator, null);
-        defer view.deinit();
-        for (view.value.results) |result| {
+        var drained = try (self.handle.?).drainFrameResults(std.heap.smp_allocator, null);
+        defer drained.deinit();
+        for (drained.value) |result| {
             switch (result.disposition) {
                 .rendered => {
                     results.rendered = true;

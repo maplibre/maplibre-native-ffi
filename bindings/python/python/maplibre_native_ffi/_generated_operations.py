@@ -60,7 +60,6 @@ from ._generated_values import (
     RenderedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
-    RenderFrameBatchView,
     RenderFrameResult,
     RenderSessionAttachOptions,
     RenderSessionCapabilities,
@@ -98,7 +97,6 @@ if TYPE_CHECKING:
         GeojsonSourceDataHandle,
         MapHandle,
         MapProjectionHandle,
-        RenderFrameBatchHandle,
         RenderSessionHandle,
         RuntimeHandle,
         StyleExpressionHandle,
@@ -1275,26 +1273,6 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return self._native.set_camera(camera)
 
 
-class _RenderFrameBatchHandleOperations(GeneratedOperations):
-    _native: _native._RenderFrameBatchHandle
-
-    def get(self) -> RenderFrameBatchView:
-        """Borrows the result view stored by an owned frame-result batch.
-
-        See `mln_render_frame_batch_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return RenderFrameBatchView._from_native(self._native.get())
-
-    def close(self) -> None:
-        """Releases a frame-result batch.
-
-        See `mln_render_frame_batch_release` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.close()
-
-
 class _RenderSessionHandleOperations(GeneratedOperations):
     _native: _native._RenderSessionHandle
 
@@ -1356,17 +1334,17 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.close()
 
-    def drain_frame_results(self) -> RenderFrameBatchHandle | None:
+    def drain_frame_results(self) -> tuple[RenderFrameResult, ...]:
         """Drains every currently queued terminal frame result into an
-        independently owned batch. The records remain stable until the batch
-        is released.
+        independently owned batch and borrows its view. The records remain
+        stable until the batch is released.
 
         See `mln_render_session_drain_frame_results` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
-        return _maybe(
-            lambda raw: _adopt_value(raw, "RenderFrameBatchHandle", None),
-            self._native.drain_frame_results(),
+        return tuple(
+            RenderFrameResult._from_native(item)
+            for item in self._native.drain_frame_results()
         )
 
     def dump_debug_logs(self) -> Future[None]:

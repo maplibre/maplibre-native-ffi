@@ -1397,9 +1397,6 @@ internal actual object C {
     mln_kw_mln_projection_mode_default(word(returned))
   }
 
-  actual fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_render_frame_batch_get(batch, word(outView), word(outDiagnostic))
-
   actual fun mln_render_frame_batch_release(batch: Long) {
     mln_kw_mln_render_frame_batch_release(batch)
   }
@@ -1435,9 +1432,15 @@ internal actual object C {
   actual fun mln_render_session_drain_frame_results(
     session: Long,
     outBatch: Long,
+    outView: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_drain_frame_results(session, word(outBatch), word(outDiagnostic))
+    mln_kw_mln_render_session_drain_frame_results(
+      session,
+      word(outBatch),
+      word(outView),
+      word(outDiagnostic),
+    )
 
   actual fun mln_render_session_dump_debug_logs(
     session: Long,
@@ -3072,11 +3075,6 @@ private fun mln_kw_mln_projected_meters_for_lat_lng(p0: Int, p1: Int, p2: Int): 
 private fun mln_kw_mln_projection_mode_default(p0: Int): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_projection_mode_default(p0)")
 
-private fun mln_kw_mln_render_frame_batch_get(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_frame_batch_get(p0, p1, p2)",
-  )
-
 private fun mln_kw_mln_render_frame_batch_release(p0: Long): Unit =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_frame_batch_release(p0)",
@@ -3117,9 +3115,14 @@ private fun mln_kw_mln_render_session_dispose(p0: Long, p1: Int, p2: Int): Int =
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_dispose(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_render_session_drain_frame_results(p0: Long, p1: Int, p2: Int): Int =
+private fun mln_kw_mln_render_session_drain_frame_results(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_drain_frame_results(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_drain_frame_results(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_render_session_dump_debug_logs(p0: Long, p1: Int, p2: Int): Int =

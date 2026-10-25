@@ -1037,13 +1037,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_projection_mode mln_projection_mode_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_frame_batch_get(
-        MlnRenderFrameBatch batch,
-        mln_render_frame_batch_view* out_view,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial void mln_render_frame_batch_release(MlnRenderFrameBatch batch);
 
     [LibraryImport(LibraryName)]
@@ -1095,6 +1088,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_drain_frame_results(
         MlnRenderSession session,
         MlnRenderFrameBatch* out_batch,
+        mln_render_frame_batch_view* out_view,
         mln_diagnostic* out_diagnostic
     );
 

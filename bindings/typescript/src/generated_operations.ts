@@ -50,7 +50,6 @@ import type {
   ProjectionMode,
   RenderAbandonResult,
   RenderBackendFlag,
-  RenderFrameBatchView,
   RenderFrameResult,
   RenderSessionAttachOptions,
   RenderSessionCapabilities,
@@ -3341,56 +3340,6 @@ export class MapProjectionHandle extends Owner {
 defineDisposers(MapProjectionHandle, undefined, "close");
 
 /**
- * An owned batch of frame results from one drain.
- *
- * See `mln_render_frame_batch` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-export class RenderFrameBatchHandle extends Owner {
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "RenderFrameBatchHandle", { registrations });
-  }
-  /**
-   * Calls `close()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `close()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases a frame-result batch.
-   *
-   * See `mln_render_frame_batch_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_render_frame_batch_release(handle, token),
-    );
-  }
-
-  /**
-   * Borrows the result view stored by an owned frame-result batch.
-   *
-   * See `mln_render_frame_batch_get` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  get(): RenderFrameBatchView {
-    return native.mln_render_frame_batch_get(this.id);
-  }
-}
-defineDisposers(RenderFrameBatchHandle, undefined, "close");
-
-/**
  * A render session, which renders one map to one render target.
  *
  * See `mln_render_session` in the
@@ -3529,21 +3478,14 @@ export class RenderSessionHandle extends Owner {
 
   /**
    * Drains every currently queued terminal frame result into an independently
-   * owned batch. The records remain stable until the batch is released.
+   * owned batch and borrows its view. The records remain stable until the batch
+   * is released.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  drainFrameResults(): RenderFrameBatchHandle | undefined {
-    const handle = native.mln_render_session_drain_frame_results(this.id);
-    return handle === undefined
-      ? undefined
-      : adopt(
-          handle,
-          () => new RenderFrameBatchHandle(ADOPT, handle),
-          (disposed) =>
-            native.mln_render_frame_batch_release(disposed, undefined),
-        );
+  drainFrameResults(): readonly RenderFrameResult[] {
+    return native.mln_render_session_drain_frame_results(this.id) ?? [];
   }
 
   /**

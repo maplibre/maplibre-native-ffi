@@ -73,15 +73,21 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_render_frame_batch_view unread = {.size = sizeof(unread)};
-  MLN_TEST_INVALID(
-    mln_render_frame_batch_get(MLN_HANDLE_NULL, &unread, &diagnostic)
-  );
+  // The drain checks its view before it looks for results.
+  mln_render_frame_batch unread = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_render_session_drain_frame_results(
+    fixture.session, &unread, NULL, &diagnostic
+  ));
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
+  mln_render_frame_batch_view small = {.size = sizeof(small) - 1};
+  MLN_TEST_INVALID(mln_render_session_drain_frame_results(
+    fixture.session, &unread, &small, NULL
+  ));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, unread);
   mln_render_frame_batch empty = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY,
-    mln_render_session_drain_frame_results(fixture.session, &empty, &diagnostic)
+    mln_test_drain_frame_results(fixture.session, &empty, &diagnostic)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
@@ -111,20 +117,9 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   const mln_render_frame_result* result = mln_test_render_view_result(&view, 0);
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), result->size);
   TEST_ASSERT_EQUAL_UINT64(201, result->token);
-  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, NULL, NULL));
-  mln_render_frame_batch_view small = {
-    .size = sizeof(small) - 1, .result_count = 99
-  };
-  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, &small, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, small.result_count);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(MLN_HANDLE_NULL);
-  mln_render_frame_batch_view stale = {
-    .size = sizeof(mln_render_frame_batch_view), .result_count = 99
-  };
-  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, &stale, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, stale.result_count);
   detach(runtime, map, &fixture);
 }
 
@@ -173,9 +168,7 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
   );
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture.session, &batch, NULL));
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool reported = false;
   for (size_t index = 0; index < view.result_count; index += 1) {
@@ -258,9 +251,7 @@ static void webgpu_demands_past_the_ring_depth_wait_for_the_gpu(void) {
   // One service runs every queued demand without returning to the event loop.
   MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture.session, &batch, NULL));
   TEST_ASSERT_EQUAL_size_t(
     depth, mln_test_render_batch_view(batch).result_count
   );
@@ -461,9 +452,8 @@ static bool still_completed_under_keepalive(void* context) {
   keepalive_wait* wait = context;
   if (wait->demand_pending) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    const mln_status drained = mln_render_session_drain_frame_results(
-      wait->fixture->session, &batch, NULL
-    );
+    const mln_status drained =
+      mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
     if (drained == MLN_STATUS_NOT_READY) {
       return false;
     }
@@ -544,7 +534,7 @@ static void expect_waiting(const mln_test_render_fixture* fixture) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY,
-    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
+    mln_test_drain_frame_results(fixture->session, &batch, NULL)
   );
 }
 

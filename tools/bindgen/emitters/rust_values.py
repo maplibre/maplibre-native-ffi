@@ -85,6 +85,9 @@ class Values:
 
             add(self, value)
             return self.public(value)
+        if array := self.bound.slices.get(value.native):
+            # A slice record presents only its array.
+            return self.add(array.value, direction)
         if value.kind in {"reference", "array"}:
             self.add(value.element, direction)
         if value.kind == "enum":

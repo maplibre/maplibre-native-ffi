@@ -2090,32 +2090,30 @@ StyleImageOptions _readStyleImageOptions(raw.mln_style_image_options source) =>
           : null,
     );
 
-RenderFrameBatchView _readRenderFrameBatchView(
-  raw.mln_render_frame_batch_view source,
-) => RenderFrameBatchView(
-  results: (() {
-    if (source.result_size < sizeOf<raw.mln_render_frame_result>()) {
-      throwInvalidState('native record stride is too small');
-    }
-    return List<RenderFrameResult>.unmodifiable(
-      List.generate(
-        source.result_count,
-        (index) => _readRenderFrameResult(
-          (source.results.cast<Uint8>() + index * source.result_size)
-              .cast<raw.mln_render_frame_result>()
-              .ref,
-        ),
-      ),
-    );
-  })(),
-);
-
 RenderAbandonResult _readRenderAbandonResult(
   raw.mln_render_abandon_result source,
 ) => RenderAbandonResult(
   disposition: RenderAbandonDisposition.fromRawValue(source.disposition),
   quarantinedResourceCount: source.quarantined_resource_count,
 );
+
+List<RenderFrameResult> _readRenderFrameBatchView(
+  raw.mln_render_frame_batch_view source,
+) => (() {
+  if (source.result_size < sizeOf<raw.mln_render_frame_result>()) {
+    throwInvalidState('native record stride is too small');
+  }
+  return List<RenderFrameResult>.unmodifiable(
+    List.generate(
+      source.result_count,
+      (index) => _readRenderFrameResult(
+        (source.results.cast<Uint8>() + index * source.result_size)
+            .cast<raw.mln_render_frame_result>()
+            .ref,
+      ),
+    ),
+  );
+})();
 
 RenderSessionCapabilities _readRenderSessionCapabilities(
   raw.mln_render_session_capabilities source,
@@ -2666,29 +2664,26 @@ RuntimeEvent _readRuntimeEvent(
   },
 );
 
-EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
-    EventBatchView(
-      events: (() {
-        if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
-          throwInvalidState('native record stride is too small');
-        }
-        return List<RuntimeEvent>.unmodifiable(
-          List.generate(
-            source.event_count,
-            (index) => _readRuntimeEvent(
-              (source.events.cast<Uint8>() + index * source.event_size)
-                  .cast<raw.mln_runtime_event>()
-                  .ref,
-              rawRecord: () =>
-                  (source.events.cast<Uint8>() + index * source.event_size)
-                      .cast<raw.mln_runtime_event>()
-                      .cast<Uint8>()
-                      .asTypedList(source.event_size),
-            ),
-          ),
-        );
-      })(),
-    );
+List<RuntimeEvent> _readEventBatchView(raw.mln_event_batch_view source) => (() {
+  if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
+    throwInvalidState('native record stride is too small');
+  }
+  return List<RuntimeEvent>.unmodifiable(
+    List.generate(
+      source.event_count,
+      (index) => _readRuntimeEvent(
+        (source.events.cast<Uint8>() + index * source.event_size)
+            .cast<raw.mln_runtime_event>()
+            .ref,
+        rawRecord: () =>
+            (source.events.cast<Uint8>() + index * source.event_size)
+                .cast<raw.mln_runtime_event>()
+                .cast<Uint8>()
+                .asTypedList(source.event_size),
+      ),
+    ),
+  );
+})();
 
 void _deliverRuntimeEventCallback(
   RuntimeEventCallback callback,
@@ -6290,55 +6285,6 @@ final class MapProjectionHandle implements Finalizable {
   });
 }
 
-/// Issued `mln_render_frame_batch` handle id.
-extension type const _NativeRenderFrameBatch(int raw) implements NativeHandle {}
-
-/// Owner of one native `mln_render_frame_batch` handle.
-///
-/// An owned batch of frame results from one drain.
-///
-/// See `mln_render_frame_batch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class RenderFrameBatchHandle implements Finalizable {
-  RenderFrameBatchHandle._(_NativeRenderFrameBatch handle)
-    : _state = NativeHandleState(handle, 'RenderFrameBatchHandle');
-  final NativeHandleState<_NativeRenderFrameBatch> _state;
-  _NativeRenderFrameBatch get _handle => _state.handle;
-
-  /// The native handle id.
-  int get id => _state.handleId;
-
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
-  bool get isClosed => _state.isClosed;
-
-  @override
-  String toString() =>
-      'RenderFrameBatchHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
-
-  /// Borrows the result view stored by an owned frame-result batch.
-  ///
-  /// See `mln_render_frame_batch_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  RenderFrameBatchView getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_render_frame_batch_view>();
-    outView.ref.size = sizeOf<raw.mln_render_frame_batch_view>();
-    _check(
-      raw.mln_render_frame_batch_get(_handle.raw, outView, nativeDiagnostic),
-    );
-    return _readRenderFrameBatchView(outView.ref);
-  });
-
-  /// Releases a frame-result batch.
-  ///
-  /// See `mln_render_frame_batch_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void close() => _state.close((handle) {
-    raw.mln_render_frame_batch_release(handle.raw);
-    return nativeStatusOk;
-  });
-}
-
 extension type RenderSessionHandleDiscarding._(RenderSessionHandle _owner) {
   _NativeRenderSession get _handle => _owner._handle;
   void resize(LogicalExtent extent) => _discard(
@@ -6488,29 +6434,29 @@ final class RenderSessionHandle implements Finalizable {
   );
 
   /// Drains every currently queued terminal frame result into an independently
-  /// owned batch. The records remain stable until the batch is released.
+  /// owned batch and borrows its view. The records remain stable until the
+  /// batch is released.
   ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  RenderFrameBatchHandle? drainFrameResults() => withNativeArena((arena) {
+  List<RenderFrameResult> drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
+    final outView = arena<raw.mln_render_frame_batch_view>();
+    outView.ref.size = sizeOf<raw.mln_render_frame_batch_view>();
     if (!_present(
       raw.mln_render_session_drain_frame_results(
         _handle.raw,
         outBatch,
+        outView,
         nativeDiagnostic,
       ),
       raw.MLN_STATUS_NOT_READY,
     )) {
-      return null;
+      return const [];
     }
-    return _adoptOwned(
-      outBatch.value,
-      () => RenderFrameBatchHandle._(_NativeRenderFrameBatch(outBatch.value)),
-      (handle) {
-        raw.mln_render_frame_batch_release(handle);
-      },
-    );
+    return _drain(outBatch.value, (batch) {
+      raw.mln_render_frame_batch_release(batch);
+    }, () => _readRenderFrameBatchView(outView.ref));
   });
 
   /// Starts asynchronous renderer diagnostic-log emission.

@@ -103,9 +103,10 @@ func runtimeEventPayloadWindowSizeForTest() int {
 	return len(C.mln_runtime_event{}.payload)
 }
 
-// decodeEventsForTest lays events out stride bytes apart in C memory, the way a
-// drain returns them, and runs the batch through the drain's copy path. A
-// stride wider than the compiled event is what a later C API version sends.
+// decodeEventsForTest lays events out stride bytes apart in C memory, the way
+// native delivers them, and passes them to an event handler through its
+// trampoline, which copies them. A stride wider than the compiled event is what
+// a later C API version sends.
 func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []RuntimeEvent {
 	stride = max(stride, unsafe.Sizeof(C.mln_runtime_event{}))
 	storage := C.calloc(C.size_t(max(len(events), 1)), C.size_t(stride))
@@ -119,12 +120,17 @@ func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []Runtime
 		}
 		*(*C.mln_runtime_event)(unsafe.Add(storage, uintptr(index)*stride)) = raw
 	}
-	return copyEventBatchView(C.mln_event_batch_view{
+	var decoded []RuntimeEvent
+	arena := &bindingArena{}
+	defer arena.close()
+	handler := arena.register(RuntimeEventHandler{Callback: func(events []RuntimeEvent) { decoded = events }})
+	mlnGo_mln_runtime_event_handler_callback(handler, &C.mln_event_batch_view{
 		size:        C.uint32_t(unsafe.Sizeof(C.mln_event_batch_view{})),
 		event_size:  C.uint32_t(stride),
 		events:      (*C.mln_runtime_event)(storage),
 		event_count: C.size_t(len(events)),
-	}).Events
+	})
+	return decoded
 }
 
 // int32CompletionForTest is a future whose bridge converts one int32 value,

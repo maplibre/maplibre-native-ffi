@@ -162,7 +162,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       return runThenRelease(listOf(runtime)) {
         runtime
           .setEventHandler(
-            RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
+            RuntimeEventHandler { batch -> batch.forEach { events.trySend(it) } },
           )
           .awaitWithin("the event handler")
         runtime.setResourceProvider(provider).awaitWithin("the resource provider")

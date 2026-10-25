@@ -1717,13 +1717,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_get(
-      batch.toULong(),
-      outView.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_render_frame_batch_release(batch: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_release(batch.toULong())
   }
@@ -1787,11 +1780,13 @@ internal actual object C {
   actual fun mln_render_session_drain_frame_results(
     session: Long,
     outBatch: Long,
+    outView: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_drain_frame_results(
       session.toULong(),
       outBatch.toCPointer(),
+      outView.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

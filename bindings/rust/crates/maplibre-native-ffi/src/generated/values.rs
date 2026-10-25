@@ -998,23 +998,6 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     }
 }
 
-/// A borrowed span of runtime events in one delivery.
-///
-/// See `mln_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct EventBatchView {
-    /// Borrowed array of event_count events in queue order.
-    pub events: Vec<RuntimeEvent>,
-}
-impl FromNative<sys::mln_event_batch_view> for EventBatchView {
-    unsafe fn from_native(raw: sys::mln_event_batch_view) -> Result<Self> {
-        Ok(Self {
-            events: unsafe { convert::copy_strided(raw.events, raw.event_count, raw.event_size) }?,
-        })
-    }
-}
-
 /// Feature-state source, feature, and key selector.
 ///
 /// See `mln_feature_state_selector` in the
@@ -3341,26 +3324,6 @@ pub enum RenderDriverKind: u32 {
 } Unknown
 }
 
-/// A borrowed view of one owned frame-result batch.
-///
-/// See `mln_render_frame_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct RenderFrameBatchView {
-    /// Borrowed array of result_count terminal frame results in completion
-    /// order.
-    pub results: Vec<RenderFrameResult>,
-}
-impl FromNative<sys::mln_render_frame_batch_view> for RenderFrameBatchView {
-    unsafe fn from_native(raw: sys::mln_render_frame_batch_view) -> Result<Self> {
-        Ok(Self {
-            results: unsafe {
-                convert::copy_strided(raw.results, raw.result_count, raw.result_size)
-            }?,
-        })
-    }
-}
-
 /// Terminal result of one frame demand, held by an owned frame-result batch and
 /// copied by `mln_acquired_frame_get_result()`.
 ///
@@ -4347,7 +4310,7 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct RuntimeEventHandler {
-    pub callback: Option<std::sync::Arc<dyn Fn(EventBatchView) + Send + Sync + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn(Vec<RuntimeEvent>) + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for RuntimeEventHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4358,14 +4321,14 @@ impl std::fmt::Debug for RuntimeEventHandler {
 impl RuntimeEventHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(EventBatchView) + Send + Sync + 'static,
+        F: Fn(Vec<RuntimeEvent>) + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(EventBatchView) + Send + Sync + 'static,
+        F: Fn(Vec<RuntimeEvent>) + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -4377,7 +4340,11 @@ impl RuntimeEventHandler {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_runtime_event_callback", (), || {
-            callback::require(&state.callback)?(unsafe { convert::copy_reference(events) }?);
+            callback::require(&state.callback)?({
+                let view = unsafe { events.as_ref() }
+                    .ok_or_else(|| Error::invalid_argument("null record value"))?;
+                unsafe { convert::copy_strided(view.events, view.event_count, view.event_size) }?
+            });
             Ok(())
         })
     }

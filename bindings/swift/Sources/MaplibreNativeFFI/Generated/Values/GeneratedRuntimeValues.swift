@@ -51,33 +51,6 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// A borrowed span of runtime events in one delivery.
-///
-/// See `mln_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct EventBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of event_count events in queue order.
-  public var events: [RuntimeEvent]
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(events: [RuntimeEvent] = []) {
-    self.events = events
-  }
-
-  init(
-    raw: mln_event_batch_view,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    events = try NativeInputArena.copyStrided(
-      raw.events,
-      count: raw.event_count,
-      stride: raw.event_size
-    ) { item, bytes in try RuntimeEvent(raw: item, recordBytes: bytes) }
-  }
-}
-
 /// One HTTP header that a header rule supplies.
 ///
 /// See `mln_http_header` in the
@@ -1107,8 +1080,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventHandler: Sendable {
-  public var callback: (@Sendable (EventBatchView) -> Void)?
-  public init(callback: (@Sendable (EventBatchView) -> Void)? = nil) {
+  public var callback: (@Sendable ([RuntimeEvent]) -> Void)?
+  public init(callback: (@Sendable ([RuntimeEvent]) -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -1140,7 +1113,12 @@ private func invokeRuntimeEventHandlerCallback(
   do {
     try box.value
       .callback?(NativeInputArena.copyArray(events, count: 1)
-        .map { try EventBatchView(raw: $0) }[0])
+        .map { try NativeInputArena.copyStrided(
+          $0.events,
+          count: $0.event_count,
+          stride: $0.event_size
+        ) { item, bytes in try RuntimeEvent(raw: item, recordBytes: bytes) }
+        }[0])
   } catch {
     reportToStandardError(
       "mln_runtime_event_callback failed and native received its fallback: \(error)\n"

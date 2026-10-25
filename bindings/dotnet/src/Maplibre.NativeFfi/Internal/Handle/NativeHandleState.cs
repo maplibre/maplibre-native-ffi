@@ -22,18 +22,14 @@ internal sealed unsafe class NativeHandleState<T>
     private readonly string typeName;
     private readonly T handle;
     private readonly object? retainedParent;
-    private readonly bool protectsCopies;
     private bool closed;
-    private int readers;
-    private bool releasing;
 
     internal NativeHandleState(
         T handle,
         StatusDestroy<T> destroy,
         string typeName,
         StatusDestroy<T>? disposeAbandoned = null,
-        object? retainedParent = null,
-        bool protectsCopies = false
+        object? retainedParent = null
     )
     {
         if (handle.Value == 0)
@@ -46,7 +42,6 @@ internal sealed unsafe class NativeHandleState<T>
         this.typeName = typeName;
         this.disposeAbandoned = disposeAbandoned;
         this.retainedParent = retainedParent;
-        this.protectsCopies = protectsCopies;
     }
 
     ~NativeHandleState()
@@ -111,53 +106,17 @@ internal sealed unsafe class NativeHandleState<T>
     public override string ToString() =>
         $"{typeName}(id=0x{handle.Value:x}, closed={(IsClosed ? "true" : "false")})";
 
-    // Only a batch getter copies pointers after its native lease has ended.
-    internal ReadScope Read(object owner)
-    {
-        if (protectsCopies)
-        {
-            lock (gate)
-            {
-                if (releasing)
-                    throw InUse();
-                readers++;
-            }
-        }
-        return new(this, owner);
-    }
-
-    internal readonly ref struct ReadScope(NativeHandleState<T> state, object owner)
-    {
-        internal T Handle => state.handle;
-
-        public void Dispose()
-        {
-            if (state.protectsCopies)
-            {
-                lock (state.gate)
-                    state.readers--;
-            }
-            GC.KeepAlive(owner);
-        }
-    }
-
     internal bool Close(bool idempotent = true) => Release(destroy, idempotent);
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);
-
-    private static MaplibreException InUse() =>
-        new(global::Maplibre.NativeFfi.Status.InvalidState, "Batch is in use");
 
     // Returns whether this call ended the handle, rather than finding it closed.
     internal bool Release(StatusDestroy<T> release, bool idempotent = true)
     {
         lock (gate)
         {
-            if (protectsCopies && (readers != 0 || releasing))
-                throw InUse();
             if (idempotent && closed)
                 return false;
-            releasing = protectsCopies;
         }
         try
         {
@@ -170,8 +129,6 @@ internal sealed unsafe class NativeHandleState<T>
         }
         finally
         {
-            lock (gate)
-                releasing = false;
             GC.KeepAlive(retainedParent);
         }
     }

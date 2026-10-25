@@ -333,6 +333,19 @@ class DeliverySupport:
 
 
 @dataclass(frozen=True)
+class DrainPlan:
+    """A drain that publishes an owned batch and a borrowed slice view of it.
+
+    A binding copies the slice, releases the batch, and returns the slice, which
+    is empty when the drain reports nothing queued.
+    """
+
+    batch: ParameterPlan
+    view: ParameterPlan
+    slice: FieldPlan
+
+
+@dataclass(frozen=True)
 class AbsencePlan:
     """A failure status that reports the operation's one output as absent.
 
@@ -372,6 +385,8 @@ class OperationPlan:
     status: bool = False
     # The public name; see Binder.member.
     member: str = ""
+    # A drain's batch and slice view, which bindings present as the slice.
+    drain: DrainPlan | None = None
     # The `absent_on=` status, its value, and the output that it reports absent.
     absence: AbsencePlan | None = None
     # What an immediate call waits for before it returns, such as a native
@@ -413,6 +428,23 @@ class BoundApi:
     @functools.cached_property
     def inputs(self) -> set[str]:
         return record_reaches(self.source)[1]
+
+    @functools.cached_property
+    def slices(self) -> dict[str, FieldPlan]:
+        """The array field of each `kind=slice` record. A binding presents the
+        array in place of the record, as a drain's result or a callback's
+        argument."""
+        return {
+            record.name: next(
+                field
+                for field in self.values[record.name].fields
+                if field.value.kind == "array"
+            )
+            for typedef in self.source.typedefs
+            if typedef.metadata.get("kind") == "slice"
+            for record in (self.source.records_by_name.get(typedef.name),)
+            if record is not None and record.name in self.values
+        }
 
     @functools.cached_property
     def enum_numbers(self) -> dict[str, int]:
@@ -468,10 +500,13 @@ class BoundApi:
 
     @property
     def public_values(self) -> dict[str, ValuePlan]:
+        # A slice record reaches host code as its slice alone.
         return {
             name: value
             for name, value in self.values.items()
-            if name not in self.source.runtime_types and name not in self.control_enums
+            if name not in self.source.runtime_types
+            and name not in self.control_enums
+            and name not in self.slices
         }
 
     @property
@@ -1233,6 +1268,26 @@ class Binder:
                 ),
                 outputs[0],
             )
+        drain = None
+        if absence and len(outputs) == 2:
+            # A drain publishes its owned batch with a slice view of it.
+            def slice_record(parameter):
+                value = parameter.value
+                value = value.element if value.kind == "reference" else value
+                typedef = self.typedefs.get(value.native) if value else None
+                is_slice = (
+                    typedef is not None and typedef.metadata.get("kind") == "slice"
+                )
+                return value if is_slice else None
+
+            (slice_view,) = [o for o in outputs if slice_record(o)]
+            (batch,) = [o for o in outputs if not slice_record(o)]
+            record = slice_record(slice_view)
+            drain = DrainPlan(
+                batch,
+                slice_view,
+                next(f for f in record.fields if f.value.kind == "array"),
+            )
         # A runtime export's caller reads its outputs itself, so only a
         # generated operation and a default copy what native writes.
         if (
@@ -1262,8 +1317,9 @@ class Binder:
             scoped_receiver,
             is_status(function.return_type),
             member,
-            absence,
-            metadata.get("blocks"),
+            drain=drain,
+            absence=absence,
+            blocks=metadata.get("blocks"),
         )
 
     def copied(
@@ -1439,25 +1495,39 @@ class Binder:
                 diagnostics.extend(error.diagnostics)
         if require_complete and diagnostics:
             raise ModelError(diagnostics)
+        # A drain releases the batch it publishes itself, so the batch handle
+        # and its release stay internal.
+        batches = {
+            (value.element if value.kind == "reference" else value).native
+            for operation in operations
+            if operation.drain
+            for value in (operation.drain.batch.value,)
+        }
+        drained = {
+            self.handles[native].release for native in batches if native in self.handles
+        }
+
+        def internal(operation):
+            return (
+                operation.name in self.api.runtime_exports
+                or operation.name in drained
+                or isinstance(operation.support, DeliverySupport)
+            )
+
         return BoundApi(
             self.api,
             tuple(
                 operation
                 for operation in operations
-                if operation.name not in self.api.runtime_exports
-                and not isinstance(operation.support, (ViewSupport, DeliverySupport))
+                if not internal(operation)
+                and not isinstance(operation.support, ViewSupport)
             ),
             self.values,
             self.callbacks,
             self.handles,
             tuple(sorted(set(diagnostics))),
             unsupported,
-            tuple(
-                operation
-                for operation in operations
-                if operation.name in self.api.runtime_exports
-                or isinstance(operation.support, DeliverySupport)
-            ),
+            tuple(operation for operation in operations if internal(operation)),
             frozenset(self.returned),
         )
 

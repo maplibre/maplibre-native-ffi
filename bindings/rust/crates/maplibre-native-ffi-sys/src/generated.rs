@@ -2473,11 +2473,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_projection_mode_default() -> mln_projection_mode;
-    pub fn mln_render_frame_batch_get(
-        batch: mln_render_frame_batch,
-        out_view: *mut mln_render_frame_batch_view,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_frame_batch_release(batch: mln_render_frame_batch);
     pub fn mln_render_session_abandon(
         session: mln_render_session,
@@ -2513,6 +2508,7 @@ unsafe extern "C" {
     pub fn mln_render_session_drain_frame_results(
         session: mln_render_session,
         out_batch: *mut mln_render_frame_batch,
+        out_view: *mut mln_render_frame_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_dump_debug_logs(

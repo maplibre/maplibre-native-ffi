@@ -80,7 +80,7 @@ class CompletionTest {
       val events = Channel<RuntimeEventType>(Channel.UNLIMITED)
       runtime
         .setEventHandler(
-          RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it.type) } },
+          RuntimeEventHandler { batch -> batch.forEach { events.trySend(it.type) } },
         )
         .await()
       val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()

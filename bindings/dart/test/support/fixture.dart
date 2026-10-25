@@ -126,7 +126,7 @@ Future<RuntimeFixture> openRuntime({
   await runtime.setEventHandler(
     RuntimeEventHandler(
       callback: (batch) {
-        pending.addAll(batch.events);
+        pending.addAll(batch);
         events.notify();
       },
     ),

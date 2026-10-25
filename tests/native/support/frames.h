@@ -45,7 +45,16 @@ void mln_test_render_wait_for_result_list(
   mln_render_frame_result* out
 );
 
-// Reads the borrowed view of `batch`, which stays valid until its release.
+// Drains frame results as mln_render_session_drain_frame_results() does, and
+// records the drained batch's view for mln_test_render_batch_view().
+mln_status mln_test_drain_frame_results(
+  mln_render_session session, mln_render_frame_batch* out_batch,
+  mln_diagnostic* out_diagnostic
+);
+
+// The borrowed view that the drain of `batch` returned, which stays valid
+// until the batch's release. `batch` must come from
+// mln_test_drain_frame_results().
 mln_render_frame_batch_view mln_test_render_batch_view(
   mln_render_frame_batch batch
 );

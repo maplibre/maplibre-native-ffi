@@ -30,22 +30,20 @@ void wake_frames(void* user_data) {
 static void drain_frame_results(mln_render_session session, bool* pending) {
   // #region results
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  if (
-    mln_render_session_drain_frame_results(session, &batch, NULL) !=
-    MLN_STATUS_OK
-  )
-    return;
   mln_render_frame_batch_view view = {
     .size = sizeof(mln_render_frame_batch_view)
   };
-  if (mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
-    for (size_t index = 0; index < view.result_count; index++) {
-      const char* bytes = (const char*)view.results + index * view.result_size;
-      const mln_render_frame_result* result =
-        (const mln_render_frame_result*)bytes;
-      (void)result;
-      *pending = true;
-    }
+  if (
+    mln_render_session_drain_frame_results(session, &batch, &view, NULL) !=
+    MLN_STATUS_OK
+  )
+    return;
+  for (size_t index = 0; index < view.result_count; index++) {
+    const char* bytes = (const char*)view.results + index * view.result_size;
+    const mln_render_frame_result* result =
+      (const mln_render_frame_result*)bytes;
+    (void)result;
+    *pending = true;
   }
   mln_render_frame_batch_release(batch);
   // #endregion results

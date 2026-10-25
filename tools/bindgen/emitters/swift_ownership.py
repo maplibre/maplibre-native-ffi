@@ -73,21 +73,16 @@ def consumed(plan, owner, values):
     )
     # The closure's parameters select the overload: a status-returning close
     # takes the diagnostic, so its status is always checked. A void release
-    # can't fail, so its close throws only when a batch refuses it.
+    # can't fail, so its close doesn't throw.
     call = native_call(function, *disposer_arguments(handle, function, "raw"))
-    if infallible_close(handle, function):
+    if function.return_type.kind == "void":
         synchronous = f"""{documented}func {method}() {{
   nativeClose {{ raw in {call} }}
 }}
 """
-    elif function.return_type.kind != "void":
-        synchronous = f"""{documented}func {method}() throws {{
-  try nativeClose {{ raw, diagnostic in {call} }}
-}}
-"""
     else:
         synchronous = f"""{documented}func {method}() throws {{
-  try nativeGuardedClose {{ raw in {call} }}
+  try nativeClose {{ raw, diagnostic in {call} }}
 }}
 """
     if plan.completion:
@@ -118,16 +113,6 @@ def disposer_arguments(handle, function, raw):
     return [raw]
 
 
-def protects_copies(handle):
-    """Whether the handle lends memory that its getters copy after they return."""
-    return handle.native == "mln_render_frame_batch"
-
-
-def infallible_close(handle, function):
-    """Whether `function`, a release of `handle`, closes it without a throw."""
-    return function.return_type.kind == "void" and not protects_copies(handle)
-
-
 def owner_name(handle):
     """The public owner class of a handle plan."""
     from .swift import name
@@ -144,8 +129,11 @@ def public_handles(bound):
 
     used = set()
     for operation in bound.operations:
+        # A drain releases its batch itself.
+        drained = operation.drain.batch.name if operation.drain else None
         for parameter in (*operation.inputs, *operation.outputs):
-            used.update(handles(parameter.value))
+            if parameter.name != drained:
+                used.update(handles(parameter.value))
         if operation.result:
             used.update(handles(operation.result))
     return [bound.handles[native] for native in sorted(used)]
@@ -177,8 +165,6 @@ def owner_declarations(bound):
             else ""
         )
         passed = ", parent: parent" if handle.parent else ""
-        if protects_copies(handle):
-            passed += ", protectsCopies: true"
         from .swift import doc
 
         id_doc = (

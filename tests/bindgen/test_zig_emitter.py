@@ -11,6 +11,7 @@ from support import (
     parse,
     parse_sources,
     protocol_header,
+    real_api,
     require_tool,
 )
 
@@ -20,7 +21,59 @@ from tools.bindgen.schema import validate
 BINDING = ROOT / "bindings/zig"
 
 
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
+
+
 class ZigEmitterTests(unittest.TestCase):
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        validate(api)
+        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        # call.drain copies the view's strided readings and releases the batch.
+        self.assertIn(
+            "pub fn drainReadings(allocator: std.mem.Allocator, diagnostic: "
+            "?*diagnostics.Diagnostic) status.Error!OwnedValue([]const Reading) {\n"
+            '    return call.drain("mln_drain_readings", .none, {}, Reading, '
+            '"readings", "reading_count", "reading_size", '
+            "c.mln_reading_batch_release, allocator, diagnostic, "
+            "c.MLN_STATUS_NOT_READY);",
+            source,
+        )
+        # Neither the batch nor its view is public.
+        self.assertNotIn("pub const ReadingBatch ", source)
+        self.assertNotIn("ReadingView", source)
+
+    def test_a_callback_receives_its_slice_argument_as_a_slice(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        self.assertIn(
+            "?*const fn (?*anyopaque, []const RuntimeEvent) anyerror!void",
+            source,
+        )
+        self.assertNotIn("EventBatchView", source)
+
     def test_a_dispose_with_a_completion_releases_and_disposes(self):
         api = parse(
             """

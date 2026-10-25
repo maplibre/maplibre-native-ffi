@@ -682,7 +682,8 @@ mln_status mln_probe_read_level(
 
 // Plain records that native steps through by a stride it reports, which may
 // exceed the record a binding compiled. The stride versions each record, so a
-// record carries no size of its own.
+// record carries no size of its own. A drain publishes them in an owned batch
+// with a slice view of it, as the render session's frame-result drain does.
 #ifdef MLN_PROTOCOL_STRIDED_RECORDS
 typedef struct mln_probe_reading {
   uint64_t value;
@@ -693,18 +694,25 @@ typedef struct mln_probe_reading_view {
   const mln_probe_reading* readings
     BIND("length=reading_count;stride=reading_size");
   size_t reading_count;
-} mln_probe_reading_view;
+} mln_probe_reading_view BIND("kind=slice");
 typedef unsigned long long mln_probe_ledger BIND(
   "kind=handle;release=mln_probe_ledger_release;dispose=mln_probe_ledger_"
   "release"
 );
+typedef unsigned long long mln_probe_reading_batch BIND(
+  "kind=handle;release=mln_probe_reading_batch_release;"
+  "dispose=mln_probe_reading_batch_release"
+);
 void mln_probe_ledger_release(mln_probe_ledger ledger);
+void mln_probe_reading_batch_release(mln_probe_reading_batch batch);
 mln_status mln_probe_ledger_open(
   mln_probe_ledger* out_ledger BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-mln_status mln_probe_ledger_get(
+BIND("execution=event_batch")
+mln_status mln_probe_ledger_drain(
   mln_probe_ledger ledger,
+  mln_probe_reading_batch* out_batch BIND("direction=out"),
   mln_probe_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );

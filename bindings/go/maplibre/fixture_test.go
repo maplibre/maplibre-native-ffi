@@ -134,8 +134,8 @@ func newRuntimeFixture(t *testing.T) *fixture {
 	}
 	f.runtime = runtime
 	// A handler accepted before CreateMap receives the map's first events.
-	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
-		for _, event := range batch.Events {
+	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(events []RuntimeEvent) {
+		for _, event := range events {
 			f.pendingEvents <- event
 		}
 	}}); err != nil {

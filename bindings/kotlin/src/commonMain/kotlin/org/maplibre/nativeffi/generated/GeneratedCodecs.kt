@@ -1632,24 +1632,21 @@ internal fun readLatLngBounds(source: Long): LatLngBounds =
 internal fun readScreenPoint(source: Long): ScreenPoint =
   ScreenPoint(x = readF64(source), y = readF64(source + 8))
 
-internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
-  RenderFrameBatchView(
-    results =
-      readStrided(
-        readAddress(source + 8),
-        readSize(source + w(12, 16)),
-        readU32(source + 4).toULong(),
-        280,
-      ) { item ->
-        readRenderFrameResult(item)
-      },
-  )
-
 internal fun readRenderAbandonResult(source: Long): RenderAbandonResult =
   RenderAbandonResult(
     disposition = RenderAbandonDisposition(readU32(source + 4)),
     quarantinedResourceCount = readU32(source + 8),
   )
+
+internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
+  readStrided(
+    readAddress(source + 8),
+    readSize(source + w(12, 16)),
+    readU32(source + 4).toULong(),
+    280,
+  ) { item ->
+    readRenderFrameResult(item)
+  }
 
 internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilities =
   RenderSessionCapabilities(
@@ -1990,18 +1987,15 @@ internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
-internal fun readEventBatchView(source: Long): EventBatchView =
-  EventBatchView(
-    events =
-      readStrided(
-        readAddress(source + 8),
-        readSize(source + w(12, 16)),
-        readU32(source + 4).toULong(),
-        w(112, 120),
-      ) { item ->
-        readRuntimeEvent(item)
-      },
-  )
+internal fun readEventBatchView(source: Long): List<RuntimeEvent> =
+  readStrided(
+    readAddress(source + 8),
+    readSize(source + w(12, 16)),
+    readU32(source + 4).toULong(),
+    w(112, 120),
+  ) { item ->
+    readRuntimeEvent(item)
+  }
 
 internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)

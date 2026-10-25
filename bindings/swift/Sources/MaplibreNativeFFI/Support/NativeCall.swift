@@ -144,15 +144,7 @@ extension NativeReceiver {
   func nativeClose(
     _ call: @escaping (UInt64) -> Void
   ) {
-    handle.closeUnguarded { live in call(live.raw) }
-  }
-
-  /// Closes a batch whose release can't fail, but which refuses to close
-  /// while a copy reads it.
-  func nativeGuardedClose(
-    _ call: @escaping (UInt64) -> Void
-  ) throws {
-    try handle.closeOnce { live in call(live.raw) }
+    handle.closeInfallibly { live in call(live.raw) }
   }
 
   func nativeStartClose(

@@ -187,29 +187,3 @@ private final class StandardErrorCapture: @unchecked Sendable {
     FileHandle.standardError.write(captured.value)
   }
 }
-
-/// Borrowed copies share the batch, and release fails until the last copy ends.
-@Test func borrowedCopiesAllowReadersAndRefuseConcurrentRelease() throws {
-  let handle = try NativeHandleState(
-    typeName: "test batch", handle: RecordedHandle(raw: 1), protectsCopies: true
-  )
-  let entered = DispatchSemaphore(value: 0)
-  let leave = DispatchSemaphore(value: 0)
-  let done = DispatchSemaphore(value: 0)
-  DispatchQueue.global().async {
-    defer { done.signal() }
-    do {
-      try handle.withHandle { _ in
-        entered.signal()
-        #expect(leave.wait(timeout: TestTimeout.deadline()) == .success)
-      }
-    } catch { Issue.record("reading the batch failed: \(error)") }
-  }
-  #expect(entered.wait(timeout: TestTimeout.deadline()) == .success)
-  defer { leave.signal() }
-  #expect(throws: MaplibreError.self) { try handle.closeOnce { _ in } }
-  try handle.withHandle { #expect($0.raw == 1) }
-  leave.signal()
-  #expect(done.wait(timeout: TestTimeout.deadline()) == .success)
-  try handle.closeOnce { _ in }
-}

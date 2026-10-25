@@ -17,9 +17,13 @@ public sealed unsafe class RuntimeEventTests
             events = &record,
             event_count = 1,
         };
-        Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyEventBatchView(batch));
+        Assert.Throws<InvalidOperationException>(() =>
+            GeneratedValues.CopyEventBatchViewEvents(batch)
+        );
         batch.event_size++;
-        Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyEventBatchView(batch));
+        Assert.Throws<InvalidOperationException>(() =>
+            GeneratedValues.CopyEventBatchViewEvents(batch)
+        );
     }
 
     private static int OffsetOf(string fieldName) =>

@@ -4482,23 +4482,6 @@ final class StyleImageOptions extends _Value {
   ]);
 }
 
-/// A borrowed view of one owned frame-result batch.
-///
-/// See `mln_render_frame_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-final class RenderFrameBatchView extends _Value {
-  RenderFrameBatchView({required List<RenderFrameResult> results})
-    : results = List.unmodifiable(results);
-
-  /// Borrowed array of result_count terminal frame results in completion order.
-  final List<RenderFrameResult> results;
-
-  @override
-  List<Object?> get _members => [results];
-  @override
-  String toString() => _describe('RenderFrameBatchView', const ['results']);
-}
-
 final class RenderAbandonResult extends _Value {
   const RenderAbandonResult({
     this.disposition = const RenderAbandonDisposition.fromRawValue(0),
@@ -5591,28 +5574,11 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
   final Uint8List rawRecord;
 }
 
-/// A borrowed span of runtime events in one delivery.
-///
-/// See `mln_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class EventBatchView extends _Value {
-  EventBatchView({required List<RuntimeEvent> events})
-    : events = List.unmodifiable(events);
-
-  /// Borrowed array of event_count events in queue order.
-  final List<RuntimeEvent> events;
-
-  @override
-  List<Object?> get _members => [events];
-  @override
-  String toString() => _describe('EventBatchView', const ['events']);
-}
-
 /// Receives selected events after their snapshots have been published.
 ///
 /// See `mln_runtime_event_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-typedef RuntimeEventCallback = void Function(EventBatchView);
+typedef RuntimeEventCallback = void Function(List<RuntimeEvent>);
 
 /// Runtime and map event delivery. Set either callback or queue.
 ///

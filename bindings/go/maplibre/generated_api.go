@@ -2171,30 +2171,6 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	return raw
 }
 
-// EventBatchView corresponds to mln_event_batch_view. A borrowed span of
-// runtime events in one delivery.
-//
-// See mln_event_batch_view in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type EventBatchView struct {
-	// Borrowed array of event_count events in queue order.
-	Events []RuntimeEvent
-}
-
-func copyEventBatchView(raw C.mln_event_batch_view) EventBatchView {
-	var result EventBatchView
-	result.Events = func() []RuntimeEvent {
-		length := bindingLength(uint64(raw.event_count))
-		result := make([]RuntimeEvent, length)
-		for i := range result {
-			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
-			result[i] = copyRuntimeEvent(item)
-		}
-		return result
-	}()
-	return result
-}
-
 // FeatureStateSelector corresponds to mln_feature_state_selector. Feature-state
 // source, feature, and key selector.
 //
@@ -3718,30 +3694,6 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 	return result
 }
 
-// RenderFrameBatchView corresponds to mln_render_frame_batch_view. A borrowed
-// view of one owned frame-result batch.
-//
-// See mln_render_frame_batch_view in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-type RenderFrameBatchView struct {
-	// Borrowed array of result_count terminal frame results in completion order.
-	Results []RenderFrameResult
-}
-
-func copyRenderFrameBatchView(raw C.mln_render_frame_batch_view) RenderFrameBatchView {
-	var result RenderFrameBatchView
-	result.Results = func() []RenderFrameResult {
-		length := bindingLength(uint64(raw.result_count))
-		result := make([]RenderFrameResult, length)
-		for i := range result {
-			item := *(*C.mln_render_frame_result)(bindingElement(unsafe.Pointer(raw.results), i, uint64(raw.result_size), unsafe.Sizeof(*raw.results), unsafe.Alignof(*raw.results)))
-			result[i] = copyRenderFrameResult(item)
-		}
-		return result
-	}()
-	return result
-}
-
 // RenderFrameResult corresponds to mln_render_frame_result. Terminal result of
 // one frame demand, held by an owned frame-result batch and copied by
 // mln_acquired_frame_get_result().
@@ -4318,7 +4270,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 //
 // See mln_runtime_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventHandler struct{ Callback func(EventBatchView) }
+type RuntimeEventHandler struct{ Callback func([]RuntimeEvent) }
 
 func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C.mln_runtime_event_handler {
 	raw := C.mln_runtime_event_handler{}
@@ -5900,7 +5852,7 @@ func (view VulkanTextureFrameView) Layout() (uint32, error) {
 type AcquiredFrameHandle struct{ *bindingOwner }
 
 func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
-	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", false, func(raw uint64) { C.mln_acquired_frame_discard(C.mln_acquired_frame(raw), nil) })}
+	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", func(raw uint64) { C.mln_acquired_frame_discard(C.mln_acquired_frame(raw), nil) })}
 	return owner
 }
 
@@ -5933,7 +5885,7 @@ func (handle *AcquiredFrameHandle) String() string {
 type GeojsonSourceDataHandle struct{ *bindingOwner }
 
 func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
-	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", false, func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
+	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
@@ -5966,7 +5918,7 @@ func (handle *GeojsonSourceDataHandle) String() string {
 type MapHandle struct{ *bindingOwner }
 
 func adoptMapHandle(raw uint64, parent any) *MapHandle {
-	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", false, func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
+	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
 	return owner
 }
 
@@ -5998,7 +5950,7 @@ func (handle *MapHandle) String() string { return bindingDescribe("MapHandle", h
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
-	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", false, func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw)) })}
+	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw)) })}
 	return owner
 }
 
@@ -6023,39 +5975,6 @@ func (handle *MapProjectionHandle) String() string {
 	return bindingDescribe("MapProjectionHandle", handle.owner())
 }
 
-// RenderFrameBatchHandle corresponds to mln_render_frame_batch. An owned batch
-// of frame results from one drain.
-//
-// See mln_render_frame_batch in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type RenderFrameBatchHandle struct{ *bindingOwner }
-
-func adoptRenderFrameBatchHandle(raw uint64, parent any) *RenderFrameBatchHandle {
-	owner := &RenderFrameBatchHandle{bindingAdopt(raw, parent, "RenderFrameBatchHandle", true, func(raw uint64) { C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// Id returns the native handle value. It stays readable after the handle
-// closes.
-func (handle *RenderFrameBatchHandle) Id() uint64 { return handle.owner().id() }
-
-// IsClosed reports whether the binding has accepted a release, dispose, or
-// discard of the handle. A nil handle is closed.
-func (handle *RenderFrameBatchHandle) IsClosed() bool { return handle.owner().isClosed() }
-
-// String formats the handle as RenderFrameBatchHandle(id=0x<hex>, closed=<true|false>).
-func (handle *RenderFrameBatchHandle) String() string {
-	return bindingDescribe("RenderFrameBatchHandle", handle.owner())
-}
-
 // RenderSessionHandle corresponds to mln_render_session. A render session,
 // which renders one map to one render target.
 //
@@ -6064,7 +5983,7 @@ func (handle *RenderFrameBatchHandle) String() string {
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
-	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", false, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil, nil) })}
+	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil, nil) })}
 	return owner
 }
 
@@ -6097,7 +6016,7 @@ func (handle *RenderSessionHandle) String() string {
 type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
-	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", false, func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request(raw)) })}
+	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request(raw)) })}
 	return owner
 }
 
@@ -6130,7 +6049,7 @@ func (handle *ResourceRequestHandle) String() string {
 type ResourceTransformRequestHandle struct{ *bindingOwner }
 
 func adoptResourceTransformRequestHandle(raw uint64, parent any) *ResourceTransformRequestHandle {
-	owner := &ResourceTransformRequestHandle{bindingAdopt(raw, parent, "ResourceTransformRequestHandle", false, func(raw uint64) { C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw)) })}
+	owner := &ResourceTransformRequestHandle{bindingAdopt(raw, parent, "ResourceTransformRequestHandle", func(raw uint64) { C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw)) })}
 	return owner
 }
 
@@ -6163,7 +6082,7 @@ func (handle *ResourceTransformRequestHandle) String() string {
 type RuntimeHandle struct{ *bindingOwner }
 
 func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
-	owner := &RuntimeHandle{bindingAdopt(raw, parent, "RuntimeHandle", false, func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
+	owner := &RuntimeHandle{bindingAdopt(raw, parent, "RuntimeHandle", func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
 	return owner
 }
 
@@ -6195,7 +6114,7 @@ func (handle *RuntimeHandle) String() string { return bindingDescribe("RuntimeHa
 type StyleExpressionHandle struct{ *bindingOwner }
 
 func adoptStyleExpressionHandle(raw uint64, parent any) *StyleExpressionHandle {
-	owner := &StyleExpressionHandle{bindingAdopt(raw, parent, "StyleExpressionHandle", false, func(raw uint64) { C.mln_style_expression_release(C.mln_style_expression(raw)) })}
+	owner := &StyleExpressionHandle{bindingAdopt(raw, parent, "StyleExpressionHandle", func(raw uint64) { C.mln_style_expression_release(C.mln_style_expression(raw)) })}
 	return owner
 }
 
@@ -7579,32 +7498,6 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 	})
 }
 
-// Get borrows the result view stored by an owned frame-result batch.
-//
-// See mln_render_frame_batch_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Get() (RenderFrameBatchView, error) {
-	var outView C.mln_render_frame_batch_view
-	outView.size = C.uint32_t(unsafe.Sizeof(outView))
-	return bindingGet(bindingRead(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) RenderFrameBatchView {
-		return copyRenderFrameBatchView(outView)
-	})
-}
-
-// Close releases a frame-result batch.
-//
-// See mln_render_frame_batch_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw))
-		return struct{}{}
-	})
-	return err
-}
-
 // Abandon irreversibly ends session work and destroys the session's graphics
 // objects where that is safe.
 //
@@ -7681,18 +7574,28 @@ func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
 }
 
 // DrainFrameResults drains every currently queued terminal frame result into an
-// independently owned batch. The records remain stable until the batch is
-// released.
+// independently owned batch and borrows its view. The records remain stable
+// until the batch is released.
 //
 // See mln_render_session_drain_frame_results in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandle, error) {
+func (receiver *RenderSessionHandle) DrainFrameResults() ([]RenderFrameResult, error) {
 	var outBatch C.mln_render_frame_batch
+	var outView C.mln_render_frame_batch_view
+	outView.size = C.uint32_t(unsafe.Sizeof(outView))
 	return bindingGetUnless(bindingOwned(receiver.owner()), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, diagnostic))
-	}, func(arena *bindingArena) *RenderFrameBatchHandle {
-		adopted := adoptRenderFrameBatchHandle(uint64(outBatch), nil)
-		return adopted
+		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, &outView, diagnostic))
+	}, func(arena *bindingArena) []RenderFrameResult {
+		defer C.mln_render_frame_batch_release(outBatch)
+		return func() []RenderFrameResult {
+			length := bindingLength(uint64(outView.result_count))
+			result := make([]RenderFrameResult, length)
+			for i := range result {
+				item := *(*C.mln_render_frame_result)(bindingElement(unsafe.Pointer(outView.results), i, uint64(outView.result_size), unsafe.Sizeof(*outView.results), unsafe.Alignof(*outView.results)))
+				result[i] = copyRenderFrameResult(item)
+			}
+			return result
+		}()
 	})
 }
 
@@ -8933,7 +8836,15 @@ func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, n
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	callbacks.Callback(copyEventBatchView((*native_events)))
+	callbacks.Callback(func() []RuntimeEvent {
+		length := bindingLength(uint64((*native_events).event_count))
+		result := make([]RuntimeEvent, length)
+		for i := range result {
+			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer((*native_events).events), i, uint64((*native_events).event_size), unsafe.Sizeof(*(*native_events).events), unsafe.Alignof(*(*native_events).events)))
+			result[i] = copyRuntimeEvent(item)
+		}
+		return result
+	}())
 	return
 }
 

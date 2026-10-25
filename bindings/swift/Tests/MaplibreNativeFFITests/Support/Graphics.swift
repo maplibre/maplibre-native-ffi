@@ -172,12 +172,6 @@ struct FixtureError: Error, CustomStringConvertible {
 let pulsingFrameWake = Wake(callback: { Pulse.shared.signal() })
 
 extension RenderSessionHandle {
-  func drainFrameCopies() throws -> [RenderFrameResult] {
-    guard let batch = try drainFrameResults() else { return [] }
-    defer { try? batch.close() }
-    return try batch.get().results
-  }
-
   /// Demands frames until one renders, and returns its result. Each demand
   /// forces a frame, and a demand whose frame does not render, such as one
   /// before the style loads, is followed by another.
@@ -197,7 +191,7 @@ extension RenderSessionHandle {
         try requestFrame(demand: FrameDemand(flags: [], token: token))
         pending = token
       }
-      for result in try drainFrameCopies() where result.token == pending {
+      for result in try drainFrameResults() where result.token == pending {
         guard result.disposition == .rendered else {
           pending = nil
           continue

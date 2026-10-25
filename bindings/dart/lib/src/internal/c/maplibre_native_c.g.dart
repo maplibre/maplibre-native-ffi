@@ -4009,19 +4009,6 @@ external int mln_projected_meters_for_lat_lng(
 @Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
 
-@Native<
-  Int32 Function(
-    mln_render_frame_batch,
-    Pointer<mln_render_frame_batch_view>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_frame_batch_get(
-  int batch,
-  Pointer<mln_render_frame_batch_view> out_view,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Void Function(mln_render_frame_batch)>()
 external void mln_render_frame_batch_release(int batch);
 
@@ -4111,12 +4098,14 @@ external int mln_render_session_dispose(
   Int32 Function(
     mln_render_session,
     Pointer<mln_render_frame_batch>,
+    Pointer<mln_render_frame_batch_view>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_drain_frame_results(
   int session,
   Pointer<mln_render_frame_batch> out_batch,
+  Pointer<mln_render_frame_batch_view> out_view,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

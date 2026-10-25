@@ -38,6 +38,31 @@ mln_status mln_lease_dispose(
 );
 """
 
+# A drain that publishes an owned batch of strided readings with a slice view
+# of it, as the render session's frame-result drain does.
+SLICE_DRAIN = """
+typedef struct mln_reading {
+  double value;
+} mln_reading;
+typedef struct mln_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_reading_view BIND("kind=slice");
+typedef unsigned long long mln_reading_batch BIND(
+  "kind=handle;release=mln_reading_batch_release;"
+  "dispose=mln_reading_batch_release"
+);
+void mln_reading_batch_release(mln_reading_batch batch);
+BIND("execution=event_batch")
+mln_status mln_drain_readings(
+  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+"""
+
 # One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
 # every other target is LP64.
 TARGETS = {32: "armv7a-linux-androideabi24", 64: "aarch64-linux-android24"}
@@ -246,6 +271,42 @@ class KotlinLayoutTests(unittest.TestCase):
         )
         self.assertIn("public override val isClosed: Boolean", owner)
         self.assertIn("public override fun close() { dispose() }", owner)
+
+    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
+        outputs = kotlin.generate(
+            parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        )
+        api = outputs[f"{GENERATED}/GeneratedApi.kt"]
+        # The drain copies the slice, then releases the batch even if the copy
+        # throws, and nothing queued reads as an empty list.
+        self.assertIn("public fun drainReadings(): List<Reading> =", api)
+        self.assertIn(
+            "if (present(C.mln_drain_readings(batch, out, diagnostic), absent = -9)) "
+            "drain(batch, { C.mln_reading_batch_release(it) }) "
+            "{ readReadingView(out) } else emptyList()",
+            api,
+        )
+        codecs = outputs[f"{GENERATED}/GeneratedCodecs.kt"]
+        self.assertIn(
+            "internal fun readReadingView(source: Long): List<Reading> = readStrided(",
+            codecs,
+        )
+        # Neither the batch nor its view is public.
+        values = outputs[f"{GENERATED}/GeneratedValues.kt"]
+        self.assertNotIn("class ReadingView", values)
+        self.assertFalse(any("ReadingBatch" in path for path in outputs))
+
+    def test_a_callback_receives_its_slice_argument_as_a_list(self):
+        outputs = kotlin.generate(real_api())
+        values = outputs[f"{GENERATED}/GeneratedValues.kt"]
+        self.assertIn("public operator fun invoke(events: List<RuntimeEvent>)", values)
+        self.assertNotIn("EventBatchView", values)
+        self.assertIn(
+            "invoke(readEventBatchView(events))",
+            outputs[
+                "src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt"
+            ],
+        )
 
     def test_split_registrations_take_a_form_per_target(self):
         _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(

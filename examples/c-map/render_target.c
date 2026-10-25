@@ -177,9 +177,10 @@ app_error render_session_drain_results(
 ) {
   *out_results = (frame_results){};
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  mln_render_frame_batch_view view = {.size = sizeof(view)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_status status = mln_render_session_drain_frame_results(
-    session->handle, &batch, &diagnostic
+  const mln_status status = mln_render_session_drain_frame_results(
+    session->handle, &batch, &view, &diagnostic
   );
   if (status == MLN_STATUS_NOT_READY) return APP_OK;
   if (status != MLN_STATUS_OK) {
@@ -187,9 +188,7 @@ app_error render_session_drain_results(
       APP_ERROR_RENDER_FAILED, "frame result drain failed", status, &diagnostic
     );
   }
-  mln_render_frame_batch_view view = {.size = sizeof(view)};
-  status = mln_render_frame_batch_get(batch, &view, &diagnostic);
-  for (size_t i = 0; status == MLN_STATUS_OK && i < view.result_count; ++i) {
+  for (size_t i = 0; i < view.result_count; ++i) {
     const mln_render_frame_result* result =
       (const mln_render_frame_result*)((const char*)view.results +
                                        i * view.result_size);
@@ -205,11 +204,6 @@ app_error render_session_drain_results(
     }
   }
   mln_render_frame_batch_release(batch);
-  if (status != MLN_STATUS_OK) {
-    return log_failure(
-      APP_ERROR_RENDER_FAILED, "frame result read failed", status, &diagnostic
-    );
-  }
   return APP_OK;
 }
 

@@ -89,8 +89,8 @@ export class EventStream {
   readonly #wake = new AwaitableWake();
 
   /** The handler to register, which queues each batch's events. */
-  readonly handler = (batch: { readonly events: readonly RuntimeEvent[] }) => {
-    this.#pending.push(...batch.events);
+  readonly handler = (events: readonly RuntimeEvent[]) => {
+    this.#pending.push(...events);
     this.#wake.wake();
   };
 

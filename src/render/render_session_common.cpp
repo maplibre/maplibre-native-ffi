@@ -3358,10 +3358,15 @@ auto render_session_service_driver_work(mln_render_session session)
 }
 
 auto render_session_drain_frame_results(
-  mln_render_session session, mln_render_frame_batch* out_batch
+  mln_render_session session, mln_render_frame_batch* out_batch,
+  mln_render_frame_batch_view* out_view
 ) -> mln_status {
   if (out_batch == nullptr || *out_batch != MLN_HANDLE_NULL) {
     set_thread_error("out_batch must point to a null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_view == nullptr || out_view->size < sizeof(*out_view)) {
+    set_thread_error("out_view must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
@@ -3390,23 +3395,11 @@ auto render_session_drain_frame_results(
     return MLN_STATUS_NOT_READY;
   }
   *out_batch = handle;
-  return MLN_STATUS_OK;
-}
-
-auto render_frame_batch_get(
-  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view
-) -> mln_status {
-  if (out_view == nullptr || out_view->size < sizeof(*out_view)) {
-    set_thread_error("out_view must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
-  if (live == nullptr) return recorded_handle_fault_status();
   *out_view = mln_render_frame_batch_view{
     .size = sizeof(mln_render_frame_batch_view),
     .result_size = sizeof(mln_render_frame_result),
-    .results = live->results.data(),
-    .result_count = live->results.size(),
+    .results = batch->results.data(),
+    .result_count = batch->results.size(),
   };
   return MLN_STATUS_OK;
 }

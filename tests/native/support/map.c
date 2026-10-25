@@ -5,6 +5,7 @@
 #include "map.h"
 
 #include "env.h"
+#include "frames.h"
 #include "wait.h"
 
 typedef struct still_image_wait {
@@ -18,7 +19,7 @@ typedef struct still_image_wait {
 // frame it rendered so the texture ring never fills.
 static bool collect_demand(still_image_wait* wait) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  const mln_status drained = mln_render_session_drain_frame_results(
+  const mln_status drained = mln_test_drain_frame_results(
     wait->fixture->session, &batch, MLN_TEST_DIAGNOSTIC
   );
   if (drained == MLN_STATUS_NOT_READY) {

@@ -65,6 +65,8 @@ class Lowered:
     decoder: str | None = None
     # Whether a discarding view of the receiver also calls the command.
     discardable: bool = False
+    # The C statement that releases a drained batch after its slice is copied.
+    drained: str | None = None
     c_locals: list[str] = field(default_factory=list)
     c_body: list[str] = field(default_factory=list)
 
@@ -200,6 +202,16 @@ def lower_function(
             continue
         if parameter.name in outputs:
             value = outputs[parameter.name].value
+            if plan.drain and parameter.name == plan.drain.batch.name:
+                # The call releases the batch once it copies the slice.
+                handle = value.element.handle
+                release = bound.source.functions_by_name[handle.release]
+                if release.diagnostic or release.return_type.kind != "void":
+                    raise Unsupported("a drained batch needs a void release")
+                locals_.append(f"{handle.native} {local} = MLN_HANDLE_NULL;")
+                args.append(f"&{local}")
+                lowered.drained = f"{handle.release}({local});"
+                continue
             owned = next(
                 (o for o in plan.owned_outputs if o.parameter == parameter.name), None
             )
@@ -547,6 +559,10 @@ def lower_function(
             f"call->result = {natives.to_js(value, f'arg_{name}', output_count(name))};"
         )
         lowered.native_result = lowered.returns = values.ts(value)
+        if lowered.drained:
+            # The batch is released whether or not its copy succeeded.
+            body.append(lowered.drained)
+            lowered.shape = "drain"
         if plan.view:
             if value.kind != "record":
                 raise Unsupported("borrowed view requires a record output")
@@ -564,7 +580,8 @@ def lower_function(
         lowered.native_result = lowered.returns = values.ts(result_value)
     if lowered.absent:
         lowered.native_result += " | undefined"
-        lowered.returns += " | undefined"
+        if not lowered.drained:
+            lowered.returns += " | undefined"
     if plan.consumes:
         if not receiver:
             raise Unsupported("consumption requires an owned receiver")

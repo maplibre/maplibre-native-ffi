@@ -249,6 +249,10 @@ class Values:
             raise Unsupported(
                 f"{value.native}: {value.kind} needs another Kotlin value rule"
             )
+        if value.native in self.bound.slices:
+            # A slice record reaches host code as its list alone.
+            self.check(self.bound.slices[value.native].value)
+            return
         try:
             self.abi.record_named(value.native, 64)
         except LayoutError as error:
@@ -276,6 +280,8 @@ class Values:
             result = "NativePointer"
         elif value.kind == "handle":
             result = owner_class(value.handle)
+        elif value.native in self.bound.slices:
+            result = self.public(self.bound.slices[value.native].value)
         elif value.kind in {"record", "enum"}:
             result = name(value.native)
         elif value.kind == "array":
@@ -834,6 +840,12 @@ class Values:
             from . import kotlin_callbacks
 
             return kotlin_callbacks.read_function(value, self)
+        if value.native in self.bound.slices:
+            field = self.bound.slices[value.native]
+            return (
+                f"internal fun {self.read(value)}(source: Long): "
+                f"{self.public(field.value)} = {self.field_read(value, field, None)}"
+            )
         public = name(value.native)
         scoped = value.native in self.views
         scope = "scope" if scoped else None

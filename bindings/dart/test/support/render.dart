@@ -98,14 +98,8 @@ void _requestFrame(RenderSessionHandle session, int token) {
 /// Drains the session's frame results and returns the one for [token], or
 /// null while it has not arrived.
 RenderFrameResult? _takeResult(RenderSessionHandle session, int token) {
-  final batch = session.drainFrameResults();
-  if (batch == null) return null;
-  try {
-    for (final result in batch.getValue().results) {
-      if (result.token == token) return result;
-    }
-    return null;
-  } finally {
-    batch.close();
+  for (final result in session.drainFrameResults()) {
+    if (result.token == token) return result;
   }
+  return null;
 }

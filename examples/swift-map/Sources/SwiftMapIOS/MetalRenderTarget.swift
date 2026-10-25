@@ -105,12 +105,8 @@ final class MetalRenderTarget {
 
   /// Drains every queued frame result.
   func drainResults() throws -> FrameResults {
-    guard let batch = try session.drainFrameResults() else {
-      return FrameResults()
-    }
-    defer { try? batch.close() }
     var results = FrameResults()
-    for result in try batch.get().results {
+    for result in try session.drainFrameResults() {
       if result.disposition == .rendered {
         results.rendered = true
       } else if result.disposition == .targetNotReady {

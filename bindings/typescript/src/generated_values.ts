@@ -405,19 +405,6 @@ export interface EglContextDescriptor {
 }
 
 /**
- * A borrowed span of runtime events in one delivery.
- *
- * See `mln_event_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export interface EventBatchView {
-  /**
-   * Borrowed array of event_count events in queue order.
-   */
-  readonly events: readonly RuntimeEvent[];
-}
-
-/**
  * Feature-state source, feature, and key selector.
  *
  * See `mln_feature_state_selector` in the
@@ -1744,19 +1731,6 @@ export type RenderDriverKind =
   | (number & {});
 
 /**
- * A borrowed view of one owned frame-result batch.
- *
- * See `mln_render_frame_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-export interface RenderFrameBatchView {
-  /**
-   * Borrowed array of result_count terminal frame results in completion order.
-   */
-  readonly results: readonly RenderFrameResult[];
-}
-
-/**
  * Terminal result of one frame demand, held by an owned frame-result batch and
  * copied by `mln_acquired_frame_get_result()`.
  *
@@ -2361,7 +2335,7 @@ export interface RuntimeEvent {
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export type RuntimeEventHandler = (events: EventBatchView) => void;
+export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
 
 /**
  * Bit values for the map and runtime event subscription masks.

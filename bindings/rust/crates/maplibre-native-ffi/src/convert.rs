@@ -655,29 +655,26 @@ mod tests {
                     .write_unaligned(event);
             }
         }
-        // SAFETY: the view is plain data, and all zeroes is a valid value.
-        let mut raw: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_event_batch_view>() as u32;
-        raw.event_size = stride as u32;
-        raw.events = storage.as_ptr().cast();
-        raw.event_count = events.len();
-
-        // SAFETY: every pointer in the view addresses the storage above.
-        let view = unsafe { crate::EventBatchView::from_native(raw) }.unwrap();
-        assert_eq!(view.events.len(), 2);
-        assert_eq!(view.events[0].r#type, crate::RuntimeEventType::MapIdle);
-        assert_eq!(view.events[0].payload, crate::RuntimeEventPayload::Empty);
-        assert_eq!(view.events[0].message, "first");
+        // SAFETY: every pointer in the events addresses the storage above.
+        let events: Vec<crate::RuntimeEvent> = unsafe {
+            copy_strided(
+                storage.as_ptr().cast::<sys::mln_runtime_event>(),
+                events.len(),
+                stride,
+            )
+        }
+        .unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].r#type, crate::RuntimeEventType::MapIdle);
+        assert_eq!(events[0].payload, crate::RuntimeEventPayload::Empty);
+        assert_eq!(events[0].message, "first");
+        assert_eq!(events[1].r#type, crate::RuntimeEventType::MapStyleLoaded);
+        assert_eq!(events[1].source, 0xabcd_0000_0000_0001);
+        assert_eq!(events[1].generation, 0x1_0000_0001);
         assert_eq!(
-            view.events[1].r#type,
-            crate::RuntimeEventType::MapStyleLoaded
-        );
-        assert_eq!(view.events[1].source, 0xabcd_0000_0000_0001);
-        assert_eq!(view.events[1].generation, 0x1_0000_0001);
-        assert_eq!(
-            view.events[1].payload,
+            events[1].payload,
             crate::RuntimeEventPayload::Unknown(0xfff0)
         );
-        assert_eq!(view.events[1].message, "second");
+        assert_eq!(events[1].message, "second");
     }
 }

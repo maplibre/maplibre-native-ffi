@@ -6,7 +6,7 @@
 [cases]
 "ERR-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeStatusTests.cs::AnUnknownStatusKeepsItsValueAndDiagnostic"
 "ERR-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeLibraryLoaderTests.cs::ALibraryWithAnotherAbiVersionIsRejected"
-"ERR-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ADrainBeforeAnyDemandReturnsNull"
+"ERR-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ADrainBeforeAnyDemandReturnsNoValue"
 "LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative"
 "LIFE-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds"
 "LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ABorrowedFrameViewExpiresWithItsScope"

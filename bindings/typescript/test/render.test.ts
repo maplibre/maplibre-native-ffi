@@ -83,11 +83,11 @@ test(
   { needs: ["disposers"] },
 );
 
-test("a drain before any demand returns no batch", async () => {
+test("a drain before any demand returns no results", async () => {
   const map = await openRenderMap();
   const worker = await TestSession.attach(map);
-  // Native reports the drain as not ready, which reads as undefined.
-  assert.equal(worker.session.drainFrameResults(), undefined);
+  // Native reports the drain as not ready, which reads as no results.
+  assert.deepEqual(worker.session.drainFrameResults(), []);
 });
 
 test("a caller-driven session is serviced from the event loop", async () => {

@@ -116,7 +116,7 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try fixture.closeMap();
 }
 
-fn ignoreEvents(_: *support.Counter, _: maplibre.EventBatchView) void {}
+fn ignoreEvents(_: *support.Counter, _: []const maplibre.RuntimeEvent) void {}
 
 fn countRelease(counter: *support.Counter) void {
     counter.add();

@@ -1,12 +1,9 @@
 //! Keep the receiver and input storage live through the native call. Copy
-//! borrowed outputs before the receiver lease or view scope ends.
+//! borrowed outputs before the view scope ends.
 
 use std::ffi::c_void;
 
-use maplibre_native_ffi_core::{
-    self as maplibre_core,
-    handle::{NativeHandle, NativeRead},
-};
+use maplibre_native_ffi_core::{self as maplibre_core, handle::NativeHandle};
 use maplibre_native_ffi_sys as sys;
 
 use crate::Result;
@@ -17,27 +14,24 @@ pub(crate) struct Call<'a, H: NativeHandle> {
     native: H,
     // The receiver and its parent stay alive while borrowed output is copied.
     _owner: std::marker::PhantomData<&'a H>,
-    // Held through the native call, and dropped in this order: a view scope
-    // keeps borrowed graphics resources live, and a read keeps close away from
-    // borrowed storage.
+    // Held through the native call; a view scope keeps borrowed graphics
+    // resources live.
     _view: Option<ViewScope>,
-    _read: Option<NativeRead<H>>,
     arena: InputArena,
 }
 
 impl Call<'static, ()> {
     pub(crate) fn global() -> Self {
-        Self::new((), None)
+        Self::new(())
     }
 }
 
 impl<'a, H: NativeHandle> Call<'a, H> {
-    pub(crate) fn new(native: H, read: Option<NativeRead<H>>) -> Self {
+    pub(crate) fn new(native: H) -> Self {
         Self {
             native,
             _owner: std::marker::PhantomData,
             _view: None,
-            _read: read,
             arena: InputArena::default(),
         }
     }

@@ -283,27 +283,18 @@ internal abstract class RenderTarget : IDisposable
     /// <returns>Whether a frame reached the window.</returns>
     protected bool DrainFrameResults()
     {
-        var results = Session.DrainFrameResults();
-        if (results is null)
-        {
-            return false;
-        }
-
         var rendered = false;
         var retry = false;
-        using (results)
+        foreach (var result in Session.DrainFrameResults())
         {
-            foreach (var result in results.Get().Results)
+            switch (result.Disposition)
             {
-                switch (result.Disposition)
-                {
-                    case RenderResult.Rendered:
-                        rendered = true;
-                        break;
-                    case RenderResult.TargetNotReady:
-                        retry = true;
-                        break;
-                }
+                case RenderResult.Rendered:
+                    rendered = true;
+                    break;
+                case RenderResult.TargetNotReady:
+                    retry = true;
+                    break;
             }
         }
 
