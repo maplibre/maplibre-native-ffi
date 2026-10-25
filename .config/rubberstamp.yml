@@ -77,14 +77,15 @@ labels:
         qualify.
       rules:
         - unless:
-            threshold: 0.3
-            ask: >-
-              Does this work concern particular bindings rather than the
-              bindings in general? It does when it changes, fixes, or reports
-              something in one or a few named bindings that the others don't
-              share. It doesn't when most or all bindings pick it up alike, such
-              as a C API change that every binding exposes, a generator change,
-              or a policy that every binding meets.
+            ask:
+              threshold: 0.3
+              question: >-
+                Does this work concern particular bindings rather than the
+                bindings in general? It does when it changes, fixes, or reports
+                something in one or a few named bindings that the others don't
+                share. It doesn't when most or all bindings pick it up alike,
+                such as a C API change that every binding exposes, a generator
+                change, or a policy that every binding meets.
           then: skip
     platform:
       labels: ["platform:*"]
@@ -93,12 +94,13 @@ labels:
         share alike. EGL and WGL are renderer subjects, not platform ones.
       rules:
         - unless:
-            threshold: 0.3
-            ask: >-
-              Does this work concern particular platforms rather than platforms
-              in general? It does when it changes, fixes, or reports something
-              on one or a few named platforms that the others don't share. EGL
-              and WGL are renderer subjects, not platform ones.
+            ask:
+              threshold: 0.3
+              question: >-
+                Does this work concern particular platforms rather than
+                platforms in general? It does when it changes, fixes, or reports
+                something on one or a few named platforms that the others don't
+                share. EGL and WGL are renderer subjects, not platform ones.
           then: skip
     renderer:
       labels: ["renderer:*"]
@@ -107,12 +109,13 @@ labels:
         alike.
       rules:
         - unless:
-            threshold: 0.3
-            ask: >-
-              Does this work concern particular render backends rather than
-              rendering in general? It does when it changes, fixes, or reports
-              something in one or a few named backends that the others don't
-              share.
+            ask:
+              threshold: 0.3
+              question: >-
+                Does this work concern particular render backends rather than
+                rendering in general? It does when it changes, fixes, or reports
+                something in one or a few named backends that the others don't
+                share.
           then: skip
     # Whether the engine causes an issue is a judgment the labeler gets wrong,
     # so only pull requests are labeled, by what they change.
@@ -126,10 +129,10 @@ labels:
           rules:
             - if:
                 files:
-                  - patches/maplibre-native/*
+                  - patches/maplibre-native/**
                   - third_party/maplibre-native
               then: apply
-            - then: skip
+          otherwise: skip
     dependencies:
       labels:
         dependencies: >-
@@ -138,7 +141,8 @@ labels:
           count.
 
 # `ci/workflow.toml` maps each unit to its jobs. A unit's rule runs it
-# regardless of the plan when a changed file matches; `*` also matches `/`.
+# regardless of the plan when a changed file matches, with globs as in GitHub
+# Actions path filters.
 ci:
   workflow: .github/workflows/ci-coverage.yml
   threshold: 0.6
@@ -163,7 +167,7 @@ ci:
         Builds the Astro docs site, which hygiene only formats, and generates
         each binding's API reference with its own tool (Doxygen, Dokka, DocC,
         DocFX, dart doc, and others) from the C headers and binding sources.
-      rules: [{ if: { files: ["docs/*"] }, then: apply }]
+      rules: [{ if: { files: ["docs/**"] }, then: apply }]
     linux-x64:
       covers: >-
         Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
@@ -207,13 +211,13 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/apple/*
-              - src/render/metal/*
-              - cmake/apple/*
+              - src/platform/apple/**
+              - src/render/metal/**
+              - cmake/apple/**
               - cmake/platform/apple.cmake
               - mise.macos.toml
-              - bindings/kotlin/src/macosTest/*
-              - examples/swift-map/*
+              - bindings/kotlin/src/macosTest/**
+              - examples/swift-map/**
               - third_party/maplibre-native
           then: apply
     apple-mobile:
@@ -227,19 +231,19 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/apple/*
-              - src/render/metal/*
-              - cmake/apple/*
+              - src/platform/apple/**
+              - src/render/metal/**
+              - cmake/apple/**
               - cmake/platform/apple.cmake
               - cmake/toolchains/apple.cmake
               - cmake/mln_ffi_apple_framework.cmake
               - .mise/tasks/package-xcframework
-              - bindings/kotlin/src/iosTest/*
-              - bindings/kotlin/src/tvosTest/*
+              - bindings/kotlin/src/iosTest/**
+              - bindings/kotlin/src/tvosTest/**
               - examples/swift-map/Package.swift
               - examples/swift-map/mise.toml
-              - examples/swift-map/.mise/*
-              - examples/swift-map/Sources/SwiftMapIOS/*
+              - examples/swift-map/.mise/**
+              - examples/swift-map/Sources/SwiftMapIOS/**
               - third_party/maplibre-native
           then: apply
     windows-x64:
@@ -251,12 +255,12 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/windows/*
+              - src/platform/windows/**
               - src/render/opengl/wgl_*
               - cmake/platform/windows.cmake
               - mise.windows.toml
-              - .github/actions/setup-windows-*
-              - .github/actions/setup-ci-deps/*
+              - .github/actions/setup-windows-*/**
+              - .github/actions/setup-ci-deps/**
               - third_party/maplibre-native
           then: apply
     windows-arm64:
@@ -272,7 +276,7 @@ ci:
             files:
               - cmake/platform/windows.cmake
               - mise.windows.toml
-              - .github/actions/setup-windows-*
+              - .github/actions/setup-windows-*/**
               - third_party/maplibre-native
           then: apply
     android:
@@ -286,10 +290,10 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/android/*
+              - src/platform/android/**
               - cmake/platform/android.cmake
               - mise.android.*
-              - bindings/kotlin/src/android*
+              - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
               - .mise/tasks/kotlin/verify-android-multi-abi
               - third_party/maplibre-native
@@ -307,7 +311,7 @@ ci:
             files:
               - cmake/platform/ohos.cmake
               - mise.ohos.*
-              - src/platform/ohos/*
+              - src/platform/ohos/**
               - tests/native/abi/platform/transport.c
               - bindings/typescript/native/CMake*
               - bindings/typescript/native/exports.map
@@ -316,8 +320,8 @@ ci:
               - bindings/typescript/scripts/build-hap.sh
               - bindings/typescript/scripts/test-arkts.sh
               - bindings/typescript/src/arkts.ts
-              - bindings/typescript/src/internal/*
-              - bindings/typescript/test/arkts/*
+              - bindings/typescript/src/internal/**
+              - bindings/typescript/test/arkts/**
               - third_party/maplibre-native
           then: apply
     web:
@@ -329,15 +333,15 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/emscripten/*
-              - src/render/webgpu/*
+              - src/platform/emscripten/**
+              - src/render/webgpu/**
               - cmake/platform/emscripten.cmake
               - cmake/toolchains/emscripten.cmake
               - cmake/mln_ffi_emscripten.cmake
               - mise.emscripten.*
-              - bindings/kotlin/src/wasmJs*
-              - bindings/kotlin/wasm/*
-              - bindings/kotlin/karma.config.d/*
+              - bindings/kotlin/src/wasmJs*/**
+              - bindings/kotlin/wasm/**
+              - bindings/kotlin/karma.config.d/**
               - third_party/maplibre-native
           then: apply
     maven:
