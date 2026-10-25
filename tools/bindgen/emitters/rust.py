@@ -385,7 +385,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         if (
             value.kind in {"array", "buffer"}
             and value.length
-            and value.length != "nul"
             and not value.length.isdigit()
         ):
             source = names[parameter.name]
@@ -458,7 +457,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif (
             value_plan
             and value_plan.kind == "buffer"
-            and value_plan.length != "nul"
             and value_plan.buffer_form != "view"
         ):
             public = "&str" if is_text(value_plan) else "&[u8]"

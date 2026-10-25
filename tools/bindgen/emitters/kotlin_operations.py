@@ -205,8 +205,7 @@ def counted_inputs(plan):
     return {
         p.value.length: p
         for p in plan.inputs
-        if p.value.kind in {"array", "buffer"}
-        and p.value.length not in {None, "nul", "1"}
+        if p.value.kind in {"array", "buffer"} and p.value.length not in {None, "1"}
     }
 
 

@@ -243,8 +243,7 @@ class Conventions:
         declares it, and elsewhere a native pointer that bindings pass through.
         A context outlives the call that passes it; every other value lasts for
         the call. A buffer view or character pointer holds UTF-8 text. A pointer
-        borrows its target. A character pointer is NUL-terminated, and a pointer
-        to a record addresses one record.
+        borrows its target, and a pointer to a record addresses one record.
         """
         defaults = {}
         resolved = self.resolve(type_)
@@ -267,7 +266,7 @@ class Conventions:
         if kind in OPAQUE_POINTER_KINDS:
             return defaults
         if pointee.kind in TEXT_POINTEE_KINDS:
-            defaults.update(length="nul", encoding="utf8")
+            defaults["encoding"] = "utf8"
         elif self.is_record(pointee):
             defaults["length"] = "1"
             if is_buffer_view(resolved.pointee) or is_buffer_view(pointee):
@@ -506,6 +505,15 @@ def value_metadata_errors(
         )
     if "length" in metadata and type_.kind not in {"pointer", "array"}:
         errors.append(f"{context}: length requires a pointer or array")
+    # Text crosses the API as an mln_buffer_view, so a character pointer is
+    # caller-sized storage that names its capacity.
+    if (
+        is_text_pointer
+        and is_pointer
+        and "length" not in metadata
+        and metadata.get("kind") not in OPAQUE_POINTER_KINDS
+    ):
+        errors.append(f"{context}: text requires an mln_buffer_view")
     return errors
 
 
@@ -829,7 +837,6 @@ def validate(api: Api) -> None:
             if (
                 "length" in parameter.metadata
                 and parameter.metadata["length"] not in parameters
-                and parameter.metadata["length"] != "nul"
                 and parameter.metadata["length"] != "1"
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
@@ -998,7 +1005,7 @@ def validate(api: Api) -> None:
                 if (
                     key in field.metadata
                     and field_path(record.name, field.metadata[key]) is None
-                    and not (key == "length" and field.metadata[key] in {"nul", "1"})
+                    and not (key == "length" and field.metadata[key] == "1")
                 ):
                     errors.append(f"{fcontext}: {key} names an absent field")
     for typedef in api.typedefs:

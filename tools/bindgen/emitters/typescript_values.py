@@ -232,7 +232,7 @@ def is_counted(value: ValuePlan) -> bool:
     return (
         value.kind == "buffer"
         and value.buffer_form != "view"
-        and value.length not in {None, "1", "nul"}
+        and value.length not in {None, "1"}
     )
 
 
@@ -346,10 +346,7 @@ class Values:
                 raise Unsupported(f"{value.native}: unsupported buffer encoding")
             if value.encoding == "json" and value.buffer_form != "view":
                 raise Unsupported(f"{value.native}: JSON outside a view")
-            if value.buffer_form != "view" and value.length == "nul":
-                if value.encoding == "bytes":
-                    raise Unsupported(f"{value.native}: NUL-terminated bytes")
-            elif value.buffer_form != "view" and not is_counted(value):
+            if value.buffer_form != "view" and not is_counted(value):
                 raise Unsupported(f"{value.native}: buffer without a length")
             return
         if value.kind == "reference":

@@ -13,7 +13,6 @@ import (
 	"runtime/cgo"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -109,15 +108,6 @@ func (arena *bindingArena) bytes(value []byte) unsafe.Pointer {
 	pointer := unsafe.Pointer(unsafe.SliceData(value))
 	arena.pins.Pin(pointer)
 	return pointer
-}
-
-func (arena *bindingArena) cstring(value string) *C.char {
-	if strings.IndexByte(value, 0) >= 0 {
-		arena.fail("text contains an embedded NUL")
-	}
-	pointer := arena.allocate(uintptr(len(value) + 1))
-	copy(unsafe.Slice((*byte)(pointer), len(value)), value)
-	return (*C.char)(pointer)
 }
 
 func (arena *bindingArena) close() {

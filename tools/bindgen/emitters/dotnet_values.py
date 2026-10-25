@@ -325,12 +325,6 @@ class Values:
                 f"{expression}.{member(array.value.length)}",
             )
         if plan.kind == "buffer":
-            if plan.length == "nul":
-                return (
-                    f"{expression} == null ? null : NativeCallScope.CopyCString({expression})"
-                    if plan.nullable
-                    else f"NativeCallScope.CopyCString({expression})"
-                )
             if plan.ctype.pointee:
                 if length is None:
                     raise Unsupported("counted buffer requires a count expression")
@@ -379,12 +373,6 @@ class Values:
             scope = ", scope" if self.needs_scope(plan) else ""
             return f"Native{public_name(plan.native)}({expression}{scope})"
         if plan.kind == "buffer":
-            if plan.length == "nul":
-                return (
-                    f"{expression} is null ? null : scope.CString({expression})"
-                    if plan.nullable
-                    else f"scope.CString({expression})"
-                )
             method = "Utf8" if plan.encoding in TEXT_ENCODINGS else "Buffer"
             return (
                 f"{expression} is null ? default : scope.{method}({expression})"
@@ -881,11 +869,7 @@ class Values:
             )
             encoded.append(f"{indent}}}")
             return encoded
-        if (
-            field.value.kind == "buffer"
-            and field.value.ctype.pointee
-            and field.value.length != "nul"
-        ):
+        if field.value.kind == "buffer" and field.value.ctype.pointee:
             local = "buffer" + pascal(field.name)
             method = "Utf8" if field.value.encoding in TEXT_ENCODINGS else "Buffer"
             count = next(

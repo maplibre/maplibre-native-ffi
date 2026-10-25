@@ -852,10 +852,6 @@ class Binder:
             if metadata.get("length") == "1":
                 element = self.value(pointee, child_metadata, context + " pointee")
                 return ValuePlan(kind="reference", element=element, **common)
-            if metadata.get("length") == "nul":
-                if pointee.kind not in {"char_s", "char_u", "schar", "uchar"}:
-                    raise ModelError([f"{context}: nul length requires character data"])
-                return ValuePlan(kind="buffer", buffer_form="pointer", **common)
             if "length" in metadata:
                 if metadata.get("encoding") in {"utf8", "json", "bytes"} and (
                     pointee.kind in {"char_s", "char_u", "schar", "uchar"}

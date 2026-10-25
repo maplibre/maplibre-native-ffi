@@ -86,12 +86,6 @@ final class NativeInputArena {
       .assumingMemoryBound(to: Value.self))
   }
 
-  func cString(_ value: String) throws -> UnsafePointer<CChar> {
-    guard !value.utf8.contains(0)
-    else { throw MaplibreError.invalidArgument("embedded null in C string") }
-    return array(value.utf8CString.map { $0 })!
-  }
-
   static func copyArray<Value>(_ pointer: UnsafePointer<Value>?,
                                count: Int) throws -> [Value]
   {

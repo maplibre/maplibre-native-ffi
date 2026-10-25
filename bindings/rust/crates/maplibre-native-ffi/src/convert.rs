@@ -147,18 +147,6 @@ impl ToNative<sys::mln_buffer_view> for Vec<u8> {
     }
 }
 
-impl ToNative<*const c_char> for str {
-    fn to_native(&self, arena: &mut InputArena) -> Result<*const c_char> {
-        arena.c_string(self)
-    }
-}
-
-impl ToNative<*const c_char> for String {
-    fn to_native(&self, arena: &mut InputArena) -> Result<*const c_char> {
-        arena.c_string(self)
-    }
-}
-
 impl FromNative<sys::mln_buffer_view> for String {
     unsafe fn from_native(native: sys::mln_buffer_view) -> Result<Self> {
         // SAFETY: the caller guarantees the view is readable.
@@ -182,23 +170,6 @@ impl<T: FromNative<sys::mln_buffer_view>> FromNative<sys::mln_buffer_view> for O
         }
         // SAFETY: the caller guarantees the view is readable.
         unsafe { T::from_native(native) }.map(Some)
-    }
-}
-
-impl FromNative<*const c_char> for String {
-    unsafe fn from_native(native: *const c_char) -> Result<Self> {
-        // SAFETY: the caller guarantees a terminated string or null.
-        unsafe { maplibre_core::string::copy_c_string(native) }
-    }
-}
-
-impl FromNative<*const c_char> for Option<String> {
-    unsafe fn from_native(native: *const c_char) -> Result<Self> {
-        if native.is_null() {
-            return Ok(None);
-        }
-        // SAFETY: the caller guarantees a terminated string.
-        unsafe { String::from_native(native) }.map(Some)
     }
 }
 
@@ -445,9 +416,6 @@ impl InputArena {
     }
     pub(crate) fn array<T: 'static>(&mut self, values: Vec<T>) -> *const T {
         self.storage.array(values)
-    }
-    pub(crate) fn c_string(&mut self, value: &str) -> Result<*const c_char> {
-        self.storage.c_string(value)
     }
 }
 

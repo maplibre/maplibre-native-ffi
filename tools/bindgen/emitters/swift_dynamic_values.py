@@ -31,7 +31,7 @@ def public(values, value):
 
 def encode_throws(value):
     if value.kind == "buffer":
-        return value.length == "nul"
+        return False
     if value.kind == "reference":
         return encode_throws(value.element)
     if value.kind == "array":
@@ -60,13 +60,10 @@ def encode(values, value, source):
             if value.kind == "array"
             or value.kind == "buffer"
             and value.buffer_form != "view"
-            and value.length != "nul"
             else "map"
         )
         return f"{'try ' if encode_throws(value) else ''}{source}.{method} {{ {converted} }}{fallback}"
     if value.kind == "buffer":
-        if value.length == "nul":
-            return f"try arena.cString({source})"
         if value.buffer_form != "view":
             pointee = (
                 "CChar"
@@ -146,8 +143,6 @@ def decode(values, value, source, context="raw"):
         )
         return f"{absent} ? nil : {converted}"
     if value.kind == "buffer":
-        if value.length == "nul":
-            return f"try NativeString.copyCString({source})"
         copier = "copyUTF8" if value.encoding in TEXT_ENCODINGS else "copyData"
         if value.buffer_form != "view":
             count = (

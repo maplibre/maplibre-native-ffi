@@ -292,7 +292,7 @@ def operation(
                 setup.append(
                     f"        let {local} = {local}.unwrap_or_else(|| py.None().into_bound(py));"
                 )
-            if value.kind == "buffer" and value.ctype.pointee and value.length != "nul":
+            if value.kind == "buffer" and value.ctype.pointee:
                 setup.append(
                     f"        let {local}_view = storage.buffer({local}.clone(), {str(value.encoding == 'utf8').lower()})?;"
                 )

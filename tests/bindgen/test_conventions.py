@@ -14,7 +14,7 @@ from tools.bindgen.semantic import DefaultSupport, bind
 REGISTRATION = """
 typedef unsigned long long session BIND("kind=handle;release=session_close");
 void session_close(session value);
-typedef void (*notify)(void *context, const char *message);
+typedef void (*notify)(void *context, mln_buffer_view message);
 typedef void (*release)(void *context);
 typedef struct listener {
   notify callback;
@@ -84,8 +84,8 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         )
         message = notify.parameters[1].value
         self.assertEqual(
-            (message.kind, message.length, message.encoding, message.ownership),
-            ("buffer", "nul", "utf8", "borrowed"),
+            (message.kind, message.buffer_form, message.encoding),
+            ("buffer", "view", "utf8"),
         )
         self.assertEqual(notify.parameters[0].value.lifetime, "owner")
         operation = bound.operations_by_name["session_open"]
@@ -98,6 +98,23 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         self.assertEqual(window.value.kind, "native_pointer")
         (owner,) = operation.owned_outputs
         self.assertEqual((owner.parameter, owner.handle.parent), ("out_session", None))
+
+    def test_terminated_text_is_rejected(self):
+        # Text is an mln_buffer_view; a character pointer must name its length.
+        with self.assertRaisesRegex(ModelError, "text requires an mln_buffer_view"):
+            validate(
+                parse(
+                    REGISTRATION.replace(
+                        "mln_buffer_view message", "const char *message"
+                    )
+                )
+            )
+        with self.assertRaisesRegex(ModelError, "text requires an mln_buffer_view"):
+            validate(
+                parse(
+                    "mln_status set_label(const char *label, mln_diagnostic *out_diagnostic);"
+                )
+            )
 
     def test_an_annotation_that_restates_a_default_is_rejected(self):
         with self.assertRaisesRegex(
@@ -128,7 +145,7 @@ BIND("execution=command") mln_status session_flush(
         )
         validate(parse(source))
         command = 'BIND("execution=command'
-        message = "const char *message"
+        message = "mln_buffer_view message"
         # A key that no header writes.
         with self.assertRaisesRegex(ModelError, "unknown metadata key 'receiver'"):
             validate(parse(source.replace(command, command + ";receiver=value", 1)))

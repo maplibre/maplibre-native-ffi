@@ -44,8 +44,6 @@ def encode(values, value, source, depth=0):
         )
         return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False), item, depth + 1)} else {fallback}"
     if value.kind == "buffer":
-        if value.length == "nul":
-            return f"try marshal.cString(allocator, {source})"
         return (
             f"marshal.view({source})"
             if value.buffer_form == "view"
@@ -75,7 +73,7 @@ def encoding(value) -> tuple[bool, bool]:
         allocates, roots = fields_encoding(value)
         return allocates, True
     if value.kind == "buffer":
-        return value.length == "nul", False
+        return False, False
     if value.kind == "reference":
         return True, encoding(value.element)[1]
     if value.kind == "array":
@@ -167,9 +165,6 @@ def decode(values, value, source, context="raw", borrowed=False):
         )
         return f"if ({absent}) null else {decode(values, replace(value, nullable=False), source, context, borrowed)}"
     if value.kind == "buffer":
-        if value.length == "nul":
-            span = f"std.mem.span({source} orelse return error.NativeError)"
-            return span if borrowed else f"try allocator.dupe(u8, {span})"
         if value.buffer_form != "view":
             count = (
                 value.length

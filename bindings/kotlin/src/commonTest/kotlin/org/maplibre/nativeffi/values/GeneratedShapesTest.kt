@@ -83,7 +83,8 @@ class GeneratedShapesTest {
   @Test
   fun hostStringsUseViewsAndNativeLentStringsDecode() = runSuspendTest {
     NativeArena().use { arena ->
-      assertEquals("native-lent é", readCString(arena.cString("native-lent é")))
+      val lent = "native-lent é".encodeToByteArray() + 0
+      assertEquals("native-lent é", readCString(arena.bytes(lent)))
     }
     withMap {
       // Native rejects an embedded NUL in the URL view before a C-string consumer.

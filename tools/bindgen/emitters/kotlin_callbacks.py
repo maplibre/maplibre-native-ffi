@@ -618,10 +618,6 @@ def callback_argument(parameter, values):
             return f"{public_name(value.element, values)}({local}, scope)"
         decoded = values.decode(value.element, local)
         return f"if ({local} == 0L) null else {decoded}" if value.nullable else decoded
-    if value.kind == "buffer" and value.length == "nul":
-        return (
-            f"readCStringOrNull({local})" if value.nullable else f"readCString({local})"
-        )
     if value.kind == "record" or (
         value.kind == "buffer" and value.buffer_form == "view"
     ):

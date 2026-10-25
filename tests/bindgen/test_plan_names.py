@@ -47,7 +47,7 @@ class PlanNameTests(unittest.TestCase):
         self.assertEqual((operation.receiver, operation.member), (None, "pass_after"))
 
     def test_a_marshalled_input_lasts_for_the_call(self):
-        source = "mln_status mln_pass_note(mln_pass pass, const char *text{}, mln_diagnostic *out_diagnostic);\n"
+        source = "mln_status mln_pass_note(mln_pass pass, mln_buffer_view text{}, mln_diagnostic *out_diagnostic);\n"
         bind(parse(source.format(""), groups=("plan_names",)), require_complete=True)
         with self.assertRaisesRegex(
             ModelError, "retained input requires a lifetime contract"

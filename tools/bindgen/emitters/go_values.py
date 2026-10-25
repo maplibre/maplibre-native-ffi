@@ -245,13 +245,6 @@ class Values:
                 return f"func() {self.type(value)} {{ if {expr} == nil {{ return nil }}; value := {converted}; return &value }}()"
             return converted
         if value.kind == "buffer":
-            if value.length == "nul":
-                copy = f"C.GoString({expr})"
-                return (
-                    f"func() *string {{ if {expr} == nil {{ return nil }}; value := {copy}; return &value }}()"
-                    if value.nullable
-                    else copy
-                )
             if value.ctype.pointee:
                 size = (
                     value.length
@@ -313,14 +306,13 @@ class Values:
             converted = self.native(
                 replace(value, nullable=False), f"(*{expr})", dest, scope
             )
-            if value.length != "nul":
-                pointer = dest if value.ctype.pointee else dest + ".data"
-                assignment = (
-                    f"({self.c_type(value)})(arena.allocate(1))"
-                    if value.ctype.pointee
-                    else "arena.allocate(1)"
-                )
-                converted += f"; if {pointer} == nil {{ {pointer} = {assignment} }}"
+            pointer = dest if value.ctype.pointee else dest + ".data"
+            assignment = (
+                f"({self.c_type(value)})(arena.allocate(1))"
+                if value.ctype.pointee
+                else "arena.allocate(1)"
+            )
+            converted += f"; if {pointer} == nil {{ {pointer} = {assignment} }}"
             return f"if {expr} != nil {{ {converted} }}"
         if value.kind in {"scalar", "enum"}:
             return f"{dest} = {self.c_type(value)}({expr})"
@@ -341,16 +333,14 @@ class Values:
         if value.kind == "buffer":
             data = f"[]byte({expr})" if is_text(value) else expr
             inner = f"arena.bytes({data})"
-            if value.length == "nul":
-                inner = f"arena.cstring({expr})"
-            elif not value.ctype.pointee:
+            if not value.ctype.pointee:
                 inner = (
                     f"C.mln_buffer_view{{data: {inner}, size: C.size_t(len({expr}))}}"
                 )
             else:
                 inner = f"({self.c_type(value)})({inner})"
             code = f"{dest} = {inner}"
-            if value.length and value.length != "nul" and not value.length.isdigit():
+            if value.length and not value.length.isdigit():
                 code += f"; {scope}.{native_identifier(value.length)} = bindingCountLike({scope}.{native_identifier(value.length)}, len({expr}))"
             return code
         if value.kind == "array":

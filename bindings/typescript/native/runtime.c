@@ -284,20 +284,6 @@ bool mln_ts_read_text_view(
   return true;
 }
 
-bool mln_ts_read_text(
-  mln_ts_call* call, napi_value value, const char** out, const char* path
-) {
-  mln_buffer_view view = {0};
-  if (!mln_ts_read_text_view(call, value, &view, path)) {
-    return false;
-  }
-  if (memchr(view.data, '\0', view.size) != NULL) {
-    return fail_type(call, path, "a string without NUL characters");
-  }
-  *out = view.data;
-  return true;
-}
-
 // Calls JSON[name](argument) on the realm's global JSON object.
 static napi_value call_json(
   napi_env env, const char* name, napi_value argument

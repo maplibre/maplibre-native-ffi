@@ -163,7 +163,6 @@ def operation(
         if (value := input_plans.get(param.name))
         and value.kind in {"array", "buffer"}
         and value.length
-        and value.length != "nul"
         and not value.length.isdigit()
     }
     # Caller-sized text passes its storage, capacity, and length to a closure

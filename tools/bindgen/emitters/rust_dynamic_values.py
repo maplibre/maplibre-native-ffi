@@ -44,9 +44,7 @@ def public(values, value):
 def encode(values, value, source):
     """Converts the place `source` for one native call, with `arena` in scope."""
     if value.kind in {"buffer", "array", "reference"} and value.nullable:
-        if value.kind == "buffer" and (
-            value.buffer_form == "view" or value.length == "nul"
-        ):
+        if value.kind == "buffer" and value.buffer_form == "view":
             return f"to_native(&{source}, arena)?"
         if value.kind == "buffer":
             return f"{source}.as_ref().map_or(std::ptr::null(), |item| item.as_ptr().cast())"
@@ -56,7 +54,7 @@ def encode(values, value, source):
             return f"convert::optional_reference({source}.as_ref(), arena)?"
         raise Unsupported(f"{value.native}: optional fixed arrays need a presence rule")
     if value.kind == "buffer":
-        if value.buffer_form == "view" or value.length == "nul":
+        if value.buffer_form == "view":
             return f"to_native(&{source}, arena)?"
         return f"{source}.as_ptr().cast()"
     if value.kind == "reference":
@@ -83,9 +81,7 @@ def count(value, context):
 def decode(values, value, source, context="raw"):
     """Copies the C place `source`, whose sibling fields `context` holds."""
     if value.kind in {"buffer", "array", "reference"} and value.nullable:
-        if value.kind == "buffer" and (
-            value.buffer_form == "view" or value.length == "nul"
-        ):
+        if value.kind == "buffer" and value.buffer_form == "view":
             return TRAIT_COPY.format(source)
         if value.kind == "reference":
             # An optional record member takes a presence bit, so only a
@@ -96,7 +92,7 @@ def decode(values, value, source, context="raw"):
         copied = decode(values, replace(value, nullable=False), source, context)
         return f"if {source}.is_null() {{ None }} else {{ Some({copied}) }}"
     if value.kind == "buffer":
-        if value.buffer_form != "view" and value.length != "nul":
+        if value.buffer_form != "view":
             return f"unsafe {{ convert::counted({source}, {count(value, context)}) }}?"
         return TRAIT_COPY.format(source)
     if array := slice_of(values, value):

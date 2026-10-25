@@ -842,8 +842,8 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                 "queue_result must be an integer",
             ),
             (
-                "  int code;\n  const char* text",
-                '  const char* text BIND("lifetime=owner");\n  int code',
+                "  int code;\n  mln_buffer_view text",
+                '  mln_buffer_view text BIND("lifetime=owner");\n  int code',
                 "must mirror",
             ),
             (

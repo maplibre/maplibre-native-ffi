@@ -275,23 +275,19 @@ class Values:
             return f"generated_value(py, {expr})?"
         if plan.kind == "buffer":
             if plan.ctype.pointee:
-                if plan.length != "nul":
-                    if not plan.length:
-                        self.fail(
-                            plan, "pointer buffer needs an explicit copied length"
-                        )
-                    count = (
-                        plan.length
-                        if plan.length.isdigit()
-                        else f"{scope}.{rust_field(plan.length)}"
-                    )
-                    view = f"generated_view({expr}, {count})?"
-                    return self.copy(
-                        replace(plan, ctype=replace(plan.ctype, pointee=None)),
-                        view,
-                        scope=scope,
-                    )
-                return f"unsafe {{ generated_c_string(py, {expr}, {str(optional(plan)).lower()}) }}?"
+                if not plan.length:
+                    self.fail(plan, "pointer buffer needs an explicit copied length")
+                count = (
+                    plan.length
+                    if plan.length.isdigit()
+                    else f"{scope}.{rust_field(plan.length)}"
+                )
+                view = f"generated_view({expr}, {count})?"
+                return self.copy(
+                    replace(plan, ctype=replace(plan.ctype, pointee=None)),
+                    view,
+                    scope=scope,
+                )
             argument = (
                 expr[1:-1] if expr.startswith("(*") and expr.endswith(")") else expr
             )
@@ -407,8 +403,6 @@ class Values:
                 self.fail(plan, "JSON requires a view")
             return f"storage.json({expr}, {str(member).lower()})?"
         if plan.kind == "buffer":
-            if plan.length == "nul":
-                self.fail(plan, "terminated text needs a view")
             converted = (
                 f"storage.buffer({expr}, {str(plan.encoding == 'utf8').lower()})?"
             )

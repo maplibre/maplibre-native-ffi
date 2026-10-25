@@ -15,12 +15,6 @@ const Error = status.Error;
 
 pub const Access = enum { none, handle, scoped };
 
-const CString = struct { bytes: []const u8 };
-
-pub fn cString(bytes: []const u8) CString {
-    return .{ .bytes = bytes };
-}
-
 fn Output(comptime T: type, comptime sized: bool) type {
     return struct {
         pub const Value = T;
@@ -158,7 +152,7 @@ fn InputSlot(comptime Input: type, comptime Parameter: type) type {
     const Item = @typeInfo(Parameter).pointer.child;
     if (@typeInfo(Item) == .@"opaque") return void;
     const Value = if (@typeInfo(Input) == .optional) @typeInfo(Input).optional.child else Input;
-    if (Value == CString or isHandle(Value)) return void;
+    if (isHandle(Value)) return void;
     // Bytes passed by pointer to a view are one value, not an array.
     if (Item == c.mln_buffer_view and Value == []const u8) return Item;
     if (@typeInfo(Value) == .pointer and @typeInfo(Value).pointer.size == .slice) return void;
@@ -270,7 +264,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn encode(self: *Self, comptime Target: type, input: anytype) Error!Target {
             const Input = @TypeOf(input);
             if (Input == Target) return input;
-            if (Input == CString) return @ptrCast(try marshal.cString(self.inputAllocator(), input.bytes));
             if (@typeInfo(Input) == .optional) {
                 if (input) |present| return self.encode(Target, present);
                 if (Target == c.mln_buffer_view) return std.mem.zeroes(c.mln_buffer_view);

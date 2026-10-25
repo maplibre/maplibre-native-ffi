@@ -109,9 +109,7 @@ class NativeValues:
                     "json": "mln_ts_read_json_view",
                 }.get(value.encoding, "mln_ts_read_text_view")
                 return [f"if (!{reader}(call, {js}, &{target}, {path})) {fail};"]
-            return [
-                f"{{ const char* text = NULL; if (!mln_ts_read_text(call, {js}, &text, {path})) {fail}; {target} = text; }}"
-            ]
+            raise Unsupported(f"{value.native}: text outside a view")
         if value.kind == "reference" and value.element.kind == "buffer":
             return self.read(value.element, js, target, path, fail)
         if value.kind == "record" and value.registration:
@@ -448,8 +446,7 @@ class NativeValues:
                 if value.nullable:
                     return f"(({source}).data == NULL ? mln_ts_undefined(env) : {expression})"
                 return expression
-            expression = f"mln_ts_text(env, {source}, strlen({source}))"
-            return f"(({source}) == NULL ? mln_ts_undefined(env) : {expression})"
+            raise Unsupported(f"{value.native}: text outside a view")
         if value.kind == "reference":
             element = value.element
             if element.kind != "record":

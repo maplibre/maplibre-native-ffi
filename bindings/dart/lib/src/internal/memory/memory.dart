@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../c/maplibre_native_c.g.dart' as raw;
-import '../status/status.dart';
 
 /// Runs [body] with zeroed native memory that it must not use after it
 /// returns.
@@ -97,29 +96,6 @@ final class _CallArena implements Allocator {
       }
     }
   }
-}
-
-final class NativeUtf8CString {
-  const NativeUtf8CString(this.pointer, this.byteLength);
-
-  final Pointer<Utf8> pointer;
-
-  final int byteLength;
-}
-
-NativeUtf8CString nativeUtf8CString(String value, Allocator allocator) {
-  if (value.contains('\u0000')) {
-    throwInvalidArgument(
-      'null-terminated strings must not contain embedded NUL',
-    );
-  }
-
-  final bytes = utf8.encode(value);
-  final data = allocator<Uint8>(bytes.length + 1);
-  data.asTypedList(bytes.length).setAll(0, bytes);
-  data[bytes.length] = 0;
-
-  return NativeUtf8CString(data.cast<Utf8>(), bytes.length);
 }
 
 final class NativeStringView {

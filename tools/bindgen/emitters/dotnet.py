@@ -114,7 +114,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
         value = planned.value
         if (
             value.length not in (None, "1")
-            and not (value.length == "nul" and value.encoding == "utf8")
             and planned.direction != "in"
             and not planned.sized_by
             and not planned.result_length
@@ -513,7 +512,7 @@ def emit_operation(
         parameter.value.length: parameter.name
         for parameter in plan.inputs
         if parameter.value.kind in {"array", "buffer"}
-        and parameter.value.length not in {None, "nul"}
+        and parameter.value.length is not None
     }
     outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
     # Caller-sized text starts in scope memory of a guessed size, and the call
@@ -613,7 +612,7 @@ def emit_operation(
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind in {"array", "buffer"}
-            and input_plans[parameter.name].length not in {None, "nul"}
+            and input_plans[parameter.name].length is not None
             and input_plans[parameter.name].encoding in {"utf8", "bytes", "json"}
             and (
                 input_plans[parameter.name].kind == "buffer"
@@ -691,15 +690,6 @@ def emit_operation(
                 omittable.add(name)
             scoped = True
             args.append(values.encode(value_plan, name))
-        elif (
-            value_plan
-            and value_plan.buffer_form == "pointer"
-            and value_plan.length == "nul"
-            and value_plan.encoding == "utf8"
-        ):
-            parameters.append(f"string {name}")
-            scoped = True
-            args.append(f"scope.CString({name})")
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind == "array"

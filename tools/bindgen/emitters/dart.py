@@ -147,7 +147,7 @@ def lower_function(
         if p.value.kind == "array"
         or p.value.kind == "buffer"
         and p.value.buffer_form != "view"
-        and p.value.length not in {None, "1", "nul"}
+        and p.value.length not in {None, "1"}
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
@@ -296,7 +296,7 @@ def lower_function(
         if (
             value.kind == "buffer"
             and value.buffer_form != "view"
-            and value.length not in {None, "1", "nul"}
+            and value.length not in {None, "1"}
         ):
             view = (
                 f"nativeStringView({local}, arena).value"

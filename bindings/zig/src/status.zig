@@ -9,7 +9,6 @@ const generated = @import("generated_status.zig");
 pub const NativeStatusError = generated.NativeStatusError;
 
 pub const BindingError = NativeStatusError || error{
-    InvalidString,
     AbiVersionMismatch,
     AlreadyCompleted,
 };
@@ -123,7 +122,6 @@ fn validateAbiVersionValue(
 
 fn bindingMessage(err: anyerror) []const u8 {
     return switch (err) {
-        error.InvalidString => "the string contains a NUL byte",
         error.AlreadyCompleted => "the operation already completed",
         error.OutOfMemory => "out of memory",
         else => @errorName(err),
@@ -185,9 +183,9 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     try std.testing.expectEqualStrings("", diagnostic.message());
     // A failure the binding detects records its own message only once, so the
     // first recorded cause wins.
-    fail(&diagnostic, error.InvalidString);
     fail(&diagnostic, error.AlreadyCompleted);
-    try std.testing.expectEqualStrings("the string contains a NUL byte", diagnostic.message());
+    fail(&diagnostic, error.OutOfMemory);
+    try std.testing.expectEqualStrings("the operation already completed", diagnostic.message());
 }
 
 test "ABI version validation reports mismatch diagnostics" {

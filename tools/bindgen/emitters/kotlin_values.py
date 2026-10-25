@@ -646,10 +646,6 @@ class Values:
             return f"{expression}?.let {{ {written} }} ?: 0L" if nullable else written
         if value.kind == "buffer" and value.buffer_form == "view":
             return f"view({expression})"
-        if value.kind == "buffer" and value.length == "nul":
-            if value.nullable:
-                return f"{expression}?.let {{ cString(it) }} ?: 0L"
-            return f"cString({expression})"
         if value.kind == "buffer":
             data = f"{expression}.encodeToByteArray()" if is_text(value) else expression
             if value.nullable:
@@ -750,7 +746,7 @@ class Values:
         value = field.value
         lines = [self.place(value, self.at("target", record, field.name), expression)]
         if value.kind == "array" or (
-            value.kind == "buffer" and value.length not in {None, "nul", "1"}
+            value.kind == "buffer" and value.length not in {None, "1"}
         ):
             lines.append(self.write_count(record, value, expression))
         return lines
@@ -857,12 +853,6 @@ class Values:
                     f"readAddress({address}).takeIf {{ it != 0L }}?.let {{ {inner} }}"
                 )
             return self.decode(value.element, f"readAddress({address})", scope)
-        if value.kind == "buffer" and value.length == "nul":
-            return (
-                f"readCStringOrNull(readAddress({address}))"
-                if value.nullable
-                else f"readCString(readAddress({address}))"
-            )
         if value.kind == "buffer" and value.buffer_form == "view":
             text = is_text(value)
             if value.nullable:
@@ -925,7 +915,7 @@ class Values:
         value = field.value
         address = self.at("source", record, field.name)
         if value.kind == "array" or (
-            value.kind == "buffer" and value.length not in {None, "nul", "1"}
+            value.kind == "buffer" and value.length not in {None, "1"}
         ):
             count = self.read_count(record, value.length)
             pointer = f"readAddress({address})"

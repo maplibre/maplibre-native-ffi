@@ -422,7 +422,7 @@ def lent_text(value):
         value.kind == "buffer"
         and is_text(value)
         and not value.nullable
-        and (value.length == "nul" or value.buffer_form == "view")
+        and value.buffer_form == "view"
     )
 
 
@@ -439,12 +439,7 @@ def callback_parameter_capture(values, parameter, local=None):
     if scoped:
         return f"&mut {values.name(scoped)}::new({local})?"
     if lent_text(parameter.value):
-        borrow = (
-            "borrow_c_string"
-            if parameter.value.length == "nul"
-            else "borrow_string_view"
-        )
-        return f"unsafe {{ maplibre_core::string::{borrow}({local}) }}?"
+        return f"unsafe {{ maplibre_core::string::borrow_string_view({local}) }}?"
     if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
         return f"{values.public(parameter.value)}::adopt({local}, None)?"
     if parameter.value.kind == "handle":
@@ -463,9 +458,7 @@ def response_declaration(values, value):
         counts = {
             p.value.length: p.name
             for p in plan.inputs
-            if p.value.kind in {"buffer", "array"}
-            and p.value.length
-            and p.value.length != "nul"
+            if p.value.kind in {"buffer", "array"} and p.value.length
         }
         for parameter in plan.inputs:
             local = identifier(parameter.name)
@@ -482,8 +475,8 @@ def response_declaration(values, value):
                 signature.append(f"{local}: {public}")
                 if (
                     parameter.value.buffer_form == "view"
-                    or parameter.value.length == "nul"
-                ) and "let arena = &mut InputArena::default();" not in setup:
+                    and "let arena = &mut InputArena::default();" not in setup
+                ):
                     setup.insert(0, "let arena = &mut InputArena::default();")
                 setup.append(
                     f"let native_{local} = {encode(values, parameter.value, local)};"

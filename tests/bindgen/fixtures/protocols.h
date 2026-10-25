@@ -534,7 +534,7 @@ typedef struct mln_sample_delivery {
 typedef unsigned long long mln_query
   BIND("kind=handle;release=mln_query_release;dispose=mln_query_release");
 typedef void (*mln_query_callback)(
-  void* context, const char* text, mln_query query BIND("ownership=owned")
+  void* context, mln_buffer_view text, mln_query query BIND("ownership=owned")
 ) BIND("delivery=MLN_DELIVERY_TYPE_QUERY");
 typedef void (*mln_query_release_context)(void* context);
 typedef struct mln_query_handler {
@@ -554,7 +554,7 @@ mln_status mln_query_answer(
 );
 void mln_query_release(mln_query query);
 typedef struct mln_query_delivery {
-  const char* text BIND("lifetime=owner");
+  mln_buffer_view text BIND("lifetime=owner");
   mln_query query BIND("ownership=owned");
 } mln_query_delivery;
 #endif
@@ -624,7 +624,7 @@ typedef struct mln_ticket_cancel_delivery {
 // that native code supplies in queue mode.
 typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
-  void* context, int code, const char* text
+  void* context, int code, mln_buffer_view text
 ) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1");
 // Its release must not call back into the API.
 typedef struct mln_notice_handler {
@@ -639,7 +639,7 @@ mln_status mln_notice_set_callback(
 );
 typedef struct mln_notice_delivery {
   int code;
-  const char* text BIND("lifetime=owner");
+  mln_buffer_view text BIND("lifetime=owner");
 } mln_notice_delivery;
 #endif
 

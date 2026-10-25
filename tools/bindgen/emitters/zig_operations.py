@@ -146,10 +146,7 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
     length_sources = {
         v.length: n
         for n, v in inputs.items()
-        if v.kind in {"array", "buffer"}
-        and v.length
-        and v.length != "nul"
-        and not v.length.isdigit()
+        if v.kind in {"array", "buffer"} and v.length and not v.length.isdigit()
     }
     # Caller-sized text marks its storage, capacity, and length, which the
     # call fills in and passes again with enough storage when the text did
@@ -235,13 +232,6 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
             needs_allocator |= encoding(
                 value.element if value.kind == "reference" else value
             )[0]
-        if value.kind == "buffer" and value.length == "nul":
-            arguments.append(
-                f"if ({local}) |text| call.cString(text) else null"
-                if value.nullable
-                else f"call.cString({local})"
-            )
-            continue
         arguments.append(local)
     mode = access(plan)
     receiver = names[receiver_name] if receiver_name else "{}"

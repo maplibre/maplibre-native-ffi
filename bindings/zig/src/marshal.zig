@@ -35,11 +35,6 @@ pub fn CallbackResult(comptime T: type) type {
     return @typeInfo(CallbackFunction(T)).@"fn".return_type.?;
 }
 
-pub fn cString(allocator: std.mem.Allocator, bytes: []const u8) status.Error![*:0]const u8 {
-    if (std.mem.indexOfScalar(u8, bytes, 0) != null) return error.InvalidString;
-    return (try allocator.dupeSentinel(u8, bytes, 0)).ptr;
-}
-
 pub fn store(allocator: std.mem.Allocator, value: anytype) status.Error!*const @TypeOf(value) {
     const pointer = try allocator.create(@TypeOf(value));
     pointer.* = value;

@@ -68,12 +68,4 @@ enum NativeString {
     }
     return text
   }
-
-  static func copyCString(_ data: UnsafePointer<CChar>?) throws -> String {
-    guard let data, let value = String(validatingCString: data) else {
-      throw MaplibreError
-        .invalidArgument("native C string is null or invalid UTF-8")
-    }
-    return value
-  }
 }

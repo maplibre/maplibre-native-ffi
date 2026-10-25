@@ -457,8 +457,6 @@ class Values:
                     if value.encoding == "utf8"
                     else f"nativeBufferView({expression}, arena)"
                 )
-            if value.length == "nul":
-                return f"nativeUtf8CString({expression}, arena).pointer.cast<Char>()"
             view = (
                 f"nativeStringView({expression}, arena).value"
                 if value.encoding == "utf8"
@@ -509,12 +507,9 @@ class Values:
                 if value.nullable:
                     result = f"{expression}.data == nullptr ? null : {result}"
             else:
-                if value.length == "nul":
-                    result = f"{expression}.cast<Utf8>().toDartString()"
-                else:
-                    result = f"Uint8List.fromList({expression}.cast<Uint8>().asTypedList({count}))"
-                    if value.encoding == "utf8":
-                        result = f"utf8.decode({result})"
+                result = f"Uint8List.fromList({expression}.cast<Uint8>().asTypedList({count}))"
+                if value.encoding == "utf8":
+                    result = f"utf8.decode({result})"
                 if value.nullable:
                     result = f"{expression} == nullptr ? null : {result}"
         elif value.kind == "array":
@@ -1357,7 +1352,7 @@ class Values:
                 if (
                     field.value.kind == "buffer"
                     and field.value.buffer_form != "view"
-                    and field.value.length not in {None, "nul", "1"}
+                    and field.value.length not in {None, "1"}
                 ):
                     view = (
                         f"nativeStringView({expression}, arena).value"
