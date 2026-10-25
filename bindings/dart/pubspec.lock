@@ -117,10 +117,10 @@ packages:
     dependency: "direct dev"
     description:
       name: frontend_server_client
-      sha256: f64a0333a82f30b0cca061bc3d143813a486dc086b574bfb233b7c1372427694
+      sha256: "2b56423afc7651a81da53ed3a4f9f51e92572293f54d0d54e19b759f13714849"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.0"
+    version: "4.2.0"
   glob:
     dependency: transitive
     description:
