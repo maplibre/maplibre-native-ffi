@@ -171,8 +171,9 @@ class Values:
             arms.append(
                 f"case {self.union_name(union)}{name(variant.name)}Variant: {self.native(variant.value, 'variant.Value', write)}"
             )
-        if self.unknown(union):
-            arms.append('default: arena.fail("unknown input union variant")')
+        # A pointer to a variant, or a type embedding one, also satisfies the
+        # sealed interface, so every union rejects what the switch doesn't name.
+        arms.append('default: arena.fail("unknown input union variant")')
         return f'if {expr} == nil {{ arena.fail("missing union variant") }}; {tag}({expr}.bindingTag()); switch variant := {expr}.(type) {{ {"; ".join(arms)} }}'
 
     def tag_write(self, record, union):

@@ -352,7 +352,13 @@ class Values:
             copied = self.facade_copy(bare, expr)
             if copied == expr:
                 return expr
-            if bare.kind in {"record", "enum"} and not bare.response:
+            # A record that presents its union copies through _copy_variant,
+            # which takes more than the value, so it can't pass as a callable.
+            if (
+                bare.kind in {"record", "enum"}
+                and not bare.response
+                and not bare.union_member
+            ):
                 return f"_maybe({copied.removesuffix(f'({expr})')}, {expr})"
             return f"None if {expr} is None else ({copied})"
         if plan.kind == "union":

@@ -57,6 +57,17 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("ReadingBatchHandle", source)
         self.assertNotIn("ReadingView", source)
 
+    def test_an_input_only_union_rejects_a_value_its_switch_does_not_name(self):
+        source = go.generate(real_api())["generated_api.go"]
+        # A pointer to a variant also satisfies the sealed interface, so even a
+        # union with no UnknownVariant rejects whatever its switch doesn't name.
+        encode = re.search(
+            r"case RenderedQueryGeometryLineStringVariant:[^\n]*", source
+        )
+        self.assertIsNotNone(encode)
+        self.assertIn('default: arena.fail("unknown input union variant")', encode[0])
+        self.assertNotIn("func (UnknownVariant) isRenderedQueryGeometry()", source)
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(

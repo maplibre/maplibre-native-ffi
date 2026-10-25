@@ -3956,6 +3956,8 @@ func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingAren
 		*(*C.mln_screen_box)(unsafe.Pointer(&raw.data)) = nativeScreenBox(variant.Value, arena)
 	case RenderedQueryGeometryLineStringVariant:
 		*(*C.mln_screen_line_string)(unsafe.Pointer(&raw.data)) = nativeScreenLineString(variant.Value, arena)
+	default:
+		arena.fail("unknown input union variant")
 	}
 	return raw
 }
