@@ -110,31 +110,6 @@ public value class CameraUpdateMode(public val rawValue: UInt) {
 }
 
 /**
- * Terminal dispositions reported by command completions.
- *
- * Later versions may add values; an unknown one keeps its `rawValue`.
- *
- * See `mln_command_disposition` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
- */
-@JvmInline
-public value class CommandDisposition(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "COMMITTED"
-      1u -> "FAILED"
-      2u -> "CANCELLED"
-      else -> "CommandDisposition($rawValue)"
-    }
-
-  public companion object {
-    public val COMMITTED: CommandDisposition = CommandDisposition(0u)
-    public val FAILED: CommandDisposition = CommandDisposition(1u)
-    public val CANCELLED: CommandDisposition = CommandDisposition(2u)
-  }
-}
-
-/**
  * Map constraint modes used by `mln_map_viewport_options`.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.

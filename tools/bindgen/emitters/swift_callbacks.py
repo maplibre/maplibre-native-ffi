@@ -325,7 +325,7 @@ def descriptor(values, plan):
             else ""
         )
         body = (
-            f'  do {{ {invoke} }}{deliberate} catch {{ reportToStandardError("{callback.native} failed and native received its fallback: \\(error)\\n"); {fail} }}'
+            f'  do {{ {invoke} }}{deliberate} catch {{ reportToStandardError("{callback.native} failed: \\(error)\\n"); {fail} }}'
             if "try " in invoke
             else f"  {invoke}"
         )

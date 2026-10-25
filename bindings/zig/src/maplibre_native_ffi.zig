@@ -2060,19 +2060,6 @@ pub const CanonicalTileId = struct {
     }
 };
 
-/// Terminal dispositions reported by command completions.
-///
-/// See `mln_command_disposition` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
-pub const CommandDisposition = enum(u32) {
-    committed = 0,
-    failed = 1,
-    cancelled = 2,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 /// Map constraint modes used by `mln_map_viewport_options`.
 ///
 /// See `mln_constrain_mode` in the

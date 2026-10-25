@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.readLatLng
@@ -56,6 +55,10 @@ internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 
 /** Calls the completion's `mln_user_data_release` at [release] on this thread. */
 internal expect fun callCompletionRelease(release: Long, userData: Long)
+
+// The mln_command_disposition values; the bridge reads only the status.
+private const val DISPOSITION_FAILED = 1u
+private const val DISPOSITION_CANCELLED = 2u
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
 private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
@@ -145,7 +148,7 @@ class CompletionBridgeTest {
       Status.NOT_FOUND.rawValue,
       9u,
       "the source does not exist",
-      CommandDisposition.FAILED.rawValue,
+      DISPOSITION_FAILED,
     )
     failed.release()
     val failure = assertFailsWithStatus(Status.NOT_FOUND) { failed.deferred.await() }
@@ -157,7 +160,7 @@ class CompletionBridgeTest {
       Status.CANCELLED.rawValue,
       0u,
       "asynchronous work was abandoned",
-      CommandDisposition.CANCELLED.rawValue,
+      DISPOSITION_CANCELLED,
     )
     cancelled.release()
     val cancellation = assertFailsWithStatus(Status.CANCELLED) { cancelled.deferred.await() }

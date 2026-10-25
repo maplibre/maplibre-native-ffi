@@ -7,7 +7,6 @@
 /dotnet/src/Maplibre.NativeFfi/Base/Maplibre.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Completion/CommandDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
@@ -315,7 +314,6 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedBaseValues.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedCompletionValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLoggingValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedMapValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedQueryValues.swift linguist-generated=true

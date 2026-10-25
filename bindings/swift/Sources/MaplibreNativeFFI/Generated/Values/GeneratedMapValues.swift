@@ -556,7 +556,7 @@ private func invokeCameraTransitionHandlerCallback(
         .map { CameraTransitionEnd(raw: $0) }[0])
   } catch {
     reportToStandardError(
-      "mln_camera_transition_end_callback failed and native received its fallback: \(error)\n"
+      "mln_camera_transition_end_callback failed: \(error)\n"
     )
   }
 }

@@ -671,23 +671,6 @@ impl FromNative<sys::mln_canonical_tile_id> for CanonicalTileId {
 }
 
 native_enum! {
-/// Terminal dispositions reported by command completions.
-///
-/// See `mln_command_disposition` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
-pub enum CommandDisposition: u32 {
-    Committed = 0,
-    Failed = 1,
-    Cancelled = 2,
-} Unknown
-}
-impl Default for CommandDisposition {
-    fn default() -> Self {
-        Self::Committed
-    }
-}
-
-native_enum! {
 /// Map constraint modes used by `mln_map_viewport_options`.
 ///
 /// See `mln_constrain_mode` in the

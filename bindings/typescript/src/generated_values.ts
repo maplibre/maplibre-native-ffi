@@ -291,22 +291,6 @@ export interface CanonicalTileId {
 }
 
 /**
- * Terminal dispositions reported by command completions.
- *
- * See `mln_command_disposition` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
- */
-export const CommandDisposition = {
-  committed: 0,
-  failed: 1,
-  cancelled: 2,
-} as const;
-/** One of the CommandDisposition values, or a value this binding does not know. */
-export type CommandDisposition =
-  | (typeof CommandDisposition)[keyof typeof CommandDisposition]
-  | (number & {});
-
-/**
  * Map constraint modes used by `mln_map_viewport_options`.
  *
  * See `mln_constrain_mode` in the

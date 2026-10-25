@@ -200,7 +200,7 @@ private func invokeHttpHeaderTransformCallback(
     .ok { return mln_status(rawValue: error.status.rawValue) } catch
   {
     reportToStandardError(
-      "mln_http_header_transform_callback failed and native received its fallback: \(error)\n"
+      "mln_http_header_transform_callback failed: \(error)\n"
     ); return MLN_STATUS_NATIVE_ERROR
   }
 }
@@ -566,7 +566,7 @@ private func invokeResourceProviderCallback(
     ownedHandle
   ) } catch {
     reportToStandardError(
-      "mln_resource_provider_callback failed and native received its fallback: \(error)\n"
+      "mln_resource_provider_callback failed: \(error)\n"
     ); ownedHandle
       .close()
   }
@@ -950,7 +950,7 @@ private func invokeResourceTransformCallback(
     ownedRequest
   ) } catch {
     reportToStandardError(
-      "mln_resource_transform_callback failed and native received its fallback: \(error)\n"
+      "mln_resource_transform_callback failed: \(error)\n"
     ); ownedRequest
       .close()
   }
@@ -1179,9 +1179,7 @@ private func invokeRuntimeEventHandlerCallback(
         ) { item, bytes in try RuntimeEvent(raw: item, recordBytes: bytes) }
         }[0])
   } catch {
-    reportToStandardError(
-      "mln_runtime_event_callback failed and native received its fallback: \(error)\n"
-    )
+    reportToStandardError("mln_runtime_event_callback failed: \(error)\n")
   }
 }
 

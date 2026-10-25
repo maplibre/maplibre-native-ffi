@@ -106,9 +106,7 @@ private func invokeLogHandlerCallback(
     code,
     NativeString.copyUTF8(data: message.data, size: message.size)
   ) } catch {
-    reportToStandardError(
-      "mln_log_callback failed and native received its fallback: \(error)\n"
-    ); return false
+    reportToStandardError("mln_log_callback failed: \(error)\n"); return false
   }
 }
 

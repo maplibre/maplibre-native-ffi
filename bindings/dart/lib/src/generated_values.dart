@@ -82,24 +82,6 @@ final class CameraUpdateMode extends _Enum {
   };
 }
 
-/// Terminal dispositions reported by command completions.
-///
-/// See `mln_command_disposition` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
-final class CommandDisposition extends _Enum {
-  const CommandDisposition.fromRawValue(super.rawValue);
-  static const committed = CommandDisposition.fromRawValue(0);
-  static const failed = CommandDisposition.fromRawValue(1);
-  static const cancelled = CommandDisposition.fromRawValue(2);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'CommandDisposition.committed',
-    1 => 'CommandDisposition.failed',
-    2 => 'CommandDisposition.cancelled',
-    _ => 'CommandDisposition($rawValue)',
-  };
-}
-
 /// Map constraint modes used by `mln_map_viewport_options`.
 ///
 /// See `mln_constrain_mode` in the

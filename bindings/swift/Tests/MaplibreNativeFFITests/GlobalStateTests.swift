@@ -50,7 +50,7 @@ struct GlobalStateTests {
       throw CallbackFailure()
     })
     let report =
-      "mln_log_callback failed and native received its fallback: CallbackFailure()"
+      "mln_log_callback failed: CallbackFailure()"
     try await withMapFixture { fixture in
       // MapLibre logs the parse failure of a malformed document.
       _ = try? await fixture.map

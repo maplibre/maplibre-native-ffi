@@ -119,31 +119,6 @@ func (value CameraUpdateMode) String() string {
 	return fmt.Sprintf("CameraUpdateMode(%d)", value)
 }
 
-// CommandDisposition corresponds to mln_command_disposition. Terminal
-// dispositions reported by command completions.
-//
-// See mln_command_disposition in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html
-type CommandDisposition uint32
-
-const (
-	CommandDispositionCommitted CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_COMMITTED)
-	CommandDispositionFailed    CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_FAILED)
-	CommandDispositionCancelled CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_CANCELLED)
-)
-
-func (value CommandDisposition) String() string {
-	switch value {
-	case 0:
-		return "CommandDispositionCommitted"
-	case 1:
-		return "CommandDispositionFailed"
-	case 2:
-		return "CommandDispositionCancelled"
-	}
-	return fmt.Sprintf("CommandDisposition(%d)", value)
-}
-
 // ConstrainMode corresponds to mln_constrain_mode. Map constraint modes used by
 // mln_map_viewport_options.
 //

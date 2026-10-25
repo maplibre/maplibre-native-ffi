@@ -226,6 +226,18 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
         # A value field that also uses the enum keeps it public.
         self.assertIn("shared", api.public_values)
 
+    def test_enums_that_only_completion_results_use_stay_private(self):
+        api = bind(
+            parse(
+                'BIND("execution=command") mln_status submit('
+                "const mln_completion *completion, mln_diagnostic *out_diagnostic);",
+                defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
+            ),
+            require_complete=True,
+        )
+        self.assertIn("mln_command_disposition", api.control_enums)
+        self.assertNotIn("mln_command_disposition", api.public_values)
+
     def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
 typedef enum BIND("kind=bitmask") field : unsigned { CENTER = 1, ZOOM = 2 } field;

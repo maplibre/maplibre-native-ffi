@@ -233,18 +233,6 @@ class CameraUpdateMode(UnknownIntEnum):
     FLY = 2
 
 
-class CommandDisposition(UnknownIntEnum):
-    """Terminal dispositions reported by command completions.
-
-    See `mln_command_disposition` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
-    """
-
-    COMMITTED = 0
-    FAILED = 1
-    CANCELLED = 2
-
-
 class ConstrainMode(UnknownIntEnum):
     """Map constraint modes used by `mln_map_viewport_options`.
 

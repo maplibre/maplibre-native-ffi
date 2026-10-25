@@ -2,7 +2,7 @@ const std = @import("std");
 const status = @import("status.zig");
 
 pub fn reportError(name: []const u8, err: anyerror) void {
-    std.log.scoped(.maplibre_native_ffi).warn("{s} failed and native received its fallback: {s}", .{ name, @errorName(err) });
+    std.log.scoped(.maplibre_native_ffi).warn("{s} failed: {s}", .{ name, @errorName(err) });
 }
 
 // Callback response pointers are valid only on their callback's thread.

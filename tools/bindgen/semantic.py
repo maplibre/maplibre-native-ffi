@@ -19,6 +19,7 @@ from .model import Api, CType, Function, ModelError
 from .names import type_name
 from .protocol import (
     BUFFER_VIEW,
+    COMPLETION_RESULT,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
     DELIVERY_BATCH,
@@ -510,7 +511,8 @@ class BoundApi:
 
     @functools.cached_property
     def control_enums(self) -> frozenset[str]:
-        """Enums that only presence masks and union tags use.
+        """Enums that only presence masks, union tags, and completion results
+        use, other than the status that every runtime names.
 
         A binding writes and reads those fields itself, so no host code names
         the enum, and a binding keeps its values private.
@@ -528,7 +530,13 @@ class BoundApi:
             for member in value.fields:
                 visit(
                     member.value,
-                    control if member.role in {"presence_mask", "tag"} else used,
+                    control
+                    if member.role in {"presence_mask", "tag"}
+                    or (
+                        value.native == COMPLETION_RESULT
+                        and member.value.native != STATUS
+                    )
+                    else used,
                 )
         for operation in (*self.operations, *self.runtime_operations):
             for parameter in (*operation.inputs, *operation.outputs):

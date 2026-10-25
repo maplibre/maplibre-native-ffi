@@ -15,7 +15,7 @@ internal static class NativeCallbackFailure
             try
             {
                 Console.Error.WriteLine(
-                    $"Maplibre.NativeFfi CallbackException: {callback} threw and native received its fallback: {exception}"
+                    $"Maplibre.NativeFfi CallbackException: {callback} threw: {exception}"
                 );
             }
             catch
