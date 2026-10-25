@@ -25,7 +25,10 @@ internal static class NativeLeakReporter
         }
     }
 
-    private static bool HasHostListener()
+    /// <summary>
+    /// Whether a host added a trace listener. The default listener alone does not count.
+    /// </summary>
+    internal static bool HasHostListener()
     {
         lock (Trace.Listeners)
         {

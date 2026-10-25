@@ -100,6 +100,28 @@ public sealed class LeakReportTests
         return map;
     }
 
+    // The default listener writes only to an attached debugger, so a report goes to the trace
+    // listeners only once the host adds one of its own.
+    [Fact]
+    public void OnlyAListenerTheHostAddedReceivesReports()
+    {
+        var installed = Trace.Listeners.Cast<TraceListener>().ToArray();
+        Trace.Listeners.Clear();
+        try
+        {
+            Assert.False(NativeLeakReporter.HasHostListener());
+            Trace.Listeners.Add(new DefaultTraceListener());
+            Assert.False(NativeLeakReporter.HasHostListener());
+            using var reports = new LeakCapture();
+            Assert.True(NativeLeakReporter.HasHostListener());
+        }
+        finally
+        {
+            Trace.Listeners.Clear();
+            Trace.Listeners.AddRange(installed);
+        }
+    }
+
     /// <summary>Records the leak warnings that reach the trace listeners until disposed.</summary>
     private sealed class LeakCapture : TraceListener
     {
