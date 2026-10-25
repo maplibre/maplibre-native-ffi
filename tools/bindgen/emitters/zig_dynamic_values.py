@@ -118,13 +118,46 @@ def to_native(value, source):
     return f"try {source}.toNative({', '.join(to_native_parameters(value))})"
 
 
-def decode(values, value, source, context="raw"):
+def borrows(values, value):
+    """Whether a copy of `value` can borrow native's text and needs no
+    allocator: none of its arrays has a length that varies."""
+    if slice_of(values, value):
+        return False
+    if value.kind == "array":
+        return value.ctype.kind == "array" and borrows(values, value.element)
+    if value.kind == "reference":
+        return borrows(values, value.element)
+    if value.kind in {"record", "union"}:
+        return all(
+            borrows(values, field.value)
+            for field in value.fields
+            if field.public or value.kind == "union"
+        )
+    return True
+
+
+def lends(values, value):
+    """Whether a record's `fromNative` borrows native's text, which a callback
+    argument alone reaches and native lends until the callback returns."""
+    return (
+        value.kind == "record"
+        and dynamic(value)
+        and value.native in values.bound.lent
+        and borrows(values, value)
+    )
+
+
+def decode(values, value, source, context="raw", borrowed=False):
+    """Copies `value` from `source`. A `borrowed` copy points into native's
+    text instead of copying it."""
     if value.registration and value.native not in values.bound.returned:
         # Native never returns callbacks, so a copy leaves a registration
         # unset.
         return "null" if value.nullable else ".{}"
     if array := slice_of(values, value):
-        return decode(values, array.value, f"{source}.{identifier(array.name)}", source)
+        return decode(
+            values, array.value, f"{source}.{identifier(array.name)}", source, borrowed
+        )
     optional = value.nullable
     if value.kind in {"buffer", "array", "reference"} and optional:
         absent = (
@@ -132,10 +165,11 @@ def decode(values, value, source, context="raw"):
             if value.buffer_form == "view"
             else f"{source} == null"
         )
-        return f"if ({absent}) null else {decode(values, replace(value, nullable=False), source, context)}"
+        return f"if ({absent}) null else {decode(values, replace(value, nullable=False), source, context, borrowed)}"
     if value.kind == "buffer":
         if value.length == "nul":
-            return f"try allocator.dupe(u8, std.mem.span({source} orelse return error.NativeError))"
+            span = f"std.mem.span({source} orelse return error.NativeError)"
+            return span if borrowed else f"try allocator.dupe(u8, {span})"
         if value.buffer_form != "view":
             count = (
                 value.length
@@ -143,9 +177,11 @@ def decode(values, value, source, context="raw"):
                 else f"{context}.{identifier(value.length)}"
             )
             source = f".{{ .data = {source}, .size = {count} }}"
+        if borrowed:
+            return f"try marshal.borrowView({source})"
         return f"try marshal.copyView(allocator, {source})"
     if value.kind == "reference" and slice_of(values, value.element):
-        view = decode(values, value.element, "slice_view")
+        view = decode(values, value.element, "slice_view", borrowed=borrowed)
         return f"slice: {{ const slice_view = ({source} orelse return error.NativeError).*; break :slice {view}; }}"
     if value.kind == "reference":
         return decode(
@@ -153,6 +189,7 @@ def decode(values, value, source, context="raw"):
             value.element,
             f"({source} orelse return error.NativeError).*",
             context,
+            borrowed,
         )
     if value.kind == "array":
         fixed = value.ctype.kind == "array"
@@ -171,26 +208,28 @@ def decode(values, value, source, context="raw"):
             if fixed
             else f"const copied = try allocator.alloc({values.public(value.element)}, {count});"
         )
-        copied = decode(values, value.element, "item", context)
+        copied = decode(values, value.element, "item", context, borrowed)
         if value.stride:
             return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try marshal.stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
         return f"blk: {{ {storage} for ({items}, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"
     if value.kind == "union":
-        return variant(values, value, value, source, context)
+        return variant(values, value, value, source, context, borrowed)
     if value.kind in {"scalar", "native_pointer"}:
         return source
     return (
-        f"try {values.public(value)}.fromNative(allocator, {source})"
+        f"try {values.public(value)}.fromNative({source})"
+        if lends(values, value)
+        else f"try {values.public(value)}.fromNative(allocator, {source})"
         if dynamic(value)
         else f"{values.public(value)}.fromNative({source})"
     )
 
 
-def variant(values, union, owner, source, context):
+def variant(values, union, owner, source, context, borrowed=False):
     """Copies the variant of the union at `source` that the tag in `context`
     selects. Only a returned `owner` keeps a tag it predates as `unknown`."""
     cases = ", ".join(
-        f"c.{field.presence.variant} => .{{ .{identifier(field.name)} = {decode(values, field.value, source + '.' + identifier(field.name), context)} }}"
+        f"c.{field.presence.variant} => .{{ .{identifier(field.name)} = {decode(values, field.value, source + '.' + identifier(field.name), context, borrowed)} }}"
         for field in union.fields
     )
     if union.empty_variant:
@@ -219,6 +258,7 @@ def submit(values, union, owner, source, place):
 
 def declaration(values, value):
     typ = values.public(value)
+    borrowed = lends(values, value)
     fields, writes, captures = [], [], []
     trampolines = []
     hidden = set()
@@ -268,7 +308,9 @@ def declaration(values, value):
                 doc(values.bound, f"{value.native}.{field.name}", "    ")
                 + f"    {local}: {values.public(union)}{default},"
             )
-            captures.append(f"            .{local} = {decode(values, union, raw)},")
+            captures.append(
+                f"            .{local} = {decode(values, union, raw, borrowed=borrowed)},"
+            )
             writes.append(submit(values, union, union, f"self.{local}", raw))
             continue
         optional = field.presence and field.presence.mask
@@ -299,7 +341,7 @@ def declaration(values, value):
             )
             + ","
         )
-        copied = decode(values, field.value, raw)
+        copied = decode(values, field.value, raw, borrowed=borrowed)
         if optional:
             path = identifier(field.presence.mask)
             bit = field.presence.bit
@@ -340,14 +382,20 @@ def declaration(values, value):
     )
     capture_use = (
         ""
-        if any("allocator" in line for line in captures)
+        if borrowed or any("allocator" in line for line in captures)
         else "        _ = allocator;\n"
     )
     if not any("raw." in line for line in captures):
         capture_use += "        _ = raw;\n"
+    # A lent copy's text is native's, valid until the callback returns.
+    lent_doc = (
+        "    /// Borrows the record's text, which native lends until the callback returns.\n"
+        if borrowed
+        else ""
+    )
     # Native returns a registration only as its own default.
     copy = (
-        f"""    pub fn fromNative(allocator: std.mem.Allocator, raw: c.{value.native}) status.Error!{typ} {{
+        f"""{lent_doc}    pub fn fromNative({"" if borrowed else "allocator: std.mem.Allocator, "}raw: c.{value.native}) status.Error!{typ} {{
 {capture_use}        return .{{
 {chr(10).join(captures)}
         }};

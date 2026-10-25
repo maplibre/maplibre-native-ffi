@@ -466,6 +466,9 @@ class BoundApi:
     # operation's output or result, a callback's argument, or a record default
     # reaches. A copy leaves a callback registration field unset.
     returned: frozenset[str] = frozenset()
+    # The returned records and unions that only a callback's arguments reach,
+    # which native lends for the callback's duration.
+    lent: frozenset[str] = frozenset()
 
     @functools.cached_property
     def inputs(self) -> set[str]:
@@ -652,6 +655,8 @@ class Binder:
         self.callbacks: dict[str, CallbackPlan] = {}
         self.resolving: set[str] = set()
         self.returned: set[str] = set()
+        self.lent: set[str] = set()
+        self.kept: set[str] = set()
         self.handles = {
             name: HandlePlan(
                 name,
@@ -1335,12 +1340,14 @@ class Binder:
             function.name not in self.api.runtime_exports
             and not isinstance(support, DeliverySupport)
         ) or isinstance(support, DefaultSupport):
-            self.returned |= self.copied(
+            kept = self.copied(
                 outputs,
                 result,
                 context,
                 isinstance(support, DefaultSupport),
             )
+            self.returned |= kept
+            self.kept |= kept
         return OperationPlan(
             function,
             metadata["execution"],
@@ -1474,9 +1481,11 @@ class Binder:
             )
             for parameter in typedef.parameters
         )
-        self.returned |= self.copied(
+        lent = self.copied(
             tuple(p for p in parameters if p.direction != "out"), None, context
         )
+        self.returned |= lent
+        self.lent |= lent
         return CallbackPlan(
             name,
             parameters,
@@ -1564,6 +1573,7 @@ class Binder:
             unsupported,
             tuple(operation for operation in operations if internal(operation)),
             frozenset(self.returned),
+            frozenset(self.lent - self.kept),
         )
 
 

@@ -10,14 +10,13 @@ const support = @import("fixture.zig");
 // Host strings cross as views. Native rejects NUL in paths before a C-string
 // consumer reads them, while other views preserve NUL.
 test "host strings use views and native-lent strings decode" {
-    const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[1].?;
+    const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[0].?;
     var raw_request = std.mem.zeroes(RawRequest);
     const lent_url = "custom://native-lent/é";
     raw_request.resolved_url = .{ .data = lent_url, .size = lent_url.len };
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const request = try maplibre.ResourceRequestInfo.fromNative(arena.allocator(), raw_request);
-    try testing.expectEqualStrings("custom://native-lent/é", request.resolved_url);
+    // A callback argument borrows native's text rather than copying it.
+    const request = try maplibre.ResourceRequestInfo.fromNative(raw_request);
+    try testing.expectEqual(@as([*]const u8, lent_url), request.resolved_url.ptr);
 
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
@@ -104,6 +103,8 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
             try testing.expectEqual(@as(u64, 0x1_0000_0002), events[0].generation);
             try testing.expectEqual(@as(u32, 77), events[0].payload.unknown);
             try testing.expectEqualStrings("future", events[0].message);
+            // The batch lends its text rather than a copy.
+            try testing.expectEqual(@as([*]const u8, messages), events[0].message.ptr);
             try testing.expectEqual(maplibre.RuntimeEventType.map_style_loaded, events[1].type);
             try testing.expect(events[1].payload == .empty);
             try testing.expectEqualStrings("loaded", events[1].message);

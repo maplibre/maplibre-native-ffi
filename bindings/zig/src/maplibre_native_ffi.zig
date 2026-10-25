@@ -4550,10 +4550,7 @@ pub const ResourceProvider = struct {
                 defer if (!ownership_transferred) {
                     owned_handle.release();
                 };
-                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
-                defer arena.deinit();
-                const allocator = arena.allocator();
-                try host(state.value.context, try ResourceRequestInfo.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), owned_handle);
+                try host(state.value.context, try ResourceRequestInfo.fromNative((callback_arg_1 orelse return error.NativeError).*), owned_handle);
                 ownership_transferred = true;
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2) catch |err| {
@@ -4674,10 +4671,11 @@ pub const ResourceRequestInfo = struct {
     prior_etag: []const u8 = &.{},
     prior_data: []const u8 = &.{},
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request_info) status.Error!ResourceRequestInfo {
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_resource_request_info) status.Error!ResourceRequestInfo {
         return .{
-            .requested_url = try marshal.copyView(allocator, raw.requested_url),
-            .resolved_url = try marshal.copyView(allocator, raw.resolved_url),
+            .requested_url = try marshal.borrowView(raw.requested_url),
+            .resolved_url = try marshal.borrowView(raw.resolved_url),
             .kind = ResourceKind.fromNative(raw.kind),
             .loading_method = ResourceLoadingMethod.fromNative(raw.loading_method),
             .priority = ResourcePriority.fromNative(raw.priority),
@@ -4686,8 +4684,8 @@ pub const ResourceRequestInfo = struct {
             .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
             .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
             .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
-            .prior_etag = try marshal.copyView(allocator, raw.prior_etag),
-            .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
+            .prior_etag = try marshal.borrowView(raw.prior_etag),
+            .prior_data = try marshal.borrowView(.{ .data = raw.prior_data, .size = raw.prior_data_size }),
         };
     }
 };
@@ -4876,14 +4874,15 @@ pub const RuntimeEvent = struct {
     /// Typed payload selected by payload_type.
     payload: RuntimeEventPayload = .{ .unknown = 0 },
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event) status.Error!RuntimeEvent {
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_runtime_event) status.Error!RuntimeEvent {
         return .{
             .type = RuntimeEventType.fromNative(raw.type),
             .source_type = RuntimeEventSourceType.fromNative(raw.source_type),
             .source = raw.source,
             .generation = raw.generation,
             .code = raw.code,
-            .message = try marshal.copyView(allocator, raw.message),
+            .message = try marshal.borrowView(raw.message),
             .payload = switch (raw.payload_type) {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => .{ .render_frame = RuntimeEventRenderFrame.fromNative(raw.payload.render_frame) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => .{ .render_map = RuntimeEventRenderMap.fromNative(raw.payload.render_map) },
@@ -4964,7 +4963,7 @@ pub const RuntimeEventHandler = struct {
                         const copied = try allocator.alloc(RuntimeEvent, slice_view.event_count);
                         for (0..slice_view.event_count) |index| {
                             const item = try marshal.stridedAt(c.mln_runtime_event, slice_view.events, slice_view.event_count, slice_view.event_size, index);
-                            copied[index] = try RuntimeEvent.fromNative(allocator, item);
+                            copied[index] = try RuntimeEvent.fromNative(item);
                         }
                         break :blk copied;
                     };
