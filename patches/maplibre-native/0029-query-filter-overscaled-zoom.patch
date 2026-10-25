@@ -2,18 +2,6 @@ Evaluates rendered-feature query filters at the overscaled tile zoom. Keeps the
 fix of 0028, which it follows.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4704
 
-diff --git a/CHANGELOG.md b/CHANGELOG.md
-index b92b64c02f4cf20da58aab4c82da02a0b16466ba..05b837ed1288510ba7b5158d28769169679df9d3 100644
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -36,6 +36,7 @@
- 
- - *...Add new stuff here...*
- - [core] Fix a crash in `RenderImageSource::update` when an image source's coordinates give an empty tile cover, such as an image wholly beyond the latitudes Web Mercator can show.
-+- [core] Evaluate rendered-feature query filters at overscaled tile zoom, matching layer filters and source queries when overzoomed.
- - [core] Evaluate rendered-feature hit-test paint properties at camera zoom, including fractional zoom and overzooming.
- - [core] Fix rendered-feature queries near the final endpoint of an offset line.
- - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
 index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8cab386315 100644
 --- a/src/mln/geometry/feature_index.cpp

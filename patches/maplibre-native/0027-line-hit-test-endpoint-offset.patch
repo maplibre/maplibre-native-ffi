@@ -1,18 +1,6 @@
 Applies the full line offset to the last vertex in hit testing.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4702
 
-diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 5c1c2ca0412b2b7c46fc2c33502209fff6d2d92e..32157bc2e1919f27e7039761670b8689d88dbe38 100644
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -36,6 +36,7 @@
- 
- - *...Add new stuff here...*
- - [core] Fix a crash in `RenderImageSource::update` when an image source's coordinates give an empty tile cover, such as an image wholly beyond the latitudes Web Mercator can show.
-+- [core] Fix rendered-feature queries near the final endpoint of an offset line.
- - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
- - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
- - [core] Fix `ImageSource` not rendering across world copies ([#4508](https://github.com/maplibre/maplibre-native/issues/4508)).
 diff --git a/src/mln/renderer/layers/render_line_layer.cpp b/src/mln/renderer/layers/render_line_layer.cpp
 index f7f29b63bd1362953e73d4c79b080abbf1e0c892..c9126efc98ca386f86e2af8f9810cc2b2ded397b 100644
 --- a/src/mln/renderer/layers/render_line_layer.cpp
