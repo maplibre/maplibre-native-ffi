@@ -1194,13 +1194,24 @@ class Values:
             described = ", ".join(f"'{name}'" for name in names)
             copy = ""
             if value.native in self.bound.inputs:
+                # A JSON member takes null as a value meaning absent, so its
+                # parameter defaults to a sentinel instead of null.
+                json = {name for name, typ, _ in members if typ == "Object?"}
                 parameters = ", ".join(
-                    f"{typ.removesuffix('?')}? {name}" for name, typ, _ in members
+                    f"Object? {name} = _unchanged"
+                    if name in json
+                    else f"{typ.removesuffix('?')}? {name}"
+                    for name, typ, _ in members
                 ) + "".join(f", bool? {name}" for name, _ in flags)
                 copy = (
                     f"\n  /// A copy of this value with the given members replaced.\n"
                     f"  {public} copyWith({{{parameters}}}) => {public}("
-                    + ", ".join(f"{name}: {name} ?? this.{name}" for name in names)
+                    + ", ".join(
+                        f"{name}: identical({name}, _unchanged) ? this.{name} : {name}"
+                        if name in json
+                        else f"{name}: {name} ?? this.{name}"
+                        for name in names
+                    )
                     + ");\n"
                 )
             declarations.append(

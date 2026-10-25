@@ -12,6 +12,14 @@ import 'runtime/runtime.dart';
 
 part 'generated_values.dart';
 
+/// The default of a `copyWith` parameter that takes any JSON value, where null
+/// is a value of its own: it means the member is absent.
+const Object _unchanged = _Unchanged();
+
+final class _Unchanged {
+  const _Unchanged();
+}
+
 /// A value whose equality compares its members, and lists element by element.
 abstract base class _Value {
   const _Value();

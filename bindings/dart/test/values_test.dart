@@ -285,6 +285,11 @@ void main() {
     final camera = CameraOptions(zoom: 2, bearing: 30);
     expect(camera.copyWith(zoom: 4), CameraOptions(zoom: 4, bearing: 30));
     expect(camera.copyWith(), camera);
+
+    // A JSON member's null is a value of its own: the member is absent.
+    final filtered = RenderedFeatureQueryOptions(filter: ['has', 'name']);
+    expect(filtered.copyWith().filter, ['has', 'name']);
+    expect(filtered.copyWith(filter: null).filter, isNull);
   });
 
   test('values and flag sets describe their members', () {

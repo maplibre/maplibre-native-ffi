@@ -2524,7 +2524,7 @@ final class GeojsonSourceOptions extends _Value {
     double? maxZoom,
     double? tolerance,
     double? clusterMaxZoom,
-    Object? clusterProperties,
+    Object? clusterProperties = _unchanged,
     int? buffer,
     int? clusterRadius,
     int? clusterMinPoints,
@@ -2536,7 +2536,9 @@ final class GeojsonSourceOptions extends _Value {
     maxZoom: maxZoom ?? this.maxZoom,
     tolerance: tolerance ?? this.tolerance,
     clusterMaxZoom: clusterMaxZoom ?? this.clusterMaxZoom,
-    clusterProperties: clusterProperties ?? this.clusterProperties,
+    clusterProperties: identical(clusterProperties, _unchanged)
+        ? this.clusterProperties
+        : clusterProperties,
     buffer: buffer ?? this.buffer,
     clusterRadius: clusterRadius ?? this.clusterRadius,
     clusterMinPoints: clusterMinPoints ?? this.clusterMinPoints,
@@ -4678,10 +4680,10 @@ final class RenderedFeatureQueryOptions extends _Value {
   /// A copy of this value with the given members replaced.
   RenderedFeatureQueryOptions copyWith({
     List<String>? layerIds,
-    Object? filter,
+    Object? filter = _unchanged,
   }) => RenderedFeatureQueryOptions(
     layerIds: layerIds ?? this.layerIds,
-    filter: filter ?? this.filter,
+    filter: identical(filter, _unchanged) ? this.filter : filter,
   );
 
   @override
@@ -4746,10 +4748,10 @@ final class SourceFeatureQueryOptions extends _Value {
   /// A copy of this value with the given members replaced.
   SourceFeatureQueryOptions copyWith({
     List<String>? sourceLayerIds,
-    Object? filter,
+    Object? filter = _unchanged,
   }) => SourceFeatureQueryOptions(
     sourceLayerIds: sourceLayerIds ?? this.sourceLayerIds,
-    filter: filter ?? this.filter,
+    filter: identical(filter, _unchanged) ? this.filter : filter,
   );
 
   @override
@@ -5083,14 +5085,14 @@ final class OfflineGeometryRegionDefinition extends _Value {
   /// A copy of this value with the given members replaced.
   OfflineGeometryRegionDefinition copyWith({
     String? styleUrl,
-    Object? geometry,
+    Object? geometry = _unchanged,
     double? minZoom,
     double? maxZoom,
     double? pixelRatio,
     bool? includeIdeographs,
   }) => OfflineGeometryRegionDefinition(
     styleUrl: styleUrl ?? this.styleUrl,
-    geometry: geometry ?? this.geometry,
+    geometry: identical(geometry, _unchanged) ? this.geometry : geometry,
     minZoom: minZoom ?? this.minZoom,
     maxZoom: maxZoom ?? this.maxZoom,
     pixelRatio: pixelRatio ?? this.pixelRatio,
@@ -5788,18 +5790,22 @@ final class StyleExpressionInputs extends _Value {
     double? zoom,
     double? colorRampParameter,
     double? elevation,
-    Object? feature,
-    Object? featureState,
-    Object? globalState,
+    Object? feature = _unchanged,
+    Object? featureState = _unchanged,
+    Object? globalState = _unchanged,
     CanonicalTileId? canonicalTileId,
     List<String>? availableImages,
   }) => StyleExpressionInputs(
     zoom: zoom ?? this.zoom,
     colorRampParameter: colorRampParameter ?? this.colorRampParameter,
     elevation: elevation ?? this.elevation,
-    feature: feature ?? this.feature,
-    featureState: featureState ?? this.featureState,
-    globalState: globalState ?? this.globalState,
+    feature: identical(feature, _unchanged) ? this.feature : feature,
+    featureState: identical(featureState, _unchanged)
+        ? this.featureState
+        : featureState,
+    globalState: identical(globalState, _unchanged)
+        ? this.globalState
+        : globalState,
     canonicalTileId: canonicalTileId ?? this.canonicalTileId,
     availableImages: availableImages ?? this.availableImages,
   );
