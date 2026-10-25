@@ -32,13 +32,14 @@ zig build --build-file ../../build.zig \
 
 [tasks.test]
 extends = "ffi:preset"
-# Android presets use their matching emulator; host presets run in process.
-# Each test gets 30 seconds times MLN_TEST_TIMEOUT_SCALE, which defaults to 3
-# on emulators and to 1 on the host; the fixture scales its waits by the same
-# value.
+# Android presets use their matching emulator, musl presets run in Alpine, and
+# other host presets run in process. Each test gets 30 seconds times
+# MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in Alpine's
+# software renderer, and to 1 on the host; the fixture scales its waits by the
+# same value.
 run = '''
 case "$usage_preset" in
-  android-*)
+  android-* | linux-musl-*)
     export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
     ;;
   *)

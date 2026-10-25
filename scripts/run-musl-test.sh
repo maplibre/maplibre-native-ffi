@@ -14,6 +14,10 @@ if [[ "$1" == */* && ! -x "$1" ]]; then
   echo "The musl test executable does not exist: $1" >&2
   exit 2
 fi
+# The container's working directory is the repository root, not the caller's.
+if [[ "$1" == */* && "$1" != /* ]]; then
+  set -- "$PWD/$1" "${@:2}"
+fi
 
 if command -v docker >/dev/null; then
   container_engine=docker

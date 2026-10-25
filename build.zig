@@ -511,6 +511,20 @@ fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Buil
             if (target.cpu.arch == .x86_64 and options.native.backend == .opengl) "26" else null,
         );
         test_step.dependOn(&run_tests.step);
+    } else if (target.abi == .musl) {
+        // The executables load Alpine's graphics stack through musl's dynamic
+        // loader, so each one runs in an Alpine container.
+        const preset = b.fmt("{s}-{s}", .{
+            targetPlatform(b, target),
+            backendSuffix(options.native.backend, target),
+        });
+        for (test_compiles) |tests| {
+            const run_tests = b.addSystemCommand(&.{"bash"});
+            run_tests.addFileArg(b.path("scripts/run-musl-test.sh"));
+            run_tests.addArg(preset);
+            run_tests.addArtifactArg(tests);
+            test_step.dependOn(&run_tests.step);
+        }
     } else {
         for (test_compiles) |tests| {
             const run_tests = b.addRunArtifact(tests);
