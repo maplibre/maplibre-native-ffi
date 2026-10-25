@@ -49,7 +49,7 @@
     }
 
     var mtlPixelFormat: MTLPixelFormat {
-      get throws { try MTLPixelFormat(rawValue: UInt(pixelFormat))! }
+      MTLPixelFormat(rawValue: UInt(pixelFormat))!
     }
   }
 #endif

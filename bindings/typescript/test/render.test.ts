@@ -120,15 +120,24 @@ test("a frame view expires with its scope and holds off release inside it", asyn
   const frame = session.acquireFrame();
   assert.ok(frame, "the session exposed no frame");
 
-  const withTexture = <T>(use: (view: { readonly width: number }) => T): T =>
+  // Reads a view's width, a plain value, and the texture object it lends.
+  type Reader = { width(): number; texture(): unknown };
+  const withTexture = <T>(use: (view: Reader) => T): T =>
     backend === "metal"
-      ? frame.withMetalTexture(use)
+      ? frame.withMetalTexture((view) =>
+          use({ width: () => view.width, texture: () => view.texture }),
+        )
       : backend === "vulkan"
-        ? frame.withVulkanTexture(use)
-        : frame.withOpenglTexture(use);
-  let escaped: { readonly width: number } | undefined;
+        ? frame.withVulkanTexture((view) =>
+            use({ width: () => view.width, texture: () => view.image }),
+          )
+        : frame.withOpenglTexture((view) =>
+            use({ width: () => view.width, texture: () => view.texture }),
+          );
+  let escaped: Reader | undefined;
   const width = withTexture((view) => {
     escaped = view;
+    view.texture();
     // The view borrows the frame, so native refuses to release the frame or
     // abandon its session while the view is open.
     assert.throws(
@@ -139,12 +148,14 @@ test("a frame view expires with its scope and holds off release inside it", asyn
       () => session.abandon(),
       (error) => error instanceof MaplibreError && error.status === Status.busy,
     );
-    return view.width;
+    return view.width();
   });
   assert.equal(width, renderSize);
-  // A view that escapes its scope refuses every read.
+  // A view that escapes its scope refuses to read the texture it lends, and
+  // still reads its plain values.
+  assert.equal(escaped!.width(), renderSize);
   assert.throws(
-    () => escaped!.width,
+    () => escaped!.texture(),
     (error) =>
       error instanceof MaplibreError && error.status === Status.invalidState,
   );

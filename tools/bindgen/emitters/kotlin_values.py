@@ -461,10 +461,17 @@ class Values:
             else:
                 companion = ""
             if value.native in self.views:
-                args = [arg.replace("public val ", "") for arg in args]
+                # A view's scope guards only what its owner lends; a copy of
+                # any other member stays readable after the scope ends.
+                members = self.members(value)
+                args = [
+                    arg.replace("public val ", "", 1) if field.scoped else arg
+                    for arg, (_, _, field) in zip(args, members, strict=False)
+                ] + args[len(members) :]
                 getters = [
                     f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
-                    for member, typ, _ in self.members(value)
+                    for member, typ, field in members
+                    if field.scoped
                 ]
                 result.append(
                     f"{doc(self.bound, value.native)}public class {public}(\n"
@@ -898,7 +905,7 @@ class Values:
             if field.value.kind == "union":
                 arguments.append(f"{member} = {self.union_read(value, field)}")
                 continue
-            decoded = self.field_read(value, field, scope)
+            decoded = self.field_read(value, field, scope if field.scoped else None)
             presence = field.presence
             if presence and presence.mask:
                 decoded = f"if ({self.present('source', value, presence.mask, presence.bit)}) {decoded} else null"

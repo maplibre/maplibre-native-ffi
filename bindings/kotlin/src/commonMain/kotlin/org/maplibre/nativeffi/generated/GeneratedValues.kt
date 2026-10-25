@@ -1598,70 +1598,28 @@ public value class WebglContextKind(public val rawValue: UInt) {
  */
 public class MetalTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong,
+  public val generation: ULong,
   /** Physical Metal texture width in device pixels. */
-  width: UInt,
+  public val width: UInt,
   /** Physical Metal texture height in device pixels. */
-  height: UInt,
+  public val height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double,
+  public val scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong,
+  public val frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt,
+  public val slot: UInt,
   /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   device: NativePointer,
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
-  pixelFormat: ULong,
+  public val pixelFormat: ULong,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedGeneration: ULong = generation
-  public val generation: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedGeneration
-    }
-
-  private val storedWidth: UInt = width
-  public val width: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedWidth
-    }
-
-  private val storedHeight: UInt = height
-  public val height: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedHeight
-    }
-
-  private val storedScaleFactor: Double = scaleFactor
-  public val scaleFactor: Double
-    get() {
-      bindingScope?.ensureActive()
-      return storedScaleFactor
-    }
-
-  private val storedFrameId: ULong = frameId
-  public val frameId: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedFrameId
-    }
-
-  private val storedSlot: UInt = slot
-  public val slot: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedSlot
-    }
-
   private val storedTexture: NativePointer = texture
   public val texture: NativePointer
     get() {
@@ -1675,13 +1633,6 @@ public class MetalTextureFrame(
       bindingScope?.ensureActive()
       return storedDevice
     }
-
-  private val storedPixelFormat: ULong = pixelFormat
-  public val pixelFormat: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedPixelFormat
-    }
 }
 
 /**
@@ -1692,110 +1643,40 @@ public class MetalTextureFrame(
  */
 public class OpenglTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong,
+  public val generation: ULong,
   /** Physical OpenGL texture width in device pixels. */
-  width: UInt,
+  public val width: UInt,
   /** Physical OpenGL texture height in device pixels. */
-  height: UInt,
+  public val height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double,
+  public val scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong,
+  public val frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt,
+  public val slot: UInt,
   /** Borrowed OpenGL texture object name. Valid until frame release. */
   texture: UInt,
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
-  target: UInt,
+  public val target: UInt,
   /**
    * OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture, whose format the host
    * chose.
    */
-  internalFormat: UInt,
+  public val internalFormat: UInt,
   /** OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture. */
-  format: UInt,
+  public val format: UInt,
   /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture. */
-  type: UInt,
+  public val type: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedGeneration: ULong = generation
-  public val generation: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedGeneration
-    }
-
-  private val storedWidth: UInt = width
-  public val width: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedWidth
-    }
-
-  private val storedHeight: UInt = height
-  public val height: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedHeight
-    }
-
-  private val storedScaleFactor: Double = scaleFactor
-  public val scaleFactor: Double
-    get() {
-      bindingScope?.ensureActive()
-      return storedScaleFactor
-    }
-
-  private val storedFrameId: ULong = frameId
-  public val frameId: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedFrameId
-    }
-
-  private val storedSlot: UInt = slot
-  public val slot: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedSlot
-    }
-
   private val storedTexture: UInt = texture
   public val texture: UInt
     get() {
       bindingScope?.ensureActive()
       return storedTexture
-    }
-
-  private val storedTarget: UInt = target
-  public val target: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedTarget
-    }
-
-  private val storedInternalFormat: UInt = internalFormat
-  public val internalFormat: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedInternalFormat
-    }
-
-  private val storedFormat: UInt = format
-  public val format: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedFormat
-    }
-
-  private val storedType: UInt = type
-  public val type: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedType
     }
 }
 
@@ -1806,18 +1687,11 @@ public class OpenglTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class GpuSync(
-  kind: GpuSyncKind = GpuSync.default.kind,
+  public val kind: GpuSyncKind = GpuSync.default.kind,
   /** Bit pattern of the GLsync pointer. */
   handle: ULong = GpuSync.default.handle,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedKind: GpuSyncKind = kind
-  public val kind: GpuSyncKind
-    get() {
-      bindingScope?.ensureActive()
-      return storedKind
-    }
-
   private val storedHandle: ULong = handle
   public val handle: ULong
     get() {
@@ -2005,20 +1879,20 @@ public data class RenderFrameResult(
  */
 public class VulkanTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong,
+  public val generation: ULong,
   /** Physical Vulkan image width in device pixels. */
-  width: UInt,
+  public val width: UInt,
   /** Physical Vulkan image height in device pixels. */
-  height: UInt,
+  public val height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double,
+  public val scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong,
+  public val frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its image in the
    * descriptor's textures array.
    */
-  slot: UInt,
+  public val slot: UInt,
   /** Borrowed VkImage bit pattern. Valid until frame release. */
   image: ULong,
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
@@ -2026,57 +1900,15 @@ public class VulkanTextureFrame(
   /** Borrowed VkDevice. Valid until frame release. */
   device: NativePointer,
   /** Backend-native VkFormat value. */
-  format: UInt,
+  public val format: UInt,
   /**
    * Backend-native VkImageLayout value that the image is in:
    * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the descriptor's
    * final_layout for a borrowed one.
    */
-  layout: UInt,
+  public val layout: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedGeneration: ULong = generation
-  public val generation: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedGeneration
-    }
-
-  private val storedWidth: UInt = width
-  public val width: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedWidth
-    }
-
-  private val storedHeight: UInt = height
-  public val height: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedHeight
-    }
-
-  private val storedScaleFactor: Double = scaleFactor
-  public val scaleFactor: Double
-    get() {
-      bindingScope?.ensureActive()
-      return storedScaleFactor
-    }
-
-  private val storedFrameId: ULong = frameId
-  public val frameId: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedFrameId
-    }
-
-  private val storedSlot: UInt = slot
-  public val slot: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedSlot
-    }
-
   private val storedImage: ULong = image
   public val image: ULong
     get() {
@@ -2097,20 +1929,6 @@ public class VulkanTextureFrame(
       bindingScope?.ensureActive()
       return storedDevice
     }
-
-  private val storedFormat: UInt = format
-  public val format: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedFormat
-    }
-
-  private val storedLayout: UInt = layout
-  public val layout: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedLayout
-    }
 }
 
 /**
@@ -2121,20 +1939,20 @@ public class VulkanTextureFrame(
  */
 public class WebgpuTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong,
+  public val generation: ULong,
   /** Physical WebGPU texture width in device pixels. */
-  width: UInt,
+  public val width: UInt,
   /** Physical WebGPU texture height in device pixels. */
-  height: UInt,
+  public val height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double,
+  public val scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong,
+  public val frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt,
+  public val slot: UInt,
   /** Borrowed WGPUTexture. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed WGPUTextureView. Valid until frame release. */
@@ -2142,51 +1960,9 @@ public class WebgpuTextureFrame(
   /** Borrowed WGPUDevice. Valid until frame release. */
   device: NativePointer,
   /** Backend-native WGPUTextureFormat value. */
-  format: UInt,
+  public val format: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedGeneration: ULong = generation
-  public val generation: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedGeneration
-    }
-
-  private val storedWidth: UInt = width
-  public val width: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedWidth
-    }
-
-  private val storedHeight: UInt = height
-  public val height: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedHeight
-    }
-
-  private val storedScaleFactor: Double = scaleFactor
-  public val scaleFactor: Double
-    get() {
-      bindingScope?.ensureActive()
-      return storedScaleFactor
-    }
-
-  private val storedFrameId: ULong = frameId
-  public val frameId: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedFrameId
-    }
-
-  private val storedSlot: UInt = slot
-  public val slot: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedSlot
-    }
-
   private val storedTexture: NativePointer = texture
   public val texture: NativePointer
     get() {
@@ -2206,13 +1982,6 @@ public class WebgpuTextureFrame(
     get() {
       bindingScope?.ensureActive()
       return storedDevice
-    }
-
-  private val storedFormat: UInt = format
-  public val format: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedFormat
     }
 }
 

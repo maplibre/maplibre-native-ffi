@@ -138,33 +138,45 @@ public sealed class RenderTests
                     ?? throw new InvalidOperationException("No rendered frame is ready");
                 Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
 
-                Func<uint>? escaped = null;
-                void Inside(Func<uint> width)
+                Func<uint>? escapedWidth = null;
+                Action? escapedTexture = null;
+                void Inside(Func<uint> width, Action texture)
                 {
                     Assert.Equal(RenderFixture.Width, width());
+                    texture();
                     // The view borrows the frame, so neither the session nor the frame can end
                     // while it is in scope.
                     var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
                     Assert.Equal(Status.Busy, busy.Status);
                     var inUse = Assert.Throws<MaplibreException>(() => frame.Release(null));
                     Assert.Equal(Status.Busy, inUse.Status);
-                    escaped = width;
+                    escapedWidth = width;
+                    escapedTexture = texture;
                 }
                 switch (backend)
                 {
                     case TestGraphicsBackend.Metal when OperatingSystem.IsMacOS():
-                        frame.WithMetalTexture(view => Inside(() => view.Width));
+                        frame.WithMetalTexture(view =>
+                            Inside(() => view.Width, () => _ = view.Texture)
+                        );
                         break;
                     case TestGraphicsBackend.Vulkan:
-                        frame.WithVulkanTexture(view => Inside(() => view.Width));
+                        frame.WithVulkanTexture(view =>
+                            Inside(() => view.Width, () => _ = view.Image)
+                        );
                         break;
                     default:
-                        frame.WithOpenglTexture(view => Inside(() => view.Width));
+                        frame.WithOpenglTexture(view =>
+                            Inside(() => view.Width, () => _ = view.Texture)
+                        );
                         break;
                 }
 
-                Assert.NotNull(escaped);
-                Assert.Throws<MaplibreException>(() => escaped());
+                // Only the texture that the frame lends expires with the scope.
+                Assert.NotNull(escapedWidth);
+                Assert.NotNull(escapedTexture);
+                Assert.Equal(RenderFixture.Width, escapedWidth());
+                Assert.Throws<MaplibreException>(() => escapedTexture());
                 Assert.False(frame.IsClosed);
                 frame.Release(null);
                 Assert.True(frame.IsClosed);
@@ -207,7 +219,10 @@ public sealed class RenderTests
         thread.Join();
         Assert.IsType<MaplibreException>(crossThread);
 
+        // The scope guards only what the frame lends; plain values stay readable.
         scope.Expire();
         Assert.Throws<MaplibreException>(() => frame.ImageView);
+        Assert.Equal(2u, frame.Width);
+        Assert.Equal(10u, frame.Format);
     }
 }

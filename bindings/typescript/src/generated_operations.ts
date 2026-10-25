@@ -4599,7 +4599,8 @@ export interface NewRenderSession {
 
 /**
  * A `GpuSync` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withProducerSync} runs.
+ * callback of {@link AcquiredFrameHandle.withProducerSync} runs. Its other members stay
+ * readable after the callback returns.
  */
 export class ScopedGpuSync {
   readonly #value: GpuSync;
@@ -4617,7 +4618,7 @@ export class ScopedGpuSync {
   }
 
   get kind(): GpuSync["kind"] {
-    return this.#scope.active(this.#value).kind;
+    return this.#value.kind;
   }
 
   get handle(): GpuSync["handle"] {
@@ -4627,7 +4628,8 @@ export class ScopedGpuSync {
 
 /**
  * A `MetalTextureFrame` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withMetalTexture} runs.
+ * callback of {@link AcquiredFrameHandle.withMetalTexture} runs. Its other members stay
+ * readable after the callback returns.
  */
 export class ScopedMetalTextureFrame {
   readonly #value: MetalTextureFrame;
@@ -4645,27 +4647,27 @@ export class ScopedMetalTextureFrame {
   }
 
   get generation(): MetalTextureFrame["generation"] {
-    return this.#scope.active(this.#value).generation;
+    return this.#value.generation;
   }
 
   get width(): MetalTextureFrame["width"] {
-    return this.#scope.active(this.#value).width;
+    return this.#value.width;
   }
 
   get height(): MetalTextureFrame["height"] {
-    return this.#scope.active(this.#value).height;
+    return this.#value.height;
   }
 
   get scaleFactor(): MetalTextureFrame["scaleFactor"] {
-    return this.#scope.active(this.#value).scaleFactor;
+    return this.#value.scaleFactor;
   }
 
   get frameId(): MetalTextureFrame["frameId"] {
-    return this.#scope.active(this.#value).frameId;
+    return this.#value.frameId;
   }
 
   get slot(): MetalTextureFrame["slot"] {
-    return this.#scope.active(this.#value).slot;
+    return this.#value.slot;
   }
 
   get texture(): MetalTextureFrame["texture"] {
@@ -4677,13 +4679,14 @@ export class ScopedMetalTextureFrame {
   }
 
   get pixelFormat(): MetalTextureFrame["pixelFormat"] {
-    return this.#scope.active(this.#value).pixelFormat;
+    return this.#value.pixelFormat;
   }
 }
 
 /**
  * A `OpenglTextureFrame` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withOpenglTexture} runs.
+ * callback of {@link AcquiredFrameHandle.withOpenglTexture} runs. Its other members stay
+ * readable after the callback returns.
  */
 export class ScopedOpenglTextureFrame {
   readonly #value: OpenglTextureFrame;
@@ -4701,27 +4704,27 @@ export class ScopedOpenglTextureFrame {
   }
 
   get generation(): OpenglTextureFrame["generation"] {
-    return this.#scope.active(this.#value).generation;
+    return this.#value.generation;
   }
 
   get width(): OpenglTextureFrame["width"] {
-    return this.#scope.active(this.#value).width;
+    return this.#value.width;
   }
 
   get height(): OpenglTextureFrame["height"] {
-    return this.#scope.active(this.#value).height;
+    return this.#value.height;
   }
 
   get scaleFactor(): OpenglTextureFrame["scaleFactor"] {
-    return this.#scope.active(this.#value).scaleFactor;
+    return this.#value.scaleFactor;
   }
 
   get frameId(): OpenglTextureFrame["frameId"] {
-    return this.#scope.active(this.#value).frameId;
+    return this.#value.frameId;
   }
 
   get slot(): OpenglTextureFrame["slot"] {
-    return this.#scope.active(this.#value).slot;
+    return this.#value.slot;
   }
 
   get texture(): OpenglTextureFrame["texture"] {
@@ -4729,25 +4732,26 @@ export class ScopedOpenglTextureFrame {
   }
 
   get target(): OpenglTextureFrame["target"] {
-    return this.#scope.active(this.#value).target;
+    return this.#value.target;
   }
 
   get internalFormat(): OpenglTextureFrame["internalFormat"] {
-    return this.#scope.active(this.#value).internalFormat;
+    return this.#value.internalFormat;
   }
 
   get format(): OpenglTextureFrame["format"] {
-    return this.#scope.active(this.#value).format;
+    return this.#value.format;
   }
 
   get type(): OpenglTextureFrame["type"] {
-    return this.#scope.active(this.#value).type;
+    return this.#value.type;
   }
 }
 
 /**
  * A `VulkanTextureFrame` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withVulkanTexture} runs.
+ * callback of {@link AcquiredFrameHandle.withVulkanTexture} runs. Its other members stay
+ * readable after the callback returns.
  */
 export class ScopedVulkanTextureFrame {
   readonly #value: VulkanTextureFrame;
@@ -4765,27 +4769,27 @@ export class ScopedVulkanTextureFrame {
   }
 
   get generation(): VulkanTextureFrame["generation"] {
-    return this.#scope.active(this.#value).generation;
+    return this.#value.generation;
   }
 
   get width(): VulkanTextureFrame["width"] {
-    return this.#scope.active(this.#value).width;
+    return this.#value.width;
   }
 
   get height(): VulkanTextureFrame["height"] {
-    return this.#scope.active(this.#value).height;
+    return this.#value.height;
   }
 
   get scaleFactor(): VulkanTextureFrame["scaleFactor"] {
-    return this.#scope.active(this.#value).scaleFactor;
+    return this.#value.scaleFactor;
   }
 
   get frameId(): VulkanTextureFrame["frameId"] {
-    return this.#scope.active(this.#value).frameId;
+    return this.#value.frameId;
   }
 
   get slot(): VulkanTextureFrame["slot"] {
-    return this.#scope.active(this.#value).slot;
+    return this.#value.slot;
   }
 
   get image(): VulkanTextureFrame["image"] {
@@ -4801,11 +4805,11 @@ export class ScopedVulkanTextureFrame {
   }
 
   get format(): VulkanTextureFrame["format"] {
-    return this.#scope.active(this.#value).format;
+    return this.#value.format;
   }
 
   get layout(): VulkanTextureFrame["layout"] {
-    return this.#scope.active(this.#value).layout;
+    return this.#value.layout;
   }
 }
 

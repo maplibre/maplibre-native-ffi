@@ -351,15 +351,11 @@ func (target *openGLFrameTarget) drawFrame() (bool, error) {
 	drawErr := requireCPUCompleteProducer(newest)
 	if drawErr == nil {
 		drawErr = newest.WithOpenglTexture(func(info maplibre.OpenglTextureFrameView) error {
-			targetID, err := info.Target()
-			if err != nil {
-				return err
-			}
 			texture, err := info.Texture()
 			if err != nil {
 				return err
 			}
-			return target.compositor.DrawTexture(targetID, texture)
+			return target.compositor.DrawTexture(info.Target(), texture)
 		})
 	}
 	releaseErr := target.releaseHeld()
@@ -382,11 +378,7 @@ func releaseFrame(frame *maplibre.AcquiredFrameHandle) error {
 
 func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
 	return frame.WithProducerSync(func(producer maplibre.GpuSyncView) error {
-		kind, err := producer.Kind()
-		if err != nil {
-			return err
-		}
-		if kind != maplibre.GpuSyncKindCpuComplete {
+		if kind := producer.Kind(); kind != maplibre.GpuSyncKindCpuComplete {
 			return fmt.Errorf("go-map cannot wait on producer synchronization kind %d", kind)
 		}
 		return nil

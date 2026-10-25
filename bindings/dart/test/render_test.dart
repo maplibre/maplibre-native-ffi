@@ -126,8 +126,9 @@ void main() {
       final session = worker.session;
       final frame = session.acquireFrame()!;
 
-      final readEscapedWidth = _openFrameView(frame, (width) {
-        expect(width, renderSize);
+      final escaped = _openFrameView(frame, (view) {
+        expect(view.width(), renderSize);
+        view.texture();
         // The view borrows the frame, so neither the frame nor its session
         // can go away while it is open.
         expect(
@@ -151,8 +152,10 @@ void main() {
           ),
         );
       });
-      // A view that escapes its scope refuses every read.
-      expect(readEscapedWidth, throwsA(isA<MaplibreException>()));
+      // A view that escapes its scope refuses the texture it lends, and still
+      // reads its plain values.
+      expect(escaped.width(), renderSize);
+      expect(escaped.texture, throwsA(isA<MaplibreException>()));
 
       // The refused release left the frame open; a second release after the
       // accepted one is a no-op.
@@ -170,28 +173,32 @@ void main() {
   );
 }
 
+/// Reads a backend's texture view: its width, a plain value, and the texture
+/// that it lends, which the view's scope guards.
+typedef _FrameView = ({int Function() width, int Function() texture});
+
 /// Runs [inside] within the scope of the backend's texture view of [frame],
-/// and returns a reader of that view's width for use after the scope ends.
-int Function() _openFrameView(
+/// and returns a reader of that view for use after the scope ends.
+_FrameView _openFrameView(
   AcquiredFrameHandle frame,
-  void Function(int width) inside,
+  void Function(_FrameView view) inside,
 ) {
   final backends = supportedRenderBackendMask();
   if (backends.contains(RenderBackendFlag.metal)) {
-    late ScopedMetalTextureFrame escaped;
+    late _FrameView escaped;
     frame.withMetalTexture((view) {
-      escaped = view;
-      inside(view.width);
+      escaped = (width: () => view.width, texture: () => view.texture.address);
+      inside(escaped);
     });
-    return () => escaped.width;
+    return escaped;
   }
   if (backends.contains(RenderBackendFlag.vulkan)) {
-    late ScopedVulkanTextureFrame escaped;
+    late _FrameView escaped;
     frame.withVulkanTexture((view) {
-      escaped = view;
-      inside(view.width);
+      escaped = (width: () => view.width, texture: () => view.image);
+      inside(escaped);
     });
-    return () => escaped.width;
+    return escaped;
   }
   fail('no core-worker frame view on $backends');
 }

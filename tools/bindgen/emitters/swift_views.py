@@ -18,9 +18,15 @@ def operation(plan, values):
         if not field.public:
             continue
         local = identifier(camel(field.name))
-        members.append(
-            f"  public var {local}: {values.public(field.value)} {{ get throws {{ try scope.check(); return snapshot.{local} }} }}"
-        )
+        typ = values.public(field.value)
+        # The scope guards only what the view's owner lends; a copy of any
+        # other member stays readable after the scope ends.
+        if field.scoped:
+            members.append(
+                f"  public var {local}: {typ} {{ get throws {{ try scope.check(); return snapshot.{local} }} }}"
+            )
+        else:
+            members.append(f"  public var {local}: {typ} {{ snapshot.{local} }}")
     values.views[scoped] = f"""public final class {scoped} {{
   private let snapshot: {public}
   private let scope: NativeViewScope

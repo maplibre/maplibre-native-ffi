@@ -13,15 +13,15 @@ public sealed class VulkanTextureFrameView
         this.scope = scope;
     }
 
-    public ulong Generation => scope.Active(value).Generation;
-    public uint Width => scope.Active(value).Width;
-    public uint Height => scope.Active(value).Height;
-    public double ScaleFactor => scope.Active(value).ScaleFactor;
-    public ulong FrameId => scope.Active(value).FrameId;
-    public uint Slot => scope.Active(value).Slot;
+    public ulong Generation => value.Generation;
+    public uint Width => value.Width;
+    public uint Height => value.Height;
+    public double ScaleFactor => value.ScaleFactor;
+    public ulong FrameId => value.FrameId;
+    public uint Slot => value.Slot;
     public ulong Image => scope.Active(value).Image;
     public ulong ImageView => scope.Active(value).ImageView;
     public NativePointer Device => scope.Active(value).Device;
-    public uint Format => scope.Active(value).Format;
-    public uint Layout => scope.Active(value).Layout;
+    public uint Format => value.Format;
+    public uint Layout => value.Layout;
 }

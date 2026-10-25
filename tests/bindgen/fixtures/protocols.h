@@ -473,6 +473,35 @@ mln_status mln_measurement_take_sample(
 );
 #endif
 
+#ifdef MLN_PROTOCOL_BORROWED_VIEW
+// A handle that lends a record inside its view scope. The texture stays valid
+// only until the frame's release, and the width is a plain value.
+typedef unsigned long long mln_frame BIND(
+  "kind=handle;release=mln_frame_release;discard=mln_frame_discard;"
+  "view_begin=mln_frame_view_begin;view_end=mln_frame_view_end"
+);
+typedef struct mln_frame_texture {
+  unsigned int size;
+  unsigned int width;
+  unsigned long long texture BIND("lifetime=owner");
+} mln_frame_texture;
+mln_status mln_frame_acquire(
+  mln_frame* out_frame BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+mln_status mln_frame_release(mln_frame frame, mln_diagnostic* out_diagnostic);
+mln_status mln_frame_discard(mln_frame frame, mln_diagnostic* out_diagnostic);
+mln_status mln_frame_view_begin(
+  mln_frame frame, void** out_scope BIND("direction=out;kind=context"),
+  mln_diagnostic* out_diagnostic
+);
+void mln_frame_view_end(void* scope BIND("kind=context"));
+BIND("view_owner=frame")
+mln_status mln_frame_get_texture(
+  mln_frame frame, mln_frame_texture* out_texture BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
 #ifdef MLN_PROTOCOL_RETAINED_REGISTRATION
 // A callback registration record retained until native quiescence.
 typedef struct mln_sample_point {

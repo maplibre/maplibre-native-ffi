@@ -150,7 +150,7 @@ private func attachOwnedTextureSession(
       try frame.withMetalTexture { view in
         let texture = try view.mtlTexture
         #expect(texture.width == 32)
-        #expect(try view.mtlPixelFormat == .bgra8Unorm)
+        #expect(view.mtlPixelFormat == .bgra8Unorm)
         #expect(try view.mtlDevice === rendered.graphics.metalDevice)
         #expect(texture.device === rendered.graphics.metalDevice)
       }
@@ -170,10 +170,10 @@ private func attachOwnedTextureSession(
   }
 }
 
-/// A frame view is usable only inside its callback. A release of the frame
-/// and an abandon of its session are refused while it is open, and neither a
-/// second view of the same frame nor a sibling frame that the host drops
-/// inside the view disturbs it.
+/// A frame view lends its texture only inside its callback, while its plain
+/// values stay readable after. A release of the frame and an abandon of its
+/// session are refused while it is open, and neither a second view of the same
+/// frame nor a sibling frame that the host drops inside the view disturbs it.
 @Test func aFrameViewExpiresWithItsScopeAndHoldsOffAbandon() async throws {
   try await withOwnedTextureSession(ringDepth: 2) { rendered in
     let session = rendered.session
@@ -186,10 +186,11 @@ private func attachOwnedTextureSession(
     let escaped = try rendered.graphics.withTextureView(of: first) { view in
       sibling = nil
       #expect(weakSibling == nil)
-      #expect(try view.width == 32)
-      #expect(try view.height == 32)
+      #expect(view.width == 32)
+      #expect(view.height == 32)
+      try view.readTexture()
       #expect(try rendered.graphics
-        .withTextureView(of: first) { try $0.width } == 32)
+        .withTextureView(of: first) { $0.width } == 32)
       do {
         try first.release(consumerCompletion: .default)
         Issue.record("release inside a view should be busy")
@@ -204,7 +205,8 @@ private func attachOwnedTextureSession(
       }
       return view
     }
-    #expect(throws: MaplibreError.self) { try escaped.width }
+    #expect(escaped.width == 32)
+    #expect(throws: MaplibreError.self) { try escaped.readTexture() }
 
     // The refused release left the frame open; a second release after the
     // accepted one is a no-op.

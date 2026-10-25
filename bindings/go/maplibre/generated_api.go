@@ -5532,59 +5532,17 @@ type MetalTextureFrameView struct {
 	scope *bindingScope
 }
 
-func (view MetalTextureFrameView) Generation() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Generation
-	})
-}
+func (view MetalTextureFrameView) Generation() uint64 { return view.value.Generation }
 
-func (view MetalTextureFrameView) Width() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Width
-	})
-}
+func (view MetalTextureFrameView) Width() uint32 { return view.value.Width }
 
-func (view MetalTextureFrameView) Height() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Height
-	})
-}
+func (view MetalTextureFrameView) Height() uint32 { return view.value.Height }
 
-func (view MetalTextureFrameView) ScaleFactor() (float64, error) {
-	return bindingCall(func() float64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.ScaleFactor
-	})
-}
+func (view MetalTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
 
-func (view MetalTextureFrameView) FrameId() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.FrameId
-	})
-}
+func (view MetalTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
-func (view MetalTextureFrameView) Slot() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Slot
-	})
-}
+func (view MetalTextureFrameView) Slot() uint32 { return view.value.Slot }
 
 func (view MetalTextureFrameView) UnsafeTexture() (uintptr, error) {
 	return bindingCall(func() uintptr {
@@ -5604,73 +5562,24 @@ func (view MetalTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view MetalTextureFrameView) PixelFormat() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.PixelFormat
-	})
-}
+func (view MetalTextureFrameView) PixelFormat() uint64 { return view.value.PixelFormat }
 
 type OpenglTextureFrameView struct {
 	value OpenglTextureFrame
 	scope *bindingScope
 }
 
-func (view OpenglTextureFrameView) Generation() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Generation
-	})
-}
+func (view OpenglTextureFrameView) Generation() uint64 { return view.value.Generation }
 
-func (view OpenglTextureFrameView) Width() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Width
-	})
-}
+func (view OpenglTextureFrameView) Width() uint32 { return view.value.Width }
 
-func (view OpenglTextureFrameView) Height() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Height
-	})
-}
+func (view OpenglTextureFrameView) Height() uint32 { return view.value.Height }
 
-func (view OpenglTextureFrameView) ScaleFactor() (float64, error) {
-	return bindingCall(func() float64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.ScaleFactor
-	})
-}
+func (view OpenglTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
 
-func (view OpenglTextureFrameView) FrameId() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.FrameId
-	})
-}
+func (view OpenglTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
-func (view OpenglTextureFrameView) Slot() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Slot
-	})
-}
+func (view OpenglTextureFrameView) Slot() uint32 { return view.value.Slot }
 
 func (view OpenglTextureFrameView) Texture() (uint32, error) {
 	return bindingCall(func() uint32 {
@@ -5681,55 +5590,20 @@ func (view OpenglTextureFrameView) Texture() (uint32, error) {
 	})
 }
 
-func (view OpenglTextureFrameView) Target() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Target
-	})
-}
+func (view OpenglTextureFrameView) Target() uint32 { return view.value.Target }
 
-func (view OpenglTextureFrameView) InternalFormat() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.InternalFormat
-	})
-}
+func (view OpenglTextureFrameView) InternalFormat() uint32 { return view.value.InternalFormat }
 
-func (view OpenglTextureFrameView) Format() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Format
-	})
-}
+func (view OpenglTextureFrameView) Format() uint32 { return view.value.Format }
 
-func (view OpenglTextureFrameView) Type() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Type
-	})
-}
+func (view OpenglTextureFrameView) Type() uint32 { return view.value.Type }
 
 type GpuSyncView struct {
 	value GpuSync
 	scope *bindingScope
 }
 
-func (view GpuSyncView) Kind() (GpuSyncKind, error) {
-	return bindingCall(func() GpuSyncKind {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Kind
-	})
-}
+func (view GpuSyncView) Kind() GpuSyncKind { return view.value.Kind }
 
 func (view GpuSyncView) Handle() (uint64, error) {
 	return bindingCall(func() uint64 {
@@ -5745,59 +5619,17 @@ type VulkanTextureFrameView struct {
 	scope *bindingScope
 }
 
-func (view VulkanTextureFrameView) Generation() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Generation
-	})
-}
+func (view VulkanTextureFrameView) Generation() uint64 { return view.value.Generation }
 
-func (view VulkanTextureFrameView) Width() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Width
-	})
-}
+func (view VulkanTextureFrameView) Width() uint32 { return view.value.Width }
 
-func (view VulkanTextureFrameView) Height() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Height
-	})
-}
+func (view VulkanTextureFrameView) Height() uint32 { return view.value.Height }
 
-func (view VulkanTextureFrameView) ScaleFactor() (float64, error) {
-	return bindingCall(func() float64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.ScaleFactor
-	})
-}
+func (view VulkanTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
 
-func (view VulkanTextureFrameView) FrameId() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.FrameId
-	})
-}
+func (view VulkanTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
-func (view VulkanTextureFrameView) Slot() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Slot
-	})
-}
+func (view VulkanTextureFrameView) Slot() uint32 { return view.value.Slot }
 
 func (view VulkanTextureFrameView) Image() (uint64, error) {
 	return bindingCall(func() uint64 {
@@ -5826,23 +5658,9 @@ func (view VulkanTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view VulkanTextureFrameView) Format() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Format
-	})
-}
+func (view VulkanTextureFrameView) Format() uint32 { return view.value.Format }
 
-func (view VulkanTextureFrameView) Layout() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Layout
-	})
-}
+func (view VulkanTextureFrameView) Layout() uint32 { return view.value.Layout }
 
 // AcquiredFrameHandle corresponds to mln_acquired_frame. A rendered frame that
 // a render session lends until its release.

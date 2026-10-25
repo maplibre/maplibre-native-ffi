@@ -334,7 +334,7 @@ final class MetalTextureCompositor {
     guard let commandBuffer = queue.makeCommandBuffer() else {
       throw metalError("Metal command buffer creation failed")
     }
-    switch try producerSynchronization?.kind ?? .cpuComplete {
+    switch producerSynchronization?.kind ?? .cpuComplete {
     case .cpuComplete:
       break
     default:

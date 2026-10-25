@@ -609,19 +609,23 @@ def render_scoped_views(bound, generated, values):
         emitted.add(public)
         getters = []
         for name, typ, field in values.members(value):
-            native_pointer = field.value.kind == "native_pointer"
-            result = (
-                f"ScopedNativePointer(_value.{name}.address, checkValid: _scope.checkActive, debugName: '{public}.{name}')"
-                if native_pointer
-                else f"_scope.active(_value).{name}"
-            )
+            # The scope guards only what the view's owner lends; a copy of any
+            # other member stays readable after the scope ends.
+            native_pointer = field.value.kind == "native_pointer" and field.scoped
+            if native_pointer:
+                result = f"ScopedNativePointer(_value.{name}.address, checkValid: _scope.checkActive, debugName: '{public}.{name}')"
+            elif field.scoped:
+                result = f"_scope.active(_value).{name}"
+            else:
+                result = f"_value.{name}"
             getters.append(
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
         method = "with" + camel(plan.member).removeprefix("get")
         chunks.append(
-            f"/// A `{public}` that is readable only while the callback of\n"
-            f"/// `{owner_names(plan.view.owner)[0]}.{method}` runs.\n"
+            f"/// A `{public}` whose native objects are readable only while the\n"
+            f"/// callback of `{owner_names(plan.view.owner)[0]}.{method}` runs. Its\n"
+            "/// other members stay readable after the callback returns.\n"
             f"final class Scoped{public} {{\n  Scoped{public}._(this._scope, this._value);\n  final {public} _value;\n  final _NativeViewScope _scope;\n"
             + "\n".join(getters)
             + "\n}\n"

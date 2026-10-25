@@ -17,7 +17,7 @@ class NativeEmitterTests(unittest.TestCase):
     def test_zig_nested_retained_inputs_fail_closed(self):
         api = self.parse("""
 typedef struct mln_store_options {
-  mln_buffer_view view BIND("lifetime=owner");
+  mln_buffer_view view BIND("lifetime=process");
 } mln_store_options;
 BIND("execution=command")
 mln_status mln_map_store(mln_map map, const mln_store_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);

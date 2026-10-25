@@ -20,10 +20,11 @@ import (
 const backgroundStyle = `{"version":8,"sources":{},"layers":[` +
 	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
 
-// frameView is what every backend's owned-texture frame view reports.
+// frameView is what every backend's owned-texture frame view reports, and
+// readTexture reads the texture that one lends, which the view's scope guards.
 type frameView interface {
-	Width() (uint32, error)
-	Height() (uint32, error)
+	Width() uint32
+	Height() uint32
 }
 
 type renderFixture struct {
@@ -263,9 +264,10 @@ func TestOwnedTextureFrameReadsBackAsPixels(t *testing.T) {
 	}
 }
 
-// A frame's texture view lives only for its callback. While it lives, it
-// refuses a read from another thread, and the frame refuses to close from
-// one; once the callback returns, the view has expired and the frame closes.
+// A frame view lends its texture only for its callback. While it lives, it
+// refuses a read of the texture from another thread, and the frame refuses to
+// close from one; once the callback returns, the view refuses the texture but
+// still reads its plain values, and the frame closes.
 func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
@@ -277,16 +279,16 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	var expired frameView
 	err = withFrameView(frame, func(view frameView) error {
 		expired = view
-		width, widthErr := view.Width()
-		height, heightErr := view.Height()
-		if widthErr != nil || heightErr != nil || width != 32 || height != 16 {
-			t.Errorf("view size = %dx%d (%v, %v), want 32x16", width, height, widthErr, heightErr)
+		if width, height := view.Width(), view.Height(); width != 32 || height != 16 {
+			t.Errorf("view size = %dx%d, want 32x16", width, height)
+		}
+		if err := readTexture(view); err != nil {
+			t.Errorf("view texture read = %v, want nil", err)
 		}
 		// This goroutine holds its OS thread, so another one runs elsewhere.
 		foreign := make(chan [2]error, 1)
 		go func() {
-			_, viewErr := view.Width()
-			foreign <- [2]error{viewErr, frame.Close(nil)}
+			foreign <- [2]error{readTexture(view), frame.Close(nil)}
 		}()
 		result := <-foreign
 		if !errors.Is(result[0], StatusInvalidState) {
@@ -300,8 +302,11 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("frame view: %v", err)
 	}
-	if _, err := expired.Width(); !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("expired view read = %v, want StatusInvalidState", err)
+	if err := readTexture(expired); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("expired view texture read = %v, want StatusInvalidState", err)
+	}
+	if width := expired.Width(); width != 32 {
+		t.Fatalf("expired view width = %d, want 32", width)
 	}
 	if err := frame.Close(&GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("frame close after the view: %v", err)
@@ -352,11 +357,10 @@ func TestFrameViewSurvivesYielding(t *testing.T) {
 		finished <- withFrameView(frame, func(view frameView) error {
 			for range 1000 {
 				stdruntime.Gosched()
-				width, err := view.Width()
-				if err != nil {
+				if err := readTexture(view); err != nil {
 					return err
 				}
-				if width != 32 {
+				if width := view.Width(); width != 32 {
 					return fmt.Errorf("view width = %d, want 32", width)
 				}
 			}

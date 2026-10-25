@@ -50,6 +50,15 @@ PLATFORMS = ("android", "ios", "linux", "macos", "ohos", "tvos", "web", "windows
 # them; an absent nullable means false. The semantic layer supplies
 # lifetime=completion for an array completion result and discardable
 # completions for commands.
+#
+# A lifetime says how long a value stays valid: `call` for the call that passes
+# or returns it, `process` until the process exits, and `owner` until whatever
+# lends the value releases it. A callback context's owner is its registration.
+# A record field's owner is what lends its record: a delivery batch lends its
+# payload records, and the handle that a `view_owner` function names lends that
+# function's output record, whose `lifetime=owner` fields stay valid only until
+# that handle's release or the end of its view scope. A binding guards those
+# fields, and only those, with the view's scope.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -580,6 +589,17 @@ def caller_sized_text_errors(function, parameter, parameters, context) -> list[s
     return errors
 
 
+def view_records(api: Api) -> set[str]:
+    """The records that `view_owner` functions output."""
+    return {
+        parameter.type.pointee.declaration
+        for function in api.functions
+        if "view_owner" in function.metadata
+        for parameter in function.parameters
+        if parameter.metadata.get("direction") == "out" and parameter.type.pointee
+    }
+
+
 def validate(api: Api) -> None:
     """Reject incomplete or contradictory execution and result contracts.
 
@@ -641,6 +661,15 @@ def validate(api: Api) -> None:
         for typedef in api.typedefs
         if "default_function" in typedef.metadata
     }
+    # The records that an owner lends. A record that no function reaches, such
+    # as one that only another platform's view reads, is not checked.
+    payload = api.records_by_name.get(DELIVERY_PAYLOAD)
+    lent = view_records(api) | {
+        field.type.declaration
+        for field in (payload.fields if payload else ())
+        if "variant" in field.metadata
+    }
+    reached = record_reaches(api)[0]
     for function in api.functions:
         context = f"{function.location}: {function.name}"
         metadata = function.metadata
@@ -683,6 +712,16 @@ def validate(api: Api) -> None:
             ):
                 errors.append(
                     f"{context}: view_owner requires one borrowed output record"
+                )
+            elif not any(
+                field.metadata.get("lifetime") == "owner"
+                for field in api.records_by_name[
+                    views[0].type.pointee.declaration
+                ].fields
+            ):
+                errors.append(
+                    f"{context}: view_owner requires an output record with a "
+                    "lifetime=owner field"
                 )
         execution = metadata.get("execution")
         returns_status = is_status(function.return_type)
@@ -880,6 +919,16 @@ def validate(api: Api) -> None:
                 metadata_errors(field.metadata, FIELD_KEYS, fcontext, KINDS["field"])
             )
             errors.extend(value_metadata_errors(field.type, field.metadata, fcontext))
+            if (
+                field.metadata.get("lifetime") == "owner"
+                and field.metadata.get("kind") != "context"
+                and record.name in reached
+                and record.name not in lent
+            ):
+                errors.append(
+                    f"{fcontext}: lifetime=owner requires a record that a "
+                    "delivery batch or a view owner lends"
+                )
             if field.metadata.get("kind") == "delivery_queue" and (
                 api.typedefs_by_name.get(record.name) is None
                 or api.typedefs_by_name[record.name].metadata.get("kind")

@@ -28,7 +28,8 @@ class ViewScopeTest {
     assertEquals(2u, frame.width)
     assertEquals(0x10L, texture.address)
     scope.close()
-    assertFailsWith<IllegalStateException> { frame.width }
+    // The scope guards only what the frame lends; plain values stay readable.
+    assertEquals(2u, frame.width)
     assertFailsWith<IllegalStateException> { frame.texture }
     assertFailsWith<IllegalStateException> { texture.address }
     assertFailsWith<IllegalStateException> { texture.toString() }

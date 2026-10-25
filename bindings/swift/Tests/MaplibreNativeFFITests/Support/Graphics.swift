@@ -151,13 +151,30 @@ final class TestGraphics: @unchecked Sendable {
 
 /// The part every backend's owned-texture frame view shares.
 protocol OwnedTextureFrameView: AnyObject {
-  var width: UInt32 { get throws }
-  var height: UInt32 { get throws }
+  var width: UInt32 { get }
+  var height: UInt32 { get }
+  /// Reads the texture object that the frame lends, which the view's scope
+  /// guards.
+  func readTexture() throws
 }
 
-extension MetalTextureFrameView: OwnedTextureFrameView {}
-extension VulkanTextureFrameView: OwnedTextureFrameView {}
-extension OpenglTextureFrameView: OwnedTextureFrameView {}
+extension MetalTextureFrameView: OwnedTextureFrameView {
+  func readTexture() throws {
+    _ = try texture
+  }
+}
+
+extension VulkanTextureFrameView: OwnedTextureFrameView {
+  func readTexture() throws {
+    _ = try image
+  }
+}
+
+extension OpenglTextureFrameView: OwnedTextureFrameView {
+  func readTexture() throws {
+    _ = try texture
+  }
+}
 
 struct FixtureError: Error, CustomStringConvertible {
   let description: String

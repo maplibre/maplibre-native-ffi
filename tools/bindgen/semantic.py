@@ -224,6 +224,15 @@ class FieldPlan:
     def public(self) -> bool:
         return self.role not in CONTROL_ROLES
 
+    @property
+    def scoped(self) -> bool:
+        """The field names a native object that its record's owner lends.
+
+        In a borrowed view's output, it stays valid only while the view's scope
+        is active, so a binding guards it, and no other field, with that scope.
+        """
+        return self.value.lifetime == "owner"
+
 
 def required_callbacks(value: ValuePlan) -> tuple[FieldPlan, ...]:
     """The callbacks that a registration requires of its host.
@@ -1071,9 +1080,11 @@ class Binder:
                 A binding copies a buffer, array, or record into storage that
                 it frees when the call returns, so no input value may claim a
                 longer lifetime. Opaque pointers, handles, callbacks, and
-                registrations carry their own retention contracts.
+                registrations carry their own retention contracts, and a scalar
+                is copied by value, such as the bit pattern of a native object
+                that a record lends when native writes it.
                 """
-                if item.kind in {"native_pointer", "handle", "callback"} or (
+                if item.kind in {"native_pointer", "handle", "callback", "scalar"} or (
                     item.registration
                 ):
                     return

@@ -217,9 +217,10 @@ typedef struct mln_gpu_sync {
   /**
    * Bit pattern of the GLsync pointer.
    *
-   * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE.
+   * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE. A producer fence that frame
+   * access copies is valid only until the frame's release or discard.
    */
-  uint64_t handle;
+  uint64_t handle MLN_BINDING("lifetime=owner");
 } mln_gpu_sync;
 
 /** Returns CPU-complete synchronization for this C API version. */

@@ -11,27 +11,27 @@ public final class MetalTextureFrameView {
   }
 
   public var generation: UInt64 {
-    get throws { try scope.check(); return snapshot.generation }
+    snapshot.generation
   }
 
   public var width: UInt32 {
-    get throws { try scope.check(); return snapshot.width }
+    snapshot.width
   }
 
   public var height: UInt32 {
-    get throws { try scope.check(); return snapshot.height }
+    snapshot.height
   }
 
   public var scaleFactor: Double {
-    get throws { try scope.check(); return snapshot.scaleFactor }
+    snapshot.scaleFactor
   }
 
   public var frameId: UInt64 {
-    get throws { try scope.check(); return snapshot.frameId }
+    snapshot.frameId
   }
 
   public var slot: UInt32 {
-    get throws { try scope.check(); return snapshot.slot }
+    snapshot.slot
   }
 
   public var texture: NativePointer {
@@ -43,7 +43,7 @@ public final class MetalTextureFrameView {
   }
 
   public var pixelFormat: UInt64 {
-    get throws { try scope.check(); return snapshot.pixelFormat }
+    snapshot.pixelFormat
   }
 }
 
@@ -55,27 +55,27 @@ public final class OpenglTextureFrameView {
   }
 
   public var generation: UInt64 {
-    get throws { try scope.check(); return snapshot.generation }
+    snapshot.generation
   }
 
   public var width: UInt32 {
-    get throws { try scope.check(); return snapshot.width }
+    snapshot.width
   }
 
   public var height: UInt32 {
-    get throws { try scope.check(); return snapshot.height }
+    snapshot.height
   }
 
   public var scaleFactor: Double {
-    get throws { try scope.check(); return snapshot.scaleFactor }
+    snapshot.scaleFactor
   }
 
   public var frameId: UInt64 {
-    get throws { try scope.check(); return snapshot.frameId }
+    snapshot.frameId
   }
 
   public var slot: UInt32 {
-    get throws { try scope.check(); return snapshot.slot }
+    snapshot.slot
   }
 
   public var texture: UInt32 {
@@ -83,19 +83,19 @@ public final class OpenglTextureFrameView {
   }
 
   public var target: UInt32 {
-    get throws { try scope.check(); return snapshot.target }
+    snapshot.target
   }
 
   public var internalFormat: UInt32 {
-    get throws { try scope.check(); return snapshot.internalFormat }
+    snapshot.internalFormat
   }
 
   public var format: UInt32 {
-    get throws { try scope.check(); return snapshot.format }
+    snapshot.format
   }
 
   public var type: UInt32 {
-    get throws { try scope.check(); return snapshot.type }
+    snapshot.type
   }
 }
 
@@ -107,7 +107,7 @@ public final class GpuSyncView {
   }
 
   public var kind: GpuSyncKind {
-    get throws { try scope.check(); return snapshot.kind }
+    snapshot.kind
   }
 
   public var handle: UInt64 {
@@ -123,27 +123,27 @@ public final class VulkanTextureFrameView {
   }
 
   public var generation: UInt64 {
-    get throws { try scope.check(); return snapshot.generation }
+    snapshot.generation
   }
 
   public var width: UInt32 {
-    get throws { try scope.check(); return snapshot.width }
+    snapshot.width
   }
 
   public var height: UInt32 {
-    get throws { try scope.check(); return snapshot.height }
+    snapshot.height
   }
 
   public var scaleFactor: Double {
-    get throws { try scope.check(); return snapshot.scaleFactor }
+    snapshot.scaleFactor
   }
 
   public var frameId: UInt64 {
-    get throws { try scope.check(); return snapshot.frameId }
+    snapshot.frameId
   }
 
   public var slot: UInt32 {
-    get throws { try scope.check(); return snapshot.slot }
+    snapshot.slot
   }
 
   public var image: UInt64 {
@@ -159,10 +159,10 @@ public final class VulkanTextureFrameView {
   }
 
   public var format: UInt32 {
-    get throws { try scope.check(); return snapshot.format }
+    snapshot.format
   }
 
   public var layout: UInt32 {
-    get throws { try scope.check(); return snapshot.layout }
+    snapshot.layout
   }
 }

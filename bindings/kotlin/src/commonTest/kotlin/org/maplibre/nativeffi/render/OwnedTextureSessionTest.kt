@@ -10,6 +10,7 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GpuSync
+import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionState
 import org.maplibre.nativeffi.generated.Status
@@ -78,9 +79,11 @@ class OwnedTextureSessionTest {
       val sibling = assertNotNull(session.acquireFrame())
 
       var escaped: GpuSync? = null
+      var kind: GpuSyncKind? = null
       frame.withProducerSync { sync ->
         escaped = sync
-        val kind = sync.kind
+        kind = sync.kind
+        val handle = sync.handle
         // The view borrows the frame, so neither the frame nor its session can go away under it.
         assertFailsWithStatus(Status.BUSY) { frame.release() }
         assertFailsWithStatus(Status.BUSY) { session.abandon() }
@@ -89,9 +92,11 @@ class OwnedTextureSessionTest {
         sibling.discard()
         assertTrue(sibling.isClosed)
         sibling.discard()
-        assertEquals(kind, sync.kind)
+        assertEquals(handle, sync.handle)
       }
-      assertFailsWith<IllegalStateException> { escaped!!.kind }
+      // Only the sync object that the frame lends expires with the block.
+      assertEquals(kind, escaped!!.kind)
+      assertFailsWith<IllegalStateException> { escaped.handle }
       frame.release()
       assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
     }

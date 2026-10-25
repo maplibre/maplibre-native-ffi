@@ -140,20 +140,66 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                         coverage["unsupported"],
                     )
                     # No declaration disappears without a reason. Support
-                    # functions back the generated values that call them, and
-                    # a generated drain releases its own batch.
+                    # functions back the generated values that call them, a
+                    # generated drain releases its own batch, and a generated
+                    # view opens and ends its owner's scope.
                     released = {
                         bound.handles[plan.drain.batch.value.unwrapped.native].release
                         for plan in bound.operations
                         if plan.drain and plan.name in coverage["generated"]
                     }
+                    scoped = {
+                        name
+                        for plan in bound.operations
+                        if plan.view and plan.name in coverage["generated"]
+                        for name in (plan.view.begin, plan.view.end)
+                    }
                     self.assertEqual(
                         set(coverage["generated"])
                         | set(coverage["unsupported"])
                         | set(coverage.get("support", ()))
-                        | released,
+                        | released
+                        | scoped,
                         {function.name for function in api.public_functions},
                     )
+
+    def test_a_view_scope_guards_only_the_fields_its_owner_lends(self):
+        api = parse(groups=("borrowed_view",))
+        validate(api)
+        # Each binding that checks a view's scope reads the lent texture through
+        # that check and the plain width straight from its copy.
+        expected = {
+            go: (
+                "func (view FrameTextureView) Texture() (uint64,error) { return bindingCall(func() uint64 { runtime.LockOSThread(); defer runtime.UnlockOSThread(); view.scope.check(); return view.value.Texture }) }",
+                "func (view FrameTextureView) Width() uint32 { return view.value.Width }",
+            ),
+            swift: (
+                "public var `texture`: UInt64 { get throws { try scope.check(); return snapshot.`texture` } }",
+                "public var `width`: UInt32 { snapshot.`width` }",
+            ),
+            dart: (
+                "int get texture => _scope.active(_value).texture;",
+                "int get width => _value.width;",
+            ),
+            dotnet: (
+                "public ulong Texture => scope.Active(value).Texture;",
+                "public uint Width => value.Width;",
+            ),
+            typescript: (
+                "return this.#scope.active(this.#value).texture;",
+                "return this.#value.width;",
+            ),
+            kotlin: (
+                "public val texture: ULong get() { bindingScope?.ensureActive(); return storedTexture }",
+                "  public val width: UInt,",
+            ),
+        }
+        for emitter, (lent, plain) in expected.items():
+            with self.subTest(emitter=emitter.__name__):
+                source = self.rendered(emitter, api)
+                self.assertIn(lent, source)
+                self.assertIn(plain, source)
+                self.assertNotIn("storedWidth", source)
 
     def rendered(self, emitter, api):
         output = emitter.generate(api)

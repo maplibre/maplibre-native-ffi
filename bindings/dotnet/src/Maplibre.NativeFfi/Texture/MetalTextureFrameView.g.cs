@@ -13,13 +13,13 @@ public sealed class MetalTextureFrameView
         this.scope = scope;
     }
 
-    public ulong Generation => scope.Active(value).Generation;
-    public uint Width => scope.Active(value).Width;
-    public uint Height => scope.Active(value).Height;
-    public double ScaleFactor => scope.Active(value).ScaleFactor;
-    public ulong FrameId => scope.Active(value).FrameId;
-    public uint Slot => scope.Active(value).Slot;
+    public ulong Generation => value.Generation;
+    public uint Width => value.Width;
+    public uint Height => value.Height;
+    public double ScaleFactor => value.ScaleFactor;
+    public ulong FrameId => value.FrameId;
+    public uint Slot => value.Slot;
     public NativePointer Texture => scope.Active(value).Texture;
     public NativePointer Device => scope.Active(value).Device;
-    public ulong PixelFormat => scope.Active(value).PixelFormat;
+    public ulong PixelFormat => value.PixelFormat;
 }

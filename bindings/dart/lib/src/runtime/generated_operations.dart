@@ -7464,18 +7464,19 @@ final class NewRenderSession {
   final Future<void> ready;
 }
 
-/// A `MetalTextureFrame` that is readable only while the callback of
-/// `AcquiredFrameHandle.withMetalTexture` runs.
+/// A `MetalTextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withMetalTexture` runs. Its
+/// other members stay readable after the callback returns.
 final class ScopedMetalTextureFrame {
   ScopedMetalTextureFrame._(this._scope, this._value);
   final MetalTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _scope.active(_value).generation;
-  int get width => _scope.active(_value).width;
-  int get height => _scope.active(_value).height;
-  double get scaleFactor => _scope.active(_value).scaleFactor;
-  int get frameId => _scope.active(_value).frameId;
-  int get slot => _scope.active(_value).slot;
+  int get generation => _value.generation;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get frameId => _value.frameId;
+  int get slot => _value.slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,
     checkValid: _scope.checkActive,
@@ -7486,50 +7487,53 @@ final class ScopedMetalTextureFrame {
     checkValid: _scope.checkActive,
     debugName: 'MetalTextureFrame.device',
   );
-  int get pixelFormat => _scope.active(_value).pixelFormat;
+  int get pixelFormat => _value.pixelFormat;
 }
 
-/// A `OpenglTextureFrame` that is readable only while the callback of
-/// `AcquiredFrameHandle.withOpenglTexture` runs.
+/// A `OpenglTextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withOpenglTexture` runs. Its
+/// other members stay readable after the callback returns.
 final class ScopedOpenglTextureFrame {
   ScopedOpenglTextureFrame._(this._scope, this._value);
   final OpenglTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _scope.active(_value).generation;
-  int get width => _scope.active(_value).width;
-  int get height => _scope.active(_value).height;
-  double get scaleFactor => _scope.active(_value).scaleFactor;
-  int get frameId => _scope.active(_value).frameId;
-  int get slot => _scope.active(_value).slot;
+  int get generation => _value.generation;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get frameId => _value.frameId;
+  int get slot => _value.slot;
   int get texture => _scope.active(_value).texture;
-  int get target => _scope.active(_value).target;
-  int get internalFormat => _scope.active(_value).internalFormat;
-  int get format => _scope.active(_value).format;
-  int get type => _scope.active(_value).type;
+  int get target => _value.target;
+  int get internalFormat => _value.internalFormat;
+  int get format => _value.format;
+  int get type => _value.type;
 }
 
-/// A `GpuSync` that is readable only while the callback of
-/// `AcquiredFrameHandle.withProducerSync` runs.
+/// A `GpuSync` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withProducerSync` runs. Its
+/// other members stay readable after the callback returns.
 final class ScopedGpuSync {
   ScopedGpuSync._(this._scope, this._value);
   final GpuSync _value;
   final _NativeViewScope _scope;
-  GpuSyncKind get kind => _scope.active(_value).kind;
+  GpuSyncKind get kind => _value.kind;
   int get handle => _scope.active(_value).handle;
 }
 
-/// A `VulkanTextureFrame` that is readable only while the callback of
-/// `AcquiredFrameHandle.withVulkanTexture` runs.
+/// A `VulkanTextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withVulkanTexture` runs. Its
+/// other members stay readable after the callback returns.
 final class ScopedVulkanTextureFrame {
   ScopedVulkanTextureFrame._(this._scope, this._value);
   final VulkanTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _scope.active(_value).generation;
-  int get width => _scope.active(_value).width;
-  int get height => _scope.active(_value).height;
-  double get scaleFactor => _scope.active(_value).scaleFactor;
-  int get frameId => _scope.active(_value).frameId;
-  int get slot => _scope.active(_value).slot;
+  int get generation => _value.generation;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get frameId => _value.frameId;
+  int get slot => _value.slot;
   int get image => _scope.active(_value).image;
   int get imageView => _scope.active(_value).imageView;
   ScopedNativePointer get device => ScopedNativePointer(
@@ -7537,6 +7541,6 @@ final class ScopedVulkanTextureFrame {
     checkValid: _scope.checkActive,
     debugName: 'VulkanTextureFrame.device',
   );
-  int get format => _scope.active(_value).format;
-  int get layout => _scope.active(_value).layout;
+  int get format => _value.format;
+  int get layout => _value.layout;
 }

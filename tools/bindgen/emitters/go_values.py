@@ -618,14 +618,21 @@ class Values:
             chunks.append(
                 f"type {typename} struct {{ value {public(native)}; scope *bindingScope }}"
             )
-            for member, v, _ in self.members(value):
+            for member, v, f in self.members(value):
                 result = self.type(v) if v else "bool"
                 method = (
                     "Unsafe" + member
                     if v and v.kind in {"native_pointer", "union"}
                     else member
                 )
-                chunks.append(
-                    f"func (view {typename}) {method}() ({result},error) {{ return bindingCall(func() {result} {{ runtime.LockOSThread(); defer runtime.UnlockOSThread(); view.scope.check(); return view.value.{member} }}) }}"
-                )
+                # The scope guards only what the view's owner lends; a copy of
+                # any other member stays readable after the scope ends.
+                if v and f.scoped:
+                    chunks.append(
+                        f"func (view {typename}) {method}() ({result},error) {{ return bindingCall(func() {result} {{ runtime.LockOSThread(); defer runtime.UnlockOSThread(); view.scope.check(); return view.value.{member} }}) }}"
+                    )
+                else:
+                    chunks.append(
+                        f"func (view {typename}) {method}() {result} {{ return view.value.{member} }}"
+                    )
         return "\n\n".join(chunks)

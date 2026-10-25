@@ -341,15 +341,22 @@ def render_views(bound, values: Values, lowered: list[Lowered]) -> list[str]:
         record = public_name(value.native)
         name = scoped_name(value.native)
         view = entry.plan.view
+        # The scope guards only what the view's owner lends; a copy of any
+        # other member stays readable after the scope ends.
         getters = "".join(
             f'\n  get {identifier(f.name)}(): {record}["{identifier(f.name)}"] {{\n'
-            f"    return this.#scope.active(this.#value).{identifier(f.name)};\n  }}\n"
+            + (
+                f"    return this.#scope.active(this.#value).{identifier(f.name)};\n  }}\n"
+                if f.scoped
+                else f"    return this.#value.{identifier(f.name)};\n  }}\n"
+            )
             for f in values.fields(value)
         )
         method = f"{owner_class(view.owner)}.{entry.method}"
         chunks[entry.view] = (
             f"/**\n * A `{record}` whose native objects stay valid only while the\n"
-            f" * callback of {{@link {method}}} runs.\n */\n"
+            f" * callback of {{@link {method}}} runs. Its other members stay\n"
+            " * readable after the callback returns.\n */\n"
             f"export class {name} {{\n"
             f"  readonly #value: {record};\n"
             "  readonly #scope: ViewScope;\n\n"

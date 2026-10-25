@@ -97,9 +97,9 @@ typedef struct mln_metal_texture_frame {
   /**
    * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
    */
-  void* texture;
+  void* texture MLN_BINDING("lifetime=owner");
   /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
-  void* device;
+  void* device MLN_BINDING("lifetime=owner");
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   uint64_t pixel_format;
 } mln_metal_texture_frame;
@@ -216,11 +216,11 @@ typedef struct mln_vulkan_texture_frame {
    */
   uint32_t slot;
   /** Borrowed VkImage bit pattern. Valid until frame release. */
-  mln_vulkan_non_dispatchable_handle image;
+  mln_vulkan_non_dispatchable_handle image MLN_BINDING("lifetime=owner");
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
-  mln_vulkan_non_dispatchable_handle image_view;
+  mln_vulkan_non_dispatchable_handle image_view MLN_BINDING("lifetime=owner");
   /** Borrowed VkDevice. Valid until frame release. */
-  void* device;
+  void* device MLN_BINDING("lifetime=owner");
   /** Backend-native VkFormat value. */
   uint32_t format;
   /**
@@ -386,11 +386,11 @@ typedef struct mln_webgpu_texture_frame {
    */
   uint32_t slot;
   /** Borrowed WGPUTexture. Valid until frame release. */
-  void* texture;
+  void* texture MLN_BINDING("lifetime=owner");
   /** Borrowed WGPUTextureView. Valid until frame release. */
-  void* texture_view;
+  void* texture_view MLN_BINDING("lifetime=owner");
   /** Borrowed WGPUDevice. Valid until frame release. */
-  void* device;
+  void* device MLN_BINDING("lifetime=owner");
   /** Backend-native WGPUTextureFormat value. */
   uint32_t format;
 } mln_webgpu_texture_frame;
@@ -419,7 +419,7 @@ typedef struct mln_opengl_texture_frame {
    * The session's context wrote the texture. A host that samples it from
    * another context of the share group must bind it again after acquisition.
    */
-  uint32_t texture;
+  uint32_t texture MLN_BINDING("lifetime=owner");
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   uint32_t target;
   /**

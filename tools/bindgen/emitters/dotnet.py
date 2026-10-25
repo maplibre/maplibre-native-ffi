@@ -1432,8 +1432,12 @@ def emit(api: Api | BoundApi) -> Emission:
         value = values.record(native)
         name = public_type(native)
         directory = directory_for(api.records_by_name[native].location.path)
+        # The scope guards only what the view's owner lends; a copy of any
+        # other member stays readable after the scope ends.
         properties = "".join(
-            f"    public {values.property_type(value, member, field)} {member} => scope.Active(value).{member};\n"
+            f"    public {values.property_type(value, member, field)} {member} => "
+            + (f"scope.Active(value).{member}" if field.scoped else f"value.{member}")
+            + ";\n"
             for member, field in values.members(value)
         )
         files[f"{directory}/{name}View.g.cs"] = (

@@ -393,7 +393,7 @@ mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic)
         source = """
 typedef unsigned long long parent BIND("kind=handle;release=parent_close;dispose=parent_close;abandon=parent_abandon");
 typedef unsigned long long child BIND("kind=handle;release=child_close;dispose=child_close;parent=parent;view_begin=child_begin;view_end=child_end");
-typedef struct view { void *texture; } view;
+typedef struct view { void *texture BIND("lifetime=owner"); int width; } view;
 mln_status parent_close(parent value, mln_diagnostic *out_diagnostic);
 mln_status parent_abandon(parent value, mln_diagnostic *out_diagnostic);
 mln_status child_close(child value, mln_diagnostic *out_diagnostic);
@@ -411,6 +411,26 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
             (view.output.name, view.begin, view.end, view.stem),
             ("out", "child_begin", "child_end", "view"),
         )
+        # The scope guards only the fields that the owner lends.
+        self.assertEqual(
+            {f.name: f.scoped for f in view.output.value.element.fields},
+            {"texture": True, "width": False},
+        )
+        # A view lends at least one field, and only a lent record has one.
+        with self.assertRaisesRegex(ModelError, "a lifetime=owner field"):
+            bind(
+                self.parse(source.replace(' BIND("lifetime=owner")', "")),
+                require_complete=True,
+            )
+        with self.assertRaisesRegex(ModelError, "view owner lends"):
+            bind(
+                self.parse(
+                    source
+                    + 'typedef struct loose { int id BIND("lifetime=owner"); } loose;\n'
+                    + 'mln_status child_read(child owner, loose *out BIND("direction=out"), mln_diagnostic *out_diagnostic);\n'
+                ),
+                require_complete=True,
+            )
         with self.assertRaisesRegex(ModelError, "input handle"):
             bind(
                 self.parse(source.replace("view_owner=owner", "view_owner=out")),
