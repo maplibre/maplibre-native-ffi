@@ -23,7 +23,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "binding.h"
 
@@ -238,7 +237,14 @@ MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
  * view.
  */
 static inline mln_buffer_view mln_buffer_view_from_cstr(const char* text) {
-  const mln_buffer_view view = {text, text != NULL ? strlen(text) : 0};
+  // Counts instead of calling strlen() so the headers stay freestanding.
+  size_t size = 0;
+  if (text != NULL) {
+    while (text[size] != '\0') {
+      size++;
+    }
+  }
+  const mln_buffer_view view = {text, size};
   return view;
 }
 
