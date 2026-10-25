@@ -68,6 +68,14 @@ jobs:
             runner: blacksmith-4vcpu-ubuntu-2404-arm
           - preset: linux-gnu-arm64-egl
             runner: blacksmith-4vcpu-ubuntu-2404-arm
+          - preset: linux-musl-x64-vulkan
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - preset: linux-musl-x64-egl
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - preset: linux-musl-arm64-vulkan
+            runner: blacksmith-4vcpu-ubuntu-2404-arm
+          - preset: linux-musl-arm64-egl
+            runner: blacksmith-4vcpu-ubuntu-2404-arm
           - preset: macos-arm64-metal
             runner: blacksmith-6vcpu-macos-26
           - preset: macos-arm64-vulkan

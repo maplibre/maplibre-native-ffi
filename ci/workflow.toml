@@ -33,6 +33,7 @@ commands = [
   { task = "//bindings/rust:test" },
   { task = "//bindings/dotnet:test" },
   { task = "//bindings/zig:test" },
+  { task = "//bindings/python:test" },
 ]
 
 # Every other binding step is handed a local install prefix. These commands
