@@ -1,5 +1,5 @@
-// Statuses and diagnostics: a failed call reports its own, and an addon built
-// from other headers fails to load.
+// Statuses and diagnostics: a failed call reports its own, and an addon with
+// another C ABI version fails to load.
 
 import assert from "node:assert/strict";
 
@@ -8,7 +8,11 @@ import {
   MaplibreError,
   Status,
 } from "../src/index.ts";
-import { type Addon, bindAddon } from "../src/internal/addon.ts";
+import {
+  type Addon,
+  bindAddon,
+  EXPECTED_C_ABI_VERSION,
+} from "../src/internal/addon.ts";
 import { openRuntime } from "./support/fixture.ts";
 import { test } from "./support/harness.ts";
 
@@ -41,10 +45,12 @@ test("a failed call carries its status, an unknown status code, and its own diag
   assert.equal(unknown.diagnostic, "from a later C API");
 });
 
-test("an addon generated from other headers fails to load before any other call", () => {
-  // The addon has abiDigest alone, so any other call would throw a TypeError
-  // instead of the digest mismatch.
-  const stub = { abiDigest: () => "0".repeat(16) } as unknown as Addon;
+test("an addon with another C ABI version fails to load before any other call", () => {
+  // The addon has mln_c_version alone, so any other call would throw a
+  // TypeError instead of the version mismatch.
+  const stub = {
+    mln_c_version: () => EXPECTED_C_ABI_VERSION + 1,
+  } as unknown as Addon;
   assert.throws(
     () =>
       bindAddon(stub, {}, () => {
@@ -54,6 +60,7 @@ test("an addon generated from other headers fails to load before any other call"
       error instanceof AbiVersionMismatchError &&
       error instanceof MaplibreError &&
       error.status === Status.unsupported &&
-      /ABI digest 0000000000000000/.test(error.diagnostic),
+      error.diagnostic ===
+        `unsupported MapLibre Native C ABI version ${EXPECTED_C_ABI_VERSION + 1}; expected ${EXPECTED_C_ABI_VERSION}`,
   );
 });

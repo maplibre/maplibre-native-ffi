@@ -31,8 +31,8 @@ internal object Jni {
     }
   }
 
-  /** The address of the C function that calls the [index]th method of [Upcalls]. */
-  @JvmStatic external fun upcallStub(index: Int): Long
+  /** The address of the C function that calls the upcall method named [name], or 0 for none. */
+  @JvmStatic external fun upcallStub(name: String): Long
 
   /** Calls `mln_android_init` with this thread's JNIEnv and [context]. */
   @JvmStatic external fun androidInit(context: Any, diagnostic: Long): Int

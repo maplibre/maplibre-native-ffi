@@ -652,18 +652,10 @@ class NativeValues:
         self.functions[name] = (prototype, "\n".join(lines))
         return name
 
-    def decoder_key(self, name: str) -> str:
-        """The member of the TypeScript `Decoder` table that names a
-        completion decoder: its name without the runtime prefix."""
-        return identifier(name.removeprefix("mln_ts_decode_"))
-
-    def decoder_keys(self) -> list[tuple[str, int]]:
-        """Each completion decoder's member and its index in the addon's
-        decoder table."""
-        return [
-            (self.decoder_key(name), index)
-            for index, name in enumerate(sorted(self.decoders))
-        ]
+    def decoder_id(self, name: str | None) -> str:
+        """The constant that names a completion decoder, or no decoder, in the
+        user data of a completion that an export submits."""
+        return "MLN_TS_NO_DECODER" if name is None else name.upper()
 
     # -- Deliveries ---------------------------------------------------------
 
@@ -689,14 +681,28 @@ class NativeValues:
         self.functions[name] = (prototype, "\n".join(lines))
         return name
 
+    def decoder_ids(self) -> str:
+        """The constants that name the completion decoders. A name keys each
+        decoder, so a new one leaves the others as they are."""
+        return (
+            "/** The completion decoders, by the constant that an export records in\n"
+            " * its completion. */\n"
+            "enum {\n  MLN_TS_NO_DECODER,\n"
+            + "".join(f"  {self.decoder_id(name)},\n" for name in sorted(self.decoders))
+            + "};\n"
+        )
+
     def decoder_table(self) -> str:
-        names = sorted(self.decoders)
         return (
             "const mln_ts_decoder mln_ts_decoders[] = {\n"
-            + "".join(f"  {name},\n" for name in names)
-            + ("" if names else "  NULL,\n")
+            + "  [MLN_TS_NO_DECODER] = NULL,\n"
+            + "".join(
+                f"  [{self.decoder_id(name)}] = {name},\n"
+                for name in sorted(self.decoders)
+            )
             + "};\n"
-            + f"const size_t mln_ts_decoder_count = {len(names)};\n"
+            + "const size_t mln_ts_decoder_count =\n"
+            + "  sizeof mln_ts_decoders / sizeof mln_ts_decoders[0];\n"
         )
 
     def prototypes(self) -> list[tuple[str, str]]:

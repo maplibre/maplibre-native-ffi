@@ -50,12 +50,13 @@ bool mln_jni_upcall_long(
 );
 
 // Defined by the generated shim: the natives of
-// org.maplibre.nativeffi.internal.c.C, the upcall methods, and one C function
-// per upcall, in the order UpcallStubs indexes them.
+// org.maplibre.nativeffi.internal.c.C, the upcall methods, and, at the same
+// index, the C function that calls each one, which UpcallStubs looks up by the
+// method's name.
 extern const JNINativeMethod mln_jni_methods[];
 extern const JNINativeMethod mln_jni_critical_methods[];
 extern const size_t mln_jni_method_count;
-extern mln_jni_upcall mln_jni_upcalls[];
+extern mln_jni_upcall* const mln_jni_upcalls[];
 extern void* const mln_jni_upcall_stubs[];
 extern const size_t mln_jni_upcall_count;
 

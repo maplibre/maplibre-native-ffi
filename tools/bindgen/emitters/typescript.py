@@ -9,9 +9,7 @@ execution shape.
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 from .. import async_hosts
 from ..compiler import compile_api
@@ -63,7 +61,7 @@ class Lowered:
     declined: bool = False
     # The record a borrowed view scopes, for a scoped view result.
     view: str | None = None
-    # The addon's completion decoder for the result, if any.
+    # The completion decoder that the addon records for the result, if any.
     decoder: str | None = None
     # Whether a discarding view of the receiver also calls the command.
     discardable: bool = False
@@ -462,8 +460,9 @@ def lower_function(
             if result.nullable or result.optional:
                 ts += " | undefined"
             lowered.shape, lowered.returns = "query", f"Promise<{ts}>"
+        decoder = natives.decoder_id(lowered.decoder)
         body.append(
-            f"if (!mln_ts_read_completion(call, {token}, {'true' if nullable else 'false'}, &{local}, &present_{completion.parameter})) goto done;"
+            f"if (!mln_ts_read_completion(call, {token}, {'true' if nullable else 'false'}, {decoder}, &{local}, &present_{completion.parameter})) goto done;"
         )
     call_arguments = ", ".join(args + (["&diagnostic"] if function.diagnostic else []))
     if function.diagnostic:
@@ -617,44 +616,13 @@ def lower(api: Api | BoundApi):
     return bound, values, natives, lowered, unsupported
 
 
-def abi_digest(bound: BoundApi) -> str:
-    """A digest of the declarations that both halves are generated from.
-
-    It covers the C API's own declarations, in the `mln_` namespace, with
-    their types as the headers spell them and their metadata. It leaves out
-    source locations, comments, the host's canonical expansion of a type, and
-    the system typedefs behind the fixed-width types, so the same headers give
-    the same digest on every host.
-    """
-
-    def scrub(value):
-        if isinstance(value, dict):
-            return {
-                key: scrub(item)
-                for key, item in value.items()
-                if key not in {"location", "documentation", "canonical"}
-            }
-        if isinstance(value, (list, tuple)):
-            return [scrub(item) for item in value]
-        return value
-
-    source = asdict(bound.source)
-    for kind in ("functions", "records", "enums", "typedefs"):
-        source[kind] = [
-            item for item in source[kind] if item["name"].startswith("mln_")
-        ]
-    text = json.dumps(scrub(source), sort_keys=True)
-    return hashlib.sha256(text.encode()).hexdigest()[:16]
-
-
 def generate(api: Api | BoundApi) -> dict[str, str]:
     from .typescript_native import render_native
     from .typescript_operations import delivered, render_operations, view_scopes
 
     bound, values, natives, lowered, _ = lower(api)
-    digest = abi_digest(bound)
-    # The operations name every value and decoder, so the table follows them.
-    outputs = render_operations(bound, values, natives, lowered, digest)
+    # The operations name every value, so the value table follows them.
+    outputs = render_operations(bound, values, lowered)
     natives.payload_reader(
         [callback for callback, _ in delivered(bound, values).values()]
     )
@@ -662,7 +630,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         "// Generated from the C headers by tools/bindgen. Do not edit.\n\n"
         + values.render()
     )
-    outputs.update(render_native(bound, natives, lowered, view_scopes(lowered), digest))
+    outputs.update(render_native(bound, natives, lowered, view_scopes(lowered)))
     return outputs
 
 

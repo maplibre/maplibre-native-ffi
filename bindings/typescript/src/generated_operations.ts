@@ -1,6 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
-import { Decoder } from "./generated_native.ts";
 import type {
   AmbientCacheOperation,
   AnimationOptions,
@@ -1563,7 +1562,7 @@ export class MapHandle extends Owner {
     geometry: string,
     fitOptions?: CameraFitOptions,
   ): Promise<CameraOptions> {
-    return query<CameraOptions>(Decoder.cameraOptions, (completion) =>
+    return query<CameraOptions>((completion) =>
       native.mln_map_camera_for_geometry(
         this.id,
         geometry,
@@ -1583,7 +1582,7 @@ export class MapHandle extends Owner {
     bounds: LatLngBounds = {},
     fitOptions?: CameraFitOptions,
   ): Promise<CameraOptions> {
-    return query<CameraOptions>(Decoder.cameraOptions, (completion) =>
+    return query<CameraOptions>((completion) =>
       native.mln_map_camera_for_lat_lng_bounds(
         this.id,
         bounds,
@@ -1603,7 +1602,7 @@ export class MapHandle extends Owner {
     coordinates: readonly LatLng[],
     fitOptions?: CameraFitOptions,
   ): Promise<CameraOptions> {
-    return query<CameraOptions>(Decoder.cameraOptions, (completion) =>
+    return query<CameraOptions>((completion) =>
       native.mln_map_camera_for_lat_lngs(
         this.id,
         coordinates,
@@ -1698,7 +1697,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   getCamera(): Promise<CameraQueryResult> {
-    return query<CameraQueryResult>(Decoder.cameraQueryResult, (completion) =>
+    return query<CameraQueryResult>((completion) =>
       native.mln_map_get_camera(this.id, completion),
     );
   }
@@ -1710,7 +1709,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   getFeatureState(selector: FeatureStateSelector): Promise<string> {
-    return query<string>(Decoder.bufferView, (completion) =>
+    return query<string>((completion) =>
       native.mln_map_get_feature_state(this.id, selector, completion),
     );
   }
@@ -1723,7 +1722,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getGlobalState(): Promise<string> {
-    return query<string>(Decoder.bufferView, (completion) =>
+    return query<string>((completion) =>
       native.mln_map_get_global_state(this.id, completion),
     );
   }
@@ -1735,7 +1734,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getImageSourceCoordinates(sourceId: string): Promise<readonly LatLng[]> {
-    return query<readonly LatLng[]>(Decoder.latLngList, (completion) =>
+    return query<readonly LatLng[]>((completion) =>
       native.mln_map_get_image_source_coordinates(
         this.id,
         sourceId,
@@ -1751,7 +1750,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   getLoadedStyleJson(): Promise<string> {
-    return query<string>(Decoder.bufferView, (completion) =>
+    return query<string>((completion) =>
       native.mln_map_get_loaded_style_json(this.id, completion),
     );
   }
@@ -1773,10 +1772,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleImage(imageId: string): Promise<StyleImageInfo | undefined> {
-    return query<StyleImageInfo | undefined>(
-      Decoder.styleImageInfoOptional,
-      (completion) =>
-        native.mln_map_get_style_image(this.id, imageId, completion),
+    return query<StyleImageInfo | undefined>((completion) =>
+      native.mln_map_get_style_image(this.id, imageId, completion),
     );
   }
 
@@ -1787,10 +1784,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleLayer(layerId: string): Promise<StyleLayerInfo | undefined> {
-    return query<StyleLayerInfo | undefined>(
-      Decoder.styleLayerInfoOptional,
-      (completion) =>
-        native.mln_map_get_style_layer(this.id, layerId, completion),
+    return query<StyleLayerInfo | undefined>((completion) =>
+      native.mln_map_get_style_layer(this.id, layerId, completion),
     );
   }
 
@@ -1801,7 +1796,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleLayerJson(layerId: string): Promise<string | undefined> {
-    return query<string | undefined>(Decoder.bufferViewOptional, (completion) =>
+    return query<string | undefined>((completion) =>
       native.mln_map_get_style_layer_json(this.id, layerId, completion),
     );
   }
@@ -1816,7 +1811,7 @@ export class MapHandle extends Owner {
     layerId: string,
     propertyName: string,
   ): Promise<string | undefined> {
-    return query<string | undefined>(Decoder.bufferViewOptional, (completion) =>
+    return query<string | undefined>((completion) =>
       native.mln_map_get_style_layer_property(
         this.id,
         layerId,
@@ -1833,7 +1828,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleLightProperty(propertyName: string): Promise<string | undefined> {
-    return query<string | undefined>(Decoder.bufferViewOptional, (completion) =>
+    return query<string | undefined>((completion) =>
       native.mln_map_get_style_light_property(
         this.id,
         propertyName,
@@ -1849,10 +1844,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleSource(sourceId: string): Promise<StyleSourceInfo | undefined> {
-    return query<StyleSourceInfo | undefined>(
-      Decoder.styleSourceInfoOptional,
-      (completion) =>
-        native.mln_map_get_style_source(this.id, sourceId, completion),
+    return query<StyleSourceInfo | undefined>((completion) =>
+      native.mln_map_get_style_source(this.id, sourceId, completion),
     );
   }
 
@@ -1863,10 +1856,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   getStyleTransitionOptions(): Promise<StyleTransitionOptions> {
-    return query<StyleTransitionOptions>(
-      Decoder.styleTransitionOptions,
-      (completion) =>
-        native.mln_map_get_style_transition_options(this.id, completion),
+    return query<StyleTransitionOptions>((completion) =>
+      native.mln_map_get_style_transition_options(this.id, completion),
     );
   }
 
@@ -1877,7 +1868,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   getStyleUrl(): Promise<string> {
-    return query<string>(Decoder.bufferView, (completion) =>
+    return query<string>((completion) =>
       native.mln_map_get_style_url(this.id, completion),
     );
   }
@@ -1949,7 +1940,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   latLngBoundsForCamera(camera: CameraOptions = {}): Promise<LatLngBounds> {
-    return query<LatLngBounds>(Decoder.latLngBounds, (completion) =>
+    return query<LatLngBounds>((completion) =>
       native.mln_map_lat_lng_bounds_for_camera(this.id, camera, completion),
     );
   }
@@ -1963,7 +1954,7 @@ export class MapHandle extends Owner {
   latLngBoundsForCameraUnwrapped(
     camera: CameraOptions = {},
   ): Promise<LatLngBounds> {
-    return query<LatLngBounds>(Decoder.latLngBounds, (completion) =>
+    return query<LatLngBounds>((completion) =>
       native.mln_map_lat_lng_bounds_for_camera_unwrapped(
         this.id,
         camera,
@@ -1979,9 +1970,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   listStyleLayers(): Promise<readonly StyleLayerInfo[]> {
-    return query<readonly StyleLayerInfo[]>(
-      Decoder.styleLayerInfoList,
-      (completion) => native.mln_map_list_style_layers(this.id, completion),
+    return query<readonly StyleLayerInfo[]>((completion) =>
+      native.mln_map_list_style_layers(this.id, completion),
     );
   }
 
@@ -1992,9 +1982,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   listStyleSources(): Promise<readonly StyleSourceInfo[]> {
-    return query<readonly StyleSourceInfo[]>(
-      Decoder.styleSourceInfoList,
-      (completion) => native.mln_map_list_style_sources(this.id, completion),
+    return query<readonly StyleSourceInfo[]>((completion) =>
+      native.mln_map_list_style_sources(this.id, completion),
     );
   }
 
@@ -3764,7 +3753,7 @@ export class RenderSessionHandle extends Owner {
     extensionField: string,
     argumentsValue?: string,
   ): Promise<string> {
-    return query<string>(Decoder.bufferView, (completion) =>
+    return query<string>((completion) =>
       native.mln_render_session_query_feature_extensions(
         this.id,
         sourceId,
@@ -3787,15 +3776,13 @@ export class RenderSessionHandle extends Owner {
     geometry: RenderedQueryGeometry,
     options?: RenderedFeatureQueryOptions,
   ): Promise<readonly RenderedFeature[]> {
-    return query<readonly RenderedFeature[]>(
-      Decoder.renderedFeatureList,
-      (completion) =>
-        native.mln_render_session_query_rendered_features(
-          this.id,
-          geometry,
-          options,
-          completion,
-        ),
+    return query<readonly RenderedFeature[]>((completion) =>
+      native.mln_render_session_query_rendered_features(
+        this.id,
+        geometry,
+        options,
+        completion,
+      ),
     );
   }
 
@@ -3809,15 +3796,13 @@ export class RenderSessionHandle extends Owner {
     sourceId: string,
     options?: SourceFeatureQueryOptions,
   ): Promise<readonly SourceFeature[]> {
-    return query<readonly SourceFeature[]>(
-      Decoder.sourceFeatureList,
-      (completion) =>
-        native.mln_render_session_query_source_features(
-          this.id,
-          sourceId,
-          options,
-          completion,
-        ),
+    return query<readonly SourceFeature[]>((completion) =>
+      native.mln_render_session_query_source_features(
+        this.id,
+        sourceId,
+        options,
+        completion,
+      ),
     );
   }
 
@@ -3829,10 +3814,8 @@ export class RenderSessionHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   readTexture(): Promise<TextureReadbackResult> {
-    return query<TextureReadbackResult>(
-      Decoder.textureReadbackResult,
-      (completion) =>
-        native.mln_render_session_read_texture(this.id, completion),
+    return query<TextureReadbackResult>((completion) =>
+      native.mln_render_session_read_texture(this.id, completion),
     );
   }
 
@@ -4350,7 +4333,7 @@ export class RuntimeHandle extends Owner {
     definition: OfflineRegionDefinition,
     metadata: Uint8Array,
   ): Promise<OfflineRegionInfo> {
-    return query<OfflineRegionInfo>(Decoder.offlineRegionInfo, (completion) =>
+    return query<OfflineRegionInfo>((completion) =>
       native.mln_runtime_create_offline_region(
         this.id,
         definition,
@@ -4401,10 +4384,8 @@ export class RuntimeHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   getOfflineRegion(regionId: bigint): Promise<OfflineRegionInfo | undefined> {
-    return query<OfflineRegionInfo | undefined>(
-      Decoder.offlineRegionInfoOptional,
-      (completion) =>
-        native.mln_runtime_get_offline_region(this.id, regionId, completion),
+    return query<OfflineRegionInfo | undefined>((completion) =>
+      native.mln_runtime_get_offline_region(this.id, regionId, completion),
     );
   }
 
@@ -4415,14 +4396,12 @@ export class RuntimeHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   getOfflineRegionStatus(regionId: bigint): Promise<OfflineRegionStatus> {
-    return query<OfflineRegionStatus>(
-      Decoder.offlineRegionStatus,
-      (completion) =>
-        native.mln_runtime_get_offline_region_status(
-          this.id,
-          regionId,
-          completion,
-        ),
+    return query<OfflineRegionStatus>((completion) =>
+      native.mln_runtime_get_offline_region_status(
+        this.id,
+        regionId,
+        completion,
+      ),
     );
   }
 
@@ -4449,10 +4428,8 @@ export class RuntimeHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   listOfflineRegions(): Promise<readonly OfflineRegionInfo[]> {
-    return query<readonly OfflineRegionInfo[]>(
-      Decoder.offlineRegionInfoList,
-      (completion) =>
-        native.mln_runtime_list_offline_regions(this.id, completion),
+    return query<readonly OfflineRegionInfo[]>((completion) =>
+      native.mln_runtime_list_offline_regions(this.id, completion),
     );
   }
 
@@ -4465,14 +4442,12 @@ export class RuntimeHandle extends Owner {
   mergeOfflineRegions(
     sideDatabasePath: string,
   ): Promise<readonly OfflineRegionInfo[]> {
-    return query<readonly OfflineRegionInfo[]>(
-      Decoder.offlineRegionInfoList,
-      (completion) =>
-        native.mln_runtime_merge_offline_regions(
-          this.id,
-          sideDatabasePath,
-          completion,
-        ),
+    return query<readonly OfflineRegionInfo[]>((completion) =>
+      native.mln_runtime_merge_offline_regions(
+        this.id,
+        sideDatabasePath,
+        completion,
+      ),
     );
   }
 
@@ -4637,7 +4612,7 @@ export class RuntimeHandle extends Owner {
     regionId: bigint,
     metadata: Uint8Array,
   ): Promise<OfflineRegionInfo> {
-    return query<OfflineRegionInfo>(Decoder.offlineRegionInfo, (completion) =>
+    return query<OfflineRegionInfo>((completion) =>
       native.mln_runtime_update_offline_region_metadata(
         this.id,
         regionId,

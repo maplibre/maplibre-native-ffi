@@ -78,32 +78,6 @@ import type {
   WebgpuTextureFrame,
 } from "./generated_values.ts";
 
-/** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "b00d5cac21f937e4";
-
-/** The index of each completion decoder in the addon's decoder table. */
-export const Decoder = {
-  bufferView: 0,
-  bufferViewOptional: 1,
-  cameraOptions: 2,
-  cameraQueryResult: 3,
-  latLngBounds: 4,
-  latLngList: 5,
-  offlineRegionInfo: 6,
-  offlineRegionInfoList: 7,
-  offlineRegionInfoOptional: 8,
-  offlineRegionStatus: 9,
-  renderedFeatureList: 10,
-  sourceFeatureList: 11,
-  styleImageInfoOptional: 12,
-  styleLayerInfoList: 13,
-  styleLayerInfoOptional: 14,
-  styleSourceInfoList: 15,
-  styleSourceInfoOptional: 16,
-  styleTransitionOptions: 17,
-  textureReadbackResult: 18,
-} as const;
-
 /** The addon function of each generated operation, by C function name. */
 export interface NativeOperations {
   mln_acquired_frame_discard(frame: bigint, token: object | undefined): void;

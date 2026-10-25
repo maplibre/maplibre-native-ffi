@@ -2,21 +2,27 @@
 package org.maplibre.nativeffi.internal.c
 
 internal actual object UpcallStubs {
-  actual val completion: Long = Jni.upcallStub(0)
-  actual val completionRelease: Long = Jni.upcallStub(1)
-  actual val releaseRoot: Long = Jni.upcallStub(2)
-  actual val logHandlerCallback: Long = Jni.upcallStub(3)
-  actual val httpHeaderTransformCallback: Long = Jni.upcallStub(4)
-  actual val customGeometrySourceOptionsFetchTile: Long = Jni.upcallStub(5)
-  actual val customGeometrySourceOptionsCancelTile: Long = Jni.upcallStub(6)
-  actual val customMvtVectorSourceOptionsFetchTile: Long = Jni.upcallStub(7)
-  actual val customMvtVectorSourceOptionsCancelTile: Long = Jni.upcallStub(8)
-  actual val resourceRequestCancelHandlerCallback: Long = Jni.upcallStub(9)
-  actual val runtimeEventHandlerCallback: Long = Jni.upcallStub(10)
-  actual val resourceProviderCallback: Long = Jni.upcallStub(11)
-  actual val resourceTransformCallback: Long = Jni.upcallStub(12)
-  actual val wakeCallback: Long = Jni.upcallStub(13)
-  actual val queueLockLock: Long = Jni.upcallStub(14)
-  actual val queueLockUnlock: Long = Jni.upcallStub(15)
-  actual val cameraTransitionHandlerCallback: Long = Jni.upcallStub(16)
+  actual val completion: Long = Jni.upcallStub("completion")
+  actual val completionRelease: Long = Jni.upcallStub("completionRelease")
+  actual val releaseRoot: Long = Jni.upcallStub("releaseRoot")
+  actual val logHandlerCallback: Long = Jni.upcallStub("logHandlerCallback")
+  actual val httpHeaderTransformCallback: Long = Jni.upcallStub("httpHeaderTransformCallback")
+  actual val customGeometrySourceOptionsFetchTile: Long =
+    Jni.upcallStub("customGeometrySourceOptionsFetchTile")
+  actual val customGeometrySourceOptionsCancelTile: Long =
+    Jni.upcallStub("customGeometrySourceOptionsCancelTile")
+  actual val customMvtVectorSourceOptionsFetchTile: Long =
+    Jni.upcallStub("customMvtVectorSourceOptionsFetchTile")
+  actual val customMvtVectorSourceOptionsCancelTile: Long =
+    Jni.upcallStub("customMvtVectorSourceOptionsCancelTile")
+  actual val resourceRequestCancelHandlerCallback: Long =
+    Jni.upcallStub("resourceRequestCancelHandlerCallback")
+  actual val runtimeEventHandlerCallback: Long = Jni.upcallStub("runtimeEventHandlerCallback")
+  actual val resourceProviderCallback: Long = Jni.upcallStub("resourceProviderCallback")
+  actual val resourceTransformCallback: Long = Jni.upcallStub("resourceTransformCallback")
+  actual val wakeCallback: Long = Jni.upcallStub("wakeCallback")
+  actual val queueLockLock: Long = Jni.upcallStub("queueLockLock")
+  actual val queueLockUnlock: Long = Jni.upcallStub("queueLockUnlock")
+  actual val cameraTransitionHandlerCallback: Long =
+    Jni.upcallStub("cameraTransitionHandlerCallback")
 }

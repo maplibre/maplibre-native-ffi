@@ -40,7 +40,7 @@ GROUPS = (
     "tagged_union",
     "completion_results",
 )
-DEFINES = ("MLN_PROTOCOL_COMPLETION_RUNTIME",)
+DEFINES = ("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION")
 
 
 class TypeScriptEmitterTests(unittest.TestCase):

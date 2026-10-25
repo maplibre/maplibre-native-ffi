@@ -1,6 +1,6 @@
 // The loaded Node-API addon, which an entry point binds before any call.
 
-import { ABI_DIGEST, type NativeOperations } from "../generated_native.ts";
+import type { NativeOperations } from "../generated_native.ts";
 import { AbiVersionMismatchError } from "./errors.ts";
 
 /**
@@ -36,7 +36,6 @@ export interface Addon extends NativeOperations {
       path: string,
     ) => readonly bigint[] | undefined,
   ): void;
-  abiDigest(): string;
   setReferenced(referenced: boolean): void;
   ownerTokenCreate(handle: bigint, name: string, session: boolean): object;
   shutdownAtExit(): void;
@@ -46,8 +45,11 @@ export interface Addon extends NativeOperations {
    * null when the batch could not be allocated.
    */
   drain(): DrainedEntry[] | undefined | null;
-  /** Converts a drained completion's value. */
-  completionValue(index: number, decoder: number): unknown;
+  /**
+   * Converts a drained completion's value through the decoder that the
+   * operation's export recorded.
+   */
+  completionValue(index: number): unknown;
   /** Takes the owned handles of a drained delivery from the batch. */
   deliveryTake(index: number): void;
   batchRelease(): void;
@@ -72,19 +74,22 @@ export interface HostHooks {
 export let native: Addon = undefined as never;
 export let hooks: HostHooks = {};
 
+/** The C ABI version that this binding was generated for. */
+export const EXPECTED_C_ABI_VERSION = 0;
+
 /**
- * Checks the addon's ABI digest before any other call and makes it the
- * addon that every operation calls.
+ * Checks the C ABI version of the addon's embedded library before any other
+ * call and makes it the addon that every operation calls.
  */
 export function bindAddon(
   addon: Addon,
   hostHooks: HostHooks,
   install: (addon: Addon) => void,
 ): void {
-  const digest = addon.abiDigest();
-  if (digest !== ABI_DIGEST) {
+  const version = addon.mln_c_version();
+  if (version !== EXPECTED_C_ABI_VERSION) {
     throw new AbiVersionMismatchError(
-      `the native addon was generated from other C headers (ABI digest ${digest}, expected ${ABI_DIGEST})`,
+      `unsupported MapLibre Native C ABI version ${version}; expected ${EXPECTED_C_ABI_VERSION}`,
     );
   }
   // The addon refuses a second copy of the binding in one realm, before this

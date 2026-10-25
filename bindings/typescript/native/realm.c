@@ -41,6 +41,14 @@ enum {
 // Tokens stay below 2^31, so a shifted token fits the data on every target.
 #define MLN_TS_MAX_TOKEN 0x7fffffff
 
+// A completion's user data carries its token in the low 32 bits and, above
+// them, the decoder that its export recorded, so the addon alone chooses how
+// to read a completion's value.
+_Static_assert(
+  UINTPTR_MAX > UINT32_MAX, "a completion's user data holds a decoder"
+);
+#define MLN_TS_DECODER_SHIFT 32
+
 /**
  * What native threads reach of a realm. A poster calls the threadsafe function
  * only under the lock and only while the shim is open, so a realm's teardown
@@ -86,7 +94,6 @@ struct mln_ts_realm {
   pthread_mutex_t owners_lock;
   mln_ts_owner* owners;
   mln_ts_realm* next_realm;
-  const char* digest;
 };
 
 struct mln_ts_owner {
@@ -443,7 +450,7 @@ bool mln_ts_read_native_registration(
 }
 
 bool mln_ts_read_completion(
-  mln_ts_call* call, napi_value token, bool discardable,
+  mln_ts_call* call, napi_value token, bool discardable, uint32_t decoder,
   mln_completion* storage, const mln_completion** out
 ) {
   *out = NULL;
@@ -461,7 +468,8 @@ bool mln_ts_read_completion(
   // A rejected submission queues nothing, so the completion needs no cleanup.
   memset(storage, 0, sizeof *storage);
   storage->size = sizeof *storage;
-  storage->user_data = (void*)(uintptr_t)number;
+  storage->user_data =
+    (void*)((uintptr_t)decoder << MLN_TS_DECODER_SHIFT | (uintptr_t)number);
   storage->queue = queue;
   *out = storage;
   return true;
@@ -562,7 +570,7 @@ static napi_value drain(napi_env env, napi_callback_info info) {
       !mln_ts_set_index(env, entry, 0, type) ||
       !mln_ts_set_index(
         env, entry, 1,
-        mln_ts_number(env, (double)(uintptr_t)delivery->user_data)
+        mln_ts_number(env, (uint32_t)(uintptr_t)delivery->user_data)
       ) ||
       !mln_ts_set_index(env, entry, 2, payload) ||
       !mln_ts_set_index(env, entries, (uint32_t)index, entry)
@@ -602,25 +610,24 @@ static bool take(mln_ts_call* call, size_t index) {
 }
 
 /**
- * completionValue(index, decoder) converts a drained completion's value
- * through the decoder that the TypeScript half names.
+ * completionValue(index) converts a drained completion's value through the
+ * decoder that its export recorded.
  */
 static napi_value completion_value(napi_env env, napi_callback_info info) {
   mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 2)) {
+  if (!mln_ts_begin(&call, env, info, 1)) {
     return NULL;
   }
   size_t index = 0;
-  int64_t decoder = 0;
   const mln_delivery* delivery = delivery_at(&call, &index);
-  if (
-    delivery != NULL && mln_ts_read_int(
-                          &call, call.argv[1], 0,
-                          (int64_t)mln_ts_decoder_count - 1, &decoder, "decoder"
-                        )
-  ) {
+  if (delivery != NULL) {
+    uintptr_t decoder = (uintptr_t)delivery->user_data >> MLN_TS_DECODER_SHIFT;
     if (delivery->type != MLN_DELIVERY_TYPE_COMPLETION) {
       napi_throw_error(env, NULL, "the delivery is not a completion");
+    } else if (
+      decoder >= mln_ts_decoder_count || mln_ts_decoders[decoder] == NULL
+    ) {
+      napi_throw_error(env, NULL, "the operation completes without a value");
     } else {
       napi_value value =
         mln_ts_decoders[decoder](env, &delivery->payload.completion);
@@ -943,12 +950,6 @@ static napi_value set_referenced(napi_env env, napi_callback_info info) {
   return mln_ts_end(&call);
 }
 
-static napi_value abi_digest(napi_env env, napi_callback_info info) {
-  (void)info;
-  const char* digest = mln_ts_realm_of(env)->digest;
-  return mln_ts_text(env, digest, strlen(digest));
-}
-
 static void define(
   napi_env env, napi_value exports, const mln_ts_export* entries, size_t count
 ) {
@@ -980,7 +981,7 @@ static void pin_module(void) {
 
 napi_value mln_ts_module_init(
   napi_env env, napi_value exports, const mln_ts_export* generated,
-  size_t generated_count, const char* digest
+  size_t generated_count
 ) {
   pin_module();
   mln_ts_realm* realm = calloc(1, sizeof *realm);
@@ -995,7 +996,6 @@ napi_value mln_ts_module_init(
   atomic_init(&shim->references, 2);
   realm->env = env;
   realm->shim = shim;
-  realm->digest = digest;
   pthread_mutex_init(&realm->owners_lock, NULL);
   napi_value name;
   napi_create_string_utf8(env, "maplibre_native_ffi", NAPI_AUTO_LENGTH, &name);
@@ -1027,7 +1027,6 @@ napi_value mln_ts_module_init(
   pthread_mutex_unlock(&registry_lock);
   static const mln_ts_export runtime_exports[] = {
     {"install", install},
-    {"abiDigest", abi_digest},
     {"setReferenced", set_referenced},
     {"ownerTokenCreate", owner_token_create},
     {"shutdownAtExit", shutdown_at_exit},

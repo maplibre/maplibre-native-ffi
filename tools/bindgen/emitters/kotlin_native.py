@@ -596,8 +596,8 @@ class NativeShims:
             for s in self.signatures
         ]
         stubs = [
-            f"  actual val {site.name}: Long = Jni.upcallStub({index})"
-            for index, site in enumerate(self.sites)
+            f'  actual val {site.name}: Long = Jni.upcallStub("{site.name}")'
+            for site in self.sites
         ]
         kotlin = (
             HEADER
@@ -678,8 +678,8 @@ class NativeShims:
             critical_methods.append(
                 f'  {{"{s.function}", "{descriptor}", (void*){s.function}_{target}}},'
             )
-        upcalls, entries, stubs = [], [], []
-        for index, site in enumerate(self.sites):
+        upcalls, entries, pointers, stubs = [], [], [], []
+        for site in self.sites:
             parameters, values = [], []
             for local, ctype, carrier in site.parameters:
                 c_name = local
@@ -698,7 +698,7 @@ class NativeShims:
                 f"jvalue arguments[] = {{{', '.join(values)}}};" if values else ""
             )
             array = "arguments" if values else "NULL"
-            upcall = f"&mln_jni_upcalls[{index}]"
+            upcall = f"&mln_jni_{site.name}_upcall"
             if result is None:
                 body = f"mln_jni_upcall_void({upcall}, {array});"
                 callback = self.bound.callbacks.get(site.callback)
@@ -739,7 +739,10 @@ class NativeShims:
                 + JNI_LETTER[site.result_carrier]
             )
             owner = f"{PACKAGE.replace('.', '/')}/{site.owner}"
-            entries.append(f'  {{"{owner}", "{site.name}", "{descriptor}", NULL}},')
+            entries.append(
+                f'static mln_jni_upcall mln_jni_{site.name}_upcall = {{"{owner}", "{site.name}", "{descriptor}", NULL}};'
+            )
+            pointers.append(f"  &mln_jni_{site.name}_upcall,")
             stubs.append(f"  (void*)mln_jni_{site.name},")
         return (
             HEADER
@@ -756,11 +759,12 @@ class NativeShims:
             + "const JNINativeMethod mln_jni_critical_methods[] = {\n"
             + "\n".join(critical_methods)
             + "\n};\n\n"
-            + "mln_jni_upcall mln_jni_upcalls[] = {\n"
             + "\n".join(entries)
-            + "\n};\n\n"
+            + "\n\n"
             + "\n\n".join(upcalls)
-            + "\n\nvoid* const mln_jni_upcall_stubs[] = {\n"
+            + "\n\nmln_jni_upcall* const mln_jni_upcalls[] = {\n"
+            + "\n".join(pointers)
+            + "\n};\n\nvoid* const mln_jni_upcall_stubs[] = {\n"
             + "\n".join(stubs)
             + "\n};\nconst size_t mln_jni_upcall_count =\n"
             + "  sizeof mln_jni_upcall_stubs / sizeof mln_jni_upcall_stubs[0];\n"

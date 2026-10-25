@@ -10,13 +10,11 @@
 
 [cases]
 "ERR-01" = "bindings/typescript/test/errors.test.ts::a failed call carries its status, an unknown status code, and its own diagnostic"
-# The facade and the addon ship as separate packages, so the facade compares
-# the addon's header digest with its own. The addon links the native archive in
-# when it is built, so no other library can load in its place, and no
-# mln_c_version() check runs. The case binds an addon object that has abiDigest
-# alone, so the check fails before the loader could make any other call, which
-# would throw a TypeError instead.
-"ERR-02" = "bindings/typescript/test/errors.test.ts::an addon generated from other headers fails to load before any other call"
+# The facade and the addon ship as separate packages, so the facade checks the
+# C ABI version of the library that the addon links in. The case binds an addon
+# object that has mln_c_version alone, so the check fails before the loader
+# could make any other call, which would throw a TypeError instead.
+"ERR-02" = "bindings/typescript/test/errors.test.ts::an addon with another C ABI version fails to load before any other call"
 "ERR-03" = "bindings/typescript/test/render.test.ts::a drain before any demand returns no batch"
 "LIFE-01" = "bindings/typescript/test/lifecycle.test.ts::repeated asynchronous release reaches native"
 "LIFE-02" = "bindings/typescript/test/lifecycle.test.ts::a refused close leaves the handle usable for a later close"

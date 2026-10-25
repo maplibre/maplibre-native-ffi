@@ -35,8 +35,10 @@ typedef napi_value (*mln_ts_decoder)(
   napi_env env, const mln_completion_result* result
 );
 
-/** The generated completion decoders, which the TypeScript half names by
- * index. */
+/**
+ * The generated completion decoders, by the constant that an export records
+ * in its completion. An operation without a value has a NULL entry.
+ */
 extern const mln_ts_decoder mln_ts_decoders[];
 extern const size_t mln_ts_decoder_count;
 
@@ -69,7 +71,7 @@ typedef struct mln_ts_call {
 /** Initializes the realm and defines the generated and runtime exports. */
 napi_value mln_ts_module_init(
   napi_env env, napi_value exports, const mln_ts_export* generated,
-  size_t generated_count, const char* digest
+  size_t generated_count
 );
 
 bool mln_ts_begin(
@@ -206,11 +208,12 @@ void mln_ts_wake(void* user_data);
 void mln_ts_wake_release(void* user_data);
 /**
  * A completion for the pending entry that token names, which the realm's
- * queue delivers. A discardable command takes an undefined token as no
+ * queue delivers and whose value completionValue() reads through the decoder
+ * named by its constant. A discardable command takes an undefined token as no
  * completion, and *out stays NULL.
  */
 bool mln_ts_read_completion(
-  mln_ts_call* call, napi_value token, bool discardable,
+  mln_ts_call* call, napi_value token, bool discardable, uint32_t decoder,
   mln_completion* storage, const mln_completion** out
 );
 

@@ -292,13 +292,20 @@ static const JNINativeMethod mln_jni_memory_critical_methods[] = {
 
 // org.maplibre.nativeffi.internal.c.Jni.
 
-static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jint index) {
-  (void)env;
+static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jstring name) {
   (void)type;
-  if (index < 0 || (size_t)index >= mln_jni_upcall_count) {
+  const char* chars = (*env)->GetStringUTFChars(env, name, NULL);
+  if (chars == NULL) {
     return 0;
   }
-  return MLN_JNI_ADDRESS(mln_jni_upcall_stubs[index]);
+  jlong stub = 0;
+  for (size_t index = 0; index < mln_jni_upcall_count && stub == 0; ++index) {
+    if (strcmp(mln_jni_upcalls[index]->name, chars) == 0) {
+      stub = MLN_JNI_ADDRESS(mln_jni_upcall_stubs[index]);
+    }
+  }
+  (*env)->ReleaseStringUTFChars(env, name, chars);
+  return stub;
 }
 
 // mln_android_init takes the calling JNIEnv and the Context object, the one C
@@ -324,7 +331,7 @@ static void mln_jni_call_user_data_release(
 }
 
 static const JNINativeMethod mln_jni_runtime_methods[] = {
-  {"upcallStub", "(I)J", (void*)mln_jni_upcall_stub},
+  {"upcallStub", "(Ljava/lang/String;)J", (void*)mln_jni_upcall_stub},
   {"androidInit", "(Ljava/lang/Object;J)I", (void*)mln_jni_android_init},
   {"callUserDataRelease", "(JJ)V", (void*)mln_jni_call_user_data_release},
 };
@@ -379,11 +386,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
   // FindClass here resolves through the class loader that loaded this
   // library; an attached native thread would see only the system classes.
   for (size_t index = 0; index < mln_jni_upcall_count; ++index) {
-    mln_jni_upcall* upcall = &mln_jni_upcalls[index];
+    mln_jni_upcall* upcall = mln_jni_upcalls[index];
     for (size_t earlier = 0; earlier < index && upcall->type == NULL;
          ++earlier) {
-      if (strcmp(mln_jni_upcalls[earlier].owner, upcall->owner) == 0) {
-        upcall->type = mln_jni_upcalls[earlier].type;
+      if (strcmp(mln_jni_upcalls[earlier]->owner, upcall->owner) == 0) {
+        upcall->type = mln_jni_upcalls[earlier]->type;
       }
     }
     if (upcall->type == NULL) {

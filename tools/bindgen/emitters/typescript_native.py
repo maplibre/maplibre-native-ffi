@@ -1,11 +1,12 @@
 """Render the Node-API addon: one export function per operation, the export
-table, the converters, and the ABI digest.
+table, and the converters.
 
 Each export function converts its arguments through the runtime helpers and
 the generated converters, calls its C function directly with a diagnostic of
 its own, and throws a MaplibreError for a failed status. The converters also
 read the deliveries that the realm drains from its queue: each completion's
-value through the decoder table, and every other payload by its type.
+value through the decoder that its export recorded, and every other payload by
+its type.
 """
 
 from __future__ import annotations
@@ -73,7 +74,6 @@ def render_native(
     natives: NativeValues,
     lowered: list[Lowered],
     scopes: set[tuple[str, str]],
-    digest: str,
 ):
     entries = sorted(lowered, key=lambda e: e.plan.name)
     header = (
@@ -90,7 +90,8 @@ def render_native(
             )
         )
         + "\n"
-        + f'#define MLN_TS_ABI_DIGEST "{digest}"\n\n'
+        + natives.decoder_ids()
+        + "\n"
         + "".join(f"{prototype};\n" for prototype, _ in natives.prototypes())
         + "\n#endif\n"
     )
@@ -111,7 +112,7 @@ def render_native(
         + table
         + "};\n\n"
         + "NAPI_MODULE_EXPORT napi_value napi_register_module_v1(napi_env env, napi_value exports_object) {\n"
-        + "  return mln_ts_module_init(env, exports_object, exports, sizeof exports / sizeof exports[0], MLN_TS_ABI_DIGEST);\n"
+        + "  return mln_ts_module_init(env, exports_object, exports, sizeof exports / sizeof exports[0]);\n"
         + "}\n"
     )
     values = (

@@ -87,7 +87,7 @@ def holder(entry: Lowered) -> str:
     return "rootsOf(this)" if entry.owner else ""
 
 
-def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[str]:
+def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
     call = f"native.{entry.plan.name}({', '.join(entry.arguments)})"
     if discard:
         call = f"native.{entry.plan.name}({', '.join([*entry.arguments, 'undefined'])})"
@@ -108,11 +108,6 @@ def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[s
             f"(completion) => {{ native.{entry.plan.name}({arguments}); "
             f"registrations.commit({holder(entry)}); }}"
         )
-    decoder = (
-        f"Decoder.{natives.decoder_key(entry.decoder)}"
-        if entry.decoder is not None
-        else None
-    )
     shape = entry.shape
     if shape == "close":
         lines = [f"closeSync(this, (handle, token) => {call});"]
@@ -126,7 +121,7 @@ def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[s
         lines = [f"return command({start});"]
     elif shape == "query":
         result = entry.returns.removeprefix("Promise<").removesuffix(">")
-        lines = [f"return query<{result}>({decoder}, {start});"]
+        lines = [f"return query<{result}>({start});"]
     elif shape == "attach":
         member = identifier(output_member(entry.owned.parameter))
         lines = [
@@ -171,8 +166,8 @@ def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[s
     return lines
 
 
-def render_method(bound, values, natives, entry: Lowered, indent: str) -> str:
-    body = method_body(bound, values, natives, entry)
+def render_method(bound, values, entry: Lowered, indent: str) -> str:
+    body = method_body(bound, values, entry)
     head = "" if entry.owner else "export function "
     text = doc(bound, entry.plan.name, indent)
     generic = "<T>" if entry.shape == "view" else ""
@@ -181,7 +176,7 @@ def render_method(bound, values, natives, entry: Lowered, indent: str) -> str:
     return text + f"{indent}}}\n"
 
 
-def render_discarding(bound, values, natives, public, entries) -> str:
+def render_discarding(bound, values, public, entries) -> str:
     """The view of an owner whose commands discard their completions."""
     name = f"{public}Discarding"
     text = (
@@ -198,7 +193,7 @@ def render_discarding(bound, values, natives, public, entries) -> str:
         "  }\n"
     )
     for entry in sorted(entries, key=lambda e: e.method):
-        body = method_body(bound, values, natives, entry, discard=True)
+        body = method_body(bound, values, entry, discard=True)
         body = [
             line.replace("this.id", "this.#owner.id").replace(
                 "rootsOf(this)", "rootsOf(this.#owner)"
@@ -212,7 +207,7 @@ def render_discarding(bound, values, natives, public, entries) -> str:
     return text + "}\n"
 
 
-def render_owner(bound, values, natives, native: str, handle, methods) -> str:
+def render_owner(bound, values, native: str, handle, methods) -> str:
     public = owner_class(handle)
     parameters = ["key: AdoptKey", "handle: bigint"]
     options = []
@@ -291,8 +286,7 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
             "  declare [Symbol.dispose]: () => void;\n"
         )
     rendered = [
-        (entry.method, render_method(bound, values, natives, entry, "  "))
-        for entry in methods
+        (entry.method, render_method(bound, values, entry, "  ")) for entry in methods
     ]
     if handle.dispose_completion:
         rendered.append(("dispose", render_dispose(bound, handle, "  ")))
@@ -307,7 +301,7 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
         + ");\n"
     )
     if discarding:
-        text += "\n" + render_discarding(bound, values, natives, public, discarding)
+        text += "\n" + render_discarding(bound, values, public, discarding)
     return text
 
 
@@ -475,7 +469,6 @@ def value_imports(values: Values, text: str) -> str:
 
 def runtime_imports(text: str) -> str:
     modules = {
-        "./generated_native.ts": ["Decoder"],
         "./internal/addon.ts": ["native"],
         "./internal/completions.ts": [
             "type CommandCompletion",
@@ -517,20 +510,16 @@ def runtime_imports(text: str) -> str:
     return "".join(lines)
 
 
-def render_operations(
-    bound, values: Values, natives, lowered: list[Lowered], digest: str
-):
+def render_operations(bound, values: Values, lowered: list[Lowered]):
     by_owner: dict[str | None, list[Lowered]] = {}
     for entry in lowered:
         by_owner.setdefault(entry.owner, []).append(entry)
     chunks = []
     for entry in sorted(by_owner.get(None, []), key=lambda e: e.method):
-        chunks.append(render_method(bound, values, natives, entry, ""))
+        chunks.append(render_method(bound, values, entry, ""))
     for native, handle in sorted(bound.public_handles.items()):
         chunks.append(
-            render_owner(
-                bound, values, natives, native, handle, by_owner.get(native, [])
-            )
+            render_owner(bound, values, native, handle, by_owner.get(native, []))
         )
     chunks += render_attachments(bound, lowered)
     chunks += render_views(bound, values, lowered)
@@ -557,12 +546,6 @@ def render_operations(
         + "\n"
         + value_imports(values, interface_text)
         + "\n"
-        + "/** The digest of the C headers that this facade and its addon came from. */\n"
-        + f'export const ABI_DIGEST = "{digest}";\n\n'
-        + "/** The index of each completion decoder in the addon's decoder table. */\n"
-        + "export const Decoder = {\n"
-        + "".join(f"  {key}: {index},\n" for key, index in natives.decoder_keys())
-        + "} as const;\n\n"
         + "/** The addon function of each generated operation, by C function name. */\n"
         + "export interface NativeOperations {\n"
         + interface_text

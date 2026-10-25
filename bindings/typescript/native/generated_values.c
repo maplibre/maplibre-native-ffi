@@ -8040,24 +8040,33 @@ bool mln_ts_write_wgl_context_descriptor(
 }
 
 const mln_ts_decoder mln_ts_decoders[] = {
-  mln_ts_decode_buffer_view,
-  mln_ts_decode_buffer_view_optional,
-  mln_ts_decode_camera_options,
-  mln_ts_decode_camera_query_result,
-  mln_ts_decode_lat_lng_bounds,
-  mln_ts_decode_lat_lng_list,
-  mln_ts_decode_offline_region_info,
-  mln_ts_decode_offline_region_info_list,
-  mln_ts_decode_offline_region_info_optional,
-  mln_ts_decode_offline_region_status,
-  mln_ts_decode_rendered_feature_list,
-  mln_ts_decode_source_feature_list,
-  mln_ts_decode_style_image_info_optional,
-  mln_ts_decode_style_layer_info_list,
-  mln_ts_decode_style_layer_info_optional,
-  mln_ts_decode_style_source_info_list,
-  mln_ts_decode_style_source_info_optional,
-  mln_ts_decode_style_transition_options,
-  mln_ts_decode_texture_readback_result,
+  [MLN_TS_NO_DECODER] = NULL,
+  [MLN_TS_DECODE_BUFFER_VIEW] = mln_ts_decode_buffer_view,
+  [MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL] = mln_ts_decode_buffer_view_optional,
+  [MLN_TS_DECODE_CAMERA_OPTIONS] = mln_ts_decode_camera_options,
+  [MLN_TS_DECODE_CAMERA_QUERY_RESULT] = mln_ts_decode_camera_query_result,
+  [MLN_TS_DECODE_LAT_LNG_BOUNDS] = mln_ts_decode_lat_lng_bounds,
+  [MLN_TS_DECODE_LAT_LNG_LIST] = mln_ts_decode_lat_lng_list,
+  [MLN_TS_DECODE_OFFLINE_REGION_INFO] = mln_ts_decode_offline_region_info,
+  [MLN_TS_DECODE_OFFLINE_REGION_INFO_LIST] =
+    mln_ts_decode_offline_region_info_list,
+  [MLN_TS_DECODE_OFFLINE_REGION_INFO_OPTIONAL] =
+    mln_ts_decode_offline_region_info_optional,
+  [MLN_TS_DECODE_OFFLINE_REGION_STATUS] = mln_ts_decode_offline_region_status,
+  [MLN_TS_DECODE_RENDERED_FEATURE_LIST] = mln_ts_decode_rendered_feature_list,
+  [MLN_TS_DECODE_SOURCE_FEATURE_LIST] = mln_ts_decode_source_feature_list,
+  [MLN_TS_DECODE_STYLE_IMAGE_INFO_OPTIONAL] =
+    mln_ts_decode_style_image_info_optional,
+  [MLN_TS_DECODE_STYLE_LAYER_INFO_LIST] = mln_ts_decode_style_layer_info_list,
+  [MLN_TS_DECODE_STYLE_LAYER_INFO_OPTIONAL] =
+    mln_ts_decode_style_layer_info_optional,
+  [MLN_TS_DECODE_STYLE_SOURCE_INFO_LIST] = mln_ts_decode_style_source_info_list,
+  [MLN_TS_DECODE_STYLE_SOURCE_INFO_OPTIONAL] =
+    mln_ts_decode_style_source_info_optional,
+  [MLN_TS_DECODE_STYLE_TRANSITION_OPTIONS] =
+    mln_ts_decode_style_transition_options,
+  [MLN_TS_DECODE_TEXTURE_READBACK_RESULT] =
+    mln_ts_decode_texture_readback_result,
 };
-const size_t mln_ts_decoder_count = 19;
+const size_t mln_ts_decoder_count =
+  sizeof mln_ts_decoders / sizeof mln_ts_decoders[0];

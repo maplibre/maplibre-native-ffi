@@ -108,14 +108,15 @@ export function command(start: Start): Promise<CommandCompletion> {
 }
 
 /**
- * An operation whose value the addon converts through its decoder. A value
- * that fails to convert rejects the Promise, and the batch disposes it.
+ * An operation whose value the addon converts through the decoder that its
+ * export recorded. A value that fails to convert rejects the Promise, and the
+ * batch disposes it.
  */
-export function query<T>(decoder: number, start: Start): Promise<T> {
+export function query<T>(start: Start): Promise<T> {
   return rejected(() =>
     submit(start, (index, header) => {
       check(header);
-      return native.completionValue(index, decoder) as T;
+      return native.completionValue(index) as T;
     }),
   );
 }

@@ -4,7 +4,6 @@
 
 import assert from "node:assert/strict";
 
-import { Decoder } from "../src/generated_native.ts";
 import {
   AwaitableWake,
   MapDebugOption,
@@ -22,14 +21,14 @@ import { emptyStyle } from "./support/styles.ts";
 test("a completion delivers once and reports a value that fails to convert", async () => {
   const fixture = await openRuntime();
   const pending = pendingCompletions();
-  // A runtime command completes without a value, so a decoder that expects
-  // one fails to convert it.
-  const conversion = query(Decoder.cameraOptions, (completion) =>
+  // A runtime command records no decoder, so reading its completion as a
+  // value fails to convert it.
+  const conversion = query((completion) =>
     native.mln_runtime_clear_resource_transform(fixture.runtime.id, completion),
   );
   await assert.rejects(
     bounded(conversion, "the conversion"),
-    /the completion carried no value/,
+    /the operation completes without a value/,
   );
   // The delivery settled its entry once and left none behind.
   assert.equal(pendingCompletions(), pending);

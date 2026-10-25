@@ -3453,37 +3453,67 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_webgpu_surface_descriptor_default_critical},
 };
 
-mln_jni_upcall mln_jni_upcalls[] = {
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "completion", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "completionRelease", "(J)V",
-   NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "releaseRoot", "(J)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls", "logHandlerCallback",
-   "(JIIJJ)I", NULL},
-  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
-   "httpHeaderTransformCallback", "(JIJJ)I", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "runtimeEventHandlerCallback",
-   "(JJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceProviderCallback",
-   "(JJJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
-   "(JIJJ)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockLock", "(J)V", NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockUnlock", "(J)V",
-   NULL},
-  {"org/maplibre/nativeffi/internal/c/Upcalls",
-   "cameraTransitionHandlerCallback", "(JJ)V", NULL},
+static mln_jni_upcall mln_jni_completion_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "completion", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_completionRelease_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "completionRelease", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_releaseRoot_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "releaseRoot", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_logHandlerCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/ThreadedUpcalls", "logHandlerCallback",
+  "(JIIJJ)I", NULL
+};
+static mln_jni_upcall mln_jni_httpHeaderTransformCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
+  "httpHeaderTransformCallback", "(JIJJ)I", NULL
+};
+static mln_jni_upcall mln_jni_customGeometrySourceOptionsFetchTile_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_customGeometrySourceOptionsCancelTile_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_customMvtVectorSourceOptionsFetchTile_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_customMvtVectorSourceOptionsCancelTile_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_resourceRequestCancelHandlerCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "resourceRequestCancelHandlerCallback", "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_runtimeEventHandlerCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "runtimeEventHandlerCallback",
+  "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_resourceProviderCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "resourceProviderCallback",
+  "(JJJ)V", NULL
+};
+static mln_jni_upcall mln_jni_resourceTransformCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
+  "(JIJJ)V", NULL
+};
+static mln_jni_upcall mln_jni_wakeCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_queueLockLock_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "queueLockLock", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_queueLockUnlock_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "queueLockUnlock", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_cameraTransitionHandlerCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls",
+  "cameraTransitionHandlerCallback", "(JJ)V", NULL
 };
 
 static void mln_jni_completion(
@@ -3492,17 +3522,17 @@ static void mln_jni_completion(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(result)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[0], arguments);
+  mln_jni_upcall_void(&mln_jni_completion_upcall, arguments);
 }
 
 static void mln_jni_completionRelease(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[1], arguments);
+  mln_jni_upcall_void(&mln_jni_completionRelease_upcall, arguments);
 }
 
 static void mln_jni_releaseRoot(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[2], arguments);
+  mln_jni_upcall_void(&mln_jni_releaseRoot_upcall, arguments);
 }
 
 static uint32_t mln_jni_logHandlerCallback(
@@ -3517,7 +3547,7 @@ static uint32_t mln_jni_logHandlerCallback(
     {.j = MLN_JNI_ADDRESS(message)}
   };
   jint result = 0;
-  mln_jni_upcall_int(&mln_jni_upcalls[3], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_logHandlerCallback_upcall, arguments, &result);
   return (uint32_t)result;
 }
 
@@ -3532,7 +3562,9 @@ static mln_status mln_jni_httpHeaderTransformCallback(
     {.j = MLN_JNI_ADDRESS(outResponse)}
   };
   jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[4], arguments, &result);
+  mln_jni_upcall_int(
+    &mln_jni_httpHeaderTransformCallback_upcall, arguments, &result
+  );
   return (mln_status)result;
 }
 
@@ -3542,7 +3574,9 @@ static void mln_jni_customGeometrySourceOptionsFetchTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[5], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_customGeometrySourceOptionsFetchTile_upcall, arguments
+  );
 }
 
 static void mln_jni_customGeometrySourceOptionsCancelTile(
@@ -3551,7 +3585,9 @@ static void mln_jni_customGeometrySourceOptionsCancelTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[6], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_customGeometrySourceOptionsCancelTile_upcall, arguments
+  );
 }
 
 static void mln_jni_customMvtVectorSourceOptionsFetchTile(
@@ -3560,7 +3596,9 @@ static void mln_jni_customMvtVectorSourceOptionsFetchTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_customMvtVectorSourceOptionsFetchTile_upcall, arguments
+  );
 }
 
 static void mln_jni_customMvtVectorSourceOptionsCancelTile(
@@ -3569,14 +3607,18 @@ static void mln_jni_customMvtVectorSourceOptionsCancelTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_customMvtVectorSourceOptionsCancelTile_upcall, arguments
+  );
 }
 
 static void mln_jni_resourceRequestCancelHandlerCallback(
   void* userData, mln_resource_request handle
 ) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}, {.j = (jlong)handle}};
-  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_resourceRequestCancelHandlerCallback_upcall, arguments
+  );
 }
 
 static void mln_jni_runtimeEventHandlerCallback(
@@ -3585,7 +3627,7 @@ static void mln_jni_runtimeEventHandlerCallback(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(events)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[10], arguments);
+  mln_jni_upcall_void(&mln_jni_runtimeEventHandlerCallback_upcall, arguments);
 }
 
 static void mln_jni_resourceProviderCallback(
@@ -3597,7 +3639,9 @@ static void mln_jni_resourceProviderCallback(
     {.j = MLN_JNI_ADDRESS(request)},
     {.j = (jlong)handle}
   };
-  if (!mln_jni_upcall_void(&mln_jni_upcalls[11], arguments)) {
+  if (!mln_jni_upcall_void(
+        &mln_jni_resourceProviderCallback_upcall, arguments
+      )) {
     mln_resource_request_release(handle);
   }
 }
@@ -3612,24 +3656,26 @@ static void mln_jni_resourceTransformCallback(
     {.j = MLN_JNI_ADDRESS(url)},
     {.j = (jlong)request}
   };
-  if (!mln_jni_upcall_void(&mln_jni_upcalls[12], arguments)) {
+  if (!mln_jni_upcall_void(
+        &mln_jni_resourceTransformCallback_upcall, arguments
+      )) {
     mln_resource_transform_request_release(request);
   }
 }
 
 static void mln_jni_wakeCallback(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
+  mln_jni_upcall_void(&mln_jni_wakeCallback_upcall, arguments);
 }
 
 static void mln_jni_queueLockLock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
+  mln_jni_upcall_void(&mln_jni_queueLockLock_upcall, arguments);
 }
 
 static void mln_jni_queueLockUnlock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
+  mln_jni_upcall_void(&mln_jni_queueLockUnlock_upcall, arguments);
 }
 
 static void mln_jni_cameraTransitionHandlerCallback(
@@ -3638,8 +3684,30 @@ static void mln_jni_cameraTransitionHandlerCallback(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(end)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[16], arguments);
+  mln_jni_upcall_void(
+    &mln_jni_cameraTransitionHandlerCallback_upcall, arguments
+  );
 }
+
+mln_jni_upcall* const mln_jni_upcalls[] = {
+  &mln_jni_completion_upcall,
+  &mln_jni_completionRelease_upcall,
+  &mln_jni_releaseRoot_upcall,
+  &mln_jni_logHandlerCallback_upcall,
+  &mln_jni_httpHeaderTransformCallback_upcall,
+  &mln_jni_customGeometrySourceOptionsFetchTile_upcall,
+  &mln_jni_customGeometrySourceOptionsCancelTile_upcall,
+  &mln_jni_customMvtVectorSourceOptionsFetchTile_upcall,
+  &mln_jni_customMvtVectorSourceOptionsCancelTile_upcall,
+  &mln_jni_resourceRequestCancelHandlerCallback_upcall,
+  &mln_jni_runtimeEventHandlerCallback_upcall,
+  &mln_jni_resourceProviderCallback_upcall,
+  &mln_jni_resourceTransformCallback_upcall,
+  &mln_jni_wakeCallback_upcall,
+  &mln_jni_queueLockLock_upcall,
+  &mln_jni_queueLockUnlock_upcall,
+  &mln_jni_cameraTransitionHandlerCallback_upcall,
+};
 
 void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_completion,
