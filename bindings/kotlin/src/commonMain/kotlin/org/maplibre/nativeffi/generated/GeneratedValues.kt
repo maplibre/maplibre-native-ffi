@@ -760,7 +760,10 @@ public value class RenderResult(public val rawValue: UInt) {
      * the host demands again when the target can be ready, such as after a paced delay.
      */
     public val TARGET_NOT_READY: RenderResult = RenderResult(2u)
-    /** A newer IF_NEEDED demand with the same flags replaced this demand. */
+    /**
+     * A newer IF_NEEDED demand with the same flags replaced this demand. A still image's demand is
+     * never replaced, and never replaces one.
+     */
     public val SUPERSEDED: RenderResult = RenderResult(3u)
   }
 }
@@ -2410,7 +2413,10 @@ public data class CanonicalTileId(
 public data class FrameDemand(
   /** A bitwise OR of `mln_frame_demand_flag` values. Defaults to `MLN_FRAME_DEMAND_IF_NEEDED`. */
   public val flags: FrameDemandFlag = FrameDemand.default.flags,
-  /** Host identity returned with the terminal frame result. */
+  /**
+   * Host identity returned with the terminal frame result. Any value except
+   * `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+   */
   public val token: ULong = FrameDemand.default.token,
 ) {
   public companion object {

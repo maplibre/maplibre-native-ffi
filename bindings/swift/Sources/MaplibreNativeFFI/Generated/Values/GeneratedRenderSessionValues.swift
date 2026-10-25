@@ -11,7 +11,8 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
   /// `MLN_FRAME_DEMAND_IF_NEEDED`.
   public var flags: FrameDemandFlag
-  /// Host identity returned with the terminal frame result.
+  /// Host identity returned with the terminal frame result. Any value except
+  /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
   public var token: UInt64
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_frame_demand_default))
@@ -211,7 +212,8 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// result does not cause a map update, so the host demands again when the
   /// target can be ready, such as after a paced delay.
   public static let targetNotReady: RenderResult = .init(rawValue: 2)
-  /// A newer IF_NEEDED demand with the same flags replaced this demand.
+  /// A newer IF_NEEDED demand with the same flags replaced this demand. A still
+  /// image's demand is never replaced, and never replaces one.
   public static let superseded: RenderResult = .init(rawValue: 3)
   public var description: String {
     switch rawValue {

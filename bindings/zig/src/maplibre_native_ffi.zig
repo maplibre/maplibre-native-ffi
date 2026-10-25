@@ -624,7 +624,7 @@ pub const Map = struct {
         return call.submit("mln_map_request_repaint", .handle, self, call.command, null, diagnostic, .{});
     }
 
-    /// Requests one still image for a static or tile map.
+    /// Requests one still image for a static or tile map, which renders itself.
     ///
     /// See `mln_map_request_still_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1019,7 +1019,8 @@ pub const RenderSession = struct {
     /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
     /// finished. A running demand finishes its attempt and ends any wait for a map
     /// update or a free slot. After completion, a new frame demand is required to
-    /// render again.
+    /// render again, except that a pending still image submits its next demand
+    /// itself; see `mln_map_request_still_image()`.
     ///
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2366,7 +2367,8 @@ pub const FrameDemand = struct {
     /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
     /// `MLN_FRAME_DEMAND_IF_NEEDED`.
     flags: FrameDemandFlag,
-    /// Host identity returned with the terminal frame result.
+    /// Host identity returned with the terminal frame result. Any value except
+    /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
     token: u64,
     pub fn toNative(self: FrameDemand) c.mln_frame_demand {
         var raw = c.mln_frame_demand_default();
@@ -4152,7 +4154,8 @@ pub const RenderResult = enum(u32) {
     /// result does not cause a map update, so the host demands again when the
     /// target can be ready, such as after a paced delay.
     target_not_ready = 2,
-    /// A newer IF_NEEDED demand with the same flags replaced this demand.
+    /// A newer IF_NEEDED demand with the same flags replaced this demand. A
+    /// still image's demand is never replaced, and never replaces one.
     superseded = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;

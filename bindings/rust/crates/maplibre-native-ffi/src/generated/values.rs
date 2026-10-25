@@ -1054,7 +1054,8 @@ pub struct FrameDemand {
     /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
     /// `MLN_FRAME_DEMAND_IF_NEEDED`.
     pub flags: FrameDemandFlag,
-    /// Host identity returned with the terminal frame result.
+    /// Host identity returned with the terminal frame result. Any value except
+    /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
     pub token: u64,
 }
 impl Default for FrameDemand {
@@ -3417,7 +3418,8 @@ pub enum RenderResult: u32 {
     /// result does not cause a map update, so the host demands again when the
     /// target can be ready, such as after a paced delay.
     TargetNotReady = 2,
-    /// A newer IF_NEEDED demand with the same flags replaced this demand.
+    /// A newer IF_NEEDED demand with the same flags replaced this demand. A
+    /// still image's demand is never replaced, and never replaces one.
     Superseded = 3,
 } Unknown
 }

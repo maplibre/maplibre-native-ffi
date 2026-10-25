@@ -588,7 +588,8 @@ final class RenderResult extends _Enum {
   /// target can be ready, such as after a paced delay.
   static const targetNotReady = RenderResult.fromRawValue(2);
 
-  /// A newer IF_NEEDED demand with the same flags replaced this demand.
+  /// A newer IF_NEEDED demand with the same flags replaced this demand. A still
+  /// image's demand is never replaced, and never replaces one.
   static const superseded = RenderResult.fromRawValue(3);
   @override
   String toString() => switch (rawValue) {
@@ -2380,7 +2381,8 @@ final class FrameDemand extends _Value {
   /// `MLN_FRAME_DEMAND_IF_NEEDED`.
   final FrameDemandFlag flags;
 
-  /// Host identity returned with the terminal frame result.
+  /// Host identity returned with the terminal frame result. Any value except
+  /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
   final int token;
 
   /// A copy of this value with the given members replaced.
