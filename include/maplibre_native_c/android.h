@@ -16,9 +16,7 @@ extern "C" {
  * Initializes Android platform services.
  *
  * Required once per Android process, before creating a runtime. Configures
- * locale services, HTTP, and APK asset access. HTTP goes through
- * java.net.HttpURLConnection, so it follows the application's network security
- * configuration, which refuses plain HTTP unless the application permits it.
+ * locale services, HTTP, and APK asset access.
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `context` must be
  * an Android `android.content.Context` object. Any Context subtype may be

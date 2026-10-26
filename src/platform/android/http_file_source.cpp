@@ -1,8 +1,6 @@
-// Android HTTP through java.net.HttpURLConnection, which brings the platform's
-// trust store, revocation policy, and proxy, and the application's network
-// security configuration, without any Java code of the library's own.
-// HttpURLConnection blocks, so a pool of threads attached to the Java VM runs
-// the requests.
+// Android HTTP through java.net.HttpURLConnection, which needs no Java code of
+// the library's own. It blocks, so a pool of threads attached to the Java VM
+// runs the requests.
 
 #include <condition_variable>
 #include <cstddef>
