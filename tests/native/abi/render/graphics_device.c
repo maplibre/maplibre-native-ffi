@@ -2,6 +2,8 @@
 // targets that render on them. Metal, Vulkan, and EGL builds create a device;
 // every other build reports that it cannot, after it validates the call.
 
+#include <stdio.h>
+
 #include "support/frames.h"
 #include "support/test_support.h"
 
@@ -49,6 +51,7 @@ static void create_reports_an_unsupported_backend(void) {
 #endif
 
 #if defined(DEVICE_SUPPORTED)
+#define DIAG_STEP(what) (fprintf(stderr, "DIAG %s:%d %s\n", __func__, __LINE__, what), fflush(stderr))
 static mln_graphics_device create_device(void) {
   mln_graphics_device device = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_graphics_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
@@ -86,8 +89,11 @@ static mln_test_render_fixture attach_device_texture(
     map, device, &descriptor, &options, &fixture.session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   ));
+  DIAG_STEP("attach submitted");
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  DIAG_STEP("attach completed");
   mln_test_completion_destroy(&attach);
+  DIAG_STEP("attach released");
   return fixture;
 }
 
@@ -97,8 +103,11 @@ static void detach_device_texture(mln_test_render_fixture* fixture) {
     fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
+  DIAG_STEP("detach completed");
   mln_test_completion_destroy(&detach);
+  DIAG_STEP("detach released");
   MLN_TEST_OK(mln_test_render_session_dispose(fixture->session));
+  DIAG_STEP("disposed");
   *fixture = (mln_test_render_fixture){0};
 }
 
@@ -106,7 +115,9 @@ static void expect_red_pixels(const mln_test_render_fixture* fixture) {
   enum { pixel_bytes = 64 * 64 * 4 };
   static uint8_t pixels[pixel_bytes];
   mln_texture_image_info info = {0};
+  DIAG_STEP("readback start");
   MLN_TEST_OK(mln_test_render_read_back(fixture, &info, pixels, pixel_bytes));
+  DIAG_STEP("readback released");
   TEST_ASSERT_EQUAL_UINT32(64, info.width);
   TEST_ASSERT_EQUAL_UINT32(64, info.height);
   TEST_ASSERT_EQUAL_size_t(pixel_bytes, info.byte_length);
@@ -174,13 +185,37 @@ static void sessions_on_two_maps_share_one_device(void) {
   mln_test_render_fixture first = attach_device_texture(first_map, device);
   mln_test_render_fixture second = attach_device_texture(second_map, device);
 
+  DIAG_STEP("both attached");
   render_red_frame(first_map, &first, 11);
+  DIAG_STEP("first rendered");
   render_red_frame(second_map, &second, 12);
+  DIAG_STEP("second rendered");
   expect_red_pixels(&first);
   expect_red_pixels(&second);
 
   detach_device_texture(&first);
   detach_device_texture(&second);
+  mln_graphics_device_release(device);
+  mln_test_destroy_map(second_map);
+  mln_test_destroy_map(first_map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void sessions_on_two_maps_take_turns_on_one_device(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map first_map = mln_test_create_map(runtime);
+  mln_map second_map = mln_test_create_map(runtime);
+  mln_graphics_device device = create_device();
+  mln_test_render_fixture first = attach_device_texture(first_map, device);
+  render_red_frame(first_map, &first, 21);
+  expect_red_pixels(&first);
+  detach_device_texture(&first);
+  DIAG_STEP("first turn done");
+  mln_test_render_fixture second = attach_device_texture(second_map, device);
+  render_red_frame(second_map, &second, 22);
+  expect_red_pixels(&second);
+  detach_device_texture(&second);
+  DIAG_STEP("second turn done");
   mln_graphics_device_release(device);
   mln_test_destroy_map(second_map);
   mln_test_destroy_map(first_map);
@@ -292,6 +327,7 @@ MLN_TEST_GROUP {
   RUN_TEST(create_rejects_malformed_arguments);
 #if defined(DEVICE_SUPPORTED)
   RUN_TEST(device_texture_reads_back_after_the_handle_is_released);
+  RUN_TEST(sessions_on_two_maps_take_turns_on_one_device);
   RUN_TEST(sessions_on_two_maps_share_one_device);
   RUN_TEST(attach_rejects_what_a_device_texture_cannot_take);
   RUN_TEST(the_first_named_adapter_renders);
