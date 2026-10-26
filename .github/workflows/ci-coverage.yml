@@ -1125,6 +1125,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-emscripten-wasm32-webgl-${{ github.sha }}
+          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
@@ -1182,6 +1189,13 @@ jobs:
         with:
           name: native-package-emscripten-wasm32-webgpu-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-emscripten-wasm32-webgpu-${{ github.sha }}
+          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed

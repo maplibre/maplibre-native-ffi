@@ -41,9 +41,6 @@ export default defineConfig({
     platform: "browser",
     fixedExtension: false,
     hash: false,
-    // The page has no package resolution, so the bundle carries emnapi's
-    // runtime.
-    deps: { alwaysBundle: [/^@emnapi\//] },
     plugins: [
       {
         name: "browser-host",

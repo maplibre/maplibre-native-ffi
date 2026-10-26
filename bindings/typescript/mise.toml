@@ -61,12 +61,12 @@ echo "$addon exports only napi_register_module_v1"
 description = "Generate the TypeScript API reference HTML with TypeDoc."
 run = '''
 rm -rf build/typedoc
-pnpm exec typedoc --entryPoints src/index.ts --excludeInternal --out build/typedoc \
+pnpm exec typedoc --entryPoints src/index.ts src/browser.ts --excludeInternal --out build/typedoc \
   --name @maplibre/native-ffi --readme none
 '''
 
 [tasks.pack]
-description = "Pack the facade, a desktop preset's backend package, and its addon package into npm tarballs."
+description = "Pack the facade, a desktop or Emscripten preset's backend package, and its addon package into npm tarballs."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}"
 flag "--version <version>" default="0.0.0" help="The version of every package"

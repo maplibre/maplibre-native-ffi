@@ -204,7 +204,7 @@ def target_job(row: dict) -> dict:
     # The npm release publishes the addon that the TypeScript suite built
     # against the packaged native artifact and tested, for each preset that
     # bindings/typescript/scripts/pack.ts packs.
-    if preset.startswith(("linux-gnu-", "macos-")) and (
+    if preset.startswith(("linux-gnu-", "macos-", "emscripten-")) and (
         f"mise run //bindings/typescript:test {preset}"
         in row.get("consumer_commands", [])
     ):

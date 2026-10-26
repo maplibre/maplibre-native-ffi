@@ -5,10 +5,12 @@
 // A user installs the facade, @maplibre/native-ffi, and one backend package,
 // such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
 // pins one addon package per platform through optionalDependencies, and each
-// addon package declares the platform it serves, so a package manager installs
-// only the addon for the host. Each addon package carries the addon that the
-// build task installed for its preset, with the licenses of the native library
-// that the addon embeds.
+// desktop addon package declares the platform it serves, so a package manager
+// installs only the addon for the host. A browser addon package carries the
+// module of an Emscripten preset, which no host platform selects, so it
+// installs wherever its backend package does. Each addon package carries what
+// the build task installed for its preset, with the licenses of the native
+// library that it embeds.
 //
 // Every package takes the same version, 0.0.0 unless --version names one, and
 // every pin is exact, so the facade and the addon always come from one build.
@@ -55,32 +57,49 @@ const titles: Record<string, string> = {
   opengl: "OpenGL",
   metal: "Metal",
   vulkan: "Vulkan",
+  webgpu: "WebGPU",
 };
+// WebGL is the OpenGL backend with the browser's context provider.
 const backends: Record<string, string> = {
   egl: "opengl",
   metal: "metal",
   vulkan: "vulkan",
+  webgl: "opengl",
+  webgpu: "webgpu",
 };
 
 interface Addon {
   readonly preset: string;
   readonly backend: string;
   readonly name: string;
-  readonly os: string;
-  readonly cpu: string;
-  readonly libc: string | undefined;
+  /** The platform that a desktop addon serves; a browser module has none. */
+  readonly platform:
+    | { readonly os: string; readonly cpu: string; readonly libc?: string }
+    | undefined;
+  readonly files: readonly string[];
 }
 
 // A coverage preset builds the addon of its base preset with instrumentation,
 // so it packs under the same name for the suite to install.
 function addonOf(preset: string): Addon {
+  const browser = /^emscripten-wasm32-(webgl|webgpu)$/.exec(preset);
+  if (browser !== null) {
+    const backend = backends[browser[1]!]!;
+    return {
+      preset,
+      backend,
+      name: `${source.name}-${backend}-wasm32`,
+      platform: undefined,
+      files: ["maplibre_native_ffi.mjs", "maplibre_native_ffi.wasm"],
+    };
+  }
   const match =
     /^(linux-gnu|macos)-(x64|arm64)-(egl|metal|vulkan)(?:-coverage)?$/.exec(
       preset,
     );
   if (match === null) {
     throw new Error(
-      `${preset} has no addon package; only the Linux glibc and macOS presets do`,
+      `${preset} has no addon package; only the Linux glibc, macOS, and Emscripten presets do`,
     );
   }
   const { os, libc } = platforms[match[1]!]!;
@@ -91,9 +110,8 @@ function addonOf(preset: string): Addon {
     preset,
     backend,
     name: `${source.name}-${backend}-${os}-${cpu}${suffix}`,
-    os,
-    cpu,
-    libc,
+    platform: { os, cpu, ...(libc === undefined ? {} : { libc }) },
+    files: ["maplibre_native_ffi.node"],
   };
 }
 
@@ -112,7 +130,9 @@ function pack(directory: string, manifest: object): void {
 }
 
 // Node strips types only outside node_modules, so the published facade is the
-// bundle rather than the sources.
+// bundle rather than the sources: one entry for Node, Bun, and Deno, and one
+// for the browser, which share their chunks. The browser entry bundles emnapi's
+// runtime, a development dependency, so the facade depends on nothing.
 const dist = join(binding, "build", "dist");
 rmSync(dist, { recursive: true, force: true });
 execFileSync(
@@ -122,7 +142,13 @@ execFileSync(
     "vp",
     "pack",
     "src/index.ts",
+    "src/browser.ts",
     "--no-config",
+    // The browser entry runs where no require() exists, which the node
+    // platform would bring through node:module.
+    "--platform",
+    "neutral",
+    "--fixed-extension",
     "--dts",
     "--out-dir",
     dist,
@@ -138,21 +164,26 @@ for (const addon of addons) {
   const directory = join(staging, addon.name.split("/")[1]!);
   const install = join(binding, "native", "build", addon.preset, "install");
   mkdirSync(directory, { recursive: true });
-  cpSync(
-    join(install, "maplibre_native_ffi.node"),
-    join(directory, "maplibre_native_ffi.node"),
-  );
+  for (const file of addon.files) {
+    cpSync(join(install, file), join(directory, file));
+  }
   cpSync(join(install, "licenses"), join(directory, "licenses"), {
     recursive: true,
   });
+  const { platform } = addon;
   pack(directory, {
     name: addon.name,
     ...shared,
-    description: `The ${addon.preset} Node-API addon of ${source.name}.`,
-    os: [addon.os],
-    cpu: [addon.cpu],
-    ...(addon.libc === undefined ? {} : { libc: [addon.libc] }),
-    files: ["maplibre_native_ffi.node", "licenses"],
+    description:
+      platform === undefined
+        ? `The ${addon.preset} browser module of ${source.name}.`
+        : `The ${addon.preset} Node-API addon of ${source.name}.`,
+    ...(platform && {
+      os: [platform.os],
+      cpu: [platform.cpu],
+      ...(platform.libc === undefined ? {} : { libc: [platform.libc] }),
+    }),
+    files: [...addon.files, "licenses"],
   });
 }
 
@@ -162,7 +193,7 @@ for (const backend of new Set(addons.map((addon) => addon.backend))) {
   pack(directory, {
     name: `${source.name}-${backend}`,
     ...shared,
-    description: `The ${titles[backend]} backend of ${source.name}: the Node-API addon for each platform.`,
+    description: `The ${titles[backend]} backend of ${source.name}: the native module for each platform.`,
     optionalDependencies: Object.fromEntries(
       addons
         .filter((addon) => addon.backend === backend)
@@ -186,8 +217,13 @@ pack(facade, {
   ...shared,
   description: source.description,
   type: "module",
+  // A bundler that builds for the web takes the browser entry, and Node, Bun,
+  // and Deno take the default.
   exports: {
-    ".": { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
+    ".": {
+      browser: { types: "./dist/browser.d.mts", default: "./dist/browser.mjs" },
+      default: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
+    },
   },
   engines: source.engines,
   peerDependencies: backendPeers,

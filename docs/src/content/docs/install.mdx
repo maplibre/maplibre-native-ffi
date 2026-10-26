@@ -403,7 +403,8 @@ before you build.
 
 Add the package from [npm](https://www.npmjs.com/package/@maplibre/native-ffi)
 with exactly one backend package: `@maplibre/native-ffi-opengl`,
-`@maplibre/native-ffi-metal`, or `@maplibre/native-ffi-vulkan`.
+`@maplibre/native-ffi-metal`, `@maplibre/native-ffi-vulkan`, or
+`@maplibre/native-ffi-webgpu`.
 
 ```bash frame="terminal"
 npm install @maplibre/native-ffi @maplibre/native-ffi-vulkan
@@ -413,6 +414,21 @@ The backend package installs the C library for the host. The binding runs on
 Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later, on Linux with glibc and on
 macOS. Releases include macOS for arm64 alone. Deno imports the package as
 `npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
+
+In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
+`@maplibre/native-ffi-webgpu` with WebGPU. Each also installs its browser
+module, in `@maplibre/native-ffi-opengl-wasm32` or
+`@maplibre/native-ffi-webgpu-wasm32`. A bundler that builds for the web takes
+the binding's browser entry. Serve the module's `maplibre_native_ffi.mjs` and
+`maplibre_native_ffi.wasm` side by side and unbundled, such as from Vite's
+`public` directory, and load the module before any other call:
+
+```ts
+import { loadModule, RuntimeHandle } from "@maplibre/native-ffi";
+
+await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
+const runtime = await RuntimeHandle.create();
+```
 
 npm has no snapshot channel. To try `main`, pack the packages for your preset
 in a checkout of this repository, then install the tarballs:
@@ -587,7 +603,8 @@ provider.
 ### Web
 
 Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
-provider.
+provider. The WebGPU backend suspends threads through JSPI, which Chrome 137,
+Firefox 139, and later support, and Safari does not.
 
 A page that loads a browser module must be cross-origin isolated: serve it with
 the `Cross-Origin-Opener-Policy: same-origin` and

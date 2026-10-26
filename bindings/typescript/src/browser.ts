@@ -1,8 +1,13 @@
-// The entry point for browsers.
-//
-// A page loads the browser module with loadModule() before any other call, and
-// imports the page's graphics objects into it for its render targets. A page
-// has no exit event that ends native work, so its runtimes end with it.
+/**
+ * The entry that a bundler building for the web takes in place of the default
+ * one. A page loads the browser module with {@link loadModule} before any other
+ * call, and imports its own graphics objects into the module for the render
+ * target descriptors that name them. Every other export is the default entry's.
+ *
+ * @module browser
+ */
+
+// A page has no exit event that ends native work, so its runtimes end with it.
 
 export * from "./generated_operations.ts";
 export * from "./generated_values.ts";

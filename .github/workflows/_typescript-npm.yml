@@ -94,7 +94,7 @@ jobs:
           for kind in addon backend facade; do
             for tarball in build/npm/*.tgz; do
               manifest="$(tar -xOzf "$tarball" package/package.json)"
-              if [[ "$(jq -r 'if .os then "addon" elif .optionalDependencies then "backend" else "facade" end' <<<"$manifest")" != "$kind" ]]; then
+              if [[ "$(jq -r 'if .optionalDependencies then "backend" elif .exports then "facade" else "addon" end' <<<"$manifest")" != "$kind" ]]; then
                 continue
               fi
               name="$(jq -r .name <<<"$manifest")"
