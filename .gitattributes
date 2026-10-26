@@ -2,6 +2,8 @@
 *.bat       text eol=crlf
 *.jar       binary
 *.patch     -whitespace
+# Preserve the CRLF source lines in the diff against the Hypium package.
+bindings/typescript/test/arkts/hypium-startup.patch -text
 *.mlt       binary
 *.db        binary
 
