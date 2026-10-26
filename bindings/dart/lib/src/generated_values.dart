@@ -2000,9 +2000,8 @@ final class ProjectedMeters extends _Value {
       _describe('ProjectedMeters', const ['northing', 'easting']);
 }
 
-/// Receives a MapLibre Native log record. The callback runs synchronously on
-/// the thread that emits the record, or on a MapLibre background thread for a
-/// severity that `setLogAsyncSeverityMask()` dispatches asynchronously.
+/// Receives a MapLibre Native log record. The callback runs asynchronously in
+/// the isolate and zone that registered it, after native queues the call.
 ///
 /// See `mln_log_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2036,23 +2035,23 @@ final class CanonicalTileId extends _Value {
 }
 
 /// Requests one tile of a custom geometry or custom MVT vector source. The
-/// callback may run on any native worker thread, concurrently with runtime and
-/// map calls.
+/// callback runs asynchronously in the isolate and zone that registered it,
+/// after native queues the call.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
 
 /// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort. The callback may run on any native worker thread,
-/// concurrently with runtime and map calls.
+/// source, best effort. The callback runs asynchronously in the isolate and
+/// zone that registered it, after native queues the call.
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
 
-/// Options for custom geometry sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Options for custom geometry sources. The callback runs asynchronously in the
+/// isolate and zone that registered it, after native queues the call.
 ///
 /// See `mln_custom_geometry_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2083,8 +2082,8 @@ final class CustomGeometrySourceOptions {
   final bool? wrap;
 }
 
-/// Options for custom MVT vector sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Options for custom MVT vector sources. The callback runs asynchronously in
+/// the isolate and zone that registered it, after native queues the call.
 ///
 /// See `mln_custom_mvt_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2223,8 +2222,9 @@ final class CameraTransitionEnd extends _Value {
       _describe('CameraTransitionEnd', const ['outcome', 'generation']);
 }
 
-/// Receives the end of one camera command's transitions. The callback runs on
-/// the runtime worker.
+/// Receives the end of one camera command's transitions. The callback runs
+/// asynchronously in the isolate and zone that registered it, after native
+/// queues the call.
 ///
 /// See `mln_camera_transition_end_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2456,8 +2456,9 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   ]);
 }
 
-/// Schedules service by the receiver that owns a queue or driver. Native code
-/// may invoke the callback from any thread, and calls may coalesce or overlap.
+/// Schedules service by the receiver that owns a queue or driver. The callback
+/// runs asynchronously in the isolate and zone that registered it, after native
+/// queues the call.
 ///
 /// See `mln_wake_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -2465,8 +2466,8 @@ typedef WakeCallback = void Function();
 
 /// Receiver wake callback copied by a successful owning call. The callback
 /// schedules service by the receiver and returns without waiting for another
-/// thread. Native code may invoke the callback from any thread, and calls may
-/// coalesce or overlap.
+/// thread. The callback runs asynchronously in the isolate and zone that
+/// registered it, after native queues the call.
 ///
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -2496,8 +2497,8 @@ final class Wake {
 }
 
 /// Host lock on the graphics queue that a session shares with its host, copied
-/// by a successful attach. The callback runs on the session's graphics thread
-/// or on the thread that abandons the session.
+/// by a successful attach. The callback runs asynchronously in the isolate and
+/// zone that registered it, after native queues the call.
 ///
 /// See `mln_queue_lock` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -4757,10 +4758,8 @@ final class ResourceResponse extends _Value {
 }
 
 /// Reports that MapLibre cancelled a C API resource provider request. The
-/// callback runs on the thread that discards the request, never a host thread:
-/// the runtime's native scheduler thread when a committed map or runtime
-/// command discards it, such as a style change or map destruction, and a
-/// MapLibre worker thread otherwise.
+/// callback runs asynchronously in the isolate and zone that registered it,
+/// after native queues the call.
 ///
 /// See `mln_resource_request_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5384,9 +5383,9 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
   final Uint8List rawRecord;
 }
 
-/// Receives selected events after their snapshots have been published. Map
-/// events arrive on the runtime's native scheduler thread, and offline events
-/// may arrive on a MapLibre worker thread.
+/// Receives selected events after their snapshots have been published. The
+/// callback runs asynchronously in the isolate and zone that registered it,
+/// after native queues the call.
 ///
 /// See `mln_runtime_event_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5456,7 +5455,8 @@ final class HttpHeaderRule extends _Value {
 }
 
 /// HTTP header transform state: a callback, or native header rules. The
-/// callback runs synchronously on a MapLibre worker or network thread.
+/// callback runs asynchronously in the isolate and zone that registered it,
+/// after native queues the call.
 ///
 /// See `mln_http_header_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5556,8 +5556,8 @@ final class ResourceRequestInfo extends _Value {
   ]);
 }
 
-/// Intercepts a network resource request. The callback runs synchronously on a
-/// MapLibre thread.
+/// Intercepts a network resource request. The callback runs asynchronously in
+/// the isolate and zone that registered it, after native queues the call.
 ///
 /// See `mln_resource_provider_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5600,8 +5600,8 @@ final class ResourceRoute extends _Value {
       _describe('ResourceRoute', const ['kinds', 'flags', 'url']);
 }
 
-/// Resource provider state. The callback runs synchronously on a MapLibre
-/// thread.
+/// Resource provider state. The callback runs asynchronously in the isolate and
+/// zone that registered it, after native queues the call.
 ///
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5619,7 +5619,8 @@ final class ResourceProvider {
 }
 
 /// Asks the host for the URL of one network resource request. The callback runs
-/// on a MapLibre network thread.
+/// asynchronously in the isolate and zone that registered it, after native
+/// queues the call.
 ///
 /// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

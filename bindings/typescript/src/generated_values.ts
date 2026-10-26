@@ -213,7 +213,8 @@ export interface CameraTransitionEnd {
 
 /**
  * Callback that one camera command copies to report the end of its transitions.
- * The callback runs on the runtime worker.
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -308,8 +309,8 @@ export type ConstrainMode =
   | (number & {});
 
 /**
- * Options for custom geometry sources. The callback may run on any native
- * worker thread, concurrently with runtime and map calls.
+ * Options for custom geometry sources. The callback runs asynchronously on the
+ * JavaScript thread that registered it, after native queues the call.
  *
  * See `mln_custom_geometry_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -333,8 +334,8 @@ export interface CustomGeometrySourceOptions {
 }
 
 /**
- * Options for custom MVT vector sources. The callback may run on any native
- * worker thread, concurrently with runtime and map calls.
+ * Options for custom MVT vector sources. The callback runs asynchronously on
+ * the JavaScript thread that registered it, after native queues the call.
  *
  * See `mln_custom_mvt_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -667,7 +668,8 @@ export interface HttpHeaderRule {
 
 /**
  * HTTP header transform state: a callback, or native header rules. The callback
- * runs synchronously on a MapLibre worker or network thread.
+ * runs asynchronously on the JavaScript thread that registered it, after native
+ * queues the call.
  *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -760,9 +762,8 @@ export const LogEvent = {
 export type LogEvent = (typeof LogEvent)[keyof typeof LogEvent] | (number & {});
 
 /**
- * Process-global log callback. The callback runs synchronously on the thread
- * that emits the record, or on a MapLibre background thread for a severity that
- * `setLogAsyncSeverityMask()` dispatches asynchronously.
+ * Process-global log callback. The callback runs asynchronously on the
+ * JavaScript thread that registered it, after native queues the call.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -1593,8 +1594,8 @@ export interface Quaternion {
 
 /**
  * Host lock on the graphics queue that a session shares with its host, copied
- * by a successful attach. The callback runs on the session's graphics thread or
- * on the thread that abandons the session.
+ * by a successful attach. The callback runs asynchronously on the JavaScript
+ * thread that registered it, after native queues the call.
  *
  * See `mln_queue_lock` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2078,8 +2079,8 @@ export type ResourcePriority =
   | (number & {});
 
 /**
- * Resource provider state. The callback runs synchronously on a MapLibre
- * thread.
+ * Resource provider state. The callback runs asynchronously on the JavaScript
+ * thread that registered it, after native queues the call.
  *
  * See `mln_resource_provider` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2116,10 +2117,9 @@ export interface ResourceRange {
 }
 
 /**
- * Cancel callback for one handled resource request. The callback runs on the
- * thread that discards the request, never a host thread: the runtime's native
- * scheduler thread when a committed map or runtime command discards it, such as
- * a style change or map destruction, and a MapLibre worker thread otherwise.
+ * Cancel callback for one handled resource request. The callback runs
+ * asynchronously on the JavaScript thread that registered it, after native
+ * queues the call.
  *
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2217,7 +2217,8 @@ export type ResourceStoragePolicy =
   | (number & {});
 
 /**
- * Resource transform state. The callback runs on a MapLibre network thread.
+ * Resource transform state. The callback runs asynchronously on the JavaScript
+ * thread that registered it, after native queues the call.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2316,8 +2317,8 @@ export const RuntimeEventFlag = {
 export type RuntimeEventFlag = bigint;
 
 /**
- * Runtime and map event callback. Map events arrive on the runtime's native
- * scheduler thread, and offline events may arrive on a MapLibre worker thread.
+ * Runtime and map event callback. The callback runs asynchronously on the
+ * JavaScript thread that registered it, after native queues the call.
  *
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3396,8 +3397,8 @@ export interface VulkanTextureFrame {
 /**
  * Receiver wake callback copied by a successful owning call. The callback
  * schedules service by the receiver and returns without waiting for another
- * thread. Native code may invoke the callback from any thread, and calls may
- * coalesce or overlap.
+ * thread. The callback runs asynchronously on the JavaScript thread that
+ * registered it, after native queues the call.
  *
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

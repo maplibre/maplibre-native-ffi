@@ -718,6 +718,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{identifier(name)}"
             for name in ("generation", "render_update_generation")
         },
+        # Native queues each call, and the realm drains the queue on its event
+        # loop after the native callback has returned.
+        threads=(
+            "The callback runs asynchronously on the JavaScript thread that "
+            "registered it, after native queues the call."
+        ),
     )
 
 

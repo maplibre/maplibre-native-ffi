@@ -223,6 +223,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{camel(name)}"
             for name in ("generation", "render_update_generation")
         },
+        # Native queues each call, and the isolate that registered the callback
+        # drains the queue through a receive port.
+        threads=(
+            "The callback runs asynchronously in the isolate and zone that "
+            "registered it, after native queues the call."
+        ),
     )
 
 

@@ -111,6 +111,14 @@ class TranslateTests(unittest.TestCase):
             ["Reads `a. B` first.", "Then `mln_x.y`.", "Done."],
         )
 
+    def test_a_sentence_that_starts_with_a_code_span_ends_the_one_before(self):
+        self.assertEqual(
+            docs.translate(
+                "Copies a value. `mln_queue` is internal.", self.symbols, "mln_value"
+            ),
+            "Copies a value.",
+        )
+
     def test_rejects_a_first_sentence_that_names_an_unexposed_declaration(self):
         with self.assertRaisesRegex(docs.DocError, "mln_thing: .* mln_queue"):
             docs.translate(
@@ -145,6 +153,17 @@ class ThreadsTests(unittest.TestCase):
             "/// See `mln_tick_handler` in the\n"
             f"/// [C API reference]({docs.REFERENCE}api_8h.html).\n",
         )
+
+    def test_a_binding_that_queues_callbacks_states_its_own_threads(self):
+        doc = Doc(
+            "mln_tick_handler", "Tick callback state.", threads=("Runs on a worker.",)
+        )
+        queued = docs.Resolver({}, threads="Runs on the registering thread.")
+        self.assertIn(
+            "Tick callback state. Runs on the registering thread.",
+            docs.line_comment(doc, queued),
+        )
+        self.assertNotIn("worker", docs.line_comment(doc, queued))
 
     def test_a_documented_callback_must_state_its_threads(self):
         api = parse(TICK.replace("Threads:", "Notes:"))

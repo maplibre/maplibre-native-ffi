@@ -206,9 +206,8 @@ export function setLogAsyncSeverityMask(mask: LogSeverityFlag): void {
 
 /**
  * Installs a process-global MapLibre Native log callback. The callback runs
- * synchronously on the thread that emits the record, or on a MapLibre
- * background thread for a severity that `setLogAsyncSeverityMask()` dispatches
- * asynchronously.
+ * asynchronously on the JavaScript thread that registered it, after native
+ * queues the call.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -493,8 +492,8 @@ export class MapHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Adds a custom geometry source. The callback may run on any native worker
-   * thread, concurrently with runtime and map calls.
+   * Adds a custom geometry source. The callback runs asynchronously on the
+   * JavaScript thread that registered it, after native queues the call.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -517,8 +516,8 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a custom MVT vector source. The callback may run on any native worker
-   * thread, concurrently with runtime and map calls.
+   * Adds a custom MVT vector source. The callback runs asynchronously on the
+   * JavaScript thread that registered it, after native queues the call.
    *
    * See `mln_map_add_custom_mvt_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2026,8 +2025,8 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a custom geometry source. The callback may run on any native worker
-   * thread, concurrently with runtime and map calls.
+   * Adds a custom geometry source. The callback runs asynchronously on the
+   * JavaScript thread that registered it, after native queues the call.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2048,8 +2047,8 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a custom MVT vector source. The callback may run on any native worker
-   * thread, concurrently with runtime and map calls.
+   * Adds a custom MVT vector source. The callback runs asynchronously on the
+   * JavaScript thread that registered it, after native queues the call.
    *
    * See `mln_map_add_custom_mvt_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3479,10 +3478,8 @@ export class ResourceRequestHandle extends Owner {
 
   /**
    * Registers a callback that runs when MapLibre cancels a C API resource
-   * provider request. The callback runs on the thread that discards the
-   * request, never a host thread: the runtime's native scheduler thread when a
-   * committed map or runtime command discards it, such as a style change or map
-   * destruction, and a MapLibre worker thread otherwise.
+   * provider request. The callback runs asynchronously on the JavaScript thread
+   * that registered it, after native queues the call.
    *
    * See `mln_resource_request_set_cancel_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3833,9 +3830,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Selects how runtime and map events reach the host. Map events arrive on the
-   * runtime's native scheduler thread, and offline events may arrive on a
-   * MapLibre worker thread.
+   * Selects how runtime and map events reach the host. The callback runs
+   * asynchronously on the JavaScript thread that registered it, after native
+   * queues the call.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3861,7 +3858,8 @@ export class RuntimeHandle extends Owner {
 
   /**
    * Registers or replaces the runtime-scoped outgoing HTTP header transform.
-   * The callback runs synchronously on a MapLibre worker or network thread.
+   * The callback runs asynchronously on the JavaScript thread that registered
+   * it, after native queues the call.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3936,7 +3934,8 @@ export class RuntimeHandle extends Owner {
 
   /**
    * Registers or replaces a runtime-scoped network resource provider. The
-   * callback runs synchronously on a MapLibre thread.
+   * callback runs asynchronously on the JavaScript thread that registered it,
+   * after native queues the call.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3952,7 +3951,8 @@ export class RuntimeHandle extends Owner {
 
   /**
    * Registers or updates a runtime-scoped URL transform for network resources.
-   * The callback runs on a MapLibre network thread.
+   * The callback runs asynchronously on the JavaScript thread that registered
+   * it, after native queues the call.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4053,9 +4053,9 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Selects how runtime and map events reach the host. Map events arrive on the
-   * runtime's native scheduler thread, and offline events may arrive on a
-   * MapLibre worker thread.
+   * Selects how runtime and map events reach the host. The callback runs
+   * asynchronously on the JavaScript thread that registered it, after native
+   * queues the call.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4069,7 +4069,8 @@ export class RuntimeHandleDiscarding {
 
   /**
    * Registers or replaces the runtime-scoped outgoing HTTP header transform.
-   * The callback runs synchronously on a MapLibre worker or network thread.
+   * The callback runs asynchronously on the JavaScript thread that registered
+   * it, after native queues the call.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4087,7 +4088,8 @@ export class RuntimeHandleDiscarding {
 
   /**
    * Registers or replaces a runtime-scoped network resource provider. The
-   * callback runs synchronously on a MapLibre thread.
+   * callback runs asynchronously on the JavaScript thread that registered it,
+   * after native queues the call.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4105,7 +4107,8 @@ export class RuntimeHandleDiscarding {
 
   /**
    * Registers or updates a runtime-scoped URL transform for network resources.
-   * The callback runs on a MapLibre network thread.
+   * The callback runs asynchronously on the JavaScript thread that registered
+   * it, after native queues the call.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

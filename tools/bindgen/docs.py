@@ -49,6 +49,9 @@ _REFERENCE = re.compile(r"((?:mln|MLN)_\w+(?:\.[A-Za-z_]\w*)*)(\[\w*\]|\(\))?")
 # A sentence ends at a period, question mark, or exclamation mark that
 # whitespace and a capital, digit, or code span follow.
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9`])")
+# A boundary at the end of prose that a code span follows, where the span's
+# opening backtick is the next character but sits in the next part.
+_SENTENCE_END_BEFORE_CODE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9`]|$)")
 
 
 def _comment_lines(raw: str) -> list[str]:
@@ -193,11 +196,15 @@ def spans(markdown: str) -> list[tuple[str, bool]]:
 def sentences(markdown: str) -> list[str]:
     """Split Markdown into its sentences, never inside a code span."""
     found, current = [], ""
-    for index, part in enumerate(markdown.split("`")):
+    parts = markdown.split("`")
+    for index, part in enumerate(parts):
         if index % 2:
             current += f"`{part}`"
             continue
-        first, *rest = _SENTENCE_END.split(part)
+        boundary = (
+            _SENTENCE_END if index == len(parts) - 1 else _SENTENCE_END_BEFORE_CODE
+        )
+        first, *rest = boundary.split(part)
         current += first
         for piece in rest:
             found.append(current.strip())
@@ -254,7 +261,11 @@ def _paragraphs(doc: Doc, symbol: Symbol) -> tuple[str, list[str]]:
         part
         for part in (
             translate(doc.summary, symbol, doc.symbol),
-            *(translate(threads, symbol, doc.symbol) for threads in doc.threads),
+            *(
+                (getattr(symbol, "threads", None),)
+                if doc.threads and getattr(symbol, "threads", None)
+                else (translate(threads, symbol, doc.symbol) for threads in doc.threads)
+            ),
         )
         if part
     )
@@ -270,6 +281,7 @@ def resolver(
     field: Callable[[ValuePlan, FieldPlan], str | None],
     flag: Callable[[ValuePlan, MaskFlag], str | None] | None = None,
     extra: dict[str, str] | None = None,
+    threads: str | None = None,
 ) -> Symbol:
     """A binding's symbol resolver over the declarations that a host can name.
 
@@ -297,7 +309,23 @@ def resolver(
             names[plan.name] = operation(plan)
     found = {name: spelled for name, spelled in names.items() if spelled}
     found.update(extra or {})
-    return found.get
+    return Resolver(found, threads)
+
+
+@dataclass(frozen=True)
+class Resolver:
+    """A binding's symbol resolver, and how its own callbacks run.
+
+    `threads` replaces a callback's C `Threads:` paragraph in a binding that
+    delivers callbacks through a queue it drains itself, where the native
+    threads never run host code.
+    """
+
+    names: dict[str, str]
+    threads: str | None = None
+
+    def __call__(self, name: str) -> str | None:
+        return self.names.get(name)
 
 
 def _render(markdown: str, escape, code) -> str:
