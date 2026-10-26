@@ -4,6 +4,8 @@
 
 #include <stdexcept>
 
+#include <mln/platform/gl_functions.hpp>
+
 #include "render/opengl/egl_common.hpp"
 
 namespace mln::core::opengl {
@@ -28,6 +30,14 @@ void EglSharedContext::activate_pbuffer() {
 // exactly as this session wants to find it next time.
 void EglSharedContext::deactivate() {
   if (dedicated()) {
+    // Releasing a shared context flushes it, but a dedicated one stays
+    // current, so its last commands would wait for its next render. ANGLE on
+    // Metal runs every context of a display on one command queue in order, so
+    // such unsubmitted work would also stall every other context's waits,
+    // such as a readback on another session's thread.
+    if (current_on_thread()) {
+      mln::platform::glFlush();
+    }
     return;
   }
   release_current_context();
