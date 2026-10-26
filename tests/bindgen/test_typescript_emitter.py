@@ -105,7 +105,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
             {
                 "mln_camera_transition_handler": "queue",
                 "mln_custom_geometry_source_options": "queue",
-                "mln_custom_mvt_vector_source_options": "queue",
+                "mln_custom_vector_source_options": "queue",
                 "mln_http_header_transform": "rules",
                 "mln_log_handler": "queue",
                 "mln_queue_lock": "native",

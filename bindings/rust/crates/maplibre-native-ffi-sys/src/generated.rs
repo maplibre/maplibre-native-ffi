@@ -68,11 +68,9 @@ pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE: mln_custom_geometry_sourc
 pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER: mln_custom_geometry_source_option_field = 16;
 pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP: mln_custom_geometry_source_option_field = 32;
 pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: mln_custom_geometry_source_option_field = 64;
-pub type mln_custom_mvt_vector_source_option_field = u32;
-pub const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_mvt_vector_source_option_field =
-    1;
-pub const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_mvt_vector_source_option_field =
-    2;
+pub type mln_custom_vector_source_option_field = u32;
+pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_vector_source_option_field = 1;
+pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_vector_source_option_field = 2;
 pub type mln_feature_state_selector_field = u32;
 pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
@@ -409,8 +407,8 @@ pub const MLN_STYLE_SOURCE_TYPE_GEO_JSON: mln_style_source_type = 4;
 pub const MLN_STYLE_SOURCE_TYPE_IMAGE: mln_style_source_type = 5;
 pub const MLN_STYLE_SOURCE_TYPE_VIDEO: mln_style_source_type = 6;
 pub const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS: mln_style_source_type = 7;
-pub const MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR: mln_style_source_type = 8;
-pub const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR: mln_style_source_type = 9;
+pub const MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY: mln_style_source_type = 8;
+pub const MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR: mln_style_source_type = 9;
 pub type mln_style_tile_scheme = u32;
 pub const MLN_STYLE_TILE_SCHEME_XYZ: mln_style_tile_scheme = 0;
 pub const MLN_STYLE_TILE_SCHEME_TMS: mln_style_tile_scheme = 1;
@@ -602,9 +600,9 @@ pub struct mln_custom_geometry_source_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_custom_mvt_vector_source_options {
+pub struct mln_custom_vector_source_options {
     pub size: u32,
-    pub fields: mln_custom_mvt_vector_source_option_fields,
+    pub fields: mln_custom_vector_source_option_fields,
     pub fetch_tile: mln_custom_source_fetch_tile_callback,
     pub cancel_tile: mln_custom_source_cancel_tile_callback,
     pub user_data: *mut std::ffi::c_void,
@@ -1623,11 +1621,11 @@ pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
 pub type mln_custom_geometry_source_option_fields = u32;
-pub type mln_custom_mvt_vector_source_option_fields = u32;
 pub type mln_custom_source_cancel_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
 pub type mln_custom_source_fetch_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
+pub type mln_custom_vector_source_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_delivery_queue(pub u64);
@@ -1832,10 +1830,10 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_custom_mvt_vector_source(
+    pub fn mln_map_add_custom_vector_source(
         map: mln_map,
         source_id: mln_buffer_view,
-        options: *const mln_custom_mvt_vector_source_options,
+        options: *const mln_custom_vector_source_options,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2130,7 +2128,7 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_invalidate_custom_mvt_vector_source_tile(
+    pub fn mln_map_invalidate_custom_vector_source_tile(
         map: mln_map,
         source_id: mln_buffer_view,
         tile_id: mln_canonical_tile_id,
@@ -2294,15 +2292,16 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_custom_mvt_vector_source_tile_data(
+    pub fn mln_map_set_custom_vector_source_tile_data(
         map: mln_map,
         source_id: mln_buffer_view,
         tile_id: mln_canonical_tile_id,
+        encoding: mln_style_vector_tile_encoding,
         data: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_custom_mvt_vector_source_tile_error(
+    pub fn mln_map_set_custom_vector_source_tile_error(
         map: mln_map,
         source_id: mln_buffer_view,
         tile_id: mln_canonical_tile_id,

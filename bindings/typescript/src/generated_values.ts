@@ -279,7 +279,7 @@ export type CameraUpdateMode =
   | (number & {});
 
 /**
- * Canonical tile identity used by custom geometry and custom MVT vector source
+ * Canonical tile identity used by custom geometry and custom vector source
  * callbacks.
  *
  * See `mln_canonical_tile_id` in the
@@ -334,13 +334,13 @@ export interface CustomGeometrySourceOptions {
 }
 
 /**
- * Options for custom MVT vector sources. The callback runs asynchronously on
- * the JavaScript thread that registered it, after native queues the call.
+ * Options for custom vector sources. The callback runs asynchronously on the
+ * JavaScript thread that registered it, after native queues the call.
  *
- * See `mln_custom_mvt_vector_source_options` in the
+ * See `mln_custom_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-export interface CustomMvtVectorSourceOptions {
+export interface CustomVectorSourceOptions {
   /**
    * Tile fetch callback.
    */
@@ -2986,8 +2986,8 @@ export const StyleSourceType = {
   image: 5,
   video: 6,
   annotations: 7,
-  customVector: 8,
-  customMvtVector: 9,
+  customGeometry: 8,
+  customVector: 9,
 } as const;
 /** One of the StyleSourceType values, or a value this binding does not know. */
 export type StyleSourceType =

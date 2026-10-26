@@ -127,7 +127,7 @@ auto callback_source_matches(
   switch (kind) {
     case CallbackSourceKind::CustomGeometry:
       return source->as<mln::style::CustomGeometrySource>() != nullptr;
-    case CallbackSourceKind::CustomMvtVector:
+    case CallbackSourceKind::CustomVector:
       return source->as<mln::style::CustomVectorSource>() != nullptr;
   }
   return false;

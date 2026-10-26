@@ -495,14 +495,14 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_add_custom_mvt_vector_source(
+static napi_value mln_ts_export_mln_map_add_custom_vector_source(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
-  mln_custom_mvt_vector_source_options arg_options;
+  mln_custom_vector_source_options arg_options;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -518,7 +518,7 @@ static napi_value mln_ts_export_mln_map_add_custom_mvt_vector_source(
   memset(&arg_options, 0, sizeof arg_options);
   arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_custom_mvt_vector_source_options(
+  if (!mln_ts_write_custom_vector_source_options(
         call, call->argv[2], &arg_options, "options"
       ))
     goto done;
@@ -529,7 +529,7 @@ static napi_value mln_ts_export_mln_map_add_custom_mvt_vector_source(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_add_custom_mvt_vector_source(
+  status = mln_map_add_custom_vector_source(
     arg_map, arg_source_id, &arg_options, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
@@ -2344,8 +2344,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value
-mln_ts_export_mln_map_invalidate_custom_mvt_vector_source_tile(
+static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_tile(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -2380,7 +2379,7 @@ mln_ts_export_mln_map_invalidate_custom_mvt_vector_source_tile(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_invalidate_custom_mvt_vector_source_tile(
+  status = mln_map_invalidate_custom_vector_source_tile(
     arg_map, arg_source_id, arg_tile_id, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -3331,7 +3330,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data(
+static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_data(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -3339,12 +3338,13 @@ static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data(
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
   mln_canonical_tile_id arg_tile_id;
+  mln_style_vector_tile_encoding arg_encoding;
   mln_buffer_view arg_data = {0};
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  if (!mln_ts_begin(call, env, info, 6)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
@@ -3360,25 +3360,34 @@ static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data(
         ))
       goto done;
   }
-  if (!mln_ts_read_bytes_view(call, call->argv[3], &arg_data, "data"))
+  memset(&arg_encoding, 0, sizeof arg_encoding);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[3], 0LL, 4294967295LL, &number, "encoding"
+        ))
+      goto done;
+    arg_encoding = (mln_style_vector_tile_encoding)number;
+  }
+  if (!mln_ts_read_bytes_view(call, call->argv[4], &arg_data, "data"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
+        call, call->argv[5], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_set_custom_mvt_vector_source_tile_data(
-    arg_map, arg_source_id, arg_tile_id, arg_data, present_completion,
-    &diagnostic
+  status = mln_map_set_custom_vector_source_tile_data(
+    arg_map, arg_source_id, arg_tile_id, arg_encoding, arg_data,
+    present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_error(
+static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_error(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -3416,7 +3425,7 @@ static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_error(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_set_custom_mvt_vector_source_tile_error(
+  status = mln_map_set_custom_vector_source_tile_error(
     arg_map, arg_source_id, arg_tile_id, arg_message, present_completion,
     &diagnostic
   );
@@ -6759,8 +6768,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_logical_extent_physical_size},
   {"mln_map_add_custom_geometry_source",
    mln_ts_export_mln_map_add_custom_geometry_source},
-  {"mln_map_add_custom_mvt_vector_source",
-   mln_ts_export_mln_map_add_custom_mvt_vector_source},
+  {"mln_map_add_custom_vector_source",
+   mln_ts_export_mln_map_add_custom_vector_source},
   {"mln_map_add_geo_json_source_data",
    mln_ts_export_mln_map_add_geo_json_source_data},
   {"mln_map_add_geo_json_source_url",
@@ -6829,8 +6838,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_invalidate_custom_geometry_source_region},
   {"mln_map_invalidate_custom_geometry_source_tile",
    mln_ts_export_mln_map_invalidate_custom_geometry_source_tile},
-  {"mln_map_invalidate_custom_mvt_vector_source_tile",
-   mln_ts_export_mln_map_invalidate_custom_mvt_vector_source_tile},
+  {"mln_map_invalidate_custom_vector_source_tile",
+   mln_ts_export_mln_map_invalidate_custom_vector_source_tile},
   {"mln_map_lat_lng_bounds_for_camera",
    mln_ts_export_mln_map_lat_lng_bounds_for_camera},
   {"mln_map_lat_lng_bounds_for_camera_unwrapped",
@@ -6871,10 +6880,10 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_set_custom_geometry_source_tile_data},
   {"mln_map_set_custom_geometry_source_tile_error",
    mln_ts_export_mln_map_set_custom_geometry_source_tile_error},
-  {"mln_map_set_custom_mvt_vector_source_tile_data",
-   mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data},
-  {"mln_map_set_custom_mvt_vector_source_tile_error",
-   mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_error},
+  {"mln_map_set_custom_vector_source_tile_data",
+   mln_ts_export_mln_map_set_custom_vector_source_tile_data},
+  {"mln_map_set_custom_vector_source_tile_error",
+   mln_ts_export_mln_map_set_custom_vector_source_tile_error},
   {"mln_map_set_debug_options", mln_ts_export_mln_map_set_debug_options},
   {"mln_map_set_event_mask", mln_ts_export_mln_map_set_event_mask},
   {"mln_map_set_feature_state", mln_ts_export_mln_map_set_feature_state},

@@ -476,22 +476,22 @@ _prepareCustomGeometrySourceOptions(
   }
 }
 
-_NativeRegistration<raw.mln_custom_mvt_vector_source_options>
-_prepareCustomMvtVectorSourceOptions(
-  CustomMvtVectorSourceOptions value,
+_NativeRegistration<raw.mln_custom_vector_source_options>
+_prepareCustomVectorSourceOptions(
+  CustomVectorSourceOptions value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
   try {
-    final result = arena<raw.mln_custom_mvt_vector_source_options>();
-    result.ref.size = sizeOf<raw.mln_custom_mvt_vector_source_options>();
+    final result = arena<raw.mln_custom_vector_source_options>();
+    result.ref.size = sizeOf<raw.mln_custom_vector_source_options>();
     if (value.minZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM;
       result.ref.min_zoom = value.minZoom!;
     }
     if (value.maxZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
     final registered = registration = roots.registerQueued({
@@ -2994,17 +2994,17 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       ),
     );
   });
-  void addCustomMvtVectorSource(
+  void addCustomVectorSource(
     String sourceId,
-    CustomMvtVectorSourceOptions options,
+    CustomVectorSourceOptions options,
   ) => _discard((arena, completion) {
     final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
-      () => raw.mln_map_add_custom_mvt_vector_source(
+      () => raw.mln_map_add_custom_vector_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomMvtVectorSourceOptions(options, registrations.roots),
+          _prepareCustomVectorSourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -3163,11 +3163,11 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void invalidateCustomMvtVectorSourceTile(
+  void invalidateCustomVectorSourceTile(
     String sourceId,
     CanonicalTileId tileId,
   ) => _discard(
-    (arena, completion) => raw.mln_map_invalidate_custom_mvt_vector_source_tile(
+    (arena, completion) => raw.mln_map_invalidate_custom_vector_source_tile(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
@@ -3264,26 +3264,28 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setCustomMvtVectorSourceTileData(
+  void setCustomVectorSourceTileData(
     String sourceId,
     CanonicalTileId tileId,
+    StyleVectorTileEncoding encoding,
     Uint8List data,
   ) => _discard(
-    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_data(
+    (arena, completion) => raw.mln_map_set_custom_vector_source_tile_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
+      encoding.rawValue,
       nativeBufferView(data, arena),
       completion,
       nativeDiagnostic,
     ),
   );
-  void setCustomMvtVectorSourceTileError(
+  void setCustomVectorSourceTileError(
     String sourceId,
     CanonicalTileId tileId,
     String message,
   ) => _discard(
-    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_error(
+    (arena, completion) => raw.mln_map_set_custom_vector_source_tile_error(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
@@ -3587,22 +3589,22 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   });
 
-  /// Adds a custom MVT vector source. The callback runs asynchronously in the
+  /// Adds a custom vector source. The callback runs asynchronously in the
   /// isolate and zone that registered it, after native queues the call.
   ///
-  /// See `mln_map_add_custom_mvt_vector_source` in the
+  /// See `mln_map_add_custom_vector_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addCustomMvtVectorSource(
+  Future<CommandCompletion> addCustomVectorSource(
     String sourceId,
-    CustomMvtVectorSourceOptions options,
+    CustomVectorSourceOptions options,
   ) => _command((arena, completion) {
     final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
-      () => raw.mln_map_add_custom_mvt_vector_source(
+      () => raw.mln_map_add_custom_vector_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomMvtVectorSourceOptions(options, registrations.roots),
+          _prepareCustomVectorSourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -4411,15 +4413,15 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Invalidates custom MVT vector source data for one canonical tile.
+  /// Invalidates custom vector source data for one canonical tile.
   ///
-  /// See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+  /// See `mln_map_invalidate_custom_vector_source_tile` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> invalidateCustomMvtVectorSourceTile(
+  Future<CommandCompletion> invalidateCustomVectorSourceTile(
     String sourceId,
     CanonicalTileId tileId,
   ) => _command(
-    (arena, completion) => raw.mln_map_invalidate_custom_mvt_vector_source_tile(
+    (arena, completion) => raw.mln_map_invalidate_custom_vector_source_tile(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
@@ -4649,35 +4651,37 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Sets custom MVT vector source data for one canonical tile.
+  /// Sets custom vector source data for one canonical tile.
   ///
-  /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+  /// See `mln_map_set_custom_vector_source_tile_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setCustomMvtVectorSourceTileData(
+  Future<CommandCompletion> setCustomVectorSourceTileData(
     String sourceId,
     CanonicalTileId tileId,
+    StyleVectorTileEncoding encoding,
     Uint8List data,
   ) => _command(
-    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_data(
+    (arena, completion) => raw.mln_map_set_custom_vector_source_tile_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
+      encoding.rawValue,
       nativeBufferView(data, arena),
       completion,
       nativeDiagnostic,
     ),
   );
 
-  /// Reports a custom MVT vector source error for one canonical tile.
+  /// Reports a custom vector source error for one canonical tile.
   ///
-  /// See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+  /// See `mln_map_set_custom_vector_source_tile_error` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setCustomMvtVectorSourceTileError(
+  Future<CommandCompletion> setCustomVectorSourceTileError(
     String sourceId,
     CanonicalTileId tileId,
     String message,
   ) => _command(
-    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_error(
+    (arena, completion) => raw.mln_map_set_custom_vector_source_tile_error(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,

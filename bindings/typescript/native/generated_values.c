@@ -3321,9 +3321,9 @@ bool mln_ts_write_custom_geometry_source_options(
   return true;
 }
 
-bool mln_ts_write_custom_mvt_vector_source_options(
-  mln_ts_call* call, napi_value value,
-  mln_custom_mvt_vector_source_options* out, const char* path
+bool mln_ts_write_custom_vector_source_options(
+  mln_ts_call* call, napi_value value, mln_custom_vector_source_options* out,
+  const char* path
 ) {
   napi_value member;
   char child[256];
@@ -3349,7 +3349,7 @@ bool mln_ts_write_custom_mvt_vector_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->min_zoom = (double)number;
     }
-    out->fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+    out->fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM;
   }
   if (!mln_ts_member(call, value, "maxZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "maxZoom");
@@ -3359,7 +3359,7 @@ bool mln_ts_write_custom_mvt_vector_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->max_zoom = (double)number;
     }
-    out->fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+    out->fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
   }
   return true;
 }

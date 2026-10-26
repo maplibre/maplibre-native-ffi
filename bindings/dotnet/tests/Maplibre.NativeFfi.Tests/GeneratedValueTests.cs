@@ -33,13 +33,19 @@ public sealed class GeneratedValueTests
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
         var tile = new CanonicalTileId(0, 0, 0);
         var filled = await Assert.ThrowsAsync<MaplibreException>(() =>
-            fixture.Map.SetCustomMvtVectorSourceTileDataAsync("missing", tile, [1, 2, 3])
+            fixture.Map.SetCustomVectorSourceTileDataAsync(
+                "missing",
+                tile,
+                StyleVectorTileEncoding.Mvt,
+                [1, 2, 3]
+            )
         );
         Assert.Equal(Status.NotFound, filled.Status);
         var empty = await Assert.ThrowsAsync<MaplibreException>(() =>
-            fixture.Map.SetCustomMvtVectorSourceTileDataAsync(
+            fixture.Map.SetCustomVectorSourceTileDataAsync(
                 "missing",
                 tile,
+                StyleVectorTileEncoding.Mvt,
                 ReadOnlySpan<byte>.Empty
             )
         );

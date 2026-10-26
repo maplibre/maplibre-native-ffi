@@ -181,13 +181,13 @@ pub const Map = struct {
         return call.submit("mln_map_add_custom_geometry_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
     }
 
-    /// Adds a custom MVT vector source. The callback may run on any native worker
+    /// Adds a custom vector source. The callback may run on any native worker
     /// thread, concurrently with runtime and map calls.
     ///
-    /// See `mln_map_add_custom_mvt_vector_source` in the
+    /// See `mln_map_add_custom_vector_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn addCustomMvtVectorSource(self: Map, source_id: []const u8, options: CustomMvtVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_custom_mvt_vector_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
+    pub fn addCustomVectorSource(self: Map, source_id: []const u8, options: CustomVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_add_custom_vector_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
     }
 
     /// Adds a GeoJSON source with prepared inline data.
@@ -543,12 +543,12 @@ pub const Map = struct {
         return call.submit("mln_map_invalidate_custom_geometry_source_tile", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id });
     }
 
-    /// Invalidates custom MVT vector source data for one canonical tile.
+    /// Invalidates custom vector source data for one canonical tile.
     ///
-    /// See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+    /// See `mln_map_invalidate_custom_vector_source_tile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn invalidateCustomMvtVectorSourceTile(self: Map, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_invalidate_custom_mvt_vector_source_tile", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id });
+    pub fn invalidateCustomVectorSourceTile(self: Map, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_invalidate_custom_vector_source_tile", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id });
     }
 
     /// Starts an ordered wrapped-bounds query for a copied camera.
@@ -681,20 +681,20 @@ pub const Map = struct {
         return call.submit("mln_map_set_custom_geometry_source_tile_error", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, message });
     }
 
-    /// Sets custom MVT vector source data for one canonical tile.
+    /// Sets custom vector source data for one canonical tile.
     ///
-    /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+    /// See `mln_map_set_custom_vector_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn setCustomMvtVectorSourceTileData(self: Map, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_custom_mvt_vector_source_tile_data", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, data });
+    pub fn setCustomVectorSourceTileData(self: Map, source_id: []const u8, tile_id: CanonicalTileId, encoding: StyleVectorTileEncoding, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_custom_vector_source_tile_data", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, encoding, data });
     }
 
-    /// Reports a custom MVT vector source error for one canonical tile.
+    /// Reports a custom vector source error for one canonical tile.
     ///
-    /// See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+    /// See `mln_map_set_custom_vector_source_tile_error` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn setCustomMvtVectorSourceTileError(self: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_custom_mvt_vector_source_tile_error", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, message });
+    pub fn setCustomVectorSourceTileError(self: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_custom_vector_source_tile_error", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, message });
     }
 
     /// Submits a debug-overlay command.
@@ -2085,7 +2085,7 @@ pub const CameraUpdateMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// Canonical tile identity used by custom geometry and custom vector source
 /// callbacks.
 ///
 /// See `mln_canonical_tile_id` in the
@@ -2214,35 +2214,35 @@ pub const CustomGeometrySourceOptions = struct {
     }
 };
 
-/// Options for custom MVT vector sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Options for custom vector sources. The callback may run on any native worker
+/// thread, concurrently with runtime and map calls.
 ///
-/// See `mln_custom_mvt_vector_source_options` in the
+/// See `mln_custom_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const CustomMvtVectorSourceOptions = struct {
+pub const CustomVectorSourceOptions = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
     fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void,
     cancel_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
-    pub fn toNative(self: CustomMvtVectorSourceOptions, roots: *callbacks.Roots) status.Error!c.mln_custom_mvt_vector_source_options {
-        var raw = std.mem.zeroes(c.mln_custom_mvt_vector_source_options);
+    pub fn toNative(self: CustomVectorSourceOptions, roots: *callbacks.Roots) status.Error!c.mln_custom_vector_source_options {
+        var raw = std.mem.zeroes(c.mln_custom_vector_source_options);
         raw.fields = 0;
-        raw.size = @sizeOf(c.mln_custom_mvt_vector_source_options);
-        marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
-        marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
+        raw.size = @sizeOf(c.mln_custom_vector_source_options);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
         raw.fetch_tile = fetch_tileTrampoline;
         raw.cancel_tile = if (self.cancel_tile != null) cancel_tileTrampoline else null;
-        const retained = try roots.retain(CustomMvtVectorSourceOptions, self);
+        const retained = try roots.retain(CustomVectorSourceOptions, self);
         raw.user_data = retained;
-        raw.release_user_data = callbacks.Registration(CustomMvtVectorSourceOptions).releaseNative;
+        raw.release_user_data = callbacks.Registration(CustomVectorSourceOptions).releaseNative;
         return raw;
     }
     fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
-                const state = callbacks.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
+                const state = callbacks.Registration(CustomVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile;
                 try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
@@ -2254,7 +2254,7 @@ pub const CustomMvtVectorSourceOptions = struct {
     fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
-                const state = callbacks.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
+                const state = callbacks.Registration(CustomVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
@@ -2265,14 +2265,14 @@ pub const CustomMvtVectorSourceOptions = struct {
             return;
         };
     }
-    /// Builds a `CustomMvtVectorSourceOptions` whose callbacks receive `context`, a pointer, as
+    /// Builds a `CustomVectorSourceOptions` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
     /// of its field, and may return any error; pass null to leave an optional one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
-    pub fn init(context: anytype, comptime fetch_tile: anytype, comptime cancel_tile: anytype, comptime release: ?fn (@TypeOf(context)) void) CustomMvtVectorSourceOptions {
+    pub fn init(context: anytype, comptime fetch_tile: anytype, comptime cancel_tile: anytype, comptime release: ?fn (@TypeOf(context)) void) CustomVectorSourceOptions {
         const Context = @TypeOf(context);
-        if (@typeInfo(Context) != .pointer) @compileError("a CustomMvtVectorSourceOptions context must be a pointer");
+        if (@typeInfo(Context) != .pointer) @compileError("a CustomVectorSourceOptions context must be a pointer");
         return .{
             .context = @ptrCast(@constCast(context)),
             .release_context = if (release == null) null else struct {
@@ -5784,8 +5784,8 @@ pub const StyleSourceType = enum(u32) {
     image = 5,
     video = 6,
     annotations = 7,
-    custom_vector = 8,
-    custom_mvt_vector = 9,
+    custom_geometry = 8,
+    custom_vector = 9,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -6523,9 +6523,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_custom_geometry_source", .handle, map, null, diagnostic, .{ source_id, options });
     }
 
-    pub fn addCustomMvtVectorSource(self: MapDiscarding, source_id: []const u8, options: CustomMvtVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn addCustomVectorSource(self: MapDiscarding, source_id: []const u8, options: CustomVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_add_custom_mvt_vector_source", .handle, map, null, diagnostic, .{ source_id, options });
+        return call.discard("mln_map_add_custom_vector_source", .handle, map, null, diagnostic, .{ source_id, options });
     }
 
     pub fn addGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -6598,9 +6598,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_invalidate_custom_geometry_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
     }
 
-    pub fn invalidateCustomMvtVectorSourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn invalidateCustomVectorSourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_invalidate_custom_mvt_vector_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
+        return call.discard("mln_map_invalidate_custom_vector_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
     }
 
     pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -6653,14 +6653,14 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_custom_geometry_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
-    pub fn setCustomMvtVectorSourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setCustomVectorSourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, encoding: StyleVectorTileEncoding, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_custom_mvt_vector_source_tile_data", .handle, map, null, diagnostic, .{ source_id, tile_id, data });
+        return call.discard("mln_map_set_custom_vector_source_tile_data", .handle, map, null, diagnostic, .{ source_id, tile_id, encoding, data });
     }
 
-    pub fn setCustomMvtVectorSourceTileError(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setCustomVectorSourceTileError(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_custom_mvt_vector_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
+        return call.discard("mln_map_set_custom_vector_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
     pub fn setDebugOptions(self: MapDiscarding, options: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

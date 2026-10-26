@@ -152,9 +152,9 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/UrlMatchFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CanonicalTileId.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomGeometrySourceOptions.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Style/CustomMvtVectorSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomSourceCancelTileCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomSourceFetchTileCallback.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Style/CustomVectorSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/GeoJsonSourceDataHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/GeoJsonSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/ImageContent.g.cs linguist-generated=true

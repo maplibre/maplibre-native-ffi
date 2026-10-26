@@ -153,6 +153,18 @@ auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
   return valid_view(view, name);
 }
 
+auto valid_vector_tile_encoding(mln_style_vector_tile_encoding encoding)
+  -> bool {
+  switch (encoding) {
+    case MLN_STYLE_VECTOR_TILE_ENCODING_MVT:
+    case MLN_STYLE_VECTOR_TILE_ENCODING_MLT:
+      return true;
+    default:
+      mln::core::set_thread_error("encoding is invalid");
+      return false;
+  }
+}
+
 // A rejected submission leaves user_data with the caller. An accepted command
 // releases it with the last shared reference unless the style adopts it.
 template <typename Options>
@@ -628,28 +640,28 @@ auto mln_map_invalidate_custom_geometry_source_region(
   });
 }
 
-auto mln_map_add_custom_mvt_vector_source(
+auto mln_map_add_custom_vector_source(
   mln_map map, mln_buffer_view source_id,
-  const mln_custom_mvt_vector_source_options* options,
+  const mln_custom_vector_source_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return add_callback_source(
-      map, source_id, options,
-      mln::core::validate_custom_mvt_vector_source_options,
-      mln::core::map_add_custom_mvt_vector_source, completion
+      map, source_id, options, mln::core::validate_custom_vector_source_options,
+      mln::core::map_add_custom_vector_source, completion
     );
   });
 }
 
-auto mln_map_set_custom_mvt_vector_source_tile_data(
+auto mln_map_set_custom_vector_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
+  mln_style_vector_tile_encoding encoding, mln_buffer_view data,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_non_empty_view(source_id, "source_id") || !valid_view(data, "data")
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_vector_tile_encoding(encoding) || !valid_view(data, "data")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -657,10 +669,10 @@ auto mln_map_set_custom_mvt_vector_source_tile_data(
     auto owned = OwnedView{data};
     return mln::core::submit_map_command(
       map,
-      [id = std::move(id), owned = std::move(owned),
-       tile_id](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_set_custom_mvt_vector_source_tile_data(
-          live, id.view(), tile_id, owned.view()
+      [id = std::move(id), owned = std::move(owned), tile_id,
+       encoding](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_custom_vector_source_tile_data(
+          live, id.view(), tile_id, encoding, owned.view()
         );
       },
       completion
@@ -668,7 +680,7 @@ auto mln_map_set_custom_mvt_vector_source_tile_data(
   });
 }
 
-auto mln_map_set_custom_mvt_vector_source_tile_error(
+auto mln_map_set_custom_vector_source_tile_error(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -686,7 +698,7 @@ auto mln_map_set_custom_mvt_vector_source_tile_error(
       map,
       [id = std::move(id), owned = std::move(owned),
        tile_id](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_set_custom_mvt_vector_source_tile_error(
+        return mln::core::map_set_custom_vector_source_tile_error(
           live, id.view(), tile_id, owned.view()
         );
       },
@@ -695,7 +707,7 @@ auto mln_map_set_custom_mvt_vector_source_tile_error(
   });
 }
 
-auto mln_map_invalidate_custom_mvt_vector_source_tile(
+auto mln_map_invalidate_custom_vector_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -707,7 +719,7 @@ auto mln_map_invalidate_custom_mvt_vector_source_tile(
     return mln::core::submit_map_command(
       map,
       [id = std::move(id), tile_id](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_invalidate_custom_mvt_vector_source_tile(
+        return mln::core::map_invalidate_custom_vector_source_tile(
           live, id.view(), tile_id
         );
       },

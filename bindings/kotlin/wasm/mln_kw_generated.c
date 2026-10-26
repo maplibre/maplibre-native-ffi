@@ -212,13 +212,13 @@ int32_t mln_kw_mln_map_add_custom_geometry_source(
   );
 }
 
-int32_t mln_kw_mln_map_add_custom_mvt_vector_source(
+int32_t mln_kw_mln_map_add_custom_vector_source(
   int64_t map, uintptr_t source_id, uintptr_t options, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_add_custom_mvt_vector_source(
+  return (int32_t)mln_map_add_custom_vector_source(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (const mln_custom_mvt_vector_source_options*)options,
+    (const mln_custom_vector_source_options*)options,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -689,11 +689,11 @@ int32_t mln_kw_mln_map_invalidate_custom_geometry_source_tile(
   );
 }
 
-int32_t mln_kw_mln_map_invalidate_custom_mvt_vector_source_tile(
+int32_t mln_kw_mln_map_invalidate_custom_vector_source_tile(
   int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_invalidate_custom_mvt_vector_source_tile(
+  return (int32_t)mln_map_invalidate_custom_vector_source_tile(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
     *(const mln_canonical_tile_id*)(uintptr_t)tile_id,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
@@ -960,23 +960,24 @@ int32_t mln_kw_mln_map_set_custom_geometry_source_tile_error(
   );
 }
 
-int32_t mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(
-  int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t data,
-  uintptr_t completion, uintptr_t out_diagnostic
+int32_t mln_kw_mln_map_set_custom_vector_source_tile_data(
+  int64_t map, uintptr_t source_id, uintptr_t tile_id, int32_t encoding,
+  uintptr_t data, uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_custom_mvt_vector_source_tile_data(
+  return (int32_t)mln_map_set_custom_vector_source_tile_data(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
     *(const mln_canonical_tile_id*)(uintptr_t)tile_id,
+    (mln_style_vector_tile_encoding)encoding,
     *(const mln_buffer_view*)(uintptr_t)data, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_set_custom_mvt_vector_source_tile_error(
+int32_t mln_kw_mln_map_set_custom_vector_source_tile_error(
   int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t message,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_custom_mvt_vector_source_tile_error(
+  return (int32_t)mln_map_set_custom_vector_source_tile_error(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
     *(const mln_canonical_tile_id*)(uintptr_t)tile_id,
     *(const mln_buffer_view*)(uintptr_t)message,

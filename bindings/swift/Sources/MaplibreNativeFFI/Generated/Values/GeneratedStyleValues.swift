@@ -3,7 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// Canonical tile identity used by custom geometry and custom vector source
 /// callbacks.
 ///
 /// See `mln_canonical_tile_id` in the
@@ -135,12 +135,30 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
-/// Options for custom MVT vector sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Cancels a request for one tile of a custom geometry or custom vector source,
+/// best effort. The callback may run on any native worker thread, concurrently
+/// with runtime and map calls.
 ///
-/// See `mln_custom_mvt_vector_source_options` in the
+/// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct CustomMvtVectorSourceOptions: Sendable {
+public typealias CustomSourceCancelTileCallback =
+  @Sendable (_ tileId: CanonicalTileId) -> Void
+
+/// Requests one tile of a custom geometry or custom vector source. The callback
+/// may run on any native worker thread, concurrently with runtime and map
+/// calls.
+///
+/// See `mln_custom_source_fetch_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomSourceFetchTileCallback =
+  @Sendable (_ tileId: CanonicalTileId) -> Void
+
+/// Options for custom vector sources. The callback may run on any native worker
+/// thread, concurrently with runtime and map calls.
+///
+/// See `mln_custom_vector_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct CustomVectorSourceOptions: Sendable {
   /// Tile fetch callback.
   public var fetchTile: CustomSourceFetchTileCallback
   /// Optional best-effort tile cancel callback.
@@ -160,20 +178,20 @@ public struct CustomMvtVectorSourceOptions: Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws
-    -> mln_custom_mvt_vector_source_options
+    -> mln_custom_vector_source_options
   {
-    var raw = mln_custom_mvt_vector_source_options()
-    raw.size = UInt32(MemoryLayout<mln_custom_mvt_vector_source_options>.size)
-    raw.fetch_tile = invokeCustomMvtVectorSourceOptionsFetchTile
+    var raw = mln_custom_vector_source_options()
+    raw.size = UInt32(MemoryLayout<mln_custom_vector_source_options>.size)
+    raw.fetch_tile = invokeCustomVectorSourceOptionsFetchTile
     raw
       .cancel_tile = cancelTile == nil ? nil :
-      invokeCustomMvtVectorSourceOptionsCancelTile
+      invokeCustomVectorSourceOptionsCancelTile
     if let item = minZoom {
-      raw.fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
+      raw.fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
         .min_zoom = item
     }
     if let item = maxZoom {
-      raw.fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
+      raw.fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
         .max_zoom = item
     }
     raw.user_data = arena.callback(self)
@@ -182,43 +200,25 @@ public struct CustomMvtVectorSourceOptions: Sendable {
   }
 }
 
-private func invokeCustomMvtVectorSourceOptionsFetchTile(
+private func invokeCustomVectorSourceOptionsFetchTile(
   user_data: UnsafeMutableRawPointer?,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
+  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
   box.value.fetchTile(CanonicalTileId(raw: tile_id))
 }
 
-private func invokeCustomMvtVectorSourceOptionsCancelTile(
+private func invokeCustomVectorSourceOptionsCancelTile(
   user_data: UnsafeMutableRawPointer?,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
+  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
-
-/// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort. The callback may run on any native worker thread,
-/// concurrently with runtime and map calls.
-///
-/// See `mln_custom_source_cancel_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceCancelTileCallback =
-  @Sendable (_ tileId: CanonicalTileId) -> Void
-
-/// Requests one tile of a custom geometry or custom MVT vector source. The
-/// callback may run on any native worker thread, concurrently with runtime and
-/// map calls.
-///
-/// See `mln_custom_source_fetch_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceFetchTileCallback =
-  @Sendable (_ tileId: CanonicalTileId) -> Void
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
@@ -916,8 +916,8 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
   public static let image: StyleSourceType = .init(rawValue: 5)
   public static let video: StyleSourceType = .init(rawValue: 6)
   public static let annotations: StyleSourceType = .init(rawValue: 7)
-  public static let customVector: StyleSourceType = .init(rawValue: 8)
-  public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
+  public static let customGeometry: StyleSourceType = .init(rawValue: 8)
+  public static let customVector: StyleSourceType = .init(rawValue: 9)
   public var description: String {
     switch rawValue {
     case 0: return "unknown"
@@ -928,8 +928,8 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
     case 5: return "image"
     case 6: return "video"
     case 7: return "annotations"
-    case 8: return "customVector"
-    case 9: return "customMvtVector"
+    case 8: return "customGeometry"
+    case 9: return "customVector"
     default: return "StyleSourceType(\(rawValue))"
     }
   }

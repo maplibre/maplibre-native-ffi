@@ -1087,8 +1087,8 @@ final class StyleSourceType extends _Enum {
   static const image = StyleSourceType.fromRawValue(5);
   static const video = StyleSourceType.fromRawValue(6);
   static const annotations = StyleSourceType.fromRawValue(7);
-  static const customVector = StyleSourceType.fromRawValue(8);
-  static const customMvtVector = StyleSourceType.fromRawValue(9);
+  static const customGeometry = StyleSourceType.fromRawValue(8);
+  static const customVector = StyleSourceType.fromRawValue(9);
   @override
   String toString() => switch (rawValue) {
     0 => 'StyleSourceType.unknown',
@@ -1099,8 +1099,8 @@ final class StyleSourceType extends _Enum {
     5 => 'StyleSourceType.image',
     6 => 'StyleSourceType.video',
     7 => 'StyleSourceType.annotations',
-    8 => 'StyleSourceType.customVector',
-    9 => 'StyleSourceType.customMvtVector',
+    8 => 'StyleSourceType.customGeometry',
+    9 => 'StyleSourceType.customVector',
     _ => 'StyleSourceType($rawValue)',
   };
 }
@@ -2013,7 +2013,7 @@ typedef LogCallback =
       String message,
     );
 
-/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// Canonical tile identity used by custom geometry and custom vector source
 /// callbacks.
 ///
 /// See `mln_canonical_tile_id` in the
@@ -2034,17 +2034,17 @@ final class CanonicalTileId extends _Value {
   String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
 }
 
-/// Requests one tile of a custom geometry or custom MVT vector source. The
-/// callback runs asynchronously in the isolate and zone that registered it,
-/// after native queues the call.
+/// Requests one tile of a custom geometry or custom vector source. The callback
+/// runs asynchronously in the isolate and zone that registered it, after native
+/// queues the call.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
 
-/// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort. The callback runs asynchronously in the isolate and
-/// zone that registered it, after native queues the call.
+/// Cancels a request for one tile of a custom geometry or custom vector source,
+/// best effort. The callback runs asynchronously in the isolate and zone that
+/// registered it, after native queues the call.
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2082,13 +2082,13 @@ final class CustomGeometrySourceOptions {
   final bool? wrap;
 }
 
-/// Options for custom MVT vector sources. The callback runs asynchronously in
-/// the isolate and zone that registered it, after native queues the call.
+/// Options for custom vector sources. The callback runs asynchronously in the
+/// isolate and zone that registered it, after native queues the call.
 ///
-/// See `mln_custom_mvt_vector_source_options` in the
+/// See `mln_custom_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CustomMvtVectorSourceOptions {
-  const CustomMvtVectorSourceOptions({
+final class CustomVectorSourceOptions {
+  const CustomVectorSourceOptions({
     required this.fetchTile,
     this.cancelTile,
     this.minZoom,

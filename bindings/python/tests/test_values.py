@@ -237,15 +237,18 @@ def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
 
     result(map_handle.set_style_json(EMPTY_STYLE))
     result(
-        map_handle.add_custom_mvt_vector_source(
-            "custom", mln.CustomMvtVectorSourceOptions(fetch_tile=lambda *_: None)
+        map_handle.add_custom_vector_source(
+            "custom", mln.CustomVectorSourceOptions(fetch_tile=lambda *_: None)
         )
     )
     tile = mln.CanonicalTileId(z=0, x=0, y=0)
     # A parameter copies a buffer that is not bytes before native reads it.
     result(
-        map_handle.set_custom_mvt_vector_source_tile_data(
-            "custom", tile, memoryview(bytearray(b"\x1a\x00"))
+        map_handle.set_custom_vector_source_tile_data(
+            "custom",
+            tile,
+            mln.StyleVectorTileEncoding.MVT,
+            memoryview(bytearray(b"\x1a\x00")),
         )
     )
     with pytest.raises(TypeError, match="not str"):

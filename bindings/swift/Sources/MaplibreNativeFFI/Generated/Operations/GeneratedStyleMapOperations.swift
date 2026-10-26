@@ -25,18 +25,18 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a custom MVT vector source. The callback may run on any native worker
+  /// Adds a custom vector source. The callback may run on any native worker
   /// thread, concurrently with runtime and map calls.
   ///
-  /// See `mln_map_add_custom_mvt_vector_source` in the
+  /// See `mln_map_add_custom_vector_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func addCustomMvtVectorSource(
+  func addCustomVectorSource(
     _ bindingArg0: String,
-    options bindingArg1: CustomMvtVectorSourceOptions
+    options bindingArg1: CustomVectorSourceOptions
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_add_custom_mvt_vector_source(
+      try mln_map_add_custom_vector_source(
         raw,
         arena.view(bindingArg0),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -402,17 +402,17 @@ public extension MapHandle {
     }
   }
 
-  /// Invalidates custom MVT vector source data for one canonical tile.
+  /// Invalidates custom vector source data for one canonical tile.
   ///
-  /// See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+  /// See `mln_map_invalidate_custom_vector_source_tile` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func invalidateCustomMvtVectorSourceTile(
+  func invalidateCustomVectorSourceTile(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_invalidate_custom_mvt_vector_source_tile(
+      mln_map_invalidate_custom_vector_source_tile(
         raw,
         arena.view(bindingArg0),
         bindingArg1.nativeValue(),
@@ -572,40 +572,42 @@ public extension MapHandle {
     }
   }
 
-  /// Sets custom MVT vector source data for one canonical tile.
+  /// Sets custom vector source data for one canonical tile.
   ///
-  /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+  /// See `mln_map_set_custom_vector_source_tile_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func setCustomMvtVectorSourceTileData(
+  func setCustomVectorSourceTileData(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
-    data bindingArg2: Data
+    encoding bindingArg2: StyleVectorTileEncoding,
+    data bindingArg3: Data
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_custom_mvt_vector_source_tile_data(
+      mln_map_set_custom_vector_source_tile_data(
         raw,
         arena.view(bindingArg0),
         bindingArg1.nativeValue(),
-        arena.view(bindingArg2),
+        mln_style_vector_tile_encoding(rawValue: bindingArg2.rawValue),
+        arena.view(bindingArg3),
         completion,
         diagnostic
       )
     }
   }
 
-  /// Reports a custom MVT vector source error for one canonical tile.
+  /// Reports a custom vector source error for one canonical tile.
   ///
-  /// See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+  /// See `mln_map_set_custom_vector_source_tile_error` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func setCustomMvtVectorSourceTileError(
+  func setCustomVectorSourceTileError(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_custom_mvt_vector_source_tile_error(
+      mln_map_set_custom_vector_source_tile_error(
         raw,
         arena.view(bindingArg0),
         bindingArg1.nativeValue(),
@@ -898,13 +900,13 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func addCustomMvtVectorSource(
+  func addCustomVectorSource(
     _ bindingArg0: String,
-    options bindingArg1: CustomMvtVectorSourceOptions
+    options bindingArg1: CustomVectorSourceOptions
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_add_custom_mvt_vector_source(
+        try mln_map_add_custom_vector_source(
           raw,
           arena.view(bindingArg0),
           arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -1046,13 +1048,13 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func invalidateCustomMvtVectorSourceTile(
+  func invalidateCustomVectorSourceTile(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        mln_map_invalidate_custom_mvt_vector_source_tile(
+        mln_map_invalidate_custom_vector_source_tile(
           raw,
           arena.view(bindingArg0),
           bindingArg1.nativeValue(),
@@ -1141,32 +1143,34 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setCustomMvtVectorSourceTileData(
+  func setCustomVectorSourceTileData(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
-    data bindingArg2: Data
+    encoding bindingArg2: StyleVectorTileEncoding,
+    data bindingArg3: Data
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        mln_map_set_custom_mvt_vector_source_tile_data(
+        mln_map_set_custom_vector_source_tile_data(
           raw,
           arena.view(bindingArg0),
           bindingArg1.nativeValue(),
-          arena.view(bindingArg2),
+          mln_style_vector_tile_encoding(rawValue: bindingArg2.rawValue),
+          arena.view(bindingArg3),
           nil,
           diagnostic
         )
       }
   }
 
-  func setCustomMvtVectorSourceTileError(
+  func setCustomVectorSourceTileError(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        mln_map_set_custom_mvt_vector_source_tile_error(
+        mln_map_set_custom_vector_source_tile_error(
           raw,
           arena.view(bindingArg0),
           bindingArg1.nativeValue(),

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// Canonical tile identity used by custom geometry and custom vector source
 /// callbacks.
 /// </summary>
 /// <remarks>

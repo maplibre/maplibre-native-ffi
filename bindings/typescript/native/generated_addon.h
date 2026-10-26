@@ -369,9 +369,9 @@ bool mln_ts_write_custom_geometry_source_options(
   mln_ts_call* call, napi_value value, mln_custom_geometry_source_options* out,
   const char* path
 );
-bool mln_ts_write_custom_mvt_vector_source_options(
-  mln_ts_call* call, napi_value value,
-  mln_custom_mvt_vector_source_options* out, const char* path
+bool mln_ts_write_custom_vector_source_options(
+  mln_ts_call* call, napi_value value, mln_custom_vector_source_options* out,
+  const char* path
 );
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path

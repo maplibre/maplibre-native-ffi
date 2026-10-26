@@ -14,7 +14,7 @@
  * accepts a queue: mln_completion, mln_runtime_event_handler, mln_log_handler,
  * mln_resource_provider, mln_resource_request_cancel_handler,
  * mln_resource_transform, mln_camera_transition_handler, and the custom
- * geometry and custom MVT vector source options.
+ * geometry and custom vector source options.
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. Events and completions that select

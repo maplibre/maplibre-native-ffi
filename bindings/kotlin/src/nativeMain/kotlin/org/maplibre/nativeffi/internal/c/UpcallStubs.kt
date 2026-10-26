@@ -72,19 +72,19 @@ internal actual object UpcallStubs {
       }
     }
     .toLong()
-  actual val customMvtVectorSourceOptionsFetchTile: Long =
+  actual val customVectorSourceOptionsFetchTile: Long =
     staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
       tileId.useContents {
         val tileIdAddress = ptr.toLong()
-        Upcalls.customMvtVectorSourceOptionsFetchTile(userData.toLong(), tileIdAddress)
+        Upcalls.customVectorSourceOptionsFetchTile(userData.toLong(), tileIdAddress)
       }
     }
     .toLong()
-  actual val customMvtVectorSourceOptionsCancelTile: Long =
+  actual val customVectorSourceOptionsCancelTile: Long =
     staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
       tileId.useContents {
         val tileIdAddress = ptr.toLong()
-        Upcalls.customMvtVectorSourceOptionsCancelTile(userData.toLong(), tileIdAddress)
+        Upcalls.customVectorSourceOptionsCancelTile(userData.toLong(), tileIdAddress)
       }
     }
     .toLong()

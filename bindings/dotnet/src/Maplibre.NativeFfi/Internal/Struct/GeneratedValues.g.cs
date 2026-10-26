@@ -358,14 +358,14 @@ internal static unsafe class GeneratedValues
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void InvokeCustomMvtVectorSourceOptionsFetchTile(
+    private static void InvokeCustomVectorSourceOptionsFetchTile(
         void* user_data,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
-            ((CustomMvtVectorSourceOptions)NativeCallbackRoot.Value(user_data)).FetchTile?.Invoke(
+            ((CustomVectorSourceOptions)NativeCallbackRoot.Value(user_data)).FetchTile?.Invoke(
                 CopyCanonicalTileId(tile_id)
             );
         }
@@ -376,14 +376,14 @@ internal static unsafe class GeneratedValues
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void InvokeCustomMvtVectorSourceOptionsCancelTile(
+    private static void InvokeCustomVectorSourceOptionsCancelTile(
         void* user_data,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
-            ((CustomMvtVectorSourceOptions)NativeCallbackRoot.Value(user_data)).CancelTile?.Invoke(
+            ((CustomVectorSourceOptions)NativeCallbackRoot.Value(user_data)).CancelTile?.Invoke(
                 CopyCanonicalTileId(tile_id)
             );
         }
@@ -393,34 +393,34 @@ internal static unsafe class GeneratedValues
         }
     }
 
-    internal static mln_custom_mvt_vector_source_options NativeCustomMvtVectorSourceOptions(
-        CustomMvtVectorSourceOptions value,
+    internal static mln_custom_vector_source_options NativeCustomVectorSourceOptions(
+        CustomVectorSourceOptions value,
         NativeCallScope scope
     )
     {
-        var native = new mln_custom_mvt_vector_source_options();
+        var native = new mln_custom_vector_source_options();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_custom_mvt_vector_source_options);
+        native.size = (uint)sizeof(mln_custom_vector_source_options);
         if (value.FetchTile is not null || value.CancelTile is not null)
         {
             native.user_data = scope.Register(value with { });
             native.release_user_data = &NativeCallbackRoot.Release;
             native.fetch_tile = value.FetchTile is null
                 ? null
-                : &InvokeCustomMvtVectorSourceOptionsFetchTile;
+                : &InvokeCustomVectorSourceOptionsFetchTile;
             native.cancel_tile = value.CancelTile is null
                 ? null
-                : &InvokeCustomMvtVectorSourceOptionsCancelTile;
+                : &InvokeCustomVectorSourceOptionsCancelTile;
         }
         native.fields |= Put(
             value.MinZoom,
             ref native.min_zoom,
-            MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+            MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM
         );
         native.fields |= Put(
             value.MaxZoom,
             ref native.max_zoom,
-            MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+            MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM
         );
         return native;
     }

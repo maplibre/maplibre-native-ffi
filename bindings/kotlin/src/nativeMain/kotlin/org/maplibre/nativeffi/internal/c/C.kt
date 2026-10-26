@@ -228,14 +228,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_custom_mvt_vector_source(
+  actual fun mln_map_add_custom_vector_source(
     map: Long,
     sourceId: Long,
     options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_custom_mvt_vector_source(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_add_custom_vector_source(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       options.toCPointer(),
@@ -836,14 +836,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_invalidate_custom_mvt_vector_source_tile(
+  actual fun mln_map_invalidate_custom_vector_source_tile(
     map: Long,
     sourceId: Long,
     tileId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_invalidate_custom_mvt_vector_source_tile(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_invalidate_custom_vector_source_tile(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       tileId.toCPointer<mln_canonical_tile_id>()!!.pointed.readValue(),
@@ -1164,24 +1164,26 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_custom_mvt_vector_source_tile_data(
+  actual fun mln_map_set_custom_vector_source_tile_data(
     map: Long,
     sourceId: Long,
     tileId: Long,
+    encoding: Int,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_custom_mvt_vector_source_tile_data(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_custom_vector_source_tile_data(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       tileId.toCPointer<mln_canonical_tile_id>()!!.pointed.readValue(),
+      encoding.toUInt(),
       data.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_custom_mvt_vector_source_tile_error(
+  actual fun mln_map_set_custom_vector_source_tile_error(
     map: Long,
     sourceId: Long,
     tileId: Long,
@@ -1189,7 +1191,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_custom_mvt_vector_source_tile_error(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_custom_vector_source_tile_error(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       tileId.toCPointer<mln_canonical_tile_id>()!!.pointed.readValue(),

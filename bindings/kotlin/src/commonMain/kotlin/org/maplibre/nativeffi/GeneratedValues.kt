@@ -1359,8 +1359,8 @@ public value class StyleSourceType(public val rawValue: UInt) {
       5u -> "IMAGE"
       6u -> "VIDEO"
       7u -> "ANNOTATIONS"
-      8u -> "CUSTOM_VECTOR"
-      9u -> "CUSTOM_MVT_VECTOR"
+      8u -> "CUSTOM_GEOMETRY"
+      9u -> "CUSTOM_VECTOR"
       else -> "StyleSourceType($rawValue)"
     }
 
@@ -1373,8 +1373,8 @@ public value class StyleSourceType(public val rawValue: UInt) {
     public val IMAGE: StyleSourceType = StyleSourceType(5u)
     public val VIDEO: StyleSourceType = StyleSourceType(6u)
     public val ANNOTATIONS: StyleSourceType = StyleSourceType(7u)
-    public val CUSTOM_VECTOR: StyleSourceType = StyleSourceType(8u)
-    public val CUSTOM_MVT_VECTOR: StyleSourceType = StyleSourceType(9u)
+    public val CUSTOM_GEOMETRY: StyleSourceType = StyleSourceType(8u)
+    public val CUSTOM_VECTOR: StyleSourceType = StyleSourceType(9u)
   }
 }
 
@@ -2034,7 +2034,7 @@ public data class StyleExpressionOptions(
 )
 
 /**
- * Canonical tile identity used by custom geometry and custom MVT vector source callbacks.
+ * Canonical tile identity used by custom geometry and custom vector source callbacks.
  *
  * See `mln_canonical_tile_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3747,7 +3747,7 @@ public data class CustomGeometrySourceOptions(
 )
 
 /**
- * Requests one tile of a custom geometry or custom MVT vector source.
+ * Requests one tile of a custom geometry or custom vector source.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
  * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
@@ -3762,7 +3762,7 @@ public fun interface CustomSourceFetchTileCallback {
 }
 
 /**
- * Cancels a request for one tile of a custom geometry or custom MVT vector source, best effort.
+ * Cancels a request for one tile of a custom geometry or custom vector source, best effort.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
  * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
@@ -3777,13 +3777,13 @@ public fun interface CustomSourceCancelTileCallback {
 }
 
 /**
- * Options for custom MVT vector sources. The callback may run on any native worker thread,
- * concurrently with runtime and map calls.
+ * Options for custom vector sources. The callback may run on any native worker thread, concurrently
+ * with runtime and map calls.
  *
- * See `mln_custom_mvt_vector_source_options` in the
+ * See `mln_custom_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public data class CustomMvtVectorSourceOptions(
+public data class CustomVectorSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   /** Tile fetch callback. */

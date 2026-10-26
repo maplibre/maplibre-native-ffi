@@ -157,14 +157,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_add_custom_mvt_vector_source(
+  actual fun mln_map_add_custom_vector_source(
     map: Long,
     sourceId: Long,
     options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_add_custom_mvt_vector_source(
+    mln_kw_mln_map_add_custom_vector_source(
       map,
       word(sourceId),
       word(options),
@@ -689,14 +689,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_invalidate_custom_mvt_vector_source_tile(
+  actual fun mln_map_invalidate_custom_vector_source_tile(
     map: Long,
     sourceId: Long,
     tileId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_invalidate_custom_mvt_vector_source_tile(
+    mln_kw_mln_map_invalidate_custom_vector_source_tile(
       map,
       word(sourceId),
       word(tileId),
@@ -952,24 +952,26 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_custom_mvt_vector_source_tile_data(
+  actual fun mln_map_set_custom_vector_source_tile_data(
     map: Long,
     sourceId: Long,
     tileId: Long,
+    encoding: Int,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(
+    mln_kw_mln_map_set_custom_vector_source_tile_data(
       map,
       word(sourceId),
       word(tileId),
+      encoding,
       word(data),
       word(completion),
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_custom_mvt_vector_source_tile_error(
+  actual fun mln_map_set_custom_vector_source_tile_error(
     map: Long,
     sourceId: Long,
     tileId: Long,
@@ -977,7 +979,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_custom_mvt_vector_source_tile_error(
+    mln_kw_mln_map_set_custom_vector_source_tile_error(
       map,
       word(sourceId),
       word(tileId),
@@ -2021,7 +2023,7 @@ private fun mln_kw_mln_map_add_custom_geometry_source(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_geometry_source(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_add_custom_mvt_vector_source(
+private fun mln_kw_mln_map_add_custom_vector_source(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2029,7 +2031,7 @@ private fun mln_kw_mln_map_add_custom_mvt_vector_source(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_mvt_vector_source(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_vector_source(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_add_geo_json_source_data(
@@ -2394,7 +2396,7 @@ private fun mln_kw_mln_map_invalidate_custom_geometry_source_tile(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_geometry_source_tile(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_invalidate_custom_mvt_vector_source_tile(
+private fun mln_kw_mln_map_invalidate_custom_vector_source_tile(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2402,7 +2404,7 @@ private fun mln_kw_mln_map_invalidate_custom_mvt_vector_source_tile(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_mvt_vector_source_tile(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_vector_source_tile(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_lat_lng_bounds_for_camera(p0: Long, p1: Int, p2: Int, p3: Int): Int =
@@ -2581,19 +2583,20 @@ private fun mln_kw_mln_map_set_custom_geometry_source_tile_error(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_geometry_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(
+private fun mln_kw_mln_map_set_custom_vector_source_tile_data(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
   p4: Int,
   p5: Int,
+  p6: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_vector_source_tile_data(p0, p1, p2, p3, p4, p5, p6)",
   )
 
-private fun mln_kw_mln_map_set_custom_mvt_vector_source_tile_error(
+private fun mln_kw_mln_map_set_custom_vector_source_tile_error(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2602,7 +2605,7 @@ private fun mln_kw_mln_map_set_custom_mvt_vector_source_tile_error(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_mvt_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_debug_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =

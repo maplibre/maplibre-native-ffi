@@ -56,18 +56,18 @@ internal actual object UpcallStubs {
         "customGeometrySourceOptionsCancelTile needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
-  actual val customMvtVectorSourceOptionsFetchTile: Long
+  actual val customVectorSourceOptionsFetchTile: Long
     get() =
       throw MaplibreException(
         Status.UNSUPPORTED,
-        "customMvtVectorSourceOptionsFetchTile needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+        "customVectorSourceOptionsFetchTile needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
-  actual val customMvtVectorSourceOptionsCancelTile: Long
+  actual val customVectorSourceOptionsCancelTile: Long
     get() =
       throw MaplibreException(
         Status.UNSUPPORTED,
-        "customMvtVectorSourceOptionsCancelTile needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+        "customVectorSourceOptionsCancelTile needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
   actual val resourceRequestCancelHandlerCallback: Long

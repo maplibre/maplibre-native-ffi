@@ -9,7 +9,7 @@ import type {
   CameraUpdate,
   CanonicalTileId,
   CustomGeometrySourceOptions,
-  CustomMvtVectorSourceOptions,
+  CustomVectorSourceOptions,
   FeatureStateSelector,
   FrameDemand,
   FreeCameraOptions,
@@ -64,6 +64,7 @@ import type {
   StyleExpressionOptions,
   StyleImageOptions,
   StyleTransitionOptions,
+  StyleVectorTileEncoding,
   VulkanBorrowedTextureDescriptor,
   VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
@@ -111,10 +112,10 @@ export interface NativeOperations {
     options: CustomGeometrySourceOptions,
     completion: number | undefined,
   ): void;
-  mln_map_add_custom_mvt_vector_source(
+  mln_map_add_custom_vector_source(
     map: bigint,
     sourceId: string,
-    options: CustomMvtVectorSourceOptions,
+    options: CustomVectorSourceOptions,
     completion: number | undefined,
   ): void;
   mln_map_add_geo_json_source_data(
@@ -323,7 +324,7 @@ export interface NativeOperations {
     tileId: CanonicalTileId | undefined,
     completion: number | undefined,
   ): void;
-  mln_map_invalidate_custom_mvt_vector_source_tile(
+  mln_map_invalidate_custom_vector_source_tile(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
@@ -436,14 +437,15 @@ export interface NativeOperations {
     message: string,
     completion: number | undefined,
   ): void;
-  mln_map_set_custom_mvt_vector_source_tile_data(
+  mln_map_set_custom_vector_source_tile_data(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
+    encoding: StyleVectorTileEncoding,
     data: Uint8Array,
     completion: number | undefined,
   ): void;
-  mln_map_set_custom_mvt_vector_source_tile_error(
+  mln_map_set_custom_vector_source_tile_error(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,

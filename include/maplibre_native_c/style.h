@@ -87,8 +87,8 @@ typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_IMAGE = 5,
   MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
   MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
-  MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
-  MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9,
+  MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY = 8,
+  MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 9,
 } mln_style_source_type;
 
 /** Fields available in mln_style_source_info. */
@@ -202,16 +202,16 @@ typedef enum MLN_BINDING(
 /** A set of mln_custom_geometry_source_option_field bits. */
 typedef uint32_t mln_custom_geometry_source_option_fields;
 
-/** Field mask values for mln_custom_mvt_vector_source_options. */
+/** Field mask values for mln_custom_vector_source_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
-) mln_custom_mvt_vector_source_option_field : uint32_t {
-  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
-  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
-} mln_custom_mvt_vector_source_option_field;
+) mln_custom_vector_source_option_field : uint32_t {
+  MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
+  MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
+} mln_custom_vector_source_option_field;
 
-/** A set of mln_custom_mvt_vector_source_option_field bits. */
-typedef uint32_t mln_custom_mvt_vector_source_option_fields;
+/** A set of mln_custom_vector_source_option_field bits. */
+typedef uint32_t mln_custom_vector_source_option_fields;
 
 /** Field mask values for mln_style_image_options. */
 typedef enum MLN_BINDING(
@@ -393,7 +393,7 @@ typedef struct mln_geo_json_source_options {
   );
 } mln_geo_json_source_options;
 
-/** Canonical tile identity used by custom geometry and custom MVT vector source
+/** Canonical tile identity used by custom geometry and custom vector source
  * callbacks. */
 typedef struct mln_canonical_tile_id {
   uint32_t z;
@@ -402,7 +402,7 @@ typedef struct mln_canonical_tile_id {
 } mln_canonical_tile_id;
 
 /**
- * Requests one tile of a custom geometry or custom MVT vector source.
+ * Requests one tile of a custom geometry or custom vector source.
  *
  * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
  * instead.
@@ -417,7 +417,7 @@ typedef void (*mln_custom_source_fetch_tile_callback)(
 );
 
 /**
- * Cancels a request for one tile of a custom geometry or custom MVT vector
+ * Cancels a request for one tile of a custom geometry or custom vector
  * source, best effort.
  *
  * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
@@ -500,10 +500,10 @@ typedef struct mln_custom_geometry_source_options {
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Options for custom MVT vector sources. */
-typedef struct mln_custom_mvt_vector_source_options {
+/** Options for custom vector sources. */
+typedef struct mln_custom_vector_source_options {
   uint32_t size;
-  mln_custom_mvt_vector_source_option_fields fields;
+  mln_custom_vector_source_option_fields fields;
   /**
    * Tile fetch callback.
    *
@@ -523,9 +523,9 @@ typedef struct mln_custom_mvt_vector_source_options {
    */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
-    MLN_BINDING("mask=fields;bit=MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM");
+    MLN_BINDING("mask=fields;bit=MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM");
+    MLN_BINDING("mask=fields;bit=MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM");
   /**
    * Optional. Invoked once after an accepted command stops referencing
    * user_data.
@@ -554,7 +554,7 @@ typedef struct mln_custom_mvt_vector_source_options {
    * MLN_STATUS_INVALID_STATE.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
-} mln_custom_mvt_vector_source_options MLN_BINDING(
+} mln_custom_vector_source_options MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
@@ -1155,7 +1155,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a custom MVT vector source.
+ * Adds a custom vector source.
  *
  * source_id is borrowed for the call. options is borrowed for the call, but the
  * callback function pointers and user_data pointer are retained by value. The
@@ -1173,14 +1173,14 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * execution. Every callback returns normally; see mln_user_data_release.
  * cancel_tile is best-effort and may be repeated or race with fetch_tile.
  *
- * Custom MVT vector sources belong to the current style. Replacing the style
+ * Custom vector sources belong to the current style. Replacing the style
  * drops sources that were added to the previous style. A layer that draws this
- * source names a source-layer that exists inside the MVT bytes the host
+ * source names a source-layer that exists inside the tile bytes the host
  * delivers.
  *
  * A host that owns callback state frees it in options.release_user_data, which
  * this API invokes once after it stops referencing user_data. See
- * mln_custom_mvt_vector_source_options.release_user_data.
+ * mln_custom_vector_source_options.release_user_data.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1196,18 +1196,21 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  *   runs release_user_data once.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_custom_mvt_vector_source(
+MLN_API mln_status mln_map_add_custom_vector_source(
   mln_map map, mln_buffer_view source_id,
-  const mln_custom_mvt_vector_source_options* options,
+  const mln_custom_vector_source_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Sets custom MVT vector source data for one canonical tile.
+ * Sets custom vector source data for one canonical tile.
  *
- * source_id and the MVT protobuf bytes are borrowed for the call. The function
- * copies accepted bytes before return. A zero-length view, including a null
- * pointer with size 0, is an empty tile.
+ * source_id and the tile bytes are borrowed for the call. The function copies
+ * accepted bytes before return. encoding names the format of data: MVT
+ * protobuf bytes, or MapLibre Tile bytes that decode as
+ * mln_map_options.fast_pfor_enabled allows. One source may mix encodings
+ * across tiles. A zero-length view, including a null pointer with size 0, is
+ * an empty tile.
  *
  * MapLibre ignores the bytes unless fetch_tile requested that tile and
  * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
@@ -1216,25 +1219,27 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, data is a null pointer with a nonzero
- *   size, or completion is invalid.
+ *   invalid or empty, tile_id is invalid, encoding is not an
+ *   mln_style_vector_tile_encoding value, data is a null pointer with a
+ *   nonzero size, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
  *   source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
+MLN_API mln_status mln_map_set_custom_vector_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_style_vector_tile_encoding encoding,
   mln_buffer_view data MLN_BINDING("encoding=bytes"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Reports a custom MVT vector source error for one canonical tile.
+ * Reports a custom vector source error for one canonical tile.
  *
  * source_id and the UTF-8 diagnostic message are borrowed for the call. The
  * function copies accepted bytes before return. An empty message is accepted.
@@ -1254,18 +1259,18 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
  *   source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
+MLN_API mln_status mln_map_set_custom_vector_source_tile_error(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Invalidates custom MVT vector source data for one canonical tile.
+ * Invalidates custom vector source data for one canonical tile.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1276,11 +1281,11 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
  *   source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
+MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

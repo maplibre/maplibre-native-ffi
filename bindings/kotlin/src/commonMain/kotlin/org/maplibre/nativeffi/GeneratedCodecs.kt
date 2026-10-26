@@ -175,9 +175,9 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
 internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
   allocate(w(72, 88), 8).also { putCustomGeometrySourceOptions(it, value) }
 
-internal fun NativeCall.putCustomMvtVectorSourceOptions(
+internal fun NativeCall.putCustomVectorSourceOptions(
   target: Long,
-  value: CustomMvtVectorSourceOptions,
+  value: CustomVectorSourceOptions,
 ) {
   var fields = 0u
   writeU32(target, w(56, 64).toUInt())
@@ -194,18 +194,17 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
   val queue = HostDelivery.queue
   if (queue != 0L) writeI64(target + w(48, 56), queue)
   else {
-    writeAddress(target + 8, UpcallStubs.customMvtVectorSourceOptionsFetchTile)
+    writeAddress(target + 8, UpcallStubs.customVectorSourceOptionsFetchTile)
     writeAddress(
       target + w(12, 16),
-      if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
+      if (value.cancelTile == null) 0L else UpcallStubs.customVectorSourceOptionsCancelTile,
     )
     writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
   }
 }
 
-internal fun NativeCall.writeCustomMvtVectorSourceOptions(
-  value: CustomMvtVectorSourceOptions,
-): Long = allocate(w(56, 64), 8).also { putCustomMvtVectorSourceOptions(it, value) }
+internal fun NativeCall.writeCustomVectorSourceOptions(value: CustomVectorSourceOptions): Long =
+  allocate(w(56, 64), 8).also { putCustomVectorSourceOptions(it, value) }
 
 internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {
   writeU32(target, w(24, 32).toUInt())

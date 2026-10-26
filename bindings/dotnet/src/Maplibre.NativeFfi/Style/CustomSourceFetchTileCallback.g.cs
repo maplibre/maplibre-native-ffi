@@ -3,9 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Requests one tile of a custom geometry or custom MVT vector source. The
-/// callback may run on any native worker thread, concurrently with runtime and
-/// map calls.
+/// Requests one tile of a custom geometry or custom vector source. The callback
+/// may run on any native worker thread, concurrently with runtime and map
+/// calls.
 /// </summary>
 /// <remarks>
 /// See <c>mln_custom_source_fetch_tile_callback</c> in the <see

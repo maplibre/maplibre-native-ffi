@@ -1282,16 +1282,16 @@ func (value StyleRasterDemEncoding) String() string {
 type StyleSourceType uint32
 
 const (
-	StyleSourceTypeUnknown         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_UNKNOWN)
-	StyleSourceTypeVector          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VECTOR)
-	StyleSourceTypeRaster          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER)
-	StyleSourceTypeRasterDem       StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
-	StyleSourceTypeGeoJson         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEO_JSON)
-	StyleSourceTypeImage           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
-	StyleSourceTypeVideo           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
-	StyleSourceTypeAnnotations     StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
-	StyleSourceTypeCustomVector    StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
-	StyleSourceTypeCustomMvtVector StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR)
+	StyleSourceTypeUnknown        StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_UNKNOWN)
+	StyleSourceTypeVector         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VECTOR)
+	StyleSourceTypeRaster         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER)
+	StyleSourceTypeRasterDem      StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
+	StyleSourceTypeGeoJson        StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEO_JSON)
+	StyleSourceTypeImage          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
+	StyleSourceTypeVideo          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
+	StyleSourceTypeAnnotations    StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
+	StyleSourceTypeCustomGeometry StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY)
+	StyleSourceTypeCustomVector   StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
 )
 
 func (value StyleSourceType) String() string {
@@ -1313,9 +1313,9 @@ func (value StyleSourceType) String() string {
 	case 7:
 		return "StyleSourceTypeAnnotations"
 	case 8:
-		return "StyleSourceTypeCustomVector"
+		return "StyleSourceTypeCustomGeometry"
 	case 9:
-		return "StyleSourceTypeCustomMvtVector"
+		return "StyleSourceTypeCustomVector"
 	}
 	return fmt.Sprintf("StyleSourceType(%d)", value)
 }
@@ -1954,7 +1954,7 @@ func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_up
 }
 
 // CanonicalTileId corresponds to mln_canonical_tile_id. Canonical tile identity
-// used by custom geometry and custom MVT vector source callbacks.
+// used by custom geometry and custom vector source callbacks.
 //
 // See mln_canonical_tile_id in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -2025,14 +2025,13 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	return raw
 }
 
-// CustomMvtVectorSourceOptions corresponds to
-// mln_custom_mvt_vector_source_options. Options for custom MVT vector sources.
-// The callback may run on any native worker thread, concurrently with runtime
-// and map calls.
+// CustomVectorSourceOptions corresponds to mln_custom_vector_source_options.
+// Options for custom vector sources. The callback may run on any native worker
+// thread, concurrently with runtime and map calls.
 //
-// See mln_custom_mvt_vector_source_options in the C API reference:
+// See mln_custom_vector_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type CustomMvtVectorSourceOptions struct {
+type CustomVectorSourceOptions struct {
 	MinZoom *float64
 	MaxZoom *float64
 	// Tile fetch callback.
@@ -2041,20 +2040,20 @@ type CustomMvtVectorSourceOptions struct {
 	CancelTile func(tileId CanonicalTileId)
 }
 
-func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, arena *bindingArena) C.mln_custom_mvt_vector_source_options {
-	raw := C.mln_custom_mvt_vector_source_options{}
+func nativeCustomVectorSourceOptions(input CustomVectorSourceOptions, arena *bindingArena) C.mln_custom_vector_source_options {
+	raw := C.mln_custom_vector_source_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_vector_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_source_cancel_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_cancel_tile_callback(C.binding_mln_custom_vector_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -5599,14 +5598,14 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options Cust
 	}, completionCommand)
 }
 
-// AddCustomMvtVectorSource adds a custom MVT vector source. The callback may
-// run on any native worker thread, concurrently with runtime and map calls.
+// AddCustomVectorSource adds a custom vector source. The callback may run on
+// any native worker thread, concurrently with runtime and map calls.
 //
-// See mln_map_add_custom_mvt_vector_source in the C API reference:
+// See mln_map_add_custom_vector_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddCustomVectorSource(sourceId string, options CustomVectorSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
+		return int32(C.mln_map_add_custom_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomVectorSourceOptions(options, arena), arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -6076,14 +6075,14 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, t
 	}, completionCommand)
 }
 
-// InvalidateCustomMvtVectorSourceTile invalidates custom MVT vector source data
-// for one canonical tile.
+// InvalidateCustomVectorSourceTile invalidates custom vector source data for
+// one canonical tile.
 //
-// See mln_map_invalidate_custom_mvt_vector_source_tile in the C API reference:
+// See mln_map_invalidate_custom_vector_source_tile in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) InvalidateCustomVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
+		return int32(C.mln_map_invalidate_custom_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -6415,25 +6414,25 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileError(sourceId string, til
 	}, completionCommand)
 }
 
-// SetCustomMvtVectorSourceTileData sets custom MVT vector source data for one
+// SetCustomVectorSourceTileData sets custom vector source data for one
 // canonical tile.
 //
-// See mln_map_set_custom_mvt_vector_source_tile_data in the C API reference:
+// See mln_map_set_custom_vector_source_tile_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomVectorSourceTileData(sourceId string, tileId CanonicalTileId, encoding StyleVectorTileEncoding, data []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
+		return int32(C.mln_map_set_custom_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), C.mln_style_vector_tile_encoding(encoding), bindingView(data, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
-// SetCustomMvtVectorSourceTileError reports a custom MVT vector source error
-// for one canonical tile.
+// SetCustomVectorSourceTileError reports a custom vector source error for one
+// canonical tile.
 //
-// See mln_map_set_custom_mvt_vector_source_tile_error in the C API reference:
+// See mln_map_set_custom_vector_source_tile_error in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
+		return int32(C.mln_map_set_custom_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7495,10 +7494,10 @@ func (view MapHandleDiscarding) AddCustomGeometrySource(sourceId string, options
 	})
 }
 
-func (view MapHandleDiscarding) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) error {
+func (view MapHandleDiscarding) AddCustomVectorSource(sourceId string, options CustomVectorSourceOptions) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
+		return int32(C.mln_map_add_custom_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomVectorSourceOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
@@ -7600,10 +7599,10 @@ func (view MapHandleDiscarding) InvalidateCustomGeometrySourceTile(sourceId stri
 	})
 }
 
-func (view MapHandleDiscarding) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) error {
+func (view MapHandleDiscarding) InvalidateCustomVectorSourceTile(sourceId string, tileId CanonicalTileId) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
+		return int32(C.mln_map_invalidate_custom_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
 	})
 }
 
@@ -7677,17 +7676,17 @@ func (view MapHandleDiscarding) SetCustomGeometrySourceTileError(sourceId string
 	})
 }
 
-func (view MapHandleDiscarding) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) error {
+func (view MapHandleDiscarding) SetCustomVectorSourceTileData(sourceId string, tileId CanonicalTileId, encoding StyleVectorTileEncoding, data []byte) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
+		return int32(C.mln_map_set_custom_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), C.mln_style_vector_tile_encoding(encoding), bindingView(data, arena), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) error {
+func (view MapHandleDiscarding) SetCustomVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
+		return int32(C.mln_map_set_custom_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
 	})
 }
 
@@ -7969,14 +7968,14 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	return
 }
 
-//export mlnGo_mln_custom_mvt_vector_source_options_fetch_tile
-func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+//export mlnGo_mln_custom_vector_source_options_fetch_tile
+func mlnGo_mln_custom_vector_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
+	callbacks, ok := bindingCallbackValue[CustomVectorSourceOptions](native_user_data)
 	if !ok || callbacks.FetchTile == nil {
 		return
 	}
@@ -7984,14 +7983,14 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 	return
 }
 
-//export mlnGo_mln_custom_mvt_vector_source_options_cancel_tile
-func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+//export mlnGo_mln_custom_vector_source_options_cancel_tile
+func mlnGo_mln_custom_vector_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
+	callbacks, ok := bindingCallbackValue[CustomVectorSourceOptions](native_user_data)
 	if !ok || callbacks.CancelTile == nil {
 		return
 	}

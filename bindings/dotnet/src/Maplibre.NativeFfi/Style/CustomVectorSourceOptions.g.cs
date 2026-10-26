@@ -3,14 +3,14 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for custom MVT vector sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Options for custom vector sources. The callback may run on any native worker
+/// thread, concurrently with runtime and map calls.
 /// </summary>
 /// <remarks>
-/// See <c>mln_custom_mvt_vector_source_options</c> in the <see
+/// See <c>mln_custom_vector_source_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
-public sealed record CustomMvtVectorSourceOptions
+public sealed record CustomVectorSourceOptions
 {
     /// <summary>
     /// Tile fetch callback.

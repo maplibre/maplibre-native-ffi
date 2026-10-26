@@ -14,10 +14,10 @@ void binding_mln_custom_geometry_source_options_fetch_tile(
 void binding_mln_custom_geometry_source_options_cancel_tile(
   void* user_data, mln_canonical_tile_id tile_id
 );
-void binding_mln_custom_mvt_vector_source_options_fetch_tile(
+void binding_mln_custom_vector_source_options_fetch_tile(
   void* user_data, mln_canonical_tile_id tile_id
 );
-void binding_mln_custom_mvt_vector_source_options_cancel_tile(
+void binding_mln_custom_vector_source_options_cancel_tile(
   void* user_data, mln_canonical_tile_id tile_id
 );
 void binding_mln_camera_transition_handler_callback(

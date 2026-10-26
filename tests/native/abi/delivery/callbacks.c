@@ -231,12 +231,12 @@ static void a_custom_source_delivers_its_fetches_and_cancels_then_retires(
     map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
   ));
 
-  mln_custom_mvt_vector_source_options mvt = {
-    .size = sizeof(mln_custom_mvt_vector_source_options)
+  mln_custom_vector_source_options mvt = {
+    .size = sizeof(mln_custom_vector_source_options)
   };
   mvt.queue = queue.handle;
   mvt.cancel_tile = unused_tile;
-  MLN_TEST_INVALID(mln_map_add_custom_mvt_vector_source(
+  MLN_TEST_INVALID(mln_map_add_custom_vector_source(
     map, MLN_BUFFER_LITERAL("refused"), &mvt, NULL, NULL
   ));
 

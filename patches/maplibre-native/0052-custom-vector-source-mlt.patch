@@ -1,0 +1,102 @@
+Lets a custom vector source take MapLibre Tiles as well as MVT, so a host
+that tiles its own data can deliver MLT bytes per tile. The tile decodes them
+with the map's FastPFOR option, as a vector source with "encoding": "mlt" does
+(https://github.com/maplibre/maplibre-native-ffi/issues/584).
+Upstream: not proposed
+
+diff --git a/include/mln/style/sources/custom_vector_source.hpp b/include/mln/style/sources/custom_vector_source.hpp
+index e02dcc1..6dd0b9c 100644
+--- a/include/mln/style/sources/custom_vector_source.hpp
++++ b/include/mln/style/sources/custom_vector_source.hpp
+@@ -23,6 +23,7 @@ class CustomVectorTileLoader;
+ 
+ enum class TileDataFormat : uint8_t {
+     MVT = 0,
++    MLT = 1,
+ };
+ 
+ class CustomVectorSource final : public Source {
+diff --git a/src/mln/renderer/sources/render_custom_vector_source.cpp b/src/mln/renderer/sources/render_custom_vector_source.cpp
+index 07bcee0..36ac607 100644
+--- a/src/mln/renderer/sources/render_custom_vector_source.cpp
++++ b/src/mln/renderer/sources/render_custom_vector_source.cpp
+@@ -50,7 +50,7 @@ void RenderCustomVectorSource::update(Immutable<style::Source::Impl> baseImpl_,
+                        {},
+                        [&](const OverscaledTileID& tileID, TileObserver* observer_) {
+                            return std::make_unique<CustomVectorTile>(
+-                               tileID, impl().id, parameters, *tileLoader, observer_);
++                               tileID, impl().id, parameters, *tileLoader, observer_, fastPFOREnabled);
+                        });
+ }
+ 
+diff --git a/src/mln/renderer/sources/render_custom_vector_source.hpp b/src/mln/renderer/sources/render_custom_vector_source.hpp
+index 187d06a..5178197 100644
+--- a/src/mln/renderer/sources/render_custom_vector_source.hpp
++++ b/src/mln/renderer/sources/render_custom_vector_source.hpp
+@@ -15,8 +15,12 @@ public:
+                 bool needsRelayout,
+                 const TileParameters&) override;
+ 
++    void setFastPFOREnabled(bool enable) override { fastPFOREnabled = enable; }
++
+ private:
+     const style::CustomVectorSource::Impl& impl() const;
++
++    bool fastPFOREnabled = false;
+ };
+ 
+ } // namespace mln
+diff --git a/src/mln/tile/custom_vector_tile.cpp b/src/mln/tile/custom_vector_tile.cpp
+index a3890fc..bd2768b 100644
+--- a/src/mln/tile/custom_vector_tile.cpp
++++ b/src/mln/tile/custom_vector_tile.cpp
+@@ -1,4 +1,5 @@
+ #include <mln/tile/custom_vector_tile.hpp>
++#include <mln/tile/vector_mlt_tile_data.hpp>
+ #include <mln/tile/vector_mvt_tile_data.hpp>
+ #include <mln/renderer/tile_parameters.hpp>
+ #include <mln/actor/scheduler.hpp>
+@@ -13,8 +14,10 @@ CustomVectorTile::CustomVectorTile(const OverscaledTileID& overscaledTileID,
+                                    std::string sourceID_,
+                                    const TileParameters& parameters,
+                                    ActorRef<style::CustomVectorTileLoader> loader_,
+-                                   TileObserver* observer_)
++                                   TileObserver* observer_,
++                                   bool fastPFOREnabled_)
+     : GeometryTile(overscaledTileID, std::move(sourceID_), parameters, observer_),
++      fastPFOREnabled(fastPFOREnabled_),
+       necessity(TileNecessity::Optional),
+       loader(std::move(loader_)),
+       mailbox(std::make_shared<Mailbox>(*Scheduler::GetCurrent())),
+@@ -31,6 +34,9 @@ void CustomVectorTile::setTileData(const std::shared_ptr<const std::string>& dat
+         case style::TileDataFormat::MVT:
+             GeometryTile::setData(data ? std::make_unique<VectorMVTTileData>(data) : nullptr);
+             break;
++        case style::TileDataFormat::MLT:
++            GeometryTile::setData(data ? std::make_unique<VectorMLTTileData>(data, fastPFOREnabled) : nullptr);
++            break;
+         default:
+             assert(false && "Unhandled TileDataFormat");
+             GeometryTile::setData(nullptr);
+diff --git a/src/mln/tile/custom_vector_tile.hpp b/src/mln/tile/custom_vector_tile.hpp
+index 4bb9161..e017def 100644
+--- a/src/mln/tile/custom_vector_tile.hpp
++++ b/src/mln/tile/custom_vector_tile.hpp
+@@ -18,7 +18,8 @@ public:
+                      std::string sourceID,
+                      const TileParameters&,
+                      ActorRef<style::CustomVectorTileLoader> loader,
+-                     TileObserver* observer = nullptr);
++                     TileObserver* observer = nullptr,
++                     bool fastPFOREnabled = false);
+     ~CustomVectorTile() override;
+ 
+     void setTileData(const std::shared_ptr<const std::string>& data, style::TileDataFormat format);
+@@ -28,6 +29,7 @@ public:
+ 
+ private:
+     bool stale = true;
++    bool fastPFOREnabled;
+     TileNecessity necessity;
+     ActorRef<style::CustomVectorTileLoader> loader;
+     std::shared_ptr<Mailbox> mailbox;

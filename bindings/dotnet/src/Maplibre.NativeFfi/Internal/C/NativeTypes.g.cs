@@ -183,10 +183,10 @@ internal unsafe struct mln_custom_geometry_source_options
     public MlnDeliveryQueue queue;
 }
 
-internal unsafe struct mln_custom_mvt_vector_source_options
+internal unsafe struct mln_custom_vector_source_options
 {
     public uint size;
-    public mln_custom_mvt_vector_source_option_field fields;
+    public mln_custom_vector_source_option_field fields;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
     public void* user_data;
@@ -1347,10 +1347,10 @@ internal enum mln_custom_geometry_source_option_field : uint
     MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64,
 }
 
-internal enum mln_custom_mvt_vector_source_option_field : uint
+internal enum mln_custom_vector_source_option_field : uint
 {
-    MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1,
-    MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2,
+    MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1,
+    MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2,
 }
 
 internal enum mln_feature_state_selector_field : uint
@@ -1856,8 +1856,8 @@ internal enum mln_style_source_type : uint
     MLN_STYLE_SOURCE_TYPE_IMAGE = 5,
     MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
     MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9,
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY = 8,
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 9,
 }
 
 internal enum mln_style_tile_scheme : uint

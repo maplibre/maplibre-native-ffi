@@ -39,11 +39,11 @@ class _MapHandle:
     def _discard_add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> None: ...
-    def add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions
+    def add_custom_vector_source(
+        self, source_id: str, options: CustomVectorSourceOptions
     ) -> Future[CommandCompletion]: ...
-    def _discard_add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions
+    def _discard_add_custom_vector_source(
+        self, source_id: str, options: CustomVectorSourceOptions
     ) -> None: ...
     def add_geo_json_source_data(
         self, source_id: str, data: _GeoJsonSourceDataHandle
@@ -178,10 +178,10 @@ class _MapHandle:
     def _discard_invalidate_custom_geometry_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> None: ...
-    def invalidate_custom_mvt_vector_source_tile(
+    def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> Future[CommandCompletion]: ...
-    def _discard_invalidate_custom_mvt_vector_source_tile(
+    def _discard_invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> None: ...
     def lat_lng_bounds_for_camera(
@@ -230,16 +230,24 @@ class _MapHandle:
     def _discard_set_custom_geometry_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> None: ...
-    def set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
+    def set_custom_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        encoding: StyleVectorTileEncoding,
+        data: Buffer,
     ) -> Future[CommandCompletion]: ...
-    def _discard_set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
+    def _discard_set_custom_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        encoding: StyleVectorTileEncoding,
+        data: Buffer,
     ) -> None: ...
-    def set_custom_mvt_vector_source_tile_error(
+    def set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> Future[CommandCompletion]: ...
-    def _discard_set_custom_mvt_vector_source_tile_error(
+    def _discard_set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> None: ...
     def set_debug_options(self, options: MapDebugFlag) -> Future[CommandCompletion]: ...

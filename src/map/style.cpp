@@ -130,9 +130,9 @@ auto to_c_source_type(mln::style::SourceType type) -> mln_style_source_type {
     case mln::style::SourceType::Image:
       return MLN_STYLE_SOURCE_TYPE_IMAGE;
     case mln::style::SourceType::CustomVector:
-      return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
+      return MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY;
     case mln::style::SourceType::CustomMVTVector:
-      return MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR;
+      return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
   }
   assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
@@ -333,31 +333,31 @@ auto to_native_custom_geometry_source_options(
   return result;
 }
 
-auto has_custom_mvt_vector_source_option(
-  const mln_custom_mvt_vector_source_options& options, uint32_t field
+auto has_custom_vector_source_option(
+  const mln_custom_vector_source_options& options, uint32_t field
 ) -> bool {
   return (options.fields & field) != 0U;
 }
 
-auto effective_custom_mvt_vector_source_options(
-  const mln_custom_mvt_vector_source_options& options
-) -> mln_custom_mvt_vector_source_options {
-  auto result = mln::core::custom_mvt_vector_source_options_default();
+auto effective_custom_vector_source_options(
+  const mln_custom_vector_source_options& options
+) -> mln_custom_vector_source_options {
+  auto result = mln::core::custom_vector_source_options_default();
   result.fields = options.fields;
   result.fetch_tile = options.fetch_tile;
   result.cancel_tile = options.cancel_tile;
   result.user_data = options.user_data;
   result.release_user_data = options.release_user_data;
   if (
-    has_custom_mvt_vector_source_option(
-      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    has_custom_vector_source_option(
+      options, MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM
     )
   ) {
     result.min_zoom = options.min_zoom;
   }
   if (
-    has_custom_mvt_vector_source_option(
-      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    has_custom_vector_source_option(
+      options, MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM
     )
   ) {
     result.max_zoom = options.max_zoom;
@@ -365,8 +365,21 @@ auto effective_custom_mvt_vector_source_options(
   return result;
 }
 
-auto to_native_custom_mvt_vector_source_options(
-  const mln_custom_mvt_vector_source_options& options
+auto to_native_tile_data_format(mln_style_vector_tile_encoding encoding)
+  -> mln::style::TileDataFormat {
+  switch (encoding) {
+    case MLN_STYLE_VECTOR_TILE_ENCODING_MVT:
+      return mln::style::TileDataFormat::MVT;
+    case MLN_STYLE_VECTOR_TILE_ENCODING_MLT:
+      return mln::style::TileDataFormat::MLT;
+    default:
+      assert(false);
+      return mln::style::TileDataFormat::MVT;
+  }
+}
+
+auto to_native_custom_vector_source_options(
+  const mln_custom_vector_source_options& options
 ) -> mln::style::CustomVectorSource::Options {
   auto result = mln::style::CustomVectorSource::Options{};
   result.fetchTileFunction =
@@ -823,10 +836,10 @@ auto custom_geometry_source_options_default() noexcept
   };
 }
 
-auto custom_mvt_vector_source_options_default() noexcept
-  -> mln_custom_mvt_vector_source_options {
-  return mln_custom_mvt_vector_source_options{
-    .size = sizeof(mln_custom_mvt_vector_source_options),
+auto custom_vector_source_options_default() noexcept
+  -> mln_custom_vector_source_options {
+  return mln_custom_vector_source_options{
+    .size = sizeof(mln_custom_vector_source_options),
     .fields = 0,
     .fetch_tile = nullptr,
     .cancel_tile = nullptr,
@@ -936,31 +949,31 @@ auto validate_custom_geometry_source_options(
   return MLN_STATUS_OK;
 }
 
-auto validate_custom_mvt_vector_source_options(
-  const mln_custom_mvt_vector_source_options* options
+auto validate_custom_vector_source_options(
+  const mln_custom_vector_source_options* options
 ) -> mln_status {
   if (options == nullptr) {
     mln::core::set_thread_error("options must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (options->size < sizeof(mln_custom_mvt_vector_source_options)) {
+  if (options->size < sizeof(mln_custom_vector_source_options)) {
     mln::core::set_thread_error(
-      "mln_custom_mvt_vector_source_options.size is too small"
+      "mln_custom_vector_source_options.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM) |
-    MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+    static_cast<uint32_t>(MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
-      "mln_custom_mvt_vector_source_options.fields contains unknown bits"
+      "mln_custom_vector_source_options.fields contains unknown bits"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    has_custom_mvt_vector_source_option(
-      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    has_custom_vector_source_option(
+      *options, MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM
     )
   ) {
     const auto status =
@@ -970,8 +983,8 @@ auto validate_custom_mvt_vector_source_options(
     }
   }
   if (
-    has_custom_mvt_vector_source_option(
-      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    has_custom_vector_source_option(
+      *options, MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM
     )
   ) {
     const auto status =
@@ -980,7 +993,7 @@ auto validate_custom_mvt_vector_source_options(
       return status;
     }
   }
-  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  const auto effective = effective_custom_vector_source_options(*options);
   if (effective.min_zoom > effective.max_zoom) {
     mln::core::set_thread_error(
       "min_zoom must be less than or equal to max_zoom"
@@ -1438,7 +1451,7 @@ auto map_invalidate_custom_geometry_source_region(
   return MLN_STATUS_OK;
 }
 
-auto lookup_custom_mvt_vector_source(
+auto lookup_custom_vector_source(
   MapObject& live, mln_buffer_view source_id,
   mln::style::CustomVectorSource*& out_source
 ) -> mln_status {
@@ -1450,15 +1463,15 @@ auto lookup_custom_mvt_vector_source(
   }
   out_source = source->as<mln::style::CustomVectorSource>();
   if (out_source == nullptr) {
-    set_thread_error("source is not a custom MVT vector source");
+    set_thread_error("source is not a custom vector source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
 }
 
-auto map_add_custom_mvt_vector_source(
+auto map_add_custom_vector_source(
   MapObject& live, mln_buffer_view source_id,
-  const mln_custom_mvt_vector_source_options* options
+  const mln_custom_vector_source_options* options
 ) -> mln_status {
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
@@ -1467,20 +1480,20 @@ auto map_add_custom_mvt_vector_source(
     return add_status;
   }
 
-  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  const auto effective = effective_custom_vector_source_options(*options);
   // Tracked before the style takes the source, so the two cannot disagree. A
   // throw while tracking leaves no source in the style, and a style that
   // rejects the source untracks it again; either way the add failed and the
   // caller still owns user_data. Tracking afterwards would leave a live source
   // whose release never runs.
   track_callback_source(
-    live, id, CallbackSourceKind::CustomMvtVector, effective.release_user_data,
+    live, id, CallbackSourceKind::CustomVector, effective.release_user_data,
     effective.user_data
   );
   try {
     style.addSource(
       std::make_unique<mln::style::CustomVectorSource>(
-        id, to_native_custom_mvt_vector_source_options(effective)
+        id, to_native_custom_vector_source_options(effective)
       )
     );
   } catch (...) {
@@ -1495,9 +1508,9 @@ auto map_add_custom_mvt_vector_source(
   return MLN_STATUS_OK;
 }
 
-auto map_set_custom_mvt_vector_source_tile_data(
+auto map_set_custom_vector_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data
+  mln_style_vector_tile_encoding encoding, mln_buffer_view data
 ) -> mln_status {
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
@@ -1506,7 +1519,7 @@ auto map_set_custom_mvt_vector_source_tile_data(
 
   mln::style::CustomVectorSource* custom_source = nullptr;
   const auto source_status =
-    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+    lookup_custom_vector_source(live, source_id, custom_source);
   if (source_status != MLN_STATUS_OK) {
     return source_status;
   }
@@ -1519,12 +1532,12 @@ auto map_set_custom_mvt_vector_source_tile_data(
   }
   custom_source->setTileData(
     to_native_canonical_tile_id(tile_id), native_data,
-    mln::style::TileDataFormat::MVT
+    to_native_tile_data_format(encoding)
   );
   return MLN_STATUS_OK;
 }
 
-auto map_set_custom_mvt_vector_source_tile_error(
+auto map_set_custom_vector_source_tile_error(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message
 ) -> mln_status {
@@ -1535,7 +1548,7 @@ auto map_set_custom_mvt_vector_source_tile_error(
 
   mln::style::CustomVectorSource* custom_source = nullptr;
   const auto source_status =
-    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+    lookup_custom_vector_source(live, source_id, custom_source);
   if (source_status != MLN_STATUS_OK) {
     return source_status;
   }
@@ -1547,7 +1560,7 @@ auto map_set_custom_mvt_vector_source_tile_error(
   return MLN_STATUS_OK;
 }
 
-auto map_invalidate_custom_mvt_vector_source_tile(
+auto map_invalidate_custom_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
   const auto tile_status = validate_canonical_tile_id(tile_id);
@@ -1557,7 +1570,7 @@ auto map_invalidate_custom_mvt_vector_source_tile(
 
   mln::style::CustomVectorSource* custom_source = nullptr;
   const auto source_status =
-    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+    lookup_custom_vector_source(live, source_id, custom_source);
   if (source_status != MLN_STATUS_OK) {
     return source_status;
   }

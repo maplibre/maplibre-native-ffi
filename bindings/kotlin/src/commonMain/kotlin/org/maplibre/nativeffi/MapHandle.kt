@@ -64,22 +64,22 @@ internal constructor(
     }
 
   /**
-   * Adds a custom MVT vector source. The callback may run on any native worker thread, concurrently
+   * Adds a custom vector source. The callback may run on any native worker thread, concurrently
    * with runtime and map calls.
    *
-   * See `mln_map_add_custom_mvt_vector_source` in the
+   * See `mln_map_add_custom_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun addCustomMvtVectorSource(
+  public fun addCustomVectorSource(
     sourceId: String,
-    options: CustomMvtVectorSourceOptions,
+    options: CustomVectorSourceOptions,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
-        C.mln_map_add_custom_mvt_vector_source(
+        C.mln_map_add_custom_vector_source(
           handle,
           view(sourceId),
-          writeCustomMvtVectorSourceOptions(options),
+          writeCustomVectorSourceOptions(options),
           completion,
           diagnostic,
         ),
@@ -737,18 +737,18 @@ internal constructor(
     }
 
   /**
-   * Invalidates custom MVT vector source data for one canonical tile.
+   * Invalidates custom vector source data for one canonical tile.
    *
-   * See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+   * See `mln_map_invalidate_custom_vector_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun invalidateCustomMvtVectorSourceTile(
+  public fun invalidateCustomVectorSourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_invalidate_custom_mvt_vector_source_tile(
+        C.mln_map_invalidate_custom_vector_source_tile(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
@@ -1014,22 +1014,24 @@ internal constructor(
     }
 
   /**
-   * Sets custom MVT vector source data for one canonical tile.
+   * Sets custom vector source data for one canonical tile.
    *
-   * See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+   * See `mln_map_set_custom_vector_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setCustomMvtVectorSourceTileData(
+  public fun setCustomVectorSourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
+    encoding: StyleVectorTileEncoding,
     data: ByteArray,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_custom_mvt_vector_source_tile_data(
+        C.mln_map_set_custom_vector_source_tile_data(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
+          encoding.rawValue.toInt(),
           view(data),
           completion,
           diagnostic,
@@ -1038,19 +1040,19 @@ internal constructor(
     }
 
   /**
-   * Reports a custom MVT vector source error for one canonical tile.
+   * Reports a custom vector source error for one canonical tile.
    *
-   * See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+   * See `mln_map_set_custom_vector_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setCustomMvtVectorSourceTileError(
+  public fun setCustomVectorSourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_custom_mvt_vector_source_tile_error(
+        C.mln_map_set_custom_vector_source_tile_error(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
@@ -1513,17 +1515,14 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.addCustomMvtVectorSource] without its completion. */
-  public fun addCustomMvtVectorSource(
-    sourceId: String,
-    options: CustomMvtVectorSourceOptions,
-  ): Unit =
+  /** [MapHandle.addCustomVectorSource] without its completion. */
+  public fun addCustomVectorSource(sourceId: String, options: CustomVectorSourceOptions): Unit =
     nativeDiscard(owner, binding, bindingCallbacks) {
       check(
-        C.mln_map_add_custom_mvt_vector_source(
+        C.mln_map_add_custom_vector_source(
           handle,
           view(sourceId),
-          writeCustomMvtVectorSourceOptions(options),
+          writeCustomVectorSourceOptions(options),
           completion,
           diagnostic,
         ),
@@ -1693,11 +1692,11 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.invalidateCustomMvtVectorSourceTile] without its completion. */
-  public fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
+  /** [MapHandle.invalidateCustomVectorSourceTile] without its completion. */
+  public fun invalidateCustomVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_invalidate_custom_mvt_vector_source_tile(
+        C.mln_map_invalidate_custom_vector_source_tile(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
@@ -1808,18 +1807,20 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.setCustomMvtVectorSourceTileData] without its completion. */
-  public fun setCustomMvtVectorSourceTileData(
+  /** [MapHandle.setCustomVectorSourceTileData] without its completion. */
+  public fun setCustomVectorSourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
+    encoding: StyleVectorTileEncoding,
     data: ByteArray,
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_custom_mvt_vector_source_tile_data(
+        C.mln_map_set_custom_vector_source_tile_data(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
+          encoding.rawValue.toInt(),
           view(data),
           completion,
           diagnostic,
@@ -1827,15 +1828,15 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.setCustomMvtVectorSourceTileError] without its completion. */
-  public fun setCustomMvtVectorSourceTileError(
+  /** [MapHandle.setCustomVectorSourceTileError] without its completion. */
+  public fun setCustomVectorSourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_custom_mvt_vector_source_tile_error(
+        C.mln_map_set_custom_vector_source_tile_error(
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),

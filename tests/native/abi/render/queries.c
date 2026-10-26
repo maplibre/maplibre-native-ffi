@@ -446,13 +446,13 @@ static void source_queries_read_the_named_source_layers(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
-  mln_custom_mvt_vector_source_options options = {
-    .size = sizeof(mln_custom_mvt_vector_source_options)
+  mln_custom_vector_source_options options = {
+    .size = sizeof(mln_custom_vector_source_options)
   };
   options.fetch_tile = count_fetch;
   options.cancel_tile = ignore_cancel;
   options.user_data = &fetches;
-  MLN_TEST_AWAIT_OK(mln_map_add_custom_mvt_vector_source(
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_vector_source(
     map, MLN_BUFFER_LITERAL("tiles"), &options, &completion.descriptor, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
@@ -469,9 +469,10 @@ static void source_queries_read_the_named_source_layers(void) {
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     &fixture, root_fetched, &fetched, "the root tile fetch"
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_data(
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_vector_source_tile_data(
     map, MLN_BUFFER_LITERAL("tiles"),
     (mln_canonical_tile_id){.z = 0, .x = 0, .y = 0},
+    MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
     mln_test_buffer_view(two_layer_tile, sizeof(two_layer_tile)),
     &completion.descriptor, NULL
   ));

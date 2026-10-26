@@ -743,8 +743,8 @@ class StyleSourceType(UnknownIntEnum):
     IMAGE = 5
     VIDEO = 6
     ANNOTATIONS = 7
-    CUSTOM_VECTOR = 8
-    CUSTOM_MVT_VECTOR = 9
+    CUSTOM_GEOMETRY = 8
+    CUSTOM_VECTOR = 9
 
 
 class StyleTileScheme(UnknownIntEnum):
@@ -1145,8 +1145,8 @@ class CameraUpdate:
 
 @dataclass(frozen=True, slots=True)
 class CanonicalTileId:
-    """Canonical tile identity used by custom geometry and custom MVT vector
-    source callbacks.
+    """Canonical tile identity used by custom geometry and custom vector source
+    callbacks.
 
     See `mln_canonical_tile_id` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1199,11 +1199,11 @@ class CustomGeometrySourceOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class CustomMvtVectorSourceOptions:
-    """Options for custom MVT vector sources. The callback may run on any native
+class CustomVectorSourceOptions:
+    """Options for custom vector sources. The callback may run on any native
     worker thread, concurrently with runtime and map calls.
 
-    See `mln_custom_mvt_vector_source_options` in the
+    See `mln_custom_vector_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
@@ -4286,7 +4286,7 @@ class CameraTransitionEndCallback(Protocol):
 
 
 class CustomSourceCancelTileCallback(Protocol):
-    """Cancels a request for one tile of a custom geometry or custom MVT vector
+    """Cancels a request for one tile of a custom geometry or custom vector
     source, best effort. The callback may run on any native worker thread,
     concurrently with runtime and map calls.
 
@@ -4298,7 +4298,7 @@ class CustomSourceCancelTileCallback(Protocol):
 
 
 class CustomSourceFetchTileCallback(Protocol):
-    """Requests one tile of a custom geometry or custom MVT vector source. The
+    """Requests one tile of a custom geometry or custom vector source. The
     callback may run on any native worker thread, concurrently with runtime
     and map calls.
 

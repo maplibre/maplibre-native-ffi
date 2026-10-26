@@ -1,4 +1,4 @@
-// Custom geometry and custom MVT vector sources: when the host's callback state
+// Custom geometry and custom vector sources: when the host's callback state
 // is released, delivered tiles becoming features, failed tiles being reported,
 // and an invalidation cancelling and refetching a tile.
 //
@@ -74,25 +74,25 @@ static mln_status add_geometry_source(
   );
 }
 
-static mln_status add_mvt_source(
+static mln_status add_vector_source(
   mln_map map, custom_probe* probe, enum add_variant variant,
   const mln_completion* completion
 ) {
-  mln_custom_mvt_vector_source_options options = {
-    .size = sizeof(mln_custom_mvt_vector_source_options)
+  mln_custom_vector_source_options options = {
+    .size = sizeof(mln_custom_vector_source_options)
   };
   options.fetch_tile = variant == ADD_WITHOUT_FETCH ? NULL : probe_fetch_tile;
   options.cancel_tile = probe_cancel_tile;
   options.user_data = probe;
   options.release_user_data = probe_release;
   if (variant == ADD_NEGATIVE_MIN_ZOOM) {
-    options.fields = MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+    options.fields = MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM;
     options.min_zoom = -1;
   }
-  return mln_map_add_custom_mvt_vector_source(
+  return mln_map_add_custom_vector_source(
     map,
     variant == ADD_WITHOUT_ID ? MLN_BUFFER_LITERAL("")
-                              : MLN_BUFFER_LITERAL("custom-mvt-vector"),
+                              : MLN_BUFFER_LITERAL("custom-vector"),
     &options, completion, NULL
   );
 }
@@ -123,8 +123,9 @@ static const uint8_t mvt_point_tile[] = {
 static mln_status deliver_mvt_point(
   mln_map map, const mln_completion* completion
 ) {
-  return mln_map_set_custom_mvt_vector_source_tile_data(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile,
+  return mln_map_set_custom_vector_source_tile_data(
+    map, MLN_BUFFER_LITERAL("custom-vector"), root_tile,
+    MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
     (mln_buffer_view){.data = mvt_point_tile, .size = sizeof(mvt_point_tile)},
     completion, NULL
   );
@@ -157,18 +158,20 @@ static mln_status invalidate_geometry_region(
   );
 }
 
-static mln_status fail_mvt_tile(mln_map map, const mln_completion* completion) {
-  return mln_map_set_custom_mvt_vector_source_tile_error(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile,
+static mln_status fail_vector_tile(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_set_custom_vector_source_tile_error(
+    map, MLN_BUFFER_LITERAL("custom-vector"), root_tile,
     MLN_BUFFER_LITERAL("provider failed"), completion, NULL
   );
 }
 
-static mln_status invalidate_mvt_tile(
+static mln_status invalidate_vector_tile(
   mln_map map, const mln_completion* completion
 ) {
-  return mln_map_invalidate_custom_mvt_vector_source_tile(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile, completion, NULL
+  return mln_map_invalidate_custom_vector_source_tile(
+    map, MLN_BUFFER_LITERAL("custom-vector"), root_tile, completion, NULL
   );
 }
 
@@ -208,15 +211,15 @@ static const custom_kind kinds[] = {
     .invalidate_region = invalidate_geometry_region,
   },
   {
-    .name = "custom MVT vector",
-    .source_id = "custom-mvt-vector",
+    .name = "custom vector",
+    .source_id = "custom-vector",
     .source_layer = "points",
     .layer_json = "{\"id\":\"custom-dots\",\"type\":\"circle\",\"source\":"
-                  "\"custom-mvt-vector\",\"source-layer\":\"points\"}",
-    .add = add_mvt_source,
+                  "\"custom-vector\",\"source-layer\":\"points\"}",
+    .add = add_vector_source,
     .deliver_point = deliver_mvt_point,
-    .fail_root = fail_mvt_tile,
-    .invalidate_root = invalidate_mvt_tile,
+    .fail_root = fail_vector_tile,
+    .invalidate_root = invalidate_vector_tile,
   },
 };
 
@@ -666,37 +669,38 @@ static uint32_t source_type(mln_map map, const char* id) {
 }
 
 // Tile data and errors go to a tile inside its zoom level's grid of a custom
-// source of the matching kind that exists. An empty tile is data, and a tile
-// operation against the other kind is accepted and then fails on the worker.
+// source of the matching kind that exists, in an encoding the API names. An
+// empty tile is data, and a tile operation against the other kind is accepted
+// and then fails on the worker.
 static void tile_operations_check_their_tile_and_source_kind(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   custom_probe geometry_probe;
-  custom_probe mvt_probe;
+  custom_probe vector_probe;
   init_probe(&geometry_probe);
-  init_probe(&mvt_probe);
+  init_probe(&vector_probe);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   add_source(&kinds[0], map, &geometry_probe);
-  add_source(&kinds[1], map, &mvt_probe);
+  add_source(&kinds[1], map, &vector_probe);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR, source_type(map, "custom-geometry")
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY, source_type(map, "custom-geometry")
   );
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
-    source_type(map, "custom-mvt-vector")
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR, source_type(map, "custom-vector")
   );
 
   const mln_buffer_view geometry = MLN_BUFFER_LITERAL("custom-geometry");
-  const mln_buffer_view mvt = MLN_BUFFER_LITERAL("custom-mvt-vector");
+  const mln_buffer_view vector = MLN_BUFFER_LITERAL("custom-vector");
   const mln_buffer_view empty = {.data = NULL, .size = 0};
   const mln_buffer_view no_features =
     MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}");
   const mln_buffer_view missing = MLN_BUFFER_LITERAL("missing");
-  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_data(
-    map, mvt, root_tile, empty, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_vector_source_tile_data(
+    map, vector, root_tile, MLN_STYLE_VECTOR_TILE_ENCODING_MVT, empty,
+    &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_error(
-    map, mvt, root_tile, missing, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_vector_source_tile_error(
+    map, vector, root_tile, missing, &completion.descriptor, NULL
   ));
   MLN_TEST_OK(submit_and_settle(&kinds[1], map, kinds[1].invalidate_root));
 
@@ -707,59 +711,68 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
       no_features, &completion.descriptor, NULL
     )
   );
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "encoding is invalid",
+    mln_map_set_custom_vector_source_tile_data(
+      map, vector, root_tile, (mln_style_vector_tile_encoding)2, empty,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "does not exist",
-    mln_map_set_custom_mvt_vector_source_tile_data(
-      map, missing, root_tile, empty, &completion.descriptor, NULL
+    mln_map_set_custom_vector_source_tile_data(
+      map, missing, root_tile, MLN_STYLE_VECTOR_TILE_ENCODING_MVT, empty,
+      &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_custom_mvt_vector_source_tile_data(
-      map, geometry, root_tile, empty, &completion.descriptor, NULL
+    mln_map_set_custom_vector_source_tile_data(
+      map, geometry, root_tile, MLN_STYLE_VECTOR_TILE_ENCODING_MVT, empty,
+      &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_custom_mvt_vector_source_tile_error(
+    mln_map_set_custom_vector_source_tile_error(
       map, geometry, root_tile, missing, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_invalidate_custom_mvt_vector_source_tile(
+    mln_map_invalidate_custom_vector_source_tile(
       map, geometry, root_tile, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_custom_geometry_source_tile_data(
-      map, mvt, root_tile, no_features, &completion.descriptor, NULL
+      map, vector, root_tile, no_features, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_custom_geometry_source_tile_error(
-      map, mvt, root_tile, missing, &completion.descriptor, NULL
+      map, vector, root_tile, missing, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_invalidate_custom_geometry_source_tile(
-      map, mvt, root_tile, &completion.descriptor, NULL
+      map, vector, root_tile, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_invalidate_custom_geometry_source_region(
-      map, mvt, (mln_lat_lng_bounds){{-1, -1}, {1, 1}}, &completion.descriptor,
-      NULL
+      map, vector, (mln_lat_lng_bounds){{-1, -1}, {1, 1}},
+      &completion.descriptor, NULL
     )
   );
 
   MLN_TEST_OK(mln_test_map_close(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&vector_probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -830,8 +843,8 @@ static void custom_sources_take_and_validate_every_option(void) {
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   custom_probe geometry_probe;
   init_probe(&geometry_probe);
-  custom_probe mvt_probe;
-  init_probe(&mvt_probe);
+  custom_probe vector_probe;
+  init_probe(&vector_probe);
 
   mln_custom_geometry_source_options geometry =
     every_geometry_option(&geometry_probe);
@@ -863,26 +876,26 @@ static void custom_sources_take_and_validate_every_option(void) {
     mln_test_completion_destroy(&completion);
   }
 
-  mln_custom_mvt_vector_source_options mvt = {
-    .size = sizeof(mln_custom_mvt_vector_source_options)
+  mln_custom_vector_source_options vector = {
+    .size = sizeof(mln_custom_vector_source_options)
   };
-  mvt.fields = MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM |
-               MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
-  mvt.min_zoom = 2;
-  mvt.max_zoom = 10;
-  mvt.fetch_tile = probe_fetch_tile;
-  mvt.user_data = &mvt_probe;
-  mvt.release_user_data = probe_release;
-  MLN_TEST_AWAIT_OK(mln_map_add_custom_mvt_vector_source(
-    map, MLN_BUFFER_LITERAL("every-mvt-option"), &mvt, &completion.descriptor,
-    NULL
+  vector.fields = MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM |
+                  MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+  vector.min_zoom = 2;
+  vector.max_zoom = 10;
+  vector.fetch_tile = probe_fetch_tile;
+  vector.user_data = &vector_probe;
+  vector.release_user_data = probe_release;
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_vector_source(
+    map, MLN_BUFFER_LITERAL("every-vector-option"), &vector,
+    &completion.descriptor, NULL
   ));
-  mln_custom_mvt_vector_source_options rejected = mvt;
+  mln_custom_vector_source_options rejected = vector;
   rejected.max_zoom = 4.5;
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "max_zoom must be an integer within [0, 32]",
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("mvt-fractional"), &rejected,
+    mln_map_add_custom_vector_source(
+      map, MLN_BUFFER_LITERAL("vector-fractional"), &rejected,
       &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
@@ -890,15 +903,15 @@ static void custom_sources_take_and_validate_every_option(void) {
   rejected.max_zoom = 4.0;
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "min_zoom must be less than or equal to max_zoom",
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("mvt-inverted"), &rejected,
+    mln_map_add_custom_vector_source(
+      map, MLN_BUFFER_LITERAL("vector-inverted"), &rejected,
       &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 
   MLN_TEST_OK(mln_test_map_close(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&vector_probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 

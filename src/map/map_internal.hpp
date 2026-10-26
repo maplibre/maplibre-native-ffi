@@ -118,7 +118,7 @@ struct HandleTraits<MapProjectionObject> {
 };
 
 // The kinds of host-callback-backed sources the registry tracks.
-enum class CallbackSourceKind : uint8_t { CustomGeometry, CustomMvtVector };
+enum class CallbackSourceKind : uint8_t { CustomGeometry, CustomVector };
 
 using CallbackSourceRelease = void (*)(void*);
 

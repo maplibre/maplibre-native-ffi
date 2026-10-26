@@ -11,10 +11,10 @@ internal actual object UpcallStubs {
     Jni.upcallStub("customGeometrySourceOptionsFetchTile")
   actual val customGeometrySourceOptionsCancelTile: Long =
     Jni.upcallStub("customGeometrySourceOptionsCancelTile")
-  actual val customMvtVectorSourceOptionsFetchTile: Long =
-    Jni.upcallStub("customMvtVectorSourceOptionsFetchTile")
-  actual val customMvtVectorSourceOptionsCancelTile: Long =
-    Jni.upcallStub("customMvtVectorSourceOptionsCancelTile")
+  actual val customVectorSourceOptionsFetchTile: Long =
+    Jni.upcallStub("customVectorSourceOptionsFetchTile")
+  actual val customVectorSourceOptionsCancelTile: Long =
+    Jni.upcallStub("customVectorSourceOptionsCancelTile")
   actual val resourceRequestCancelHandlerCallback: Long =
     Jni.upcallStub("resourceRequestCancelHandlerCallback")
   actual val runtimeEventHandlerCallback: Long = Jni.upcallStub("runtimeEventHandlerCallback")

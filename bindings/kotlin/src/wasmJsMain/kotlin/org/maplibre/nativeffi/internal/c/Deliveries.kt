@@ -62,8 +62,8 @@ internal object Deliveries {
           is CustomGeometrySourceOptions -> {
             Upcalls.customGeometrySourceOptionsFetchTile(token, payload)
           }
-          is CustomMvtVectorSourceOptions -> {
-            Upcalls.customMvtVectorSourceOptionsFetchTile(token, payload)
+          is CustomVectorSourceOptions -> {
+            Upcalls.customVectorSourceOptionsFetchTile(token, payload)
           }
           else -> Unit
         }
@@ -72,8 +72,8 @@ internal object Deliveries {
           is CustomGeometrySourceOptions -> {
             Upcalls.customGeometrySourceOptionsCancelTile(token, payload)
           }
-          is CustomMvtVectorSourceOptions -> {
-            Upcalls.customMvtVectorSourceOptionsCancelTile(token, payload)
+          is CustomVectorSourceOptions -> {
+            Upcalls.customVectorSourceOptionsCancelTile(token, payload)
           }
           else -> Unit
         }

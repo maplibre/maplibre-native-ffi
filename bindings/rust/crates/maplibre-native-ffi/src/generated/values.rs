@@ -543,7 +543,7 @@ impl Default for CameraUpdateMode {
     }
 }
 
-/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// Canonical tile identity used by custom geometry and custom vector source
 /// callbacks.
 ///
 /// See `mln_canonical_tile_id` in the
@@ -721,13 +721,13 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
     }
 }
 
-/// Options for custom MVT vector sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// Options for custom vector sources. The callback may run on any native worker
+/// thread, concurrently with runtime and map calls.
 ///
-/// See `mln_custom_mvt_vector_source_options` in the
+/// See `mln_custom_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
-pub struct CustomMvtVectorSourceOptions {
+pub struct CustomVectorSourceOptions {
     /// Tile fetch callback.
     ///
     /// The callback receives (`tile_id`).
@@ -739,13 +739,13 @@ pub struct CustomMvtVectorSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
 }
-impl std::fmt::Debug for CustomMvtVectorSourceOptions {
+impl std::fmt::Debug for CustomVectorSourceOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CustomMvtVectorSourceOptions")
+        f.debug_struct("CustomVectorSourceOptions")
             .finish_non_exhaustive()
     }
 }
-impl CustomMvtVectorSourceOptions {
+impl CustomVectorSourceOptions {
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
         F: Fn(CanonicalTileId) + Send + Sync + 'static,
@@ -789,25 +789,22 @@ impl CustomMvtVectorSourceOptions {
         })
     }
 }
-impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
-    fn to_native(
-        &self,
-        arena: &mut InputArena,
-    ) -> Result<sys::mln_custom_mvt_vector_source_options> {
-        let mut raw: sys::mln_custom_mvt_vector_source_options = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_custom_vector_source_options> for CustomVectorSourceOptions {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_custom_vector_source_options> {
+        let mut raw: sys::mln_custom_vector_source_options = unsafe { std::mem::zeroed() };
         raw.fields = 0;
-        raw.size = std::mem::size_of::<sys::mln_custom_mvt_vector_source_options>() as _;
+        raw.size = std::mem::size_of::<sys::mln_custom_vector_source_options>() as _;
         raw.fetch_tile = Some(Self::fetch_tile_trampoline as _);
         raw.cancel_tile = self
             .cancel_tile
             .as_ref()
             .map(|_| Self::cancel_tile_trampoline as _);
         if let Some(item) = &self.min_zoom {
-            raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+            raw.fields |= sys::MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM;
             raw.min_zoom = *item;
         }
         if let Some(item) = &self.max_zoom {
-            raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+            raw.fields |= sys::MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
             raw.max_zoom = *item;
         }
         if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
@@ -4766,8 +4763,8 @@ pub enum StyleSourceType: u32 {
     Image = 5,
     Video = 6,
     Annotations = 7,
-    CustomVector = 8,
-    CustomMvtVector = 9,
+    CustomGeometry = 8,
+    CustomVector = 9,
 } Unrecognized
 }
 impl Default for StyleSourceType {

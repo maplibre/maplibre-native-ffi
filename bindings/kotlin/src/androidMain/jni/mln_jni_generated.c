@@ -245,13 +245,13 @@ static jint mln_map_add_custom_geometry_source_jni(
   );
 }
 
-static jint mln_map_add_custom_mvt_vector_source_jni(
+static jint mln_map_add_custom_vector_source_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong options,
   jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_add_custom_mvt_vector_source(
+  return (jint)mln_map_add_custom_vector_source(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
-    MLN_JNI_POINTER(const mln_custom_mvt_vector_source_options*, options),
+    MLN_JNI_POINTER(const mln_custom_vector_source_options*, options),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -777,11 +777,11 @@ static jint mln_map_invalidate_custom_geometry_source_tile_jni(
   );
 }
 
-static jint mln_map_invalidate_custom_mvt_vector_source_tile_jni(
+static jint mln_map_invalidate_custom_vector_source_tile_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
   jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_invalidate_custom_mvt_vector_source_tile(
+  return (jint)mln_map_invalidate_custom_vector_source_tile(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     MLN_JNI_RECORD(mln_canonical_tile_id, tile_id),
     MLN_JNI_POINTER(const mln_completion*, completion),
@@ -1078,24 +1078,25 @@ static jint mln_map_set_custom_geometry_source_tile_error_jni(
   );
 }
 
-static jint mln_map_set_custom_mvt_vector_source_tile_data_jni(
+static jint mln_map_set_custom_vector_source_tile_data_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
-  jlong data, jlong completion, jlong out_diagnostic
+  jint encoding, jlong data, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_set_custom_mvt_vector_source_tile_data(
+  return (jint)mln_map_set_custom_vector_source_tile_data(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     MLN_JNI_RECORD(mln_canonical_tile_id, tile_id),
+    (mln_style_vector_tile_encoding)encoding,
     MLN_JNI_RECORD(mln_buffer_view, data),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
-static jint mln_map_set_custom_mvt_vector_source_tile_error_jni(
+static jint mln_map_set_custom_vector_source_tile_error_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
   jlong message, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_set_custom_mvt_vector_source_tile_error(
+  return (jint)mln_map_set_custom_vector_source_tile_error(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     MLN_JNI_RECORD(mln_canonical_tile_id, tile_id),
     MLN_JNI_RECORD(mln_buffer_view, message),
@@ -2176,8 +2177,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
-  {"mln_map_add_custom_mvt_vector_source", "(JJJJJ)I",
-   (void*)mln_map_add_custom_mvt_vector_source_jni},
+  {"mln_map_add_custom_vector_source", "(JJJJJ)I",
+   (void*)mln_map_add_custom_vector_source_jni},
   {"mln_map_add_geo_json_source_data", "(JJJJJ)I",
    (void*)mln_map_add_geo_json_source_data_jni},
   {"mln_map_add_geo_json_source_url", "(JJJJJJ)I",
@@ -2256,8 +2257,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_invalidate_custom_geometry_source_region_jni},
   {"mln_map_invalidate_custom_geometry_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_geometry_source_tile_jni},
-  {"mln_map_invalidate_custom_mvt_vector_source_tile", "(JJJJJ)I",
-   (void*)mln_map_invalidate_custom_mvt_vector_source_tile_jni},
+  {"mln_map_invalidate_custom_vector_source_tile", "(JJJJJ)I",
+   (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
   {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
@@ -2304,10 +2305,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_set_custom_geometry_source_tile_data_jni},
   {"mln_map_set_custom_geometry_source_tile_error", "(JJJJJJ)I",
    (void*)mln_map_set_custom_geometry_source_tile_error_jni},
-  {"mln_map_set_custom_mvt_vector_source_tile_data", "(JJJJJJ)I",
-   (void*)mln_map_set_custom_mvt_vector_source_tile_data_jni},
-  {"mln_map_set_custom_mvt_vector_source_tile_error", "(JJJJJJ)I",
-   (void*)mln_map_set_custom_mvt_vector_source_tile_error_jni},
+  {"mln_map_set_custom_vector_source_tile_data", "(JJJIJJJ)I",
+   (void*)mln_map_set_custom_vector_source_tile_data_jni},
+  {"mln_map_set_custom_vector_source_tile_error", "(JJJJJJ)I",
+   (void*)mln_map_set_custom_vector_source_tile_error_jni},
   {"mln_map_set_debug_options", "(JIJJ)I",
    (void*)mln_map_set_debug_options_jni},
   {"mln_map_set_event_mask", "(JJJJ)I", (void*)mln_map_set_event_mask_jni},
@@ -2531,8 +2532,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
-  {"mln_map_add_custom_mvt_vector_source", "(JJJJJ)I",
-   (void*)mln_map_add_custom_mvt_vector_source_jni},
+  {"mln_map_add_custom_vector_source", "(JJJJJ)I",
+   (void*)mln_map_add_custom_vector_source_jni},
   {"mln_map_add_geo_json_source_data", "(JJJJJ)I",
    (void*)mln_map_add_geo_json_source_data_jni},
   {"mln_map_add_geo_json_source_url", "(JJJJJJ)I",
@@ -2611,8 +2612,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_invalidate_custom_geometry_source_region_jni},
   {"mln_map_invalidate_custom_geometry_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_geometry_source_tile_jni},
-  {"mln_map_invalidate_custom_mvt_vector_source_tile", "(JJJJJ)I",
-   (void*)mln_map_invalidate_custom_mvt_vector_source_tile_jni},
+  {"mln_map_invalidate_custom_vector_source_tile", "(JJJJJ)I",
+   (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
   {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
@@ -2659,10 +2660,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_set_custom_geometry_source_tile_data_jni},
   {"mln_map_set_custom_geometry_source_tile_error", "(JJJJJJ)I",
    (void*)mln_map_set_custom_geometry_source_tile_error_jni},
-  {"mln_map_set_custom_mvt_vector_source_tile_data", "(JJJJJJ)I",
-   (void*)mln_map_set_custom_mvt_vector_source_tile_data_jni},
-  {"mln_map_set_custom_mvt_vector_source_tile_error", "(JJJJJJ)I",
-   (void*)mln_map_set_custom_mvt_vector_source_tile_error_jni},
+  {"mln_map_set_custom_vector_source_tile_data", "(JJJIJJJ)I",
+   (void*)mln_map_set_custom_vector_source_tile_data_jni},
+  {"mln_map_set_custom_vector_source_tile_error", "(JJJJJJ)I",
+   (void*)mln_map_set_custom_vector_source_tile_error_jni},
   {"mln_map_set_debug_options", "(JIJJ)I",
    (void*)mln_map_set_debug_options_jni},
   {"mln_map_set_event_mask", "(JJJJ)I", (void*)mln_map_set_event_mask_jni},
@@ -2865,13 +2866,13 @@ static mln_jni_upcall mln_jni_customGeometrySourceOptionsCancelTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
   "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL
 };
-static mln_jni_upcall mln_jni_customMvtVectorSourceOptionsFetchTile_upcall = {
+static mln_jni_upcall mln_jni_customVectorSourceOptionsFetchTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL
+  "customVectorSourceOptionsFetchTile", "(JJ)V", NULL
 };
-static mln_jni_upcall mln_jni_customMvtVectorSourceOptionsCancelTile_upcall = {
+static mln_jni_upcall mln_jni_customVectorSourceOptionsCancelTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL
+  "customVectorSourceOptionsCancelTile", "(JJ)V", NULL
 };
 static mln_jni_upcall mln_jni_resourceRequestCancelHandlerCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
@@ -2979,25 +2980,25 @@ static void mln_jni_customGeometrySourceOptionsCancelTile(
   );
 }
 
-static void mln_jni_customMvtVectorSourceOptionsFetchTile(
+static void mln_jni_customVectorSourceOptionsFetchTile(
   void* userData, mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
-    &mln_jni_customMvtVectorSourceOptionsFetchTile_upcall, arguments
+    &mln_jni_customVectorSourceOptionsFetchTile_upcall, arguments
   );
 }
 
-static void mln_jni_customMvtVectorSourceOptionsCancelTile(
+static void mln_jni_customVectorSourceOptionsCancelTile(
   void* userData, mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
-    &mln_jni_customMvtVectorSourceOptionsCancelTile_upcall, arguments
+    &mln_jni_customVectorSourceOptionsCancelTile_upcall, arguments
   );
 }
 
@@ -3086,8 +3087,8 @@ mln_jni_upcall* const mln_jni_upcalls[] = {
   &mln_jni_httpHeaderTransformCallback_upcall,
   &mln_jni_customGeometrySourceOptionsFetchTile_upcall,
   &mln_jni_customGeometrySourceOptionsCancelTile_upcall,
-  &mln_jni_customMvtVectorSourceOptionsFetchTile_upcall,
-  &mln_jni_customMvtVectorSourceOptionsCancelTile_upcall,
+  &mln_jni_customVectorSourceOptionsFetchTile_upcall,
+  &mln_jni_customVectorSourceOptionsCancelTile_upcall,
   &mln_jni_resourceRequestCancelHandlerCallback_upcall,
   &mln_jni_runtimeEventHandlerCallback_upcall,
   &mln_jni_resourceProviderCallback_upcall,
@@ -3106,8 +3107,8 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_httpHeaderTransformCallback,
   (void*)mln_jni_customGeometrySourceOptionsFetchTile,
   (void*)mln_jni_customGeometrySourceOptionsCancelTile,
-  (void*)mln_jni_customMvtVectorSourceOptionsFetchTile,
-  (void*)mln_jni_customMvtVectorSourceOptionsCancelTile,
+  (void*)mln_jni_customVectorSourceOptionsFetchTile,
+  (void*)mln_jni_customVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
   (void*)mln_jni_runtimeEventHandlerCallback,
   (void*)mln_jni_resourceProviderCallback,

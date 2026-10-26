@@ -8,7 +8,7 @@ global using static Maplibre.NativeFfi.Internal.C.mln_camera_delta_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_camera_fit_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_camera_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_custom_geometry_source_option_field;
-global using static Maplibre.NativeFfi.Internal.C.mln_custom_mvt_vector_source_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_custom_vector_source_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_feature_state_selector_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_free_camera_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_geo_json_source_option_field;

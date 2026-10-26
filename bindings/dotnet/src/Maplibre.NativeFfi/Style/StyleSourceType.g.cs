@@ -18,6 +18,6 @@ public enum StyleSourceType : uint
     Image = 5,
     Video = 6,
     Annotations = 7,
-    CustomVector = 8,
-    CustomMvtVector = 9,
+    CustomGeometry = 8,
+    CustomVector = 9,
 }

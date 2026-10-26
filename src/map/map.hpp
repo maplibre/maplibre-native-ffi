@@ -38,8 +38,8 @@ auto free_camera_options_default() noexcept -> mln_free_camera_options;
 auto geojson_source_options_default() noexcept -> mln_geo_json_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
-auto custom_mvt_vector_source_options_default() noexcept
-  -> mln_custom_mvt_vector_source_options;
+auto custom_vector_source_options_default() noexcept
+  -> mln_custom_vector_source_options;
 auto style_image_options_default() noexcept -> mln_style_image_options;
 auto style_transition_options_default() noexcept
   -> mln_style_transition_options;
@@ -247,8 +247,8 @@ auto start_style_operation(
 auto validate_custom_geometry_source_options(
   const mln_custom_geometry_source_options* options
 ) -> mln_status;
-auto validate_custom_mvt_vector_source_options(
-  const mln_custom_mvt_vector_source_options* options
+auto validate_custom_vector_source_options(
+  const mln_custom_vector_source_options* options
 ) -> mln_status;
 auto validate_style_image_input(
   const mln_premultiplied_rgba8_image* image,
@@ -355,19 +355,19 @@ auto map_invalidate_custom_geometry_source_tile(
 auto map_invalidate_custom_geometry_source_region(
   MapObject& live, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) -> mln_status;
-auto map_add_custom_mvt_vector_source(
+auto map_add_custom_vector_source(
   MapObject& live, mln_buffer_view source_id,
-  const mln_custom_mvt_vector_source_options* options
+  const mln_custom_vector_source_options* options
 ) -> mln_status;
-auto map_set_custom_mvt_vector_source_tile_data(
+auto map_set_custom_vector_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data
+  mln_style_vector_tile_encoding encoding, mln_buffer_view data
 ) -> mln_status;
-auto map_set_custom_mvt_vector_source_tile_error(
+auto map_set_custom_vector_source_tile_error(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message
 ) -> mln_status;
-auto map_invalidate_custom_mvt_vector_source_tile(
+auto map_invalidate_custom_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
 auto map_set_style_image(MapObject& live, mln::style::Image&& image)

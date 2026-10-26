@@ -49,8 +49,8 @@ internal object Upcalls {
   }
 
   @JvmStatic
-  fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
-    upcall<CustomMvtVectorSourceOptions, Boolean>(
+  fun customVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomVectorSourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
       userData,
       false,
@@ -61,8 +61,8 @@ internal object Upcalls {
   }
 
   @JvmStatic
-  fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
-    upcall<CustomMvtVectorSourceOptions, Boolean>(
+  fun customVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomVectorSourceOptions, Boolean>(
       "mln_custom_source_cancel_tile_callback",
       userData,
       false,
@@ -168,8 +168,8 @@ internal expect object UpcallStubs {
   val httpHeaderTransformCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
-  val customMvtVectorSourceOptionsFetchTile: Long
-  val customMvtVectorSourceOptionsCancelTile: Long
+  val customVectorSourceOptionsFetchTile: Long
+  val customVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
   val runtimeEventHandlerCallback: Long
   val resourceProviderCallback: Long

@@ -3,9 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort. The callback may run on any native worker thread,
-/// concurrently with runtime and map calls.
+/// Cancels a request for one tile of a custom geometry or custom vector source,
+/// best effort. The callback may run on any native worker thread, concurrently
+/// with runtime and map calls.
 /// </summary>
 /// <remarks>
 /// See <c>mln_custom_source_cancel_tile_callback</c> in the <see

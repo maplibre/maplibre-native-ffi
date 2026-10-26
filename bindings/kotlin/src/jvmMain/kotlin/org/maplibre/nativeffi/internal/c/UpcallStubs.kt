@@ -46,18 +46,18 @@ internal actual object UpcallStubs {
       JAVA_LONG,
       mln_canonical_tile_id,
     )
-  actual val customMvtVectorSourceOptionsFetchTile: Long =
+  actual val customVectorSourceOptionsFetchTile: Long =
     Ffm.upcall(
       Upcalls::class.java,
-      "customMvtVectorSourceOptionsFetchTile",
+      "customVectorSourceOptionsFetchTile",
       null,
       JAVA_LONG,
       mln_canonical_tile_id,
     )
-  actual val customMvtVectorSourceOptionsCancelTile: Long =
+  actual val customVectorSourceOptionsCancelTile: Long =
     Ffm.upcall(
       Upcalls::class.java,
-      "customMvtVectorSourceOptionsCancelTile",
+      "customVectorSourceOptionsCancelTile",
       null,
       JAVA_LONG,
       mln_canonical_tile_id,

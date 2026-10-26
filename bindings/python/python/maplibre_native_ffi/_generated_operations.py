@@ -20,7 +20,7 @@ from ._generated_values import (
     CameraUpdate,
     CanonicalTileId,
     CustomGeometrySourceOptions,
-    CustomMvtVectorSourceOptions,
+    CustomVectorSourceOptions,
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
@@ -82,6 +82,7 @@ from ._generated_values import (
     StyleLayerInfo,
     StyleSourceInfo,
     StyleTransitionOptions,
+    StyleVectorTileEncoding,
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
@@ -297,16 +298,16 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_custom_geometry_source(source_id, options)
 
-    def add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions
+    def add_custom_vector_source(
+        self, source_id: str, options: CustomVectorSourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom MVT vector source. The callback may run on any native
+        """Adds a custom vector source. The callback may run on any native
         worker thread, concurrently with runtime and map calls.
 
-        See `mln_map_add_custom_mvt_vector_source` in the
+        See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.add_custom_mvt_vector_source(source_id, options)
+        return self._native.add_custom_vector_source(source_id, options)
 
     def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
@@ -755,15 +756,15 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.invalidate_custom_geometry_source_tile(source_id, tile_id)
 
-    def invalidate_custom_mvt_vector_source_tile(
+    def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> Future[CommandCompletion]:
-        """Invalidates custom MVT vector source data for one canonical tile.
+        """Invalidates custom vector source data for one canonical tile.
 
-        See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+        See `mln_map_invalidate_custom_vector_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.invalidate_custom_mvt_vector_source_tile(source_id, tile_id)
+        return self._native.invalidate_custom_vector_source_tile(source_id, tile_id)
 
     def lat_lng_bounds_for_camera(
         self, camera: CameraOptions | None = None
@@ -924,27 +925,31 @@ class _MapHandleOperations(GeneratedOperations):
             source_id, tile_id, message
         )
 
-    def set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
+    def set_custom_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        encoding: StyleVectorTileEncoding,
+        data: Buffer,
     ) -> Future[CommandCompletion]:
-        """Sets custom MVT vector source data for one canonical tile.
+        """Sets custom vector source data for one canonical tile.
 
-        See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+        See `mln_map_set_custom_vector_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.set_custom_mvt_vector_source_tile_data(
-            source_id, tile_id, data
+        return self._native.set_custom_vector_source_tile_data(
+            source_id, tile_id, encoding, data
         )
 
-    def set_custom_mvt_vector_source_tile_error(
+    def set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> Future[CommandCompletion]:
-        """Reports a custom MVT vector source error for one canonical tile.
+        """Reports a custom vector source error for one canonical tile.
 
-        See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+        See `mln_map_set_custom_vector_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.set_custom_mvt_vector_source_tile_error(
+        return self._native.set_custom_vector_source_tile_error(
             source_id, tile_id, message
         )
 
@@ -2089,16 +2094,16 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_custom_geometry_source(source_id, options)
 
-    def add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions
+    def add_custom_vector_source(
+        self, source_id: str, options: CustomVectorSourceOptions
     ) -> None:
-        """Adds a custom MVT vector source. The callback may run on any native
+        """Adds a custom vector source. The callback may run on any native
         worker thread, concurrently with runtime and map calls.
 
-        See `mln_map_add_custom_mvt_vector_source` in the
+        See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_add_custom_mvt_vector_source(source_id, options)
+        return self._native._discard_add_custom_vector_source(source_id, options)
 
     def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
@@ -2236,15 +2241,15 @@ class MapHandleDiscarding:
             source_id, tile_id
         )
 
-    def invalidate_custom_mvt_vector_source_tile(
+    def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> None:
-        """Invalidates custom MVT vector source data for one canonical tile.
+        """Invalidates custom vector source data for one canonical tile.
 
-        See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+        See `mln_map_invalidate_custom_vector_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_invalidate_custom_mvt_vector_source_tile(
+        return self._native._discard_invalidate_custom_vector_source_tile(
             source_id, tile_id
         )
 
@@ -2336,27 +2341,31 @@ class MapHandleDiscarding:
             source_id, tile_id, message
         )
 
-    def set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
+    def set_custom_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        encoding: StyleVectorTileEncoding,
+        data: Buffer,
     ) -> None:
-        """Sets custom MVT vector source data for one canonical tile.
+        """Sets custom vector source data for one canonical tile.
 
-        See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+        See `mln_map_set_custom_vector_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_set_custom_mvt_vector_source_tile_data(
-            source_id, tile_id, data
+        return self._native._discard_set_custom_vector_source_tile_data(
+            source_id, tile_id, encoding, data
         )
 
-    def set_custom_mvt_vector_source_tile_error(
+    def set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> None:
-        """Reports a custom MVT vector source error for one canonical tile.
+        """Reports a custom vector source error for one canonical tile.
 
-        See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+        See `mln_map_set_custom_vector_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_set_custom_mvt_vector_source_tile_error(
+        return self._native._discard_set_custom_vector_source_tile_error(
             source_id, tile_id, message
         )
 

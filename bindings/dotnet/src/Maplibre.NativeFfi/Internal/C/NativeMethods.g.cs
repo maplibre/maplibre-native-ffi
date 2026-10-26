@@ -134,10 +134,10 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_custom_mvt_vector_source(
+    internal static partial mln_status mln_map_add_custom_vector_source(
         MlnMap map,
         mln_buffer_view source_id,
-        mln_custom_mvt_vector_source_options* options,
+        mln_custom_vector_source_options* options,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -492,7 +492,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
+    internal static partial mln_status mln_map_invalidate_custom_vector_source_tile(
         MlnMap map,
         mln_buffer_view source_id,
         mln_canonical_tile_id tile_id,
@@ -712,17 +712,18 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_custom_mvt_vector_source_tile_data(
+    internal static partial mln_status mln_map_set_custom_vector_source_tile_data(
         MlnMap map,
         mln_buffer_view source_id,
         mln_canonical_tile_id tile_id,
+        mln_style_vector_tile_encoding encoding,
         mln_buffer_view data,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_custom_mvt_vector_source_tile_error(
+    internal static partial mln_status mln_map_set_custom_vector_source_tile_error(
         MlnMap map,
         mln_buffer_view source_id,
         mln_canonical_tile_id tile_id,

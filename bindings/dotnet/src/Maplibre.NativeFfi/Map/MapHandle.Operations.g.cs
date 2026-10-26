@@ -103,22 +103,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a custom MVT vector source. The callback may run on any native
-    /// worker thread, concurrently with runtime and map calls.
+    /// Adds a custom vector source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_add_custom_mvt_vector_source</c> in the <see
+    /// See <c>mln_map_add_custom_vector_source</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddCustomMvtVectorSourceAsync(
+    public Task<CommandCompletion> AddCustomVectorSourceAsync(
         string sourceId,
-        CustomMvtVectorSourceOptions options
+        CustomVectorSourceOptions options
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeOptions = NativeCustomMvtVectorSourceOptions(options, scope);
+        var nativeOptions = NativeCustomVectorSourceOptions(options, scope);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_add_custom_mvt_vector_source(
+        var nativeStatus = NativeMethods.mln_map_add_custom_vector_source(
             Handle,
             scope.Utf8(sourceId),
             &nativeOptions,
@@ -1208,20 +1208,20 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Invalidates custom MVT vector source data for one canonical tile.
+    /// Invalidates custom vector source data for one canonical tile.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_invalidate_custom_mvt_vector_source_tile</c> in the <see
+    /// See <c>mln_map_invalidate_custom_vector_source_tile</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> InvalidateCustomMvtVectorSourceTileAsync(
+    public Task<CommandCompletion> InvalidateCustomVectorSourceTileAsync(
         string sourceId,
         CanonicalTileId tileId
     )
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+        var nativeStatus = NativeMethods.mln_map_invalidate_custom_vector_source_tile(
             Handle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
@@ -1604,15 +1604,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets custom MVT vector source data for one canonical tile.
+    /// Sets custom vector source data for one canonical tile.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_custom_mvt_vector_source_tile_data</c> in the <see
+    /// See <c>mln_map_set_custom_vector_source_tile_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetCustomMvtVectorSourceTileDataAsync(
+    public Task<CommandCompletion> SetCustomVectorSourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
+        StyleVectorTileEncoding encoding,
         ReadOnlySpan<byte> data
     )
     {
@@ -1620,10 +1621,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         {
             using var scope = new NativeCallScope(this);
             mln_completion nativeCompletion;
-            var nativeStatus = NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+            var nativeStatus = NativeMethods.mln_map_set_custom_vector_source_tile_data(
                 Handle,
                 scope.Utf8(sourceId),
                 NativeCanonicalTileId(tileId),
+                (mln_style_vector_tile_encoding)encoding,
                 new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
                 NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
                 Diagnostic
@@ -1633,13 +1635,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Reports a custom MVT vector source error for one canonical tile.
+    /// Reports a custom vector source error for one canonical tile.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_custom_mvt_vector_source_tile_error</c> in the <see
+    /// See <c>mln_map_set_custom_vector_source_tile_error</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetCustomMvtVectorSourceTileErrorAsync(
+    public Task<CommandCompletion> SetCustomVectorSourceTileErrorAsync(
         string sourceId,
         CanonicalTileId tileId,
         string message
@@ -1647,7 +1649,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+        var nativeStatus = NativeMethods.mln_map_set_custom_vector_source_tile_error(
             Handle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
@@ -2230,13 +2232,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddCustomMvtVectorSource(string sourceId, CustomMvtVectorSourceOptions options)
+        public void AddCustomVectorSource(string sourceId, CustomVectorSourceOptions options)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
-            var nativeOptions = NativeCustomMvtVectorSourceOptions(options, scope);
+            var nativeOptions = NativeCustomVectorSourceOptions(options, scope);
             Check(
-                NativeMethods.mln_map_add_custom_mvt_vector_source(
+                NativeMethods.mln_map_add_custom_vector_source(
                     receiverHandle,
                     scope.Utf8(sourceId),
                     &nativeOptions,
@@ -2461,12 +2463,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void InvalidateCustomMvtVectorSourceTile(string sourceId, CanonicalTileId tileId)
+        public void InvalidateCustomVectorSourceTile(string sourceId, CanonicalTileId tileId)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
-                NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+                NativeMethods.mln_map_invalidate_custom_vector_source_tile(
                     receiverHandle,
                     scope.Utf8(sourceId),
                     NativeCanonicalTileId(tileId),
@@ -2630,9 +2632,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetCustomMvtVectorSourceTileData(
+        public void SetCustomVectorSourceTileData(
             string sourceId,
             CanonicalTileId tileId,
+            StyleVectorTileEncoding encoding,
             ReadOnlySpan<byte> data
         )
         {
@@ -2641,10 +2644,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 var receiverHandle = owner.Handle;
                 using var scope = new NativeCallScope(owner);
                 Check(
-                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                    NativeMethods.mln_map_set_custom_vector_source_tile_data(
                         receiverHandle,
                         scope.Utf8(sourceId),
                         NativeCanonicalTileId(tileId),
+                        (mln_style_vector_tile_encoding)encoding,
                         new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
                         null,
                         Diagnostic
@@ -2654,7 +2658,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             }
         }
 
-        public void SetCustomMvtVectorSourceTileError(
+        public void SetCustomVectorSourceTileError(
             string sourceId,
             CanonicalTileId tileId,
             string message
@@ -2663,7 +2667,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
-                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+                NativeMethods.mln_map_set_custom_vector_source_tile_error(
                     receiverHandle,
                     scope.Utf8(sourceId),
                     NativeCanonicalTileId(tileId),
