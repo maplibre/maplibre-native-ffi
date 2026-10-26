@@ -27,10 +27,12 @@ opengl = []
 vulkan = []
 webgpu = []
 
-# The release workflow drops this table, because the platform crate is not
-# published and the published crates do not support Emscripten.
-[target.'cfg(target_os = "emscripten")'.dependencies]
-mln-ffi-platform = { path = "../../../../src/platform/rust" }
+# The C library calls into a Rust platform layer on these targets. Its static
+# library carries a second Rust standard library, which collides with the host's
+# unless both are the same build, so Cargo builds the layer instead. The build
+# script names the same targets.
+[target.'cfg(any(all(target_os = "linux", not(target_env = "ohos")), target_os = "windows", target_os = "emscripten"))'.dependencies]
+maplibre-native-ffi-platform.workspace = true
 
 [build-dependencies]
 flate2 = "1.1.9"

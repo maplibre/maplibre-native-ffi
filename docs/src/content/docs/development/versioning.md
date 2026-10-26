@@ -34,10 +34,11 @@ checkout of a published release tag or from the release run.
   publishing from GitHub Actions for `maplibre/maplibre-native-ffi`, with the
   tag pattern v{{version}} and the `pub.dev` environment.
 - Rust: run `mise run //bindings/rust:prepare-release <tag>`, then
-  `cargo publish --allow-dirty -p <crate>` for `maplibre-native-ffi-sys`,
-  `maplibre-native-ffi-core`, and `maplibre-native-ffi`, in that order. In each
-  crate's settings, add a trusted publisher for `maplibre/maplibre-native-ffi`,
-  with the workflow `release.yml` and the `crates.io` environment.
+  `cargo publish --allow-dirty -p <crate>` for `maplibre-native-ffi-platform`,
+  `maplibre-native-ffi-sys`, `maplibre-native-ffi-core`, and
+  `maplibre-native-ffi`, in that order. In each crate's settings, add a trusted
+  publisher for `maplibre/maplibre-native-ffi`, with the workflow `release.yml`
+  and the `crates.io` environment.
 - TypeScript: the release run's TypeScript job uploads the packed packages as
   the `npm-packages-<version>` artifact before it publishes. Download it and run
   `npm publish --access public <tarball>` for each addon package, then each

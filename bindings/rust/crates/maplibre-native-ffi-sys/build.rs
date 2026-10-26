@@ -14,6 +14,8 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 const LIBRARY_NAME: &str = "maplibre-native-c";
+/// The archive that holds the Rust platform layer the C library calls.
+const PLATFORM_ARCHIVE: &str = "mln_ffi_platform";
 const LOCAL_BUILD_ENV: &str = "MAPLIBRE_NATIVE_FFI_LOCAL_BUILD";
 const RELEASE_URL_ENV: &str = "MAPLIBRE_NATIVE_FFI_RELEASE_URL";
 const DEFAULT_RELEASE_URL: &str =
@@ -50,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     let install_dir = match env::var_os(LOCAL_BUILD_ENV) {
         Some(local_build) => local_prefix(Path::new(&local_build), &platform, backend, &preset)?,
-        None => download::install_prefix(&preset, &target_os)?,
+        None => download::install_prefix(&preset)?,
     };
     let link_dir = native_library_dir(&install_dir);
     let descriptor = read_descriptor(&install_dir)?;
@@ -73,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         install_dir.join(DESCRIPTOR_PATH).display()
     );
 
-    for archive in static_archives(&link_dir, &target_os)? {
+    for archive in static_archives(&link_dir, &target_os, &target_env)? {
         println!("cargo:rustc-link-lib=static={archive}");
     }
     // The `links` key passes these to the crates that depend on this one as
@@ -257,13 +259,17 @@ fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
 }
 
 /// The complete static archive, then whatever ships beside it, such as the Rust
-/// platform layer the C archive calls into.
+/// platform layer the C archive calls into, unless Cargo builds that layer.
 ///
 /// Every format but COFF lets the file extension separate the archive from the
 /// shared library. COFF cannot, because the shared build's import library
 /// already holds that name, so there the archive carries a `-static` suffix and
 /// the import library is the one to leave out.
-fn static_archives(link_dir: &Path, target_os: &str) -> Result<Vec<String>, Box<dyn Error>> {
+fn static_archives(
+    link_dir: &Path,
+    target_os: &str,
+    target_env: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let windows = target_os == "windows";
     let (extension, prefix) = if windows { ("lib", "") } else { ("a", "lib") };
     let primary = if windows {
@@ -283,7 +289,10 @@ fn static_archives(link_dir: &Path, target_os: &str) -> Result<Vec<String>, Box<
             let name = path.file_stem()?.to_str()?.strip_prefix(prefix)?.to_owned();
             // On COFF this is the shared library's import library, which would
             // put the consumer back on the DLL.
-            (name != primary && !(windows && name == LIBRARY_NAME)).then_some(name)
+            let import_library = windows && name == LIBRARY_NAME;
+            // Two copies of the platform layer would collide.
+            let platform = name == PLATFORM_ARCHIVE && cargo_builds_platform(target_os, target_env);
+            (name != primary && !import_library && !platform).then_some(name)
         })
         .collect();
     companions.sort();
@@ -299,13 +308,21 @@ fn static_archives(link_dir: &Path, target_os: &str) -> Result<Vec<String>, Box<
         .into());
     }
 
-    // The archive references the companions, so it comes first. Emscripten
-    // takes the platform layer from Cargo, so linking a copy here would collide.
+    // The archive references the companions, so it comes first.
     let mut archives = vec![primary];
-    if target_os != "emscripten" {
-        archives.extend(companions);
-    }
+    archives.extend(companions);
     Ok(archives)
+}
+
+/// Whether Cargo builds the Rust platform layer for the target, as the
+/// manifest's target-specific dependency on `maplibre-native-ffi-platform`
+/// names.
+fn cargo_builds_platform(target_os: &str, target_env: &str) -> bool {
+    match target_os {
+        "linux" => target_env != "ohos",
+        "windows" | "emscripten" => true,
+        _ => false,
+    }
 }
 
 fn native_library_dir(install_dir: &Path) -> PathBuf {
@@ -346,7 +363,7 @@ mod download {
 
     /// Downloads and unpacks `preset` from the pinned release, unless an
     /// earlier build already did.
-    pub(super) fn install_prefix(preset: &str, target_os: &str) -> Result<PathBuf, Box<dyn Error>> {
+    pub(super) fn install_prefix(preset: &str) -> Result<PathBuf, Box<dyn Error>> {
         let pin_path =
             Path::new(&env::var_os("CARGO_MANIFEST_DIR").ok_or("CARGO_MANIFEST_DIR is unset")?)
                 .join(PIN_PATH);
@@ -355,15 +372,6 @@ mod download {
             return Err(format!(
                 "Only a published maplibre-native-ffi-sys crate downloads the native library. \
                  Name a local build in {LOCAL_BUILD_ENV}."
-            )
-            .into());
-        }
-        // The browser links the Rust platform layer from Cargo, and that crate
-        // is not published.
-        if target_os == "emscripten" {
-            return Err(format!(
-                "The published crates do not support Emscripten. Depend on a checkout of \
-                 maplibre-native-ffi and name a local build in {LOCAL_BUILD_ENV}."
             )
             .into());
         }

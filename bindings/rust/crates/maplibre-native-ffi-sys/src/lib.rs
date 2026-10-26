@@ -18,11 +18,22 @@
 //! browser, and Vulkan elsewhere. Dependents read the backend from
 //! `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix from
 //! `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
+//!
+//! In the browser, the library uses shared memory, so the final module needs a
+//! standard library built with atomics: `-C target-feature=+atomics,+bulk-memory`
+//! and `-Zbuild-std=std,panic_abort`. It also needs the link options listed in
+//! `share/maplibre-native-c/emscripten-link-flags.txt` under the install prefix,
+//! passed through `-C link-arg`.
 
 #![allow(non_camel_case_types)]
 
-// Keep the Cargo-built platform rlib on the Emscripten link line.
-#[cfg(target_os = "emscripten")]
+// Nothing here names the platform layer, which only the C library calls, so
+// this keeps it on the link line.
+#[cfg(any(
+    all(target_os = "linux", not(target_env = "ohos")),
+    target_os = "windows",
+    target_os = "emscripten"
+))]
 extern crate mln_ffi_platform as _;
 
 mod generated;

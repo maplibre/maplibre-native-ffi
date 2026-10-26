@@ -445,7 +445,7 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
 fi
 # The Rust platform crate's pure helpers, such as redirect resolution, have
 # unit tests that run on the host before every ctest run.
-cargo test --locked -p mln-ffi-platform --lib
+cargo test --locked -p maplibre-native-ffi-platform --lib
 ctest --preset "$usage_preset" --parallel
 '''
 

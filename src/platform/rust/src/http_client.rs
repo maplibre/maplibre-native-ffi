@@ -2,7 +2,6 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
-use std::slice::from_raw_parts_mut;
 use std::sync::{
     Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
@@ -319,15 +318,15 @@ fn http_response(
     ranged_request: bool,
 ) -> MlnRustHttpResponse {
     let status_code = response.status().as_u16();
-    if ranged_request && (status_code == 200 || status_code == 206) {
-        if let Some(encoding) = response_header(response, "content-encoding")
-            && !encoding.eq_ignore_ascii_case("identity")
-        {
-            return http_error(
-                HTTP_ERROR_OTHER,
-                &format!("unsupported HTTP content encoding: {encoding}"),
-            );
-        }
+    if ranged_request
+        && (status_code == 200 || status_code == 206)
+        && let Some(encoding) = response_header(response, "content-encoding")
+        && !encoding.eq_ignore_ascii_case("identity")
+    {
+        return http_error(
+            HTTP_ERROR_OTHER,
+            &format!("unsupported HTTP content encoding: {encoding}"),
+        );
     }
 
     let etag = response_header(response, "etag");
@@ -616,7 +615,7 @@ fn free_http_response(response: MlnRustHttpResponse) {
         // SAFETY: `http_response` returns `data` from `Box<[u8]>`, and the
         // caller returns ownership here with the original length.
         unsafe {
-            drop(Box::from_raw(from_raw_parts_mut(
+            drop(Box::from_raw(ptr::slice_from_raw_parts_mut(
                 response.data,
                 response.data_len,
             )));

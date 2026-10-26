@@ -325,12 +325,14 @@ cargo add maplibre-native-ffi
 ```
 
 The build script downloads the C library for the target. Releases include macOS
-for arm64 alone, and the published crates do not support Emscripten.
+for arm64 alone. A browser build also needs a standard library built with
+atomics and the C library's link options, which the `maplibre-native-ffi-sys`
+documentation lists.
 
 Each target uses Metal on Apple platforms, OpenGL on Android and OpenHarmony,
-and Vulkan elsewhere. Enable one backend feature, `opengl`, `metal`, or
-`vulkan`, to choose another. A feature on a target-specific dependency applies
-to that target alone.
+WebGPU in the browser, and Vulkan elsewhere. Enable one backend feature,
+`opengl`, `metal`, `vulkan`, or `webgpu`, to choose another. A feature on a
+target-specific dependency applies to that target alone.
 
 ```toml title="Cargo.toml"
 [dependencies]

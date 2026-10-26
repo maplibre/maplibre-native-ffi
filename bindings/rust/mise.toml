@@ -126,8 +126,8 @@ run = 'python3 ci/rust_release.py . "$usage_tag"'
 description = "Package the crates as a release prepares them, and test the sys crate against this build's native archive."
 dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-# Tests the packaged sys crate alone: the crates above it add nothing to how the
-# native library arrives.
+# Tests the packaged sys crate with the packaged platform crate that it
+# requires: the crates above them add nothing to how the native library arrives.
 run = '''
 set -euo pipefail
 archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz"
@@ -148,15 +148,23 @@ printf '%s  %s\n' "$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" "$(basename "$
 python3 ci/rust_release.py "$workspace" "$tag" --checksums "$scratch/SHA256SUMS"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \
+  -p maplibre-native-ffi-platform \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi
 
-package="$scratch/maplibre-native-ffi-sys"
-mkdir "$package"
-tar -xzf "$scratch/target/package/maplibre-native-ffi-sys-${tag#v}.crate" -C "$package" --strip-components 1
+for crate in maplibre-native-ffi-platform maplibre-native-ffi-sys; do
+  mkdir "$scratch/$crate"
+  tar -xzf "$scratch/target/package/$crate-${tag#v}.crate" -C "$scratch/$crate" --strip-components 1
+done
+package="$scratch/maplibre-native-ffi-sys/Cargo.toml"
+# The packaged platform crate stands in for the one crates.io would serve, which
+# re-resolves that crate alone in the packaged lockfile.
+patch="patch.crates-io.maplibre-native-ffi-platform.path='$scratch/maplibre-native-ffi-platform'"
+cargo update --offline --manifest-path "$package" --config "$patch" -p maplibre-native-ffi-platform
 # An empty cache makes the build script download the archive.
 python3 ci/native_download_fixture.py "$archive" "$tag" -- \
   env -u MAPLIBRE_NATIVE_FFI_LOCAL_BUILD XDG_CACHE_HOME="$scratch/cache" \
-  cargo test --locked --manifest-path "$package/Cargo.toml" --target-dir "$MISE_MONOREPO_ROOT/target"
+  cargo test --locked --manifest-path "$package" --config "$patch" \
+  --target-dir "$MISE_MONOREPO_ROOT/target"
 '''

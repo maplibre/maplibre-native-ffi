@@ -1362,6 +1362,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "maplibre-native-ffi-platform"
+version = "0.0.0"
+dependencies = [
+ "fixed_decimal",
+ "http",
+ "icu_collator",
+ "icu_decimal",
+ "icu_experimental",
+ "icu_locale",
+ "icu_locale_core",
+ "icu_provider",
+ "image",
+ "jni 0.21.1",
+ "rustls-platform-verifier",
+ "threadpool",
+ "ureq",
+ "writeable",
+]
+
+[[package]]
 name = "maplibre-native-ffi-python"
 version = "0.0.0"
 dependencies = [
@@ -1375,7 +1395,7 @@ name = "maplibre-native-ffi-sys"
 version = "0.0.0"
 dependencies = [
  "flate2",
- "mln-ffi-platform",
+ "maplibre-native-ffi-platform",
  "serde",
  "serde_json",
  "sha2",
@@ -1412,26 +1432,6 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "mln-ffi-platform"
-version = "0.1.0"
-dependencies = [
- "fixed_decimal",
- "http",
- "icu_collator",
- "icu_decimal",
- "icu_experimental",
- "icu_locale",
- "icu_locale_core",
- "icu_provider",
- "image",
- "jni 0.21.1",
- "rustls-platform-verifier",
- "threadpool",
- "ureq",
- "writeable",
 ]
 
 [[package]]

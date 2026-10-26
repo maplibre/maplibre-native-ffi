@@ -154,6 +154,8 @@ function(mln_ffi_link_rust_platform target)
     list(APPEND rust_extra_args -Z build-std=std,panic_abort)
   endif()
 
+  # The manifest declares only the library that Rust hosts build from crates.io,
+  # so the static library is asked for here.
   add_custom_command(
     OUTPUT "${rust_library}"
     COMMAND
@@ -162,11 +164,14 @@ function(mln_ffi_link_rust_platform target)
       env
       ${rust_environment}
       "${CARGO_EXECUTABLE}"
-      build
+      rustc
       --manifest-path
       "${rust_manifest}"
       --package
-      mln-ffi-platform
+      maplibre-native-ffi-platform
+      --lib
+      --crate-type
+      staticlib
       --target
       "${rust_target}"
       --release

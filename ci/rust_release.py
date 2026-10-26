@@ -34,18 +34,9 @@ def prepare(
     substitute(manifest, r'^version = "0\.0\.0"$', f'version = "{version}"', 1)
     substitute(
         manifest,
-        r'^(maplibre-native-ffi-(?:core|sys) = \{.*version = )"=0\.0\.0"',
+        r'^(maplibre-native-ffi-(?:core|platform|sys) = \{.*version = )"=0\.0\.0"',
         rf'\1"={version}"',
-        2,
-    )
-
-    # The platform crate that Emscripten links from Cargo is not published, so
-    # the published sys crate leaves the dependency out.
-    substitute(
-        workspace / SYS_CRATE / "Cargo.toml",
-        r"""^\[target\.'cfg\(target_os = "emscripten"\)'\.dependencies\]\nmln-ffi-platform = .*\n""",
-        "",
-        1,
+        3,
     )
 
 

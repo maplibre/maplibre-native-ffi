@@ -1,12 +1,19 @@
 [package]
-name = "mln-ffi-platform"
-version = "0.1.0"
+name = "maplibre-native-ffi-platform"
+description = "Platform services that the MapLibre Native FFI C library calls. Depend on maplibre-native-ffi instead."
+version.workspace = true
+categories = ["external-ffi-bindings"]
 edition.workspace = true
+homepage.workspace = true
+include = ["/src/", "/LICENSE", "/README.md"]
+keywords = ["maplibre", "map", "ffi"]
 license.workspace = true
 repository.workspace = true
 
+# A Rust host builds this crate against its own standard library. Other hosts
+# link the static library that CMake builds from it, which keeps this name.
 [lib]
-crate-type = ["staticlib", "rlib"]
+name = "mln_ffi_platform"
 
 [dependencies]
 # Image decoding is shared by every platform, so a raster tile decodes to the
