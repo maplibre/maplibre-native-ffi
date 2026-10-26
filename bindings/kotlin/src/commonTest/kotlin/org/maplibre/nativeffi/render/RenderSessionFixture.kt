@@ -11,7 +11,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.GraphicsDeviceHandle
+import org.maplibre.nativeffi.GraphicsDeviceTextureDescriptor
+import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
+import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NewRenderSession
 import org.maplibre.nativeffi.RenderDriverKind
@@ -192,6 +196,51 @@ internal suspend fun <T> withOwnedTexture(
     } finally {
       canvas?.close()
     }
+  }
+
+/**
+ * Runs [block] against a map with an attached session that a core worker renders into a texture of
+ * [width] x [height] on a graphics device, and abandons and closes the session afterwards. Browser
+ * builds create no device. The map's runtime is created from [runtimeOptions], and [onFrameWake]
+ * runs on each frame wake.
+ */
+internal suspend fun <T> withDeviceTexture(
+  width: Int = 32,
+  height: Int = 16,
+  mapMode: MapMode = MapMode.STATIC,
+  runtimeOptions: RuntimeOptions = RuntimeOptions(),
+  onFrameWake: () -> Unit = {},
+  block: suspend RenderSessionFixture.() -> T,
+): T =
+  withMap(
+    mapMode,
+    options = smallMapOptions(mapMode, width, height),
+    runtimeOptions = runtimeOptions,
+  ) {
+    withRenderSession(
+      RenderDriverKind.CORE_WORKER,
+      attach = { options -> attachDeviceTexture(map, width, height, options) },
+      onFrameWake = onFrameWake,
+      block = block,
+    )
+  }
+
+/**
+ * Submits an attach of a [width] x [height] texture on a graphics device of its own. The session
+ * keeps the device, so its handle is released before this returns.
+ */
+internal fun attachDeviceTexture(
+  map: MapHandle,
+  width: Int,
+  height: Int,
+  options: RenderSessionAttachOptions,
+): NewRenderSession =
+  GraphicsDeviceHandle.create().use { device ->
+    map.attachGraphicsDeviceTexture(
+      device,
+      GraphicsDeviceTextureDescriptor(LogicalExtent(width.toUInt(), height.toUInt(), 1.0)),
+      options,
+    )
   }
 
 /**

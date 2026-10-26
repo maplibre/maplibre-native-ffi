@@ -1,5 +1,7 @@
 // Native registrations: wakes and queue locks whose function pointers and
-// context native code in the host supplies.
+// context native code in the host supplies. Sessions render on a graphics
+// device texture, which rejects a queue lock, so an accepted lock needs a
+// Vulkan owned texture in a context from tests/graphics.
 import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -17,11 +19,10 @@ final _extent = LogicalExtent(
   scaleFactor: 1,
 );
 
-/// A WGL texture shares the host's context, which only a caller-driven session
-/// can drive, and a Dart isolate services core-worker sessions only.
-final Object _wglSkip = buildHasCoreWorkerTexture
+/// Only a Vulkan owned texture takes a queue lock.
+final Object _vulkanSkip = buildAttachesVulkan
     ? false
-    : 'A WGL texture has no core-worker session for a Dart isolate to attach';
+    : 'Only a Vulkan target takes a queue lock';
 
 /// A native function that any thread may call with a context, which records
 /// the context on this isolate.
@@ -66,7 +67,6 @@ void main() {
     'a native wake reaches native unchanged and only its first call',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final graphics = TestGraphics.open();
       final wakes = _Recorder();
       final releases = _Recorder();
 
@@ -78,11 +78,7 @@ void main() {
         releaseUserData: releases.pointer,
       );
       expect(
-        () => graphics.attachOwnedTexture(
-          map,
-          _extent,
-          _options(frameWake: rejected),
-        ),
+        () => attachDeviceTexture(map, _options(frameWake: rejected)),
         _throwsStatus(Status.invalidArgument),
       );
       await releases.wait('the release of the rejected wake');
@@ -90,17 +86,12 @@ void main() {
       // Native code would reject the wake again with an invalid argument, so
       // an invalid state shows that the second call never reached it.
       expect(
-        () => graphics.attachOwnedTexture(
-          map,
-          _extent,
-          _options(frameWake: rejected),
-        ),
+        () => attachDeviceTexture(map, _options(frameWake: rejected)),
         _throwsStatus(Status.invalidState),
       );
 
-      final attachment = graphics.attachOwnedTexture(
+      final attachment = attachDeviceTexture(
         map,
-        _extent,
         _options(
           frameWake: Wake.native(
             callback: wakes.pointer,
@@ -125,49 +116,54 @@ void main() {
       wakes.close();
       releases.close();
     },
-    skip: _wglSkip,
   );
 
   test('a native queue lock reaches native with its context', () async {
     final map = await openRenderMap(emptyStyle);
-    final graphics = TestGraphics.open();
-    // A Vulkan session takes the lock around its queue calls, which this
-    // listener answers at once. The host shares no queue with the session.
+    // The session takes the lock around its queue calls, which this listener
+    // answers at once. The host shares no queue with the session.
     final locks = _Recorder();
     final releases = _Recorder();
-    final queueLock = QueueLock.native(
-      lock: locks.pointer,
-      unlock: locks.pointer,
-      userData: const NativePointer(3),
-      releaseUserData: releases.pointer,
+    final attachment = TestGraphics.open().attachOwnedTexture(
+      map,
+      _extent,
+      _options(queueLock: _queueLock(locks, releases)),
     );
-
-    if (buildAttachesVulkan) {
-      final attachment = graphics.attachOwnedTexture(
-        map,
-        _extent,
-        _options(queueLock: queueLock),
-      );
-      addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.ready, 'attachment');
-      await within(attachment.session.close(), 'session close');
-      await releases.wait('the release of the accepted queue lock');
-    } else {
-      // Only a Vulkan target takes a lock. Native code reaches that check
-      // only with both lock callbacks set, and the binding then releases the
-      // context of the rejected lock.
-      expect(
-        () => graphics.attachOwnedTexture(
-          map,
-          _extent,
-          _options(queueLock: queueLock),
-        ),
-        _throwsStatus(Status.unsupported),
-      );
-      await releases.wait('the release of the rejected queue lock');
-    }
+    addTearDown(() => releaseSession(attachment.session));
+    await within(attachment.ready, 'attachment');
+    await within(attachment.session.close(), 'session close');
+    await releases.wait('the release of the accepted queue lock');
     expect(releases.contexts, [3]);
     locks.close();
     releases.close();
-  }, skip: _wglSkip);
+  }, skip: _vulkanSkip);
+
+  test('a rejected native queue lock releases its context', () async {
+    final map = await openRenderMap(emptyStyle);
+    final locks = _Recorder();
+    final releases = _Recorder();
+    // A graphics device texture takes no lock. Native code reaches that check
+    // only with both lock callbacks set, and the binding then releases the
+    // context of the rejected lock.
+    expect(
+      () => attachDeviceTexture(
+        map,
+        _options(queueLock: _queueLock(locks, releases)),
+      ),
+      _throwsStatus(Status.unsupported),
+    );
+    await releases.wait('the release of the rejected queue lock');
+    expect(releases.contexts, [3]);
+    locks.close();
+    releases.close();
+  });
 }
+
+/// A queue lock whose callbacks both record on [locks], with a context that
+/// [releases] records once native code releases it.
+QueueLock _queueLock(_Recorder locks, _Recorder releases) => QueueLock.native(
+  lock: locks.pointer,
+  unlock: locks.pointer,
+  userData: const NativePointer(3),
+  releaseUserData: releases.pointer,
+);

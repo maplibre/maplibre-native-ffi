@@ -1,5 +1,6 @@
-// Owned-texture sessions on a core worker: rendering and readback, teardown
-// before the graphics go, and the scope of a borrowed frame view.
+// Render sessions on a core worker: rendering and readback on a graphics
+// device, teardown before the device goes, and the scope of a borrowed frame
+// view of an owned texture.
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
@@ -19,10 +20,8 @@ const _redStyle = {
   ],
 };
 
-final _extent = LogicalExtent(
-  width: renderSize,
-  height: renderSize,
-  scaleFactor: 1,
+final _descriptor = GraphicsDeviceTextureDescriptor(
+  extent: LogicalExtent(width: renderSize, height: renderSize, scaleFactor: 1),
 );
 
 void _expectRed(TextureReadbackResult image) {
@@ -32,12 +31,6 @@ void _expectRed(TextureReadbackResult image) {
   expect(image.data.sublist(center, center + 4), [255, 0, 0, 255]);
 }
 
-/// A WGL texture shares the host's context, which only a caller-driven session
-/// can drive, and a Dart isolate services core-worker sessions only.
-final Object _wglSkip = buildHasCoreWorkerTexture
-    ? false
-    : 'A WGL texture has no core-worker session for a Dart isolate to render';
-
 /// An OpenGL session exposes frames only from a context that it shares with
 /// the host, which only a caller-driven session can drive. A core-worker EGL
 /// session keeps its frames in its own context and offers readback instead.
@@ -46,35 +39,34 @@ final Object _openGlFrameSkip = buildExposesCoreWorkerFrames
     : 'An OpenGL core-worker session exposes no frames to view';
 
 void main() {
-  test('an owned texture renders a frame that reads back as pixels', () async {
+  test('a device texture renders a frame that reads back as pixels', () async {
     final map = await openRenderMap(_redStyle);
     final worker = await WorkerSession.attach(map);
 
     final result = await worker.renderFrame();
     expect(result.frameGeneration, greaterThan(0));
     _expectRed(await within(worker.session.readTexture(), 'texture readback'));
-  }, skip: _wglSkip);
+  });
 
   test('an attach with a core-worker driver completes on its own', () async {
     final map = await openRenderMap(emptyStyle);
     // Nothing services driver work, so only a core-worker driver completes.
-    final attachment = TestGraphics.open().attachOwnedTexture(
+    final attachment = attachDeviceTexture(
       map,
-      _extent,
       const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
     );
     addTearDown(() => releaseSession(attachment.session));
     await within(attachment.ready, 'attachment');
-  }, skip: _wglSkip);
+  });
 
   test(
-    'a disposed attached session lets its map release before its graphics go',
+    'a disposed attached session lets its map release before its device goes',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final graphics = TestGraphics.open();
-      final attachment = graphics.attachOwnedTexture(
-        map,
-        _extent,
+      final device = openGraphicsDevice();
+      final attachment = map.attachGraphicsDeviceTexture(
+        device,
+        _descriptor,
         const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
       );
       addTearDown(() => releaseSession(attachment.session));
@@ -86,28 +78,26 @@ void main() {
       attachment.session.dispose();
       // A dispose reports no retirement, so the map's release waits for it.
       await within(map.close(), 'map close');
-      graphics.close();
+      device.close();
     },
-    skip: _wglSkip,
   );
 
   test(
-    'closing an attached session completes once its graphics may go',
+    'closing an attached session completes before its device goes',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final graphics = TestGraphics.open();
-      final attachment = graphics.attachOwnedTexture(
-        map,
-        _extent,
+      final device = openGraphicsDevice();
+      final attachment = map.attachGraphicsDeviceTexture(
+        device,
+        _descriptor,
         const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
       );
       addTearDown(() => releaseSession(attachment.session));
       await within(attachment.ready, 'attachment');
 
       await within(attachment.session.close(), 'session close');
-      graphics.close();
+      device.close();
     },
-    skip: _wglSkip,
   );
 
   test('a drain before any demand returns no results', () async {
@@ -115,13 +105,13 @@ void main() {
     final worker = await WorkerSession.attach(map);
     // Native reports the drain as not ready, which reads as no results.
     expect(worker.session.drainFrameResults(), isEmpty);
-  }, skip: _wglSkip);
+  });
 
   test(
     'a frame view expires with its scope and holds off release inside it',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final worker = await WorkerSession.attach(map);
+      final worker = await WorkerSession.attachOwnedTexture(map);
       await worker.renderFrame();
       final session = worker.session;
       final frame = session.acquireFrame()!;

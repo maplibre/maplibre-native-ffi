@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 import 'support/fixture_process.dart';
-import 'support/graphics.dart';
 
 void main() {
   late File executable;
@@ -31,9 +30,5 @@ void main() {
     // Shutdown makes no graphics calls that would race the drivers' exit
     // teardown.
     () => expectCleanExit(executable, 'session', 'ABANDONED_SESSION'),
-    skip: buildHasCoreWorkerTexture
-        ? false
-        : 'A WGL texture has no core-worker session for a Dart isolate to '
-              'render',
   );
 }

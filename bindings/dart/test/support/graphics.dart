@@ -1,5 +1,9 @@
 /// GPU contexts from `mln_test_graphics`, the shared test library in
 /// `tests/graphics`, loaded from the install prefix the suite runs against.
+///
+/// A test attaches an owned texture in such a context only for what a graphics
+/// device texture lacks: acquired frames, and a Vulkan queue lock. Both exist
+/// only on Metal and Vulkan builds, so an OpenGL build opens no context here.
 library;
 
 import 'dart:ffi';
@@ -11,8 +15,6 @@ import 'package:test/test.dart';
 
 const _backendMetal = 1;
 const _backendVulkan = 2;
-const _backendEgl = 3;
-const _backendWgl = 4;
 
 /// Mirrors `mln_test_graphics_context`.
 final class _Context extends Struct {
@@ -80,21 +82,13 @@ String _libraryPath() {
 }
 
 /// The backend the native library was built for, which is the one backend
-/// every render test runs on.
-int _buildBackend() {
+/// every render test runs on, or null on an OpenGL build.
+int? _buildBackend() {
   final backends = supportedRenderBackendMask();
   if (backends.contains(RenderBackendFlag.metal)) return _backendMetal;
   if (backends.contains(RenderBackendFlag.vulkan)) return _backendVulkan;
-  final providers = openGlSupportedContextProviderMask();
-  if (providers.contains(OpenGlContextProviderFlag.egl)) return _backendEgl;
-  if (providers.contains(OpenGlContextProviderFlag.wgl)) return _backendWgl;
-  throw StateError('no test graphics backend for $backends');
+  return null;
 }
-
-/// Whether this build can attach an owned texture to a core worker. A WGL
-/// session shares the host's context, which only a caller-driven session can
-/// drive.
-bool get buildHasCoreWorkerTexture => _buildBackend() != _backendWgl;
 
 /// Whether this build attaches sessions to Vulkan, the one backend whose
 /// sessions take a queue lock.
@@ -104,10 +98,7 @@ bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
 /// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
 /// context that it shares with the host, which only a caller-driven session
 /// can drive.
-bool get buildExposesCoreWorkerFrames => switch (_buildBackend()) {
-  _backendMetal || _backendVulkan => true,
-  _ => false,
-};
+bool get buildExposesCoreWorkerFrames => _buildBackend() != null;
 
 /// A device or context standing in for the host's.
 final class TestGraphics {
@@ -117,15 +108,9 @@ final class TestGraphics {
   /// after every session the test attaches to it. A build whose backend has
   /// no context here fails, rather than skipping.
   factory TestGraphics.open() {
-    final graphics = TestGraphics.create();
-    addTearDown(graphics.close);
-    return graphics;
-  }
-
-  /// Creates the build's backend context, which the caller closes, for code
-  /// that runs outside a test, such as a fixture process.
-  factory TestGraphics.create() {
-    final handle = _library.create(_buildBackend());
+    final backend = _buildBackend();
+    if (backend == null) fail('an OpenGL build has no test graphics context');
+    final handle = _library.create(backend);
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');
     }
@@ -136,16 +121,16 @@ final class TestGraphics {
       _library.destroy(handle);
       fail('mln_test_graphics_get_context: $error');
     }
-    return TestGraphics._(handle, context);
+    final graphics = TestGraphics._(handle, context);
+    addTearDown(graphics.close);
+    return graphics;
   }
 
   final Pointer<Void> _handle;
   final Pointer<_Context> _context;
   var _closed = false;
 
-  /// Attaches a session-owned texture on this device for a core worker. On
-  /// EGL, the session creates a dedicated context that shares nothing with
-  /// the host's.
+  /// Attaches a session-owned texture on this device for a core worker.
   NewRenderSession attachOwnedTexture(
     MapHandle map,
     LogicalExtent extent,
@@ -182,26 +167,8 @@ final class TestGraphics {
           ),
           options,
         );
-      case _backendEgl:
-        return map.attachOpenGlOwnedTexture(
-          OpenGlOwnedTextureDescriptor(
-            extent: extent,
-            context: OpenGlContextDescriptor(
-              ownership: OpenGlContextOwnership.dedicated,
-              data: OpenGlContextDescriptorDataEgl(
-                EglContextDescriptor(
-                  display: pointer(context.eglDisplay),
-                  config: pointer(context.eglConfig),
-                  shareContext: NativePointer.nullPointer,
-                  clientApi: OpenGlClientApi.gles,
-                ),
-              ),
-            ),
-          ),
-          options,
-        );
       default:
-        fail('a WGL texture has no core-worker session');
+        fail('no owned texture for backend ${context.backend}');
     }
   }
 

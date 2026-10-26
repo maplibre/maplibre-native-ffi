@@ -6,7 +6,6 @@ import 'dart:isolate';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
 import '../support/fixture.dart';
-import '../support/graphics.dart';
 
 Future<void> closeRuntimes() async {
   for (var cycle = 0; cycle < 3; cycle++) {
@@ -48,8 +47,8 @@ Future<void> abandonHandles() async {
 }
 
 /// Leaves a session attached on its core worker after it rendered, with its
-/// runtime and map, for the isolate's shutdown to finalize while the process
-/// exits. The graphics context stays open, as a host's would until exit.
+/// runtime, map, and graphics device, for the isolate's shutdown to finalize
+/// while the process exits.
 Future<void> abandonSession() async {
   final extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = RuntimeHandle.create(RuntimeOptions());
@@ -69,9 +68,10 @@ Future<void> abandonSession() async {
     ],
   });
   var frames = Completer<void>();
-  final attachment = TestGraphics.create().attachOwnedTexture(
-    map,
-    LogicalExtent(width: 32, height: 32, scaleFactor: 1),
+  final device = GraphicsDeviceHandle.create();
+  final attachment = map.attachGraphicsDeviceTexture(
+    device,
+    GraphicsDeviceTextureDescriptor(extent: extent),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       requestedTextureRingDepth: 1,
