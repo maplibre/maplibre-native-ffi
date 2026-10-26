@@ -26,7 +26,7 @@ public extension Maplibre {
   ///
   /// See `mln_network_get_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func networkGetStatus() throws -> NetworkStatus {
+  static func getNetworkStatus() throws -> NetworkStatus {
     var value0 = mln_network_status(rawValue: 0)
     return try nativeInvoke { _, _, diagnostic in mln_network_get_status(
       &value0,
@@ -38,25 +38,10 @@ public extension Maplibre {
   ///
   /// See `mln_network_set_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func networkSetStatus(_ bindingArg0: NetworkStatus) throws {
+  static func setNetworkStatus(_ bindingArg0: NetworkStatus) throws {
     try nativeInvoke { _, _, diagnostic in mln_network_set_status(
       mln_network_status(rawValue: bindingArg0.rawValue),
       diagnostic
     ) }
-  }
-
-  /// Creates a runtime.
-  ///
-  /// See `mln_runtime_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func runtimeCreate(options bindingArg0: RuntimeOptions) throws
-    -> RuntimeHandle
-  {
-    var value0: mln_runtime = 0
-    return try nativeInvoke { _, arena, diagnostic in try mln_runtime_create(
-      arena.store(bindingArg0.nativeValue(arena: arena)),
-      &value0,
-      diagnostic
-    ) } result: { try RuntimeHandle(adopting: value0) }
   }
 }

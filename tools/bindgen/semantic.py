@@ -445,6 +445,9 @@ class OperationPlan:
     # What an immediate call waits for before it returns, such as a native
     # thread start, which some host threads cannot wait for.
     blocks: str | None = None
+    # The root handle that this receiverless call creates, which bindings
+    # present as a factory on that handle's type, or None.
+    factory: str | None = None
 
     @property
     def name(self) -> str:
@@ -594,6 +597,11 @@ def output_member(name: str) -> str:
 def public_stem(native: str) -> str:
     """A declaration's name without the C API's `mln_` namespace."""
     return native.removeprefix("mln_")
+
+
+# The verbs that a process global names after its subject in C, and first in
+# every binding: mln_log_set_callback is set_log_callback.
+GLOBAL_VERBS = frozenset({"clear", "get", "init", "set"})
 
 
 def enum_member_prefix(constants, native: str | None = None) -> str:
@@ -1268,7 +1276,8 @@ class Binder:
             ),
             None,
         )
-        member = self.member(function, receiver or scoped_receiver)
+        factory = self.factory(function, receiver or scoped_receiver, owners)
+        member = self.member(function, receiver or scoped_receiver, factory)
         view = None
         if "view_owner" in metadata:
             parameter = next(
@@ -1364,6 +1373,7 @@ class Binder:
             drain=drain,
             absence=absence,
             blocks=metadata.get("blocks"),
+            factory=factory,
         )
 
     def copied(self, parameters, result: ValuePlan | None, context: str) -> set[str]:
@@ -1395,14 +1405,34 @@ class Binder:
             visit(result, f"{context} result")
         return found
 
-    def member(self, function: Function, receiver: str | None) -> str:
+    def factory(self, function: Function, receiver: str | None, owners) -> str | None:
+        """The root handle that a public receiverless call creates and is named
+        for, such as mln_runtime_create for mln_runtime."""
+        if receiver is not None or function.name in self.api.runtime_exports:
+            return None
+        created = [
+            owned.handle.native
+            for owned in owners
+            if owned.handle.parent is None
+            and function.name.startswith(owned.handle.native + "_")
+        ]
+        return created[0] if len(created) == 1 else None
+
+    def member(
+        self, function: Function, receiver: str | None, factory: str | None = None
+    ) -> str:
         """Name an operation once for every binding.
 
         An operation on a handle, or on a callback response, drops its
-        receiver's prefix when its name starts with it; every other name drops
-        `mln_`. A dispose that is also its handle's release is named for the
-        release, which passes the completion, because the dispose passes none.
+        receiver's prefix when its name starts with it, and a factory drops the
+        prefix of the handle it creates. A public process global names its verb
+        first, as set_log_callback does for mln_log_set_callback; every other
+        name drops `mln_`. A dispose that is also its handle's release is named
+        for the release, which passes the completion, because the dispose
+        passes none.
         """
+        if factory is not None:
+            return function.name.removeprefix(factory + "_")
         if any(
             handle.dispose_completion and handle.release == function.name
             for handle in self.handles.values()
@@ -1413,7 +1443,16 @@ class Binder:
             owner = type_name(parameter.type.pointee or parameter.type)
             if function.name.startswith(owner + "_"):
                 return function.name.removeprefix(owner + "_")
-        return public_stem(function.name)
+        stem = public_stem(function.name)
+        subject, *rest = stem.split("_")
+        if (
+            receiver is None
+            and function.name not in self.api.runtime_exports
+            and rest
+            and rest[0] in GLOBAL_VERBS
+        ):
+            return "_".join((rest[0], subject, *rest[1:]))
+        return stem
 
     def response(self, name: str) -> CallbackResponsePlan:
         methods = tuple(

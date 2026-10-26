@@ -15,7 +15,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
     with pytest.raises(TypeError):
         mln.MapHandle()
 
-    with mln.runtime_create() as runtime:
+    with mln.RuntimeHandle.create() as runtime:
         with ready_map(runtime) as map_handle:
             assert map_handle.get_snapshot() is not None
         with pytest.raises(
@@ -33,7 +33,9 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
     ):
         runtime.close()
 
-    data = mln.geojson_source_data_create({"type": "FeatureCollection", "features": []})
+    data = mln.GeoJsonSourceDataHandle.create(
+        {"type": "FeatureCollection", "features": []}
+    )
     _check_handle(data, closed=False)
     data.close()
     data.close()
@@ -54,7 +56,7 @@ def _check_handle(
 
 
 def test_dispose_closes_a_handle_once() -> None:
-    runtime = mln.runtime_create()
+    runtime = mln.RuntimeHandle.create()
     map_handle = ready_map(runtime)
     for handle in (map_handle, runtime):
         _check_handle(handle, closed=False)
@@ -72,14 +74,14 @@ def test_dispose_closes_a_handle_once() -> None:
 
 
 def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
-    with mln.runtime_create() as runtime:
+    with mln.RuntimeHandle.create() as runtime:
         with ready_map(runtime) as map_handle:
             result(map_handle.close())
         result(runtime.close())
 
 
 def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> None:
-    with mln.runtime_create() as runtime:
+    with mln.RuntimeHandle.create() as runtime:
         # Release refuses a runtime with a live map, and dispose accepts it.
         map_handle = ready_map(runtime)
     _check_handle(runtime, closed=True)
@@ -146,7 +148,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
 
 
 def test_a_child_keeps_its_parent_alive() -> None:
-    runtime = mln.runtime_create()
+    runtime = mln.RuntimeHandle.create()
     parent = weakref.ref(runtime)
     map_handle = ready_map(runtime)
     del runtime
@@ -197,11 +199,11 @@ def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
 _SHUTDOWN_WITH_LIVE_HANDLES = """
 import maplibre_native_ffi as m
 
-runtime = m.runtime_create()
+runtime = m.RuntimeHandle.create()
 runtime.set_resource_provider(
     m.ResourceProvider(callback=lambda request, handle: None)
 ).result(10)
-m.log_set_callback(m.LogHandler(lambda severity, event, code, message: True))
+m.set_log_callback(m.LogHandler(lambda severity, event, code, message: True))
 options = m.MapOptions(initial_extent=m.LogicalExtent(256, 256, 1.0))
 live = runtime.create_map(options).map
 live.set_style_url("custom://never-answered.json")

@@ -118,6 +118,8 @@ def lower_function(
             receiver, receiver_reference = None, False
     if receiver_reference and not plan.consumes:
         raise Unsupported("mutable handle receiver requires consumption")
+    if plan.factory and plan.factory not in bound.public_handles:
+        raise Unsupported("factory requires a generated class")
     handle_plan = bound.handles.get(receiver) if receiver else None
     method = identifier(plan.member)
     if (

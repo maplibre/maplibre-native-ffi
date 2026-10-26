@@ -9,10 +9,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   cVersion,
-  logClearCallback,
-  type RuntimeHandle,
+  clearLogCallback,
   RuntimeEventType,
-  runtimeCreate,
+  RuntimeHandle,
 } from "../src/index.ts";
 import { mapOptions, openRuntime, styleRoute } from "./support/fixture.ts";
 import {
@@ -93,8 +92,8 @@ test(
     writeFileSync(
       join(root, "load.ts"),
       [
-        'import { runtimeCreate } from "./first/src/index.ts";',
-        "const runtime = runtimeCreate();",
+        'import { RuntimeHandle } from "./first/src/index.ts";',
+        "const runtime = RuntimeHandle.create();",
         "try {",
         '  await import("./second/src/index.ts");',
         '  console.log("the second copy loaded");',
@@ -174,7 +173,7 @@ test(
 
 /** Leaves a runtime and a map open for the collector. */
 async function abandonRuntimeWithMap() {
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   return {
@@ -207,14 +206,14 @@ test(
 
 /** A runtime whose event handler names it, and nothing else does. */
 async function runtimeHeldByItsEventHandler() {
-  const runtime: RuntimeHandle = runtimeCreate();
+  const runtime: RuntimeHandle = RuntimeHandle.create();
   await runtime.setEventHandler(() => void runtime.id);
   return { id: runtime.id, collected: watchCollection(runtime) };
 }
 
 /** A runtime whose provider names it, and nothing else does. */
 async function runtimeHeldByItsProvider() {
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   await runtime.setResourceProvider({
     routes: [styleRoute("capture://style.json")],
     callback(_request, handle) {
@@ -275,7 +274,7 @@ async function terminateRealmWithLiveWork() {
   await terminateRealm(realm, "the realm's termination");
   // The log callback is process-global, so the ended realm's registration
   // stays until another realm replaces or clears it.
-  logClearCallback();
+  clearLogCallback();
   // This realm keeps receiving after the other one ended mid-frame.
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();

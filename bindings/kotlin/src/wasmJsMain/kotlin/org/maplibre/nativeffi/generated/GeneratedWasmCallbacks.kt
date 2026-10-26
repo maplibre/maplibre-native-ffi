@@ -78,7 +78,7 @@ internal fun NativeCall.writeHttpHeaderTransformRules(value: HttpHeaderTransform
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-public fun GeneratedApi.logSetCallback(handler: QueuedLogHandler): Unit =
+public fun GeneratedApi.setLogCallback(handler: QueuedLogHandler): Unit =
   nativeCall(null, null) {
     check(C.mln_log_set_callback(writeQueuedLogHandler(handler), diagnostic))
     accept(CallbackOwner.global)

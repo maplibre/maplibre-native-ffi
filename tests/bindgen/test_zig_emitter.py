@@ -86,6 +86,22 @@ class ZigEmitterTests(unittest.TestCase):
             source,
         )
 
+    def test_a_factory_is_on_its_type_and_a_global_names_its_verb_first(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        runtime = source[source.index("pub const Runtime = struct {") :]
+        runtime = runtime[: runtime.index("\n};\n")]
+        self.assertIn(
+            '\npub fn create(@"options": RuntimeOptions, diagnostic: '
+            "?*diagnostics.Diagnostic) status.Error!Runtime {",
+            runtime,
+        )
+        self.assertNotIn("runtimeCreate", source)
+        self.assertIn(
+            'pub fn setLogCallback(@"handler": LogHandler, diagnostic: '
+            "?*diagnostics.Diagnostic) status.Error!void {",
+            source,
+        )
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = zig.generate(real_api())["maplibre_native_ffi.zig"]
         self.assertIn(

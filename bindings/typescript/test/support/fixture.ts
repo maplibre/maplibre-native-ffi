@@ -18,9 +18,8 @@ import {
   type ResourceRoute,
   type RuntimeEvent,
   type RuntimeEventType,
-  type RuntimeHandle,
   type RuntimeOptions,
-  runtimeCreate,
+  RuntimeHandle,
   Status,
 } from "../../src/index.ts";
 import { bounded, closeIfLive, nextWake, teardown } from "./harness.ts";
@@ -165,7 +164,7 @@ export const mapOptions: MapOptions = {
 export async function openRuntime(
   options: { runtime?: RuntimeOptions; provider?: ResourceProvider } = {},
 ): Promise<RuntimeFixture> {
-  const runtime = runtimeCreate(options.runtime);
+  const runtime = RuntimeHandle.create(options.runtime);
   teardown(() => closeIfLive(() => runtime.close()));
   const events = await listen(runtime);
   await bounded(

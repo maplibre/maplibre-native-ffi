@@ -23,7 +23,8 @@ fn a_handle_formats_its_id_and_dispose_consumes_it() {
 #[test]
 fn a_projection_release_consumes_it() {
     let fixture = Fixture::new();
-    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
+    let projection =
+        MapProjectionHandle::create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     assert_ne!(projection.id(), 0);
     projection.release().unwrap();
 }
@@ -122,8 +123,9 @@ fn kill(id: u32) {
 fn exit_with_live_handles_and_callbacks() -> ! {
     let fixture = Fixture::new();
     fixture.load_style(BACKGROUND_STYLE_JSON);
-    log_set_callback(LogHandler::new(|_, _, _, _| true)).unwrap();
-    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
+    set_log_callback(LogHandler::new(|_, _, _, _| true)).unwrap();
+    let projection =
+        MapProjectionHandle::create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     std::mem::forget((fixture, projection));
     std::process::exit(0);
 }

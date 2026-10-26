@@ -2,11 +2,11 @@
 // their registrations still open. Nothing else holds the event loop, so the
 // process ends when the script does.
 
-import { RuntimeEventType, runtimeCreate } from "../../src/index.ts";
+import { RuntimeEventType, RuntimeHandle } from "../../src/index.ts";
 import { listen, mapOptions, styleRoute } from "../support/fixture.ts";
 import { emptyStyle } from "../support/styles.ts";
 
-const runtime = runtimeCreate();
+const runtime = RuntimeHandle.create();
 const events = await listen(runtime);
 await runtime.setResourceProvider({
   routes: [styleRoute("open://style.json")],

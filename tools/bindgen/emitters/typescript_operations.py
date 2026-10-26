@@ -171,7 +171,9 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
 
 def render_method(bound, values, entry: Lowered, indent: str) -> str:
     body = method_body(bound, values, entry)
-    head = "" if entry.owner else "export function "
+    head = (
+        "static " if entry.plan.factory else "" if entry.owner else "export function "
+    )
     text = doc(bound, entry.plan.name, indent)
     generic = "<T>" if entry.shape == "view" else ""
     text += f"{indent}{head}{entry.method}{generic}({signature(entry)}): {entry.returns} {{\n"
@@ -523,7 +525,8 @@ def runtime_imports(text: str) -> str:
 def render_operations(bound, values: Values, lowered: list[Lowered]):
     by_owner: dict[str | None, list[Lowered]] = {}
     for entry in lowered:
-        by_owner.setdefault(entry.owner, []).append(entry)
+        # A factory is a static method of the handle that it creates.
+        by_owner.setdefault(entry.owner or entry.plan.factory, []).append(entry)
     chunks = []
     for entry in sorted(by_owner.get(None, []), key=lambda e: e.method):
         chunks.append(render_method(bound, values, entry, ""))

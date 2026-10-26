@@ -9,7 +9,7 @@ use super::*;
 /// # Safety
 /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
 #[cfg(target_os = "android")]
-pub unsafe fn android_init(
+pub unsafe fn init_android(
     jni_env: *mut std::ffi::c_void,
     context: *mut std::ffi::c_void,
 ) -> Result<()> {
@@ -32,25 +32,6 @@ pub fn c_version() -> u32 {
     value
 }
 
-/// Prepares GeoJSON source data for installation on a map.
-///
-/// See `mln_geojson_source_data_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geojson_source_data_create(
-    data: &str,
-    options: Option<&GeoJsonSourceOptions>,
-) -> Result<GeoJsonSourceDataHandle> {
-    let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
-    let mut out_data = sys::mln_geojson_source_data(0);
-    let data = call.input(&data)?;
-    let options = call.optional_reference(options.as_ref())?;
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_geojson_source_data_create(data, options, &mut out_data, out_diagnostic)
-    })?;
-    Ok(GeoJsonSourceDataHandle::adopt(out_data, None)?)
-}
-
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
@@ -70,7 +51,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 ///
 /// See `mln_log_clear_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_clear_callback() -> Result<()> {
+pub fn clear_log_callback() -> Result<()> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_clear_callback(out_diagnostic) })?;
@@ -82,7 +63,7 @@ pub fn log_clear_callback() -> Result<()> {
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_set_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
+pub fn set_log_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
@@ -95,7 +76,7 @@ pub fn log_set_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_set_callback(handler: LogHandler) -> Result<()> {
+pub fn set_log_callback(handler: LogHandler) -> Result<()> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     let handler = call.reference(&handler)?;
@@ -124,27 +105,11 @@ pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)>
     Ok((out_width, out_height))
 }
 
-/// Creates a standalone projection of a view, such as the view of a
-/// rendered frame or of a map snapshot.
-///
-/// See `mln_map_projection_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn map_projection_create(view: &MapView) -> Result<MapProjectionHandle> {
-    let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
-    let mut out_projection = sys::mln_map_projection(0);
-    let view = call.reference(&view)?;
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_map_projection_create(view, &mut out_projection, out_diagnostic)
-    })?;
-    Ok(MapProjectionHandle::adopt(out_projection, None)?)
-}
-
 /// Reads MapLibre Native's process-global network status.
 ///
 /// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn network_get_status() -> Result<NetworkStatus> {
+pub fn get_network_status() -> Result<NetworkStatus> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     let mut out_status: sys::mln_network_status = Default::default();
@@ -158,7 +123,7 @@ pub fn network_get_status() -> Result<NetworkStatus> {
 ///
 /// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn network_set_status(status: NetworkStatus) -> Result<()> {
+pub fn set_network_status(status: NetworkStatus) -> Result<()> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
@@ -183,7 +148,7 @@ pub fn opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-pub fn plugin_get_register_function_v1() -> sys::mln_plugin_register_function_v1 {
+pub fn get_plugin_register_function_v1() -> sys::mln_plugin_register_function_v1 {
     let mut call = Call::global();
     maplibre_core::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_plugin_get_register_function_v1() });
@@ -203,40 +168,6 @@ pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeter
         sys::mln_projected_meters_for_lat_lng(coordinate, &mut out_meters, out_diagnostic)
     })?;
     Ok(unsafe { from_native(out_meters) }?)
-}
-
-/// Creates a runtime.
-///
-/// See `mln_runtime_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtime_create(options: &RuntimeOptions) -> Result<RuntimeHandle> {
-    let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
-    let mut out_runtime = sys::mln_runtime(0);
-    let options = call.reference(&options)?;
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_runtime_create(options, &mut out_runtime, out_diagnostic)
-    })?;
-    Ok(RuntimeHandle::adopt(out_runtime, None)?)
-}
-
-/// Parses a style expression.
-///
-/// See `mln_style_expression_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn style_expression_create(
-    expression: &str,
-    options: Option<&StyleExpressionOptions>,
-) -> Result<StyleExpressionHandle> {
-    let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
-    let mut out_expression = sys::mln_style_expression(0);
-    let expression = call.input(&expression)?;
-    let options = call.optional_reference(options.as_ref())?;
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_style_expression_create(expression, options, &mut out_expression, out_diagnostic)
-    })?;
-    Ok(StyleExpressionHandle::adopt(out_expression, None)?)
 }
 
 /// Reports the render backends available in this native library build.

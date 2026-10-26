@@ -4,6 +4,26 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension GeoJsonSourceDataHandle {
+  /// Prepares GeoJSON source data for installation on a map.
+  ///
+  /// See `mln_geojson_source_data_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  static func create(
+    data bindingArg0: String,
+    options bindingArg1: GeoJsonSourceOptions? = nil
+  ) throws -> GeoJsonSourceDataHandle {
+    var value0: mln_geojson_source_data = 0
+    return try MaplibreNativeFFI
+      .nativeInvoke { _, arena, diagnostic in
+        try mln_geojson_source_data_create(
+          arena.view(bindingArg0),
+          bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+          &value0,
+          diagnostic
+        )
+      } result: { try GeoJsonSourceDataHandle(adopting: value0) }
+  }
+
   /// Releases prepared GeoJSON source data.
   ///
   /// See `mln_geojson_source_data_release` in the

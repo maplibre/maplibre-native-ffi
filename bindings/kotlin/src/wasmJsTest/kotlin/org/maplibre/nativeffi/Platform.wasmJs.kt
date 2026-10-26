@@ -13,7 +13,7 @@ import kotlinx.coroutines.yield
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.QueuedLogHandler
-import org.maplibre.nativeffi.generated.logSetCallback
+import org.maplibre.nativeffi.generated.setLogCallback
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /**
@@ -77,7 +77,7 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
 
 // Native consumes each record and queues it, and the page runs the callback as it drains.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
-  GeneratedApi.logSetCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
+  GeneratedApi.setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
 }
 
 // The page drains what native has queued so far, then waits for a marker wake that the shim posts

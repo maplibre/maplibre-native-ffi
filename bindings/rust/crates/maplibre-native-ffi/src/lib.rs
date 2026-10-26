@@ -19,7 +19,7 @@
 //! final binary enables one; a library that depends on this crate leaves them
 //! off.
 //!
-//! In the browser, [`runtime_create`] returns [`Status::WrongThread`] on the
+//! In the browser, [`RuntimeHandle::create`] returns [`Status::WrongThread`] on the
 //! main thread, and [`NativeFuture::wait`] blocks, so a host runs the binding
 //! on a worker, such as the one Emscripten's `-sPROXY_TO_PTHREAD` provides.
 

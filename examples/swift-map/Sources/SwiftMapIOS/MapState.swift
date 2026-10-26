@@ -46,7 +46,7 @@ final class MapState {
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
     )
-    let runtime = try Maplibre.runtimeCreate(
+    let runtime = try RuntimeHandle.create(
       options: RuntimeOptions(cachePath: ":memory:")
     )
     let map: MapHandle

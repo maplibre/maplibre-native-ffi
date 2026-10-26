@@ -14,6 +14,22 @@ native_owner! {
 }
 
 impl MapProjectionHandle {
+    /// Creates a standalone projection of a view, such as the view of a
+    /// rendered frame or of a map snapshot.
+    ///
+    /// See `mln_map_projection_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn create(view: &MapView) -> Result<MapProjectionHandle> {
+        let mut call = Call::global();
+        maplibre_core::validate_abi_version()?;
+        let mut out_projection = sys::mln_map_projection(0);
+        let view = call.reference(&view)?;
+        call.status(|_, out_diagnostic| unsafe {
+            sys::mln_map_projection_create(view, &mut out_projection, out_diagnostic)
+        })?;
+        Ok(MapProjectionHandle::adopt(out_projection, None)?)
+    }
+
     /// Copies the projection camera into out_camera.
     ///
     /// See `mln_map_projection_get_camera` in the

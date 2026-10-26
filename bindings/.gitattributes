@@ -297,10 +297,8 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceRequestOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceTransformRequestOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeRuntimeOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleExpressionGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleExpressionStyleExpressionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGeoJsonSourceDataOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedSurfaceMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedSurfaceRenderSessionOperations.swift linguist-generated=true

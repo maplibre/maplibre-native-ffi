@@ -29,7 +29,7 @@ impl MapState {
             cache_path: ":memory:".into(),
             ..Default::default()
         };
-        let runtime = maplibre_native_ffi::runtime_create(&runtime_options)
+        let runtime = maplibre_native_ffi::RuntimeHandle::create(&runtime_options)
             .map_err(|error| format!("runtime creation failed: {error}"))?;
 
         let map_options = MapOptions {

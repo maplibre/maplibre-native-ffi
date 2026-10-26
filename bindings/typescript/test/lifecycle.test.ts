@@ -5,9 +5,9 @@ import assert from "node:assert/strict";
 
 import {
   MaplibreError,
-  mapProjectionCreate,
+  MapProjectionHandle,
   RuntimeEventType,
-  runtimeCreate,
+  RuntimeHandle,
   Status,
 } from "../src/index.ts";
 import { mapOptions, openRuntime } from "./support/fixture.ts";
@@ -29,7 +29,7 @@ test("repeated asynchronous release reaches native", async () => {
   const map = await fixture.openMap();
 
   // A synchronous close is idempotent.
-  const projection = mapProjectionCreate(map.getSnapshot().view);
+  const projection = MapProjectionHandle.create(map.getSnapshot().view);
   projection.close();
   projection.close();
 
@@ -51,7 +51,7 @@ test(
     await closed[Symbol.asyncDispose]();
     closed[Symbol.dispose]();
 
-    const disposed = runtimeCreate();
+    const disposed = RuntimeHandle.create();
     disposed.dispose();
     await disposed[Symbol.asyncDispose]();
     await disposed[Symbol.asyncDispose]();
@@ -61,7 +61,7 @@ test(
 
 test("a handle names its id and whether it is closed", async () => {
   const fixture = await openRuntime();
-  const projection = mapProjectionCreate(
+  const projection = MapProjectionHandle.create(
     (await fixture.openMap()).getSnapshot().view,
   );
   const projectionId = `0x${projection.id.toString(16)}`;
@@ -77,7 +77,7 @@ test("a handle names its id and whether it is closed", async () => {
     `MapProjectionHandle(id=${projectionId}, closed=true)`,
   );
 
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   const runtimeId = `0x${runtime.id.toString(16)}`;
   assert.equal(runtime.isClosed, false);
   assert.equal(String(runtime), `RuntimeHandle(id=${runtimeId}, closed=false)`);
@@ -89,7 +89,7 @@ test("a handle names its id and whether it is closed", async () => {
 });
 
 test("a refused close leaves the handle usable for a later close", async () => {
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await bounded(ready, "map creation");
 
@@ -118,7 +118,7 @@ test("a handle id names its events and outlives close", async () => {
 
 /** Creates a runtime and a map on it, and keeps only the map. */
 async function mapWithoutItsRuntime() {
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await bounded(ready, "map creation");
   return {
@@ -130,7 +130,7 @@ async function mapWithoutItsRuntime() {
 }
 
 function unreachableRuntime(): () => boolean {
-  return watchCollection(runtimeCreate());
+  return watchCollection(RuntimeHandle.create());
 }
 
 test(

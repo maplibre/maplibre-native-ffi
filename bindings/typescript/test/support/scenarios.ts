@@ -3,12 +3,11 @@
 
 import {
   CameraUpdateMode,
-  logSetCallback,
+  setLogCallback,
   type RenderSessionHandle,
   type ResourceRequestHandle,
-  type RuntimeHandle,
   RuntimeEventType,
-  runtimeCreate,
+  RuntimeHandle,
   UrlMatchFlag,
 } from "../../src/index.ts";
 import { openRuntime, styleResponse, styleRoute } from "./fixture.ts";
@@ -69,7 +68,7 @@ export async function routeRequests(
  * `started` runs after the first round; the burst never ends on its own.
  */
 export async function burst(started: () => void): Promise<never> {
-  const runtime: RuntimeHandle = runtimeCreate();
+  const runtime: RuntimeHandle = RuntimeHandle.create();
   await runtime.setEventHandler(() => {});
   const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
   await ready;
@@ -104,8 +103,8 @@ const liveWork: object[] = [];
  * right after it returns. Returns the session.
  */
 export async function liveNativeWork(): Promise<RenderSessionHandle> {
-  logSetCallback(() => {});
-  const runtime = runtimeCreate();
+  setLogCallback(() => {});
+  const runtime = RuntimeHandle.create();
   await runtime.setEventHandler(() => {});
   let hold!: (handle: ResourceRequestHandle) => void;
   const held = new Promise<ResourceRequestHandle>(

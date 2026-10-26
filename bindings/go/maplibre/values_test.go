@@ -99,7 +99,7 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	projection, err := MapProjectionCreate(snapshot.View)
+	projection, err := NewMapProjection(snapshot.View)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 }
 
 func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
-	zoom, err := StyleExpressionCreate(`["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]`, nil)
+	zoom, err := NewStyleExpression(`["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 
 	// The result outgrows the runtime's first storage, so the call runs again.
 	text := `"` + strings.Repeat("a", 1000) + `"`
-	long, err := StyleExpressionCreate(text, nil)
+	long, err := NewStyleExpression(text, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

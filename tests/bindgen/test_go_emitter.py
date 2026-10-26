@@ -77,6 +77,15 @@ class GoEmitterTests(unittest.TestCase):
             source,
         )
 
+    def test_a_factory_is_new_and_a_global_names_its_verb_first(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "func NewRuntime(options RuntimeOptions) (*RuntimeHandle, error) {",
+            source,
+        )
+        self.assertNotIn("func RuntimeCreate(", source)
+        self.assertIn("func SetLogCallback(handler LogHandler) error {", source)
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(

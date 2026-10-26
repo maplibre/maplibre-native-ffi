@@ -2,7 +2,7 @@ import MaplibreNativeFFI
 
 func installCApiLogging() {
   do {
-    try Maplibre.logSetCallback(handler: LogHandler {
+    try Maplibre.setLogCallback(handler: LogHandler {
       severity, event, code, message in
       print(
         "[MapLibre] severity=\(severity) event=\(event) code=\(code): \(message)"
@@ -16,7 +16,7 @@ func installCApiLogging() {
 
 func clearCApiLogging() {
   do {
-    try Maplibre.logClearCallback()
+    try Maplibre.clearLogCallback()
   } catch {
     print("log callback clear failed: \(error)")
   }

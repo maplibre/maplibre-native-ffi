@@ -1,7 +1,10 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi.generated
 
+import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
+import org.maplibre.nativeffi.internal.memory.*
 
 /**
  * Prepared GeoJSON data that sources retain independently of its handle.
@@ -30,4 +33,29 @@ internal constructor(
 
   override fun toString(): String =
     "GeoJsonSourceDataHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+
+  public companion object {
+    /**
+     * Prepares GeoJSON source data for installation on a map.
+     *
+     * See `mln_geojson_source_data_create` in the
+     * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+     */
+    public fun create(
+      data: String,
+      options: GeoJsonSourceOptions? = null,
+    ): GeoJsonSourceDataHandle =
+      nativeCall(null, null) {
+        val out = allocate(8, 8)
+        check(
+          C.mln_geojson_source_data_create(
+            view(data),
+            options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
+            out,
+            diagnostic,
+          ),
+        )
+        adopt(out, GeneratedOwnerDisposal::geoJsonSourceData) { GeoJsonSourceDataHandle(it) }
+      }
+  }
 }

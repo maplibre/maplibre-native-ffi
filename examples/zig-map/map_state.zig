@@ -15,7 +15,7 @@ pub const MapState = struct {
     /// needs no network.
     pub fn init(viewport: types.Viewport, smoke: bool) !MapState {
         var diagnostic: maplibre.Diagnostic = .{};
-        var runtime = maplibre.runtimeCreate(.{ .cache_path = ":memory:" }, &diagnostic) catch |err| {
+        var runtime = maplibre.Runtime.create(.{ .cache_path = ":memory:" }, &diagnostic) catch |err| {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };

@@ -559,6 +559,10 @@ def lower(api: Api | BoundApi):
             # the check.
             if owner == "Globals" and plan.name != "mln_c_version":
                 body = abi_checked(body)
+            # A factory is a static method of the owner of the handle it
+            # creates.
+            if plan.factory:
+                owner, body = plan.factory, "  static " + body.removeprefix("  ")
             body = doc(bound, plan.name, "  ") + body
             local_values.render()
             values.used.update(local_values.used)

@@ -130,8 +130,13 @@ def operation(
         if plan.scoped_receiver
         else owner_name(value_types.bound.handles[receiver])
         if receiver
+        else owner_name(value_types.bound.handles[plan.factory])
+        if plan.factory
         else "Maplibre"
     )
+    # A factory is a static member of a handle, whose call helpers shadow the
+    # global ones that a call without a receiver uses.
+    helpers = "MaplibreNativeFFI." if plan.factory else ""
     if plan.view:
         from .swift_views import operation as view_operation
 
@@ -395,7 +400,7 @@ def operation(
         returns = "" if result == "Void" else f" -> {result}"
         return (
             f"""{doc_comment}{attribute}{signature} async throws{returns} {{
-  try await native{start}({target}{conversion}) {{ raw, arena, completion, diagnostic in {call} }}
+  try await {helpers}native{start}({target}{conversion}) {{ raw, arena, completion, diagnostic in {call} }}
 }}
 """,
             owner,
@@ -520,9 +525,7 @@ def operation(
             # Native kept nothing from a declined registration, so its
             # callbacks release with the arena.
             call = f"let status = {call}; arena.decline(if: status == MLN_STATUS_OK && {declined}); return status"
-        invoke = (
-            f"nativeInvoke({target}{absent}) {{ raw, arena, diagnostic in {call} }}"
-        )
+        invoke = f"{helpers}nativeInvoke({target}{absent}) {{ raw, arena, diagnostic in {call} }}"
         if not types:
             return (
                 f"""{doc_comment}{signature} throws {{
@@ -641,6 +644,8 @@ def lower(
             owner = (
                 name(receiver.native.removeprefix("mln_"))
                 if receiver and receiver.kind == "handle"
+                else name(plan.factory.removeprefix("mln_"))
+                if plan.factory
                 else "Globals"
             )
             stem = Path(function.location.path).stem

@@ -4,6 +4,21 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapProjectionHandle {
+  /// Creates a standalone projection of a view, such as the view of a rendered
+  /// frame or of a map snapshot.
+  ///
+  /// See `mln_map_projection_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  static func create(view bindingArg0: MapView) throws -> MapProjectionHandle {
+    var value0: mln_map_projection = 0
+    return try MaplibreNativeFFI
+      .nativeInvoke { _, arena, diagnostic in mln_map_projection_create(
+        arena.store(bindingArg0.nativeValue()),
+        &value0,
+        diagnostic
+      ) } result: { try MapProjectionHandle(adopting: value0) }
+  }
+
   /// Copies the projection camera into out_camera.
   ///
   /// See `mln_map_projection_get_camera` in the

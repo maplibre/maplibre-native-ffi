@@ -91,8 +91,8 @@ pub fn main(init_args: std.process.Init) !void {
     _ = args.skip();
     const output_path = args.next() orelse "map.ppm";
 
-    try maplibre.logSetAsyncSeverityMask(.{}, null);
-    defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityFlag.default, null) catch {};
+    try maplibre.setLogAsyncSeverityMask(.{}, null);
+    defer maplibre.setLogAsyncSeverityMask(maplibre.LogSeverityFlag.default, null) catch {};
     try logAndValidateRenderBackend();
 
     // Setup calls report into one diagnostic, and a failure prints its details.
@@ -100,7 +100,7 @@ pub fn main(init_args: std.process.Init) !void {
     errdefer if (diagnostic.message().len != 0) std.log.err("{s}", .{diagnostic.message()});
 
     var signal = WakeSignal{ .io = init_args.io };
-    var runtime = try maplibre.runtimeCreate(.{ .cache_path = ":memory:" }, &diagnostic);
+    var runtime = try maplibre.Runtime.create(.{ .cache_path = ":memory:" }, &diagnostic);
     defer if (runtime.release(null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};

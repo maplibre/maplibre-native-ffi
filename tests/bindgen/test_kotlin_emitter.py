@@ -323,6 +323,20 @@ class KotlinLayoutTests(unittest.TestCase):
             outputs[f"{GENERATED}/GeneratedApi.kt"],
         )
 
+    def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
+        self,
+    ):
+        outputs = kotlin.generate(real_api())
+        runtime = outputs[f"{GENERATED}/RuntimeHandle.kt"]
+        self.assertIn("  public companion object {\n", runtime)
+        self.assertIn(
+            "public suspend fun create(options: RuntimeOptions): RuntimeHandle =",
+            runtime.split("public companion object {")[1],
+        )
+        api = outputs[f"{GENERATED}/GeneratedApi.kt"]
+        self.assertNotIn("Create(", api)
+        self.assertIn("public fun clearLogCallback(): Unit =", api)
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn("public sealed interface RenderedQueryGeometry {", values)

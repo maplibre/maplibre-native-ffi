@@ -58,6 +58,21 @@ impl RuntimeHandle {
         })
     }
 
+    /// Creates a runtime.
+    ///
+    /// See `mln_runtime_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn create(options: &RuntimeOptions) -> Result<RuntimeHandle> {
+        let mut call = Call::global();
+        maplibre_core::validate_abi_version()?;
+        let mut out_runtime = sys::mln_runtime(0);
+        let options = call.reference(&options)?;
+        call.status(|_, out_diagnostic| unsafe {
+            sys::mln_runtime_create(options, &mut out_runtime, out_diagnostic)
+        })?;
+        Ok(RuntimeHandle::adopt(out_runtime, None)?)
+    }
+
     /// Starts creation of a map on the runtime.
     ///
     /// See `mln_runtime_create_map` in the

@@ -42,8 +42,8 @@ pub fn main(init_args: std.process.Init) !void {
     const smoke = isSmokeRun(init_args);
     try validateNativeRenderBackend();
 
-    try maplibre.logSetCallback(.{ .callback = diagnostics.logRecord }, null);
-    defer maplibre.logClearCallback(null) catch {};
+    try maplibre.setLogCallback(.{ .callback = diagnostics.logRecord }, null);
+    defer maplibre.clearLogCallback(null) catch {};
 
     if (uses_egl) {
         _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");

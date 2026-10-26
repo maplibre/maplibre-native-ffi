@@ -14,6 +14,25 @@ native_owner! {
 }
 
 impl GeoJsonSourceDataHandle {
+    /// Prepares GeoJSON source data for installation on a map.
+    ///
+    /// See `mln_geojson_source_data_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn create(
+        data: &str,
+        options: Option<&GeoJsonSourceOptions>,
+    ) -> Result<GeoJsonSourceDataHandle> {
+        let mut call = Call::global();
+        maplibre_core::validate_abi_version()?;
+        let mut out_data = sys::mln_geojson_source_data(0);
+        let data = call.input(&data)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.status(|_, out_diagnostic| unsafe {
+            sys::mln_geojson_source_data_create(data, options, &mut out_data, out_diagnostic)
+        })?;
+        Ok(GeoJsonSourceDataHandle::adopt(out_data, None)?)
+    }
+
     /// Releases prepared GeoJSON source data.
     ///
     /// See `mln_geojson_source_data_release` in the

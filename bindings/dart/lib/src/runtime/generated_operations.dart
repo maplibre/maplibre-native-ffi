@@ -2591,33 +2591,6 @@ int cVersion() {
   return nativeResult;
 }
 
-/// Prepares GeoJSON source data for installation on a map.
-///
-/// See `mln_geojson_source_data_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-GeoJsonSourceDataHandle geoJsonSourceDataCreate(
-  Object? data, {
-  GeoJsonSourceOptions? options,
-}) => withNativeArena((arena) {
-  ensureAbiVersion();
-  final outData = arena<Uint64>();
-  _check(
-    raw.mln_geojson_source_data_create(
-      _nativeJsonView(data, arena),
-      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
-      outData,
-      nativeDiagnostic,
-    ),
-  );
-  return _adoptOwned(
-    outData.value,
-    () => GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData(outData.value)),
-    (handle) {
-      raw.mln_geojson_source_data_release(handle);
-    },
-  );
-});
-
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
@@ -2640,7 +2613,7 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
 ///
 /// See `mln_log_clear_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logClearCallback() {
+void clearLogCallback() {
   ensureAbiVersion();
   return _check(raw.mln_log_clear_callback(nativeDiagnostic));
 }
@@ -2649,7 +2622,7 @@ void logClearCallback() {
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetAsyncSeverityMask(LogSeverityFlag mask) {
+void setLogAsyncSeverityMask(LogSeverityFlag mask) {
   ensureAbiVersion();
   return _check(
     raw.mln_log_set_async_severity_mask(mask.rawValue, nativeDiagnostic),
@@ -2660,7 +2633,7 @@ void logSetAsyncSeverityMask(LogSeverityFlag mask) {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetCallback(LogCallback handler) {
+void setLogCallback(LogCallback handler) {
   ensureAbiVersion();
   final registrations = _NativeRegistrations(_globalCallbackRoots);
   _check(
@@ -2693,36 +2666,11 @@ void logSetCallback(LogCallback handler) {
       return (outWidth.value, outHeight.value);
     });
 
-/// Creates a standalone projection of a view, such as the view of a rendered
-/// frame or of a map snapshot.
-///
-/// See `mln_map_projection_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-MapProjectionHandle mapProjectionCreate(MapView view) =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-      final outProjection = arena<Uint64>();
-      _check(
-        raw.mln_map_projection_create(
-          _writeMapView(view, arena),
-          outProjection,
-          nativeDiagnostic,
-        ),
-      );
-      return _adoptOwned(
-        outProjection.value,
-        () => MapProjectionHandle._(_NativeMapProjection(outProjection.value)),
-        (handle) {
-          raw.mln_map_projection_release(handle);
-        },
-      );
-    });
-
 /// Reads MapLibre Native's process-global network status.
 ///
 /// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-NetworkStatus networkGetStatus() => withNativeArena((arena) {
+NetworkStatus getNetworkStatus() => withNativeArena((arena) {
   ensureAbiVersion();
   final outStatus = arena<Uint32>();
   _check(raw.mln_network_get_status(outStatus, nativeDiagnostic));
@@ -2733,7 +2681,7 @@ NetworkStatus networkGetStatus() => withNativeArena((arena) {
 ///
 /// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-void networkSetStatus(NetworkStatus status) {
+void setNetworkStatus(NetworkStatus status) {
   ensureAbiVersion();
   return _check(raw.mln_network_set_status(status.rawValue, nativeDiagnostic));
 }
@@ -2752,7 +2700,7 @@ OpenGlContextProviderFlag openGlSupportedContextProviderMask() {
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-NativePointer pluginGetRegisterFunctionV1() {
+NativePointer getPluginRegisterFunctionV1() {
   ensureAbiVersion();
   final nativeResult = raw.mln_plugin_get_register_function_v1();
   return NativePointer(nativeResult.address);
@@ -2775,56 +2723,6 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
       );
       return _readProjectedMeters(outMeters.ref);
     });
-
-/// Creates a runtime.
-///
-/// See `mln_runtime_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
-  ensureAbiVersion();
-  final outRuntime = arena<Uint64>();
-  _check(
-    raw.mln_runtime_create(
-      _writeRuntimeOptions(options, arena),
-      outRuntime,
-      nativeDiagnostic,
-    ),
-  );
-  return _adoptOwned(
-    outRuntime.value,
-    () => RuntimeHandle._(_NativeRuntime(outRuntime.value)),
-    (handle) {
-      _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
-    },
-  );
-});
-
-/// Parses a style expression.
-///
-/// See `mln_style_expression_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-StyleExpressionHandle styleExpressionCreate(
-  Object? expression, {
-  StyleExpressionOptions? options,
-}) => withNativeArena((arena) {
-  ensureAbiVersion();
-  final outExpression = arena<Uint64>();
-  _check(
-    raw.mln_style_expression_create(
-      _nativeJsonView(expression, arena),
-      options == null ? nullptr : _writeStyleExpressionOptions(options, arena),
-      outExpression,
-      nativeDiagnostic,
-    ),
-  );
-  return _adoptOwned(
-    outExpression.value,
-    () => StyleExpressionHandle._(_NativeStyleExpression(outExpression.value)),
-    (handle) {
-      raw.mln_style_expression_release(handle);
-    },
-  );
-});
 
 /// Reports the render backends available in this native library build.
 ///
@@ -3036,6 +2934,33 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   @override
   String toString() =>
       'GeoJsonSourceDataHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Prepares GeoJSON source data for installation on a map.
+  ///
+  /// See `mln_geojson_source_data_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  static GeoJsonSourceDataHandle create(
+    Object? data, {
+    GeoJsonSourceOptions? options,
+  }) => withNativeArena((arena) {
+    ensureAbiVersion();
+    final outData = arena<Uint64>();
+    _check(
+      raw.mln_geojson_source_data_create(
+        _nativeJsonView(data, arena),
+        options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
+        outData,
+        nativeDiagnostic,
+      ),
+    );
+    return _adoptOwned(
+      outData.value,
+      () => GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData(outData.value)),
+      (handle) {
+        raw.mln_geojson_source_data_release(handle);
+      },
+    );
+  });
 
   /// Releases prepared GeoJSON source data.
   ///
@@ -5167,6 +5092,30 @@ final class MapProjectionHandle implements Finalizable {
   String toString() =>
       'MapProjectionHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
+  /// Creates a standalone projection of a view, such as the view of a rendered
+  /// frame or of a map snapshot.
+  ///
+  /// See `mln_map_projection_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  static MapProjectionHandle create(MapView view) => withNativeArena((arena) {
+    ensureAbiVersion();
+    final outProjection = arena<Uint64>();
+    _check(
+      raw.mln_map_projection_create(
+        _writeMapView(view, arena),
+        outProjection,
+        nativeDiagnostic,
+      ),
+    );
+    return _adoptOwned(
+      outProjection.value,
+      () => MapProjectionHandle._(_NativeMapProjection(outProjection.value)),
+      (handle) {
+        raw.mln_map_projection_release(handle);
+      },
+    );
+  });
+
   /// Copies the projection camera into out_camera.
   ///
   /// See `mln_map_projection_get_camera` in the
@@ -6167,6 +6116,30 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
+  /// Creates a runtime.
+  ///
+  /// See `mln_runtime_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  static RuntimeHandle create(RuntimeOptions options) =>
+      withNativeArena((arena) {
+        ensureAbiVersion();
+        final outRuntime = arena<Uint64>();
+        _check(
+          raw.mln_runtime_create(
+            _writeRuntimeOptions(options, arena),
+            outRuntime,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outRuntime.value,
+          () => RuntimeHandle._(_NativeRuntime(outRuntime.value)),
+          (handle) {
+            _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
+          },
+        );
+      });
+
   /// Starts creation of a map on the runtime.
   ///
   /// See `mln_runtime_create_map` in the
@@ -6513,6 +6486,36 @@ final class StyleExpressionHandle implements Finalizable {
   @override
   String toString() =>
       'StyleExpressionHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Parses a style expression.
+  ///
+  /// See `mln_style_expression_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  static StyleExpressionHandle create(
+    Object? expression, {
+    StyleExpressionOptions? options,
+  }) => withNativeArena((arena) {
+    ensureAbiVersion();
+    final outExpression = arena<Uint64>();
+    _check(
+      raw.mln_style_expression_create(
+        _nativeJsonView(expression, arena),
+        options == null
+            ? nullptr
+            : _writeStyleExpressionOptions(options, arena),
+        outExpression,
+        nativeDiagnostic,
+      ),
+    );
+    return _adoptOwned(
+      outExpression.value,
+      () =>
+          StyleExpressionHandle._(_NativeStyleExpression(outExpression.value)),
+      (handle) {
+        raw.mln_style_expression_release(handle);
+      },
+    );
+  });
 
   /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
   ///

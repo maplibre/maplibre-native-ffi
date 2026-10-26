@@ -8,7 +8,7 @@ public extension Maplibre {
   ///
   /// See `mln_log_clear_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func logClearCallback() throws {
+  static func clearLogCallback() throws {
     try nativeInvoke { _, _, diagnostic in mln_log_clear_callback(diagnostic) }
   }
 
@@ -16,7 +16,7 @@ public extension Maplibre {
   ///
   /// See `mln_log_set_async_severity_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func logSetAsyncSeverityMask(_ bindingArg0: LogSeverityFlag) throws {
+  static func setLogAsyncSeverityMask(_ bindingArg0: LogSeverityFlag) throws {
     try nativeInvoke { _, _, diagnostic in mln_log_set_async_severity_mask(
       bindingArg0.rawValue,
       diagnostic
@@ -27,7 +27,7 @@ public extension Maplibre {
   ///
   /// See `mln_log_set_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func logSetCallback(handler bindingArg0: LogHandler) throws {
+  static func setLogCallback(handler bindingArg0: LogHandler) throws {
     try nativeInvoke { _, arena, diagnostic in try mln_log_set_callback(
       arena.store(bindingArg0.nativeValue(arena: arena)),
       diagnostic

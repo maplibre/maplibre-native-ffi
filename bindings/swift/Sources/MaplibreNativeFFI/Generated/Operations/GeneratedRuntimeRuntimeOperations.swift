@@ -64,6 +64,22 @@ public extension RuntimeHandle {
     }
   }
 
+  /// Creates a runtime.
+  ///
+  /// See `mln_runtime_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  static func create(options bindingArg0: RuntimeOptions) throws
+    -> RuntimeHandle
+  {
+    var value0: mln_runtime = 0
+    return try MaplibreNativeFFI
+      .nativeInvoke { _, arena, diagnostic in try mln_runtime_create(
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        &value0,
+        diagnostic
+      ) } result: { try RuntimeHandle(adopting: value0) }
+  }
+
   /// Consumes a runtime handle without observing its asynchronous retirement.
   ///
   /// See `mln_runtime_dispose` in the

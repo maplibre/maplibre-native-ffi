@@ -124,7 +124,7 @@ Future<RuntimeFixture> openRuntime({
 }) async {
   final defaults = options ?? RuntimeOptions();
   final events = Signal();
-  final runtime = runtimeCreate(
+  final runtime = RuntimeHandle.create(
     RuntimeOptions(
       assetPath: defaults.assetPath,
       cachePath: defaults.cachePath,

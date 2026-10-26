@@ -23,9 +23,9 @@ fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
 
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
-    try maplibre.logSetCallback(.{ .callback = consumeLog }, null);
+    try maplibre.setLogCallback(.{ .callback = consumeLog }, null);
 
-    const runtime = try maplibre.runtimeCreate(.{}, null);
+    const runtime = try maplibre.Runtime.create(.{}, null);
     _ = try resolve(try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null));
     const created = try runtime.createMap(.{ .initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 } }, null);
     const map = created.map;

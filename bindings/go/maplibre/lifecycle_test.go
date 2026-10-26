@@ -63,7 +63,7 @@ func TestDisposeAndReleaseCloseOnce(t *testing.T) {
 	checkHandleMembers(t, f.m, "MapHandle", true)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
-	data, err := GeoJsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := NewGeoJsonSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
-	data, err := GeoJsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := NewGeoJsonSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	// No fixture: its cleanup would keep the runtime reachable. The map's
 	// cleanup closes it if the test fails, and the collector then reclaims the
 	// runtime.
-	runtime, err := RuntimeCreate(RuntimeOptions{})
+	runtime, err := NewRuntime(RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

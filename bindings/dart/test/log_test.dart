@@ -18,13 +18,13 @@ bool _isDumpRule(String message) => message.startsWith('-----');
 /// Installs a log callback that collects dump rules, and returns them.
 List<(LogSeverity, LogEvent)> _collectDumpRules() {
   final rules = <(LogSeverity, LogEvent)>[];
-  logSetCallback((severity, event, _, message) {
+  setLogCallback((severity, event, _, message) {
     if (_isDumpRule(message)) rules.add((severity, event));
   });
   return rules;
 }
 
-void _clearLogCallback() => logClearCallback();
+void _clearLogCallback() => clearLogCallback();
 
 void main() {
   late MapHandle map;
@@ -34,11 +34,11 @@ void main() {
     // from one dump could then reach the callback installed for the next.
     // Synchronous records reach the delivery queue before the dump's own
     // completion does, so awaiting a dump fences its records.
-    logSetAsyncSeverityMask(LogSeverityFlag.none);
+    setLogAsyncSeverityMask(LogSeverityFlag.none);
     addTearDown(() async {
       final installed = logRegistrationProbeForTesting();
-      logClearCallback();
-      logSetAsyncSeverityMask(LogSeverityFlag.defaultValue);
+      clearLogCallback();
+      setLogAsyncSeverityMask(LogSeverityFlag.defaultValue);
       // The next test finds no registration of this one still pending.
       if (installed != null) {
         await within(installed.released, 'the log registration release');
@@ -67,7 +67,7 @@ void main() {
       expect(first, hasLength(rules));
 
       final replacementPort = logRegistrationProbeForTesting()!;
-      logClearCallback();
+      clearLogCallback();
       await within(
         replacementPort.released,
         'the cleared registration release',

@@ -22,9 +22,11 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.MapProjectionHandle
 import org.maplibre.nativeffi.generated.OfflineRegionDefinition
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.generated.StyleExpressionHandle
 import org.maplibre.nativeffi.generated.StyleExpressionInputs
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.UrlMatchFlag
@@ -41,18 +43,20 @@ import org.maplibre.nativeffi.withMap
 class GeneratedShapesTest {
   @Test
   fun callerSizedTextReturnsResultsLongerThanItsFirstStorage() {
-    GeneratedApi.styleExpressionCreate("""["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]""")
-      .use { zoom -> assertEquals("50.0", zoom.evaluate(StyleExpressionInputs(zoom = 5.0))) }
+    StyleExpressionHandle.create("""["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]""").use {
+      zoom ->
+      assertEquals("50.0", zoom.evaluate(StyleExpressionInputs(zoom = 5.0)))
+    }
 
     // The result outgrows the call's first storage, so the call runs again.
     val text = "\"" + "a".repeat(1000) + "\""
-    GeneratedApi.styleExpressionCreate(text).use { long -> assertEquals(text, long.evaluate()) }
+    StyleExpressionHandle.create(text).use { long -> assertEquals(text, long.evaluate()) }
   }
 
   @Test
   fun synchronousCallsFillCallerSizedOutputsInInputOrder() = runSuspendTest {
     withMap {
-      val projection = GeneratedApi.mapProjectionCreate(map.getSnapshot().view)
+      val projection = MapProjectionHandle.create(map.getSnapshot().view)
       try {
         val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0), LatLng(-12.0, -30.0))
         val points = projection.pixelsForLatLngs(coordinates)
@@ -112,7 +116,7 @@ class GeneratedShapesTest {
       assertEquals(4.0, view.camera.zoom, 1e-6)
 
       // A field the output does not report stays absent rather than reading as zero.
-      val projection = GeneratedApi.mapProjectionCreate(view)
+      val projection = MapProjectionHandle.create(view)
       try {
         val reported = projection.getCamera()
         assertEquals(4.0, assertNotNull(reported.zoom), 1e-6)
@@ -168,7 +172,7 @@ class GeneratedShapesTest {
     withMap {
       // The binding passes an unknown enum value through unchanged, and native rejects it.
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-        GeneratedApi.networkSetStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
+        GeneratedApi.setNetworkStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
       }
 
       // Cancelling the largest identity ends the ease that carries it, so the identity crossed

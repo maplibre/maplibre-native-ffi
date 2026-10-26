@@ -93,7 +93,7 @@ fn presence_fields_keep_a_present_zero_apart_from_an_absent_value() {
 fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // An enum value this binding predates reaches native unchanged, and native
     // is what rejects it.
-    let error = network_set_status(NetworkStatus::Unknown(900)).unwrap_err();
+    let error = set_network_status(NetworkStatus::Unknown(900)).unwrap_err();
     assert_eq!(error.status(), Status::InvalidArgument);
     assert!(error.diagnostic().contains("network status"), "{error}");
 
@@ -178,7 +178,8 @@ fn an_enum_defaults_to_its_zero_member() {
 #[test]
 fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
     let fixture = Fixture::new();
-    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
+    let projection =
+        MapProjectionHandle::create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     let coordinates = [
         LatLng::new(0.0, 0.0),
         LatLng::new(10.0, 20.0),
@@ -216,7 +217,7 @@ fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
 
 #[test]
 fn caller_sized_text_returns_results_longer_than_its_first_storage() {
-    let zoom = style_expression_create(
+    let zoom = StyleExpressionHandle::create(
         r#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#,
         None,
     )
@@ -230,7 +231,7 @@ fn caller_sized_text_returns_results_longer_than_its_first_storage() {
 
     // The result outgrows the runtime's first storage, so the call runs again.
     let text = format!("\"{}\"", "a".repeat(1000));
-    let long = style_expression_create(&text, None).unwrap();
+    let long = StyleExpressionHandle::create(&text, None).unwrap();
     assert_eq!(long.evaluate(None).unwrap(), text);
     long.release().unwrap();
 }

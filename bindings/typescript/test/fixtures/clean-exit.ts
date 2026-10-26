@@ -3,11 +3,11 @@
 // holds no timer of its own, so the process ends exactly when nothing native
 // keeps the event loop alive.
 
-import { RuntimeEventType, runtimeCreate } from "../../src/index.ts";
+import { RuntimeEventType, RuntimeHandle } from "../../src/index.ts";
 import { listen, mapOptions } from "../support/fixture.ts";
 import { backgroundStyle } from "../support/styles.ts";
 
-const runtime = runtimeCreate();
+const runtime = RuntimeHandle.create();
 const events = await listen(runtime);
 const { map, ready } = runtime.createMap(mapOptions);
 await ready;

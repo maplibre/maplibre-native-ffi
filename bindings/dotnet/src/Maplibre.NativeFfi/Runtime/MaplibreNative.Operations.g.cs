@@ -14,7 +14,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_network_get_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public static NetworkStatus NetworkGetStatus()
+    public static NetworkStatus GetNetworkStatus()
     {
         using var call = Enter(null);
         mln_network_status outStatus = default;
@@ -29,7 +29,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_network_set_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public static void NetworkSetStatus(NetworkStatus status)
+    public static void SetNetworkStatus(NetworkStatus status)
     {
         using var call = Enter(null);
         Check(NativeMethods.mln_network_set_status((mln_network_status)status, Diagnostic));

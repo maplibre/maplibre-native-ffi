@@ -14,7 +14,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_log_clear_callback</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
     /// </remarks>
-    public static void LogClearCallback()
+    public static void ClearLogCallback()
     {
         using var call = Enter(null);
         Check(NativeMethods.mln_log_clear_callback(Diagnostic));
@@ -28,7 +28,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_log_set_async_severity_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
     /// </remarks>
-    public static void LogSetAsyncSeverityMask(LogSeverityFlag mask)
+    public static void SetLogAsyncSeverityMask(LogSeverityFlag mask)
     {
         using var call = Enter(null);
         Check(NativeMethods.mln_log_set_async_severity_mask((uint)mask, Diagnostic));
@@ -41,7 +41,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_log_set_callback</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
     /// </remarks>
-    public static void LogSetCallback(LogHandler handler)
+    public static void SetLogCallback(LogHandler handler)
     {
         using var scope = new NativeCallScope(null);
         var nativeHandler = NativeLogHandler(handler, scope);

@@ -7,9 +7,9 @@ import {
   type LogEvent,
   type LogSeverity,
   LogEvent as LogEvents,
-  logClearCallback,
-  logSetAsyncSeverityMask,
-  logSetCallback,
+  clearLogCallback,
+  setLogAsyncSeverityMask,
+  setLogCallback,
   LogSeverity as LogSeverities,
   LogSeverityFlag,
   type MapHandle,
@@ -26,7 +26,7 @@ function isDumpRule(message: string): boolean {
 /** Installs a log callback that collects dump rules, and returns them. */
 function collectDumpRules(): [LogSeverity, LogEvent][] {
   const rules: [LogSeverity, LogEvent][] = [];
-  logSetCallback((severity, event, _code, message) => {
+  setLogCallback((severity, event, _code, message) => {
     if (isDumpRule(message)) {
       rules.push([severity, event]);
     }
@@ -41,10 +41,10 @@ function collectDumpRules(): [LogSeverity, LogEvent][] {
  */
 async function openLoggingMap(): Promise<MapHandle> {
   const roots = liveRoots();
-  logSetAsyncSeverityMask(0);
+  setLogAsyncSeverityMask(0);
   teardown(async () => {
-    logClearCallback();
-    logSetAsyncSeverityMask(LogSeverityFlag.defaultValue);
+    clearLogCallback();
+    setLogAsyncSeverityMask(LogSeverityFlag.defaultValue);
     // The release arrives through the realm's queue; a later case that counts roots
     // must not see it.
     await released(() => liveRoots() === roots, "the log registration release");
@@ -80,7 +80,7 @@ test("replacing the log callback releases the previous registration", async () =
   assert.equal(replacement.length, rules);
   assert.equal(first.length, rules);
 
-  logClearCallback();
+  clearLogCallback();
   await released(
     () => liveRoots() === baseline,
     "the cleared registration release",
@@ -92,7 +92,7 @@ test("replacing the log callback releases the previous registration", async () =
 test("a log record reaches the event loop after its native call returns", async () => {
   const map = await openLoggingMap();
   const order: string[] = [];
-  logSetCallback((_severity, _event, _code, message) => {
+  setLogCallback((_severity, _event, _code, message) => {
     if (isDumpRule(message)) {
       order.push("record");
     }

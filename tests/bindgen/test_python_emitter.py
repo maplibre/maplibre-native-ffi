@@ -213,6 +213,32 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
         self.assertEqual(result["generated"], ["mln_host_destroy"])
         self.assertIn("owner member", result["unsupported"]["mln_host_id"])
 
+    def test_a_factory_is_a_classmethod_and_a_global_names_its_verb_first(self):
+        api = self.parse("""
+typedef unsigned long long mln_engine BIND("kind=handle;release=mln_engine_release;dispose=mln_engine_release");
+void mln_engine_release(mln_engine engine);
+mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
+""")
+        self.assertEqual(python.coverage(api)["unsupported"], {})
+        files = python.generate(api)
+        native = files["src/generated_operations.rs"]
+        engine = native.split("\nimpl EngineHandle {\n", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn(
+            "#[staticmethod]\n    #[pyo3(signature = ())]\n    fn create(", engine
+        )
+        self.assertIn("wrap_pyfunction!(set_level_volume, module)", native)
+        self.assertNotIn("wrap_pyfunction!(create, module)", native)
+        operations = files["python/maplibre_native_ffi/_generated_operations.py"]
+        self.assertIn(
+            "    @classmethod\n    def create(cls) -> EngineHandle:", operations
+        )
+        self.assertIn("_native._EngineHandle.create()", operations)
+        self.assertIn("\ndef set_level_volume(volume: int) -> None:", operations)
+        exports = files["python/maplibre_native_ffi/api.py"]
+        self.assertIn("from ._generated_operations import set_level_volume", exports)
+        self.assertNotIn("import create", exports)
+
     def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):
         native = python.generate(real_api())["src/generated_operations.rs"]
 

@@ -6,13 +6,13 @@ import {
   CameraTransitionOutcome,
   type CameraTransitionEnd,
   CameraUpdateMode,
-  geoJsonSourceDataCreate,
+  GeoJsonSourceDataHandle,
   type LatLng,
   MaplibreError,
-  mapProjectionCreate,
-  runtimeCreate,
+  MapProjectionHandle,
+  RuntimeHandle,
   Status,
-  styleExpressionCreate,
+  StyleExpressionHandle,
 } from "../src/index.ts";
 import { openRuntime } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
@@ -23,7 +23,7 @@ test("host strings use views and native-lent strings decode", async () => {
   // A path crosses as a view with an explicit length, and native code rejects
   // the embedded NUL where the path reaches a C-string consumer.
   assert.throws(
-    () => runtimeCreate({ cachePath: "cache\u0000tail" }),
+    () => RuntimeHandle.create({ cachePath: "cache\u0000tail" }),
     (error) =>
       error instanceof MaplibreError &&
       error.status === Status.invalidArgument &&
@@ -115,7 +115,7 @@ test("JSON crosses as JSON.stringify and JSON.parse values", async () => {
   );
 
   // A record member that is undefined is absent, an empty view.
-  const expression = styleExpressionCreate(["get", "name"]);
+  const expression = StyleExpressionHandle.create(["get", "name"]);
   try {
     assert.equal(
       expression.evaluate({
@@ -134,9 +134,9 @@ test("JSON crosses as JSON.stringify and JSON.parse values", async () => {
 
   // A value that JSON.stringify rejects throws its error before native code
   // runs, and one that it skips throws a TypeError.
-  assert.throws(() => styleExpressionCreate(1n), TypeError);
+  assert.throws(() => StyleExpressionHandle.create(1n), TypeError);
   assert.throws(
-    () => styleExpressionCreate(() => 0),
+    () => StyleExpressionHandle.create(() => 0),
     (error) =>
       error instanceof TypeError &&
       error.message === "expression: expected a JSON value",
@@ -148,7 +148,7 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
   // rather than truncated into a valid one.
   assert.throws(
     () =>
-      geoJsonSourceDataCreate(
+      GeoJsonSourceDataHandle.create(
         { type: "FeatureCollection", features: [] },
         { buffer: 2 ** 32 },
       ),
@@ -207,7 +207,7 @@ test("an array input is copied when the call submits it", async () => {
 test("a synchronous call fills a caller-sized output array in input order", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openMap();
-  const projection = mapProjectionCreate(map.getSnapshot().view);
+  const projection = MapProjectionHandle.create(map.getSnapshot().view);
   try {
     const coordinates: LatLng[] = [
       { latitude: 0, longitude: 0 },
@@ -236,7 +236,7 @@ test("a synchronous call fills a caller-sized output array in input order", asyn
 });
 
 test("caller-sized text returns a result longer than its first storage", () => {
-  const zoom = styleExpressionCreate([
+  const zoom = StyleExpressionHandle.create([
     "interpolate",
     ["linear"],
     ["zoom"],
@@ -253,7 +253,7 @@ test("caller-sized text returns a result longer than its first storage", () => {
 
   // The result outgrows the addon's first storage, so the call runs again.
   const text = "a".repeat(1000);
-  const long = styleExpressionCreate(text);
+  const long = StyleExpressionHandle.create(text);
   try {
     assert.equal(long.evaluate(), text);
   } finally {

@@ -14,7 +14,7 @@ void main() {
   test('a second close is a no-op and the handle reports it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap();
-    final projection = mapProjectionCreate(map.getSnapshot().view);
+    final projection = MapProjectionHandle.create(map.getSnapshot().view);
 
     expect(projection.id, isNot(0));
     expect(projection.isClosed, isFalse);
@@ -32,7 +32,7 @@ void main() {
   });
 
   test('a second dispose is a no-op and the handle reports it', () {
-    final runtime = runtimeCreate(RuntimeOptions());
+    final runtime = RuntimeHandle.create(RuntimeOptions());
     addTearDown(() => closeIfLive(runtime.close));
 
     expect(runtime.isClosed, isFalse);
@@ -85,7 +85,7 @@ void main() {
   });
 
   test('a refused close leaves the handle usable for a later close', () async {
-    final runtime = runtimeCreate(RuntimeOptions());
+    final runtime = RuntimeHandle.create(RuntimeOptions());
     final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
     addTearDown(() async {
       await closeIfLive(map.close);

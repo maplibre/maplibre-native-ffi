@@ -94,7 +94,7 @@ do {
 
 // A drain decodes each plain record at the stride native reports and releases
 // its batch, so the next drain reaches native, which has nothing queued.
-let ledger = try Maplibre.probeLedgerOpen()
+let ledger = try ProbeLedgerHandle.open()
 let readings = try ledger.drain().map(\.value)
 check(readings == [7, 9], "strided readings: \(readings)")
 try check(ledger.drain().isEmpty, "drained readings")

@@ -15,7 +15,7 @@ const _featureCollection = {
 
 void main() {
   test('caller-sized text returns a result longer than its first storage', () {
-    final zoom = styleExpressionCreate([
+    final zoom = StyleExpressionHandle.create([
       'interpolate',
       ['linear'],
       ['zoom'],
@@ -30,7 +30,7 @@ void main() {
     // The result outgrows the runtime's first storage, so the call runs
     // again.
     final text = 'a' * 1000;
-    final long = styleExpressionCreate(text);
+    final long = StyleExpressionHandle.create(text);
     addTearDown(long.close);
     expect(long.evaluate(), text);
   });
@@ -64,7 +64,7 @@ void main() {
     );
 
     // A record member that is null is absent, an empty view.
-    final expression = styleExpressionCreate(['get', 'name']);
+    final expression = StyleExpressionHandle.create(['get', 'name']);
     addTearDown(expression.close);
     final inputs = StyleExpressionInputs(
       feature: {
@@ -95,7 +95,7 @@ void main() {
 
     // A value that jsonEncode rejects throws before native code runs.
     expect(
-      () => styleExpressionCreate(Object()),
+      () => StyleExpressionHandle.create(Object()),
       throwsA(isA<JsonUnsupportedObjectError>()),
     );
   });
@@ -105,7 +105,7 @@ void main() {
     () async {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
-      final projection = mapProjectionCreate(map.getSnapshot().view);
+      final projection = MapProjectionHandle.create(map.getSnapshot().view);
       addTearDown(projection.close);
       const coordinates = [
         LatLng(),
@@ -132,7 +132,7 @@ void main() {
   test('host strings use views and native-lent strings decode', () async {
     // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(
-      () => runtimeCreate(RuntimeOptions(cachePath: 'cache\u0000tail')),
+      () => RuntimeHandle.create(RuntimeOptions(cachePath: 'cache\u0000tail')),
       throwsA(
         isA<MaplibreException>().having(
           (error) => error.status,
@@ -199,7 +199,7 @@ void main() {
     // A value outside a 32-bit field's range is rejected before it crosses,
     // rather than truncated into a valid one.
     expect(
-      () => geoJsonSourceDataCreate(
+      () => GeoJsonSourceDataHandle.create(
         _featureCollection,
         options: GeoJsonSourceOptions(buffer: 4294967296),
       ),

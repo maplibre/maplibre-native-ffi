@@ -102,6 +102,25 @@ mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_di
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, message):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
+    def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
+        self,
+    ):
+        source = """
+typedef unsigned long long mln_engine BIND("kind=handle;release=mln_engine_release;dispose=mln_engine_release");
+void mln_engine_release(mln_engine engine);
+mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
+mln_status mln_level_peak(unsigned *out_peak BIND("direction=out"), mln_diagnostic *out_diagnostic);
+"""
+        api = bind(self.parse(source), require_complete=True)
+        operations = {op.name: op for op in api.operations}
+        create = operations["mln_engine_create"]
+        self.assertEqual((create.factory, create.member), ("mln_engine", "create"))
+        self.assertEqual(operations["mln_level_set_volume"].member, "set_level_volume")
+        # A global without a leading verb keeps its order.
+        self.assertEqual(operations["mln_level_peak"].member, "level_peak")
+        self.assertIsNone(operations["mln_level_peak"].factory)
+
     def test_a_record_of_only_a_tag_and_its_union_presents_the_union(self):
         source = """
 typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;

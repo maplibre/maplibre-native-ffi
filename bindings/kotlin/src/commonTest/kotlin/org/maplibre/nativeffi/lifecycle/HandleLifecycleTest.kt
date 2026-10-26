@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
@@ -29,11 +29,11 @@ import org.maplibre.nativeffi.smallMapOptions
 class HandleLifecycleTest {
   @Test
   fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
-    val data = GeneratedApi.geoJsonSourceDataCreate(POINT_JSON)
+    val data = GeoJsonSourceDataHandle.create(POINT_JSON)
     data.close()
     data.close()
 
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.release().awaitWithin("the runtime teardown")
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
     // Native refuses a released handle, whether to release it again or to use it.
@@ -43,7 +43,7 @@ class HandleLifecycleTest {
 
   @Test
   fun aHandleNamesItsIdAndWhetherItIsClosed() {
-    val data = GeneratedApi.geoJsonSourceDataCreate(POINT_JSON)
+    val data = GeoJsonSourceDataHandle.create(POINT_JSON)
     val id = "0x" + data.id.toString(16)
     assertFalse(data.isClosed)
     assertEquals("GeoJsonSourceDataHandle(id=$id, closed=false)", data.toString())
@@ -54,7 +54,7 @@ class HandleLifecycleTest {
 
   @Test
   fun aDisposeEndsTheHandleAndRepeatedCleanupDoesNothing() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     val id = "0x" + runtime.id.toString(16)
     assertFalse(runtime.isClosed)
     assertEquals("RuntimeHandle(id=$id, closed=false)", runtime.toString())
@@ -70,7 +70,7 @@ class HandleLifecycleTest {
 
   @Test
   fun closingAHandleWithADisposeDisposesIt() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.useAndClose {}
     assertTrue(runtime.isClosed)
     runtime.close()
@@ -78,14 +78,14 @@ class HandleLifecycleTest {
 
   @Test
   fun useLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
-    GeneratedApi.runtimeCreate(RuntimeOptions()).use { runtime ->
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       runtime.release().awaitWithin("the runtime teardown")
     }
   }
 
   @Test
   fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     val (map, ready) = runtime.createMap(smallMapOptions())
     ready.awaitWithin("the map")
 
@@ -102,7 +102,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useKeepsTheBlockFailureAndSuppressesTheRefusedRelease() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     // The live map makes native refuse the runtime release after the block throws.
@@ -125,7 +125,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useReportsARefusedReleaseAfterTheBlockReturns() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     assertFailsWithStatus(Status.INVALID_STATE) {
@@ -142,7 +142,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useReleasesTheOwnerWhenItsBlockReturnsFromTheCaller() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     returnFromUse(runtime)
     assertTrue(runtime.isClosed)
   }
@@ -187,7 +187,7 @@ class HandleLifecycleTest {
 
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {
-    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     val (map, ready) = runtime.createMap(smallMapOptions())
     ready.awaitWithin("the map")
     return map to TestWeakReference(runtime)

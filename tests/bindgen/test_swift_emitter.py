@@ -140,6 +140,23 @@ class SwiftEmitterTests(unittest.TestCase):
             words,
         )
 
+    def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
+        self,
+    ):
+        outputs = swift.generate(real_api())
+        runtime = outputs[
+            "Generated/Operations/GeneratedRuntimeRuntimeOperations.swift"
+        ]
+        self.assertIn(
+            "static func `create`(`options` bindingArg0: RuntimeOptions) throws "
+            "-> RuntimeHandle {",
+            runtime.split("public extension RuntimeHandle {")[1],
+        )
+        self.assertIn(
+            "static func `clearLogCallback`() throws {",
+            outputs["Generated/Operations/GeneratedLoggingGlobalsOperations.swift"],
+        )
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = "".join(
             text
@@ -214,8 +231,10 @@ class SwiftEmitterTests(unittest.TestCase):
                 # submits.
                 "-enable-upcoming-feature",
                 "NonisolatedNonsendingByDefault",
+                # A factory calls the runtime's global helpers by this module's
+                # name, since its handle's own helpers shadow them.
                 "-module-name",
-                "Probe",
+                "MaplibreNativeFFI",
                 "-I",
                 str(root / "include"),
                 *map(str, sources),

@@ -70,16 +70,25 @@ def defaulted(parameter):
     return parameter.value.nullable
 
 
-def generate_owners(bound, plans):
+def generate_owners(bound, plans, factories, imports):
+    """Every handle's owner. The owner of a handle with factories has a
+    companion object, which declares the common factories and which the
+    factories of only some source sets extend."""
     return {
         f"src/commonMain/kotlin/org/maplibre/nativeffi/generated/{owner_name(bound.handles[native])}.kt": owner(
-            bound, native, plans
+            bound,
+            native,
+            plans,
+            factories.get(native, []),
+            imports
+            if any(plan.factory == native for plan in plans)
+            else "import org.maplibre.nativeffi.internal.lifecycle.*\n",
         )
         for native in generated_owners(bound)
     }
 
 
-def owner(bound, native, plans):
+def owner(bound, native, plans, factories, imports):
     handle = bound.handles[native]
     family = name(native)
     owner_class = owner_name(handle)
@@ -125,10 +134,20 @@ def owner(bound, native, plans):
     body.append(
         f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"'
     )
+    if any(plan.factory == native for plan in plans):
+        body.append(
+            "  public companion object {\n"
+            + "\n".join(
+                "".join("  " + line if line else line for line in f.splitlines(True))
+                for f in factories
+            )
+            + "  }"
+        )
     return (
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi.generated\n\n"
-        "import org.maplibre.nativeffi.internal.lifecycle.*\n\n"
+        + imports
+        + "\n"
         + doc(bound, native)
         + f"public class {owner_class} internal constructor(\n  "
         + ",\n  ".join(parameters)

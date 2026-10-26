@@ -230,6 +230,26 @@ mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_dia
 """)
         self.assertEqual(dotnet.emit(api).functions, ("mln_map_ready",))
 
+    def test_dotnet_factory_is_static_on_its_handle_and_a_global_names_its_verb_first(
+        self,
+    ):
+        api = self.parse("""
+typedef unsigned long long mln_engine BIND("kind=handle;release=mln_engine_release;dispose=mln_engine_release");
+void mln_engine_release(mln_engine engine);
+mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
+""")
+        emission = dotnet.emit(api)
+        self.assertEqual(emission.unsupported, {})
+        self.assertIn(
+            "public static EngineHandle Create()",
+            emission.files["Metrics/EngineHandle.Operations.g.cs"],
+        )
+        self.assertIn(
+            "public static void SetLevelVolume(uint volume)",
+            emission.files["Metrics/MaplibreNative.Operations.g.cs"],
+        )
+
     def test_dotnet_enum_and_flag_set_parameters_cross_as_their_c_types(self):
         api = self.parse("""
 typedef enum mln_mode : unsigned { MLN_MODE_A = 1, MLN_MODE_B = 2 } mln_mode;
@@ -244,7 +264,7 @@ mln_status mln_map_get_marks(mln_map map, mln_mark_flags *out_marks BIND("direct
         emission = dotnet.emit(api)
         self.assertEqual(emission.unsupported, {})
         operations = "".join(emission.files.values())
-        self.assertIn("MapSetMode(ulong map, Mode mode, MarkFlag marks)", operations)
+        self.assertIn("SetMapMode(ulong map, Mode mode, MarkFlag marks)", operations)
         self.assertIn("(mln_mode)mode, (ulong)marks", operations)
         self.assertIn("mln_mode outMode = default;", operations)
         self.assertIn("return (Mode)outMode;", operations)

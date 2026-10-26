@@ -364,7 +364,7 @@ impl Fixture {
 
     pub fn with_map_options(map_options: MapOptions) -> Self {
         let events = Arc::new(Signal::default());
-        let runtime = runtime_create(&RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::create(&RuntimeOptions::default()).unwrap();
         let pending_events = Arc::new(Mutex::new(Vec::new()));
         let received = Arc::clone(&pending_events);
         let signal = Arc::clone(&events);

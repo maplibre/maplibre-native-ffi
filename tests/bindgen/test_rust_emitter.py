@@ -153,6 +153,21 @@ class RustEmitterTests(unittest.TestCase):
             source,
         )
 
+    def test_a_factory_is_associated_and_a_global_names_its_verb_first(self):
+        generated = rust.generate(real_api())
+        prefix = "crates/maplibre-native-ffi/src/generated/"
+        self.assertIn("impl RuntimeHandle {", generated[prefix + "runtime.rs"])
+        self.assertIn(
+            "    pub fn create(options: &RuntimeOptions) -> Result<RuntimeHandle> {",
+            generated[prefix + "runtime.rs"],
+        )
+        source = generated[prefix + "global.rs"]
+        self.assertNotIn("fn runtime_create(", source)
+        self.assertIn(
+            "    pub fn set_log_callback(handler: LogHandler) -> Result<()> {",
+            source,
+        )
+
     def test_a_callback_documents_its_arguments_and_returns_a_bool_result(self):
         values = rust.generate(real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"

@@ -15,7 +15,7 @@ public static unsafe partial class MaplibreNative
     /// See <c>mln_plugin_get_register_function_v1</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html">C API reference</see>.
     /// </remarks>
-    public static NativePointer PluginGetRegisterFunctionV1()
+    public static NativePointer GetPluginRegisterFunctionV1()
     {
         using var call = Enter(null);
         var returned = NativeMethods.mln_plugin_get_register_function_v1();

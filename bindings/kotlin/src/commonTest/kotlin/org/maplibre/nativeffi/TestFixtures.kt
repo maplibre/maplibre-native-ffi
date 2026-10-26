@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
@@ -153,7 +152,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       block: suspend RuntimeFixture.() -> T,
     ): T {
       val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
-      val runtime = GeneratedApi.runtimeCreate(options)
+      val runtime = RuntimeHandle.create(options)
       val fixture = RuntimeFixture(runtime, events)
       return runThenRelease(listOf(runtime)) {
         runtime

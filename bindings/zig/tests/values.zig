@@ -19,7 +19,7 @@ test "host strings use views and native-lent strings decode" {
     try testing.expectEqual(@as([*]const u8, lent_url), request.resolved_url.ptr);
 
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(.{ .asset_path = "asset\x00path" }, &diagnostic));
+    try testing.expectError(error.InvalidArgument, maplibre.Runtime.create(.{ .asset_path = "asset\x00path" }, &diagnostic));
     try testing.expect(diagnostic.status != null);
     try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
@@ -139,7 +139,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     defer fixture.destroy();
     try fixture.loadStyle();
 
-    try testing.expectError(error.InvalidArgument, maplibre.networkSetStatus(@fromBackingInt(900), null));
+    try testing.expectError(error.InvalidArgument, maplibre.setNetworkStatus(@fromBackingInt(900), null));
 
     // Cancelling the identifier ends only the ease that carries it, so the
     // identifier crossed whole both times. The end handler sits two records
@@ -192,7 +192,7 @@ test "a record round trips through generated conversion" {
 test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
+    var projection = try maplibre.MapProjection.create((try fixture.map.getSnapshot(null)).view, null);
     defer projection.release();
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try projection.pixelsForLatLngs(testing.allocator, &coordinates, null);
@@ -219,7 +219,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
 }
 
 test "caller-sized text returns results longer than its first storage" {
-    var zoom = try maplibre.styleExpressionCreate("[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
+    var zoom = try maplibre.StyleExpression.create("[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
     defer zoom.release();
     var level = try zoom.evaluate(testing.allocator, .{ .zoom = 5, .available_images = &.{} }, null);
     defer level.deinit();
@@ -230,7 +230,7 @@ test "caller-sized text returns results longer than its first storage" {
     @memset(&text, 'a');
     text[0] = '"';
     text[text.len - 1] = '"';
-    var long = try maplibre.styleExpressionCreate(&text, null, null);
+    var long = try maplibre.StyleExpression.create(&text, null, null);
     defer long.release();
     var result = try long.evaluate(testing.allocator, null, null);
     defer result.deinit();

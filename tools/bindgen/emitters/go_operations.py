@@ -139,7 +139,10 @@ def operation(plan, values, *, discard=False, dispose=False):
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     handle = element(receiver.value) if receiver else None
     method = "Dispose" if dispose else method_name(plan, receiver, handle)
-    if plan.view:
+    if plan.factory:
+        # Go names a constructor New and the type that it returns.
+        method = "New" + name(values.api.handles[plan.factory].stem)
+    elif plan.view:
         method = "With" + name(plan.view.stem)
     elif (
         receiver

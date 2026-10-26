@@ -163,7 +163,7 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 // runtime, and drops every other reference to both.
 func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
 	t.Helper()
-	host, err := RuntimeCreate(RuntimeOptions{})
+	host, err := NewRuntime(RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,17 +494,17 @@ func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
 		defer bindingGlobalRoots.Unlock()
 		return len(bindingGlobalRoots.values)
 	}
-	t.Cleanup(func() { _ = LogClearCallback() })
+	t.Cleanup(func() { _ = ClearLogCallback() })
 	baseline := globalRoots()
 	for range 2 {
-		if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
+		if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
 			t.Fatal(err)
 		}
 		if live := globalRoots() - baseline; live != 1 {
 			t.Fatalf("global roots after an install = %d, want 1", live)
 		}
 	}
-	if err := LogClearCallback(); err != nil {
+	if err := ClearLogCallback(); err != nil {
 		t.Fatal(err)
 	}
 	if live := globalRoots() - baseline; live != 0 {

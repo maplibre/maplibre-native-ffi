@@ -24,12 +24,12 @@ public sealed class LoggingTests
             Assert.False(Gc.IsAlive(first));
             Assert.True(Gc.IsAlive(second));
 
-            MaplibreNative.LogClearCallback();
+            MaplibreNative.ClearLogCallback();
             Assert.False(Gc.IsAlive(second));
         }
         finally
         {
-            MaplibreNative.LogClearCallback();
+            MaplibreNative.ClearLogCallback();
         }
     }
 
@@ -37,7 +37,7 @@ public sealed class LoggingTests
     private static WeakReference InstallCapturingCallback()
     {
         var captured = new object();
-        MaplibreNative.LogSetCallback(
+        MaplibreNative.SetLogCallback(
             new LogHandler(
                 (_, _, _, _) =>
                 {

@@ -87,8 +87,7 @@ def copier(plan, values):
 
 
 def function_name(plan, values, *, discard=False):
-    """The public function's name: the C name without `mln_`, or the member
-    name on a command's discarding view.
+    """The public function's name: its member name.
 
     A dispose that is also its handle's release keeps the C name for the call
     that passes no completion, and takes the release's name, as `mapRelease`
@@ -98,9 +97,9 @@ def function_name(plan, values, *, discard=False):
     if optional and not discard:
         receiver = next(p.value.native for p in plan.inputs if p.name == plan.receiver)
         return camel(f"{values.bound.handles[receiver].stem}_{plan.member}")
-    if discard and not optional:
-        return camel(plan.member)
-    return camel(plan.name.removeprefix("mln_"))
+    if optional:
+        return camel(plan.name.removeprefix("mln_"))
+    return camel(plan.member)
 
 
 def method_name(plan, *, discard=False):
@@ -436,7 +435,7 @@ def view_operation(plan, values, method=False):
     typ = values.public(value)
     # `use` is a `*const fn (@TypeOf(context), View) E!Result`, and the view
     # returns its result with the binding's errors and its own.
-    name = method_name(plan) if method else camel(plan.name.removeprefix("mln_"))
+    name = method_name(plan)
     handle = "self" if method else "handle"
     return f'''pub fn {name}({handle}: {handle_type}, context: anytype, comptime use: anytype, {DIAGNOSTIC_PARAMETER}) call.ViewResult(@TypeOf(use)) {{
     return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, {handle}, context, use, diagnostic);
@@ -481,7 +480,7 @@ def drain_operation(plan, values, method=False):
         "diagnostic",
         f"c.{plan.absence.status}",
     ]
-    name = method_name(plan) if method else camel(plan.name.removeprefix("mln_"))
+    name = method_name(plan)
     return (
         f"pub fn {name}({', '.join(signature)}) status.Error!OwnedValue([]const {item}) {{\n"
         f"    return call.drain({', '.join(arguments)});\n"

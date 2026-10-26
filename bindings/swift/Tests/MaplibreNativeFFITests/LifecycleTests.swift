@@ -22,12 +22,12 @@ private func expectDescription(
 @Test func aSecondCloseIsANoOpAndTheHandleReportsItIsClosed() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(emptyStyle)
-    let data = try Maplibre.geoJsonSourceDataCreate(
-      #"{"type":"FeatureCollection","features":[]}"#
+    let data = try GeoJsonSourceDataHandle.create(
+      data: #"{"type":"FeatureCollection","features":[]}"#
     )
-    let other = try Maplibre
-      .geoJsonSourceDataCreate(
-        #"{"type":"FeatureCollection","features":[]}"#
+    let other = try GeoJsonSourceDataHandle
+      .create(
+        data: #"{"type":"FeatureCollection","features":[]}"#
       )
     #expect(Set([data, data, other]).count == 2)
     #expect(data.id != 0)

@@ -111,7 +111,7 @@ fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
 #[test]
 fn a_registered_callback_does_not_keep_its_runtime_alive() {
     let (probe, released) = release_probe();
-    let runtime = runtime_create(&RuntimeOptions::default()).unwrap();
+    let runtime = RuntimeHandle::create(&RuntimeOptions::default()).unwrap();
     wait_for(
         runtime.set_resource_provider(ResourceProvider::new(move |_, handle| {
             let _ = &probe;
@@ -382,7 +382,7 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
 fn replacing_the_log_callback_releases_the_one_it_replaced() {
     let _global = global_state();
     let (first, first_released) = release_probe();
-    log_set_callback(LogHandler::new(move |_, _, _, _| {
+    set_log_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &first;
         true
     }))
@@ -390,7 +390,7 @@ fn replacing_the_log_callback_releases_the_one_it_replaced() {
     assert!(first_released.try_recv().is_err());
 
     let (second, second_released) = release_probe();
-    log_set_callback(LogHandler::new(move |_, _, _, _| {
+    set_log_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &second;
         true
     }))
@@ -398,7 +398,7 @@ fn replacing_the_log_callback_releases_the_one_it_replaced() {
     await_release(&first_released);
     assert!(second_released.try_recv().is_err());
 
-    log_clear_callback().unwrap();
+    clear_log_callback().unwrap();
     await_release(&second_released);
 }
 

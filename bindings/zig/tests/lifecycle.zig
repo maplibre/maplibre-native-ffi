@@ -14,7 +14,7 @@ test "copied handles report native invalid state after release" {
     defer fixture.destroy();
     var map_copy = fixture.map;
     var runtime_copy = fixture.runtime;
-    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
+    var projection = try maplibre.MapProjection.create((try fixture.map.getSnapshot(null)).view, null);
     var projection_copy = projection;
 
     projection.release();
@@ -76,7 +76,7 @@ test "a disposed handle is closed and a second dispose does nothing" {
 test "a released projection is closed and a second release or deinit does nothing" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
+    var projection = try maplibre.MapProjection.create((try fixture.map.getSnapshot(null)).view, null);
     try testing.expect(!projection.isClosed());
     try testing.expect(projection.id() != 0);
 
@@ -86,7 +86,7 @@ test "a released projection is closed and a second release or deinit does nothin
     projection.deinit();
     try expectFormat("MapProjection(id=0x{x}, closed=true)", projection);
 
-    var scoped = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
+    var scoped = try maplibre.MapProjection.create((try fixture.map.getSnapshot(null)).view, null);
     scoped.deinit();
     try testing.expect(scoped.isClosed());
     scoped.deinit();
@@ -127,7 +127,7 @@ fn countRelease(counter: *support.Counter) void {
 // the last map goes.
 test "a child map keeps its disposed runtime's callbacks alive" {
     var handler_releases = support.Counter{};
-    var runtime = try maplibre.runtimeCreate(.{}, null);
+    var runtime = try maplibre.Runtime.create(.{}, null);
     try support.expectCommitted(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
     const created = try runtime.createMap(support.mapOptions(), null);
     var map = created.map;

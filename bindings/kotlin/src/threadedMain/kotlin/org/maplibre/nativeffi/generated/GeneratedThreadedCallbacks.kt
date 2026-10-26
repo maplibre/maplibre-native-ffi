@@ -125,7 +125,7 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-public fun GeneratedApi.logSetCallback(handler: LogHandler): Unit =
+public fun GeneratedApi.setLogCallback(handler: LogHandler): Unit =
   nativeCall(null, null) {
     check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
     accept(CallbackOwner.global)

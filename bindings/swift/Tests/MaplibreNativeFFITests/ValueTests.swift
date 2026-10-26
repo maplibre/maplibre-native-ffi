@@ -119,7 +119,7 @@ import Testing
 
 @Test func synchronousCallsFillCallerSizedOutputsInInputOrder() async throws {
   try await withMapFixture { fixture in
-    let projection = try Maplibre.mapProjectionCreate(
+    let projection = try MapProjectionHandle.create(
       view: fixture.map.getSnapshot().view
     )
     defer { projection.close() }
@@ -143,9 +143,8 @@ import Testing
 
 /// JSON goes in and comes back as a String, transcoded through UTF-8.
 @Test func callerSizedTextReturnsResultsLongerThanItsFirstStorage() throws {
-  let zoom = try Maplibre.styleExpressionCreate(
-    #"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
-  )
+  let zoom = try StyleExpressionHandle.create(expression:
+    #"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#)
   #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
     "50.0")
   zoom.close()
@@ -153,7 +152,7 @@ import Testing
   // The result outgrows the runtime's first storage, so the call runs again,
   // and its multibyte characters decode whole.
   let text = "\"" + String(repeating: "aé", count: 500) + "\""
-  let long = try Maplibre.styleExpressionCreate(text)
+  let long = try StyleExpressionHandle.create(expression: text)
   #expect(try long.evaluate() == text)
   long.close()
 }

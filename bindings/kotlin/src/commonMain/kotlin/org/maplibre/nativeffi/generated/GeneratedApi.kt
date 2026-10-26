@@ -20,29 +20,6 @@ public object GeneratedApi {
   }
 
   /**
-   * Prepares GeoJSON source data for installation on a map.
-   *
-   * See `mln_geojson_source_data_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun geoJsonSourceDataCreate(
-    data: String,
-    options: GeoJsonSourceOptions? = null,
-  ): GeoJsonSourceDataHandle =
-    nativeCall(null, null) {
-      val out = allocate(8, 8)
-      check(
-        C.mln_geojson_source_data_create(
-          view(data),
-          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
-          out,
-          diagnostic,
-        ),
-      )
-      adopt(out, GeneratedOwnerDisposal::geoJsonSourceData) { GeoJsonSourceDataHandle(it) }
-    }
-
-  /**
    * Converts spherical Mercator projected meters to a geographic coordinate.
    *
    * See `mln_lat_lng_for_projected_meters` in the
@@ -61,7 +38,7 @@ public object GeneratedApi {
    * See `mln_log_clear_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
-  public fun logClearCallback(): Unit =
+  public fun clearLogCallback(): Unit =
     nativeCall(null, null) { check(C.mln_log_clear_callback(diagnostic)) }
 
   /**
@@ -70,7 +47,7 @@ public object GeneratedApi {
    * See `mln_log_set_async_severity_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
-  public fun logSetAsyncSeverityMask(mask: LogSeverityFlag): Unit =
+  public fun setLogAsyncSeverityMask(mask: LogSeverityFlag): Unit =
     nativeCall(null, null) {
       check(C.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic))
     }
@@ -90,26 +67,12 @@ public object GeneratedApi {
     }
 
   /**
-   * Creates a standalone projection of a view, such as the view of a rendered frame or of a map
-   * snapshot.
-   *
-   * See `mln_map_projection_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun mapProjectionCreate(view: MapView): MapProjectionHandle =
-    nativeCall(null, null) {
-      val out = allocate(8, 8)
-      check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
-    }
-
-  /**
    * Reads MapLibre Native's process-global network status.
    *
    * See `mln_network_get_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun networkGetStatus(): NetworkStatus =
+  public fun getNetworkStatus(): NetworkStatus =
     nativeCall(null, null) {
       val out = allocate(4, 4)
       check(C.mln_network_get_status(out, diagnostic))
@@ -122,7 +85,7 @@ public object GeneratedApi {
    * See `mln_network_set_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun networkSetStatus(status: NetworkStatus): Unit =
+  public fun setNetworkStatus(status: NetworkStatus): Unit =
     nativeCall(null, null) { check(C.mln_network_set_status(status.rawValue.toInt(), diagnostic)) }
 
   /**
@@ -148,49 +111,6 @@ public object GeneratedApi {
       val out = allocate(16, 8)
       check(C.mln_projected_meters_for_lat_lng(writeLatLng(coordinate), out, diagnostic))
       readProjectedMeters(out)
-    }
-
-  /**
-   * Creates a runtime.
-   *
-   * Suspends until the call's thread starts. On the JVM, Android, and Kotlin/Native the call waits
-   * on the calling thread, which it blocks until then. On Kotlin/Wasm it runs on a thread of its
-   * own, so the page can call it. Cancellation does not interrupt the wait: a caller cancelled
-   * meanwhile receives the cancellation, and the binding disposes the result.
-   *
-   * See `mln_runtime_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public suspend fun runtimeCreate(options: RuntimeOptions): RuntimeHandle =
-    nativeThreadStart({ it.dispose() }) {
-      val out = allocate(8, 8)
-      threadStart { diagnostic ->
-        C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic)
-      }
-      adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
-    }
-
-  /**
-   * Parses a style expression.
-   *
-   * See `mln_style_expression_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-   */
-  public fun styleExpressionCreate(
-    expression: String,
-    options: StyleExpressionOptions? = null,
-  ): StyleExpressionHandle =
-    nativeCall(null, null) {
-      val out = allocate(8, 8)
-      check(
-        C.mln_style_expression_create(
-          view(expression),
-          options?.let { writeStyleExpressionOptions(it) } ?: 0L,
-          out,
-          diagnostic,
-        ),
-      )
-      adopt(out, GeneratedOwnerDisposal::styleExpression) { StyleExpressionHandle(it) }
     }
 
   /**

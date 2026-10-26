@@ -174,7 +174,7 @@ def lower(api: Api | BoundApi):
     )
     taken: dict[str, set[str]] = {}
     for plan in bound.operations:
-        if native := receiver_native(plan):
+        if native := receiver_native(plan) or plan.factory:
             names = taken.setdefault(native, set(HANDLE_DECLARATIONS))
             names.add(method_name(plan))
             if plan.completion and plan.completion.optional:
@@ -182,6 +182,8 @@ def lower(api: Api | BoundApi):
     for plan in bound.operations:
         function = plan.function
         native = receiver_native(plan)
+        # A factory is a function of the type that it creates.
+        container = native or plan.factory
         previous = dict(value_types.used), dict(value_types.results)
         try:
             lowered = []
@@ -197,7 +199,7 @@ def lower(api: Api | BoundApi):
                     value_types,
                     discard=discard,
                     method=native is not None,
-                    taken=frozenset(taken.get(native, ())),
+                    taken=frozenset(taken.get(container, ())),
                 )
                 name = (
                     method_name(plan, discard=discard)
@@ -216,7 +218,7 @@ def lower(api: Api | BoundApi):
                         name,
                     )
                 )
-            (methods.setdefault(native, []) if native else chunks).extend(lowered)
+            (methods.setdefault(container, []) if container else chunks).extend(lowered)
             generated.append(function.name)
         except ModelError as error:
             value_types.used, value_types.results = previous

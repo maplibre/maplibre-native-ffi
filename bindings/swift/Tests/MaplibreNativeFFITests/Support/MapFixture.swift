@@ -89,7 +89,7 @@ final class MapFixture: Sendable {
 
   /// A runtime for a test that manages its own maps.
   static func makeRuntime() throws -> RuntimeHandle {
-    try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle.create(options: RuntimeOptions(cachePath: ":memory:"))
   }
 
   /// Creates a map on `runtime` and waits until it is ready. A map that fails

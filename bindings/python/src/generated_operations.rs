@@ -3326,6 +3326,33 @@ impl AcquiredFrameHandle {
 
 #[pymethods]
 impl GeoJsonSourceDataHandle {
+    #[staticmethod]
+    #[pyo3(signature = (data, options=None))]
+    fn create(
+        py: Python<'_>,
+        data: &Bound<'_, PyAny>,
+        options: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let data_value = storage.json(data.clone(), false)?;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_geojson_source_options(&options, storage)
+        })?;
+        let mut out_data: sys::mln_geojson_source_data = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_geojson_source_data_create(
+                    data_value,
+                    generated_pointer(&options_value),
+                    &mut out_data,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { GeoJsonSourceDataHandle::adopt(py, out_data, Vec::new()) }
+    }
     #[pyo3(signature = ())]
     fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -6493,6 +6520,20 @@ impl MapHandle {
 
 #[pymethods]
 impl MapProjectionHandle {
+    #[staticmethod]
+    #[pyo3(signature = (view))]
+    fn create(py: Python<'_>, view: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let view_value = generated_input_mln_map_view(&view.clone(), storage)?;
+        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_create(&view_value, &mut out_projection, diagnostic)
+            })
+        }?;
+        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
+    }
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -7475,6 +7516,21 @@ impl RuntimeHandle {
             })
         }
     }
+    #[staticmethod]
+    #[pyo3(signature = (options=None))]
+    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_input_mln_runtime_options(&options.clone(), storage)?;
+        let mut out_runtime: sys::mln_runtime = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_runtime_create(&options_value, &mut out_runtime, diagnostic)
+            })
+        }?;
+        unsafe { RuntimeHandle::adopt(py, out_runtime, Vec::new()) }
+    }
     #[pyo3(signature = (options))]
     fn create_map(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -8009,6 +8065,33 @@ impl RuntimeHandle {
 
 #[pymethods]
 impl StyleExpressionHandle {
+    #[staticmethod]
+    #[pyo3(signature = (expression, options=None))]
+    fn create(
+        py: Python<'_>,
+        expression: &Bound<'_, PyAny>,
+        options: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let expression_value = storage.json(expression.clone(), false)?;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_expression_options(&options, storage)
+        })?;
+        let mut out_expression: sys::mln_style_expression = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_style_expression_create(
+                    expression_value,
+                    generated_pointer(&options_value),
+                    &mut out_expression,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { StyleExpressionHandle::adopt(py, out_expression, Vec::new()) }
+    }
     #[pyo3(signature = (inputs=None))]
     fn evaluate(&self, py: Python<'_>, inputs: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -8166,7 +8249,7 @@ generated_owner!(
 );
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
-fn android_init(
+fn init_android(
     py: Python<'_>,
     jni_env: &Bound<'_, PyAny>,
     context: &Bound<'_, PyAny>,
@@ -8189,34 +8272,6 @@ fn c_version(py: Python<'_>) -> PyResult<Py<PyAny>> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (data, options=None))]
-fn geojson_source_data_create(
-    py: Python<'_>,
-    data: &Bound<'_, PyAny>,
-    options: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let data_value = storage.json(data.clone(), false)?;
-    let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = generated_maybe(&options, |options| {
-        generated_input_mln_geojson_source_options(&options, storage)
-    })?;
-    let mut out_data: sys::mln_geojson_source_data = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_geojson_source_data_create(
-                data_value,
-                generated_pointer(&options_value),
-                &mut out_data,
-                diagnostic,
-            )
-        })
-    }?;
-    unsafe { GeoJsonSourceDataHandle::adopt(py, out_data, Vec::new()) }
-}
-
-#[pyfunction]
 #[pyo3(signature = (meters))]
 fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -8233,7 +8288,7 @@ fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> Py
 
 #[pyfunction]
 #[pyo3(signature = ())]
-fn log_clear_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
+fn clear_log_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     unsafe { call.status(|diagnostic| sys::mln_log_clear_callback(diagnostic)) }?;
     Ok(py.None())
@@ -8241,7 +8296,7 @@ fn log_clear_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
 
 #[pyfunction]
 #[pyo3(signature = (mask))]
-fn log_set_async_severity_mask(
+fn set_log_async_severity_mask(
     py: Python<'_>,
     mask: sys::mln_log_severity_flags,
 ) -> PyResult<Py<PyAny>> {
@@ -8252,7 +8307,7 @@ fn log_set_async_severity_mask(
 
 #[pyfunction]
 #[pyo3(signature = (handler))]
-fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+fn set_log_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let handler_value = generated_input_mln_log_handler(&handler.clone(), storage)?;
@@ -8286,23 +8341,8 @@ fn logical_extent_physical_size(py: Python<'_>, extent: &Bound<'_, PyAny>) -> Py
 }
 
 #[pyfunction]
-#[pyo3(signature = (view))]
-fn map_projection_create(py: Python<'_>, view: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let view_value = generated_input_mln_map_view(&view.clone(), storage)?;
-    let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_map_projection_create(&view_value, &mut out_projection, diagnostic)
-        })
-    }?;
-    unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
-}
-
-#[pyfunction]
 #[pyo3(signature = ())]
-fn network_get_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
+fn get_network_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let mut out_status: sys::mln_network_status = unsafe { std::mem::zeroed() };
     unsafe { call.status(|diagnostic| sys::mln_network_get_status(&mut out_status, diagnostic)) }?;
@@ -8311,7 +8351,7 @@ fn network_get_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
 
 #[pyfunction]
 #[pyo3(signature = (input_status))]
-fn network_set_status(
+fn set_network_status(
     py: Python<'_>,
     input_status: sys::mln_network_status,
 ) -> PyResult<Py<PyAny>> {
@@ -8330,7 +8370,7 @@ fn opengl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>>
 
 #[pyfunction]
 #[pyo3(signature = ())]
-fn plugin_get_register_function_v1(py: Python<'_>) -> PyResult<Py<PyAny>> {
+fn get_plugin_register_function_v1(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let result = unsafe { call.run(|| sys::mln_plugin_get_register_function_v1()) };
     generated_value(py, result.map_or(0, |function| function as usize))
@@ -8355,50 +8395,6 @@ fn projected_meters_for_lat_lng(
 }
 
 #[pyfunction]
-#[pyo3(signature = (options=None))]
-fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = generated_input_mln_runtime_options(&options.clone(), storage)?;
-    let mut out_runtime: sys::mln_runtime = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_runtime_create(&options_value, &mut out_runtime, diagnostic)
-        })
-    }?;
-    unsafe { RuntimeHandle::adopt(py, out_runtime, Vec::new()) }
-}
-
-#[pyfunction]
-#[pyo3(signature = (expression, options=None))]
-fn style_expression_create(
-    py: Python<'_>,
-    expression: &Bound<'_, PyAny>,
-    options: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let expression_value = storage.json(expression.clone(), false)?;
-    let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = generated_maybe(&options, |options| {
-        generated_input_mln_style_expression_options(&options, storage)
-    })?;
-    let mut out_expression: sys::mln_style_expression = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_style_expression_create(
-                expression_value,
-                generated_pointer(&options_value),
-                &mut out_expression,
-                diagnostic,
-            )
-        })
-    }?;
-    unsafe { StyleExpressionHandle::adopt(py, out_expression, Vec::new()) }
-}
-
-#[pyfunction]
 #[pyo3(signature = ())]
 fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -8418,25 +8414,21 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
     module.add_class::<HttpHeaderTransformResponseScope>()?;
-    module.add_function(wrap_pyfunction!(android_init, module)?)?;
+    module.add_function(wrap_pyfunction!(init_android, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
-    module.add_function(wrap_pyfunction!(geojson_source_data_create, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
-    module.add_function(wrap_pyfunction!(log_clear_callback, module)?)?;
-    module.add_function(wrap_pyfunction!(log_set_async_severity_mask, module)?)?;
-    module.add_function(wrap_pyfunction!(log_set_callback, module)?)?;
+    module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
+    module.add_function(wrap_pyfunction!(set_log_async_severity_mask, module)?)?;
+    module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(logical_extent_physical_size, module)?)?;
-    module.add_function(wrap_pyfunction!(map_projection_create, module)?)?;
-    module.add_function(wrap_pyfunction!(network_get_status, module)?)?;
-    module.add_function(wrap_pyfunction!(network_set_status, module)?)?;
+    module.add_function(wrap_pyfunction!(get_network_status, module)?)?;
+    module.add_function(wrap_pyfunction!(set_network_status, module)?)?;
     module.add_function(wrap_pyfunction!(
         opengl_supported_context_provider_mask,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(plugin_get_register_function_v1, module)?)?;
+    module.add_function(wrap_pyfunction!(get_plugin_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
-    module.add_function(wrap_pyfunction!(runtime_create, module)?)?;
-    module.add_function(wrap_pyfunction!(style_expression_create, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
     Ok(())
 }

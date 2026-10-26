@@ -14,8 +14,8 @@ const _style = {
 /// Each registration that native confirms returns a future, and that pending
 /// completion is what keeps the isolate alive until it resolves.
 Future<(RuntimeHandle, MapHandle)> _register() async {
-  logSetCallback((_, _, _, _) {});
-  final runtime = runtimeCreate(RuntimeOptions());
+  setLogCallback((_, _, _, _) {});
+  final runtime = RuntimeHandle.create(RuntimeOptions());
   await runtime.setResourceTransform((_, _, request) => request.close());
   await runtime.setResourceProvider(
     ResourceProvider(
@@ -43,7 +43,7 @@ Future<void> _awaitCompletions() async {
   print('COMPLETIONS_RESOLVED');
   await map.close();
   await runtime.close();
-  logClearCallback();
+  clearLogCallback();
 }
 
 /// Leaves every registration live and returns, so the isolate runs out of

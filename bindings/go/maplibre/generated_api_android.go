@@ -13,11 +13,11 @@ package maplibre
 import "C"
 import "unsafe"
 
-// AndroidInit initializes Android platform services.
+// InitAndroid initializes Android platform services.
 //
 // See mln_android_init in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-func AndroidInit(jniEnv uintptr, context uintptr) error {
+func InitAndroid(jniEnv uintptr, context uintptr) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})

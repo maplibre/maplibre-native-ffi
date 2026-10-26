@@ -61,7 +61,7 @@ def test_a_rejected_submission_frees_its_future(
     assert len(made) == 1
 
     # Any binding call applies the releases native made without the GIL.
-    mln.network_get_status()
+    mln.get_network_status()
     gc.collect()
     assert made[0]() is None
 

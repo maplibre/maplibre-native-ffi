@@ -78,7 +78,7 @@ private func installCApiLogging() {
     category: "MapLibre"
   )
   do {
-    try Maplibre.logSetCallback(handler: LogHandler {
+    try Maplibre.setLogCallback(handler: LogHandler {
       severity, event, code, message in
       log.info(
         "severity=\(String(describing: severity), privacy: .public) event=\(String(describing: event), privacy: .public) code=\(code): \(message, privacy: .public)"
@@ -95,7 +95,7 @@ private func installCApiLogging() {
 
 private func clearCApiLogging() {
   do {
-    try Maplibre.logClearCallback()
+    try Maplibre.clearLogCallback()
   } catch {
     let log = Logger(
       subsystem: "org.maplibre.nativeffi.examples.swift-map-ios",

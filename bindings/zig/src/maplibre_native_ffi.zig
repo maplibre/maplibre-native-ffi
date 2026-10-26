@@ -127,6 +127,14 @@ pub const GeoJsonSourceData = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
+    /// Prepares GeoJSON source data for installation on a map.
+    ///
+    /// See `mln_geojson_source_data_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn create(data: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeoJsonSourceData {
+        return call.invoke("mln_geojson_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeoJsonSourceData) });
+    }
+
     /// Releases prepared GeoJSON source data.
     ///
     /// See `mln_geojson_source_data_release` in the
@@ -895,6 +903,15 @@ pub const MapProjection = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
+    /// Creates a standalone projection of a view, such as the view of a rendered
+    /// frame or of a map snapshot.
+    ///
+    /// See `mln_map_projection_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn create(view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+        return call.invoke("mln_map_projection_create", .none, {}, null, diagnostic, .{ view, call.adopt(MapProjection) });
+    }
+
     /// Copies the projection camera into out_camera.
     ///
     /// See `mln_map_projection_get_camera` in the
@@ -1401,6 +1418,14 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_clear_resource_transform", .handle, self, call.command, null, diagnostic, .{});
     }
 
+    /// Creates a runtime.
+    ///
+    /// See `mln_runtime_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn create(options: RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
+        return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
+    }
+
     /// Starts creation of a map on the runtime.
     ///
     /// See `mln_runtime_create_map` in the
@@ -1593,6 +1618,14 @@ pub const StyleExpression = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
+    /// Parses a style expression.
+    ///
+    /// See `mln_style_expression_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    pub fn create(expression: []const u8, options: ?StyleExpressionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!StyleExpression {
+        return call.invoke("mln_style_expression_create", .none, {}, null, diagnostic, .{ expression, options, call.adopt(StyleExpression) });
+    }
+
     /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
     ///
     /// See `mln_style_expression_evaluate` in the
@@ -6350,7 +6383,7 @@ pub const NewRenderSession = struct {
 ///
 /// See `mln_android_init` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-pub const androidInit = if (builtin.abi.isAndroid()) struct {
+pub const initAndroid = if (builtin.abi.isAndroid()) struct {
     fn function(jni_env: ?*anyopaque, context: ?*anyopaque, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         return call.invoke("mln_android_init", .none, {}, null, diagnostic, .{ jni_env, context });
     }
@@ -6365,14 +6398,6 @@ pub fn cVersion() u32 {
     return c.mln_c_version();
 }
 
-/// Prepares GeoJSON source data for installation on a map.
-///
-/// See `mln_geojson_source_data_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geoJsonSourceDataCreate(data: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeoJsonSourceData {
-    return call.invoke("mln_geojson_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeoJsonSourceData) });
-}
-
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
@@ -6385,7 +6410,7 @@ pub fn latLngForProjectedMeters(meters: ProjectedMeters, diagnostic: ?*diagnosti
 ///
 /// See `mln_log_clear_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logClearCallback(diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn clearLogCallback(diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_log_clear_callback", .none, {}, null, diagnostic, .{});
 }
 
@@ -6393,7 +6418,7 @@ pub fn logClearCallback(diagnostic: ?*diagnostics.Diagnostic) status.Error!void 
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logSetAsyncSeverityMask(mask: LogSeverityFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn setLogAsyncSeverityMask(mask: LogSeverityFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_log_set_async_severity_mask", .none, {}, null, diagnostic, .{mask});
 }
 
@@ -6401,7 +6426,7 @@ pub fn logSetAsyncSeverityMask(mask: LogSeverityFlag, diagnostic: ?*diagnostics.
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logSetCallback(handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn setLogCallback(handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_log_set_callback", .none, {}, null, diagnostic, .{handler});
 }
 
@@ -6414,20 +6439,11 @@ pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostic
     return .{ .width = out[0], .height = out[1] };
 }
 
-/// Creates a standalone projection of a view, such as the view of a rendered
-/// frame or of a map snapshot.
-///
-/// See `mln_map_projection_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionCreate(view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
-    return call.invoke("mln_map_projection_create", .none, {}, null, diagnostic, .{ view, call.adopt(MapProjection) });
-}
-
 /// Reads MapLibre Native's process-global network status.
 ///
 /// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn networkGetStatus(diagnostic: ?*diagnostics.Diagnostic) status.Error!NetworkStatus {
+pub fn getNetworkStatus(diagnostic: ?*diagnostics.Diagnostic) status.Error!NetworkStatus {
     return call.invoke("mln_network_get_status", .none, {}, null, diagnostic, .{call.out(NetworkStatus)});
 }
 
@@ -6435,7 +6451,7 @@ pub fn networkGetStatus(diagnostic: ?*diagnostics.Diagnostic) status.Error!Netwo
 ///
 /// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn networkSetStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn setNetworkStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
@@ -6452,7 +6468,7 @@ pub fn openGlSupportedContextProviderMask() OpenGlContextProviderFlag {
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-pub fn pluginGetRegisterFunctionV1() c.mln_plugin_register_function_v1 {
+pub fn getPluginRegisterFunctionV1() c.mln_plugin_register_function_v1 {
     status.requireAbiVersion();
     return c.mln_plugin_get_register_function_v1();
 }
@@ -6463,22 +6479,6 @@ pub fn pluginGetRegisterFunctionV1() c.mln_plugin_register_function_v1 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ProjectedMeters {
     return call.invoke("mln_projected_meters_for_lat_lng", .none, {}, null, diagnostic, .{ coordinate, call.out(ProjectedMeters) });
-}
-
-/// Creates a runtime.
-///
-/// See `mln_runtime_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeCreate(options: RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
-    return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
-}
-
-/// Parses a style expression.
-///
-/// See `mln_style_expression_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionCreate(expression: []const u8, options: ?StyleExpressionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!StyleExpression {
-    return call.invoke("mln_style_expression_create", .none, {}, null, diagnostic, .{ expression, options, call.adopt(StyleExpression) });
 }
 
 /// Reports the render backends available in this native library build.

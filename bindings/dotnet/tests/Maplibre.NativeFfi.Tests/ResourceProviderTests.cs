@@ -133,7 +133,7 @@ public sealed class ResourceProviderTests
             lock (reports)
                 reports.Add(report);
             // This callback permits status-returning native calls.
-            reentry = Record.Exception(() => MaplibreNative.NetworkGetStatus());
+            reentry = Record.Exception(() => MaplibreNative.GetNetworkStatus());
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(

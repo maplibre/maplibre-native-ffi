@@ -30,16 +30,16 @@ internal static class Program
                 return 1;
             }
 
-            MaplibreNative.LogSetAsyncSeverityMask(LogSeverityFlag.All);
-            MaplibreNative.LogSetCallback(new LogHandler(PrintNativeLog));
+            MaplibreNative.SetLogAsyncSeverityMask(LogSeverityFlag.All);
+            MaplibreNative.SetLogCallback(new LogHandler(PrintNativeLog));
             try
             {
                 return Shell.Run(parseResult.Mode.Value, backends, parseResult.Smoke) ? 0 : 1;
             }
             finally
             {
-                MaplibreNative.LogClearCallback();
-                MaplibreNative.LogSetAsyncSeverityMask(LogSeverityFlag.Default);
+                MaplibreNative.ClearLogCallback();
+                MaplibreNative.SetLogAsyncSeverityMask(LogSeverityFlag.Default);
             }
         }
         catch (Exception error)

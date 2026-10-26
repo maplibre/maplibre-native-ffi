@@ -336,7 +336,16 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     )
     if receiver is not None and receiver not in value_types.owners:
         raise Unsupported(f"receiver {receiver} needs a generated runtime adapter")
-    module = value_types.owners[receiver] if receiver else "global"
+    if plan.factory and plan.factory not in value_types.owners:
+        raise Unsupported(f"factory {plan.factory} needs a generated owner")
+    # A factory is an associated function of the handle that it creates.
+    module = (
+        value_types.owners[receiver]
+        if receiver
+        else value_types.owners[plan.factory]
+        if plan.factory
+        else "global"
+    )
     parameters = function.parameters[1:] if receiver else function.parameters
     names = {parameter.name: local_name(parameter.name) for parameter in parameters}
     # Parameters keep their C names, so a local the body binds steps aside.

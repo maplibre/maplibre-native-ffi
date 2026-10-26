@@ -5474,12 +5474,11 @@ func CVersion() uint32 {
 	return uint32(C.mln_c_version())
 }
 
-// GeoJsonSourceDataCreate prepares GeoJSON source data for installation on a
-// map.
+// NewGeoJsonSourceData prepares GeoJSON source data for installation on a map.
 //
 // See mln_geojson_source_data_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func GeoJsonSourceDataCreate(data string, options *GeoJsonSourceOptions) (*GeoJsonSourceDataHandle, error) {
+func NewGeoJsonSourceData(data string, options *GeoJsonSourceOptions) (*GeoJsonSourceDataHandle, error) {
 	var outData C.mln_geojson_source_data
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), &outData, diagnostic))
@@ -5526,32 +5525,32 @@ func LatLngForProjectedMeters(meters ProjectedMeters) (LatLng, error) {
 	})
 }
 
-// LogClearCallback clears the process-global log callback.
+// ClearLogCallback clears the process-global log callback.
 //
 // See mln_log_clear_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogClearCallback() error {
+func ClearLogCallback() error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_clear_callback(diagnostic))
 	})
 }
 
-// LogSetAsyncSeverityMask controls which log severities MapLibre Native may
+// SetLogAsyncSeverityMask controls which log severities MapLibre Native may
 // dispatch asynchronously.
 //
 // See mln_log_set_async_severity_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogSetAsyncSeverityMask(mask LogSeverityFlag) error {
+func SetLogAsyncSeverityMask(mask LogSeverityFlag) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_set_async_severity_mask(C.mln_log_severity_flags(mask), diagnostic))
 	})
 }
 
-// LogSetCallback installs a process-global MapLibre Native log callback.
+// SetLogCallback installs a process-global MapLibre Native log callback.
 //
 // See mln_log_set_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogSetCallback(handler LogHandler) error {
+func SetLogCallback(handler LogHandler) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_set_callback(bindingStore(nativeLogHandler(handler, arena), arena), diagnostic))
 	})
@@ -6129,12 +6128,12 @@ func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId string) 
 	}, completionCommand)
 }
 
-// MapProjectionCreate creates a standalone projection of a view, such as the
-// view of a rendered frame or of a map snapshot.
+// NewMapProjection creates a standalone projection of a view, such as the view
+// of a rendered frame or of a map snapshot.
 //
 // See mln_map_projection_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func MapProjectionCreate(view MapView) (*MapProjectionHandle, error) {
+func NewMapProjection(view MapView) (*MapProjectionHandle, error) {
 	var outProjection C.mln_map_projection
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_create(bindingStore(nativeMapView(view, arena), arena), &outProjection, diagnostic))
@@ -6676,11 +6675,11 @@ func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCom
 	}, completionCommand)
 }
 
-// NetworkGetStatus reads MapLibre Native's process-global network status.
+// GetNetworkStatus reads MapLibre Native's process-global network status.
 //
 // See mln_network_get_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func NetworkGetStatus() (NetworkStatus, error) {
+func GetNetworkStatus() (NetworkStatus, error) {
 	var outStatus C.mln_network_status
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_get_status(&outStatus, diagnostic))
@@ -6689,11 +6688,11 @@ func NetworkGetStatus() (NetworkStatus, error) {
 	})
 }
 
-// NetworkSetStatus sets MapLibre Native's process-global network status.
+// SetNetworkStatus sets MapLibre Native's process-global network status.
 //
 // See mln_network_set_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func NetworkSetStatus(status NetworkStatus) error {
+func SetNetworkStatus(status NetworkStatus) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_set_status(C.mln_network_status(status), diagnostic))
 	})
@@ -6708,12 +6707,12 @@ func OpenGlSupportedContextProviderMask() OpenGlContextProviderFlag {
 	return OpenGlContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
 }
 
-// PluginGetRegisterFunctionV1 returns the process-wide mln_plugin_register_v1
+// GetPluginRegisterFunctionV1 returns the process-wide mln_plugin_register_v1
 // entry point; never null.
 //
 // See mln_plugin_get_register_function_v1 in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html
-func PluginGetRegisterFunctionV1() uintptr {
+func GetPluginRegisterFunctionV1() uintptr {
 	return uintptr(unsafe.Pointer(C.mln_plugin_get_register_function_v1()))
 }
 
@@ -7142,11 +7141,11 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompleti
 	}, completionCommand)
 }
 
-// RuntimeCreate creates a runtime.
+// NewRuntime creates a runtime.
 //
 // See mln_runtime_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
+func NewRuntime(options RuntimeOptions) (*RuntimeHandle, error) {
 	var outRuntime C.mln_runtime
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create(bindingStore(nativeRuntimeOptions(options, arena), arena), &outRuntime, diagnostic))
@@ -7380,11 +7379,11 @@ func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metad
 	}, completionOf(copyOfflineRegionInfo))
 }
 
-// StyleExpressionCreate parses a style expression.
+// NewStyleExpression parses a style expression.
 //
 // See mln_style_expression_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-func StyleExpressionCreate(expression string, options *StyleExpressionOptions) (*StyleExpressionHandle, error) {
+func NewStyleExpression(expression string, options *StyleExpressionOptions) (*StyleExpressionHandle, error) {
 	var outExpression C.mln_style_expression
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_style_expression_create(bindingView(expression, arena), bindingStoreOptional(options, arena, nativeStyleExpressionOptions), &outExpression, diagnostic))

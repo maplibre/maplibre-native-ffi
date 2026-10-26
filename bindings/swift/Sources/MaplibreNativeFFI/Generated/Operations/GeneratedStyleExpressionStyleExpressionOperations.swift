@@ -4,6 +4,24 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension StyleExpressionHandle {
+  /// Parses a style expression.
+  ///
+  /// See `mln_style_expression_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  static func create(
+    expression bindingArg0: String,
+    options bindingArg1: StyleExpressionOptions? = nil
+  ) throws -> StyleExpressionHandle {
+    var value0: mln_style_expression = 0
+    return try MaplibreNativeFFI
+      .nativeInvoke { _, arena, diagnostic in mln_style_expression_create(
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.store($0.nativeValue()) },
+        &value0,
+        diagnostic
+      ) } result: { try StyleExpressionHandle(adopting: value0) }
+  }
+
   /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
   ///
   /// See `mln_style_expression_evaluate` in the

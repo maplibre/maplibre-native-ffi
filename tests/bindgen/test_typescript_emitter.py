@@ -275,8 +275,19 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("  assetPath?: string;\n", values)
         self.assertIn("createMap(options: MapOptions): NewMap", operations)
         self.assertIn(
-            "runtimeCreate(options: RuntimeOptions = {}): RuntimeHandle", operations
+            "  static create(options: RuntimeOptions = {}): RuntimeHandle {",
+            operations,
         )
+
+    def test_a_factory_is_static_and_a_global_names_its_verb_first(self):
+        operations = typescript.generate(self.api)[
+            "bindings/typescript/src/generated_operations.ts"
+        ]
+        runtime = operations[operations.index("export class RuntimeHandle ") :]
+        runtime = runtime[: runtime.index("\n}\n")]
+        self.assertIn("  static create(", runtime)
+        self.assertNotIn("export function create(", operations)
+        self.assertIn("export function setLogCallback(handler: LogHandler)", operations)
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an

@@ -12,9 +12,9 @@ import org.maplibre.nativeffi.generated.HttpHeaderTransform
 import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogHandler
-import org.maplibre.nativeffi.generated.logSetCallback
 import org.maplibre.nativeffi.generated.setHeader
 import org.maplibre.nativeffi.generated.setHttpHeaderTransform
+import org.maplibre.nativeffi.generated.setLogCallback
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
@@ -31,7 +31,7 @@ class ThreadedCallbackTest {
     val base = roots.rootCountForTesting()
     val parsed = CompletableDeferred<LogEvent>()
     try {
-      GeneratedApi.logSetCallback(
+      GeneratedApi.setLogCallback(
         LogHandler { _, event, _, _ ->
           if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
           // Leave the record to MapLibre's own logger as well.
@@ -47,7 +47,7 @@ class ThreadedCallbackTest {
         assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
       }
     } finally {
-      GeneratedApi.logClearCallback()
+      GeneratedApi.clearLogCallback()
     }
     assertEquals(base, roots.rootCountForTesting())
   }

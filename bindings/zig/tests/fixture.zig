@@ -194,7 +194,7 @@ pub const Fixture = struct {
         const self = try testing.allocator.create(Fixture);
         errdefer testing.allocator.destroy(self);
         self.* = .{ .runtime = undefined, .map = undefined };
-        self.runtime = try maplibre.runtimeCreate(.{ .asset_path = options.asset_path }, null);
+        self.runtime = try maplibre.Runtime.create(.{ .asset_path = options.asset_path }, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
         // A handler accepted before createMap receives the map's first events.
         try self.runtime.discarding().setEventHandler(.init(self, receiveEvents, null), null);

@@ -137,7 +137,7 @@ def test_public_type_hints_resolve() -> None:
 def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
     map_handle: mln.MapHandle,
 ) -> None:
-    projection = mln.map_projection_create(map_handle.get_snapshot().view)
+    projection = mln.MapProjectionHandle.create(map_handle.get_snapshot().view)
     try:
         coordinates = (mln.LatLng(0, 0), mln.LatLng(10, 20), mln.LatLng(-12, -30))
         points = projection.pixels_for_lat_lngs(coordinates)
@@ -185,7 +185,7 @@ def test_json_crosses_as_json_dumps_and_json_loads_values(
     )
 
     # A record member that is None is absent, an empty view.
-    expression = mln.style_expression_create(["get", "name"])
+    expression = mln.StyleExpressionHandle.create(["get", "name"])
     try:
         feature = {
             "type": "Feature",
@@ -199,11 +199,11 @@ def test_json_crosses_as_json_dumps_and_json_loads_values(
 
     # A value that json.dumps rejects raises its error before native runs.
     with pytest.raises(TypeError, match="not JSON serializable"):
-        mln.style_expression_create(object())
+        mln.StyleExpressionHandle.create(object())
 
 
 def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> None:
-    zoom = mln.style_expression_create(
+    zoom = mln.StyleExpressionHandle.create(
         ["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]
     )
     try:
@@ -213,7 +213,7 @@ def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> No
 
     # The result outgrows the runtime's first storage, so the call runs again.
     text = "a" * 1000
-    long = mln.style_expression_create(text)
+    long = mln.StyleExpressionHandle.create(text)
     try:
         assert long.evaluate() == text
     finally:

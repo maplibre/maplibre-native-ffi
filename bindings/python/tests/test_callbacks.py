@@ -139,7 +139,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
             woke.set()
 
     callback = weakref.ref(receive_events)
-    runtime = mln.runtime_create(mln.RuntimeOptions())
+    runtime = mln.RuntimeHandle.create(mln.RuntimeOptions())
     runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)
@@ -358,8 +358,8 @@ def test_replacing_the_log_callback_releases_the_previous_one(
     logged = second.called
 
     try:
-        mln.log_set_callback(mln.LogHandler(first))
-        mln.log_set_callback(mln.LogHandler(second))
+        mln.set_log_callback(mln.LogHandler(first))
+        mln.set_log_callback(mln.LogHandler(second))
         del first
         assert first_retired.wait(TIMEOUT)
 
@@ -367,7 +367,7 @@ def test_replacing_the_log_callback_releases_the_previous_one(
         map_handle.set_style_json([])
         assert logged.wait(TIMEOUT)
     finally:
-        mln.log_clear_callback()
+        mln.clear_log_callback()
     del second
     assert second_retired.wait(TIMEOUT)
 
@@ -385,12 +385,12 @@ def test_a_log_handler_that_returns_none_leaves_records_unconsumed(
     handler = Unconsuming()
     logged, retired = handler.called, handler.retired
     try:
-        mln.log_set_callback(mln.LogHandler(handler))
+        mln.set_log_callback(mln.LogHandler(handler))
         del handler
         map_handle.set_style_json([])
         assert logged.wait(TIMEOUT)
     finally:
-        mln.log_clear_callback()
+        mln.clear_log_callback()
     # Once native releases the handler, no call of it is in flight.
     assert retired.wait(TIMEOUT)
     assert reports == []

@@ -246,6 +246,21 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
     _native: _native._GeoJsonSourceDataHandle
 
+    @classmethod
+    def create(
+        cls, data: Any, options: GeoJsonSourceOptions | None = None
+    ) -> GeoJsonSourceDataHandle:
+        """Prepares GeoJSON source data for installation on a map.
+
+        See `mln_geojson_source_data_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return _adopt_value(
+            _native._GeoJsonSourceDataHandle.create(data, options),
+            "GeoJsonSourceDataHandle",
+            None,
+        )
+
     def close(self) -> None:
         """Releases prepared GeoJSON source data.
 
@@ -1177,6 +1192,18 @@ class _MapHandleOperations(GeneratedOperations):
 class _MapProjectionHandleOperations(GeneratedOperations):
     _native: _native._MapProjectionHandle
 
+    @classmethod
+    def create(cls, view: MapView) -> MapProjectionHandle:
+        """Creates a standalone projection of a view, such as the view of a
+        rendered frame or of a map snapshot.
+
+        See `mln_map_projection_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return _adopt_value(
+            _native._MapProjectionHandle.create(view), "MapProjectionHandle", None
+        )
+
     def get_camera(self) -> CameraOptions:
         """Copies the projection camera into out_camera.
 
@@ -1650,6 +1677,17 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
+    @classmethod
+    def create(cls, options: RuntimeOptions | None = None) -> RuntimeHandle:
+        """Creates a runtime.
+
+        See `mln_runtime_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return _adopt_value(
+            _native._RuntimeHandle.create(options), "RuntimeHandle", None
+        )
+
     def create_map(self, options: MapOptions) -> RuntimeCreateMapResult:
         """Starts creation of a map on the runtime.
 
@@ -1863,6 +1901,21 @@ class _RuntimeHandleOperations(GeneratedOperations):
 class _StyleExpressionHandleOperations(GeneratedOperations):
     _native: _native._StyleExpressionHandle
 
+    @classmethod
+    def create(
+        cls, expression: Any, options: StyleExpressionOptions | None = None
+    ) -> StyleExpressionHandle:
+        """Parses a style expression.
+
+        See `mln_style_expression_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+        """
+        return _adopt_value(
+            _native._StyleExpressionHandle.create(expression, options),
+            "StyleExpressionHandle",
+            None,
+        )
+
     def evaluate(self, inputs: StyleExpressionInputs | None = None) -> Any:
         """Evaluates a parsed expression and writes its result as UTF-8 JSON.
 
@@ -1888,13 +1941,13 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
         return self._native.close()
 
 
-def android_init(jni_env: int, context: int) -> None:
+def init_android(jni_env: int, context: int) -> None:
     """Initializes Android platform services.
 
     See `mln_android_init` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
     """
-    return _native.android_init(jni_env, context)
+    return _native.init_android(jni_env, context)
 
 
 def c_version() -> int:
@@ -1907,21 +1960,6 @@ def c_version() -> int:
     return _native.c_version()
 
 
-def geojson_source_data_create(
-    data: Any, options: GeoJsonSourceOptions | None = None
-) -> GeoJsonSourceDataHandle:
-    """Prepares GeoJSON source data for installation on a map.
-
-    See `mln_geojson_source_data_create` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-    return _adopt_value(
-        _native.geojson_source_data_create(data, options),
-        "GeoJsonSourceDataHandle",
-        None,
-    )
-
-
 def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
     """Converts spherical Mercator projected meters to a geographic
     coordinate.
@@ -1932,32 +1970,32 @@ def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
     return LatLng._from_native(_native.lat_lng_for_projected_meters(meters))
 
 
-def log_clear_callback() -> None:
+def clear_log_callback() -> None:
     """Clears the process-global log callback.
 
     See `mln_log_clear_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
-    return _native.log_clear_callback()
+    return _native.clear_log_callback()
 
 
-def log_set_async_severity_mask(mask: LogSeverityFlag) -> None:
+def set_log_async_severity_mask(mask: LogSeverityFlag) -> None:
     """Controls which log severities MapLibre Native may dispatch
     asynchronously.
 
     See `mln_log_set_async_severity_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
-    return _native.log_set_async_severity_mask(mask)
+    return _native.set_log_async_severity_mask(mask)
 
 
-def log_set_callback(handler: LogHandler) -> None:
+def set_log_callback(handler: LogHandler) -> None:
     """Installs a process-global MapLibre Native log callback.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
-    return _native.log_set_callback(handler)
+    return _native.set_log_callback(handler)
 
 
 def logical_extent_physical_size(
@@ -1972,34 +2010,22 @@ def logical_extent_physical_size(
     return LogicalExtentPhysicalSizeResult(raw["width"], raw["height"])
 
 
-def map_projection_create(view: MapView) -> MapProjectionHandle:
-    """Creates a standalone projection of a view, such as the view of a
-    rendered frame or of a map snapshot.
-
-    See `mln_map_projection_create` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    """
-    return _adopt_value(
-        _native.map_projection_create(view), "MapProjectionHandle", None
-    )
-
-
-def network_get_status() -> NetworkStatus:
+def get_network_status() -> NetworkStatus:
     """Reads MapLibre Native's process-global network status.
 
     See `mln_network_get_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
-    return NetworkStatus(_native.network_get_status())
+    return NetworkStatus(_native.get_network_status())
 
 
-def network_set_status(status: NetworkStatus) -> None:
+def set_network_status(status: NetworkStatus) -> None:
     """Sets MapLibre Native's process-global network status.
 
     See `mln_network_set_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
-    return _native.network_set_status(status)
+    return _native.set_network_status(status)
 
 
 def opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
@@ -2011,14 +2037,14 @@ def opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
     return OpenGlContextProviderFlag(_native.opengl_supported_context_provider_mask())
 
 
-def plugin_get_register_function_v1() -> int:
+def get_plugin_register_function_v1() -> int:
     """Returns the process-wide `mln_plugin_register_v1` entry point; never
     null.
 
     See `mln_plugin_get_register_function_v1` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
     """
-    return _native.plugin_get_register_function_v1()
+    return _native.get_plugin_register_function_v1()
 
 
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
@@ -2030,30 +2056,6 @@ def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     """
     return ProjectedMeters._from_native(
         _native.projected_meters_for_lat_lng(coordinate)
-    )
-
-
-def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
-    """Creates a runtime.
-
-    See `mln_runtime_create` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-    return _adopt_value(_native.runtime_create(options), "RuntimeHandle", None)
-
-
-def style_expression_create(
-    expression: Any, options: StyleExpressionOptions | None = None
-) -> StyleExpressionHandle:
-    """Parses a style expression.
-
-    See `mln_style_expression_create` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    """
-    return _adopt_value(
-        _native.style_expression_create(expression, options),
-        "StyleExpressionHandle",
-        None,
     )
 
 

@@ -3,7 +3,7 @@
 
 import process from "node:process";
 
-import { cVersion, runtimeCreate } from "../../src/index.ts";
+import { cVersion, RuntimeHandle } from "../../src/index.ts";
 import { mapOptions } from "../support/fixture.ts";
 import { execute } from "../support/harness.ts";
 import { postToParent, realmData } from "../support/realm-child.ts";
@@ -29,7 +29,7 @@ type Request =
  * before the one this scenario adds, which tells the parent that it has run.
  */
 async function exit(): Promise<never> {
-  const runtime = runtimeCreate();
+  const runtime = RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   await map.setStyleJson(emptyStyle());
@@ -73,7 +73,7 @@ switch (request.scenario) {
     break;
   case "load": {
     // The realm loads the binding afresh, as an application that imports it.
-    const runtime = runtimeCreate();
+    const runtime = RuntimeHandle.create();
     await runtime.close();
     postToParent({ version: cVersion() });
     break;

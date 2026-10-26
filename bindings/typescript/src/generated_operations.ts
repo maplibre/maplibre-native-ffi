@@ -120,21 +120,33 @@ export function cVersion(): number {
 }
 
 /**
- * Prepares GeoJSON source data for installation on a map.
+ * Clears the process-global log callback.
  *
- * See `mln_geojson_source_data_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * See `mln_log_clear_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export function geoJsonSourceDataCreate(
-  data: unknown,
-  options?: GeoJsonSourceOptions,
-): GeoJsonSourceDataHandle {
-  const handle = native.mln_geojson_source_data_create(data, options);
-  return adopt(
-    handle,
-    () => new GeoJsonSourceDataHandle(ADOPT, handle),
-    (disposed) => native.mln_geojson_source_data_release(disposed, undefined),
-  );
+export function clearLogCallback(): void {
+  native.mln_log_clear_callback();
+}
+
+/**
+ * Reads MapLibre Native's process-global network status.
+ *
+ * See `mln_network_get_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export function getNetworkStatus(): NetworkStatus {
+  return native.mln_network_get_status();
+}
+
+/**
+ * Returns the process-wide `mln_plugin_register_v1` entry point; never null.
+ *
+ * See `mln_plugin_get_register_function_v1` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
+ */
+export function getPluginRegisterFunctionV1(): bigint {
+  return native.mln_plugin_get_register_function_v1();
 }
 
 /**
@@ -145,39 +157,6 @@ export function geoJsonSourceDataCreate(
  */
 export function latLngForProjectedMeters(meters: ProjectedMeters = {}): LatLng {
   return native.mln_lat_lng_for_projected_meters(meters);
-}
-
-/**
- * Clears the process-global log callback.
- *
- * See `mln_log_clear_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-export function logClearCallback(): void {
-  native.mln_log_clear_callback();
-}
-
-/**
- * Controls which log severities MapLibre Native may dispatch asynchronously.
- *
- * See `mln_log_set_async_severity_mask` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-export function logSetAsyncSeverityMask(mask: LogSeverityFlag): void {
-  native.mln_log_set_async_severity_mask(mask);
-}
-
-/**
- * Installs a process-global MapLibre Native log callback.
- *
- * See `mln_log_set_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-export function logSetCallback(handler: LogHandler): void {
-  return withRegistrations((registrations) => {
-    native.mln_log_set_callback(handler);
-    registrations.commit();
-  });
 }
 
 /**
@@ -194,42 +173,6 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent = {}): {
 }
 
 /**
- * Creates a standalone projection of a view, such as the view of a rendered
- * frame or of a map snapshot.
- *
- * See `mln_map_projection_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
- */
-export function mapProjectionCreate(view: MapView = {}): MapProjectionHandle {
-  const handle = native.mln_map_projection_create(view);
-  return adopt(
-    handle,
-    () => new MapProjectionHandle(ADOPT, handle),
-    (disposed) => native.mln_map_projection_release(disposed, undefined),
-  );
-}
-
-/**
- * Reads MapLibre Native's process-global network status.
- *
- * See `mln_network_get_status` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export function networkGetStatus(): NetworkStatus {
-  return native.mln_network_get_status();
-}
-
-/**
- * Sets MapLibre Native's process-global network status.
- *
- * See `mln_network_set_status` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export function networkSetStatus(status: NetworkStatus): void {
-  native.mln_network_set_status(status);
-}
-
-/**
  * Returns OpenGL context providers supported by this build.
  *
  * See `mln_opengl_supported_context_provider_mask` in the
@@ -237,16 +180,6 @@ export function networkSetStatus(status: NetworkStatus): void {
  */
 export function openGlSupportedContextProviderMask(): OpenGlContextProviderFlag {
   return native.mln_opengl_supported_context_provider_mask();
-}
-
-/**
- * Returns the process-wide `mln_plugin_register_v1` entry point; never null.
- *
- * See `mln_plugin_get_register_function_v1` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
- */
-export function pluginGetRegisterFunctionV1(): bigint {
-  return native.mln_plugin_get_register_function_v1();
 }
 
 /**
@@ -262,36 +195,36 @@ export function projectedMetersForLatLng(
 }
 
 /**
- * Creates a runtime.
+ * Controls which log severities MapLibre Native may dispatch asynchronously.
  *
- * See `mln_runtime_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * See `mln_log_set_async_severity_mask` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export function runtimeCreate(options: RuntimeOptions = {}): RuntimeHandle {
-  const handle = native.mln_runtime_create(options);
-  return adopt(
-    handle,
-    () => new RuntimeHandle(ADOPT, handle),
-    (disposed) => native.mln_runtime_dispose(disposed, undefined),
-  );
+export function setLogAsyncSeverityMask(mask: LogSeverityFlag): void {
+  native.mln_log_set_async_severity_mask(mask);
 }
 
 /**
- * Parses a style expression.
+ * Installs a process-global MapLibre Native log callback.
  *
- * See `mln_style_expression_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ * See `mln_log_set_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export function styleExpressionCreate(
-  expression: unknown,
-  options?: StyleExpressionOptions,
-): StyleExpressionHandle {
-  const handle = native.mln_style_expression_create(expression, options);
-  return adopt(
-    handle,
-    () => new StyleExpressionHandle(ADOPT, handle),
-    (disposed) => native.mln_style_expression_release(disposed, undefined),
-  );
+export function setLogCallback(handler: LogHandler): void {
+  return withRegistrations((registrations) => {
+    native.mln_log_set_callback(handler);
+    registrations.commit();
+  });
+}
+
+/**
+ * Sets MapLibre Native's process-global network status.
+ *
+ * See `mln_network_set_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export function setNetworkStatus(status: NetworkStatus): void {
+  native.mln_network_set_status(status);
 }
 
 /**
@@ -489,6 +422,24 @@ export class GeoJsonSourceDataHandle extends Owner {
   close(): void {
     closeSync(this, (handle, token) =>
       native.mln_geojson_source_data_release(handle, token),
+    );
+  }
+
+  /**
+   * Prepares GeoJSON source data for installation on a map.
+   *
+   * See `mln_geojson_source_data_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  static create(
+    data: unknown,
+    options?: GeoJsonSourceOptions,
+  ): GeoJsonSourceDataHandle {
+    const handle = native.mln_geojson_source_data_create(data, options);
+    return adopt(
+      handle,
+      () => new GeoJsonSourceDataHandle(ADOPT, handle),
+      (disposed) => native.mln_geojson_source_data_release(disposed, undefined),
     );
   }
 }
@@ -2868,6 +2819,22 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
+   * Creates a standalone projection of a view, such as the view of a rendered
+   * frame or of a map snapshot.
+   *
+   * See `mln_map_projection_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  static create(view: MapView = {}): MapProjectionHandle {
+    const handle = native.mln_map_projection_create(view);
+    return adopt(
+      handle,
+      () => new MapProjectionHandle(ADOPT, handle),
+      (disposed) => native.mln_map_projection_release(disposed, undefined),
+    );
+  }
+
+  /**
    * Copies the projection camera into out_camera.
    *
    * See `mln_map_projection_get_camera` in the
@@ -3679,6 +3646,21 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
+   * Creates a runtime.
+   *
+   * See `mln_runtime_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  static create(options: RuntimeOptions = {}): RuntimeHandle {
+    const handle = native.mln_runtime_create(options);
+    return adopt(
+      handle,
+      () => new RuntimeHandle(ADOPT, handle),
+      (disposed) => native.mln_runtime_dispose(disposed, undefined),
+    );
+  }
+
+  /**
    * Starts creation of a map on the runtime.
    *
    * See `mln_runtime_create_map` in the
@@ -4157,6 +4139,24 @@ export class StyleExpressionHandle extends Owner {
   close(): void {
     closeSync(this, (handle, token) =>
       native.mln_style_expression_release(handle, token),
+    );
+  }
+
+  /**
+   * Parses a style expression.
+   *
+   * See `mln_style_expression_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  static create(
+    expression: unknown,
+    options?: StyleExpressionOptions,
+  ): StyleExpressionHandle {
+    const handle = native.mln_style_expression_create(expression, options);
+    return adopt(
+      handle,
+      () => new StyleExpressionHandle(ADOPT, handle),
+      (disposed) => native.mln_style_expression_release(disposed, undefined),
     );
   }
 

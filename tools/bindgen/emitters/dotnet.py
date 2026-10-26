@@ -373,11 +373,7 @@ def emit_operation(
         raise Unsupported(f"receiver {receiver} requires its generated owner")
     static = receiver_parameter is None
     owner_expression = "null" if static else "owner" if discard else "this"
-    factory = (
-        plan.owned_outputs[0].handle.native
-        if static and len(plan.owned_outputs) == 1
-        else None
-    )
+    factory = plan.factory
     if factory and factory not in owners:
         raise Unsupported("factory output requires its generated owner")
     owner_class = (
@@ -812,12 +808,7 @@ def emit_operation(
         prologue.insert(0, "var receiverHandle = owner.Handle;")
         args[0] = "receiverHandle"
     arguments = ", ".join(args)
-    prefix = bound.handles[factory].native + "_" if factory else None
-    name = pascal(
-        function.name.removeprefix(prefix)
-        if prefix and function.name.startswith(prefix)
-        else plan.member
-    )
+    name = pascal(plan.member)
     modifiers = "public static" if static else "public"
     if pins and (plan.view or text):
         raise Unsupported("a pinned span requires a single native call")

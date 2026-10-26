@@ -262,16 +262,28 @@ def delivery_functions(bound):
     }
 
 
+def companion(bound, plan) -> str:
+    """The companion object that declares a factory: its handle's owner's."""
+    return owner_name(bound.handles[plan.factory]) + ".Companion"
+
+
 def generate(api: Api | BoundApi) -> dict[str, str]:
     bound = compile_api(api, TARGETS)
     functions, _, rendered, split, values, native = lowered(bound)
     # The extensions that each platform source set declares.
     platform_extensions: dict[str, list[str]] = {}
     groups = {}
+    # The common factories of each handle, which its owner's companion declares.
+    factories: dict[str, list[str]] = {}
     for function in functions:
         if function.name not in rendered:
             continue
         plan = bound.operations_by_name[function.name]
+        if plan.factory and not placement(plan):
+            factories.setdefault(plan.factory, []).append(
+                operation_doc(bound, plan, "  ") + rendered[plan.name]
+            )
+            continue
         receiver = receiver_value(plan).native if plan.receiver else None
         groups.setdefault(receiver, []).append(plan)
     for owner in generated_owners(bound):
@@ -284,9 +296,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             if (sets := placement(plan)) is None:
                 continue
             method = method_name(plan)
+            extended = companion(bound, plan) if plan.factory else class_name
             extensions = [
                 operation_doc(bound, plan)
-                + platform_extension(rendered[plan.name], class_name, method)
+                + platform_extension(rendered[plan.name], extended, method)
             ]
             if plan.receiver and plan.completion and plan.completion.discardable:
                 extensions.append(
@@ -387,6 +400,8 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 )
             elif plan.scoped_receiver:
                 receiver = kotlin_callbacks.scoped_response(plan)
+            elif plan.factory:
+                receiver = companion(bound, plan)
             else:
                 receiver = "GeneratedApi"
             extensions.append(
@@ -420,7 +435,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         )
     outputs.update(
         kotlin_owners.generate_owners(
-            bound, [bound.operations_by_name[f.name] for f in functions]
+            bound,
+            [bound.operations_by_name[f.name] for f in functions],
+            factories,
+            OPERATION_IMPORTS,
         )
     )
     outputs[f"{COMMON}/generated/GeneratedOwnerDisposal.kt"] = (

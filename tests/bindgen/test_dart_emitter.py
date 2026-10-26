@@ -140,6 +140,20 @@ class DartEmitterTests(unittest.TestCase):
             operations,
         )
 
+    def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
+        self,
+    ):
+        operations = dart.generate(real_api())
+        runtime = operations.split("final class RuntimeHandle ")[1].split("\n}\n")[0]
+        self.assertIn(
+            "  static RuntimeHandle create(RuntimeOptions options) => "
+            "withNativeArena((arena) {\n    ensureAbiVersion();",
+            runtime,
+        )
+        self.assertIn(
+            "\n  void clearLogCallback() {\n    ensureAbiVersion();", operations
+        )
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = dart.generate_values(real_api())
         self.assertIn("sealed class RenderedQueryGeometry {", values)

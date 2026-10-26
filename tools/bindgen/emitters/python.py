@@ -200,12 +200,14 @@ def operation(
         receiver = replace(receiver, value=receiver.value.element)
     if receiver is not None and receiver.value.native not in OWNERS and not scoped:
         raise unsupported(function, "receiver needs a supported handle owner")
-    native_owner = receiver.value.native if receiver else "mln"
+    if plan.factory and plan.factory not in OWNERS:
+        raise unsupported(function, "factory needs a supported handle owner")
+    native_owner = receiver.value.native if receiver else plan.factory or "mln"
     owner = (
         public_name(native_owner) + "Scope"
         if scoped
         else OWNERS[native_owner]
-        if receiver
+        if receiver or plan.factory
         else ""
     )
     if scoped:
@@ -768,7 +770,19 @@ def operation(
         stub = f"    def _discard_{name}({', '.join(['self', *native_stub_parameters])}) -> None: ...\n"
         return owner, rust, facade, stub, product
     stub = f"    def {name}({', '.join(['self', *native_stub_parameters])}) -> {native_result}: ...\n"
-    if not receiver:
+    if plan.factory:
+        # A factory is a classmethod of the handle that it creates, over a
+        # static method of that handle's native class.
+        rust = rust.replace(
+            "    #[pyo3(signature", "    #[staticmethod]\n    #[pyo3(signature"
+        ).replace("(&self, ", "(")
+        facade = "    @classmethod\n" + facade.replace("(self, ", "(cls, ").replace(
+            "(self)", "(cls)"
+        ).replace("self._native.", f"_native._{owner}.")
+        stub = "    @staticmethod\n" + stub.replace("(self, ", "(").replace(
+            "(self)", "()"
+        )
+    elif not receiver:
         rust = (
             dedent(rust)
             .replace("#[pyo3(signature", "#[pyfunction]\n#[pyo3(signature")
@@ -973,6 +987,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if plan.name in generated
         and plan.receiver is None
         and plan.scoped_receiver is None
+        and plan.factory is None
     ]
     files["src/generated_operations.rs"] += (
         global_native
@@ -1137,6 +1152,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         if plan.name in generated
         and plan.receiver is None
         and plan.scoped_receiver is None
+        and plan.factory is None
     )
     public_globals.extend(f"{owner}Discarding" for owner in discards)
     public_owners = {

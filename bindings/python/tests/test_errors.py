@@ -15,7 +15,7 @@ def test_native_statuses_carry_their_status_and_diagnostic(
     with pytest.raises(mln.MaplibreError) as invalid_state:
         harness.runtime.close()
     with pytest.raises(mln.MaplibreError) as invalid_argument:
-        mln.network_set_status(mln.NetworkStatus(999_001))
+        mln.set_network_status(mln.NetworkStatus(999_001))
 
     for raised, status in (
         (not_found, mln.Status.NOT_FOUND),
@@ -29,7 +29,7 @@ def test_native_statuses_carry_their_status_and_diagnostic(
 
 
 def test_a_closed_handle_reports_the_native_status() -> None:
-    runtime = mln.runtime_create()
+    runtime = mln.RuntimeHandle.create()
     result(runtime.close())
 
     with pytest.raises(mln.MaplibreError) as raised:

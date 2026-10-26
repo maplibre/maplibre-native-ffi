@@ -14,8 +14,9 @@ import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.LogSeverity
 import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.logSetCallback
+import org.maplibre.nativeffi.generated.setLogCallback
 import org.maplibre.nativeffi.libraryProperties
 import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
@@ -49,8 +50,8 @@ object LogProcessExitProbe {
     require(callbackState in setOf("installed", "live"))
     val received = CountDownLatch(1)
     Maplibre.loadNativeLibrary()
-    GeneratedApi.logSetAsyncSeverityMask(LogSeverityFlag.WARNING)
-    GeneratedApi.logSetCallback(
+    GeneratedApi.setLogAsyncSeverityMask(LogSeverityFlag.WARNING)
+    GeneratedApi.setLogCallback(
       LogHandler { severity, event, _, _ ->
         if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {
           received.countDown()
@@ -61,7 +62,7 @@ object LogProcessExitProbe {
     if (callbackState == "live") {
       // The runtime keeps its provider and wake, and the map a loaded style, as the process exits.
       runSuspendTest {
-        val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
+        val runtime = RuntimeHandle.create(RuntimeOptions())
         runtime.discarding.setResourceProvider(denyingProvider())
         val (map, ready) = runtime.createMap(smallMapOptions())
         ready.await()
@@ -70,7 +71,7 @@ object LogProcessExitProbe {
       }
     } else {
       runSuspendTest {
-        GeneratedApi.runtimeCreate(RuntimeOptions()).use { runtime ->
+        RuntimeHandle.create(RuntimeOptions()).use { runtime ->
           val (map, ready) = runtime.createMap(smallMapOptions())
           map.use {
             ready.await()

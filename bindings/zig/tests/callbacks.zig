@@ -75,9 +75,9 @@ const LogProbe = struct {
 test "replacing the process-global log callback releases the previous one" {
     var first = LogProbe{};
     var replacement = LogProbe{};
-    try maplibre.logSetCallback(first.handler(), null);
-    defer maplibre.logClearCallback(null) catch |err| std.log.err("log callback clear failed: {s}", .{@errorName(err)});
-    try maplibre.logSetCallback(replacement.handler(), null);
+    try maplibre.setLogCallback(first.handler(), null);
+    defer maplibre.clearLogCallback(null) catch |err| std.log.err("log callback clear failed: {s}", .{@errorName(err)});
+    try maplibre.setLogCallback(replacement.handler(), null);
     try first.releases.waitFor(1);
 
     const fixture = try support.Fixture.create(.{});
@@ -85,7 +85,7 @@ test "replacing the process-global log callback releases the previous one" {
     try testing.expectError(error.NativeError, support.resolve(try fixture.map.setStyleJson("{", null)));
     try replacement.saw_parse_error.wait();
 
-    try maplibre.logClearCallback(null);
+    try maplibre.clearLogCallback(null);
     try replacement.releases.waitFor(1);
     try testing.expectEqual(@as(usize, 1), first.releases.get());
 }

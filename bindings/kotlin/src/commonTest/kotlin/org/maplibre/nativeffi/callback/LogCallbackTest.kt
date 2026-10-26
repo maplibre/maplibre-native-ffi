@@ -39,7 +39,7 @@ class LogCallbackTest {
         )
       }
     } finally {
-      GeneratedApi.logClearCallback()
+      GeneratedApi.clearLogCallback()
     }
     awaitDeliveries()
     assertEquals(base, roots.rootCountForTesting())
