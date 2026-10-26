@@ -29,6 +29,7 @@ const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 const PIN_PATH: &str = "native_release.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
+    println!("cargo:rustc-check-cfg=cfg(mln_platform_crate)");
     // docs.rs builds without network access, and documentation links nothing.
     if env::var_os("DOCS_RS").is_some() {
         return Ok(());
@@ -38,6 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let out_path = PathBuf::from(env::var("OUT_DIR")?);
+    // The crate root keeps the Cargo-built platform layer on the link line.
+    if cargo_builds_platform(&target_os, &target_env) {
+        println!("cargo:rustc-cfg=mln_platform_crate");
+    }
 
     let platform = target_platform(&target_os, &target_env)?;
     // Checked ahead of the local build so two enabled backend features fail

@@ -27,13 +27,10 @@
 
 #![allow(non_camel_case_types)]
 
-// Nothing here names the platform layer, which only the C library calls, so
-// this keeps it on the link line.
-#[cfg(any(
-    all(target_os = "linux", not(target_env = "ohos")),
-    target_os = "windows",
-    target_os = "emscripten"
-))]
+// The build script sets this cfg where Cargo builds the platform layer. Nothing
+// here names that layer, which only the C library calls, so this keeps it on the
+// link line.
+#[cfg(mln_platform_crate)]
 extern crate mln_ffi_platform as _;
 
 mod generated;
