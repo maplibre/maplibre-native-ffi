@@ -179,10 +179,10 @@ auto default_display() -> DisplayChoice {
       egl_platform_angle_device_type_hardware,
       EGL_NONE,
     };
+    // ANGLE's headers define EGL_DEFAULT_DISPLAY as an integer, so the null
+    // native display is spelled out.
     return choose(
-      get_platform_display(
-        egl_platform_angle, EGL_DEFAULT_DISPLAY, attributes.data()
-      ),
+      get_platform_display(egl_platform_angle, nullptr, attributes.data()),
       "ANGLE Metal"
     );
   }

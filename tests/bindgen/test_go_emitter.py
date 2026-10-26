@@ -193,7 +193,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
             for line in source.splitlines()
             if line.endswith("struct { *bindingOwner }")
         ]
-        self.assertEqual(len(owners), 9)
+        self.assertEqual(len(owners), 10)
         for owner in owners:
             for member in ("Id() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)

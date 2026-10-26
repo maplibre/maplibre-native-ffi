@@ -311,7 +311,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
             for block in owners.split("\nclass ")[1:]
             if "_handle_name" in block
         }
-        self.assertEqual(len(classes), 9)
+        self.assertEqual(len(classes), 10)
         self.assertEqual(
             {name for name, block in classes.items() if "def dispose(" in block},
             {"MapHandle", "RenderSessionHandle", "RuntimeHandle"},
