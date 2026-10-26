@@ -19,11 +19,16 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         # prints FAKE_TEST_OUTPUT, and when FAKE_EMULATOR_EXITS is set, the
         # emulator's console stops naming its AVD from then on. A push ends as
         # FAKE_PUSH_ADB_STATUS says. The device log holds an adbd line among
-        # others; every other adb command succeeds.
+        # others; every other adb command succeeds. Each command whose stdin
+        # ends is logged to the file FAKE_STDIN_EOF_LOG names, when it is set.
         adb = sdk / "platform-tools/adb"
         exited = self.directory / "exited"
         adb.write_text(
             "#!/usr/bin/env bash\n"
+            'if [[ -n "$FAKE_STDIN_EOF_LOG" ]]; then\n'
+            "  read -r -t 0.1 _\n"
+            '  (($? != 1)) || echo "$*" >>"$FAKE_STDIN_EOF_LOG"\n'
+            "fi\n"
             'case "$*" in\n'
             '  *"getprop ro.product.cpu.abi"*) echo x86_64; exit "$FAKE_ABI_ADB_STATUS" ;;\n'
             '  *"getprop ro.build.version.sdk"*) echo 26 ;;\n'
@@ -57,6 +62,7 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
             "FAKE_TEST_ADB_STATUS": "0",
             "FAKE_PUSH_ADB_STATUS": "0",
             "FAKE_ABI_ADB_STATUS": "0",
+            "FAKE_STDIN_EOF_LOG": "",
         }
 
     def run_test(self, **environment):
@@ -75,7 +81,20 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=10,
+            # The GitHub Actions runner gives a step a stdin that has already
+            # ended.
+            stdin=subprocess.DEVNULL,
         )
+
+    def test_no_adb_call_sees_its_stdin_end(self):
+        eof_log = self.directory / "stdin-eof.log"
+        eof_log.touch()
+        result = self.run_test(
+            FAKE_TEST_OUTPUT="\\n__MLN_FFI_TEST_STATUS__=0\\n",
+            FAKE_STDIN_EOF_LOG=str(eof_log),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(eof_log.read_text(), "")
 
     def test_a_lost_emulator_reports_the_end_of_its_log(self):
         result = self.run_test(FAKE_EMULATOR_EXITS="1", FAKE_TEST_ADB_STATUS="255")

@@ -56,6 +56,16 @@ fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 avd_name=
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
+# When adb's stdin ends, adb tells the device's shell, and Android 8.0's adbd
+# drops the exit status of a shell that exited just before that message came.
+# adb then exits 255. A FIFO that this script holds open for reading and writing
+# never ends, so every adb call it runs inherits a stdin that adb never reports
+# closed.
+stdin_dir=$(mktemp -d)
+mkfifo "$stdin_dir/stdin"
+exec 0<>"$stdin_dir/stdin"
+rm -r "$stdin_dir"
+
 for local_file in "$native_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
     echo "Android test input does not exist: $local_file" >&2
