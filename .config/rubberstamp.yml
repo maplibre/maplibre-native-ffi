@@ -202,9 +202,9 @@ ci:
     linux-musl:
       covers: >-
         Linux musl on x64 and ARM64. Builds the native library, checks its musl
-        ABI, and runs the Rust and .NET tests in Alpine. Catches libc
-        assumptions and musl packaging problems. Platform-independent code that
-        Linux x64 tests doesn't need it.
+        ABI, and runs the binding tests in Alpine. Catches libc assumptions and
+        musl packaging problems. Platform-independent code that Linux x64 tests
+        doesn't need it.
       rules:
         - if:
             files:

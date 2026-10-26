@@ -32,6 +32,7 @@ platforms = ["linux-musl"]
 commands = [
   { task = "//bindings/rust:test" },
   { task = "//bindings/dotnet:test" },
+  { task = "//bindings/go:test" },
   { task = "//bindings/zig:test" },
   { task = "//bindings/python:test" },
 ]

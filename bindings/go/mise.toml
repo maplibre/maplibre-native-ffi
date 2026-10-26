@@ -38,11 +38,11 @@ exec go test -count=1 -tags "$go_test_tags" ./...
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: Android presets and OpenHarmony x64 presets
-# push to an emulator, and host presets run in process.
+# The preset selects the runner: musl presets run in Alpine, Android presets and
+# OpenHarmony x64 presets push to an emulator, and host presets run in process.
 run = '''
 case "$usage_preset" in
-  android-* | ohos-*)
+  linux-musl-* | android-* | ohos-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-go-device.sh" "$usage_preset"
     ;;
 esac

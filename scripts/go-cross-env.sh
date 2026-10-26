@@ -1,8 +1,9 @@
 # Sourced by the Go binding's cross-compilation tasks with a native preset as
-# $1. Maps android-*/ohos-* presets to GOOS/GOARCH and exports the cross C
-# toolchain from the Android NDK or OpenHarmony SDK. Leaves `goos` empty for
-# host presets. OpenHarmony has no Go port, so its presets build GOOS=linux
-# binaries against the OHOS sysroot; the Oniro emulator runs them.
+# $1. Maps musl, Android, and OpenHarmony presets to GOOS/GOARCH and exports the
+# cross C toolchain from the native build's Zig wrappers, the Android NDK, or
+# the OpenHarmony SDK. Leaves `goos` empty for host presets. OpenHarmony has no
+# Go port, so its presets build GOOS=linux binaries against the OHOS sysroot;
+# the Oniro emulator runs them.
 # shellcheck shell=bash
 
 goos=
@@ -32,6 +33,24 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
+    ;;
+  linux-musl-arm64-* | linux-musl-x64-*)
+    goos=linux
+    if [[ "$1" == linux-musl-arm64-* ]]; then
+      goarch=arm64
+    else
+      goarch=amd64
+    fi
+    compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
+    compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
+    if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
+      echo "The musl Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+      return 2
+    fi
+    # The binding links the C API's shared library, which makes Zig link musl
+    # dynamically, so the test binary can load Alpine's graphics drivers.
+    export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
+    export CC="$compiler" CXX="$compiler_cxx"
     ;;
   ohos-arm64-* | ohos-x64-*)
     goos=linux

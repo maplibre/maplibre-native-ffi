@@ -81,8 +81,9 @@ if ((${#test_graphics_files[@]})); then
   done
 fi
 
-# Rust cross-builds use the configured Zig wrappers after this task replaces the
-# native tree with its packaged install. Preserve them across that replacement.
+# Rust and Go cross-builds use the configured Zig wrappers after this task
+# replaces the native tree with its packaged install. Preserve them across that
+# replacement.
 zig_shim_stash=""
 if [[ "$preset" == linux-musl-* && -d "$build_dir/zig-shim" ]]; then
   zig_shim_stash="$(mktemp -d)"
