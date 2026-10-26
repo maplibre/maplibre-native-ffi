@@ -31,7 +31,7 @@ webgpu = []
 # library carries a second Rust standard library, which collides with the host's
 # unless both are the same build, so Cargo builds the layer instead. The build
 # script names the same targets.
-[target.'cfg(any(all(target_os = "linux", not(target_env = "ohos")), target_os = "windows", target_os = "emscripten"))'.dependencies]
+[target.'cfg(any(all(target_os = "linux", not(target_env = "ohos")), target_os = "windows", target_os = "emscripten", target_os = "android"))'.dependencies]
 maplibre-native-ffi-platform.workspace = true
 
 [build-dependencies]

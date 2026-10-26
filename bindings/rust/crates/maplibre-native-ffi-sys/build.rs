@@ -14,8 +14,6 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 const LIBRARY_NAME: &str = "maplibre-native-c";
-/// The archive that holds the Rust platform layer the C library calls.
-const PLATFORM_ARCHIVE: &str = "mln_ffi_platform";
 const LOCAL_BUILD_ENV: &str = "MAPLIBRE_NATIVE_FFI_LOCAL_BUILD";
 const RELEASE_URL_ENV: &str = "MAPLIBRE_NATIVE_FFI_RELEASE_URL";
 const DEFAULT_RELEASE_URL: &str =
@@ -80,9 +78,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         install_dir.join(DESCRIPTOR_PATH).display()
     );
 
-    for archive in static_archives(&link_dir, &target_os, &target_env)? {
-        println!("cargo:rustc-link-lib=static={archive}");
-    }
+    println!(
+        "cargo:rustc-link-lib=static={}",
+        static_archive(&link_dir, &target_os)?
+    );
     // The `links` key passes these to the crates that depend on this one as
     // DEP_MAPLIBRE_NATIVE_C_PREFIX and DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND.
     println!("cargo:prefix={}", install_dir.display());
@@ -263,60 +262,27 @@ fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
     Ok(directory)
 }
 
-/// The complete static archive, then whatever ships beside it, such as the Rust
-/// platform layer the C archive calls into, unless Cargo builds that layer.
+/// The complete static archive's library name.
 ///
 /// Every format but COFF lets the file extension separate the archive from the
 /// shared library. COFF cannot, because the shared build's import library
-/// already holds that name, so there the archive carries a `-static` suffix and
-/// the import library is the one to leave out.
-fn static_archives(
-    link_dir: &Path,
-    target_os: &str,
-    target_env: &str,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    let windows = target_os == "windows";
-    let (extension, prefix) = if windows { ("lib", "") } else { ("a", "lib") };
-    let primary = if windows {
-        format!("{LIBRARY_NAME}-static")
+/// already holds that name, so there the archive carries a `-static` suffix.
+fn static_archive(link_dir: &Path, target_os: &str) -> Result<String, Box<dyn Error>> {
+    let (name, file) = if target_os == "windows" {
+        let name = format!("{LIBRARY_NAME}-static");
+        let file = format!("{name}.lib");
+        (name, file)
     } else {
-        LIBRARY_NAME.to_owned()
+        (LIBRARY_NAME.to_owned(), format!("lib{LIBRARY_NAME}.a"))
     };
-
-    let mut companions: Vec<String> = fs::read_dir(link_dir)
-        .map_err(|error| format!("failed to read {}: {error}", link_dir.display()))?
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            if path.extension()? != extension {
-                return None;
-            }
-            let name = path.file_stem()?.to_str()?.strip_prefix(prefix)?.to_owned();
-            // On COFF this is the shared library's import library, which would
-            // put the consumer back on the DLL.
-            let import_library = windows && name == LIBRARY_NAME;
-            // Two copies of the platform layer would collide.
-            let platform = name == PLATFORM_ARCHIVE && cargo_builds_platform(target_os, target_env);
-            (name != primary && !import_library && !platform).then_some(name)
-        })
-        .collect();
-    companions.sort();
-
-    if !link_dir
-        .join(format!("{prefix}{primary}.{extension}"))
-        .is_file()
-    {
+    if !link_dir.join(&file).is_file() {
         return Err(format!(
-            "missing the complete static archive {prefix}{primary}.{extension} in {}",
+            "missing the complete static archive {file} in {}",
             link_dir.display()
         )
         .into());
     }
-
-    // The archive references the companions, so it comes first.
-    let mut archives = vec![primary];
-    archives.extend(companions);
-    Ok(archives)
+    Ok(name)
 }
 
 /// Whether Cargo builds the Rust platform layer for the target, as the
@@ -325,7 +291,7 @@ fn static_archives(
 fn cargo_builds_platform(target_os: &str, target_env: &str) -> bool {
     match target_os {
         "linux" => target_env != "ohos",
-        "windows" | "emscripten" => true,
+        "windows" | "emscripten" | "android" => true,
         _ => false,
     }
 }
