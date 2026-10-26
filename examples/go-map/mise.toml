@@ -2,6 +2,10 @@
 "core:go" = "{{vars.go_version}}"
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
+[env]
+# SDL 3's install prefix, empty where the tool is not installed.
+MLN_FFI_SDL3_PREFIX = { value = "{% if tools['conda:sdl3'] is defined %}{{ tools['conda:sdl3'].path }}{% endif %}", tools = true }
+
 [tasks.build]
 extends = "ffi:preset"
 run = '''
@@ -10,7 +14,7 @@ if [[ "$usage_preset" != *-egl ]]; then
   echo "go-map supports OpenGL (EGL) presets only, got: $usage_preset" >&2
   exit 2
 fi
-source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset" "{{vars.sdl3_version}}"
+source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset"
 go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
 '''
 
@@ -18,7 +22,7 @@ go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset" "{{vars.sdl3_version}}"
+source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset"
 go vet ./...
 '''
 
@@ -26,21 +30,11 @@ go vet ./...
 description = "Render one frame of a local style in each mode in a hidden window, then exit."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
-run = '''
-# Native-surface mode needs a window surface, including on a headless host.
-runner=()
-if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-  runner=(xvfb-run -a env SDL_VIDEO_DRIVER=x11 EGL_PLATFORM=x11)
-fi
-export MLN_EXAMPLE_SMOKE=1
-for mode in owned-texture borrowed-texture native-surface; do
-  ${runner[@]+"${runner[@]}"} "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" "$mode" || exit
-done
-'''
+run = '"$MISE_MONOREPO_ROOT/tools/examples/smoke" "$usage_preset" "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map"'
 
 [tasks.run]
 extends = "ffi:example-run"
 run = '''
-source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset" "{{vars.sdl3_version}}"
+source "$MISE_MONOREPO_ROOT/examples/go-map/env.sh" "$usage_preset"
 go run . "$usage_render_target"
 '''

@@ -41,39 +41,9 @@ MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir" \
 [tasks.smoke]
 description = "Render one frame in each render-target mode, then exit."
 extends = "ffi:preset"
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 dir = "../.."
-# The example opens a window. On Linux without a display, each mode runs under
-# Xvfb, which `mise bootstrap` installs, and Mesa renders in software.
-# MLN_EXAMPLE_SMOKE swaps the network style for an inline one; each mode exits 0
-# after its first rendered frame, or 1 if none renders within a deadline.
 run = '''
-set -euo pipefail
-export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-# ash loads the Vulkan loader at run time, from its search path.
-if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
-  export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
-display=()
-if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
-  if ! command -v xvfb-run >/dev/null; then
-    echo "error: no display is set and xvfb-run is missing; run mise bootstrap" >&2
-    exit 1
-  fi
-  display=(xvfb-run -a -s "-screen 0 1280x1024x24")
-fi
-cargo build -p rust-map
-for mode in owned-texture borrowed-texture native-surface; do
-  MLN_EXAMPLE_SMOKE=1 ${display[@]+"${display[@]}"} cargo run -p rust-map -- "$mode"
-done
-'''
-run_windows = '''
-set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
-cargo build -p rust-map
-for mode in owned-texture borrowed-texture native-surface; do
-  MLN_EXAMPLE_SMOKE=1 cargo run -p rust-map -- "$mode"
-done
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  "$MISE_MONOREPO_ROOT/tools/examples/smoke" "$usage_preset" cargo run -p rust-map --
 '''

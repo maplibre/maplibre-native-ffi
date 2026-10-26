@@ -32,32 +32,12 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 description = "Render one frame in each mode in a hidden window, then exit."
 extends = "ffi:preset"
 dir = "../.."
+# A hidden Wayland surface can wait indefinitely for a compositor frame
+# callback, so Linux smoke runs use X11.
 run = '''
-if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
-  export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
-# A hidden Wayland surface can wait indefinitely for a compositor frame callback.
-# Linux smoke runs use X11, with a virtual display when the host has none.
-runner=()
-if [[ "$(uname -s)" == Linux ]]; then
-  unset WAYLAND_DISPLAY
-  export XDG_SESSION_TYPE=x11 EGL_PLATFORM=x11
-  if [[ -z "${DISPLAY:-}" ]]; then
-    runner=(xvfb-run -a)
-  fi
-fi
-for mode in owned-texture borrowed-texture native-surface; do
-  MLN_EXAMPLE_SMOKE=1 \
-    MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-    ${runner[@]+"${runner[@]}"} dotnet run \
-      --project examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
-      -p:Platform="Any CPU" \
-      -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/" \
-      -- "$mode" || {
-        exit_status=$?
-        printf 'smoke: %s exited with status %s\n' "$mode" "$exit_status" >&2
-        exit "$exit_status"
-      }
-done
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  "$MISE_MONOREPO_ROOT/tools/examples/smoke" --x11 "$usage_preset" dotnet run \
+    --project examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/" --
 '''

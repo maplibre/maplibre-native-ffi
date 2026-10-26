@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Runs a desktop example's smoke test. Each example's `smoke` task calls it with
+# its preset and the command that starts the example, and it runs that command
+# with MLN_EXAMPLE_SMOKE=1 once per render target, with the target as its last
+# argument. The ffi:example-run template in mise.toml describes smoke mode.
+#
+#   tools/examples/smoke [--x11 | --offscreen] <preset> <command> [args...]
+#
+#   --x11        On Linux, draw on X11 even in a Wayland session.
+#   --offscreen  The example renders offscreen: run the command once, as
+#                given, with no render target and no display.
+set -euo pipefail
+
+kind=window
+case "${1:-}" in
+  --x11 | --offscreen)
+    kind=${1#--}
+    shift
+    ;;
+esac
+if [[ $# -lt 2 ]]; then
+  echo "usage: tools/examples/smoke [--x11 | --offscreen] <preset> <command> [args...]" >&2
+  exit 2
+fi
+preset=$1
+shift
+
+# Puts the preset's DLL directory on PATH on Windows.
+# shellcheck source=scripts/native-env.sh
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$preset"
+# Some examples load the Vulkan loader at run time, from their search path.
+if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
+  export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+export MLN_EXAMPLE_SMOKE=1
+
+if [[ $kind == offscreen ]]; then
+  exec "$@"
+fi
+
+# Every render target, native-surface included, needs a window surface. On
+# Linux without a display, each run gets a virtual one from Xvfb, which
+# `mise bootstrap` installs, and Mesa renders in software.
+display=()
+if [[ "$(uname -s)" == Linux ]]; then
+  if [[ $kind == x11 ]]; then
+    unset WAYLAND_DISPLAY
+    export XDG_SESSION_TYPE=x11 EGL_PLATFORM=x11
+  fi
+  if [[ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+    if ! command -v xvfb-run >/dev/null; then
+      echo "error: no display is set and xvfb-run is missing; run mise bootstrap" >&2
+      exit 1
+    fi
+    display=(xvfb-run -a -s "-screen 0 1280x1024x24"
+      env SDL_VIDEO_DRIVER=x11 EGL_PLATFORM=x11)
+  fi
+fi
+
+for target in owned-texture borrowed-texture native-surface; do
+  status=0
+  ${display[@]+"${display[@]}"} "$@" "$target" || status=$?
+  if [[ $status -ne 0 ]]; then
+    echo "smoke: $target exited with status $status" >&2
+    exit "$status"
+  fi
+done

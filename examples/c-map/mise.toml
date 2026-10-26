@@ -1,12 +1,15 @@
 [tools]
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
+[env]
+# SDL 3's install prefix, empty where the tool is not installed.
+MLN_FFI_SDL3_PREFIX = { value = "{% if tools['conda:sdl3'] is defined %}{{ tools['conda:sdl3'].path }}{% endif %}", tools = true }
+
 [tasks.build]
 extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$MLN_FFI_SDL3_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 # Without a sysroot, clang takes the default SDK, which can be a Command Line
 # Tools SDK newer than the selected Xcode's linker reads. The presets pin the
 # selected Xcode's SDK the same way.
@@ -21,9 +24,7 @@ cmake --build "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map"
 [tasks.run]
 extends = "ffi:example-run"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
-export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export LD_LIBRARY_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib:$MLN_FFI_SDL3_PREFIX/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" "$usage_render_target"
 '''
 
@@ -32,15 +33,6 @@ description = "Render one frame in a hidden window and exit."
 extends = "ffi:preset"
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
-export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-# Native-surface mode needs a window surface, including on a headless host.
-runner=()
-if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-  runner=(xvfb-run -a env SDL_VIDEO_DRIVER=x11 EGL_PLATFORM=x11)
-fi
-for mode in owned-texture borrowed-texture native-surface; do
-  MLN_EXAMPLE_SMOKE=1 ${runner[@]+"${runner[@]}"} "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" "$mode" || exit 1
-done
+LD_LIBRARY_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib:$MLN_FFI_SDL3_PREFIX/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+  "$MISE_MONOREPO_ROOT/tools/examples/smoke" "$usage_preset" "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map"
 '''

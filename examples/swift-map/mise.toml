@@ -14,11 +14,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 # The smoke path in Sources/SwiftMap/Smoke.swift renders through a Metal layer
 # that no window shows, with an inline style, so it needs no display or
 # network.
-run = '''
-for mode in owned-texture borrowed-texture native-surface; do
-  MLN_EXAMPLE_SMOKE=1 ".build/$usage_preset/debug/swift-map" "$mode" || exit 1
-done
-'''
+run = '"$MISE_MONOREPO_ROOT/tools/examples/smoke" "$usage_preset" ".build/$usage_preset/debug/swift-map"'
 
 [tasks.run]
 extends = "ffi:example-run"
