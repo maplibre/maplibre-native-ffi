@@ -7,6 +7,10 @@ min_version = "2026.7.15"
 
 [settings]
 lockfile = true
+# An install adds only its own entries to the lockfile. The default rebuilds
+# every entry for every platform, and fails on tools that a platform lacks, such
+# as conda packages with no Windows ARM64 build.
+lockfile_mode = "merge"
 # The cross-compilation SDKs install when asked for and never on the way to
 # something else. Otherwise a lint task or a Git hook pulls in gigabytes, and a
 # machine that cannot install one of them cannot run any task at all.
