@@ -51,6 +51,17 @@ class WorkflowTest(unittest.TestCase):
             enabled, ["target-android-x64-egl", "target-android-x64-vulkan"]
         )
 
+    def test_a_job_cannot_run_one_task_as_two_suites(self):
+        source = copy.deepcopy(self.source)
+        source["suites"].append(
+            {
+                "platforms": ["windows"],
+                "commands": [{"task": "//bindings/rust:test", "args": ["release"]}],
+            }
+        )
+        with self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"):
+            ci_workflow(source, self.presets)
+
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         source = copy.deepcopy(self.source)
         source["suites"].append(

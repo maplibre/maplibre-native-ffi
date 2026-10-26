@@ -108,10 +108,10 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build linux-gnu-x64-egl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-gnu-x64-egl
-      - id: suite-2
+      - id: check-glibc-floor
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-glibc-floor linux-gnu-x64-egl
       - name: Archive native artifact
@@ -122,87 +122,87 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-egl build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-egl
-      - id: suite-4
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-egl
-      - id: suite-5
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-egl
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-egl
-      - id: suite-7
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-egl
-      - id: suite-8
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke linux-gnu-x64-egl
-      - id: suite-9
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-egl
-      - id: suite-10
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-egl
-      - id: suite-11
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-egl
-      - id: suite-12
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-egl
-      - id: suite-13
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-egl
-      - id: suite-14
+      - id: examples-go-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/go-map:check linux-gnu-x64-egl
-      - id: suite-15
+      - id: examples-go-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/go-map:smoke linux-gnu-x64-egl
-      - id: suite-16
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-egl
-      - id: suite-17
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-egl
-      - id: suite-18
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-x64-egl
-      - id: suite-19
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -231,7 +231,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-glibc-floor.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-go-map-check.outcome == 'failure' || steps.examples-go-map-smoke.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -259,10 +259,10 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build linux-gnu-x64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-gnu-x64-vulkan
-      - id: suite-2
+      - id: check-glibc-floor
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-glibc-floor linux-gnu-x64-vulkan
       - name: Archive native artifact
@@ -273,87 +273,87 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-vulkan build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-vulkan release
-      - id: suite-4
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-vulkan
-      - id: suite-5
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-vulkan
-      - id: suite-6
+      - id: bindings-rust-test-package
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test:package linux-gnu-x64-vulkan
-      - id: suite-7
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-vulkan
-      - id: suite-8
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-vulkan
-      - id: suite-9
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke linux-gnu-x64-vulkan
-      - id: suite-10
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
-      - id: suite-11
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
-      - id: suite-12
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
-      - id: suite-13
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-vulkan
-      - id: suite-14
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-vulkan
-      - id: suite-15
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-vulkan
-      - id: suite-16
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-vulkan
-      - id: suite-17
+      - id: bindings-python-test-floor
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test:floor linux-gnu-x64-vulkan
-      - id: suite-18
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-x64-vulkan
-      - id: suite-19
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -382,7 +382,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-glibc-floor.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-rust-test-package.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-python-test-floor.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -411,10 +411,10 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build linux-gnu-arm64-egl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-gnu-arm64-egl
-      - id: suite-2
+      - id: check-glibc-floor
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-glibc-floor linux-gnu-arm64-egl
       - name: Archive native artifact
@@ -425,87 +425,87 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-arm64-egl build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-arm64-egl
-      - id: suite-4
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-arm64-egl
-      - id: suite-5
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-arm64-egl
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-egl
-      - id: suite-7
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-arm64-egl
-      - id: suite-8
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke linux-gnu-arm64-egl
-      - id: suite-9
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-arm64-egl
-      - id: suite-10
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-arm64-egl
-      - id: suite-11
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-arm64-egl
-      - id: suite-12
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-arm64-egl
-      - id: suite-13
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-arm64-egl
-      - id: suite-14
+      - id: examples-go-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/go-map:check linux-gnu-arm64-egl
-      - id: suite-15
+      - id: examples-go-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/go-map:smoke linux-gnu-arm64-egl
-      - id: suite-16
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-arm64-egl
-      - id: suite-17
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-arm64-egl
-      - id: suite-18
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-arm64-egl
-      - id: suite-19
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -534,7 +534,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-glibc-floor.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-go-map-check.outcome == 'failure' || steps.examples-go-map-smoke.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -562,10 +562,10 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build linux-gnu-arm64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-gnu-arm64-vulkan
-      - id: suite-2
+      - id: check-glibc-floor
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-glibc-floor linux-gnu-arm64-vulkan
       - name: Archive native artifact
@@ -576,77 +576,77 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-arm64-vulkan build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-arm64-vulkan
-      - id: suite-4
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-arm64-vulkan
-      - id: suite-5
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-arm64-vulkan
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-vulkan
-      - id: suite-7
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-arm64-vulkan
-      - id: suite-8
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke linux-gnu-arm64-vulkan
-      - id: suite-9
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-arm64-vulkan
-      - id: suite-10
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-arm64-vulkan
-      - id: suite-11
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-arm64-vulkan
-      - id: suite-12
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-arm64-vulkan
-      - id: suite-13
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-arm64-vulkan
-      - id: suite-14
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-arm64-vulkan
-      - id: suite-15
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-arm64-vulkan
-      - id: suite-16
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-arm64-vulkan
-      - id: suite-17
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -675,7 +675,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-glibc-floor.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -700,10 +700,10 @@ jobs:
           gradle: false
       - id: build
         run: mise run build linux-musl-x64-egl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-musl-x64-egl
-      - id: suite-2
+      - id: check-musl-abi
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-musl-abi linux-musl-x64-egl
       - name: Archive native artifact
@@ -714,27 +714,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-x64-egl build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-x64-egl
-      - id: suite-4
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-x64-egl
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-musl-x64-egl
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-musl-x64-egl
-      - id: suite-7
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -748,7 +748,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-musl-abi.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -773,10 +773,10 @@ jobs:
           gradle: false
       - id: build
         run: mise run build linux-musl-x64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-musl-x64-vulkan
-      - id: suite-2
+      - id: check-musl-abi
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-musl-abi linux-musl-x64-vulkan
       - name: Archive native artifact
@@ -787,27 +787,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-x64-vulkan build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-x64-vulkan
-      - id: suite-4
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-x64-vulkan
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-musl-x64-vulkan
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-musl-x64-vulkan
-      - id: suite-7
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -821,7 +821,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-musl-abi.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -846,10 +846,10 @@ jobs:
           gradle: false
       - id: build
         run: mise run build linux-musl-arm64-egl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-musl-arm64-egl
-      - id: suite-2
+      - id: check-musl-abi
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-musl-abi linux-musl-arm64-egl
       - name: Archive native artifact
@@ -860,27 +860,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-arm64-egl build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-arm64-egl
-      - id: suite-4
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-arm64-egl
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-musl-arm64-egl
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-musl-arm64-egl
-      - id: suite-7
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -894,7 +894,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-musl-abi.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -919,10 +919,10 @@ jobs:
           gradle: false
       - id: build
         run: mise run build linux-musl-arm64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test linux-musl-arm64-vulkan
-      - id: suite-2
+      - id: check-musl-abi
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run check-musl-abi linux-musl-arm64-vulkan
       - name: Archive native artifact
@@ -933,27 +933,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-arm64-vulkan build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-arm64-vulkan
-      - id: suite-4
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-arm64-vulkan
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-musl-arm64-vulkan
-      - id: suite-6
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-musl-arm64-vulkan
-      - id: suite-7
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -967,7 +967,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.check-musl-abi.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -995,7 +995,7 @@ jobs:
       - name: Boot FreeBSD virtual machine
         id: boot
         run: mise run //:freebsd-vm:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test freebsd-x64-egl
       - name: Archive native artifact
@@ -1015,7 +1015,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1043,7 +1043,7 @@ jobs:
       - name: Boot FreeBSD virtual machine
         id: boot
         run: mise run //:freebsd-vm:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test freebsd-x64-vulkan
       - name: Archive native artifact
@@ -1063,7 +1063,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1087,7 +1087,7 @@ jobs:
           target: emscripten-wasm32-webgl
       - id: build
         run: mise run build emscripten-wasm32-webgl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test emscripten-wasm32-webgl
       - name: Archive native artifact
@@ -1098,22 +1098,22 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package emscripten-wasm32-webgl build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test emscripten-wasm32-webgl
-      - id: suite-3
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/typescript:test emscripten-wasm32-webgl
-      - id: suite-4
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test emscripten-wasm32-webgl
-      - id: suite-5
+      - id: bindings-kotlin-test-wasm-canary
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1134,7 +1134,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-kotlin-test-wasm-canary.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1158,7 +1158,7 @@ jobs:
           target: emscripten-wasm32-webgpu
       - id: build
         run: mise run build emscripten-wasm32-webgpu
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test emscripten-wasm32-webgpu
       - name: Archive native artifact
@@ -1169,17 +1169,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package emscripten-wasm32-webgpu build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test emscripten-wasm32-webgpu
-      - id: suite-3
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/typescript:test emscripten-wasm32-webgpu
-      - id: suite-4
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1200,7 +1200,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1229,7 +1229,7 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build macos-arm64-metal
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test macos-arm64-metal
       - name: Archive native artifact
@@ -1240,82 +1240,82 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-metal build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-metal
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check macos-arm64-metal
-      - id: suite-4
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:smoke macos-arm64-metal
-      - id: suite-5
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-metal
-      - id: suite-6
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:smoke macos-arm64-metal
-      - id: suite-7
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke macos-arm64-metal
-      - id: suite-8
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-metal
-      - id: suite-9
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-metal
-      - id: suite-10
+      - id: examples-swift-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:smoke macos-arm64-metal
-      - id: suite-11
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-metal
-      - id: suite-12
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/dotnet-map:smoke macos-arm64-metal
-      - id: suite-13
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-metal
-      - id: suite-14
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:smoke macos-arm64-metal
-      - id: suite-15
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-metal
-      - id: suite-16
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-metal
-      - id: suite-17
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1344,7 +1344,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.examples-swift-map-smoke.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1372,7 +1372,7 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build macos-arm64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test macos-arm64-vulkan
       - name: Archive native artifact
@@ -1383,77 +1383,77 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-vulkan build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-vulkan
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check macos-arm64-vulkan
-      - id: suite-4
+      - id: examples-rust-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:smoke macos-arm64-vulkan
-      - id: suite-5
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-vulkan
-      - id: suite-6
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:smoke macos-arm64-vulkan
-      - id: suite-7
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke macos-arm64-vulkan
-      - id: suite-8
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-vulkan
-      - id: suite-9
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-vulkan
-      - id: suite-10
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-vulkan
-      - id: suite-11
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/dotnet-map:smoke macos-arm64-vulkan
-      - id: suite-12
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-vulkan
-      - id: suite-13
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:smoke macos-arm64-vulkan
-      - id: suite-14
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-vulkan
-      - id: suite-15
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-vulkan
-      - id: suite-16
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1482,7 +1482,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.examples-rust-map-smoke.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1510,7 +1510,7 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build macos-arm64-egl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test macos-arm64-egl
       - name: Archive native artifact
@@ -1521,67 +1521,67 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-egl build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-egl
-      - id: suite-3
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-egl
-      - id: suite-4
+      - id: examples-zig-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:smoke macos-arm64-egl
-      - id: suite-5
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke macos-arm64-egl
-      - id: suite-6
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-egl
-      - id: suite-7
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-egl
-      - id: suite-8
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-egl
-      - id: suite-9
+      - id: examples-dotnet-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/dotnet-map:smoke macos-arm64-egl
-      - id: suite-10
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-egl
-      - id: suite-11
+      - id: examples-c-map-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:smoke macos-arm64-egl
-      - id: suite-12
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-egl
-      - id: suite-13
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-egl
-      - id: suite-14
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1610,7 +1610,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-map-smoke.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.examples-dotnet-map-smoke.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.examples-c-map-smoke.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1645,27 +1645,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-arm64-metal build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-ios-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:ios-build ios-arm64-metal
-      - id: suite-2
+      - id: bindings-swift-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:build ios-arm64-metal
-      - id: suite-3
+      - id: examples-swift-map-build-ios
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios
-      - id: suite-4
+      - id: bindings-dart-build-mobile
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile ios-arm64-metal
-      - id: suite-5
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1679,7 +1679,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-ios-build.outcome == 'failure' || steps.bindings-swift-build.outcome == 'failure' || steps.examples-swift-map-build-ios.outcome == 'failure' || steps.bindings-dart-build-mobile.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1709,7 +1709,7 @@ jobs:
       - name: Boot iOS simulator
         id: boot
         run: mise run //:ios-simulator:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test ios-simulator-arm64-metal
       - name: Archive native artifact
@@ -1720,27 +1720,27 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
-      - id: suite-2
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test ios-simulator-arm64-metal
-      - id: suite-3
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test ios-simulator-arm64-metal
-      - id: suite-4
+      - id: examples-swift-map-build-ios-simulator
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios-simulator
-      - id: suite-5
+      - id: bindings-dart-test-ios
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test:ios ios-simulator-arm64-metal
-      - id: suite-6
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1754,7 +1754,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.examples-swift-map-build-ios-simulator.outcome == 'failure' || steps.bindings-dart-test-ios.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1782,7 +1782,7 @@ jobs:
         run: mise run //bindings/swift:resolve
       - id: build
         run: mise run build ios-maccatalyst-arm64-metal
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test ios-maccatalyst-arm64-metal
       - name: Archive native artifact
@@ -1793,17 +1793,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-maccatalyst-arm64-metal build/packages/native/dist/maplibre-native-c-ios-maccatalyst-arm64-metal.tar.gz
-      - id: suite-2
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test ios-maccatalyst-arm64-metal
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test ios-maccatalyst-arm64-metal
-      - id: suite-4
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1817,7 +1817,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1852,12 +1852,12 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package tvos-arm64-metal build/packages/native/dist/maplibre-native-c-tvos-arm64-metal.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-ios-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:ios-build tvos-arm64-metal
-      - id: suite-2
+      - id: bindings-swift-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1871,7 +1871,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-ios-build.outcome == 'failure' || steps.bindings-swift-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1907,12 +1907,12 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package visionos-arm64-metal build/packages/native/dist/maplibre-native-c-visionos-arm64-metal.tar.gz
-      - id: suite-1
+      - id: bindings-swift-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:build visionos-arm64-metal
-      - id: suite-2
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1926,7 +1926,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-swift-build.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1956,7 +1956,7 @@ jobs:
       - name: Boot tvOS simulator
         id: boot
         run: mise run //:tvos-simulator:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test tvos-simulator-arm64-metal
       - name: Archive native artifact
@@ -1967,12 +1967,12 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package tvos-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
-      - id: suite-2
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test tvos-simulator-arm64-metal
-      - id: suite-3
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1986,7 +1986,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2017,7 +2017,7 @@ jobs:
       - name: Boot visionOS simulator
         id: boot
         run: mise run //:visionos-simulator:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test visionos-simulator-arm64-metal
       - name: Archive native artifact
@@ -2028,12 +2028,12 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package visionos-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-visionos-simulator-arm64-metal.tar.gz
-      - id: suite-2
+      - id: bindings-swift-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test visionos-simulator-arm64-metal
-      - id: suite-3
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2047,7 +2047,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-swift-test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2079,32 +2079,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm-egl build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm-egl
-      - id: suite-2
+      - id: bindings-kotlin-android-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build opengl armeabi-v7a
-      - id: suite-3
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm-egl
-      - id: suite-4
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm-egl
-      - id: suite-5
+      - id: bindings-zig-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm-egl
-      - id: suite-6
+      - id: bindings-dart-build-mobile
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2118,7 +2118,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-android-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure' || steps.bindings-zig-build.outcome == 'failure' || steps.bindings-dart-build-mobile.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2150,32 +2150,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm-vulkan build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm-vulkan
-      - id: suite-2
+      - id: bindings-kotlin-android-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a
-      - id: suite-3
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm-vulkan
-      - id: suite-4
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm-vulkan
-      - id: suite-5
+      - id: bindings-zig-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm-vulkan
-      - id: suite-6
+      - id: bindings-dart-build-mobile
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2189,7 +2189,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-android-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure' || steps.bindings-zig-build.outcome == 'failure' || steps.bindings-dart-build-mobile.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2221,32 +2221,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm64-egl build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm64-egl
-      - id: suite-2
+      - id: bindings-kotlin-android-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build opengl arm64-v8a
-      - id: suite-3
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm64-egl
-      - id: suite-4
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm64-egl
-      - id: suite-5
+      - id: bindings-zig-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm64-egl
-      - id: suite-6
+      - id: bindings-dart-build-mobile
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2260,7 +2260,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-android-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure' || steps.bindings-zig-build.outcome == 'failure' || steps.bindings-dart-build-mobile.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2292,32 +2292,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm64-vulkan build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
-      - id: suite-1
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm64-vulkan
-      - id: suite-2
+      - id: bindings-kotlin-android-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build vulkan arm64-v8a
-      - id: suite-3
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm64-vulkan
-      - id: suite-4
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm64-vulkan
-      - id: suite-5
+      - id: bindings-zig-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm64-vulkan
-      - id: suite-6
+      - id: bindings-dart-build-mobile
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2331,7 +2331,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-android-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-rust-build.outcome == 'failure' || steps.bindings-zig-build.outcome == 'failure' || steps.bindings-dart-build-mobile.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2360,7 +2360,7 @@ jobs:
       - name: Boot Android emulator
         id: boot
         run: mise run //:android-emulator:boot x86_64 --api 26
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test android-x64-egl
       - name: Archive native artifact
@@ -2371,42 +2371,42 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-x64-egl build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
-      - id: suite-2
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-x64-egl
-      - id: suite-3
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test android-x64-egl
-      - id: suite-4
+      - id: bindings-kotlin-test-native
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test:native android-x64-egl
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test android-x64-egl
-      - id: suite-6
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test android-x64-egl
-      - id: suite-7
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test android-x64-egl
-      - id: suite-8
+      - id: bindings-dart-test-android
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test:android android-x64-egl
-      - id: suite-9
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2428,7 +2428,7 @@ jobs:
           retention-days: 30
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-kotlin-test-native.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-dart-test-android.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2457,7 +2457,7 @@ jobs:
       - name: Boot Android emulator
         id: boot
         run: mise run //:android-emulator:boot x86_64
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test android-x64-vulkan
       - name: Archive native artifact
@@ -2468,42 +2468,42 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-x64-vulkan build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
-      - id: suite-2
+      - id: bindings-kotlin-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-x64-vulkan
-      - id: suite-3
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test android-x64-vulkan
-      - id: suite-4
+      - id: bindings-kotlin-test-native
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test:native android-x64-vulkan
-      - id: suite-5
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test android-x64-vulkan
-      - id: suite-6
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test android-x64-vulkan
-      - id: suite-7
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test android-x64-vulkan
-      - id: suite-8
+      - id: bindings-dart-test-android
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test:android android-x64-vulkan
-      - id: suite-9
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2525,7 +2525,7 @@ jobs:
           retention-days: 30
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-kotlin-build.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-kotlin-test-native.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.bindings-dart-test-android.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2558,17 +2558,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-arm64-egl build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
-      - id: suite-1
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-arm64-egl
-      - id: suite-2
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-arm64-egl
-      - id: suite-3
+      - id: bindings-typescript-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2589,7 +2589,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-rust-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-typescript-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2622,17 +2622,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-arm64-vulkan build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
-      - id: suite-1
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-arm64-vulkan
-      - id: suite-2
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-arm64-vulkan
-      - id: suite-3
+      - id: bindings-typescript-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2653,7 +2653,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-rust-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-typescript-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2681,7 +2681,7 @@ jobs:
       - name: Boot OpenHarmony emulator
         id: boot
         run: mise run //:ohos-emulator:boot
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test ohos-x64-egl
       - name: Archive native artifact
@@ -2692,17 +2692,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-x64-egl build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test ohos-x64-egl
-      - id: suite-3
+      - id: bindings-go-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test ohos-x64-egl
-      - id: suite-4
+      - id: bindings-typescript-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2723,7 +2723,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.bindings-go-test.outcome == 'failure' || steps.bindings-typescript-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2756,17 +2756,17 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-x64-vulkan build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
-      - id: suite-1
+      - id: bindings-rust-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-x64-vulkan
-      - id: suite-2
+      - id: bindings-go-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-x64-vulkan
-      - id: suite-3
+      - id: bindings-typescript-build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2787,7 +2787,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.bindings-rust-build.outcome == 'failure' || steps.bindings-go-build.outcome == 'failure' || steps.bindings-typescript-build.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2812,7 +2812,7 @@ jobs:
           save-toolchains: true
       - id: build
         run: mise run build windows-x64-wgl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test windows-x64-wgl
       - name: Archive native artifact
@@ -2823,42 +2823,42 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-x64-wgl build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-wgl
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-wgl
-      - id: suite-4
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-wgl
-      - id: suite-5
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke windows-x64-wgl
-      - id: suite-6
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-x64-wgl
-      - id: suite-7
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-wgl
-      - id: suite-8
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-wgl
-      - id: suite-9
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2872,7 +2872,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2896,7 +2896,7 @@ jobs:
           target: windows-x64-vulkan
       - id: build
         run: mise run build windows-x64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         name: Run native tests in the Windows desktop session
         shell: pwsh
@@ -2910,42 +2910,42 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-x64-vulkan build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-vulkan
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-vulkan
-      - id: suite-4
+      - id: bindings-zig-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-vulkan
-      - id: suite-5
+      - id: examples-zig-readback-smoke
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke windows-x64-vulkan
-      - id: suite-6
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-x64-vulkan
-      - id: suite-7
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-vulkan
-      - id: suite-8
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-vulkan
-      - id: suite-9
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -2959,7 +2959,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.bindings-zig-test.outcome == 'failure' || steps.examples-zig-readback-smoke.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -2984,7 +2984,7 @@ jobs:
           save-toolchains: true
       - id: build
         run: mise run build windows-arm64-wgl
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test windows-arm64-wgl
       - name: Archive native artifact
@@ -2995,32 +2995,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-arm64-wgl build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-arm64-wgl
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-arm64-wgl
-      - id: suite-4
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-arm64-wgl
-      - id: suite-5
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-arm64-wgl
-      - id: suite-6
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-arm64-wgl
-      - id: suite-7
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -3034,7 +3034,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -3058,7 +3058,7 @@ jobs:
           target: windows-arm64-vulkan
       - id: build
         run: mise run build windows-arm64-vulkan
-      - id: suite-1
+      - id: test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test windows-arm64-vulkan
       - name: Archive native artifact
@@ -3069,32 +3069,32 @@ jobs:
         id: install
         if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-arm64-vulkan build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
-      - id: suite-2
+      - id: bindings-rust-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-arm64-vulkan
-      - id: suite-3
+      - id: examples-rust-map-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-arm64-vulkan
-      - id: suite-4
+      - id: bindings-kotlin-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-arm64-vulkan
-      - id: suite-5
+      - id: bindings-dotnet-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-arm64-vulkan
-      - id: suite-6
+      - id: bindings-python-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-arm64-vulkan
-      - id: suite-7
+      - id: bindings-dart-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -3108,7 +3108,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.bindings-rust-test.outcome == 'failure' || steps.examples-rust-map-check.outcome == 'failure' || steps.bindings-kotlin-test.outcome == 'failure' || steps.bindings-dotnet-test.outcome == 'failure' || steps.bindings-python-test.outcome == 'failure' || steps.bindings-dart-test.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan

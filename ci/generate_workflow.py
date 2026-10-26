@@ -7,6 +7,7 @@ import difflib
 import io
 import pathlib
 import re
+import shlex
 import sys
 
 from ruamel.yaml import YAML
@@ -19,6 +20,7 @@ from ci.workflow import (
     LINUX_RUNNER,
     SMALL_RUNNER,
     load_configuration,
+    mise_command,
     runner,
     target_rows,
 )
@@ -136,7 +138,13 @@ def target_job(row: dict) -> dict:
         )
 
     def add_suite(command: str, env: dict[str, str] | None = None) -> None:
-        suites.append(f"suite-{len(suites) + 1}")
+        # The id names the suite's task, so adding or removing a suite leaves
+        # the ids of the others alone.
+        task = shlex.split(mise_command(command))[2]
+        step_id = re.sub(r"[^A-Za-z0-9]+", "-", task).strip("-")
+        if any(step.get("id") == step_id for step in steps):
+            raise SystemExit(f"error: {preset} runs two steps with id {step_id!r}")
+        suites.append(step_id)
         env = {**(env or {}), **row["environment"].get(command, {})}
         fields = {"env": env} if env else {}
         # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
