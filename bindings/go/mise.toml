@@ -50,7 +50,13 @@ esac
 source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
+# The race detector also turns on checkptr's unsafe.Pointer checks. Go has no
+# race detector for windows/arm64.
+race=-race
+case "$usage_preset" in
+  windows-arm64-*) race= ;;
+esac
 # Go's test cache cannot see the native library, so always rerun the suite.
-go test -count=1 -tags "$go_test_tags" ./...
+go test -count=1 ${race:+"$race"} -tags "$go_test_tags" ./...
 go vet -tags "$go_test_tags" ./...
 '''
