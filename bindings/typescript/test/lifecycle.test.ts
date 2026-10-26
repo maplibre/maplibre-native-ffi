@@ -51,7 +51,7 @@ test(
     await closed[Symbol.asyncDispose]();
     closed[Symbol.dispose]();
 
-    const disposed = RuntimeHandle.create();
+    const disposed = await RuntimeHandle.create();
     disposed.dispose();
     await disposed[Symbol.asyncDispose]();
     await disposed[Symbol.asyncDispose]();
@@ -77,7 +77,7 @@ test("a handle names its id and whether it is closed", async () => {
     `MapProjectionHandle(id=${projectionId}, closed=true)`,
   );
 
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   const runtimeId = `0x${runtime.id.toString(16)}`;
   assert.equal(runtime.isClosed, false);
   assert.equal(String(runtime), `RuntimeHandle(id=${runtimeId}, closed=false)`);
@@ -89,7 +89,7 @@ test("a handle names its id and whether it is closed", async () => {
 });
 
 test("a refused close leaves the handle usable for a later close", async () => {
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await bounded(ready, "map creation");
 
@@ -118,7 +118,7 @@ test("a handle id names its events and outlives close", async () => {
 
 /** Creates a runtime and a map on it, and keeps only the map. */
 async function mapWithoutItsRuntime() {
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await bounded(ready, "map creation");
   return {
@@ -129,8 +129,8 @@ async function mapWithoutItsRuntime() {
   };
 }
 
-function unreachableRuntime(): () => boolean {
-  return watchCollection(RuntimeHandle.create());
+async function unreachableRuntime(): Promise<() => boolean> {
+  return watchCollection(await RuntimeHandle.create());
 }
 
 test(
@@ -139,7 +139,7 @@ test(
     captureLeaks();
     const { map, runtime, collected, id } = await mapWithoutItsRuntime();
     // The same collections reclaim a runtime that nothing keeps.
-    const controlCollected = unreachableRuntime();
+    const controlCollected = await unreachableRuntime();
     await collectGarbageUntil(controlCollected, "a runtime without a map");
     assert.equal(collected(), false, "the map's runtime was collected");
     assert.ok(runtimeIsLive(id));

@@ -59,11 +59,8 @@ napi_value mln_ts_end(mln_ts_call* call) {
     free(call->rejections);
     call->rejections = next;
   }
-  while (call->allocations != NULL) {
-    mln_ts_allocation* next = call->allocations->next;
-    free(call->allocations);
-    call->allocations = next;
-  }
+  mln_ts_free_allocations(call->allocations);
+  call->allocations = NULL;
   bool pending = false;
   napi_is_exception_pending(call->env, &pending);
   if (pending) {
@@ -100,6 +97,14 @@ void* mln_ts_allocate(mln_ts_call* call, size_t size) {
   allocation->next = call->allocations;
   call->allocations = allocation;
   return allocation->data;
+}
+
+void mln_ts_free_allocations(mln_ts_allocation* allocations) {
+  while (allocations != NULL) {
+    mln_ts_allocation* next = allocations->next;
+    free(allocations);
+    allocations = next;
+  }
 }
 
 bool mln_ts_read_owner(mln_ts_call* call, napi_value value) {

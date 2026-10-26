@@ -6,7 +6,7 @@ import { RuntimeEventType, RuntimeHandle } from "../../src/index.ts";
 import { listen, mapOptions, styleRoute } from "../support/fixture.ts";
 import { emptyStyle } from "../support/styles.ts";
 
-const runtime = RuntimeHandle.create();
+const runtime = await RuntimeHandle.create();
 const events = await listen(runtime);
 await runtime.setResourceProvider({
   routes: [styleRoute("open://style.json")],

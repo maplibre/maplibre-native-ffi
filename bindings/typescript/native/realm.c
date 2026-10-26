@@ -29,13 +29,19 @@
 #endif
 
 // What the threadsafe function's data carries: a token shifted left by two
-// with the message kind in the low bits, or, with both bits clear, a pointer
-// to a leak report. The TypeScript half's receive() takes the same kinds.
+// with the message kind in the low bits, or a pointer whose low bits say what
+// it points to: clear for a leak report, and MLN_TS_MESSAGE_THREAD for a
+// finished thread start. The TypeScript half's receive() takes the token
+// kinds, and the MLN_TS_RECEIVE kinds for the pointers.
 enum {
   MLN_TS_MESSAGE_WAKE = 1,
   MLN_TS_MESSAGE_RELEASE = 2,
-  MLN_TS_MESSAGE_LEAK = 3,
+  MLN_TS_MESSAGE_THREAD = 3,
   MLN_TS_MESSAGE_MASK = 3,
+};
+enum {
+  MLN_TS_RECEIVE_LEAK = 3,
+  MLN_TS_RECEIVE_THREAD = 4,
 };
 
 // Tokens stay below 2^31, so a shifted token fits the data on every target.
@@ -74,6 +80,20 @@ typedef struct mln_ts_leak {
   uint64_t handle;
   char name[64];
 } mln_ts_leak;
+
+/** A call on a thread of its own, and its outcome once it returns. */
+typedef struct mln_ts_thread_start {
+  mln_ts_shim* shim;
+  uint32_t token;
+  mln_ts_thread_run run;
+  void (*dispose)(uint64_t handle);
+  // The call memory that the copied arguments point into.
+  mln_ts_allocation* allocations;
+  mln_status status;
+  uint64_t handle;
+  mln_diagnostic diagnostic;
+  max_align_t arguments[];
+} mln_ts_thread_start;
 
 struct mln_ts_realm {
   napi_env env;
@@ -220,6 +240,74 @@ void mln_ts_wake_release(void* user_data) {
   wake_context_free(context);
 }
 
+// ---------------------------------------------------------------------------
+// Thread starts
+
+/** Disposes what a thread start created for a realm that cannot take it. */
+static void thread_start_abandon(mln_ts_thread_start* start) {
+  if (start->status == MLN_STATUS_OK && start->handle != 0) {
+    start->dispose(start->handle);
+  }
+  free(start);
+}
+
+static void* thread_start_main(void* argument) {
+  mln_ts_thread_start* start = argument;
+  start->diagnostic.size = sizeof start->diagnostic;
+  start->diagnostic.message[0] = '\0';
+  start->status =
+    start->run(start->arguments, &start->handle, &start->diagnostic);
+  mln_ts_free_allocations(start->allocations);
+  start->allocations = NULL;
+  // The realm may free the start as soon as the post lands.
+  mln_ts_shim* shim = start->shim;
+  if (!shim_post(shim, (void*)((uintptr_t)start | MLN_TS_MESSAGE_THREAD))) {
+    thread_start_abandon(start);
+  }
+  shim_release(shim);
+  return NULL;
+}
+
+bool mln_ts_start_thread(
+  mln_ts_call* call, napi_value token, mln_ts_thread_run run,
+  void (*dispose)(uint64_t handle), const void* arguments, size_t size
+) {
+  int64_t number = 0;
+  if (!mln_ts_read_int(call, token, 1, MLN_TS_MAX_TOKEN, &number, "start")) {
+    return false;
+  }
+  mln_ts_thread_start* start = calloc(1, sizeof *start + size);
+  if (start == NULL) {
+    napi_throw_error(call->env, NULL, "thread start allocation failed");
+    return false;
+  }
+  memcpy(start->arguments, arguments, size);
+  start->shim = shim_retain(call->realm->shim);
+  start->token = (uint32_t)number;
+  start->run = run;
+  start->dispose = dispose;
+  start->allocations = call->allocations;
+  call->allocations = NULL;
+  // Nothing joins the thread, so a browser page that never blocks can start
+  // it. It runs once a pool worker takes it.
+  pthread_attr_t attributes;
+  pthread_attr_init(&attributes);
+  pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
+  pthread_t thread;
+  int result = pthread_create(&thread, &attributes, thread_start_main, start);
+  pthread_attr_destroy(&attributes);
+  if (result != 0) {
+    call->allocations = start->allocations;
+    shim_release(start->shim);
+    free(start);
+    mln_ts_throw_status(
+      call->env, MLN_STATUS_NATIVE_ERROR, "the call's thread did not start"
+    );
+    return false;
+  }
+  return true;
+}
+
 /** Reports an exception that a delivery left pending, as an uncaught one. */
 static void surface_exception(napi_env env) {
   bool pending = false;
@@ -233,27 +321,45 @@ static void surface_exception(napi_env env) {
 /**
  * Receives one message on the realm's JavaScript thread and passes it to the
  * TypeScript half, which catches every error of its own. A host that tears the
- * function down passes no environment, and a leak report is then only freed.
+ * function down passes no environment: a leak report is then only freed, and
+ * a thread start disposes what it created.
  */
 static void receive(
   napi_env env, napi_value callback, void* context, void* data
 ) {
   (void)callback;
   uintptr_t bits = (uintptr_t)data;
-  mln_ts_leak* leak = (bits & MLN_TS_MESSAGE_MASK) == 0 ? data : NULL;
+  uintptr_t kind = bits & MLN_TS_MESSAGE_MASK;
+  mln_ts_leak* leak = kind == 0 ? data : NULL;
+  mln_ts_thread_start* start =
+    kind == MLN_TS_MESSAGE_THREAD
+      ? (mln_ts_thread_start*)(bits & ~(uintptr_t)MLN_TS_MESSAGE_MASK)
+      : NULL;
   mln_ts_realm* realm = context;
   napi_value target = env != NULL ? reference_value(env, realm->receive) : NULL;
   napi_value global;
   if (target != NULL && napi_get_global(env, &global) == napi_ok) {
     napi_handle_scope scope;
     if (napi_open_handle_scope(env, &scope) == napi_ok) {
-      napi_value argv[3];
+      napi_value argv[5];
       size_t argc = 2;
       if (leak != NULL) {
-        argv[0] = mln_ts_number(env, MLN_TS_MESSAGE_LEAK);
+        argv[0] = mln_ts_number(env, MLN_TS_RECEIVE_LEAK);
         argv[1] = mln_ts_text(env, leak->name, strlen(leak->name));
         argv[2] = mln_ts_u64(env, leak->handle);
         argc = 3;
+      } else if (start != NULL) {
+        argv[0] = mln_ts_number(env, MLN_TS_RECEIVE_THREAD);
+        argv[1] = mln_ts_number(env, start->token);
+        argv[2] = mln_ts_number(env, start->status);
+        argv[3] = mln_ts_u64(env, start->handle);
+        argv[4] = mln_ts_text(
+          env, start->diagnostic.message, strlen(start->diagnostic.message)
+        );
+        argc = 5;
+        // The TypeScript half owns the handle from here.
+        free(start);
+        start = NULL;
       } else {
         argv[0] = mln_ts_number(env, (double)(bits & MLN_TS_MESSAGE_MASK));
         argv[1] = mln_ts_number(env, (double)(bits >> 2));
@@ -267,6 +373,9 @@ static void receive(
     }
   }
   free(leak);
+  if (start != NULL) {
+    thread_start_abandon(start);
+  }
 }
 
 static void function_finalize(napi_env env, void* data, void* hint) {

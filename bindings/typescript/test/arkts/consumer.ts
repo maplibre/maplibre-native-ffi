@@ -8,6 +8,6 @@ import { cVersion, RuntimeHandle } from "@maplibre/native-ffi";
 import { postToParent, realmData } from "./realm-child.ts";
 
 await realmData();
-const runtime = RuntimeHandle.create();
+const runtime = await RuntimeHandle.create();
 await runtime.close();
 postToParent({ version: cVersion() });

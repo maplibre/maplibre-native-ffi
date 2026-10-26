@@ -9,6 +9,7 @@ execution shape.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .. import async_hosts, docs
@@ -74,6 +75,8 @@ class Lowered:
     drained: str | None = None
     c_locals: list[str] = field(default_factory=list)
     c_body: list[str] = field(default_factory=list)
+    # File-scope C that the export calls, such as a thread start's function.
+    c_helpers: str = ""
 
 
 def simple_disposer(bound: BoundApi, native: str | None) -> bool:
@@ -479,6 +482,8 @@ def lower_function(
         body.append(
             f"if (!mln_ts_read_completion(call, {token}, {'true' if nullable else 'false'}, {decoder}, &{local}, &present_{completion.parameter})) goto done;"
         )
+    if plan.blocks:
+        return lower_thread_start(bound, lowered, args, index)
     call_arguments = ", ".join(args + (["&diagnostic"] if function.diagnostic else []))
     if function.diagnostic:
         locals_.append("mln_diagnostic diagnostic;")
@@ -599,6 +604,89 @@ def lower_function(
             raise Unsupported("consumption requires an owned receiver without outputs")
     if completion and lowered.shape != "attach":
         lowered.native_result = "void"
+    return lowered
+
+
+def lower_thread_start(
+    bound: BoundApi, lowered: Lowered, args: list[str], index: int
+) -> Lowered:
+    """A call that waits for a thread to start, which runs on a thread of its own.
+
+    A thread that a browser page starts runs only after the page yields, so
+    the page cannot wait for one. The export copies the converted arguments,
+    with the call memory that they point into, and returns at once; the call's
+    thread creates the owner and settles the Promise through the realm.
+    """
+    plan = lowered.plan
+    function = plan.function
+    owned = lowered.owned
+    if (
+        lowered.owner
+        or plan.completion
+        or plan.registrations
+        or plan.absence
+        or not plan.status
+        or not function.diagnostic
+        or not owned
+        or len(plan.outputs) != 1
+    ):
+        raise Unsupported(
+            f"blocks={plan.blocks} takes no receiver or registration and returns one owner"
+        )
+    types = {}
+    for declaration in lowered.c_locals:
+        match = re.fullmatch(r"(.+?) (\w+)(?: = .*)?;", declaration)
+        if match:
+            types[match.group(2)] = match.group(1)
+    output = f"&arg_{owned.parameter}"
+    members, run_arguments = [], []
+    for argument in args:
+        name = argument.removeprefix("&")
+        if argument == output:
+            run_arguments.append("&handle")
+        elif re.fullmatch(r"arg_\w+", name) and name in types:
+            members.append(name)
+            run_arguments.append(argument.replace(name, f"arguments->{name}"))
+        else:
+            raise Unsupported(f"blocks={plan.blocks} copies only converted arguments")
+    name = plan.name
+    structure = f"mln_ts_{name}_arguments"
+    native = owned.handle.native
+    cleanup = bound.source.functions_by_name[owned.handle.cleanup]
+    # A dispose takes the handle, then nulls for an optional completion and a
+    # diagnostic, which simple_disposer() allows.
+    extra = len(cleanup.parameters) - 1 + bool(cleanup.diagnostic)
+    dispose = ", ".join([f"({native})handle", *["NULL"] * extra])
+    fields = "".join(f"  {types[member]} {member};\n" for member in members)
+    lowered.c_helpers = (
+        f"typedef struct {structure} {{\n{fields}}} {structure};\n\n"
+        f"static mln_status mln_ts_run_{name}(\n"
+        "  const void* data, uint64_t* out_handle, mln_diagnostic* diagnostic\n) {\n"
+        f"  const {structure}* arguments = data;\n"
+        f"  {native} handle = MLN_HANDLE_NULL;\n"
+        f"  mln_status status = {function.name}({', '.join([*run_arguments, 'diagnostic'])});\n"
+        "  *out_handle = (uint64_t)handle;\n"
+        "  return status;\n}\n\n"
+        f"static void mln_ts_dispose_{name}(uint64_t handle) {{\n"
+        f"  {cleanup.name}({dispose});\n}}\n"
+    )
+    # The thread writes the handle, so the export keeps no output.
+    lowered.c_locals = [
+        declaration
+        for declaration in lowered.c_locals
+        if not declaration.startswith(f"{native} {output.removeprefix('&')} ")
+    ]
+    lowered.c_locals.append(f"{structure} arguments;")
+    lowered.c_body += [
+        *[f"arguments.{member} = {member};" for member in members],
+        (
+            f"mln_ts_start_thread(call, call->argv[{index}], mln_ts_run_{name}, "
+            f"mln_ts_dispose_{name}, &arguments, sizeof arguments);"
+        ),
+    ]
+    lowered.native_parameters.append(("start", "number"))
+    lowered.shape = "thread_start"
+    lowered.returns = f"Promise<{owner_class(owned.handle)}>"
     return lowered
 
 

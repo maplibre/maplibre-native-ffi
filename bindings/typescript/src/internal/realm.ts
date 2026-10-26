@@ -24,6 +24,7 @@ import { takeNativeRegistration } from "./native_registrations.ts";
 const WAKE = 1;
 const RELEASE = 2;
 const LEAK = 3;
+const THREAD = 4;
 
 // The token that the queue's own wake posts.
 const QUEUE = 0;
@@ -45,12 +46,24 @@ export interface PendingCompletion {
   fail(error: unknown): void;
 }
 
+/** Settles from the outcome of a call that ran on a thread of its own. */
+export type PendingThreadStart = (
+  status: number,
+  handle: bigint,
+  diagnostic: string,
+) => void;
+
 const completions = new Map<number, PendingCompletion>();
+const threadStarts = new Map<number, PendingThreadStart>();
 let nextToken = 1;
 
-/** A token that no pending completion or rooted registration holds. */
+/** A token that no pending entry or rooted registration holds. */
 function allocateToken(): number {
-  while (registrations.has(nextToken) || completions.has(nextToken)) {
+  while (
+    registrations.has(nextToken) ||
+    completions.has(nextToken) ||
+    threadStarts.has(nextToken)
+  ) {
     nextToken = nextToken === MAX_TOKEN ? 1 : nextToken + 1;
   }
   const token = nextToken;
@@ -169,9 +182,27 @@ export function removeCompletion(token: number): void {
   }
 }
 
-/** The completions that wait for delivery, for the suite's leak checks. */
+/** Registers a pending thread start and returns its token. */
+export function addThreadStart(settle: PendingThreadStart): number {
+  const token = allocateToken();
+  threadStarts.set(token, settle);
+  hold();
+  return token;
+}
+
+/** Forgets a thread start whose thread did not start. */
+export function removeThreadStart(token: number): void {
+  if (threadStarts.delete(token)) {
+    unhold();
+  }
+}
+
+/**
+ * The completions and thread starts that wait for delivery, for the suite's
+ * leak checks.
+ */
 export function pendingCompletions(): number {
-  return completions.size;
+  return completions.size + threadStarts.size;
 }
 
 /**
@@ -285,6 +316,21 @@ function receive(kind: number, ...values: unknown[]): void {
       case RELEASE:
         retire(values[0] as number);
         return;
+      case THREAD: {
+        const [token, status, handle, diagnostic] = values as [
+          number,
+          number,
+          bigint,
+          string,
+        ];
+        const settle = threadStarts.get(token);
+        if (settle !== undefined) {
+          threadStarts.delete(token);
+          unhold();
+          settle(status, handle, diagnostic);
+        }
+        return;
+      }
       case LEAK: {
         const handle = values[1] as bigint;
         const message = `${String(values[0])} 0x${handle.toString(

@@ -22,8 +22,8 @@ import { backgroundStyle } from "./support/styles.ts";
 test("host strings use views and native-lent strings decode", async () => {
   // A path crosses as a view with an explicit length, and native code rejects
   // the embedded NUL where the path reaches a C-string consumer.
-  assert.throws(
-    () => RuntimeHandle.create({ cachePath: "cache\u0000tail" }),
+  await assert.rejects(
+    RuntimeHandle.create({ cachePath: "cache\u0000tail" }),
     (error) =>
       error instanceof MaplibreError &&
       error.status === Status.invalidArgument &&

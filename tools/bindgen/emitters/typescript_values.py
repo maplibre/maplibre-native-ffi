@@ -17,6 +17,7 @@ context, and a release.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 from .. import async_hosts, docs
@@ -219,10 +220,16 @@ def parameter_name(name: str) -> str:
     return result + "Value" if result in LOCALS else result
 
 
-def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+def doc(
+    bound: BoundApi, native: str, indent: str = "", notes: tuple[str, ...] = ()
+) -> str:
+    """The doc comment of a declaration, with `notes` in place of the C notes."""
     from .typescript import symbols
 
-    return docs.block_comment(bound.doc(native), symbols(bound), indent)
+    comment = bound.doc(native)
+    if comment is not None and notes:
+        comment = dataclasses.replace(comment, notes=notes)
+    return docs.block_comment(comment, symbols(bound), indent)
 
 
 def enum_members(value: ValuePlan) -> list[tuple[str, str, int]]:

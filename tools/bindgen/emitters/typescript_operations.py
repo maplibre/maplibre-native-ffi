@@ -30,6 +30,13 @@ from .typescript_values import (
 )
 
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+# What a call that waits for a thread to start does in TypeScript, in place of
+# the C notes on blocking.
+THREAD_START_NOTE = (
+    "Runs on a thread of its own, so a browser page can call it, and resolves "
+    "once the call returns. A pending Promise keeps the event loop alive. When "
+    "the realm ends first, the binding disposes the result."
+)
 # The handles that `mln_runtime_event_source_type` names as an event's source.
 EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
 
@@ -128,6 +135,12 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
             f"const [{member}, ready] = attach({start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});",
             f"return {{ {member}, ready }};",
         ]
+    elif shape == "thread_start":
+        arguments = ", ".join([*entry.arguments, "start"])
+        adopted = construct(bound, entry, entry.owned, "handle")
+        lines = [
+            f"return threadStart((start) => native.{entry.plan.name}({arguments}), (handle) => {adopted});"
+        ]
     elif shape == "owned":
         lines = [f"const handle = {call};"]
         adopted = construct(bound, entry, entry.owned, "handle")
@@ -174,7 +187,8 @@ def render_method(bound, values, entry: Lowered, indent: str) -> str:
     head = (
         "static " if entry.plan.factory else "" if entry.owner else "export function "
     )
-    text = doc(bound, entry.plan.name, indent)
+    notes = (THREAD_START_NOTE,) if entry.shape == "thread_start" else ()
+    text = doc(bound, entry.plan.name, indent, notes)
     generic = "<T>" if entry.shape == "view" else ""
     text += f"{indent}{head}{entry.method}{generic}({signature(entry)}): {entry.returns} {{\n"
     text += "".join(f"{indent}  {line}\n" for line in body)
@@ -490,6 +504,7 @@ def runtime_imports(text: str) -> str:
             "query",
             "run",
             "submitRun",
+            "threadStart",
         ],
         "./internal/owners.ts": [
             "ADOPT",

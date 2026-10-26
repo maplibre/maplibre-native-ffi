@@ -31,7 +31,8 @@ def render_export(entry: Lowered) -> str:
     if any("goto done" in line for line in entry.c_body):
         lines.append("done:")
     lines += ["  return mln_ts_end(call);", "}"]
-    return "\n".join(lines) + "\n"
+    helpers = entry.c_helpers + "\n" if entry.c_helpers else ""
+    return helpers + "\n".join(lines) + "\n"
 
 
 def render_view_scope(bound, begin: str, end: str) -> str:

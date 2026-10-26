@@ -93,7 +93,7 @@ test(
       join(root, "load.ts"),
       [
         'import { RuntimeHandle } from "./first/src/index.ts";',
-        "const runtime = RuntimeHandle.create();",
+        "const runtime = await RuntimeHandle.create();",
         "try {",
         '  await import("./second/src/index.ts");',
         '  console.log("the second copy loaded");',
@@ -173,7 +173,7 @@ test(
 
 /** Leaves a runtime and a map open for the collector. */
 async function abandonRuntimeWithMap() {
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   return {
@@ -206,14 +206,14 @@ test(
 
 /** A runtime whose event handler names it, and nothing else does. */
 async function runtimeHeldByItsEventHandler() {
-  const runtime: RuntimeHandle = RuntimeHandle.create();
+  const runtime: RuntimeHandle = await RuntimeHandle.create();
   await runtime.setEventHandler(() => void runtime.id);
   return { id: runtime.id, collected: watchCollection(runtime) };
 }
 
 /** A runtime whose provider names it, and nothing else does. */
 async function runtimeHeldByItsProvider() {
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   await runtime.setResourceProvider({
     routes: [styleRoute("capture://style.json")],
     callback(_request, handle) {

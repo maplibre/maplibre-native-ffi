@@ -7,7 +7,12 @@
 
 import { type CompletionHeader, native } from "./addon.ts";
 import { MaplibreError } from "./errors.ts";
-import { addCompletion, removeCompletion } from "./realm.ts";
+import {
+  addCompletion,
+  addThreadStart,
+  removeCompletion,
+  removeThreadStart,
+} from "./realm.ts";
 
 /**
  * The generations that a committed command published. A failed or cancelled
@@ -119,6 +124,38 @@ export function query<T>(start: Start): Promise<T> {
       return native.completionValue(index) as T;
     }),
   );
+}
+
+/**
+ * A call that runs on a thread of its own, because it waits for a thread to
+ * start, which a browser page cannot do. It resolves with the owner of the
+ * handle that the call created, and rejects with a {@link MaplibreError} for a
+ * failed status.
+ */
+export function threadStart<T>(
+  start: Start,
+  adopt: (handle: bigint) => T,
+): Promise<T> {
+  // A submission that throws rejects the Promise, as the executor's throw.
+  return new Promise<T>((resolve, reject) => {
+    const token = addThreadStart((status, handle, diagnostic) => {
+      if (status !== 0) {
+        reject(new MaplibreError(status, diagnostic));
+        return;
+      }
+      try {
+        resolve(adopt(handle));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    try {
+      start(token);
+    } catch (error) {
+      removeThreadStart(token);
+      throw error;
+    }
+  });
 }
 
 /**

@@ -5435,16 +5435,33 @@ done:
   return mln_ts_end(call);
 }
 
+typedef struct mln_ts_mln_runtime_create_arguments {
+  mln_runtime_options arg_options;
+} mln_ts_mln_runtime_create_arguments;
+
+static mln_status mln_ts_run_mln_runtime_create(
+  const void* data, uint64_t* out_handle, mln_diagnostic* diagnostic
+) {
+  const mln_ts_mln_runtime_create_arguments* arguments = data;
+  mln_runtime handle = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_runtime_create(&arguments->arg_options, &handle, diagnostic);
+  *out_handle = (uint64_t)handle;
+  return status;
+}
+
+static void mln_ts_dispose_mln_runtime_create(uint64_t handle) {
+  mln_runtime_dispose((mln_runtime)handle, NULL);
+}
+
 static napi_value mln_ts_export_mln_runtime_create(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime_options arg_options;
-  mln_runtime arg_out_runtime = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  mln_ts_mln_runtime_create_arguments arguments;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
   memset(&arg_options, 0, sizeof arg_options);
   arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
@@ -5452,11 +5469,11 @@ static napi_value mln_ts_export_mln_runtime_create(
         call, call->argv[0], &arg_options, "options"
       ))
     goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_runtime_create(&arg_options, &arg_out_runtime, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_runtime);
+  arguments.arg_options = arg_options;
+  mln_ts_start_thread(
+    call, call->argv[1], mln_ts_run_mln_runtime_create,
+    mln_ts_dispose_mln_runtime_create, &arguments, sizeof arguments
+  );
 done:
   return mln_ts_end(call);
 }

@@ -28,7 +28,7 @@ type Request =
  * before the one this scenario adds, which tells the parent that it has run.
  */
 async function exit(): Promise<never> {
-  const runtime = RuntimeHandle.create();
+  const runtime = await RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await ready;
   await map.setStyleJson(emptyStyle());

@@ -164,7 +164,7 @@ export const mapOptions: MapOptions = {
 export async function openRuntime(
   options: { runtime?: RuntimeOptions; provider?: ResourceProvider } = {},
 ): Promise<RuntimeFixture> {
-  const runtime = RuntimeHandle.create(options.runtime);
+  const runtime = await RuntimeHandle.create(options.runtime);
   teardown(() => closeIfLive(() => runtime.close()));
   const events = await listen(runtime);
   await bounded(

@@ -692,7 +692,7 @@ export interface NativeOperations {
     runtime: bigint,
     completion: number | undefined,
   ): void;
-  mln_runtime_create(options: RuntimeOptions | undefined): bigint;
+  mln_runtime_create(options: RuntimeOptions | undefined, start: number): void;
   mln_runtime_create_map(
     runtime: bigint,
     options: MapOptions,

@@ -6,7 +6,8 @@ import { cVersion, RuntimeHandle } from "@maplibre/native-ffi";
 // The check names no host types, so it declares the one global it prints with.
 declare const console: { log(line: string): void };
 
-const runtime: RuntimeHandle = RuntimeHandle.create();
-void runtime.close().then(() => {
-  console.log(`loaded C API version ${cVersion()}`);
-});
+void RuntimeHandle.create()
+  .then((runtime: RuntimeHandle) => runtime.close())
+  .then(() => {
+    console.log(`loaded C API version ${cVersion()}`);
+  });

@@ -87,6 +87,7 @@ import {
   query,
   run,
   submitRun,
+  threadStart,
 } from "./internal/completions.ts";
 import {
   ADOPT,
@@ -3653,15 +3654,22 @@ export class RuntimeHandle extends Owner {
   /**
    * Creates a runtime.
    *
+   * Runs on a thread of its own, so a browser page can call it, and resolves
+   * once the call returns. A pending Promise keeps the event loop alive. When
+   * the realm ends first, the binding disposes the result.
+   *
    * See `mln_runtime_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  static create(options: RuntimeOptions = {}): RuntimeHandle {
-    const handle = native.mln_runtime_create(options);
-    return adopt(
-      handle,
-      () => new RuntimeHandle(ADOPT, handle),
-      (disposed) => native.mln_runtime_dispose(disposed, undefined),
+  static create(options: RuntimeOptions = {}): Promise<RuntimeHandle> {
+    return threadStart(
+      (start) => native.mln_runtime_create(options, start),
+      (handle) =>
+        adopt(
+          handle,
+          () => new RuntimeHandle(ADOPT, handle),
+          (disposed) => native.mln_runtime_dispose(disposed, undefined),
+        ),
     );
   }
 
