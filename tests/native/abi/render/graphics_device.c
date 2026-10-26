@@ -3,6 +3,11 @@
 // every other build reports that it cannot, after it validates the call.
 
 #include <stdio.h>
+#if defined(__APPLE__)
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#endif
 
 #include "support/frames.h"
 #include "support/test_support.h"
@@ -177,6 +182,20 @@ static void device_texture_reads_back_after_the_handle_is_released(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#if defined(__APPLE__)
+static void* sample_later(void* unused) {
+  (void)unused;
+  sleep(6);
+  char command[128];
+  snprintf(
+    command, sizeof(command), "sample %d 2 -mayDie -file /dev/stderr 1>&2",
+    (int)getpid()
+  );
+  system(command);
+  return NULL;
+}
+#endif
+
 static void sessions_on_two_maps_share_one_device(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first_map = mln_test_create_map(runtime);
@@ -190,6 +209,11 @@ static void sessions_on_two_maps_share_one_device(void) {
   DIAG_STEP("first rendered");
   render_red_frame(second_map, &second, 12);
   DIAG_STEP("second rendered");
+#if defined(__APPLE__)
+  pthread_t sampler;
+  pthread_create(&sampler, NULL, sample_later, NULL);
+  pthread_detach(sampler);
+#endif
   expect_red_pixels(&first);
   expect_red_pixels(&second);
 
