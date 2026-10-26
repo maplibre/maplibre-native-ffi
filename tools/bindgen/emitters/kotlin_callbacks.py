@@ -270,6 +270,9 @@ def throw_note(value, values):
 
 def declaration_doc(value, values):
     """The KDoc of a declaration, which says how a split form differs by target."""
+    from .kotlin import symbols
+
+    symbol = symbols(values.bound)
     found = values.bound.doc(value.native)
     if value.kind == "callback":
         notes = (
@@ -282,7 +285,7 @@ def declaration_doc(value, values):
             note = split_note(value, values)
             summary = f"{summary} {note}" if summary else note
         return docs.block_comment(
-            docs.Doc(value.native, summary, found.url if found else "", notes)
+            docs.Doc(value.native, summary, found.url if found else "", notes), symbol
         )
     if accepts_native(value, values) and found:
         factory = native_factory(value, values)
@@ -290,14 +293,14 @@ def declaration_doc(value, values):
             f"The JVM, Android, and Kotlin/Native also create one from the host's "
             f"native functions with `{factory.registration}.{factory.function}`."
         )
-        return docs.block_comment(replace(found, notes=(*found.notes, note)))
+        return docs.block_comment(replace(found, notes=(*found.notes, note)), symbol)
     if split(value, values):
         note = split_note(value, values)
     else:
         return doc(values.bound, value.native)
     summary = f"{found.summary} {note}" if found else note
     return docs.block_comment(
-        docs.Doc(value.native, summary, found.url if found else "")
+        docs.Doc(value.native, summary, found.url if found else ""), symbol
     )
 
 
@@ -410,6 +413,8 @@ def native_factory(value, values):
 def native_factories(values):
     """The threaded source set's factories of every native form that common code
     declares."""
+    from .kotlin import symbols
+
     factories = []
     for value in values.used.values():
         if not accepts_native(value, values):
@@ -420,16 +425,12 @@ def native_factories(values):
         if [field for _member, _typ, field in values.members(value)] != callbacks:
             raise Unsupported("a native registration needs a record of callbacks only")
         *functions, (context, _), (release, _) = factory.parameters
-        types = ", ".join(
-            f"`{member}` is an `{field.value.native}`"
-            for (member, _), field in zip(functions, callbacks)
-        )
         found = values.bound.doc(value.native)
         summary = (
             f"Creates a `{public}` of the host's native functions, which the "
-            "binding copies to native code unchanged. Native code calls each "
-            f"function with `{context}`: {types}, and `{release}` is an "
-            "`mln_user_data_release`. A null pointer leaves its field null."
+            "binding copies to native code unchanged. Each function has the C "
+            "type of the record field that it fills, and native code calls each "
+            f"with `{context}`. A null pointer leaves its field null."
         )
         ownership = (
             "The first call that carries the registration consumes it. "
@@ -449,7 +450,8 @@ def native_factories(values):
                 summary,
                 found.url if found else "",
                 (ownership, targets),
-            )
+            ),
+            symbols(values.bound),
         )
         parameters = [f"  {member}: NativePointer" for member, _ in functions] + [
             f"  {member}: NativePointer = NativePointer.NULL_POINTER"
@@ -1077,6 +1079,7 @@ def operation(plan, values, native):
         call_arguments,
         declaration,
         encodings,
+        method_name,
         parameter_name,
     )
 
@@ -1097,7 +1100,7 @@ def operation(plan, values, native):
         index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
         arguments[index] = "handle"
         return (
-            f"  public fun {identifier(plan.member)}({declaration(params)}): Unit = "
+            f"  public fun {method_name(plan)}({declaration(params)}): Unit = "
             "nativeRespond(bindingScope, bindingAddress) "
             f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
         )
@@ -1131,6 +1134,7 @@ def immediate_registration(plan, values, native):
         call_arguments,
         declaration,
         encodings,
+        method_name,
         parameter_name,
         receiver_arguments,
     )
@@ -1159,7 +1163,7 @@ def immediate_registration(plan, values, native):
     else:
         body = f"{native.checked(plan.function, arguments)}; accept({owner})"
     return (
-        f"  public fun {identifier(plan.member)}({declaration(params)}): "
+        f"  public fun {method_name(plan)}({declaration(params)}): "
         f"{'Boolean' if declined else 'Unit'} = "
         f"nativeCall({receiver_arguments(plan)}) "
         f"{{ {encodings(plan)}{body} }}\n"

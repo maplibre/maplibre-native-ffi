@@ -6,8 +6,8 @@ import org.maplibre.nativeffi.render.NativePointer
 
 /**
  * Creates a `Wake` of the host's native functions, which the binding copies to native code
- * unchanged. Native code calls each function with `userData`: `callback` is an `mln_wake_callback`,
- * and `releaseUserData` is an `mln_user_data_release`. A null pointer leaves its field null.
+ * unchanged. Each function has the C type of the record field that it fills, and native code calls
+ * each with `userData`. A null pointer leaves its field null.
  *
  * The first call that carries the registration consumes it. Native code calls `releaseUserData`
  * once it accepts the call. When native code does not accept the call, the binding calls
@@ -32,9 +32,8 @@ public fun Wake.Companion.native(
 
 /**
  * Creates a `QueueLock` of the host's native functions, which the binding copies to native code
- * unchanged. Native code calls each function with `userData`: `lock` is an
- * `mln_queue_lock_callback`, `unlock` is an `mln_queue_lock_callback`, and `releaseUserData` is an
- * `mln_user_data_release`. A null pointer leaves its field null.
+ * unchanged. Each function has the C type of the record field that it fills, and native code calls
+ * each with `userData`. A null pointer leaves its field null.
  *
  * The first call that carries the registration consumes it. Native code calls `releaseUserData`
  * once it accepts the call. When native code does not accept the call, the binding calls

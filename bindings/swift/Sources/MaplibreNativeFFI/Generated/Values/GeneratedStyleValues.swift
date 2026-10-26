@@ -33,14 +33,15 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   }
 }
 
-/// Options for custom geometry sources.
+/// Options for custom geometry sources. The callback may run on any native
+/// worker thread, concurrently with runtime and map calls.
 ///
 /// See `mln_custom_geometry_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
-  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  /// Tile fetch callback.
   public var fetchTile: CustomSourceFetchTileCallback
-  /// Optional best-effort tile cancel callback. Null in queue mode.
+  /// Optional best-effort tile cancel callback.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -134,14 +135,15 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
-/// Options for custom MVT vector sources.
+/// Options for custom MVT vector sources. The callback may run on any native
+/// worker thread, concurrently with runtime and map calls.
 ///
 /// See `mln_custom_mvt_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
-  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  /// Tile fetch callback.
   public var fetchTile: CustomSourceFetchTileCallback
-  /// Optional best-effort tile cancel callback. Null in queue mode.
+  /// Optional best-effort tile cancel callback.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -201,14 +203,17 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
 }
 
 /// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort.
+/// source, best effort. The callback may run on any native worker thread,
+/// concurrently with runtime and map calls.
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public typealias CustomSourceCancelTileCallback =
   @Sendable (_ tileId: CanonicalTileId) -> Void
 
-/// Requests one tile of a custom geometry or custom MVT vector source.
+/// Requests one tile of a custom geometry or custom MVT vector source. The
+/// callback may run on any native worker thread, concurrently with runtime and
+/// map calls.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -231,7 +236,7 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
   /// whose members follow the MapLibre Style Spec clusterProperties form, or
-  /// empty for none. The UTF-8 bytes are borrowed for the call.
+  /// empty for none.
   public var clusterProperties: String
   /// Tile buffer in pixels within \[0, 512\]. Absent selects 128.
   public var buffer: UInt32?
@@ -465,7 +470,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   }
 }
 
-/// One complete runtime style image, borrowed for a completion callback.
+/// One complete runtime style image.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -553,11 +558,9 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
 /// See `mln_style_image_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
-  /// Horizontally stretchable intervals. Borrowed for the call and copied
-  /// before return. May be null only when stretch_x_count is 0.
+  /// Horizontally stretchable intervals.
   public var stretchX: [ImageStretch]?
-  /// Vertically stretchable intervals. Borrowed for the call and copied before
-  /// return. May be null only when stretch_y_count is 0.
+  /// Vertically stretchable intervals.
   public var stretchY: [ImageStretch]?
   /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
@@ -678,7 +681,7 @@ public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// One style layer, borrowed for a completion callback.
+/// One style layer.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -780,7 +783,7 @@ public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Complete metadata of one style source.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

@@ -189,6 +189,20 @@ void mln_query_release(mln_query query);
         self.assertIn(note + "pub const Map = struct {", source)
         self.assertNotIn(note + "pub const Query", source)
 
+    def test_a_summary_names_the_zig_symbols_of_c_declarations(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        outcome = source.split("pub const CameraTransitionOutcome = enum")[1]
+        summary = " ".join(
+            line.strip().removeprefix("///").strip()
+            for line in outcome.split('@"cancelled" = 1,')[0].splitlines()
+        )
+        self.assertIn(
+            "`Map.cancelTransitions()`, `Map.cancelCameraTransition()`, or "
+            "`GesturePhase.cancel` ended the transitions",
+            summary,
+        )
+        self.assertNotIn("mln_map_cancel_transitions", summary)
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)
         header = protocol_header(

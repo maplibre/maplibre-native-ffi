@@ -83,6 +83,13 @@ def typed_mask(field: FieldPlan) -> str | None:
     return value.native
 
 
+def enum_member(native: str, constants, key: str) -> str:
+    """The .NET member of the enum `native` for its C constant `key`, among
+    all of the enum's `constants`."""
+    prefix = enum_member_prefix(constants, native)
+    return pascal(key.removeprefix(prefix).lower())
+
+
 def public_name(native: str) -> str:
     return pascal(native.removeprefix("mln_"))
 
@@ -100,6 +107,11 @@ class Values:
             for field in value.fields
             if field.value.stride and field.value.element
         }
+
+    def symbols(self) -> docs.Symbol:
+        from .dotnet import symbols
+
+        return symbols(self.bound)
 
     def record(self, name: str) -> ValuePlan:
         try:
@@ -264,12 +276,12 @@ class Values:
         """How a callback type's delegate reports failure, or None when it
         returns nothing."""
         callback = self.bound.callbacks[native]
+        # The rendering spells each C constant as the binding's member.
         if callback.status:
-            fallback = pascal(callback.failure.removeprefix("MLN_STATUS_").lower())
             return (
                 "Returning succeeds. Throwing a `MaplibreException` whose status "
-                "is not `Status.Ok` fails the call with that status. Any other "
-                f"exception fails it with `Status.{fallback}` and is reported to "
+                "is not `MLN_STATUS_OK` fails the call with that status. Any other "
+                f"exception fails it with `{callback.failure}` and is reported to "
                 "`MaplibreNative.CallbackException`."
             )
         if callback.result.ctype.kind == "void":
@@ -1168,7 +1180,10 @@ class Values:
                 f"public abstract record {name}\n{{\n    private {name}() {{ }}\n"
                 + "".join(
                     docs.xml_param(
-                        self.bound.doc(f"{union.native}.{field.name}"), "Value", "    "
+                        self.bound.doc(f"{union.native}.{field.name}"),
+                        self.symbols(),
+                        "Value",
+                        "    ",
                     )
                     + f"    public sealed record {pascal(field.name)}({self.public_type(field.value)} Value) : {name};\n"
                     for field in union.fields
@@ -1202,6 +1217,7 @@ class Values:
                 + "".join(
                     docs.xml_param(
                         self.bound.doc(f"{union.native}.{variant.name}"),
+                        self.symbols(),
                         "Value",
                         "        ",
                     )
@@ -1273,7 +1289,9 @@ class Values:
 
     def member_doc(self, plan: ValuePlan, field: FieldPlan) -> str:
         """The XML doc comment of a member."""
-        return docs.xml_comment(self.bound.doc(f"{plan.native}.{field.name}"), "    ")
+        return docs.xml_comment(
+            self.bound.doc(f"{plan.native}.{field.name}"), self.symbols(), "    "
+        )
 
     def value_declaration(self, plan: ValuePlan) -> str:
         fields = self.fields(plan)
@@ -1293,7 +1311,7 @@ class Values:
                     + (f" = {zero};" if zero else "")
                 )
             properties.extend(
-                docs.xml_comment(self.bound.doc(flag.name), "    ")
+                docs.xml_comment(self.bound.doc(flag.name), self.symbols(), "    ")
                 + f"    public bool {self.flag_name(flag)} {{ get; init; }}"
                 for flag in plan.mask_flags
             )
@@ -1303,7 +1321,9 @@ class Values:
                 + "\n}\n"
             )
         params = "".join(
-            docs.xml_param(self.bound.doc(f"{plan.native}.{field.name}"), name)
+            docs.xml_param(
+                self.bound.doc(f"{plan.native}.{field.name}"), self.symbols(), name
+            )
             for name, field in self.members(plan)
         )
         declaration = params + (

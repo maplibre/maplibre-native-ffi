@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_geo_json_source_data` native handle.
+    /// Owns one native handle.
     ///
     /// Prepared GeoJSON data that sources retain independently of its handle.
     ///

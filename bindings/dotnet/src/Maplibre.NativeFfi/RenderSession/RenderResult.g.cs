@@ -19,8 +19,8 @@ public enum RenderResult : uint
     /// No newer map update was available, the map had no complete frame to
     /// draw, or the update extent differed from the target. The map publishes
     /// another update when it has one. A demand with
-    /// <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for that update instead,
-    /// and finishes with this result only when a barrier ends its wait.
+    /// <c>FrameDemandFlag.WaitForUpdate</c> waits for that update instead, and
+    /// finishes with this result only when a barrier ends its wait.
     /// </summary>
     NoUpdate = 1,
 

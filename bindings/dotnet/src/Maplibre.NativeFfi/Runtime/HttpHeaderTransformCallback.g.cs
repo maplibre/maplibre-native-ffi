@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Adds end-to-end headers to one outgoing HTTP request attempt.
+/// Adds end-to-end headers to one outgoing HTTP request attempt. The callback
+/// runs synchronously on a MapLibre worker or network thread.
 /// </summary>
 /// <remarks>
 /// <para>Returning succeeds. Throwing a <c>MaplibreException</c> whose status

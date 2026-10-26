@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Payload for <c>MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED</c>.
+/// Payload for <c>RuntimeEventType.MapRenderFrameFinished</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_render_frame</c> in the <see

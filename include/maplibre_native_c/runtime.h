@@ -366,8 +366,10 @@ typedef struct mln_runtime_options {
 } mln_runtime_options;
 
 /**
- * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
+ * Rendering statistics of one finished frame.
  *
+ * mln_runtime_event_render_frame carries them in the
+ * MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME payload.
  * mln_event_batch_view.event_size covers the whole event, including these
  * statistics.
  */
@@ -486,7 +488,7 @@ typedef struct mln_runtime_event {
   mln_runtime_event_type type;
   mln_runtime_event_source_type source_type;
   /**
-   * Source handle selected by source_type: an mln_runtime or an mln_map.
+   * Source handle: the mln_runtime or mln_map that source_type selects.
    *
    * The value names one object for the life of the process, so a host may
    * compare it against a handle it holds even after that handle is released.
@@ -515,7 +517,11 @@ typedef struct mln_runtime_event {
    */
   uint32_t code;
   mln_runtime_event_payload_type payload_type;
-  /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
+  /**
+   * UTF-8 message, empty when this event carries no message.
+   *
+   * The bytes are borrowed with the event.
+   */
   mln_buffer_view message;
   /** Typed payload selected by payload_type. */
   mln_runtime_event_payload payload MLN_BINDING(
@@ -537,7 +543,11 @@ typedef struct mln_event_batch_view {
    * header a caller compiled against. Index events with this value.
    */
   uint32_t event_size;
-  /** Borrowed array of event_count events in queue order. */
+  /**
+   * Events in queue order.
+   *
+   * Borrowed array of event_count events.
+   */
   const mln_runtime_event* events
     MLN_BINDING("length=event_count;stride=event_size");
   /** Number of events in events. */
@@ -547,10 +557,13 @@ typedef struct mln_event_batch_view {
 /**
  * Receives selected events after their snapshots have been published.
  *
- * Map events run on the runtime's native scheduler thread. Offline events may
- * run on a MapLibre worker thread. The callback must be thread-safe and return
- * promptly. It may call any-thread C APIs, but must not wait for runtime or
- * graphics-driver work that can only progress on its current thread.
+ * The callback must be thread-safe and return promptly. It may call any-thread
+ * C APIs, but must not wait for runtime or graphics-driver work that can only
+ * progress on its current thread.
+ *
+ * Threads:
+ * Map events arrive on the runtime's native scheduler thread, and offline
+ * events may arrive on a MapLibre worker thread.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RUNTIME_EVENTS")
 typedef void (*mln_runtime_event_callback)(
@@ -558,13 +571,14 @@ typedef void (*mln_runtime_event_callback)(
 );
 
 /**
- * Runtime and map event delivery. Exactly one of callback and queue is set.
+ * Runtime and map event callback.
  *
- * Callback mode borrows the events for the call and releases user_data after
- * replacement, clear, or runtime teardown. Queue mode copies events into
- * MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying user_data, followed by
- * MLN_DELIVERY_TYPE_RETIRED when the registration retires. Queue mode requires
- * release_user_data to be null.
+ * In queue mode, a queue takes the callback's place: exactly one of callback
+ * and queue is set. Callback mode borrows the events for the call and releases
+ * user_data after replacement, clear, or runtime teardown. Queue mode copies
+ * events into MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying user_data,
+ * followed by MLN_DELIVERY_TYPE_RETIRED when the registration retires. Queue
+ * mode requires release_user_data to be null.
  */
 typedef struct mln_runtime_event_handler {
   uint32_t size;
@@ -699,13 +713,16 @@ typedef struct mln_http_header_rule {
  * request, and releasing request without completing it keeps the URL. The
  * callback owns request until one of the two consumes it.
  *
- * The callback runs on a MapLibre network thread. It must be thread-safe and
- * return promptly, and must not wait for runtime work. url is borrowed for the
- * callback and is NUL-terminated after its bytes. The C API invokes
- * release_user_data after the final callback returns.
+ * The callback must be thread-safe and return promptly, and must not wait for
+ * runtime work. url is borrowed for the callback and is NUL-terminated after
+ * its bytes. The C API invokes release_user_data after the final callback
+ * returns.
  *
  * A transform in queue mode queues a copy as an
  * mln_resource_transform_delivery instead.
+ *
+ * Threads:
+ * The callback runs on a MapLibre network thread.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM")
 typedef void (*mln_resource_transform_callback)(
@@ -721,7 +738,11 @@ typedef void (*mln_resource_transform_callback)(
  */
 typedef struct mln_resource_transform {
   uint32_t size;
-  /** Required in callback mode; null in queue mode. */
+  /**
+   * Asks for the URL of each network resource request.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
@@ -781,10 +802,10 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
 /**
  * Adds end-to-end headers to one outgoing HTTP request attempt.
  *
- * MapLibre invokes the callback synchronously on a worker or network thread
- * after resource URL transformation and immediately before the platform HTTP
- * transport starts the attempt. kind is one mln_resource_kind value and url is
- * the transformed URL that the transport will request.
+ * MapLibre invokes the callback after resource URL transformation and
+ * immediately before the platform HTTP transport starts the attempt. kind is
+ * one mln_resource_kind value and url is the transformed URL that the
+ * transport will request.
  *
  * The callback and user_data must be thread-safe. The C API invokes
  * release_user_data after the final callback returns. url and out_response are
@@ -792,6 +813,9 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
  * bytes. Callbacks return promptly and must not wait for work that only their
  * own thread can advance. A non-OK result discards every header collected
  * during the invocation and lets the request proceed unchanged.
+ *
+ * Threads:
+ * The callback runs synchronously on a MapLibre worker or network thread.
  */
 MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
 typedef mln_status (*mln_http_header_transform_callback)(
@@ -920,7 +944,11 @@ typedef struct mln_resource_response {
   mln_resource_response_fields fields;
   mln_resource_response_status status;
   mln_resource_error_reason error_reason;
-  /** Response bytes. May be null only when byte_count is 0. */
+  /**
+   * Response bytes.
+   *
+   * May be null only when byte_count is 0.
+   */
   const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
   size_t byte_count;
   mln_buffer_view error_message;
@@ -937,12 +965,11 @@ typedef struct mln_resource_response {
 /**
  * Intercepts a network resource request.
  *
- * The callback runs synchronously on a MapLibre thread. request and its
- * pointed-to fields are borrowed for the callback. The callback owns handle
- * and answers through it, inline or later from any thread: complete the
- * request with mln_resource_request_complete(), hand it to the built-in network
- * loader with mln_resource_request_pass_through(), or release it, which fails
- * the request. Either answer consumes the handle when it returns
+ * request and its pointed-to fields are borrowed for the callback. The callback
+ * owns handle and answers through it, inline or later from any thread: complete
+ * the request with mln_resource_request_complete(), hand it to the built-in
+ * network loader with mln_resource_request_pass_through(), or release it, which
+ * fails the request. Either answer consumes the handle when it returns
  * MLN_STATUS_OK. A handle released during the callback fails the request once
  * the callback returns.
  *
@@ -952,6 +979,9 @@ typedef struct mln_resource_response {
  *
  * A provider in queue mode queues a copy of the request with its handle as an
  * mln_resource_request_delivery, for the host to answer later.
+ *
+ * Threads:
+ * The callback runs synchronously on a MapLibre thread.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST")
 typedef void (*mln_resource_provider_callback)(
@@ -961,12 +991,9 @@ typedef void (*mln_resource_provider_callback)(
 /**
  * Reports that MapLibre cancelled a C API resource provider request.
  *
- * The callback runs at most once per request, on the thread that discards the
- * request, and only for a request the provider has not completed. That thread
- * is the runtime's native scheduler thread when a committed map or runtime
- * command discards the request, such as a style change or map destruction, and
- * a MapLibre worker thread otherwise; it is never a host thread. The callback
- * must be thread-safe and return quickly. It may call the C API, including
+ * The callback runs at most once per request, and only for a request the
+ * provider has not completed. The callback must be thread-safe and return
+ * quickly. It may call the C API, including
  * mln_resource_request_release(), but must not wait for runtime work that only
  * its own thread can advance.
  *
@@ -975,6 +1002,12 @@ typedef void (*mln_resource_provider_callback)(
  *
  * A handler in queue mode queues a copy as an
  * mln_resource_request_cancel_delivery instead.
+ *
+ * Threads:
+ * The callback runs on the thread that discards the request, never a host
+ * thread: the runtime's native scheduler thread when a committed map or runtime
+ * command discards it, such as a style change or map destruction, and a
+ * MapLibre worker thread otherwise.
  */
 MLN_BINDING(
   "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL;"
@@ -985,14 +1018,18 @@ typedef void (*mln_resource_request_cancel_callback)(
 );
 
 /**
- * Cancel callback or queue state for one handled resource request.
+ * Cancel callback for one handled resource request.
  *
- * The struct itself is borrowed for the registering call. Exactly one of
- * callback and queue is set.
+ * In queue mode, a queue takes the callback's place. The struct itself is
+ * borrowed for the registering call. Exactly one of callback and queue is set.
  */
 typedef struct mln_resource_request_cancel_handler {
   uint32_t size;
-  /** Required in callback mode; null in queue mode. */
+  /**
+   * Reports the request's cancellation.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_resource_request_cancel_callback callback;
   /** Opaque host token in queue mode; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
@@ -1239,9 +1276,10 @@ MLN_API mln_status mln_resource_request_is_cancelled(
 
 /**
  * Registers a callback that runs when MapLibre cancels a C API resource
- * provider request. A request that is already cancelled registers nothing and
- * reports true through out_cancelled, and the caller handles that cancellation
- * itself.
+ * provider request.
+ *
+ * A request that is already cancelled registers nothing and reports true
+ * through out_cancelled, and the caller handles that cancellation itself.
  *
  * This function may be called from any thread while the provider still owns the
  * handle. A request accepts one registration: a later call fails and leaves the

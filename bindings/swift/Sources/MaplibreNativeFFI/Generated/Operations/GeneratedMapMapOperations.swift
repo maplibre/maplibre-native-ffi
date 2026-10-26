@@ -28,7 +28,7 @@ public extension MapHandle {
     try nativeClose { raw, diagnostic in mln_map_dispose(raw, diagnostic) }
   }
 
-  /// Ends the innermost command group that `mln_map_begin_command_group()`
+  /// Ends the innermost command group that `MapHandle.beginCommandGroup()`
   /// began.
   ///
   /// See `mln_map_end_command_group` in the

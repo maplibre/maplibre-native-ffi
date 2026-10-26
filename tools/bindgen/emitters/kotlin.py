@@ -13,10 +13,12 @@ the shared code uses (see kotlin_native).
 
 import dataclasses
 
-from tools.bindgen import docs
+from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api
-from tools.bindgen.semantic import BoundApi, DeliverySupport
+from tools.bindgen.names import camel
+from tools.bindgen.protocol import COMPLETION_RESULT
+from tools.bindgen.semantic import BoundApi, DeliverySupport, OperationPlan
 
 from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
@@ -25,9 +27,18 @@ from .kotlin_operations import (
     method_name,
     operation,
     owner_disposal,
+    public_method,
     receiver_value,
 )
-from .kotlin_values import Unsupported, Values, generated_owners, owner_name
+from .kotlin_values import (
+    Unsupported,
+    Values,
+    enum_member,
+    generated_owners,
+    identifier,
+    owner_name,
+    variant_name,
+)
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
@@ -96,8 +107,14 @@ def placement(plan) -> list[str] | None:
 
 # The C functions that the handwritten `Maplibre` objects own, on the targets
 # that can call them, so the generated API leaves them out. Their native
-# declarations stay, because those objects call them.
-HANDWRITTEN = {"mln_android_init", "mln_plugin_get_register_function_v1"}
+# declarations stay, because those objects call them. Each maps to the member
+# that a host calls.
+HANDWRITTEN = {
+    "mln_android_init": "Maplibre.initialize",
+    "mln_plugin_get_register_function_v1": "Maplibre.getPluginRegisterFunctionV1",
+}
+# The object that declares the common receiverless operations.
+API_OBJECT = "GeneratedApi"
 # The factories of the native registrations, which only the threaded targets
 # can pass (see kotlin_callbacks).
 NATIVE_REGISTRATIONS = (
@@ -138,7 +155,98 @@ def operation_doc(bound, plan, indent: str = "") -> str:
     native = bound.doc(plan.name)
     if native is not None and plan.blocks == "thread_start":
         native = dataclasses.replace(native, notes=(THREAD_START_NOTE,))
-    return docs.block_comment(native, indent)
+    return docs.block_comment(native, symbols(bound), indent)
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Kotlin spells the C declarations that its summaries name."""
+    return bound.symbols("kotlin", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    values = Values(bound)
+    # A split registration's threaded form keeps every field.
+    values.split = kotlin_callbacks.THREADED
+    # A union is presented as the record that holds it as its only value, or
+    # as the type of the record's union field.
+    unions = {}
+    for value in bound.public_values.values():
+        for field in values.fields(value):
+            if field.value.kind == "union":
+                unions.setdefault(field.value.native, values.union_name(value, field))
+    # The completion bridge takes the completion callback, and a registration
+    # holds its context's release; neither is a Kotlin type.
+    callbacks = {
+        field.value.native
+        for value in bound.public_values.values()
+        if value.registration
+        for field in async_hosts.callback_fields(value)
+    }
+
+    def type_(native: str) -> str | None:
+        if native in bound.public_handles:
+            return owner_name(bound.handles[native])
+        if native in bound.callbacks:
+            return value_name(native) if native in callbacks else None
+        if native in unions:
+            return unions[native]
+        value = bound.public_values.get(native)
+        # A slice reaches host code as its list, and the completion runtime
+        # presents a command's result as `CommandCompletion`.
+        if (
+            value is None
+            or native == COMPLETION_RESULT
+            or native in bound.slices
+            or value.kind not in {"record", "enum"}
+        ):
+            return None
+        return value_name(native)
+
+    def operation(plan: OperationPlan) -> str | None:
+        if plan.name in HANDWRITTEN:
+            return None
+        if plan.receiver:
+            owner = owner_name(bound.handles[receiver_value(plan).native])
+        elif plan.scoped_receiver:
+            owner = kotlin_callbacks.scoped_response(plan)
+        elif plan.factory:
+            owner = owner_name(bound.handles[plan.factory])
+        else:
+            owner = API_OBJECT
+        return f"{owner}.{public_method(plan)}"
+
+    def constant(value, member: str) -> str | None:
+        return f"{value_name(value.native)}.{enum_member(value, member)}"
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.union_member or value.response:
+            return None
+        if value.kind == "union":
+            return f"{typ}.{variant_name(member)}"
+        if member not in values.fields(value):
+            return None
+        return f"{typ}.{identifier(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        typ = type_(value.native)
+        return f"{typ}.{values.flag_name(value, mask_flag)}" if typ else None
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            **HANDWRITTEN,
+            **{
+                f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{camel(name)}"
+                for name in ("generation", "render_update_generation")
+            },
+        },
+    )
 
 
 def lower(api: Api | BoundApi):
@@ -291,7 +399,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     outputs = {}
     for receiver, plans in groups.items():
         family = value_name(receiver) if receiver else None
-        class_name = f"Generated{family}Operations" if receiver else "GeneratedApi"
+        class_name = f"Generated{family}Operations" if receiver else API_OBJECT
         for plan in plans:
             if (sets := placement(plan)) is None:
                 continue
@@ -371,7 +479,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 )
         else:
             source = (
-                header + "public object GeneratedApi {\n" + "\n".join(bodies) + "}\n"
+                header + f"public object {API_OBJECT} {{\n" + "\n".join(bodies) + "}\n"
             )
         outputs[f"{COMMON}/generated/{class_name}.kt"] = source
     for name, extensions in sorted(platform_extensions.items()):
@@ -403,7 +511,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             elif plan.factory:
                 receiver = companion(bound, plan)
             else:
-                receiver = "GeneratedApi"
+                receiver = API_OBJECT
             extensions.append(
                 operation_doc(bound, plan)
                 + extension(split[lowering][function.name], receiver)

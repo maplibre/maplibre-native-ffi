@@ -3,7 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Process-global log callback or queue state.
+/// Process-global log callback. The callback runs synchronously on the thread
+/// that emits the record, or on a MapLibre background thread for a severity
+/// that <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
+/// asynchronously.
 /// </summary>
 /// <remarks>
 /// See <c>mln_log_handler</c> in the <see

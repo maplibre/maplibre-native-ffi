@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Payload for <c>MLN_RUNTIME_EVENT_MAP_TILE_ACTION</c>.
+/// Payload for <c>RuntimeEventType.MapTileAction</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_tile_action</c> in the <see

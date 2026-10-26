@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .docs import section
 from .model import Api, CType, Function, ModelError
 from .names import type_name
 from .protocol import (
@@ -1031,6 +1032,17 @@ def validate(api: Api) -> None:
             )
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
+            )
+        signature = typedef.type.pointee if typedef.type.kind == "pointer" else None
+        if (
+            signature is not None
+            and signature.kind == "function"
+            and typedef.documentation
+            and not section(typedef.documentation, "Threads")
+        ):
+            # Every binding appends this paragraph to the callback's summary.
+            errors.append(
+                f"{context}: a documented callback states its threads under `Threads:`"
             )
         if typedef.metadata.get("kind") == "callback_registration":
             record = api.records_by_name.get(typedef.name)

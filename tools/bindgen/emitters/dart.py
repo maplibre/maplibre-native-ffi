@@ -6,11 +6,12 @@ import re
 from collections import defaultdict
 from dataclasses import replace
 
-from tools.bindgen import async_hosts
+from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
+from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -21,7 +22,12 @@ from .dart_values import (
     Unsupported,
     Values,
     doc,
+    enum_member,
+    identifier,
     owner_names,
+    public_name,
+    union_name,
+    variant_name,
 )
 
 # Functions that only host platform code can call. `mln_android_init` takes a
@@ -77,6 +83,149 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
+def receiver_handle(plan: OperationPlan, bound: BoundApi) -> tuple[str | None, bool]:
+    """The public handle that an operation is a method of, or None for a
+    global, and whether the call takes a pointer to it."""
+    function = plan.function
+    receiver = type_name(function.parameters[0].type) if plan.receiver else None
+    reference = False
+    if (
+        receiver
+        and function.parameters[0].type.pointee
+        and type_name(function.parameters[0].type.pointee) in bound.public_handles
+    ):
+        receiver = type_name(function.parameters[0].type.pointee)
+        reference = True
+    if receiver not in bound.public_handles:
+        return None, reference
+    return receiver, reference
+
+
+def method_name(plan: OperationPlan, bound: BoundApi, *, dispose=False) -> str:
+    """The Dart name of an operation: a method, static factory, or top-level
+    function. A receiver's release is its `close`, and a release that also
+    disposes has a synchronous `dispose` besides."""
+    name = camel(plan.member)
+    receiver, _ = receiver_handle(plan, bound)
+    handle = bound.handles.get(receiver)
+    if (
+        plan.consumes
+        and handle
+        and plan.name == handle.release
+        and not handle.release_inputs
+    ):
+        name = "close"
+    if dispose:
+        name = "dispose"
+    if name in KEYWORDS["dart"]:
+        name += "Value"
+    return name
+
+
+def view_method(name: str) -> str:
+    """The method that lends a borrowed view to a callback, for the
+    operation named `name`."""
+    return "with" + name.removeprefix("get")
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Dart spells the C declarations that its summaries name."""
+    return bound.symbols("dart", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    values = Values(bound)
+    # Each union, with the record and field that hold it.
+    unions = {
+        field.value.native: (value, field)
+        for value in bound.public_values.values()
+        for field in value.fields
+        if field.value.kind == "union"
+    }
+    # The callback types that a registration takes from Dart.
+    callbacks = {
+        field.value.native: field.value
+        for value in bound.public_values.values()
+        if not (value.registration and values.native_only(value))
+        for field in values.fields(value)
+        if field.value.kind == "callback"
+    }
+
+    def type_(native: str) -> str | None:
+        if native in bound.public_handles:
+            return owner_names(bound.handles[native])[0]
+        if native in unions:
+            return union_name(*unions[native])
+        value = callbacks.get(native) or bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`, and a slice is presented as its list alone.
+        if (
+            value is None
+            or native == COMPLETION_RESULT
+            or native in bound.slices
+            or value.kind not in {"record", "enum", "callback"}
+        ):
+            return None
+        # A lone callback that stands for its registration may be optional.
+        try:
+            return values.public(replace(value, nullable=False)).removesuffix("?")
+        except Unsupported:
+            return None
+
+    def operation(plan: OperationPlan) -> str | None:
+        if (
+            plan.name in HOST_ONLY
+            or plan.name in bound.unsupported
+            or plan.scoped_receiver
+        ):
+            return None
+        name = method_name(plan, bound)
+        if plan.view:
+            name = view_method(name)
+        owner, _ = receiver_handle(plan, bound)
+        owner = owner or plan.factory
+        if owner is None:
+            return name
+        return f"{owner_names(bound.handles[owner])[0]}.{name}"
+
+    def constant(value, member: str) -> str | None:
+        return f"{public_name(value.native)}.{enum_member(value, member)}"
+
+    def field(value, member) -> str | None:
+        if value.kind == "union":
+            record, union = unions[value.native]
+            return variant_name(record, union, member)
+        typ = type_(value.native)
+        # A lone callback stands for its registration, and a native
+        # registration takes its callbacks as constructor arguments.
+        if (
+            typ is None
+            or value.union_member
+            or values.single_callback(value)
+            or value.registration
+            and values.native_only(value)
+            or member.name not in {f.name for f in values.fields(value)}
+        ):
+            return None
+        return f"{typ}.{identifier(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{public_name(value.native)}.{identifier(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{camel(name)}"
+            for name in ("generation", "render_update_generation")
+        },
+    )
+
+
 def lower_function(
     plan: OperationPlan, values: Values, *, discard=False, dispose=False
 ) -> tuple[str, str]:
@@ -95,20 +244,8 @@ def lower_function(
         raise Unsupported(
             "operation requires its ownership or registration transaction"
         )
-    receiver = type_name(function.parameters[0].type) if plan.receiver else None
-    receiver_reference = False
-    if (
-        receiver
-        and function.parameters
-        and function.parameters[0].type.pointee
-        and type_name(function.parameters[0].type.pointee)
-        in values.bound.public_handles
-    ):
-        receiver = type_name(function.parameters[0].type.pointee)
-        receiver_reference = True
-    owner = receiver if receiver in values.bound.public_handles else "Globals"
-    if owner == "Globals":
-        receiver = None
+    receiver, receiver_reference = receiver_handle(plan, values.bound)
+    owner = receiver or "Globals"
     execution = plan.execution
     if execution not in {
         "command",
@@ -123,19 +260,7 @@ def lower_function(
     status_return = plan.status
     if not status_return and plan.completion:
         raise Unsupported("asynchronous operation requires admission status")
-    name = camel(plan.member)
-    handle_plan = values.bound.handles.get(receiver)
-    if (
-        plan.consumes
-        and handle_plan
-        and plan.name == handle_plan.release
-        and not handle_plan.release_inputs
-    ):
-        name = "close"
-    if dispose:
-        name = "dispose"
-    if name in KEYWORDS["dart"]:
-        name += "Value"
+    name = method_name(plan, values.bound, dispose=dispose)
     inputs = {p.name: p for p in plan.inputs}
     outputs = {p.name: p for p in plan.outputs}
     counts = {
@@ -484,7 +609,7 @@ def scoped_view(plan, name, signature, public, body):
     reader = "_" + name
     owner = plan.view.owner
     return (
-        f"  T with{name.removeprefix('get')}<T>(T Function(Scoped{public} view) use) => "
+        f"  T {view_method(name)}<T>(T Function(Scoped{public} view) use) => "
         f"_NativeViewScope(_state, raw.{owner.view_begin}, raw.{owner.view_end})"
         f".use((scope) => use(Scoped{public}._(scope, {reader}())));\n\n"
         f"  {public} {reader}() {method_body(body)}\n"
@@ -611,7 +736,7 @@ def render_scoped_views(bound, generated, values):
             getters.append(
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
-        method = "with" + camel(plan.member).removeprefix("get")
+        method = view_method(method_name(plan, bound))
         chunks.append(
             f"/// A `{public}` whose native objects are readable only while the\n"
             f"/// callback of `{owner_names(plan.view.owner)[0]}.{method}` runs. Its\n"
@@ -662,9 +787,9 @@ def render_owner(native, handle, bodies, bound, roots):
         )
     parameters.append(f"{native_type} handle")
     return (
-        f"/// Issued `{native}` handle id.\n"
+        "/// Issued native handle id.\n"
         f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
-        f"/// Owner of one native `{native}` handle.\n"
+        "/// Owner of one native handle.\n"
         + (f"///\n{summary}" if (summary := doc(bound, native)) else "")
         + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"

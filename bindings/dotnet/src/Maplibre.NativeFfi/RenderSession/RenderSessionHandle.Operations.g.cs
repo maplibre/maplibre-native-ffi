@@ -134,12 +134,11 @@ public sealed unsafe partial class RenderSessionHandle
 
     /// <summary>
     /// Ends every frame demand that has not started with
-    /// <c>MLN_RENDER_RESULT_NO_UPDATE</c> and completes after earlier driver
-    /// work has finished. A running demand finishes its attempt and ends any
-    /// wait for a map update or a free slot. After completion, a new frame
-    /// demand is required to render again, except that a pending still image
-    /// submits its next demand itself; see
-    /// <c>mln_map_request_still_image()</c>.
+    /// <c>RenderResult.NoUpdate</c> and completes after earlier driver work has
+    /// finished. A running demand finishes its attempt and ends any wait for a
+    /// map update or a free slot. After completion, a new frame demand is
+    /// required to render again, except that a pending still image submits its
+    /// next demand itself; see <c>MapHandle.RequestStillImageAsync()</c>.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_barrier</c> in the <see
@@ -224,9 +223,7 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Drains every currently queued terminal frame result into an
-    /// independently owned batch and borrows its view. The records remain
-    /// stable until the batch is released.
+    /// Drains every currently queued terminal frame result.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_drain_frame_results</c> in the <see
@@ -320,9 +317,7 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a feature-extension query against the latest driver state. The
-    /// completion borrows one <c>mln_buffer_view</c> holding UTF-8 JSON
-    /// (value_count 1), valid only for the callback.
+    /// Starts a feature-extension query against the latest driver state.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_query_feature_extensions</c> in the <see
@@ -525,8 +520,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// Services every queued item for a caller-graphics-thread driver. The
     /// first successful service call fixes the session's graphics-thread
     /// identity; later calls from another native thread return
-    /// <c>MLN_STATUS_WRONG_THREAD</c>. The target context must be current.
-    /// Core-worker sessions return <c>MLN_STATUS_INVALID_STATE</c>.
+    /// <c>Status.WrongThread</c>. The target context must be current.
+    /// Core-worker sessions return <c>Status.InvalidState</c>.
     /// </summary>
     /// <remarks>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,

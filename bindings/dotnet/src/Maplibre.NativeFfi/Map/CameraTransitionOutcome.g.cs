@@ -17,10 +17,10 @@ public enum CameraTransitionOutcome : uint
     Completed = 0,
 
     /// <summary>
-    /// <c>mln_map_cancel_transitions()</c>,
-    /// <c>mln_map_cancel_camera_transition()</c>, or
-    /// <c>MLN_GESTURE_PHASE_CANCEL</c> ended the transitions, or the command
-    /// failed before it started them.
+    /// <c>MapHandle.CancelTransitionsAsync()</c>,
+    /// <c>MapHandle.CancelCameraTransitionAsync()</c>, or
+    /// <c>GesturePhase.Cancel</c> ended the transitions, or the command failed
+    /// before it started them.
     /// </summary>
     Cancelled = 1,
 

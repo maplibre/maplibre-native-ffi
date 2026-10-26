@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Viewport orientation modes used by <c>mln_map_viewport_options</c>.
+/// Viewport orientation modes used by <c>MapViewportOptions</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_viewport_mode</c> in the <see

@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_resource_transform_request` native handle.
+    /// Owns one native handle.
     ///
     /// A resource URL transform that waits for its host's answer.
     ///

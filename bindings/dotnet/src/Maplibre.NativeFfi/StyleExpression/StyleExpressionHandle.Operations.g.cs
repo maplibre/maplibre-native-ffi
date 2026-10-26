@@ -126,7 +126,7 @@ public sealed unsafe partial class StyleExpressionHandle
     }
 
     /// <summary>
-    /// Copies what a parsed expression depends on into out_info.
+    /// Copies what a parsed expression depends on.
     /// </summary>
     /// <remarks>
     /// See <c>mln_style_expression_get_info</c> in the <see

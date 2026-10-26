@@ -37,7 +37,7 @@ public readonly partial record struct OfflineGeometryRegionDefinition
     public string StyleUrl { get; init; } = "";
 
     /// <summary>
-    /// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
+    /// UTF-8 GeoJSON Geometry. Required.
     /// </summary>
     public required string Geometry { get; init; }
     public double MinZoom { get; init; }

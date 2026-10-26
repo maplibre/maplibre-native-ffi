@@ -517,12 +517,58 @@ class BoundApi:
 
     @functools.cached_property
     def docs(self) -> dict[str, docs.Doc]:
-        """The documentation of each documented public declaration, by C name."""
-        return docs.index(self.source)
+        """The documentation of each documented public declaration, by C name.
+
+        A registration record, and an operation that takes one directly, end
+        with the threads of the callbacks that it registers. A registration
+        nested in another record, such as a camera command's end handler,
+        carries them in its own record's documentation.
+        """
+        index = docs.index(self.source)
+
+        def threads(descriptor: str, callbacks) -> tuple[str, ...]:
+            record = self.values[descriptor]
+            return tuple(
+                thread
+                for member in record.fields
+                if member.name in callbacks
+                for thread in getattr(index.get(member.value.native), "threads", ())
+            )
+
+        for value in self.values.values():
+            if value.registration and value.native in index:
+                index[value.native] = docs.with_threads(
+                    index[value.native],
+                    threads(value.native, value.registration.callbacks),
+                )
+        for operation in self.operations:
+            if operation.name in index:
+                index[operation.name] = docs.with_threads(
+                    index[operation.name],
+                    (
+                        thread
+                        for registration in operation.registrations
+                        if not registration.path
+                        for thread in threads(
+                            registration.descriptor, registration.callbacks
+                        )
+                    ),
+                )
+        return index
 
     def doc(self, native: str) -> docs.Doc | None:
         """The documentation of a declaration, or `record.field` member."""
         return self.docs.get(native)
+
+    @functools.cached_property
+    def _symbols(self) -> dict[str, docs.Symbol]:
+        return {}
+
+    def symbols(self, binding: str, build) -> docs.Symbol:
+        """The symbol resolver of `binding`, which `build(self)` makes once."""
+        if binding not in self._symbols:
+            self._symbols[binding] = build(self)
+        return self._symbols[binding]
 
     @functools.cached_property
     def control_enums(self) -> frozenset[str]:

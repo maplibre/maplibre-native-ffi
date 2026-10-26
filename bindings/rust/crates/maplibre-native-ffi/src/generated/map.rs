@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_map` native handle.
+    /// Owns one native handle.
     ///
     /// A map, which holds map state independent of any render target.
     ///
@@ -14,7 +14,8 @@ native_owner! {
 }
 
 impl MapHandle {
-    /// Adds a custom geometry source.
+    /// Adds a custom geometry source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -37,7 +38,8 @@ impl MapHandle {
         })
     }
 
-    /// Adds a custom MVT vector source.
+    /// Adds a custom MVT vector source. The callback may run on any native
+    /// worker thread, concurrently with runtime and map calls.
     ///
     /// See `mln_map_add_custom_mvt_vector_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -784,7 +786,7 @@ impl MapHandle {
         })
     }
 
-    /// Ends the innermost command group that `mln_map_begin_command_group()`
+    /// Ends the innermost command group that `MapHandle::begin_command_group()`
     /// began.
     ///
     /// See `mln_map_end_command_group` in the
@@ -829,8 +831,6 @@ impl MapHandle {
     }
 
     /// Queries the global-state JSON object, including style defaults.
-    /// Completion borrows one `mln_buffer_view` for the duration of the
-    /// callback.
     ///
     /// See `mln_map_get_global_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1616,7 +1616,7 @@ impl MapHandle {
         })
     }
 
-    /// Submits copied axonometric rendering option fields.
+    /// Submits axonometric rendering options.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1848,7 +1848,8 @@ impl MapHandle {
     }
 }
 impl MapHandleDiscarding<'_> {
-    /// Adds a custom geometry source.
+    /// Adds a custom geometry source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1871,7 +1872,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a custom MVT vector source.
+    /// Adds a custom MVT vector source. The callback may run on any native
+    /// worker thread, concurrently with runtime and map calls.
     ///
     /// See `mln_map_add_custom_mvt_vector_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2089,7 +2091,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Ends the innermost command group that `mln_map_begin_command_group()`
+    /// Ends the innermost command group that `MapHandle::begin_command_group()`
     /// began.
     ///
     /// See `mln_map_end_command_group` in the
@@ -2549,7 +2551,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits copied axonometric rendering option fields.
+    /// Submits axonometric rendering options.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

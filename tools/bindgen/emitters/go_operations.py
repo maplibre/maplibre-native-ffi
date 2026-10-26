@@ -29,6 +29,46 @@ def method_name(plan, receiver, handle):
     return method
 
 
+def receiver_of(plan):
+    """The parameter of the handle or response that an operation is a method
+    of, and that value, or Nones for a package function."""
+    receiver_name = plan.receiver or plan.scoped_receiver
+    receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
+    return receiver, element(receiver.value) if receiver else None
+
+
+def receiver_type_name(plan, values):
+    """The Go type that an operation is a method of, or None for a package
+    function."""
+    receiver, handle = receiver_of(plan)
+    if receiver is None:
+        return None
+    if plan.scoped_receiver:
+        return public(handle.native) + "Scope"
+    return values.owner(handle.native)
+
+
+def declared_name(plan, bound, *, dispose=False):
+    """The Go name of an operation's method or package function."""
+    receiver, handle = receiver_of(plan)
+    method = "Dispose" if dispose else method_name(plan, receiver, handle)
+    if plan.factory:
+        # Go names a constructor New and the type that it returns.
+        return "New" + name(bound.handles[plan.factory].stem)
+    if plan.view:
+        return "With" + name(plan.view.stem)
+    if (
+        receiver
+        and not plan.completion
+        and len(method) > 3
+        and method.startswith("Get")
+        and all(p.name == receiver.name for p in plan.inputs)
+    ):
+        # Go getters drop Get; queries that return a Future keep it.
+        return method.removeprefix("Get")
+    return method
+
+
 def argument(values, value, expr):
     """A Go expression that converts expr to the native value of a parameter."""
     if value.kind in {"scalar", "enum"}:
@@ -135,23 +175,8 @@ def operation(plan, values, *, discard=False, dispose=False):
             [f"{plan.name}: support relationship is emitted with its owner or value"]
         )
     receiver_name = plan.receiver or plan.scoped_receiver
-    receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
-    handle = element(receiver.value) if receiver else None
-    method = "Dispose" if dispose else method_name(plan, receiver, handle)
-    if plan.factory:
-        # Go names a constructor New and the type that it returns.
-        method = "New" + name(values.api.handles[plan.factory].stem)
-    elif plan.view:
-        method = "With" + name(plan.view.stem)
-    elif (
-        receiver
-        and not plan.completion
-        and len(method) > 3
-        and method.startswith("Get")
-        and all(p.name == receiver_name for p in plan.inputs)
-    ):
-        # Go getters drop Get; queries that return a Future keep it.
-        method = method.removeprefix("Get")
+    receiver, handle = receiver_of(plan)
+    method = declared_name(plan, values.api, dispose=dispose)
     internal = {
         "arena",
         "raw",
@@ -477,13 +502,7 @@ def operation(plan, values, *, discard=False, dispose=False):
             invocation = f"return bindingGet({target}, {check}, {result_closure})"
         else:
             invocation = f"return bindingDo({target}, {check})"
-    receiver_type = (
-        public(handle.native) + "Scope"
-        if plan.scoped_receiver
-        else values.owner(handle.native)
-        if receiver
-        else None
-    )
+    receiver_type = receiver_type_name(plan, values)
     receiver_signature = f"(receiver *{receiver_type}) " if receiver else ""
     if discard:
         receiver_signature = f"(view {receiver_type}Discarding) "

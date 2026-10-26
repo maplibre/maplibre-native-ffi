@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_render_session` native handle.
+    /// Owns one native handle.
     ///
     /// A render session, which renders one map to one render target.
     ///
@@ -50,11 +50,11 @@ impl RenderSessionHandle {
     }
 
     /// Ends every frame demand that has not started with
-    /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work
-    /// has finished. A running demand finishes its attempt and ends any wait
-    /// for a map update or a free slot. After completion, a new frame demand is
+    /// `RenderResult::NoUpdate` and completes after earlier driver work has
+    /// finished. A running demand finishes its attempt and ends any wait for a
+    /// map update or a free slot. After completion, a new frame demand is
     /// required to render again, except that a pending still image submits its
-    /// next demand itself; see `mln_map_request_still_image()`.
+    /// next demand itself; see `MapHandle::request_still_image()`.
     ///
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -131,9 +131,7 @@ impl RenderSessionHandle {
             .map_err(|error| (self, error))
     }
 
-    /// Drains every currently queued terminal frame result into an
-    /// independently owned batch and borrows its view. The records remain
-    /// stable until the batch is released.
+    /// Drains every currently queued terminal frame result.
     ///
     /// See `mln_render_session_drain_frame_results` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -210,9 +208,7 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_snapshot) }?)
     }
 
-    /// Starts a feature-extension query against the latest driver state. The
-    /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
-    /// 1), valid only for the callback.
+    /// Starts a feature-extension query against the latest driver state.
     ///
     /// See `mln_render_session_query_feature_extensions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -366,8 +362,8 @@ impl RenderSessionHandle {
     /// Services every queued item for a caller-graphics-thread driver. The
     /// first successful service call fixes the session's graphics-thread
     /// identity; later calls from another native thread return
-    /// `MLN_STATUS_WRONG_THREAD`. The target context must be current.
-    /// Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+    /// `Status::WrongThread`. The target context must be current. Core-worker
+    /// sessions return `Status::InvalidState`.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

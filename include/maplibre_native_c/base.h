@@ -202,9 +202,13 @@ typedef struct mln_buffer_view {
  * Releases the user_data of a callback registration.
  *
  * Each registration struct's release_user_data member states when native code
- * calls it and on which thread. A null release_user_data leaves user_data with
- * the caller. Every callback the C API invokes returns normally, and must not
- * throw, panic, longjmp, or otherwise unwind through the C API.
+ * calls it. A null release_user_data leaves user_data with the caller. Every
+ * callback the C API invokes returns normally, and must not throw, panic,
+ * longjmp, or otherwise unwind through the C API.
+ *
+ * Threads:
+ * Each registration struct's release_user_data member names the thread that
+ * runs it.
  */
 typedef void (*mln_user_data_release)(void* user_data);
 

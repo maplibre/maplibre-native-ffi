@@ -10,19 +10,19 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Source">
-/// Source handle selected by source_type: an <c>mln_runtime</c> or an
-/// <c>mln_map</c>.
+/// Source handle: the <c>RuntimeHandle</c> or <c>MapHandle</c> that source_type
+/// selects.
 /// </param>
 /// <param name="Generation">
 /// Map snapshot generation that the event reports, or zero when source_type is
-/// <c>MLN_RUNTIME_EVENT_SOURCE_RUNTIME</c>.
+/// <c>RuntimeEventSourceType.Runtime</c>.
 /// </param>
 /// <param name="Code">
 /// Secondary event detail whose meaning type selects; see
-/// <c>mln_runtime_event_type</c>.
+/// <c>RuntimeEventType</c>.
 /// </param>
 /// <param name="Message">
-/// Borrowed UTF-8 message bytes, empty when this event carries no message.
+/// UTF-8 message, empty when this event carries no message.
 /// </param>
 /// <param name="Payload">
 /// Typed payload selected by payload_type.

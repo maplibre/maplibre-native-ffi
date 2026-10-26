@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 
 from ..semantic import output_member
-from .typescript import Lowered, attachment_name, scoped_name
+from .typescript import Lowered, attachment_name, owner_native, scoped_name
 from .typescript_values import (
     Unsupported,
     Values,
@@ -226,11 +226,7 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     if handle.observable_root_release:
         options.append("root: true")
     summary = doc(bound, native)
-    text = (
-        f"/**\n * Owner of one native `{native}` handle.\n */\n"
-        if not summary
-        else summary
-    )
+    text = "/**\n * Owner of one native handle.\n */\n" if not summary else summary
     text += f"export class {public} extends Owner {{\n"
     text += (
         "  /**\n   * Created by the API, which passes a key that only it holds.\n"
@@ -471,6 +467,11 @@ def render_deliveries(bound, values: Values) -> str:
     )
 
 
+def code(text: str) -> str:
+    """TypeScript text without its comments, whose prose imports nothing."""
+    return re.sub(r"/\*.*?\*/|//[^\n]*", "", text, flags=re.DOTALL)
+
+
 def value_imports(values: Values, text: str) -> str:
     names = sorted({public_name(native) for native in values.used})
     used = [name for name in names if re.search(rf"\b{name}\b", text)]
@@ -526,7 +527,7 @@ def render_operations(bound, values: Values, lowered: list[Lowered]):
     by_owner: dict[str | None, list[Lowered]] = {}
     for entry in lowered:
         # A factory is a static method of the handle that it creates.
-        by_owner.setdefault(entry.owner or entry.plan.factory, []).append(entry)
+        by_owner.setdefault(owner_native(entry), []).append(entry)
     chunks = []
     for entry in sorted(by_owner.get(None, []), key=lambda e: e.method):
         chunks.append(render_method(bound, values, entry, ""))
@@ -541,8 +542,8 @@ def render_operations(bound, values: Values, lowered: list[Lowered]):
     operations = (
         HEADER
         + "\n"
-        + runtime_imports(body)
-        + value_imports(values, body)
+        + runtime_imports(code(body))
+        + value_imports(values, code(body))
         + "\n"
         + body
     )

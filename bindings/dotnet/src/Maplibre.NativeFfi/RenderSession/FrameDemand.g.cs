@@ -10,11 +10,11 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Flags">
-/// A bitwise OR of <c>mln_frame_demand_flag</c> values. Zero renders only when
-/// a newer map update exists, without presenting.
+/// Frame-demand policy. Zero renders only when a newer map update exists,
+/// without presenting.
 /// </param>
 /// <param name="Token">
-/// Host identity returned with the terminal frame result. Any value except
-/// <c>MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE</c>, the maximum uint64_t value.
+/// Host identity returned with the terminal frame result. Any value except the
+/// maximum uint64_t value.
 /// </param>
 public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token);

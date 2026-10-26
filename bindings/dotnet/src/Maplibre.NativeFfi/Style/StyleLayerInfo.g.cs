@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One style layer, borrowed for a completion callback.
+/// One style layer.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_layer_info</c> in the <see

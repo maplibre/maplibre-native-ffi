@@ -96,7 +96,9 @@ KEYWORDS = {
 
 def doc(bound, native: str, indent: str = "") -> str:
     """The KDoc comment of a declaration, or empty when it has none."""
-    return docs.block_comment(bound.doc(native), indent)
+    from .kotlin import symbols
+
+    return docs.block_comment(bound.doc(native), symbols(bound), indent)
 
 
 def is_text(value):
@@ -378,12 +380,9 @@ class Values:
             public = name(value.native)
             if value.kind == "enum":
                 scalar = self.scalar(value)[0]
-                prefix = enum_member_prefix(
-                    (n for n, _ in value.enum_values), value.native
-                )
                 bitmask = value.enum_kind == "bitmask"
                 constants = [
-                    f"{doc(self.bound, native, '    ')}    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
+                    f"{doc(self.bound, native, '    ')}    public val {enum_member(value, native)}: {public} = {public}({literal(number, scalar)})"
                     for native, number in value.enum_values
                 ]
                 if bitmask and not any(n == 0 for _, n in value.enum_values):
@@ -399,10 +398,10 @@ class Values:
                                 f"  public infix fun or(other: {public}): {public} = {public}(rawValue or other.rawValue)",
                                 f"  public infix fun and(other: {public}): {public} = {public}(rawValue and other.rawValue)",
                                 f"  public operator fun contains(other: {public}): Boolean = (rawValue and other.rawValue) == other.rawValue",
-                                flag_label(value, prefix, scalar),
+                                flag_label(value, scalar),
                             ]
                             if bitmask
-                            else [enum_label(public, value, prefix, scalar)]
+                            else [enum_label(public, value, scalar)]
                         ),
                         "  public companion object {",
                         *constants,
@@ -514,8 +513,8 @@ class Values:
 
     def union_declaration(self, public, union, documentation):
         variants = [
-            f"{doc(self.bound, f'{union.native}.{v.name}', '  ')}  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {public}"
-            + content_equality(pascal(v.name), [("value", self.public(v.value))])
+            f"{doc(self.bound, f'{union.native}.{v.name}', '  ')}  public data class {variant_name(v)}(public val value: {self.public(v.value)}): {public}"
+            + content_equality(variant_name(v), [("value", self.public(v.value))])
             for v in union.fields
         ]
         if union.empty_variant:
@@ -786,7 +785,7 @@ class Values:
         for variant in field.value.fields:
             number = self.bound.enum_number(variant.presence.variant)
             lines.append(
-                f"    is {public}.{pascal(variant.name)} -> {{ "
+                f"    is {public}.{variant_name(variant)} -> {{ "
                 + self.write_scalar(tag.value, tag_address, literal(number, tag_type))
                 + "; "
                 + self.place(variant.value, union, "variant.value")
@@ -960,7 +959,7 @@ class Values:
         for variant in field.value.fields:
             number = self.bound.enum_number(variant.presence.variant)
             arms.append(
-                f"{literal(number, tag_type)} -> {public}.{pascal(variant.name)}({self.decode(variant.value, union)})"
+                f"{literal(number, tag_type)} -> {public}.{variant_name(variant)}({self.decode(variant.value, union)})"
             )
         if field.value.empty_variant:
             arms.append(
@@ -1044,38 +1043,52 @@ FLAGS_NOTE = (
 
 def enum_doc(bound, value):
     """The KDoc of an enum or flag set, which says that C may add values."""
+    from .kotlin import symbols
+
     found = bound.doc(value.native)
     note = FLAGS_NOTE if value.enum_kind == "bitmask" else ENUM_NOTE
     if found is None:
-        return docs.block_comment(docs.Doc(value.native, note))
-    return docs.block_comment(replace(found, notes=(*found.notes, note)))
+        return docs.block_comment(docs.Doc(value.native, note), symbols(bound))
+    return docs.block_comment(
+        replace(found, notes=(*found.notes, note)), symbols(bound)
+    )
+
+
+def enum_member(value, native):
+    """The companion constant of the C enum constant [native]."""
+    prefix = enum_member_prefix((n for n, _ in value.enum_values), value.native)
+    return native.removeprefix(prefix)
+
+
+def variant_name(field):
+    """The data class of a union member."""
+    return pascal(field.name)
 
 
 def zero_constant(value):
     """The companion constant whose raw value is zero: a C member, or a flag set's `NONE`."""
-    prefix = enum_member_prefix((n for n, _ in value.enum_values), value.native)
     member = next((n for n, number in value.enum_values if number == 0), None)
     if member is not None:
-        return member.removeprefix(prefix)
+        return enum_member(value, member)
     return "NONE" if value.enum_kind == "bitmask" else None
 
 
-def flag_label(value, prefix, scalar):
+def flag_label(value, scalar):
     """A `toString` that names a flag set's single-bit members and keeps unknown bits in hex."""
     bits = {}
     for native, number in value.enum_values:
         if number > 0 and number & (number - 1) == 0:
-            bits.setdefault(number, native.removeprefix(prefix))
+            bits.setdefault(number, enum_member(value, native))
     flags = ", ".join(f'{number}uL to "{label}"' for number, label in bits.items())
     raw = "rawValue" if scalar == "ULong" else "rawValue.toULong()"
     return f'  override fun toString(): String = flagLabel({raw}, "{zero_constant(value)}", listOf({flags}))'
 
 
-def enum_label(public, value, prefix, scalar):
+def enum_label(public, value, scalar):
     """A `toString` that names an open enum's constant and keeps an unknown value's number."""
     labels = {}
     for native, number in value.enum_values:
-        labels.setdefault(number, native.removeprefix(prefix))
+        labels.setdefault(number, enum_member(value, native))
     branches = "; ".join(
         f'{literal(number, scalar)} -> "{label}"' for number, label in labels.items()
     )

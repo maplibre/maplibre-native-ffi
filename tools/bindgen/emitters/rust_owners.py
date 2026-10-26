@@ -81,7 +81,7 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     )
     return (
         "native_owner! {\n"
-        f"    /// Owns one `{native}` native handle.\n"
+        "    /// Owns one native handle.\n"
         + (f"    ///\n{summary}" if (summary := doc(bound, native, "    ")) else "")
         + f"{must_use}"
         f"    pub struct {owner}({native}) dispose {finalize};\n"

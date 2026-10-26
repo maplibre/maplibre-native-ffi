@@ -8,7 +8,8 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import pascal
-from tools.bindgen.semantic import BoundApi
+from tools.bindgen.protocol import COMPLETION_RESULT
+from tools.bindgen.semantic import BoundApi, OperationPlan
 
 SCALARS = {
     "int8_t": "i8",
@@ -85,7 +86,114 @@ def status_call(
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The Zig doc comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), indent)
+    return docs.line_comment(bound.doc(native), symbols(bound), indent)
+
+
+def type_name(native: str) -> str:
+    """The public type of a handle, record, enum, or named union."""
+    return pascal(native.removeprefix("mln_"))
+
+
+def status_error(constant: str) -> str:
+    """The error that a failing `mln_status` constant names."""
+    return pascal(constant.removeprefix("MLN_STATUS_").lower())
+
+
+def owned_handles(bound: BoundApi):
+    """The handles that have an owner type: those whose every finalizer the
+    binding generates."""
+    return [
+        handle
+        for handle in bound.handles.values()
+        if all(name in bound.operations_by_name for name in handle.finalize)
+    ]
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Zig spells the C declarations that its summaries name."""
+    return bound.symbols("zig", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    from .zig_callbacks import parameter_name
+    from .zig_operations import function_name, method_name
+    from .zig_values import Values, enum_member
+
+    values = Values(bound)
+    owners = {handle.native for handle in owned_handles(bound)}
+    # A record that holds only a union presents the union under its own name.
+    holders = {
+        member.value.native: value
+        for value in bound.values.values()
+        if (member := value.union_member)
+    }
+
+    def type_(native: str) -> str | None:
+        if native in owners:
+            return type_name(native)
+        value = holders.get(native) or bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`, and a slice record is presented as its slice.
+        if (
+            value is None
+            or value.native == COMPLETION_RESULT
+            or value.native in bound.slices
+            or value.kind not in {"record", "union", "enum"}
+        ):
+            return None
+        return values.public(value)
+
+    def operation(plan: OperationPlan) -> str | None:
+        native = receiver_native(plan)
+        # A factory is a function of the type that it creates.
+        container = native or plan.factory
+        if container is None:
+            return function_name(plan, values)
+        typ = type_(container)
+        if typ is None:
+            return None
+        name = method_name(plan) if native else function_name(plan, values)
+        return f"{typ}.{name}"
+
+    def constant(value, member: str) -> str | None:
+        # A failing status is an error of every call that returns a status.
+        if value.native == "mln_status" and dict(value.enum_values)[member] != 0:
+            return f"error.{status_error(member)}"
+        return f"{values.public(value)}.{parameter_name(enum_member(value, member))}"
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        # A response presents no members, a record that holds only a union
+        # presents the union's variants instead, and a registration presents
+        # its user data and release as `context` and `release_context`.
+        if (
+            typ is None
+            or value.response
+            or value.union_member
+            or (
+                value.registration
+                and member.name
+                in {value.registration.user_data, value.registration.release}
+            )
+        ):
+            return None
+        return f"{typ}.{parameter_name(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{values.public(value)}.{parameter_name(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{member}"
+            for member in ("generation", "render_update_generation")
+        },
+    )
 
 
 def event_sources(bound: BoundApi) -> frozenset[str]:
@@ -246,9 +354,7 @@ pub const OwnedValue = marshal.OwnedValue;
 """
     bound = compile_api(api, frozenset(PLATFORMS))
     owners = []
-    for handle in bound.handles.values():
-        if any(name not in bound.operations_by_name for name in handle.finalize):
-            continue
+    for handle in owned_handles(bound):
         calls = []
         for finalizer in handle.finalize:
             function = bound.operations_by_name[finalizer].function
@@ -266,7 +372,7 @@ pub const OwnedValue = marshal.OwnedValue;
                 if function.return_type.kind == "void"
                 else status_call(function, arguments, "null")
             )
-        public = pascal(handle.native.removeprefix("mln_"))
+        public = type_name(handle.native)
         dispose = (
             "null"
             if handle.scoped_release is None
@@ -372,7 +478,7 @@ pub const Diagnostic = diagnostics.Diagnostic;
     files = {"maplibre_native_ffi.zig": source}
     if status_value:
         entries = [
-            (key, pascal(key.removeprefix("MLN_STATUS_").lower()))
+            (key, status_error(key))
             for key, number in status_value.enum_values
             if number != 0
         ]

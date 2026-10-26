@@ -49,7 +49,7 @@ public readonly partial record struct VulkanContextDescriptor
     /// <summary>
     /// Borrowed graphics VkQueue. Required. The session's driver submits to it
     /// from its own thread, so a host that uses the same queue passes
-    /// <c>mln_render_session_attach_options.queue_lock</c> at attach.
+    /// <c>RenderSessionAttachOptions.QueueLock</c> at attach.
     /// </summary>
     public required NativePointer GraphicsQueue { get; init; }
 

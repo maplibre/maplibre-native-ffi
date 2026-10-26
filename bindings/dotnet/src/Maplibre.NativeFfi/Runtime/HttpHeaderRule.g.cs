@@ -39,7 +39,7 @@ public readonly partial record struct HttpHeaderRule
 
     /// <summary>
     /// The headers to set. Registration validates each one as
-    /// <c>mln_http_header_transform_response_set_header()</c> does.
+    /// <c>HttpHeaderTransformResponse.SetHeader()</c> does.
     /// </summary>
     public ImmutableArray<HttpHeader> Headers
     {

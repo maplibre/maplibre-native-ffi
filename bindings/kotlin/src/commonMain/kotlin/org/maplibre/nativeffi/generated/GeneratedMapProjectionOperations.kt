@@ -10,7 +10,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
   internal abstract val binding: HandleState
 
   /**
-   * Copies the projection camera into out_camera.
+   * Copies the projection camera.
    *
    * See `mln_map_projection_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

@@ -442,9 +442,17 @@ typedef struct mln_texture_image_info {
   size_t byte_length;
 } mln_texture_image_info;
 
-/** Texture readback borrowed for a completion callback. */
+/**
+ * Texture readback.
+ *
+ * A completion callback borrows it.
+ */
 typedef struct mln_texture_readback_result {
-  /** Borrowed pixel bytes, valid only during the callback. */
+  /**
+   * Pixel bytes.
+   *
+   * Borrowed, valid only during the callback.
+   */
   mln_buffer_view data MLN_BINDING("encoding=bytes");
   mln_texture_image_info info;
 } mln_texture_readback_result;

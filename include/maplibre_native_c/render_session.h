@@ -116,13 +116,15 @@ typedef uint32_t mln_frame_demand_flags;
 typedef struct mln_frame_demand {
   uint32_t size;
   /**
-   * A bitwise OR of mln_frame_demand_flag values. Zero renders only when a
-   * newer map update exists, without presenting.
+   * Frame-demand policy. Zero renders only when a newer map update exists,
+   * without presenting.
    */
   mln_frame_demand_flags flags;
   /**
    * Host identity returned with the terminal frame result. Any value except
-   * MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, the maximum uint64_t value.
+   * the maximum uint64_t value.
+   *
+   * MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE names the reserved value.
    */
   uint64_t token;
 } mln_frame_demand;
@@ -189,7 +191,9 @@ typedef struct mln_render_frame_batch_view {
    */
   uint32_t result_size;
   /**
-   * Borrowed array of result_count terminal frame results in completion order.
+   * Terminal frame results in completion order.
+   *
+   * Borrowed array of result_count results.
    */
   const mln_render_frame_result* results
     MLN_BINDING("length=result_count;stride=result_size");
@@ -302,9 +306,10 @@ MLN_API mln_status mln_render_session_request_frame(
 ) MLN_NOEXCEPT;
 
 /**
- * Drains every currently queued terminal frame result into an independently
- * owned batch and borrows its view. The records remain stable until the batch
- * is released.
+ * Drains every currently queued terminal frame result.
+ *
+ * The results move into an independently owned batch, and the function borrows
+ * its view. The records remain stable until the batch is released.
  *
  * Returns:
  * - MLN_STATUS_OK when a batch holding at least one result is published in

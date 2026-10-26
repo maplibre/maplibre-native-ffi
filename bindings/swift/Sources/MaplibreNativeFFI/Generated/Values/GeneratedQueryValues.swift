@@ -3,7 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// One rendered-feature query hit borrowed for a completion callback.
+/// One rendered-feature query hit.
 ///
 /// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -156,7 +156,7 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
 /// See `mln_screen_line_string` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct ScreenLineString: Equatable, Hashable, Sendable {
-  /// Points. Null only when point_count is 0.
+  /// Points.
   public var points: [ScreenPoint]
   public init(points: [ScreenPoint] = []) {
     self.points = points
@@ -180,7 +180,7 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
   }
 }
 
-/// One source-feature query hit borrowed for a completion callback.
+/// One source-feature query hit.
 ///
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).

@@ -23,7 +23,10 @@ public extension Maplibre {
     ) }
   }
 
-  /// Installs a process-global MapLibre Native log callback.
+  /// Installs a process-global MapLibre Native log callback. The callback runs
+  /// synchronously on the thread that emits the record, or on a MapLibre
+  /// background thread for a severity that `Maplibre.setLogAsyncSeverityMask()`
+  /// dispatches asynchronously.
   ///
   /// See `mln_log_set_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).

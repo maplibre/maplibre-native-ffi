@@ -34,7 +34,7 @@ def operation(plan, values):
 {chr(10).join(members)}
 }}
 """
-    method = camel("with_" + view.stem)
+    method = method_name(plan)
     copied = f"{'try ' if dynamic(value) else ''}{public}(raw: raw)"
     functions = values.bound.source.functions_by_name
     begin = native_call(functions[view.begin], "raw", "token")
@@ -48,3 +48,8 @@ def operation(plan, values):
 """,
         owner_name(view.owner),
     )
+
+
+def method_name(plan):
+    """The name of the method that lends a view to a closure."""
+    return camel("with_" + plan.view.stem)

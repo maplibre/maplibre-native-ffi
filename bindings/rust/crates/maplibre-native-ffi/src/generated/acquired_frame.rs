@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_acquired_frame` native handle.
+    /// Owns one native handle.
     ///
     /// A rendered frame that a render session lends until its release.
     ///

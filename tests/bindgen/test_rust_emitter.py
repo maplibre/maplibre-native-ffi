@@ -181,6 +181,17 @@ class RustEmitterTests(unittest.TestCase):
         self.assertIn("Fn(LogSeverity, LogEvent, i64, &str) -> bool", values)
         self.assertIn('callback::invoke("mln_log_callback", false, ||', values)
 
+    def test_docs_name_the_rust_symbols_of_c_declarations(self):
+        values = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        self.assertIn(
+            "    /// `MapHandle::cancel_transitions()`,\n"
+            "    /// `MapHandle::cancel_camera_transition()`, or `GesturePhase::Cancel` ended\n",
+            values,
+        )
+        self.assertNotIn("`mln_map_cancel_transitions()`", values)
+
     def test_a_status_callback_separates_conversion_from_host_failure(self):
         values = rust.generate(real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"

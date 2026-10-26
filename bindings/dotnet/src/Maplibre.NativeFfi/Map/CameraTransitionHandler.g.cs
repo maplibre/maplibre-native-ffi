@@ -3,8 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Callback or queue state that one camera command copies to report the end of
-/// its transitions.
+/// Callback that one camera command copies to report the end of its
+/// transitions. The callback runs on the runtime worker.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_transition_handler</c> in the <see

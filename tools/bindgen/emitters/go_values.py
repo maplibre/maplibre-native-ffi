@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from ..model import ModelError
 from ..semantic import enum_member_prefix
-from .go import doc, name, native_identifier
+from .go import doc, name, native_identifier, symbols
 
 
 def is_text(value):
@@ -14,6 +14,30 @@ def is_text(value):
 
 def public(native):
     return name(native.removeprefix("mln_"))
+
+
+def enum_member(value, key):
+    """The Go constant of an enum's C constant: the type name, then the
+    constant without the enum's shared prefix."""
+    prefix = enum_member_prefix((known for known, _ in value.enum_values), value.native)
+    return public(value.native) + name(key.removeprefix(prefix).lower())
+
+
+def union_name(records, value):
+    """The Go interface of a union, named after the record among `records`
+    that holds it."""
+    parent, member = next(
+        (p, f) for p in records for f in p.fields if f.value.native == value.native
+    )
+    # A record that holds only a union presents the union in its place.
+    if parent.union_member:
+        return public(parent.native)
+    return public(parent.native) + name(member.name)
+
+
+def variant_name(union, variant):
+    """The Go type of one union variant."""
+    return union + name(variant.name) + "Variant"
 
 
 def scalar(ctype, carrier=None):
@@ -146,16 +170,7 @@ class Values:
         return result
 
     def union_name(self, value):
-        parent, member = next(
-            (p, f)
-            for p in self.records.values()
-            for f in p.fields
-            if f.value.native == value.native
-        )
-        # A record that holds only a union presents the union in its place.
-        if parent.union_member:
-            return public(parent.native)
-        return public(parent.native) + name(member.name)
+        return union_name(self.records.values(), value)
 
     def unknown(self, value):
         """Whether a union keeps tags this binding predates as UnknownVariant:
@@ -169,7 +184,7 @@ class Values:
         for variant in union.fields:
             write = f"*(*C.{variant.value.native})(unsafe.Pointer(&{dest}))"
             arms.append(
-                f"case {self.union_name(union)}{name(variant.name)}Variant: {self.native(variant.value, 'variant.Value', write)}"
+                f"case {variant_name(self.union_name(union), variant)}: {self.native(variant.value, 'variant.Value', write)}"
             )
         # A pointer to a variant, or a type embedding one, also satisfies the
         # sealed interface, so every union rejects what the switch doesn't name.
@@ -299,7 +314,7 @@ class Values:
         for f in value.fields:
             read = f"*(*C.{f.value.native})(unsafe.Pointer(&{expr}))"
             arms.append(
-                f"case C.{f.presence.variant}: return {self.union_name(value)}{name(f.name)}Variant{{Value: {self.copy(f.value, read)}}}"
+                f"case C.{f.presence.variant}: return {variant_name(self.union_name(value), f)}{{Value: {self.copy(f.value, read)}}}"
             )
         if value.empty_variant:
             arms.append(f"case C.{value.empty_variant[0]}: return nil")
@@ -407,7 +422,7 @@ class Values:
             prefix = enum_member_prefix((key for key, _ in value.enum_values), native)
             constants = "\n".join(
                 doc(self.api, key, None)
-                + f"{typename}{name(key.removeprefix(prefix).lower())} {typename} = {typename}(C.{key})"
+                + f"{enum_member(value, key)} {typename} = {typename}(C.{key})"
                 for key, number in value.enum_values
             )
             chunks.append(
@@ -416,7 +431,7 @@ class Values:
             )
             if value.enum_kind != "bitmask":
                 cases = "\n".join(
-                    f'case {number}: return "{typename}{name(key.removeprefix(prefix).lower())}"'
+                    f'case {number}: return "{enum_member(value, key)}"'
                     for number, key in {
                         number: key for key, number in value.enum_values
                     }.items()
@@ -442,7 +457,7 @@ class Values:
                 # String names each single-bit flag; wider members are unions
                 # of those bits.
                 flags = ", ".join(
-                    f'{{{number}, "{typename}{name(key.removeprefix(prefix).lower())}"}}'
+                    f'{{{number}, "{enum_member(value, key)}"}}'
                     for key, number in value.enum_values
                     if number > 0 and number & (number - 1) == 0
                 )
@@ -470,7 +485,7 @@ class Values:
             if self.unknown(value):
                 chunks.append(f"func (UnknownVariant) {marker}() {{}}")
             for f in value.fields:
-                wrapper = typename + name(f.name) + "Variant"
+                wrapper = variant_name(typename, f)
                 chunks.append(
                     doc(self.api, f"{native}.{f.name}", wrapper)
                     + f"type {wrapper} struct {{ Value {self.type(f.value)} }}\nfunc ({wrapper}) bindingTag() uint32 {{ return uint32(C.{f.presence.variant}) }}\nfunc ({wrapper}) {marker}() {{}}"
@@ -513,7 +528,9 @@ class Values:
                     ]
                     fields.append(
                         callback_doc(
-                            doc(self.api, f"{native}.{member}", None), callback
+                            doc(self.api, f"{native}.{member}", None),
+                            callback,
+                            symbols(self.api),
                         )
                         + f"{name(member)} {signature(self, callback)}"
                     )

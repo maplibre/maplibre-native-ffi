@@ -35,7 +35,7 @@ public sealed record GeoJsonSourceOptions
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object
     /// whose members follow the MapLibre Style Spec clusterProperties form, or
-    /// empty for none. The UTF-8 bytes are borrowed for the call.
+    /// empty for none.
     /// </summary>
     public string ClusterProperties { get; init; } = "";
 

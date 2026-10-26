@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Rendering statistics reported in
-/// <c>MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME</c>.
+/// Rendering statistics of one finished frame.
 /// </summary>
 /// <remarks>
 /// See <c>mln_rendering_stats</c> in the <see

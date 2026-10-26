@@ -16,11 +16,11 @@ from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
+from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     HandlePlan,
     OperationPlan,
-    enum_member_prefix,
     output_member,
     public_stem,
 )
@@ -30,6 +30,7 @@ from .dotnet_values import (
     TEXT_ENCODINGS,
     Unsupported,
     Values,
+    enum_member,
     member,
     raw_handle,
     typed_mask,
@@ -166,7 +167,127 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     found = bound.doc(native)
     if found is not None and native in NOTES:
         found = replace(found, notes=(*found.notes, *NOTES[native]))
-    return docs.xml_comment(found, indent)
+    return docs.xml_comment(found, symbols(bound), indent)
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How .NET spells the C declarations that its summaries name."""
+    return bound.symbols("dotnet", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    values = Values(bound)
+    supported, used_records = set(), set()
+    for plan in bound.operations:
+        if plan.support:
+            continue
+        try:
+            _, _, records = emit_operation(plan, bound)
+        except Unsupported:
+            continue
+        supported.add(plan.name)
+        used_records |= records
+    enums = declared_enums(bound, values)
+    delegates = delegate_types(values, used_records)
+    # A union is a nested type of the record that holds it, or that record
+    # itself when the record holds only the union.
+    unions = {
+        field.value.native: (holder, name, field)
+        for holder in bound.values.values()
+        if holder.native in used_records
+        for name, field in values.members(holder)
+        if field.value.kind == "union"
+    }
+
+    def type_(native: str) -> str | None:
+        if handle := bound.handles.get(native):
+            return owner_name(handle)
+        if native in bound.callbacks:
+            return public_type(native) if native in delegates else None
+        value = bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`.
+        if value is None or native == COMPLETION_RESULT:
+            return None
+        if value.kind == "union":
+            if native not in unions:
+                return None
+            holder, name, field = unions[native]
+            return values.member_type(holder, name, field)
+        if value.kind == "enum":
+            return public_type(native) if native in enums else None
+        if value.kind == "record" and native not in bound.slices:
+            return public_type(native) if native in used_records else None
+        return None
+
+    def operation(plan: OperationPlan) -> str | None:
+        name = method_name(plan, bound)
+        if plan.name not in supported or name is None:
+            return None
+        return f"{operation_owner(plan, bound)}.{name}"
+
+    def constant(value, key: str) -> str | None:
+        typ = type_(value.native)
+        if typ is None:
+            return None
+        return (
+            f"{typ}.{enum_member(value.native, (k for k, _ in value.enum_values), key)}"
+        )
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.response or value.union_member:
+            return None
+        if value.kind == "union":
+            # Each variant is a nested record of the union's type.
+            return f"{typ}.{pascal(member.name)}"
+        name = next(
+            (n for n, f in values.members(value) if f.name == member.name), None
+        )
+        return f"{typ}.{name}" if name else None
+
+    def flag(value, mask_flag) -> str | None:
+        typ = type_(value.native)
+        return f"{typ}.{values.flag_name(mask_flag)}" if typ else None
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{pascal(name)}"
+            for name in ("generation", "render_update_generation")
+        },
+    )
+
+
+def declared_enums(bound: BoundApi, values: Values) -> set[str]:
+    """The public enums that the binding declares."""
+    names = set()
+    for value in bound.public_values.values():
+        if value.kind == "enum":
+            try:
+                values.supported(value)
+            except Unsupported:
+                continue
+            names.add(value.native)
+    return names
+
+
+def delegate_types(values: Values, records) -> list[str]:
+    """The callback types of the registrations among `records`, which the
+    binding declares as delegates."""
+    return sorted(
+        {
+            next(field for field in plan.fields if field.name == name).value.native
+            for plan in map(values.record, records)
+            if plan.registration
+            for name in plan.registration.callbacks
+        }
+    )
 
 
 def owner_name(handle: HandlePlan | str) -> str:
@@ -338,6 +459,76 @@ def completion_query(
     raise Unsupported(f"result {native!r} with shape {shape!r} needs a conversion rule")
 
 
+def receiver_native(plan: OperationPlan) -> str:
+    """The C type of the handle or response that an operation is a method of,
+    or empty for a static method."""
+    parameter = next(
+        (
+            parameter
+            for parameter in plan.function.parameters
+            if parameter.name == (plan.receiver or plan.scoped_receiver)
+        ),
+        None,
+    )
+    if parameter is None:
+        return ""
+    return type_name(parameter.type.pointee or parameter.type)
+
+
+def operation_owner(plan: OperationPlan, bound: BoundApi) -> str:
+    """The class that declares an operation's method: the receiver's owner or
+    response class, the factory's owner, or `MaplibreNative` for a process
+    global."""
+    receiver = receiver_native(plan)
+    if plan.scoped_receiver:
+        return public_type(receiver)
+    if receiver:
+        return owner_name(bound.handles.get(receiver) or receiver)
+    if plan.factory:
+        return owner_name(bound.handles[plan.factory])
+    return "MaplibreNative"
+
+
+def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str | None:
+    """The .NET name of an operation's method: `Dispose` for a release that
+    the owner's dispose runs, or None for one that no method runs. A
+    discarding command keeps the name without `Async`."""
+    function = plan.function
+    handle = bound.handles.get(receiver_native(plan))
+    name = pascal(plan.member)
+    answers = bool(plan.consumes and not plan.release and not plan.completion)
+    if handle and function.name == handle.discard:
+        return name
+    if (
+        plan.consumes
+        and handle
+        and function.name == handle.release
+        and handle.release_inputs
+    ) or (answers and handle):
+        return name if answers else "Release"
+    if (
+        handle is not None
+        and function.name == handle.release
+        and plan.completion
+        and not handle.release_inputs
+    ):
+        return "CloseAsync"
+    if plan.view:
+        return "With" + name.removeprefix("Get")
+    # A drain, and a call that creates an owner, which awaits its readiness
+    # through the owner, keep their names.
+    if plan.drain or plan.owned_outputs:
+        return name
+    if not plan.completion:
+        if handle and handle.release == function.name and len(function.parameters) == 1:
+            # Dispose already runs the release when no separate dispose exists.
+            if handle.dispose not in {None, handle.release}:
+                return "Close"
+            return "Dispose" if handle.scoped_release == function.name else None
+        return name
+    return name if discard else name + "Async"
+
+
 def emit_operation(
     plan: OperationPlan, bound: BoundApi, *, discard=False
 ) -> tuple[str, str, set[str]]:
@@ -358,39 +549,22 @@ def emit_operation(
     values = Values(bound)
     if reason := operation_contract(plan):
         raise Unsupported(reason)
-    receiver_parameter = next(
-        (
-            parameter
-            for parameter in function.parameters
-            if parameter.name == (plan.receiver or plan.scoped_receiver)
-        ),
-        None,
-    )
-    receiver = type_name(receiver_parameter.type) if receiver_parameter else ""
-    if receiver_parameter and receiver_parameter.type.pointee:
-        receiver = type_name(receiver_parameter.type.pointee)
+    receiver = receiver_native(plan)
     if receiver and receiver not in owners and not plan.scoped_receiver:
         raise Unsupported(f"receiver {receiver} requires its generated owner")
-    static = receiver_parameter is None
+    static = not receiver
     owner_expression = "null" if static else "owner" if discard else "this"
     factory = plan.factory
     if factory and factory not in owners:
         raise Unsupported("factory output requires its generated owner")
-    owner_class = (
-        public_type(receiver)
-        if plan.scoped_receiver
-        else owners[receiver]
-        if receiver
-        else owners[factory]
-        if factory
-        else "MaplibreNative"
-    )
+    owner_class = operation_owner(plan, bound)
+    declared = method_name(plan, bound, discard=discard)
     handle_plan = bound.handles.get(receiver)
     if handle_plan and function.name == handle_plan.discard:
         # Retirement runs the discard, since it is the handle's cleanup.
         return (
             owner_class,
-            method(f"public void {pascal(plan.member)}()", ["state.Retire();"]),
+            method(f"public void {declared}()", ["state.Retire();"]),
             set(),
         )
     # A release with inputs, or an answer that consumes its receiver, runs
@@ -439,7 +613,7 @@ def emit_operation(
         return (
             owner_class,
             method(
-                f"public void {pascal(plan.member) if answers else 'Release'}({', '.join(declarations)})",
+                f"public void {declared}({', '.join(declarations)})",
                 [
                     *body,
                     f"state.Release((live, diagnostic) => {call}{', idempotent: false' if answers else ''});",
@@ -458,7 +632,7 @@ def emit_operation(
             owners[receiver],
             (
                 method(
-                    "public Task CloseAsync()",
+                    f"public Task {declared}()",
                     ["state.Close(idempotent: false);", "return teardown;"],
                 )
                 # A scope that exits after an explicit close or dispose does
@@ -808,7 +982,6 @@ def emit_operation(
         prologue.insert(0, "var receiverHandle = owner.Handle;")
         args[0] = "receiverHandle"
     arguments = ", ".join(args)
-    name = pascal(plan.member)
     modifiers = "public static" if static else "public"
     if pins and (plan.view or text):
         raise Unsupported("a pinned span requires a single native call")
@@ -839,7 +1012,7 @@ def emit_operation(
         return (
             owner_class,
             method(
-                f"public void With{name.removeprefix('Get')}({', '.join(parameters)})",
+                f"public void {declared}({', '.join(parameters)})",
                 body,
             ),
             records | values.plans.keys(),
@@ -913,7 +1086,7 @@ def emit_operation(
                 return owners[receiver], "", set()
             return (
                 owners[receiver],
-                "    public void Close() { state.Close(); }\n",
+                f"    public void {declared}() {{ state.Close(); }}\n",
                 records | values.plans.keys(),
             )
         if function.return_type.kind != "void" and not plan.status:
@@ -930,7 +1103,7 @@ def emit_operation(
             return (
                 owner_class,
                 method(
-                    f"{modifiers} {result_type} {name}({', '.join(parameters)})",
+                    f"{modifiers} {result_type} {declared}({', '.join(parameters)})",
                     pinned(body),
                 ),
                 records | values.plans.keys(),
@@ -1004,7 +1177,6 @@ def emit_operation(
                 else:
                     result_type = f"Task<{value_type}>"
                     start = f"NativeCompletion.Start<{value_type}>(&nativeCompletion, {converter}, out var nativePending)"
-            name += "Async"
             body = prologue + [
                 *submitted(function, args, start),
                 "return scope.Accepted(nativePending.Submitted(nativeStatus));",
@@ -1012,7 +1184,8 @@ def emit_operation(
     return (
         owner_class,
         method(
-            f"{modifiers} {result_type} {name}({', '.join(parameters)})", pinned(body)
+            f"{modifiers} {result_type} {declared}({', '.join(parameters)})",
+            pinned(body),
         ),
         records | values.plans.keys(),
     )
@@ -1187,14 +1360,7 @@ def emit(api: Api | BoundApi) -> Emission:
         methods[owner].insert(0, declarations)
     used_records = set().union(*records.values()) if records else set()
     values = Values(bound)
-    enum_names = set()
-    for value in bound.public_values.values():
-        if value.kind == "enum":
-            try:
-                values.supported(value)
-            except Unsupported:
-                continue
-            enum_names.add(value.native)
+    enum_names = declared_enums(bound, values)
     declared_owners = {
         owner_name(handle): api.functions_by_name[handle.release].location.path
         for handle in bound.handles.values()
@@ -1323,14 +1489,7 @@ def emit(api: Api | BoundApi) -> Emission:
         files[f"{directory}/{public_type(name)}.g.cs"] = (
             HEADER + f"namespace {NAMESPACE};\n\n" + doc(bound, name) + declaration
         )
-    delegates = sorted(
-        {
-            next(field for field in plan.fields if field.name == name).value.native
-            for plan in map(values.record, used_records)
-            if plan.registration
-            for name in plan.registration.callbacks
-        }
-    )
+    delegates = delegate_types(values, used_records)
     for native in delegates:
         directory = directory_for(api.typedefs_by_name[native].location.path)
         found = bound.doc(native)
@@ -1340,14 +1499,14 @@ def emit(api: Api | BoundApi) -> Emission:
         files[f"{directory}/{public_type(native)}.g.cs"] = (
             HEADER
             + f"namespace {NAMESPACE};\n\n"
-            + docs.xml_comment(found)
+            + docs.xml_comment(found, symbols(bound))
             + values.delegate(native)
         )
     for enum in api.enums:
         if enum.name not in enum_names:
             continue
         directory = directory_for(enum.location.path)
-        prefix = enum_member_prefix((value.name for value in enum.values), enum.name)
+        constants = [value.name for value in enum.values]
         underlying = PRIMITIVES.get(enum.underlying_type.spelling)
         if underlying is None:
             underlying = {
@@ -1359,7 +1518,7 @@ def emit(api: Api | BoundApi) -> Emission:
         flags = "[Flags]\n" if enum.metadata.get("kind") == "bitmask" else ""
         fields = [
             doc(bound, value.name, "    ")
-            + f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
+            + f"    {enum_member(enum.name, constants, value.name)} = {value.value},"
             for value in enum.values
         ]
         files[f"{directory}/{public_type(enum.name)}.g.cs"] = (

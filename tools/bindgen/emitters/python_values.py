@@ -71,6 +71,24 @@ def public_name(native: str) -> str:
     return "".join(x.capitalize() for x in native.removeprefix("mln_").split("_"))
 
 
+def scope_name(native: str) -> str:
+    """The class of a callback response, which is valid only during the
+    callback."""
+    return public_name(native) + "Scope"
+
+
+def enum_member(plan: ValuePlan, key: str) -> str:
+    """The Python name of an enum constant."""
+    prefix = enum_member_prefix((known for known, _ in plan.enum_values), plan.native)
+    return key.removeprefix(prefix)
+
+
+def variant_name(parent: ValuePlan, field) -> str:
+    """The class of a union member, named after the record that holds the
+    union."""
+    return public_name(parent.native) + public_name(field.name) + "Variant"
+
+
 def native_name(plan: ValuePlan) -> str:
     """The class of a registration's native form."""
     return "Native" + public_name(plan.native)
@@ -107,6 +125,13 @@ class Values:
         self.omittable: set[str] = set()
         self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
+
+    @property
+    def symbol(self) -> docs.Symbol:
+        """How Python spells the C declarations that its summaries name."""
+        from .python import symbols
+
+        return symbols(self.api)
 
     def fail(self, plan: ValuePlan, reason: str) -> NoReturn:
         raise ModelError([f"Python: {plan.native}: {reason}"])
@@ -186,7 +211,9 @@ class Values:
         elif plan.native in self.api.slices:
             return self.type(self.api.slices[plan.native].value, input=input)
         elif plan.kind in {"record", "enum"}:
-            result = public_name(plan.native) + ("Scope" if plan.response else "")
+            result = (
+                scope_name(plan.native) if plan.response else public_name(plan.native)
+            )
             if plan.registration and async_hosts.accepts_native(self.api, plan):
                 result += " | " + native_name(plan)
         elif plan.kind == "native_pointer":
@@ -230,7 +257,7 @@ class Values:
         )
         if parent is None:
             self.fail(plan, "union has no containing record")
-        return public_name(parent.native) + public_name(field.name) + "Variant"
+        return variant_name(parent, field)
 
     def members(self, plan: ValuePlan):
         for field in plan.fields:
@@ -531,21 +558,20 @@ class Values:
                     python.append(
                         f"@dataclass(frozen=True, slots=True)\nclass {variant_name}:\n"
                         + docs.docstring(
-                            self.api.doc(f"{union.native}.{field.name}"), "    "
+                            self.api.doc(f"{union.native}.{field.name}"),
+                            self.symbol,
+                            "    ",
                         )
                         + f"    value: {self.type(field.value)}\n    _tag = {tag}\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls({self.facade_copy(field.value, 'raw')})\n"
                     )
         for name, plan in sorted(self.enums.items()):
-            prefix = enum_member_prefix(
-                (key for key, _ in plan.enum_values), plan.native
-            )
             body = "\n".join(
-                f"    {key.removeprefix(prefix)} = {value}"
+                f"    {enum_member(plan, key)} = {value}"
                 for key, value in plan.enum_values
             )
             python.append(
                 f"class {public_name(name)}({'IntFlag' if plan.enum_kind == 'bitmask' else 'UnknownIntEnum'}):\n"
-                + docs.docstring(self.api.doc(name), "    ")
+                + docs.docstring(self.api.doc(name), self.symbol, "    ")
                 + f"{body or '    pass'}\n"
             )
         for name, plan in sorted(self.records.items()):
@@ -572,7 +598,7 @@ class Values:
         name = plan.native
         python = (
             f"type {public_name(name)} = {self.type(plan.union_member.value)}\n"
-            + docs.docstring(self.api.doc(name), "")
+            + docs.docstring(self.api.doc(name), self.symbol, "")
         )
         if not copied or name not in self.outputs:
             return "", python
@@ -601,10 +627,7 @@ class Values:
                 return (
                     f" = field(default_factory=lambda: {public_name(plan.native)}(0))"
                 )
-            prefix = enum_member_prefix(
-                (key for key, _ in plan.enum_values), plan.native
-            )
-            return f" = {public_name(plan.native)}.{zero.removeprefix(prefix)}"
+            return f" = {public_name(plan.native)}.{enum_member(plan, zero)}"
         if plan.kind == "buffer":
             return ' = b""' if plan.encoding == "bytes" else ' = ""'
         if plan.kind == "array":
@@ -662,7 +685,9 @@ class Values:
             )
             fields.append(
                 f"    {member}: {public_type}{default}\n"
-                + docs.docstring(self.api.doc(f"{name}.{field.name}"), "    ")
+                + docs.docstring(
+                    self.api.doc(f"{name}.{field.name}"), self.symbol, "    "
+                )
             )
             if value.registration:
                 # Native never returns callbacks, so a copy leaves them unset.
@@ -679,7 +704,7 @@ class Values:
             )
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"
-            + docs.docstring(self.api.doc(name), "    ")
+            + docs.docstring(self.api.doc(name), self.symbol, "    ")
             + "\n".join(sorted(fields, key=lambda line: " = " in line) or ["    pass"])
             + "\n"
         )

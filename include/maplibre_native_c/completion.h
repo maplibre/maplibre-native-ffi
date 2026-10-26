@@ -71,7 +71,13 @@ typedef struct mln_completion_result {
   size_t value_count;
 } mln_completion_result;
 
-/** Receives one terminal result for an accepted asynchronous submission. */
+/**
+ * Receives one terminal result for an accepted asynchronous submission.
+ *
+ * Threads:
+ * The completion runs on an unspecified thread, which may be the submitting
+ * thread.
+ */
 typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );

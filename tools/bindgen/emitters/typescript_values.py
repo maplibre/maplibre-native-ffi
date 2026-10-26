@@ -220,7 +220,9 @@ def parameter_name(name: str) -> str:
 
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
-    return docs.block_comment(bound.doc(native), indent)
+    from .typescript import symbols
+
+    return docs.block_comment(bound.doc(native), symbols(bound), indent)
 
 
 def enum_members(value: ValuePlan) -> list[tuple[str, str, int]]:
@@ -245,6 +247,11 @@ def is_counted(value: ValuePlan) -> bool:
 def owner_class(handle) -> str:
     stem = identifier(handle.stem)
     return stem[:1].upper() + stem[1:] + "Handle"
+
+
+def native_fields(public: str) -> str:
+    """The interface of the fields that a registration's `native()` takes."""
+    return f"Native{public}Fields"
 
 
 def union_kinds(value: ValuePlan) -> list[tuple[str | None, str, str | None]]:
@@ -639,7 +646,7 @@ class Values:
         the same name whose `native()` creates one, and the fields that
         `native()` takes."""
         public = public_name(value.native)
-        fields = f"Native{public}Fields"
+        fields = native_fields(public)
         native = f'NativeRegistration<"{public}">'
         if entry.form == "native":
             alias = native

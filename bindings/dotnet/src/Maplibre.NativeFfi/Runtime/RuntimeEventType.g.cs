@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Runtime event types carried by <c>mln_runtime_event.type</c>.
+/// Runtime event types carried by <c>RuntimeEvent.Type</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_type</c> in the <see

@@ -77,7 +77,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a custom geometry source.
+    /// Adds a custom geometry source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_add_custom_geometry_source</c> in the <see
@@ -102,7 +103,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a custom MVT vector source.
+    /// Adds a custom MVT vector source. The callback may run on any native
+    /// worker thread, concurrently with runtime and map calls.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_add_custom_mvt_vector_source</c> in the <see
@@ -766,7 +768,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     /// <summary>
     /// Ends the innermost command group that
-    /// <c>mln_map_begin_command_group()</c> began.
+    /// <c>MapHandle.BeginCommandGroupAsync()</c> began.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_end_command_group</c> in the <see
@@ -842,8 +844,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     /// <summary>
     /// Queries the global-state JSON object, including style defaults.
-    /// Completion borrows one <c>mln_buffer_view</c> for the duration of the
-    /// callback.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_get_global_state</c> in the <see
@@ -1906,7 +1906,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Submits copied axonometric rendering option fields.
+    /// Submits axonometric rendering options.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_set_projection_mode</c> in the <see

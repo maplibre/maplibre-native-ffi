@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from .. import docs
 from ..semantic import required_callbacks
-from .swift import SCALARS, camel, doc, identifier, name
+from .swift import SCALARS, camel, doc, identifier, name, symbols
 
 
 def contains_callback(value):
@@ -63,7 +63,7 @@ def declaration(values, value):
     found = values.bound.doc(value.native)
     if found is not None and note:
         found = replace(found, notes=(*found.notes, note))
-    return f"{docs.line_comment(found)}public typealias {alias(callback)} = {closure_type(values, callback)}\n"
+    return f"{docs.line_comment(found, symbols(values.bound))}public typealias {alias(callback)} = {closure_type(values, callback)}\n"
 
 
 def raw_type(type_):

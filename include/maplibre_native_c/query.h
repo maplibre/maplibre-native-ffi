@@ -41,7 +41,11 @@ typedef struct mln_screen_box {
 
 /** Screen-space line string in logical map pixels. */
 typedef struct mln_screen_line_string {
-  /** Points. Null only when point_count is 0. */
+  /**
+   * Points.
+   *
+   * Null only when point_count is 0.
+   */
   const mln_screen_point* points MLN_BINDING("length=point_count");
   size_t point_count;
 } mln_screen_line_string;
@@ -114,9 +118,10 @@ typedef struct mln_source_feature_query_options {
 } mln_source_feature_query_options;
 
 /**
- * One rendered-feature query hit borrowed for a completion callback.
+ * One rendered-feature query hit.
  *
- * Every view is valid only for that callback; copy what the host keeps.
+ * A completion callback borrows it, and every view is valid only for that
+ * callback; copy what the host keeps.
  * feature is one UTF-8 GeoJSON Feature, and layer_id is the style layer that
  * rendered it. A feature that several style layers render yields one hit per
  * layer. source_id, source_layer_id, and state are empty when absent; a layer
@@ -132,9 +137,10 @@ typedef struct mln_rendered_feature {
 } mln_rendered_feature;
 
 /**
- * One source-feature query hit borrowed for a completion callback.
+ * One source-feature query hit.
  *
- * Every view is valid only for that callback; copy what the host keeps.
+ * A completion callback borrows it, and every view is valid only for that
+ * callback; copy what the host keeps.
  * feature is one UTF-8 GeoJSON Feature. source_layer_id names the vector source
  * layer the feature came from, and is empty for a source without source
  * layers, such as GeoJSON.
@@ -206,9 +212,10 @@ MLN_API mln_status mln_render_session_query_source_features(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a feature-extension query against the latest driver state. The
- * completion borrows one mln_buffer_view holding UTF-8 JSON (value_count 1),
- * valid only for the callback.
+ * Starts a feature-extension query against the latest driver state.
+ *
+ * The completion borrows one mln_buffer_view holding UTF-8 JSON (value_count
+ * 1), valid only for the callback.
  *
  * For the supercluster extension, the feature's cluster_id property and the
  * limit and offset arguments are nonnegative JSON integers, such as 5 rather

@@ -11,9 +11,9 @@ import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
- * Process-global log callback or queue state. This is the Kotlin/Wasm queue form: the page receives
- * each call after native has answered it. The JVM, Android, and Kotlin/Native take `LogHandler`,
- * whose callback computes the answer.
+ * Process-global log callback. This is the Kotlin/Wasm queue form: the page receives each call
+ * after native has answered it. The JVM, Android, and Kotlin/Native take `LogHandler`, whose
+ * callback computes the answer.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -73,7 +73,9 @@ internal fun NativeCall.writeHttpHeaderTransformRules(value: HttpHeaderTransform
   allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransformRules(it, value) }
 
 /**
- * Installs a process-global MapLibre Native log callback.
+ * Installs a process-global MapLibre Native log callback. The callback runs synchronously on the
+ * thread that emits the record, or on a MapLibre background thread for a severity that
+ * `GeneratedApi.setLogAsyncSeverityMask()` dispatches asynchronously.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -85,7 +87,8 @@ public fun GeneratedApi.setLogCallback(handler: QueuedLogHandler): Unit =
   }
 
 /**
- * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+ * Registers or replaces the runtime-scoped outgoing HTTP header transform. The callback runs
+ * synchronously on a MapLibre worker or network thread.
  *
  * See `mln_runtime_set_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

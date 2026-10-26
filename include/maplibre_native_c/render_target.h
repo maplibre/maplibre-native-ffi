@@ -60,6 +60,10 @@ typedef uint32_t mln_render_session_capability_flags;
 /**
  * Takes or returns the host's lock on the queue that a session shares with it.
  * Native code relies on the lock being held or released when the call returns.
+ *
+ * Threads:
+ * The callback runs on the session's graphics thread or on the thread that
+ * abandons the session.
  */
 MLN_BINDING("synchronous=true")
 typedef void (*mln_queue_lock_callback)(void* user_data);
@@ -161,11 +165,13 @@ typedef struct mln_render_session_attach_options {
   /** Where the session's driver runs. Required. */
   mln_render_driver_kind driver MLN_BINDING("required=true");
   /**
-   * Requested slot count of a session-owned texture ring, up to
-   * MLN_TEXTURE_RING_MAX_DEPTH. Zero selects 2, so the host can retain one
-   * frame while the session renders its replacement. Private targets grant
-   * one slot regardless of this value. A borrowed texture ring's depth is its
-   * texture count, so borrowed and other targets ignore this value.
+   * Requested slot count of a session-owned texture ring, up to 8. Zero selects
+   * 2, so the host can retain one frame while the session renders its
+   * replacement. Private targets grant one slot regardless of this value. A
+   * borrowed texture ring's depth is its texture count, so borrowed and other
+   * targets ignore this value.
+   *
+   * MLN_TEXTURE_RING_MAX_DEPTH names the maximum.
    */
   uint32_t requested_texture_ring_depth;
   /**

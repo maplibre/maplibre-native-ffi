@@ -261,7 +261,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Selects how runtime and map events reach the host.
+   * Selects how runtime and map events reach the host. Map events arrive on the runtime's native
+   * scheduler thread, and offline events may arrive on a MapLibre worker thread.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -344,7 +345,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Registers or replaces a runtime-scoped network resource provider.
+   * Registers or replaces a runtime-scoped network resource provider. The callback runs
+   * synchronously on a MapLibre thread.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -362,7 +364,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Registers or updates a runtime-scoped URL transform for network resources.
+   * Registers or updates a runtime-scoped URL transform for network resources. The callback runs on
+   * a MapLibre network thread.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -289,7 +289,8 @@ class _MapHandleOperations(GeneratedOperations):
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom geometry source.
+        """Adds a custom geometry source. The callback may run on any native
+        worker thread, concurrently with runtime and map calls.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -299,7 +300,8 @@ class _MapHandleOperations(GeneratedOperations):
     def add_custom_mvt_vector_source(
         self, source_id: str, options: CustomMvtVectorSourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom MVT vector source.
+        """Adds a custom MVT vector source. The callback may run on any native
+        worker thread, concurrently with runtime and map calls.
 
         See `mln_map_add_custom_mvt_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -590,8 +592,8 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.dump_debug_logs()
 
     def end_command_group(self) -> Future[CommandCompletion]:
-        """Ends the innermost command group that `mln_map_begin_command_group()`
-        began.
+        """Ends the innermost command group that
+        `MapHandle.begin_command_group()` began.
 
         See `mln_map_end_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -619,8 +621,6 @@ class _MapHandleOperations(GeneratedOperations):
 
     def get_global_state(self) -> Future[Any]:
         """Queries the global-state JSON object, including style defaults.
-        Completion borrows one `mln_buffer_view` for the duration of the
-        callback.
 
         See `mln_map_get_global_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1056,7 +1056,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_image_source_url(source_id, url)
 
     def set_projection_mode(self, mode: ProjectionMode) -> Future[CommandCompletion]:
-        """Submits copied axonometric rendering option fields.
+        """Submits axonometric rendering options.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1205,7 +1205,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         )
 
     def get_camera(self) -> CameraOptions:
-        """Copies the projection camera into out_camera.
+        """Copies the projection camera.
 
         See `mln_map_projection_get_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1325,11 +1325,11 @@ class _RenderSessionHandleOperations(GeneratedOperations):
 
     def barrier(self) -> Future[None]:
         """Ends every frame demand that has not started with
-        `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work
-        has finished. A running demand finishes its attempt and ends any wait
-        for a map update or a free slot. After completion, a new frame demand
-        is required to render again, except that a pending still image
-        submits its next demand itself; see `mln_map_request_still_image()`.
+        `RenderResult.NO_UPDATE` and completes after earlier driver work has
+        finished. A running demand finishes its attempt and ends any wait for
+        a map update or a free slot. After completion, a new frame demand is
+        required to render again, except that a pending still image submits
+        its next demand itself; see `MapHandle.request_still_image()`.
 
         See `mln_render_session_barrier` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1362,9 +1362,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.close()
 
     def drain_frame_results(self) -> tuple[RenderFrameResult, ...]:
-        """Drains every currently queued terminal frame result into an
-        independently owned batch and borrows its view. The records remain
-        stable until the batch is released.
+        """Drains every currently queued terminal frame result.
 
         See `mln_render_session_drain_frame_results` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1406,9 +1404,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         extension_field: str,
         arguments: Any,
     ) -> Future[Any]:
-        """Starts a feature-extension query against the latest driver state. The
-        completion borrows one `mln_buffer_view` holding UTF-8 JSON
-        (value_count 1), valid only for the callback.
+        """Starts a feature-extension query against the latest driver state.
 
         See `mln_render_session_query_feature_extensions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -1496,8 +1492,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Services every queued item for a caller-graphics-thread driver. The
         first successful service call fixes the session's graphics-thread
         identity; later calls from another native thread return
-        `MLN_STATUS_WRONG_THREAD`. The target context must be current.
-        Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+        `Status.WRONG_THREAD`. The target context must be current.
+        Core-worker sessions return `Status.INVALID_STATE`.
 
         See `mln_render_session_service_driver_work` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1611,9 +1607,10 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
 
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
         """Registers a callback that runs when MapLibre cancels a C API resource
-        provider request. A request that is already cancelled registers
-        nothing and reports true through out_cancelled, and the caller
-        handles that cancellation itself.
+        provider request. The callback runs on the thread that discards the
+        request, never a host thread: the runtime's native scheduler thread
+        when a committed map or runtime command discards it, such as a style
+        change or map destruction, and a MapLibre worker thread otherwise.
 
         See `mln_resource_request_set_cancel_callback` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1805,7 +1802,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_event_handler(
         self, handler: RuntimeEventHandler
     ) -> Future[CommandCompletion]:
-        """Selects how runtime and map events reach the host.
+        """Selects how runtime and map events reach the host. Map events arrive
+        on the runtime's native scheduler thread, and offline events may
+        arrive on a MapLibre worker thread.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1824,7 +1823,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
         self, transform: HttpHeaderTransform
     ) -> Future[CommandCompletion]:
         """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform.
+        transform. The callback runs synchronously on a MapLibre worker or
+        network thread.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1862,7 +1862,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_resource_provider(
         self, provider: ResourceProvider
     ) -> Future[CommandCompletion]:
-        """Registers or replaces a runtime-scoped network resource provider.
+        """Registers or replaces a runtime-scoped network resource provider. The
+        callback runs synchronously on a MapLibre thread.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1873,7 +1874,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         self, transform: ResourceTransform
     ) -> Future[CommandCompletion]:
         """Registers or updates a runtime-scoped URL transform for network
-        resources.
+        resources. The callback runs on a MapLibre network thread.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1925,7 +1926,7 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
         return self._native.evaluate(inputs)
 
     def get_info(self) -> StyleExpressionInfo:
-        """Copies what a parsed expression depends on into out_info.
+        """Copies what a parsed expression depends on.
 
         See `mln_style_expression_get_info` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -1990,7 +1991,10 @@ def set_log_async_severity_mask(mask: LogSeverityFlag) -> None:
 
 
 def set_log_callback(handler: LogHandler) -> None:
-    """Installs a process-global MapLibre Native log callback.
+    """Installs a process-global MapLibre Native log callback. The callback
+    runs synchronously on the thread that emits the record, or on a
+    MapLibre background thread for a severity that
+    `set_log_async_severity_mask()` dispatches asynchronously.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2038,8 +2042,7 @@ def open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
 
 
 def get_plugin_register_function_v1() -> int:
-    """Returns the process-wide `mln_plugin_register_v1` entry point; never
-    null.
+    """Returns the process-wide plugin registration entry point; never null.
 
     See `mln_plugin_get_register_function_v1` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
@@ -2078,7 +2081,8 @@ class MapHandleDiscarding:
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> None:
-        """Adds a custom geometry source.
+        """Adds a custom geometry source. The callback may run on any native
+        worker thread, concurrently with runtime and map calls.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2088,7 +2092,8 @@ class MapHandleDiscarding:
     def add_custom_mvt_vector_source(
         self, source_id: str, options: CustomMvtVectorSourceOptions
     ) -> None:
-        """Adds a custom MVT vector source.
+        """Adds a custom MVT vector source. The callback may run on any native
+        worker thread, concurrently with runtime and map calls.
 
         See `mln_map_add_custom_mvt_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2199,8 +2204,8 @@ class MapHandleDiscarding:
         return self._native._discard_dump_debug_logs()
 
     def end_command_group(self) -> None:
-        """Ends the innermost command group that `mln_map_begin_command_group()`
-        began.
+        """Ends the innermost command group that
+        `MapHandle.begin_command_group()` began.
 
         See `mln_map_end_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2457,7 +2462,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_image_source_url(source_id, url)
 
     def set_projection_mode(self, mode: ProjectionMode) -> None:
-        """Submits copied axonometric rendering option fields.
+        """Submits axonometric rendering options.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2639,7 +2644,9 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_resource_transform()
 
     def set_event_handler(self, handler: RuntimeEventHandler) -> None:
-        """Selects how runtime and map events reach the host.
+        """Selects how runtime and map events reach the host. Map events arrive
+        on the runtime's native scheduler thread, and offline events may
+        arrive on a MapLibre worker thread.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2648,7 +2655,8 @@ class RuntimeHandleDiscarding:
 
     def set_http_header_transform(self, transform: HttpHeaderTransform) -> None:
         """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform.
+        transform. The callback runs synchronously on a MapLibre worker or
+        network thread.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2656,7 +2664,8 @@ class RuntimeHandleDiscarding:
         return self._native._discard_set_http_header_transform(transform)
 
     def set_resource_provider(self, provider: ResourceProvider) -> None:
-        """Registers or replaces a runtime-scoped network resource provider.
+        """Registers or replaces a runtime-scoped network resource provider. The
+        callback runs synchronously on a MapLibre thread.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2665,7 +2674,7 @@ class RuntimeHandleDiscarding:
 
     def set_resource_transform(self, transform: ResourceTransform) -> None:
         """Registers or updates a runtime-scoped URL transform for network
-        resources.
+        resources. The callback runs on a MapLibre network thread.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

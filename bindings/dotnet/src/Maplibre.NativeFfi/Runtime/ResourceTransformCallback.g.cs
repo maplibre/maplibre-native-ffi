@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Asks the host for the URL of one network resource request.
+/// Asks the host for the URL of one network resource request. The callback runs
+/// on a MapLibre network thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_transform_callback</c> in the <see

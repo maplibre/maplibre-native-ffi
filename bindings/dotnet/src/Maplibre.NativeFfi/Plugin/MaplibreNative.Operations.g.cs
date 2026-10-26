@@ -8,8 +8,7 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Returns the process-wide <c>mln_plugin_register_v1</c> entry point;
-    /// never null.
+    /// Returns the process-wide plugin registration entry point; never null.
     /// </summary>
     /// <remarks>
     /// See <c>mln_plugin_get_register_function_v1</c> in the <see

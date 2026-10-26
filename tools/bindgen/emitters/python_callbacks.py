@@ -238,7 +238,7 @@ def sources(values, plan):
 """)
     native_class = ""
     if async_hosts.accepts_native(values.api, plan):
-        native_method, native_class = native_sources(plan)
+        native_method, native_class = native_sources(values, plan)
         methods.append(native_method)
     record_rust, record_python = values.record_sources(
         plain_fields(plan),
@@ -255,7 +255,7 @@ def sources(values, plan):
     return "\n".join(rust), "\n".join(python)
 
 
-def native_sources(plan):
+def native_sources(values, plan):
     """The record's `native` classmethod, and the class that it returns."""
     descriptor = plan.registration
     public, native = public_name(plan.native), native_name(plan)
@@ -270,6 +270,7 @@ def native_sources(plan):
         f"    @classmethod\n    def native({parameters}) -> {native}:\n"
         + docs.docstring(
             None,
+            values.symbol,
             "        ",
             (
                 (
@@ -289,6 +290,7 @@ def native_sources(plan):
         f"\n\nclass {native}:\n"
         + docs.docstring(
             None,
+            values.symbol,
             "    ",
             (
                 f"A native `{public}` from `{public}.native`, accepted wherever a `{public}` is.",
@@ -312,20 +314,24 @@ def native_sources(plan):
     return method, cls
 
 
+def callback_types(records) -> set[str]:
+    """The callback types that the registrations among `records` hold, each of
+    which a Protocol presents."""
+    return {
+        next(f for f in plan.fields if f.name == name).value.native
+        for plan in records
+        if plan.registration
+        for name in plan.registration.callbacks
+    }
+
+
 def protocol_sources(values):
     """The Protocol of each callback type that a registration holds, whose
     positional-only parameters keep the C names, so any callable of the same
     shape satisfies it."""
     from .python import OWNERS
 
-    natives = sorted(
-        {
-            next(f for f in plan.fields if f.name == name).value.native
-            for plan in values.records.values()
-            if plan.registration
-            for name in plan.registration.callbacks
-        }
-    )
+    natives = sorted(callback_types(values.records.values()))
     classes = []
     for native in natives:
         callback = values.api.callbacks[native]
@@ -359,7 +365,7 @@ def protocol_sources(values):
             notes = (note,)
         classes.append(
             f"class {public_name(native)}(Protocol):\n"
-            + docs.docstring(values.api.doc(native), "    ", notes)
+            + docs.docstring(values.api.doc(native), values.symbol, "    ", notes)
             + f"\n    def __call__(self{parameters}, /) -> {result}: ...\n"
         )
     return "\n\n".join(classes)

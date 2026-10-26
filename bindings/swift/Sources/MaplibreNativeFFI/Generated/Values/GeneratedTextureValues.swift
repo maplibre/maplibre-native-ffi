@@ -414,12 +414,12 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Texture readback borrowed for a completion callback.
+/// Texture readback.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureReadbackResult: Equatable, Hashable, Sendable {
-  /// Borrowed pixel bytes, valid only during the callback.
+  /// Pixel bytes.
   public var data: Data
   public var info: TextureImageInfo
   public init(data: Data = Data(), info: TextureImageInfo = .init()) {

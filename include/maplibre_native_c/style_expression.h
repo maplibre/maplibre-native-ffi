@@ -183,7 +183,9 @@ MLN_API void mln_style_expression_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies what a parsed expression depends on into out_info.
+ * Copies what a parsed expression depends on.
+ *
+ * The function writes the result to out_info.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

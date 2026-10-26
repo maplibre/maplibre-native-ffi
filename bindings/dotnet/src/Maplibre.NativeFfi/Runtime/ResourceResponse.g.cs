@@ -15,7 +15,7 @@ public sealed record ResourceResponse
     public ResourceErrorReason ErrorReason { get; init; }
 
     /// <summary>
-    /// Response bytes. May be null only when byte_count is 0.
+    /// Response bytes.
     /// </summary>
     public ImmutableArray<byte> Bytes
     {

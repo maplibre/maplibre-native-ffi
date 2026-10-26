@@ -14,7 +14,13 @@
 extern "C" {
 #endif
 
-/** Schedules service by the receiver that owns a queue or driver. */
+/**
+ * Schedules service by the receiver that owns a queue or driver.
+ *
+ * Threads:
+ * Native code may invoke the callback from any thread, and calls may coalesce
+ * or overlap.
+ */
 typedef void (*mln_wake_callback)(void* user_data);
 
 /**

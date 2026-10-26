@@ -430,11 +430,12 @@ MLN_API mln_status mln_map_set_free_camera_options(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits copied axonometric rendering option fields.
+ * Submits axonometric rendering options.
  *
- * Only fields selected by mode->fields affect the map. Unspecified fields keep
- * their current native values. The completion reports the terminal
- * disposition and published snapshot generation.
+ * The function copies mode before it returns. Only fields selected by
+ * mode->fields affect the map. Unspecified fields keep their current native
+ * values. The completion reports the terminal disposition and published
+ * snapshot generation.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.

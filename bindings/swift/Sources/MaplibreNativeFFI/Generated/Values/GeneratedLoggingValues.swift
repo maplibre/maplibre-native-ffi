@@ -3,7 +3,10 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Receives a MapLibre Native log record.
+/// Receives a MapLibre Native log record. The callback runs synchronously on
+/// the thread that emits the record, or on a MapLibre background thread for a
+/// severity that `Maplibre.setLogAsyncSeverityMask()` dispatches
+/// asynchronously.
 ///
 /// A thrown error answers `false` and is reported to standard error.
 ///
@@ -69,7 +72,9 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Process-global log callback or queue state.
+/// Process-global log callback. The callback runs synchronously on the thread
+/// that emits the record, or on a MapLibre background thread for a severity
+/// that `Maplibre.setLogAsyncSeverityMask()` dispatches asynchronously.
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).

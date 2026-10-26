@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Map constraint modes used by <c>mln_map_viewport_options</c>.
+/// Map constraint modes used by <c>MapViewportOptions</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_constrain_mode</c> in the <see

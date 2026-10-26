@@ -3,7 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Receives a MapLibre Native log record.
+/// Receives a MapLibre Native log record. The callback runs synchronously on
+/// the thread that emits the record, or on a MapLibre background thread for a
+/// severity that <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
+/// asynchronously.
 /// </summary>
 /// <remarks>
 /// <para>A thrown exception answers <c>false</c> and is reported to

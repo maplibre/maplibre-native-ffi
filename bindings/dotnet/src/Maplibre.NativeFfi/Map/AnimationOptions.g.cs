@@ -20,8 +20,8 @@ public sealed record AnimationOptions
     /// <summary>
     /// Average fly velocity in screenfuls per second. Must be positive and
     /// finite; absent selects 1.2. A flight whose derived duration is too long
-    /// to represent fails its completion with <c>MLN_STATUS_NATIVE_ERROR</c>.
-    /// An explicit duration overrides velocity.
+    /// to represent fails its completion with <c>Status.NativeError</c>. An
+    /// explicit duration overrides velocity.
     /// </summary>
     public double? Velocity { get; init; }
 
@@ -33,7 +33,7 @@ public sealed record AnimationOptions
 
     /// <summary>
     /// Caller-chosen identity of the command that these options animate, which
-    /// <c>mln_map_cancel_camera_transition()</c> matches.
+    /// <c>MapHandle.CancelCameraTransitionAsync()</c> matches.
     /// </summary>
     public ulong? TransitionId { get; init; }
 

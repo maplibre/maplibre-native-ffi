@@ -47,11 +47,13 @@ def owner_names(handle) -> tuple[str, str]:
     return name + "Handle", "_Native" + name
 
 
+# The C call that host native code makes, which the note names through its
+# Dart method.
 CALLER_DRIVER_NOTE = (
     "An isolate cannot service a caller-graphics-thread driver, because Dart "
     "can resume it on another native thread after any `await`. Host native "
-    "code services such a session by passing its `id` to "
-    "`mln_render_session_service_driver_work` on the graphics thread."
+    "code services such a session on the graphics thread by passing its `id` "
+    "to the C function that `mln_render_session_service_driver_work()` calls."
 )
 
 # Paragraphs about what Dart adds to a declaration's C contract, keyed like
@@ -67,7 +69,9 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     found = bound.doc(native)
     if found is not None and native in NOTES:
         found = replace(found, notes=(*found.notes, *NOTES[native]))
-    return docs.line_comment(found, indent)
+    from .dart import symbols
+
+    return docs.line_comment(found, symbols(bound), indent)
 
 
 class Unsupported(ValueError):
@@ -81,6 +85,24 @@ def public_name(native: str) -> str:
 def identifier(native: str) -> str:
     name = camel(native)
     return name + "Value" if name in DART_RESERVED else name
+
+
+def enum_member(value: ValuePlan, key: str) -> str:
+    """The Dart name of an enum constant."""
+    prefix = enum_member_prefix((name for name, _ in value.enum_values), value.native)
+    return identifier(key.removeprefix(prefix).lower())
+
+
+def union_name(value: ValuePlan, union) -> str:
+    """The sealed class of the union that `value` holds in `union`: the record
+    itself when it holds only the union, or else its payload class."""
+    public = public_name(value.native)
+    return public if value.union_member else public + pascal(union.name)
+
+
+def variant_name(value: ValuePlan, union, arm) -> str:
+    """The class of one variant of the union that `value` holds in `union`."""
+    return union_name(value, union) + pascal(arm.name)
 
 
 class Values:
@@ -602,11 +624,8 @@ class Values:
 
     def enum_members(self, value):
         """Each C enum constant's Dart name and number, in declaration order."""
-        prefix = enum_member_prefix(
-            (name for name, _ in value.enum_values), value.native
-        )
         return [
-            (name, identifier(name.removeprefix(prefix).lower()), number)
+            (name, enum_member(value, name), number)
             for name, number in value.enum_values
         ]
 
@@ -972,12 +991,12 @@ class Values:
         )
 
     def render_union(self, value, union):
-        public = public_name(value.native)
+        public = union_name(value, union)
         declarations = [f"sealed class {public} {{", f"  const {public}._();"]
         children, writes, reads = [], [], []
         for arm in union.value.fields:
             name = identifier(arm.name)
-            variant = public + pascal(arm.name)
+            variant = variant_name(value, union, arm)
             typ = self.public(arm.value)
             declarations.append(
                 doc(self.bound, f"{union.value.native}.{arm.name}", "  ")
@@ -1018,7 +1037,7 @@ class Values:
 
     def render_mixed_union(self, value, union):
         public = public_name(value.native)
-        payload = public + pascal(union.name)
+        payload = union_name(value, union)
         members = [f for f in self.fields(value) if f.name != union.name]
         arguments, fields, writes, reads = [], [], [], []
         for field in members:
@@ -1044,7 +1063,7 @@ class Values:
         ]
         cases, read_cases = [], []
         for arm in union.value.fields:
-            variant = payload + pascal(arm.name)
+            variant = variant_name(value, union, arm)
             typ = self.public(arm.value)
             declarations.append(
                 doc(self.bound, f"{union.value.native}.{arm.name}")

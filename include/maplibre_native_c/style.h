@@ -63,6 +63,7 @@ MLN_API mln_status mln_map_set_global_state_property(
 ) MLN_NOEXCEPT;
 /**
  * Queries the global-state JSON object, including style defaults.
+ *
  * Completion borrows one mln_buffer_view for the duration of the callback.
  *
  * Returns:
@@ -270,10 +271,11 @@ typedef struct mln_style_source_tile_info {
 } mln_style_source_tile_info;
 
 /**
- * Complete metadata of one style source, borrowed for a completion callback.
+ * Complete metadata of one style source.
  *
- * Views and arrays remain valid until the completion callback returns. A
- * masked member whose bit is absent from fields is zero.
+ * A completion callback borrows it. Views and arrays remain valid until the
+ * completion callback returns. A masked member whose bit is absent from fields
+ * is zero.
  */
 typedef struct mln_style_source_info {
   /** Source ID. */
@@ -305,9 +307,10 @@ typedef struct mln_style_source_info {
 } mln_style_source_info;
 
 /**
- * One style layer, borrowed for a completion callback.
+ * One style layer.
  *
- * Every view stays valid until the callback returns.
+ * A completion callback borrows it. Every view stays valid until the callback
+ * returns.
  */
 typedef struct mln_style_layer_info {
   /** Layer ID. */
@@ -350,7 +353,9 @@ typedef struct mln_geo_json_source_options {
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
    * whose members follow the MapLibre Style Spec clusterProperties form, or
-   * empty for none. The UTF-8 bytes are borrowed for the call.
+   * empty for none.
+   *
+   * The UTF-8 bytes are borrowed for the call.
    */
   mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
   /** Tile buffer in pixels within [0, 512]. Absent selects 128. */
@@ -401,6 +406,10 @@ typedef struct mln_canonical_tile_id {
  *
  * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
  * instead.
+ *
+ * Threads:
+ * The callback may run on any native worker thread, concurrently with runtime
+ * and map calls.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE")
 typedef void (*mln_custom_source_fetch_tile_callback)(
@@ -413,6 +422,10 @@ typedef void (*mln_custom_source_fetch_tile_callback)(
  *
  * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
  * instead.
+ *
+ * Threads:
+ * The callback may run on any native worker thread, concurrently with runtime
+ * and map calls.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE")
 typedef void (*mln_custom_source_cancel_tile_callback)(
@@ -423,9 +436,17 @@ typedef void (*mln_custom_source_cancel_tile_callback)(
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
   mln_custom_geometry_source_option_fields fields;
-  /** Tile fetch callback. Required in callback mode; null in queue mode. */
+  /**
+   * Tile fetch callback.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_custom_source_fetch_tile_callback fetch_tile;
-  /** Optional best-effort tile cancel callback. Null in queue mode. */
+  /**
+   * Optional best-effort tile cancel callback.
+   *
+   * Null in queue mode.
+   */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /**
@@ -483,9 +504,17 @@ typedef struct mln_custom_geometry_source_options {
 typedef struct mln_custom_mvt_vector_source_options {
   uint32_t size;
   mln_custom_mvt_vector_source_option_fields fields;
-  /** Tile fetch callback. Required in callback mode; null in queue mode. */
+  /**
+   * Tile fetch callback.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_custom_source_fetch_tile_callback fetch_tile;
-  /** Optional best-effort tile cancel callback. Null in queue mode. */
+  /**
+   * Optional best-effort tile cancel callback.
+   *
+   * Null in queue mode.
+   */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /**
@@ -550,8 +579,10 @@ typedef struct mln_style_image_options {
   uint32_t size;
   mln_style_image_option_fields fields;
   /**
-   * Horizontally stretchable intervals. Borrowed for the call and copied before
-   * return. May be null only when stretch_x_count is 0.
+   * Horizontally stretchable intervals.
+   *
+   * Borrowed for the call and copied before return. May be null only when
+   * stretch_x_count is 0.
    */
   const mln_image_stretch* stretch_x MLN_BINDING(
     "length=stretch_x_count;mask=fields;"
@@ -559,8 +590,10 @@ typedef struct mln_style_image_options {
   );
   size_t stretch_x_count;
   /**
-   * Vertically stretchable intervals. Borrowed for the call and copied before
-   * return. May be null only when stretch_y_count is 0.
+   * Vertically stretchable intervals.
+   *
+   * Borrowed for the call and copied before return. May be null only when
+   * stretch_y_count is 0.
    */
   const mln_image_stretch* stretch_y MLN_BINDING(
     "length=stretch_y_count;mask=fields;"
@@ -585,10 +618,11 @@ typedef struct mln_style_image_options {
 } mln_style_image_options;
 
 /**
- * One complete runtime style image, borrowed for a completion callback.
+ * One complete runtime style image.
  *
- * pixels and the stretch arrays remain valid until the completion callback
- * returns. A masked member whose bit is absent from fields is zero.
+ * A completion callback borrows it. pixels and the stretch arrays remain valid
+ * until the completion callback returns. A masked member whose bit is absent
+ * from fields is zero.
  */
 typedef struct mln_style_image_info {
   /** Image width in pixels. */

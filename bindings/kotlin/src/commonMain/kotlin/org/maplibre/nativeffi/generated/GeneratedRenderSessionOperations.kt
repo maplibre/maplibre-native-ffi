@@ -46,11 +46,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Ends every frame demand that has not started with `MLN_RENDER_RESULT_NO_UPDATE` and completes
-   * after earlier driver work has finished. A running demand finishes its attempt and ends any wait
-   * for a map update or a free slot. After completion, a new frame demand is required to render
-   * again, except that a pending still image submits its next demand itself; see
-   * `mln_map_request_still_image()`.
+   * Ends every frame demand that has not started with `RenderResult.NO_UPDATE` and completes after
+   * earlier driver work has finished. A running demand finishes its attempt and ends any wait for a
+   * map update or a free slot. After completion, a new frame demand is required to render again,
+   * except that a pending still image submits its next demand itself; see
+   * `MapHandle.requestStillImage()`.
    *
    * See `mln_render_session_barrier` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -103,8 +103,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeClose(this, binding) { check(C.mln_render_session_dispose(handle, 0L, diagnostic)) }
 
   /**
-   * Drains every currently queued terminal frame result into an independently owned batch and
-   * borrows its view. The records remain stable until the batch is released.
+   * Drains every currently queued terminal frame result.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -161,8 +160,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Starts a feature-extension query against the latest driver state. The completion borrows one
-   * `mln_buffer_view` holding UTF-8 JSON (value_count 1), valid only for the callback.
+   * Starts a feature-extension query against the latest driver state.
    *
    * See `mln_render_session_query_feature_extensions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -318,8 +316,8 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Services every queued item for a caller-graphics-thread driver. The first successful service
    * call fixes the session's graphics-thread identity; later calls from another native thread
-   * return `MLN_STATUS_WRONG_THREAD`. The target context must be current. Core-worker sessions
-   * return `MLN_STATUS_INVALID_STATE`.
+   * return `Status.WRONG_THREAD`. The target context must be current. Core-worker sessions return
+   * `Status.INVALID_STATE`.
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

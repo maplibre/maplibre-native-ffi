@@ -288,7 +288,8 @@ public struct OpenGlContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
 }
 
 /// Host lock on the graphics queue that a session shares with its host, copied
-/// by a successful attach.
+/// by a successful attach. The callback runs on the session's graphics thread
+/// or on the thread that abandons the session.
 ///
 /// See `mln_queue_lock` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -330,6 +331,8 @@ private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
 
 /// Takes or returns the host's lock on the queue that a session shares with it.
 /// Native code relies on the lock being held or released when the call returns.
+/// The callback runs on the session's graphics thread or on the thread that
+/// abandons the session.
 ///
 /// See `mln_queue_lock_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -369,16 +372,16 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
 public struct RenderSessionAttachOptions: Sendable {
   /// Where the session's driver runs. Required.
   public var driver: RenderDriverKind
-  /// Requested slot count of a session-owned texture ring, up to
-  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
-  /// frame while the session renders its replacement. Private targets grant one
-  /// slot regardless of this value. A borrowed texture ring's depth is its
-  /// texture count, so borrowed and other targets ignore this value.
+  /// Requested slot count of a session-owned texture ring, up to 8. Zero
+  /// selects 2, so the host can retain one frame while the session renders its
+  /// replacement. Private targets grant one slot regardless of this value. A
+  /// borrowed texture ring's depth is its texture count, so borrowed and other
+  /// targets ignore this value.
   public var requestedTextureRingDepth: UInt32
   /// Producer synchronization for acquired texture frames.
-  /// `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
-  /// and a caller-graphics-thread driver. Other targets support only CPU
-  /// completion and fail an unsupported request.
+  /// `GpuSyncKind.openGlFence` requires a shared EGL or WGL texture target and
+  /// a caller-graphics-thread driver. Other targets support only CPU completion
+  /// and fail an unsupported request.
   public var producerSyncKind: GpuSyncKind
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
@@ -387,7 +390,7 @@ public struct RenderSessionAttachOptions: Sendable {
   public var driverWorkWake: Wake
   /// Host lock on the graphics queue, disabled by default. Only Vulkan targets
   /// accept an enabled lock; other backends fail the attach with
-  /// `MLN_STATUS_UNSUPPORTED`.
+  /// `Status.unsupported`.
   public var queueLock: QueueLock
   public init(
     driver: RenderDriverKind,
@@ -496,7 +499,7 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   public var device: NativePointer
   /// Borrowed graphics VkQueue. Required. The session's driver submits to it
   /// from its own thread, so a host that uses the same queue passes
-  /// `mln_render_session_attach_options.queue_lock` at attach.
+  /// `RenderSessionAttachOptions.queueLock` at attach.
   public var graphicsQueue: NativePointer
   /// Queue family index for graphics_queue. Must support graphics commands.
   public var graphicsQueueFamilyIndex: UInt32

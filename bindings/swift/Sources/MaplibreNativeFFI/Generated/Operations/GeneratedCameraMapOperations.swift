@@ -241,7 +241,7 @@ public extension MapHandle {
     }
   }
 
-  /// Submits copied axonometric rendering option fields.
+  /// Submits axonometric rendering options.
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

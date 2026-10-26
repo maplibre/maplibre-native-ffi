@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for custom geometry sources.
+/// Options for custom geometry sources. The callback may run on any native
+/// worker thread, concurrently with runtime and map calls.
 /// </summary>
 /// <remarks>
 /// See <c>mln_custom_geometry_source_options</c> in the <see
@@ -12,12 +13,12 @@ namespace Maplibre.NativeFfi;
 public sealed record CustomGeometrySourceOptions
 {
     /// <summary>
-    /// Tile fetch callback. Required in callback mode; null in queue mode.
+    /// Tile fetch callback.
     /// </summary>
     public required CustomSourceFetchTileCallback FetchTile { get; init; }
 
     /// <summary>
-    /// Optional best-effort tile cancel callback. Null in queue mode.
+    /// Optional best-effort tile cancel callback.
     /// </summary>
     public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }

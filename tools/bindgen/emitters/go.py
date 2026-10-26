@@ -5,6 +5,7 @@ import re
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import ModelError
+from tools.bindgen.protocol import COMPLETION_RESULT
 
 # The build constraint that selects each platform the module builds for. An
 # OpenHarmony build is a GOOS=linux build, and GOOS=android satisfies linux.
@@ -69,7 +70,73 @@ def name(value: str) -> str:
 
 def doc(bound, native: str, declared: str | None, *, operation: bool = False) -> str:
     """The Go doc comment of a declaration, or empty when it has none."""
-    return docs.go_comment(bound.doc(native), declared, operation=operation)
+    return docs.go_comment(
+        bound.doc(native), symbols(bound), declared, operation=operation
+    )
+
+
+def symbols(bound) -> docs.Symbol:
+    """How Go spells the C declarations that its summaries name."""
+    return bound.symbols("go", _symbols)
+
+
+def _symbols(bound) -> docs.Symbol:
+    from .go_operations import declared_name, receiver_type_name
+    from .go_values import Values, enum_member, public, union_name, variant_name
+
+    values = Values(bound)
+    records = [value for value in bound.values.values() if value.kind == "record"]
+
+    def type_(native: str) -> str | None:
+        if handle := bound.public_handles.get(native):
+            if handle.dispose in bound.source.runtime_exports:
+                return None
+            return values.owner(native)
+        value = bound.values.get(native)
+        # A callback is a func type, and a slice record is a Go slice, so
+        # neither has a name. The completion runtime presents a command's
+        # result as CommandCompletion.
+        if value is None or values.slice(value) or native == COMPLETION_RESULT:
+            return None
+        if value.response:
+            return public(native) + "Scope"
+        if value.kind == "union":
+            return union_name(records, value)
+        if value.kind in {"record", "enum"}:
+            return public(native)
+        return None
+
+    def operation(plan) -> str | None:
+        try:
+            method = declared_name(plan, bound)
+        except ModelError:
+            return None
+        receiver = receiver_type_name(plan, values)
+        return f"{receiver}.{method}" if receiver else method
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.response or value.union_member:
+            return None
+        if value.kind == "union":
+            return variant_name(typ, member)
+        return f"{typ}.{name(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{public(value.native)}.{name(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=enum_member,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{name(member)}"
+            for member in ("generation", "render_update_generation")
+        },
+    )
 
 
 def documented_operation(bound, native: str, source: str) -> str:

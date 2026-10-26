@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Intercepts a network resource request.
+/// Intercepts a network resource request. The callback runs synchronously on a
+/// MapLibre thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_provider_callback</c> in the <see

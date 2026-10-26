@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Complete metadata of one style source.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_info</c> in the <see

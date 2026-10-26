@@ -13,14 +13,14 @@ public struct AnimationOptions: Sendable {
   public var durationMs: Double?
   /// Average fly velocity in screenfuls per second. Must be positive and
   /// finite; absent selects 1.2. A flight whose derived duration is too long to
-  /// represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+  /// represent fails its completion with `Status.nativeError`. An explicit
   /// duration overrides velocity.
   public var velocity: Double?
   /// Peak zoom for flyTo transitions.
   public var minZoom: Double?
   public var easing: UnitBezier?
   /// Caller-chosen identity of the command that these options animate, which
-  /// `mln_map_cancel_camera_transition()` matches.
+  /// `MapHandle.cancelCameraTransition()` matches.
   public var transitionId: UInt64?
   /// Reports the end of the command's transitions. Disabled by default.
   public var endHandler: CameraTransitionHandler
@@ -91,10 +91,10 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   /// Selects the unbounded geographic constraint, which leaves every camera
   /// center unconstrained and lets the map pan freely across the antimeridian.
   /// This differs from world bounds of -90/-180 to 90/180, which clamp
-  /// longitude to that range. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
+  /// longitude to that range. Mutually exclusive with `BoundOptions.bounds`,
+  /// which it leaves unread.
   public var unbounded: Bool
-  /// Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
+  /// Geographic bounds that the camera center stays inside.
   public var bounds: LatLngBounds?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -433,7 +433,7 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Camera result borrowed for an ordered camera-query completion.
+/// Camera result of an ordered camera query.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -451,7 +451,7 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// The end of one camera command's transitions, borrowed for the callback.
+/// The end of one camera command's transitions.
 ///
 /// See `mln_camera_transition_end` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -460,7 +460,7 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   /// Generation of the published snapshot that shows the camera where the
   /// transitions left it. The map events of the change that ended them carry
   /// this generation and are queued before the callback runs. Zero for
-  /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+  /// `CameraTransitionOutcome.closed`.
   public var generation: UInt64
   public init(
     outcome: CameraTransitionOutcome = .init(rawValue: 0),
@@ -476,15 +476,16 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   }
 }
 
-/// Receives the end of one camera command's transitions.
+/// Receives the end of one camera command's transitions. The callback runs on
+/// the runtime worker.
 ///
 /// See `mln_camera_transition_end_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public typealias CameraTransitionEndCallback =
   @Sendable (_ end: CameraTransitionEnd) -> Void
 
-/// Callback or queue state that one camera command copies to report the end of
-/// its transitions.
+/// Callback that one camera command copies to report the end of its
+/// transitions. The callback runs on the runtime worker.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -541,9 +542,9 @@ public struct CameraTransitionOutcome: RawRepresentable,
   /// Every property of the command reached its target, or a later camera write
   /// replaced it.
   public static let completed: CameraTransitionOutcome = .init(rawValue: 0)
-  /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
-  /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
-  /// before it started them.
+  /// `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or
+  /// `GesturePhase.cancel` ended the transitions, or the command failed before
+  /// it started them.
   public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the transitions ended.
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
@@ -599,7 +600,7 @@ public struct CameraUpdate: Sendable {
   }
 }
 
-/// Camera transition behavior for `mln_camera_update`.
+/// Camera transition behavior for `CameraUpdate`.
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -624,7 +625,7 @@ public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Map constraint modes used by `mln_map_viewport_options`.
+/// Map constraint modes used by `MapViewportOptions`.
 ///
 /// See `mln_constrain_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -694,7 +695,7 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
 /// See `mln_feature_state_selector` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FeatureStateSelector: Equatable, Hashable, Sendable {
-  /// Source ID. Required. Borrowed for the duration of the call.
+  /// Source ID. Required.
   public var sourceId: String
   /// Source layer ID, or empty for none. Required for vector-source
   /// disambiguation.
@@ -808,7 +809,7 @@ public struct GesturePhase: RawRepresentable, CustomStringConvertible,
   /// The update carries no gesture boundary and leaves the flag as it is.
   public static let none: GesturePhase = .init(rawValue: 0)
   /// Marks a gesture as in progress before the camera write. It does not cancel
-  /// running transitions; use `mln_map_cancel_transitions()` for that.
+  /// running transitions; use `MapHandle.cancelTransitions()` for that.
   public static let begin: GesturePhase = .init(rawValue: 1)
   /// Keeps the gesture marked as in progress before the camera write.
   public static let update: GesturePhase = .init(rawValue: 2)
@@ -913,7 +914,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 }
 
-/// Debug overlay mask values for `mln_map_set_debug_options()`.
+/// Debug overlay mask values for `MapHandle.setDebugOptions()`.
 ///
 /// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -975,8 +976,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
   /// encodings.
   public var fastPforEnabled: Bool
-  /// Map-originated event types this map queues, as a bitwise OR of
-  /// `mln_runtime_event_flag` values.
+  /// Map-originated event types this map queues.
   public var eventMask: RuntimeEventFlag?
   public init(
     initialExtent: LogicalExtent,
@@ -1018,7 +1018,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
-  /// Debug overlay mask of `mln_map_debug_flag` values.
+  /// Debug overlays that the map draws.
   public var debugOptions: MapDebugFlag
   public var generation: UInt64
   /// True once every requested style and tile resource finished loading.
@@ -1037,7 +1037,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var bounds: BoundOptions
   public var freeCamera: FreeCameraOptions
   /// The map's camera, extent, projection mode, and viewport options.
-  /// `mln_map_projection_create()` converts coordinates for this view.
+  /// `MapProjectionHandle.create()` converts coordinates for this view.
   public var view: MapView
   public init(
     debugOptions: MapDebugFlag = .init(rawValue: 0),
@@ -1263,7 +1263,7 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Map north orientation values used by `mln_map_viewport_options`.
+/// Map north orientation values used by `MapViewportOptions`.
 ///
 /// See `mln_north_orientation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1297,7 +1297,7 @@ public struct NorthOrientation: RawRepresentable, CustomStringConvertible,
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   /// Style URL. Copied during region creation.
   public var styleUrl: String
-  /// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
+  /// UTF-8 GeoJSON Geometry. Required.
   public var geometry: String
   public var minZoom: Double
   /// Maximum zoom. Positive infinity lets each tile source use its own maximum
@@ -1634,7 +1634,7 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
   }
 }
 
-/// Tile LOD algorithms used by `mln_map_tile_options`.
+/// Tile LOD algorithms used by `MapTileOptions`.
 ///
 /// See `mln_tile_lod_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1719,7 +1719,7 @@ public struct Vec3: Equatable, Hashable, Sendable {
   }
 }
 
-/// Viewport orientation modes used by `mln_map_viewport_options`.
+/// Viewport orientation modes used by `MapViewportOptions`.
 ///
 /// See `mln_viewport_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

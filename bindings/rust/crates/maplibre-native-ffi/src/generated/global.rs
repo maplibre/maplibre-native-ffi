@@ -72,7 +72,10 @@ pub fn set_log_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
     Ok(())
 }
 
-/// Installs a process-global MapLibre Native log callback.
+/// Installs a process-global MapLibre Native log callback. The callback
+/// runs synchronously on the thread that emits the record, or on a MapLibre
+/// background thread for a severity that `set_log_async_severity_mask()`
+/// dispatches asynchronously.
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -143,8 +146,7 @@ pub fn open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
     OpenGlContextProviderFlag::from_bits_retain(value)
 }
 
-/// Returns the process-wide `mln_plugin_register_v1` entry point; never
-/// null.
+/// Returns the process-wide plugin registration entry point; never null.
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One rendered-feature query hit borrowed for a completion callback.
+/// One rendered-feature query hit.
 /// </summary>
 /// <remarks>
 /// See <c>mln_rendered_feature</c> in the <see

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Tile LOD algorithms used by <c>mln_map_tile_options</c>.
+/// Tile LOD algorithms used by <c>MapTileOptions</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_tile_lod_mode</c> in the <see

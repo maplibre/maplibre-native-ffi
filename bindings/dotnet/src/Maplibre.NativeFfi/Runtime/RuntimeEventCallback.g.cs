@@ -3,7 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Receives selected events after their snapshots have been published.
+/// Receives selected events after their snapshots have been published. Map
+/// events arrive on the runtime's native scheduler thread, and offline events
+/// may arrive on a MapLibre worker thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_callback</c> in the <see

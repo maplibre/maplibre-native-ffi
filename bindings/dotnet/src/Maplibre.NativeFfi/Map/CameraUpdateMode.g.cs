@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Camera transition behavior for <c>mln_camera_update</c>.
+/// Camera transition behavior for <c>CameraUpdate</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_update_mode</c> in the <see

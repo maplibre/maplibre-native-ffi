@@ -56,15 +56,15 @@ def signature(values, callback):
     return "func(" + ", ".join(args) + ")" + result
 
 
-def callback_doc(summary, callback):
+def callback_doc(summary, callback, symbol):
     """A callback field's doc, with how a status callback's error reaches
-    native."""
+    native. `symbol` spells the failure status as the binding does."""
     if not callback.status:
         return summary
     text = (
         "A failure Status or an *Error with one, or an error that wraps "
         "either, answers native that status. Any other error, or a panic, is "
-        f"logged and answers {callback.failure}."
+        f"logged and answers {symbol(callback.failure)}."
     )
     lines = "".join(f"// {line}\n" for line in textwrap.wrap(text, 77))
     return summary + "//\n" + lines if summary else lines
@@ -199,7 +199,7 @@ def native_constructor(values, plan):
     text = (
         f"NewNative{typename} returns {article} {typename} from C values that "
         f"native code in the host supplies: {listed} are the members of "
-        f"{plan.native}, which the binding copies unchanged. The first call "
+        f"the C struct that {typename} presents, which the binding copies unchanged. The first call "
         f"that carries the {typename} consumes it. Native code releases "
         f"{context} if it accepts the call, and otherwise the binding calls "
         f"{release}. A later call returns StatusInvalidState."

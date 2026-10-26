@@ -222,7 +222,7 @@ class CameraTransitionOutcome(UnknownIntEnum):
 
 
 class CameraUpdateMode(UnknownIntEnum):
-    """Camera transition behavior for `mln_camera_update`.
+    """Camera transition behavior for `CameraUpdate`.
 
     See `mln_camera_update_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -234,7 +234,7 @@ class CameraUpdateMode(UnknownIntEnum):
 
 
 class ConstrainMode(UnknownIntEnum):
-    """Map constraint modes used by `mln_map_viewport_options`.
+    """Map constraint modes used by `MapViewportOptions`.
 
     See `mln_constrain_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -336,7 +336,7 @@ class LogSeverityFlag(IntFlag):
 
 
 class MapDebugFlag(IntFlag):
-    """Debug overlay mask values for `mln_map_set_debug_options()`.
+    """Debug overlay mask values for `MapHandle.set_debug_options()`.
 
     See `mln_map_debug_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -369,7 +369,7 @@ class NetworkStatus(UnknownIntEnum):
 
 
 class NorthOrientation(UnknownIntEnum):
-    """Map north orientation values used by `mln_map_viewport_options`.
+    """Map north orientation values used by `MapViewportOptions`.
 
     See `mln_north_orientation` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -531,8 +531,8 @@ class ResourceKind(UnknownIntEnum):
 
 class ResourceKindFlag(IntFlag):
     """The resource kinds that a route or rule matches, one bit per
-    `mln_resource_kind` value. Registration rejects unknown bits.
-    `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
+    `ResourceKind` value. Registration rejects unknown bits.
+    `ResourceKindFlag.ALL`, like zero, selects every resource kind.
 
     See `mln_resource_kind_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -616,7 +616,7 @@ class RuntimeEventFlag(IntFlag):
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
-    """Source kinds used by `mln_runtime_event.source_type`.
+    """Source kinds used by `RuntimeEvent.source_type`.
 
     See `mln_runtime_event_source_type` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -627,7 +627,7 @@ class RuntimeEventSourceType(UnknownIntEnum):
 
 
 class RuntimeEventType(UnknownIntEnum):
-    """Runtime event types carried by `mln_runtime_event.type`.
+    """Runtime event types carried by `RuntimeEvent.type`.
 
     See `mln_runtime_event_type` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -770,7 +770,7 @@ class StyleVectorTileEncoding(UnknownIntEnum):
 
 
 class TileLodMode(UnknownIntEnum):
-    """Tile LOD algorithms used by `mln_map_tile_options`.
+    """Tile LOD algorithms used by `MapTileOptions`.
 
     See `mln_tile_lod_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -810,7 +810,7 @@ class UrlMatchFlag(IntFlag):
 
 
 class ViewportMode(UnknownIntEnum):
-    """Viewport orientation modes used by `mln_map_viewport_options`.
+    """Viewport orientation modes used by `MapViewportOptions`.
 
     See `mln_viewport_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -847,8 +847,8 @@ class AnimationOptions:
     velocity: float | None = None
     """Average fly velocity in screenfuls per second. Must be positive and
     finite; absent selects 1.2. A flight whose derived duration is too long
-    to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An
-    explicit duration overrides velocity.
+    to represent fails its completion with `Status.NATIVE_ERROR`. An explicit
+    duration overrides velocity.
     """
 
     min_zoom: float | None = None
@@ -858,7 +858,7 @@ class AnimationOptions:
 
     transition_id: int | None = None
     """Caller-chosen identity of the command that these options animate, which
-    `mln_map_cancel_camera_transition()` matches.
+    `MapHandle.cancel_camera_transition()` matches.
     """
 
     end_handler: CameraTransitionHandler = field(
@@ -887,7 +887,7 @@ class BoundOptions:
     """
 
     bounds: LatLngBounds | None = None
-    """Read when fields contains `MLN_BOUND_OPTION_BOUNDS`."""
+    """Geographic bounds that the camera center stays inside."""
 
     min_zoom: float | None = None
 
@@ -1058,7 +1058,7 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraQueryResult:
-    """Camera result borrowed for an ordered camera-query completion.
+    """Camera result of an ordered camera query.
 
     See `mln_camera_query_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1077,7 +1077,7 @@ class CameraQueryResult:
 
 @dataclass(frozen=True, slots=True)
 class CameraTransitionEnd:
-    """The end of one camera command's transitions, borrowed for the callback.
+    """The end of one camera command's transitions.
 
     See `mln_camera_transition_end` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1089,7 +1089,7 @@ class CameraTransitionEnd:
     """Generation of the published snapshot that shows the camera where the
     transitions left it. The map events of the change that ended them carry
     this generation and are queued before the callback runs. Zero for
-    `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+    `CameraTransitionOutcome.CLOSED`.
     """
 
     @classmethod
@@ -1102,8 +1102,8 @@ class CameraTransitionEnd:
 
 @dataclass(frozen=True, slots=True)
 class CameraTransitionHandler:
-    """Callback or queue state that one camera command copies to report the end
-    of its transitions.
+    """Callback that one camera command copies to report the end of its
+    transitions. The callback runs on the runtime worker.
 
     See `mln_camera_transition_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1165,7 +1165,8 @@ class CanonicalTileId:
 
 @dataclass(frozen=True, slots=True)
 class CustomGeometrySourceOptions:
-    """Options for custom geometry sources.
+    """Options for custom geometry sources. The callback may run on any native
+    worker thread, concurrently with runtime and map calls.
 
     See `mln_custom_geometry_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1199,7 +1200,8 @@ class CustomGeometrySourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class CustomMvtVectorSourceOptions:
-    """Options for custom MVT vector sources.
+    """Options for custom MVT vector sources. The callback may run on any native
+    worker thread, concurrently with runtime and map calls.
 
     See `mln_custom_mvt_vector_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1301,7 +1303,7 @@ class FeatureStateSelector:
     """
 
     source_id: str
-    """Source ID. Required. Borrowed for the duration of the call."""
+    """Source ID. Required."""
 
     source_layer_id: str = ""
     """Source layer ID, or empty for none. Required for vector-source
@@ -1338,13 +1340,13 @@ class FrameDemand:
     """
 
     flags: FrameDemandFlag = field(default_factory=lambda: FrameDemandFlag(0))
-    """A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
-    newer map update exists, without presenting.
+    """Frame-demand policy. Zero renders only when a newer map update exists,
+    without presenting.
     """
 
     token: int = 0
     """Host identity returned with the terminal frame result. Any value except
-    `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+    the maximum uint64_t value.
     """
 
     @classmethod
@@ -1396,7 +1398,7 @@ class GeoJsonSourceOptions:
     cluster_properties: Any = None
     """Cluster aggregation expressions keyed by property name, as a JSON object
     whose members follow the MapLibre Style Spec clusterProperties form, or
-    empty for none. The UTF-8 bytes are borrowed for the call.
+    empty for none.
     """
 
     buffer: int | None = None
@@ -1490,7 +1492,7 @@ class HttpHeaderRule:
 
     headers: Sequence[HttpHeader] = ()
     """The headers to set. Registration validates each one as
-    `mln_http_header_transform_response_set_header()` does.
+    `HttpHeaderTransformResponseScope.set_header()` does.
     """
 
     def __post_init__(self):
@@ -1508,7 +1510,8 @@ class HttpHeaderRule:
 
 @dataclass(frozen=True, slots=True)
 class HttpHeaderTransform:
-    """HTTP header transform state: a callback, or native header rules.
+    """HTTP header transform state: a callback, or native header rules. The
+    callback runs synchronously on a MapLibre worker or network thread.
 
     See `mln_http_header_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1612,7 +1615,9 @@ class LatLngBounds:
 
 @dataclass(frozen=True, slots=True)
 class LogHandler:
-    """Process-global log callback or queue state.
+    """Process-global log callback. The callback runs synchronously on the
+    thread that emits the record, or on a MapLibre background thread for a
+    severity that `set_log_async_severity_mask()` dispatches asynchronously.
 
     See `mln_log_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -1671,9 +1676,7 @@ class MapOptions:
     """
 
     event_mask: RuntimeEventFlag | None = None
-    """Map-originated event types this map queues, as a bitwise OR of
-    `mln_runtime_event_flag` values.
-    """
+    """Map-originated event types this map queues."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1694,7 +1697,7 @@ class MapSnapshot:
     """
 
     debug_options: MapDebugFlag
-    """Debug overlay mask of `mln_map_debug_flag` values."""
+    """Debug overlays that the map draws."""
 
     generation: int
 
@@ -1726,7 +1729,7 @@ class MapSnapshot:
 
     view: MapView
     """The map's camera, extent, projection mode, and viewport options.
-    `mln_map_projection_create()` converts coordinates for this view.
+    `MapProjectionHandle.create()` converts coordinates for this view.
     """
 
     @classmethod
@@ -2037,7 +2040,7 @@ class OfflineGeometryRegionDefinition:
     """
 
     geometry: Any
-    """UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation."""
+    """UTF-8 GeoJSON Geometry. Required."""
 
     style_url: str = ""
     """Style URL. Copied during region creation."""
@@ -2508,7 +2511,8 @@ class Quaternion:
 @dataclass(frozen=True, slots=True)
 class QueueLock:
     """Host lock on the graphics queue that a session shares with its host,
-    copied by a successful attach.
+    copied by a successful attach. The callback runs on the session's
+    graphics thread or on the thread that abandons the session.
 
     See `mln_queue_lock` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2585,7 +2589,7 @@ class RenderAbandonResult:
 @dataclass(frozen=True, slots=True)
 class RenderFrameResult:
     """Terminal result of one frame demand, held by an owned frame-result batch
-    and copied by `mln_acquired_frame_get_result()`.
+    and copied by `AcquiredFrameHandle.get_result()`.
 
     See `mln_render_frame_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2597,38 +2601,37 @@ class RenderFrameResult:
 
     map_update_generation: int
     """Generation of the map render update the demand evaluated. When
-    disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
-    compare it with `mln_completion_result.render_update_generation` to find
-    the first frame that includes a command.
+    disposition is `RenderResult.RENDERED`, the frame drew that update;
+    compare it with `CommandCompletion.render_update_generation` to find the
+    first frame that includes a command.
     """
 
     generation: int
     """The session's target generation when the demand reached its result. See
-    `mln_render_session_snapshot.generation`.
+    `RenderSessionSnapshot.generation`.
     """
 
     frame_generation: int
     """Position of the frame among the frames that the session rendered,
-    counting from one. Zero unless disposition is
-    `MLN_RENDER_RESULT_RENDERED`.
+    counting from one. Zero unless disposition is `RenderResult.RENDERED`.
     """
 
     needs_repaint: bool
     """Whether the map asked for another frame while it rendered this one, as
     during an ongoing paint transition. Set only when disposition is
-    `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
-    matches the needs_repaint field of
-    `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
-    not set it: the map publishes an update for each of the transition's
-    frames instead, which a render-if-needed demand renders.
+    `RenderResult.RENDERED`, and false for every other outcome. It matches
+    the needs_repaint field of `RuntimeEventType.MAP_RENDER_FRAME_FINISHED`.
+    A camera transition does not set it: the map publishes an update for each
+    of the transition's frames instead, which a render-if-needed demand
+    renders.
     """
 
     view: MapView
     """The view that this frame drew, from the transform of the map update that
     it rendered. A host that displays the frame builds its projection with
-    `mln_map_projection_create()` to place overlays where the frame drew
+    `MapProjectionHandle.create()` to place overlays where the frame drew
     their coordinates. Zero, with a size of zero, unless disposition is
-    `MLN_RENDER_RESULT_RENDERED`.
+    `RenderResult.RENDERED`.
     """
 
     @classmethod
@@ -2656,16 +2659,16 @@ class RenderSessionAttachOptions:
     """Where the session's driver runs. Required."""
 
     requested_texture_ring_depth: int = 0
-    """Requested slot count of a session-owned texture ring, up to
-    `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
-    frame while the session renders its replacement. Private targets grant
-    one slot regardless of this value. A borrowed texture ring's depth is its
-    texture count, so borrowed and other targets ignore this value.
+    """Requested slot count of a session-owned texture ring, up to 8. Zero
+    selects 2, so the host can retain one frame while the session renders its
+    replacement. Private targets grant one slot regardless of this value. A
+    borrowed texture ring's depth is its texture count, so borrowed and other
+    targets ignore this value.
     """
 
     producer_sync_kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
     """Producer synchronization for acquired texture frames.
-    `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
+    `GpuSyncKind.OPEN_GL_FENCE` requires a shared EGL or WGL texture target
     and a caller-graphics-thread driver. Other targets support only CPU
     completion and fail an unsupported request.
     """
@@ -2681,7 +2684,7 @@ class RenderSessionAttachOptions:
     queue_lock: QueueLock | NativeQueueLock = field(default_factory=lambda: QueueLock())
     """Host lock on the graphics queue, disabled by default. Only Vulkan targets
     accept an enabled lock; other backends fail the attach with
-    `MLN_STATUS_UNSUPPORTED`.
+    `Status.UNSUPPORTED`.
     """
 
     @classmethod
@@ -2775,7 +2778,7 @@ class RenderSessionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class RenderedFeature:
-    """One rendered-feature query hit borrowed for a completion callback.
+    """One rendered-feature query hit.
 
     See `mln_rendered_feature` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -2843,8 +2846,7 @@ See `mln_rendered_query_geometry` in the
 
 @dataclass(frozen=True, slots=True)
 class RenderingStats:
-    """Rendering statistics reported in
-    `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+    """Rendering statistics of one finished frame.
 
     See `mln_rendering_stats` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2878,7 +2880,8 @@ class RenderingStats:
 
 @dataclass(frozen=True, slots=True)
 class ResourceProvider:
-    """Resource provider state.
+    """Resource provider state. The callback runs synchronously on a MapLibre
+    thread.
 
     See `mln_resource_provider` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2922,7 +2925,11 @@ class ResourceRange:
 
 @dataclass(frozen=True, slots=True)
 class ResourceRequestCancelHandler:
-    """Cancel callback or queue state for one handled resource request.
+    """Cancel callback for one handled resource request. The callback runs on
+    the thread that discards the request, never a host thread: the runtime's
+    native scheduler thread when a committed map or runtime command discards
+    it, such as a style change or map destruction, and a MapLibre worker
+    thread otherwise.
 
     See `mln_resource_request_cancel_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2997,7 +3004,7 @@ class ResourceResponse:
     error_reason: ResourceErrorReason = ResourceErrorReason.NONE
 
     bytes: Buffer = b""
-    """Response bytes. May be null only when byte_count is 0."""
+    """Response bytes."""
 
     error_message: str = ""
 
@@ -3056,7 +3063,7 @@ class ResourceRoute:
 
 @dataclass(frozen=True, slots=True)
 class ResourceTransform:
-    """Resource transform state.
+    """Resource transform state. The callback runs on a MapLibre network thread.
 
     See `mln_resource_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3087,20 +3094,22 @@ class RuntimeEvent:
     source_type: RuntimeEventSourceType
 
     source: int
-    """Source handle selected by source_type: an `mln_runtime` or an `mln_map`."""
+    """Source handle: the `RuntimeHandle` or `MapHandle` that source_type
+    selects.
+    """
 
     generation: int
     """Map snapshot generation that the event reports, or zero when source_type
-    is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+    is `RuntimeEventSourceType.RUNTIME`.
     """
 
     code: int
     """Secondary event detail whose meaning type selects; see
-    `mln_runtime_event_type`.
+    `RuntimeEventType`.
     """
 
     message: str
-    """Borrowed UTF-8 message bytes, empty when this event carries no message."""
+    """UTF-8 message, empty when this event carries no message."""
 
     payload: (
         RuntimeEventRenderFrameVariant
@@ -3140,7 +3149,9 @@ class RuntimeEvent:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventHandler:
-    """Runtime and map event delivery. Exactly one of callback and queue is set.
+    """Runtime and map event callback. Map events arrive on the runtime's native
+    scheduler thread, and offline events may arrive on a MapLibre worker
+    thread.
 
     See `mln_runtime_event_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3155,7 +3166,7 @@ class RuntimeEventHandler:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionResponseError:
-    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+    """Payload for `RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR`.
 
     See `mln_runtime_event_offline_region_response_error` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3174,7 +3185,7 @@ class RuntimeEventOfflineRegionResponseError:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionStatus:
-    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+    """Payload for `RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED`.
 
     See `mln_runtime_event_offline_region_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3194,7 +3205,7 @@ class RuntimeEventOfflineRegionStatus:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionTileCountLimit:
-    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+    """Payload for `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
 
     See `mln_runtime_event_offline_region_tile_count_limit` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3211,7 +3222,7 @@ class RuntimeEventOfflineRegionTileCountLimit:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventRenderFrame:
-    """Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+    """Payload for `RuntimeEventType.MAP_RENDER_FRAME_FINISHED`.
 
     See `mln_runtime_event_render_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3239,7 +3250,7 @@ class RuntimeEventRenderFrame:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventRenderMap:
-    """Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+    """Payload for `RuntimeEventType.MAP_RENDER_MAP_FINISHED`.
 
     See `mln_runtime_event_render_map` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3254,7 +3265,7 @@ class RuntimeEventRenderMap:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventTileAction:
-    """Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+    """Payload for `RuntimeEventType.MAP_TILE_ACTION`.
 
     See `mln_runtime_event_tile_action` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3324,7 +3335,7 @@ class ScreenLineString:
     """
 
     points: Sequence[ScreenPoint] = ()
-    """Points. Null only when point_count is 0."""
+    """Points."""
 
     def __post_init__(self):
         object.__setattr__(self, "points", _sequence(self.points))
@@ -3356,7 +3367,7 @@ class ScreenPoint:
 
 @dataclass(frozen=True, slots=True)
 class SourceFeature:
-    """One source-feature query hit borrowed for a completion callback.
+    """One source-feature query hit.
 
     See `mln_source_feature` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -3527,7 +3538,7 @@ class StyleExpressionType:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageInfo:
-    """One complete runtime style image, borrowed for a completion callback.
+    """One complete runtime style image.
 
     See `mln_style_image_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3594,14 +3605,10 @@ class StyleImageOptions:
     """
 
     stretch_x: Sequence[ImageStretch] | None = None
-    """Horizontally stretchable intervals. Borrowed for the call and copied
-    before return. May be null only when stretch_x_count is 0.
-    """
+    """Horizontally stretchable intervals."""
 
     stretch_y: Sequence[ImageStretch] | None = None
-    """Vertically stretchable intervals. Borrowed for the call and copied before
-    return. May be null only when stretch_y_count is 0.
-    """
+    """Vertically stretchable intervals."""
 
     content: ImageContent | None = None
     """Content box used when icon-text-fit applies."""
@@ -3641,7 +3648,7 @@ class StyleImageOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerInfo:
-    """One style layer, borrowed for a completion callback.
+    """One style layer.
 
     See `mln_style_layer_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3682,8 +3689,7 @@ class StyleLayerInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
-    """Complete metadata of one style source, borrowed for a completion
-    callback.
+    """Complete metadata of one style source.
 
     See `mln_style_source_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3825,14 +3831,14 @@ class TextureImageInfo:
 
 @dataclass(frozen=True, slots=True)
 class TextureReadbackResult:
-    """Texture readback borrowed for a completion callback.
+    """Texture readback.
 
     See `mln_texture_readback_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     data: bytes
-    """Borrowed pixel bytes, valid only during the callback."""
+    """Pixel bytes."""
 
     info: TextureImageInfo
 
@@ -4010,7 +4016,7 @@ class VulkanContextDescriptor:
     graphics_queue: int
     """Borrowed graphics VkQueue. Required. The session's driver submits to it
     from its own thread, so a host that uses the same queue passes
-    `mln_render_session_attach_options.queue_lock` at attach.
+    `RenderSessionAttachOptions.queue_lock` at attach.
     """
 
     graphics_queue_family_index: int = 0
@@ -4157,7 +4163,8 @@ class VulkanTextureFrame:
 class Wake:
     """Receiver wake callback copied by a successful owning call. The callback
     schedules service by the receiver and returns without waiting for another
-    thread.
+    thread. Native code may invoke the callback from any thread, and calls
+    may coalesce or overlap.
 
     See `mln_wake` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -4268,7 +4275,8 @@ class WglContextDescriptor:
 
 
 class CameraTransitionEndCallback(Protocol):
-    """Receives the end of one camera command's transitions.
+    """Receives the end of one camera command's transitions. The callback runs
+    on the runtime worker.
 
     See `mln_camera_transition_end_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4279,7 +4287,8 @@ class CameraTransitionEndCallback(Protocol):
 
 class CustomSourceCancelTileCallback(Protocol):
     """Cancels a request for one tile of a custom geometry or custom MVT vector
-    source, best effort.
+    source, best effort. The callback may run on any native worker thread,
+    concurrently with runtime and map calls.
 
     See `mln_custom_source_cancel_tile_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4289,7 +4298,9 @@ class CustomSourceCancelTileCallback(Protocol):
 
 
 class CustomSourceFetchTileCallback(Protocol):
-    """Requests one tile of a custom geometry or custom MVT vector source.
+    """Requests one tile of a custom geometry or custom MVT vector source. The
+    callback may run on any native worker thread, concurrently with runtime
+    and map calls.
 
     See `mln_custom_source_fetch_tile_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4299,7 +4310,8 @@ class CustomSourceFetchTileCallback(Protocol):
 
 
 class HttpHeaderTransformCallback(Protocol):
-    """Adds end-to-end headers to one outgoing HTTP request attempt.
+    """Adds end-to-end headers to one outgoing HTTP request attempt. The
+    callback runs synchronously on a MapLibre worker or network thread.
 
     See `mln_http_header_transform_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4319,7 +4331,10 @@ class HttpHeaderTransformCallback(Protocol):
 
 
 class LogCallback(Protocol):
-    """Receives a MapLibre Native log record.
+    """Receives a MapLibre Native log record. The callback runs synchronously on
+    the thread that emits the record, or on a MapLibre background thread for
+    a severity that `set_log_async_severity_mask()` dispatches
+    asynchronously.
 
     See `mln_log_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -4336,7 +4351,8 @@ class LogCallback(Protocol):
 class QueueLockCallback(Protocol):
     """Takes or returns the host's lock on the queue that a session shares with
     it. Native code relies on the lock being held or released when the call
-    returns.
+    returns. The callback runs on the session's graphics thread or on the
+    thread that abandons the session.
 
     See `mln_queue_lock_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -4346,7 +4362,8 @@ class QueueLockCallback(Protocol):
 
 
 class ResourceProviderCallback(Protocol):
-    """Intercepts a network resource request.
+    """Intercepts a network resource request. The callback runs synchronously on
+    a MapLibre thread.
 
     See `mln_resource_provider_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4358,7 +4375,11 @@ class ResourceProviderCallback(Protocol):
 
 
 class ResourceRequestCancelCallback(Protocol):
-    """Reports that MapLibre cancelled a C API resource provider request.
+    """Reports that MapLibre cancelled a C API resource provider request. The
+    callback runs on the thread that discards the request, never a host
+    thread: the runtime's native scheduler thread when a committed map or
+    runtime command discards it, such as a style change or map destruction,
+    and a MapLibre worker thread otherwise.
 
     See `mln_resource_request_cancel_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4368,7 +4389,8 @@ class ResourceRequestCancelCallback(Protocol):
 
 
 class ResourceTransformCallback(Protocol):
-    """Asks the host for the URL of one network resource request.
+    """Asks the host for the URL of one network resource request. The callback
+    runs on a MapLibre network thread.
 
     See `mln_resource_transform_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4380,7 +4402,9 @@ class ResourceTransformCallback(Protocol):
 
 
 class RuntimeEventCallback(Protocol):
-    """Receives selected events after their snapshots have been published.
+    """Receives selected events after their snapshots have been published. Map
+    events arrive on the runtime's native scheduler thread, and offline
+    events may arrive on a MapLibre worker thread.
 
     See `mln_runtime_event_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4390,7 +4414,9 @@ class RuntimeEventCallback(Protocol):
 
 
 class WakeCallback(Protocol):
-    """Schedules service by the receiver that owns a queue or driver.
+    """Schedules service by the receiver that owns a queue or driver. Native
+    code may invoke the callback from any thread, and calls may coalesce or
+    overlap.
 
     See `mln_wake_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

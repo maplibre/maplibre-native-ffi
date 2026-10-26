@@ -5,7 +5,7 @@ import re
 from ..model import ModelError
 from ..names import camel
 from ..semantic import required_callbacks
-from .zig import identifier
+from .zig import identifier, status_error
 from .zig_dynamic_values import decode
 
 
@@ -55,9 +55,9 @@ def parts(values, value):
         )
         argument_types = [values.public(p.value) for p in parameters]
         summary = (
-            "    /// An error that names a native status, such as\n"
-            "    /// error.InvalidArgument, answers native that status. Any other\n"
-            f"    /// error is logged and answers {plan.failure}.\n"
+            "    /// An error that names a native status, such as error.InvalidArgument,\n"
+            "    /// answers native that status. Any other error is logged and answers\n"
+            f"    /// the status that error.{status_error(plan.failure)} names.\n"
             if plan.status
             else ""
         )

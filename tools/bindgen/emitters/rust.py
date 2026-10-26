@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
+from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -75,7 +76,88 @@ def gated(plan: OperationPlan, code: str) -> str:
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The rustdoc comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), indent)
+    return docs.line_comment(bound.doc(native), symbols(bound), indent)
+
+
+def receiver_native(plan: OperationPlan) -> str | None:
+    """The C type of the handle or response that an operation is a method of."""
+    receiver = plan.receiver or plan.scoped_receiver
+    value = next((p.value for p in plan.inputs if p.name == receiver), None)
+    if value is None:
+        return None
+    return value.element.native if value.kind == "reference" else value.native
+
+
+def method_name(plan: OperationPlan) -> str:
+    return identifier(plan.member)
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Rust spells the C declarations that its summaries name."""
+    return bound.symbols("rust", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    from .rust_owners import owned_handles, owner_name
+    from .rust_values import Values, enum_member
+
+    values = Values(bound)
+    owners = owned_handles(bound)
+    # A record that holds only a union presents the union under its own name.
+    holders = {
+        member.value.native: value
+        for value in bound.values.values()
+        if (member := value.union_member)
+    }
+
+    def type_(native: str) -> str | None:
+        if native in owners:
+            return owner_name(native)
+        value = holders.get(native) or bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`.
+        if (
+            value is None
+            or value.native == COMPLETION_RESULT
+            or value.kind not in {"record", "union", "enum"}
+        ):
+            return None
+        return values.name(value)
+
+    def operation(plan: OperationPlan) -> str | None:
+        owner = receiver_native(plan) or plan.factory
+        if owner is None:
+            return method_name(plan)
+        typ = type_(owner)
+        return f"{typ}::{method_name(plan)}" if typ else None
+
+    def constant(value, member: str) -> str | None:
+        name = enum_member(value, member)
+        return f"{values.name(value)}::{name}" if name else None
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.union_member:
+            return None
+        # A union's members are its enum's variants.
+        name = pascal(member.name) if value.kind == "union" else identifier(member.name)
+        return f"{typ}::{name}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{values.name(value)}::{identifier(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"CommandCompletion::{name}"
+            for name in ("generation", "render_update_generation")
+        },
+    )
 
 
 def ctype(value: CType) -> str:
@@ -316,23 +398,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         value_types.add(scoped)
         return "global", ""
     consuming = bool(plan.consumes)
-    receiver_plan = next(
-        (
-            parameter.value
-            for parameter in plan.inputs
-            if parameter.name == plan.receiver
-        ),
-        None,
-    )
-    receiver = (
-        (
-            receiver_plan.element.native
-            if receiver_plan.kind == "reference"
-            else receiver_plan.native
-        )
-        if receiver_plan
-        else None
-    )
+    receiver = receiver_native(plan)
     if receiver is not None and receiver not in value_types.owners:
         raise Unsupported(f"receiver {receiver} needs a generated runtime adapter")
     if plan.factory and plan.factory not in value_types.owners:
@@ -644,7 +710,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         method == "close" and not consuming
     ):
         raise Unsupported("method name is reserved by the handle runtime")
-    method = identifier(method)
+    method = method_name(plan) if method == plan.member else identifier(method)
     if plan.completion:
         closure = (
             f"|{closure}, {local_name(plan.completion.parameter)}, out_diagnostic|"

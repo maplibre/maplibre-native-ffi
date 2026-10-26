@@ -88,6 +88,12 @@ def method_name(plan):
     return identifier(plan.member)
 
 
+def public_method(plan):
+    """The method that a host calls for [plan]: a view's is the `with` function
+    that lends its value to a block."""
+    return identifier("with_" + plan.view.stem) if plan.view else method_name(plan)
+
+
 def copies_borrowed(value):
     if not value:
         return False
@@ -702,7 +708,7 @@ def lifecycle(plan, values, native):
 def view(plan, values, native):
     values.views.add(plan.outputs[0].value.element.native)
     method, _params, _inputs, result, result_type = signature(plan, values)
-    method = identifier("with_" + plan.view.stem)
+    method = public_method(plan)
     functions = values.bound.source.functions_by_name
     allocation, _decoded = output_storage(result, values)
     begin = native.status(functions[plan.view.begin], ["handle", "it"])

@@ -12,8 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleImageOptions
 {
     /// <summary>
-    /// Horizontally stretchable intervals. Borrowed for the call and copied
-    /// before return. May be null only when stretch_x_count is 0.
+    /// Horizontally stretchable intervals.
     /// </summary>
     public ImmutableArray<ImageStretch>? StretchX
     {
@@ -23,8 +22,7 @@ public sealed record StyleImageOptions
     internal ValueArray<ImageStretch>? StretchXStorage { get; init; }
 
     /// <summary>
-    /// Vertically stretchable intervals. Borrowed for the call and copied
-    /// before return. May be null only when stretch_y_count is 0.
+    /// Vertically stretchable intervals.
     /// </summary>
     public ImmutableArray<ImageStretch>? StretchY
     {

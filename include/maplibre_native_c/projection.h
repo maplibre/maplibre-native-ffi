@@ -62,10 +62,10 @@ MLN_API void mln_map_projection_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the projection camera into out_camera.
+ * Copies the projection camera.
  *
- * The result observes every earlier projection setter. This function may be
- * called from any thread.
+ * The function writes the camera to out_camera. The result observes every
+ * earlier projection setter. This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

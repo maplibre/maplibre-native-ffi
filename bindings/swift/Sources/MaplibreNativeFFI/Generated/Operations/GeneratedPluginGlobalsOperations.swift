@@ -5,7 +5,7 @@ internal import MaplibreNativeC.Plugin
 import Foundation
 
 public extension Maplibre {
-  /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
+  /// Returns the process-wide plugin registration entry point; never null.
   ///
   /// See `mln_plugin_get_register_function_v1` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).

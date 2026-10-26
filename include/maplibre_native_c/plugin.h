@@ -39,7 +39,11 @@
 extern "C" {
 #endif
 
-/** Returns the process-wide mln_plugin_register_v1 entry point; never null. */
+/**
+ * Returns the process-wide plugin registration entry point; never null.
+ *
+ * The entry point is an mln_plugin_register_v1 function.
+ */
 MLN_BINDING("kind=native_pointer;ownership=borrowed;lifetime=process")
 MLN_API mln_plugin_register_function_v1
 mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;

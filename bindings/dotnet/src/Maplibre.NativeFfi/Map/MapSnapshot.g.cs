@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="DebugOptions">
-/// Debug overlay mask of <c>mln_map_debug_flag</c> values.
+/// Debug overlays that the map draws.
 /// </param>
 /// <param name="FullyLoaded">
 /// True once every requested style and tile resource finished loading.
@@ -28,7 +28,7 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="View">
 /// The map's camera, extent, projection mode, and viewport options.
-/// <c>mln_map_projection_create()</c> converts coordinates for this view.
+/// <c>MapProjectionHandle.Create()</c> converts coordinates for this view.
 /// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugFlag DebugOptions,

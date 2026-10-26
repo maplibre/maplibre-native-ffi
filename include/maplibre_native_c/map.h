@@ -78,8 +78,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
    * Selects the unbounded geographic constraint, which leaves every camera
    * center unconstrained and lets the map pan freely across the antimeridian.
    * This differs from world bounds of -90/-180 to 90/180, which clamp
-   * longitude to that range. Mutually exclusive with MLN_BOUND_OPTION_BOUNDS,
-   * and leaves mln_bound_options.bounds unread.
+   * longitude to that range. Mutually exclusive with mln_bound_options.bounds,
+   * which it leaves unread.
    */
   MLN_BOUND_OPTION_UNBOUNDED = 1U << 5U,
 } mln_bound_option_field;
@@ -229,8 +229,7 @@ typedef struct mln_map_options {
    */
   bool fast_pfor_enabled;
   /**
-   * Map-originated event types this map queues, as a bitwise OR of
-   * mln_runtime_event_flag values.
+   * Map-originated event types this map queues.
    *
    * Absent selects every event type. Present, MLN_RUNTIME_EVENT_FLAG_ALL
    * selects every event type this library reports, and
@@ -330,7 +329,9 @@ typedef enum mln_camera_transition_outcome : uint32_t {
 } mln_camera_transition_outcome;
 
 /**
- * The end of one camera command's transitions, borrowed for the callback.
+ * The end of one camera command's transitions.
+ *
+ * The callback borrows it.
  */
 typedef struct mln_camera_transition_end {
   uint32_t size;
@@ -349,6 +350,9 @@ typedef struct mln_camera_transition_end {
  *
  * A handler in queue mode queues a copy as an
  * mln_camera_transition_end_delivery instead.
+ *
+ * Threads:
+ * The callback runs on the runtime worker.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END")
 typedef void (*mln_camera_transition_end_callback)(
@@ -356,12 +360,13 @@ typedef void (*mln_camera_transition_end_callback)(
 );
 
 /**
- * Callback or queue state that one camera command copies to report the end of
- * its transitions.
+ * Callback that one camera command copies to report the end of its
+ * transitions.
  *
- * A handler with neither a callback nor a queue is disabled, and a disabled
- * handler must not carry release_user_data. See
- * mln_animation_options.end_handler for when the callback runs.
+ * In queue mode, a queue takes the callback's place. A handler with neither a
+ * callback nor a queue is disabled, and a disabled handler must not carry
+ * release_user_data. See mln_animation_options.end_handler for when the
+ * callback runs.
  */
 typedef struct mln_camera_transition_handler {
   mln_camera_transition_end_callback callback MLN_BINDING("nullable=true");
@@ -600,7 +605,11 @@ typedef uint32_t mln_feature_state_selector_fields;
 typedef struct mln_feature_state_selector {
   uint32_t size;
   mln_feature_state_selector_fields fields;
-  /** Source ID. Required. Borrowed for the duration of the call. */
+  /**
+   * Source ID. Required.
+   *
+   * Borrowed for the duration of the call.
+   */
   mln_buffer_view source_id MLN_BINDING("required=true");
   /**
    * Source layer ID, or empty for none. Required for vector-source
@@ -631,7 +640,11 @@ typedef struct mln_lat_lng_bounds {
 typedef struct mln_bound_options {
   uint32_t size;
   mln_bound_option_fields fields;
-  /** Read when fields contains MLN_BOUND_OPTION_BOUNDS. */
+  /**
+   * Geographic bounds that the camera center stays inside.
+   *
+   * Read when fields contains MLN_BOUND_OPTION_BOUNDS.
+   */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_BOUNDS");
   double min_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_ZOOM");
@@ -660,7 +673,9 @@ typedef struct mln_offline_geometry_region_definition {
   /** Style URL. Copied during region creation. */
   mln_buffer_view style_url;
   /**
-   * UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
+   * UTF-8 GeoJSON Geometry. Required.
+   *
+   * Borrowed during region creation.
    */
   mln_buffer_view geometry MLN_BINDING("encoding=json;required=true");
   double min_zoom;
@@ -1081,7 +1096,7 @@ typedef struct mln_map_tile_options {
  */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  /** Debug overlay mask of mln_map_debug_flag values. */
+  /** Debug overlays that the map draws. */
   mln_map_debug_flags debug_options;
   uint64_t generation;
   /** True once every requested style and tile resource finished loading. */
@@ -1136,7 +1151,11 @@ typedef struct mln_map_snapshot {
   mln_map_view view;
 } mln_map_snapshot;
 
-/** Camera result borrowed for an ordered camera-query completion. */
+/**
+ * Camera result of an ordered camera query.
+ *
+ * The query's completion borrows it.
+ */
 typedef struct mln_camera_query_result {
   uint64_t generation;
   mln_camera camera;

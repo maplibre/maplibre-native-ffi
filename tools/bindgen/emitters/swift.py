@@ -10,6 +10,7 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
+from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -94,7 +95,118 @@ def unsupported(function: Function | Record, detail: str) -> ModelError:
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The DocC comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), indent)
+    return docs.line_comment(bound.doc(native), symbols(bound), indent)
+
+
+def receiver_native(plan: OperationPlan) -> str | None:
+    """The C type of the handle or response that an operation is a method of."""
+    receiver = plan.receiver or plan.scoped_receiver
+    value = next((p.value for p in plan.inputs if p.name == receiver), None)
+    if value is None:
+        return None
+    return (
+        value.element.native
+        if value.kind == "reference" and value.element
+        else value.native
+    )
+
+
+def owner_type(plan: OperationPlan, bound: BoundApi) -> str:
+    """The type that declares an operation: its receiver's, its factory's, or
+    `Maplibre` for a process global."""
+    from .swift_ownership import owner_name
+
+    receiver = receiver_native(plan)
+    if plan.scoped_receiver:
+        return name(receiver.removeprefix("mln_"))
+    if receiver:
+        return owner_name(bound.handles[receiver])
+    if plan.factory:
+        return owner_name(bound.handles[plan.factory])
+    return "Maplibre"
+
+
+def method_name(plan: OperationPlan) -> str:
+    """The name of an operation's method, without the backticks that declare it."""
+    if plan.view:
+        from .swift_views import method_name as view_method
+
+        return view_method(plan)
+    if plan.consumes:
+        from .swift_ownership import method_name as consuming_method
+
+        return consuming_method(plan)
+    return camel(plan.member)
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Swift spells the C declarations that its summaries name."""
+    return bound.symbols("swift", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    from .swift_callbacks import alias
+    from .swift_ownership import owner_name, public_handles
+    from .swift_values import Values, enum_member
+
+    values = Values(bound)
+    owners = {handle.native: owner_name(handle) for handle in public_handles(bound)}
+    # A record that holds only a union presents the union under its own name.
+    holders = {
+        member.value.native: value
+        for value in bound.values.values()
+        if (member := value.union_member)
+    }
+
+    def type_(native: str) -> str | None:
+        if native in owners:
+            return owners[native]
+        if native in bound.callbacks:
+            return alias(bound.callbacks[native])
+        value = holders.get(native) or bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`, and a slice record as its array alone.
+        if (
+            value is None
+            or value.native == COMPLETION_RESULT
+            or value.native in bound.slices
+            or value.kind not in {"record", "union", "enum"}
+        ):
+            return None
+        return values.public(value)
+
+    def operation(plan: OperationPlan) -> str | None:
+        owner = receiver_native(plan) or plan.factory
+        if owner is not None and type_(owner) is None:
+            return None
+        return f"{owner_type(plan, bound)}.{method_name(plan)}"
+
+    def constant(value, member: str) -> str | None:
+        return f"{values.public(value)}.{enum_member(value, member)}"
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        # A response presents no members, and a record that holds only a union
+        # presents the union's variants instead.
+        if typ is None or value.response or value.union_member:
+            return None
+        return f"{typ}.{camel(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{values.public(value)}.{camel(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{camel(member)}"
+            for member in ("generation", "render_update_generation")
+        },
+    )
 
 
 def member_doc(bound: BoundApi, native: str) -> str:
@@ -111,29 +223,10 @@ def operation(
 
     function = plan.function
     params = list(function.parameters)
-    receiver = next(
-        (
-            (
-                p.value.element.native
-                if p.value.kind == "reference" and p.value.element
-                else p.value.native
-            )
-            for p in plan.inputs
-            if p.name == (plan.receiver or plan.scoped_receiver)
-        ),
-        None,
-    )
+    receiver = receiver_native(plan)
     if receiver:
         params.pop(0)
-    owner = (
-        name(receiver.removeprefix("mln_"))
-        if plan.scoped_receiver
-        else owner_name(value_types.bound.handles[receiver])
-        if receiver
-        else owner_name(value_types.bound.handles[plan.factory])
-        if plan.factory
-        else "Maplibre"
-    )
+    owner = owner_type(plan, value_types.bound)
     # A factory is a static member of a handle, whose call helpers shadow the
     # global ones that a call without a receiver uses.
     helpers = "MaplibreNativeFFI." if plan.factory else ""
@@ -183,7 +276,7 @@ def operation(
         else {}
     )
     output_names = {parameter.name for parameter in plan.outputs}
-    method = camel(plan.member)
+    method = method_name(plan)
     for parameter_index, param in enumerate(params):
         local = f"bindingArg{parameter_index}"
         label = (
@@ -261,7 +354,7 @@ def operation(
             if argument not in text_arguments.values():
                 hoisted.append(f"let bindingInput{index} = {argument}")
                 arguments[index] = f"bindingInput{index}"
-    method = camel(plan.member)
+    method = method_name(plan)
     if method in {"close", "deinit"}:
         raise unsupported(function, "method name is reserved by the handle runtime")
     method = identifier(method)

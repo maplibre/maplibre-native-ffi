@@ -16,7 +16,8 @@ public abstract class GeneratedMapOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Adds a custom geometry source.
+   * Adds a custom geometry source. The callback may run on any native worker thread, concurrently
+   * with runtime and map calls.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -38,7 +39,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Adds a custom MVT vector source.
+   * Adds a custom MVT vector source. The callback may run on any native worker thread, concurrently
+   * with runtime and map calls.
    *
    * See `mln_map_add_custom_mvt_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -421,7 +423,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Ends the innermost command group that `mln_map_begin_command_group()` began.
+   * Ends the innermost command group that `MapHandle.beginCommandGroup()` began.
    *
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -465,8 +467,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Queries the global-state JSON object, including style defaults. Completion borrows one
-   * `mln_buffer_view` for the duration of the callback.
+   * Queries the global-state JSON object, including style defaults.
    *
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1241,7 +1242,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Submits copied axonometric rendering option fields.
+   * Submits axonometric rendering options.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

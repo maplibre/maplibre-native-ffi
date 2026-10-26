@@ -17,7 +17,7 @@ public enum RenderSessionState : uint
 
     /// <summary>
     /// A frame or driver task failed and the session can no longer render. The
-    /// map reports the failure as <c>MLN_RUNTIME_EVENT_MAP_RENDER_ERROR</c>. A
+    /// map reports the failure as <c>RuntimeEventType.MapRenderError</c>. A
     /// failed attach reports it through its completion instead.
     /// </summary>
     TargetLost = 5,

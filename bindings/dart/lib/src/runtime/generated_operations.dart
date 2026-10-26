@@ -2629,7 +2629,10 @@ void setLogAsyncSeverityMask(LogSeverityFlag mask) {
   );
 }
 
-/// Installs a process-global MapLibre Native log callback.
+/// Installs a process-global MapLibre Native log callback. The callback runs
+/// synchronously on the thread that emits the record, or on a MapLibre
+/// background thread for a severity that `setLogAsyncSeverityMask()`
+/// dispatches asynchronously.
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2696,7 +2699,7 @@ OpenGlContextProviderFlag openGlSupportedContextProviderMask() {
   return OpenGlContextProviderFlag.fromRawValue(nativeResult);
 }
 
-/// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
+/// Returns the process-wide plugin registration entry point; never null.
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
@@ -2734,10 +2737,10 @@ RenderBackendFlag supportedRenderBackendMask() {
   return RenderBackendFlag.fromRawValue(nativeResult);
 }
 
-/// Issued `mln_acquired_frame` handle id.
+/// Issued native handle id.
 extension type const _NativeAcquiredFrame(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_acquired_frame` handle.
+/// Owner of one native handle.
 ///
 /// A rendered frame that a render session lends until its release.
 ///
@@ -2907,11 +2910,11 @@ final class AcquiredFrameHandle implements Finalizable {
   );
 }
 
-/// Issued `mln_geo_json_source_data` handle id.
+/// Issued native handle id.
 extension type const _NativeGeoJsonSourceData(int raw)
     implements NativeHandle {}
 
-/// Owner of one native `mln_geo_json_source_data` handle.
+/// Owner of one native handle.
 ///
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
@@ -3526,10 +3529,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
   });
 }
 
-/// Issued `mln_map` handle id.
+/// Issued native handle id.
 extension type const _NativeMap(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_map` handle.
+/// Owner of one native handle.
 ///
 /// A map, which holds map state independent of any render target.
 ///
@@ -3562,7 +3565,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   String toString() =>
       'MapHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
-  /// Adds a custom geometry source.
+  /// Adds a custom geometry source. The callback may run on any native worker
+  /// thread, concurrently with runtime and map calls.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3584,7 +3588,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   });
 
-  /// Adds a custom MVT vector source.
+  /// Adds a custom MVT vector source. The callback may run on any native worker
+  /// thread, concurrently with runtime and map calls.
   ///
   /// See `mln_map_add_custom_mvt_vector_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4177,7 +4182,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         raw.mln_map_dump_debug_logs(_handle.raw, completion, nativeDiagnostic),
   );
 
-  /// Ends the innermost command group that `mln_map_begin_command_group()`
+  /// Ends the innermost command group that `MapHandle.beginCommandGroup()`
   /// began.
   ///
   /// See `mln_map_end_command_group` in the
@@ -4214,8 +4219,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Queries the global-state JSON object, including style defaults. Completion
-  /// borrows one `mln_buffer_view` for the duration of the callback.
+  /// Queries the global-state JSON object, including style defaults.
   ///
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4863,7 +4867,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         ),
       );
 
-  /// Submits copied axonometric rendering option fields.
+  /// Submits axonometric rendering options.
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -5066,10 +5070,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       });
 }
 
-/// Issued `mln_map_projection` handle id.
+/// Issued native handle id.
 extension type const _NativeMapProjection(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_map_projection` handle.
+/// Owner of one native handle.
 ///
 /// A standalone projection of one map view.
 ///
@@ -5116,7 +5120,7 @@ final class MapProjectionHandle implements Finalizable {
     );
   });
 
-  /// Copies the projection camera into out_camera.
+  /// Copies the projection camera.
   ///
   /// See `mln_map_projection_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -5338,10 +5342,10 @@ extension type RenderSessionHandleDiscarding._(RenderSessionHandle _owner) {
   );
 }
 
-/// Issued `mln_render_session` handle id.
+/// Issued native handle id.
 extension type const _NativeRenderSession(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_render_session` handle.
+/// Owner of one native handle.
 ///
 /// A render session, which renders one map to one render target.
 ///
@@ -5409,12 +5413,12 @@ final class RenderSessionHandle implements Finalizable {
     );
   });
 
-  /// Ends every frame demand that has not started with
-  /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
-  /// finished. A running demand finishes its attempt and ends any wait for a
-  /// map update or a free slot. After completion, a new frame demand is
-  /// required to render again, except that a pending still image submits its
-  /// next demand itself; see `mln_map_request_still_image()`.
+  /// Ends every frame demand that has not started with `RenderResult.noUpdate`
+  /// and completes after earlier driver work has finished. A running demand
+  /// finishes its attempt and ends any wait for a map update or a free slot.
+  /// After completion, a new frame demand is required to render again, except
+  /// that a pending still image submits its next demand itself; see
+  /// `MapHandle.requestStillImage()`.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5475,9 +5479,7 @@ final class RenderSessionHandle implements Finalizable {
         raw.mln_render_session_dispose(handle.raw, nullptr, nativeDiagnostic),
   );
 
-  /// Drains every currently queued terminal frame result into an independently
-  /// owned batch and borrows its view. The records remain stable until the
-  /// batch is released.
+  /// Drains every currently queued terminal frame result.
   ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5547,9 +5549,7 @@ final class RenderSessionHandle implements Finalizable {
     return _readRenderSessionSnapshot(outSnapshot.ref);
   });
 
-  /// Starts a feature-extension query against the latest driver state. The
-  /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
-  /// 1), valid only for the callback.
+  /// Starts a feature-extension query against the latest driver state.
   ///
   /// See `mln_render_session_query_feature_extensions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -5678,14 +5678,14 @@ final class RenderSessionHandle implements Finalizable {
 
   /// Services every queued item for a caller-graphics-thread driver. The first
   /// successful service call fixes the session's graphics-thread identity;
-  /// later calls from another native thread return `MLN_STATUS_WRONG_THREAD`.
-  /// The target context must be current. Core-worker sessions return
-  /// `MLN_STATUS_INVALID_STATE`.
+  /// later calls from another native thread return `Status.wrongThread`. The
+  /// target context must be current. Core-worker sessions return
+  /// `Status.invalidState`.
   ///
   /// An isolate cannot service a caller-graphics-thread driver, because Dart
   /// can resume it on another native thread after any `await`. Host native code
-  /// services such a session by passing its `id` to
-  /// `mln_render_session_service_driver_work` on the graphics thread.
+  /// services such a session on the graphics thread by passing its `id` to the
+  /// C function that `RenderSessionHandle.serviceDriverWork()` calls.
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5787,10 +5787,10 @@ final class RenderSessionHandle implements Finalizable {
       );
 }
 
-/// Issued `mln_resource_request` handle id.
+/// Issued native handle id.
 extension type const _NativeResourceRequest(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_resource_request` handle.
+/// Owner of one native handle.
 ///
 /// A resource request that a resource provider handles.
 ///
@@ -5866,9 +5866,10 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   });
 
   /// Registers a callback that runs when MapLibre cancels a C API resource
-  /// provider request. A request that is already cancelled registers nothing
-  /// and reports true through out_cancelled, and the caller handles that
-  /// cancellation itself.
+  /// provider request. The callback runs on the thread that discards the
+  /// request, never a host thread: the runtime's native scheduler thread when a
+  /// committed map or runtime command discards it, such as a style change or
+  /// map destruction, and a MapLibre worker thread otherwise.
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5896,11 +5897,11 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
       });
 }
 
-/// Issued `mln_resource_transform_request` handle id.
+/// Issued native handle id.
 extension type const _NativeResourceTransformRequest(int raw)
     implements NativeHandle {}
 
-/// Owner of one native `mln_resource_transform_request` handle.
+/// Owner of one native handle.
 ///
 /// A resource URL transform that waits for its host's answer.
 ///
@@ -6036,10 +6037,10 @@ extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
       });
 }
 
-/// Issued `mln_runtime` handle id.
+/// Issued native handle id.
 extension type const _NativeRuntime(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_runtime` handle.
+/// Owner of one native handle.
 ///
 /// A runtime: the native scheduler thread and event store for its maps.
 ///
@@ -6310,7 +6311,9 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
         ),
       );
 
-  /// Selects how runtime and map events reach the host.
+  /// Selects how runtime and map events reach the host. Map events arrive on
+  /// the runtime's native scheduler thread, and offline events may arrive on a
+  /// MapLibre worker thread.
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6342,6 +6345,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   );
 
   /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
+  /// The callback runs synchronously on a MapLibre worker or network thread.
   ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6403,7 +6407,8 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Registers or replaces a runtime-scoped network resource provider.
+  /// Registers or replaces a runtime-scoped network resource provider. The
+  /// callback runs synchronously on a MapLibre thread.
   ///
   /// See `mln_runtime_set_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6423,6 +6428,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
       });
 
   /// Registers or updates a runtime-scoped URL transform for network resources.
+  /// The callback runs on a MapLibre network thread.
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6462,10 +6468,10 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   });
 }
 
-/// Issued `mln_style_expression` handle id.
+/// Issued native handle id.
 extension type const _NativeStyleExpression(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_style_expression` handle.
+/// Owner of one native handle.
 ///
 /// A parsed style expression, immutable and independent of any map.
 ///
@@ -6544,7 +6550,7 @@ final class StyleExpressionHandle implements Finalizable {
     return _decodeJson(text.text);
   });
 
-  /// Copies what a parsed expression depends on into out_info.
+  /// Copies what a parsed expression depends on.
   ///
   /// See `mln_style_expression_get_info` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

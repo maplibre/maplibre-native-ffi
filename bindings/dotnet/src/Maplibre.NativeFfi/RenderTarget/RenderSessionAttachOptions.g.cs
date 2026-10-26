@@ -35,18 +35,17 @@ public readonly partial record struct RenderSessionAttachOptions
     public required RenderDriverKind Driver { get; init; }
 
     /// <summary>
-    /// Requested slot count of a session-owned texture ring, up to
-    /// <c>MLN_TEXTURE_RING_MAX_DEPTH</c>. Zero selects 2, so the host can
-    /// retain one frame while the session renders its replacement. Private
-    /// targets grant one slot regardless of this value. A borrowed texture
-    /// ring's depth is its texture count, so borrowed and other targets ignore
-    /// this value.
+    /// Requested slot count of a session-owned texture ring, up to 8. Zero
+    /// selects 2, so the host can retain one frame while the session renders
+    /// its replacement. Private targets grant one slot regardless of this
+    /// value. A borrowed texture ring's depth is its texture count, so borrowed
+    /// and other targets ignore this value.
     /// </summary>
     public uint RequestedTextureRingDepth { get; init; }
 
     /// <summary>
     /// Producer synchronization for acquired texture frames.
-    /// <c>MLN_GPU_SYNC_OPEN_GL_FENCE</c> requires a shared EGL or WGL texture
+    /// <c>GpuSyncKind.OpenGlFence</c> requires a shared EGL or WGL texture
     /// target and a caller-graphics-thread driver. Other targets support only
     /// CPU completion and fail an unsupported request.
     /// </summary>
@@ -66,7 +65,7 @@ public readonly partial record struct RenderSessionAttachOptions
     /// <summary>
     /// Host lock on the graphics queue, disabled by default. Only Vulkan
     /// targets accept an enabled lock; other backends fail the attach with
-    /// <c>MLN_STATUS_UNSUPPORTED</c>.
+    /// <c>Status.Unsupported</c>.
     /// </summary>
     public QueueLock QueueLock { get; init; }
 }

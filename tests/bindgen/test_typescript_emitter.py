@@ -289,6 +289,17 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertNotIn("export function create(", operations)
         self.assertIn("export function setLogCallback(handler: LogHandler)", operations)
 
+    def test_docs_name_the_binding_symbols_of_c_declarations(self):
+        values = typescript.generate(self.api)[
+            "bindings/typescript/src/generated_values.ts"
+        ]
+        self.assertIn(
+            "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or\n"
+            "   * `GesturePhase.cancel` ended the transitions",
+            values,
+        )
+        self.assertNotIn("`mln_map_cancel_transitions()`", values)
+
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
         # attachment, so only the categories that return synchronously can

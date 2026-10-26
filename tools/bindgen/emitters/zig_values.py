@@ -2,7 +2,7 @@
 
 from ..model import ModelError
 from ..semantic import ValuePlan, enum_member_prefix, required_callbacks
-from .zig import SCALARS, doc, documented, identifier, pascal
+from .zig import SCALARS, doc, documented, identifier, pascal, type_name
 
 
 def field_default(values, field) -> str | None:
@@ -14,13 +14,8 @@ def field_default(values, field) -> str | None:
     if value.kind == "enum":
         if value.enum_kind == "bitmask":
             return ".{}"
-        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         zero = next((key for key, number in value.enum_values if number == 0), None)
-        return (
-            "." + identifier(zero.removeprefix(prefix).lower())
-            if zero
-            else "@enumFromInt(0)"
-        )
+        return "." + identifier(enum_member(value, zero)) if zero else "@enumFromInt(0)"
     if value.kind == "union" or value.union_member:
         # Only a union that keeps unknown tags has a value to start from.
         return ".{ .unknown = 0 }" if value.native in values.bound.returned else None
@@ -49,6 +44,18 @@ def field_default(values, field) -> str | None:
     if any(field_default(values, member) is None for member in members):
         return None
     return ".{}"
+
+
+def enum_member(value, key) -> str:
+    """The Zig name of an enum constant: a flag set's field or constant, or an
+    enum's member, which aliased constants share."""
+    prefix = enum_member_prefix((known for known, _ in value.enum_values), value.native)
+    if value.enum_kind != "bitmask":
+        number = dict(value.enum_values)[key]
+        key = next(
+            known for known, first in first_names(value.enum_values) if first == number
+        )
+    return key.removeprefix(prefix).lower()
 
 
 def first_names(enum_values):
@@ -91,7 +98,7 @@ class Values:
         if specialized:
             return specialized
         if value.kind == "handle":
-            return pascal(value.native.removeprefix("mln_"))
+            return type_name(value.native)
         if value.kind == "native_pointer":
             return (
                 "c." + value.native
@@ -132,7 +139,7 @@ class Values:
             )
             return pascal(parent.native.removeprefix("mln_")) + pascal(field.name)
         if value.kind in {"record", "enum", "union"}:
-            return pascal(value.native.removeprefix("mln_"))
+            return type_name(value.native)
         raise ModelError(
             [f"Zig: {value.native}: {value.kind} needs a value conversion"]
         )
@@ -339,10 +346,9 @@ class Values:
                 "unsigned long long": "u64",
             }.get(canonical, "u32"),
         )
-        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         if value.enum_kind == "bitmask":
             single = [
-                (identifier(key.removeprefix(prefix).lower()), number, key)
+                (identifier(enum_member(value, key)), number, key)
                 for key, number in value.enum_values
                 if number > 0 and number & (number - 1) == 0
             ]
@@ -351,7 +357,7 @@ class Values:
                 for local, _, key in single
             )
             constants = "".join(
-                f"    pub const {identifier(key.removeprefix(prefix).lower())}: {public} = {flag_literal(single, number)};\n"
+                f"    pub const {identifier(enum_member(value, key))}: {public} = {flag_literal(single, number)};\n"
                 for key, number in value.enum_values
                 if number == 0 or number & (number - 1) != 0
             )
@@ -365,7 +371,7 @@ class Values:
             )
             return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n    pub const native_bits = [_]{raw}{{ {bits} }};\n    const methods = marshal.FlagMethods(@This());\n{methods}{constants}}};\n"
         members = "\n".join(
-            f"{doc(self.bound, key, '    ')}    {identifier(key.removeprefix(prefix).lower())} = {number},"
+            f"{doc(self.bound, key, '    ')}    {identifier(enum_member(value, key))} = {number},"
             for key, number in first_names(value.enum_values)
         )
         return f"pub const {public} = enum({raw}) {{\n{members}\n    _,\n    pub const fromNative = marshal.EnumMethods(@This()).fromNative;\n    pub const toNative = marshal.EnumMethods(@This()).toNative;\n}};\n"

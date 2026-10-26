@@ -154,6 +154,15 @@ class DartEmitterTests(unittest.TestCase):
             "\n  void clearLogCallback() {\n    ensureAbiVersion();", operations
         )
 
+    def test_docs_name_the_dart_symbols_of_c_declarations(self):
+        values = dart.generate_values(real_api())
+        self.assertIn(
+            "  /// `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or\n"
+            "  /// `GesturePhase.cancel` ended the transitions",
+            values,
+        )
+        self.assertNotIn("`mln_map_cancel_transitions()`", values)
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = dart.generate_values(real_api())
         self.assertIn("sealed class RenderedQueryGeometry {", values)

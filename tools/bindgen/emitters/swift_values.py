@@ -262,9 +262,8 @@ class Values:
                 "unsigned long long": "UInt64",
             }.get(canonical, "UInt32"),
         )
-        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         members = "\n".join(
-            f"{doc(self.bound, key, '  ')}  public static let {identifier(camel(key.removeprefix(prefix).lower()))}: {public} = "
+            f"{doc(self.bound, key, '  ')}  public static let {identifier(enum_member(value, key))}: {public} = "
             + (
                 "[]"
                 if number == 0 and value.enum_kind == "bitmask"
@@ -279,7 +278,7 @@ class Values:
         if value.enum_kind != "bitmask":
             conformance += ", CustomStringConvertible"
             cases = "\n".join(
-                f'case {number}: return "{camel(key.removeprefix(prefix).lower())}"'
+                f'case {number}: return "{enum_member(value, key)}"'
                 for number, key in {
                     number: key for key, number in value.enum_values
                 }.items()
@@ -292,3 +291,9 @@ class Values:
   }}
 '''
         return f"{doc(self.bound, value.native)}public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n{description}}}\n"
+
+
+def enum_member(value, key):
+    """The Swift name of an enum constant's static member."""
+    prefix = enum_member_prefix((known for known, _ in value.enum_values), value.native)
+    return camel(key.removeprefix(prefix).lower())

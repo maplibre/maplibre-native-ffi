@@ -8,11 +8,11 @@ import Foundation
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FrameDemand: Equatable, Hashable, Sendable {
-  /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
-  /// newer map update exists, without presenting.
+  /// Frame-demand policy. Zero renders only when a newer map update exists,
+  /// without presenting.
   public var flags: FrameDemandFlag
   /// Host identity returned with the terminal frame result. Any value except
-  /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+  /// the maximum uint64_t value.
   public var token: UInt64
   public init(flags: FrameDemandFlag = .init(rawValue: 0), token: UInt64 = 0) {
     self.flags = flags
@@ -51,18 +51,18 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// presenting target whose demand clears this bit still renders and keeps
   /// whatever it presented last. Ignored by targets without presentation.
   public static let present: FrameDemandFlag = .init(rawValue: 2)
-  /// Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
-  /// `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the
-  /// map's next update, a target replacement, or an applied resize. A waiting
-  /// demand holds no ring slot. A later demand with the same flags supersedes
-  /// it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and
-  /// detach, abandon, or the quarantine of the ring's last usable slot end it
-  /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
-  /// follow the results of demands accepted after it. The flag does not pace: a
-  /// host that re-arms a waiting demand as each result arrives renders every
-  /// update the map publishes, and a command that arrives while a frame renders
-  /// appears in a later frame. To show several commands in one frame, submit
-  /// them in a command group, or arm demands once per display frame.
+  /// Without `FrameDemandFlag.force`, a demand that would finish with
+  /// `RenderResult.noUpdate` waits instead, and runs again after the map's next
+  /// update, a target replacement, or an applied resize. A waiting demand holds
+  /// no ring slot. A later demand with the same flags supersedes it, a barrier
+  /// ends its wait with `RenderResult.noUpdate`, and detach, abandon, or the
+  /// quarantine of the ring's last usable slot end it with
+  /// `RenderResult.targetNotReady`. A waiting demand's result can follow the
+  /// results of demands accepted after it. The flag does not pace: a host that
+  /// re-arms a waiting demand as each result arrives renders every update the
+  /// map publishes, and a command that arrives while a frame renders appears in
+  /// a later frame. To show several commands in one frame, submit them in a
+  /// command group, or arm demands once per display frame.
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
@@ -110,7 +110,7 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
 }
 
 /// Terminal result of one frame demand, held by an owned frame-result batch and
-/// copied by `mln_acquired_frame_get_result()`.
+/// copied by `AcquiredFrameHandle.getResult()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -118,29 +118,28 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   public var disposition: RenderResult
   public var token: UInt64
   /// Generation of the map render update the demand evaluated. When disposition
-  /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
-  /// with `mln_completion_result.render_update_generation` to find the first
-  /// frame that includes a command.
+  /// is `RenderResult.rendered`, the frame drew that update; compare it with
+  /// `CommandCompletion.renderUpdateGeneration` to find the first frame that
+  /// includes a command.
   public var mapUpdateGeneration: UInt64
   /// The session's target generation when the demand reached its result. See
-  /// `mln_render_session_snapshot.generation`.
+  /// `RenderSessionSnapshot.generation`.
   public var generation: UInt64
   /// Position of the frame among the frames that the session rendered, counting
-  /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+  /// from one. Zero unless disposition is `RenderResult.rendered`.
   public var frameGeneration: UInt64
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing paint transition. Set only when disposition is
-  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
-  /// matches the needs_repaint field of
-  /// `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
-  /// not set it: the map publishes an update for each of the transition's
-  /// frames instead, which a render-if-needed demand renders.
+  /// `RenderResult.rendered`, and false for every other outcome. It matches the
+  /// needs_repaint field of `RuntimeEventType.mapRenderFrameFinished`. A camera
+  /// transition does not set it: the map publishes an update for each of the
+  /// transition's frames instead, which a render-if-needed demand renders.
   public var needsRepaint: Bool
   /// The view that this frame drew, from the transform of the map update that
   /// it rendered. A host that displays the frame builds its projection with
-  /// `mln_map_projection_create()` to place overlays where the frame drew their
-  /// coordinates. Zero, with a size of zero, unless disposition is
-  /// `MLN_RENDER_RESULT_RENDERED`.
+  /// `MapProjectionHandle.create()` to place overlays where the frame drew
+  /// their coordinates. Zero, with a size of zero, unless disposition is
+  /// `RenderResult.rendered`.
   public var view: MapView
   public init(
     disposition: RenderResult = .init(rawValue: 0),
@@ -187,7 +186,7 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   public static let rendered: RenderResult = .init(rawValue: 0)
   /// No newer map update was available, the map had no complete frame to draw,
   /// or the update extent differed from the target. The map publishes another
-  /// update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
+  /// update when it has one. A demand with `FrameDemandFlag.waitForUpdate`
   /// waits for that update instead, and finishes with this result only when a
   /// barrier ends its wait.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
@@ -282,7 +281,7 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
   public static let detaching: RenderSessionState = .init(rawValue: 3)
   public static let detached: RenderSessionState = .init(rawValue: 4)
   /// A frame or driver task failed and the session can no longer render. The
-  /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed
+  /// map reports the failure as `RuntimeEventType.mapRenderError`. A failed
   /// attach reports it through its completion instead.
   public static let targetLost: RenderSessionState = .init(rawValue: 5)
   public static let abandoned: RenderSessionState = .init(rawValue: 6)

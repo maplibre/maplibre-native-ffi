@@ -17,8 +17,8 @@ public enum GesturePhase : uint
 
     /// <summary>
     /// Marks a gesture as in progress before the camera write. It does not
-    /// cancel running transitions; use <c>mln_map_cancel_transitions()</c> for
-    /// that.
+    /// cancel running transitions; use
+    /// <c>MapHandle.CancelTransitionsAsync()</c> for that.
     /// </summary>
     Begin = 1,
 

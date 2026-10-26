@@ -4,7 +4,8 @@ namespace Maplibre.NativeFfi;
 
 /// <summary>
 /// Host lock on the graphics queue that a session shares with its host, copied
-/// by a successful attach.
+/// by a successful attach. The callback runs on the session's graphics thread
+/// or on the thread that abandons the session.
 /// </summary>
 /// <remarks>
 /// See <c>mln_queue_lock</c> in the <see

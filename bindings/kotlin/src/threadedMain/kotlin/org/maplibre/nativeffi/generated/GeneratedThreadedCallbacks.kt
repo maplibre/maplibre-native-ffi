@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
- * Process-global log callback or queue state. Kotlin/Wasm takes `QueuedLogHandler` in its place.
+ * Process-global log callback. Kotlin/Wasm takes `QueuedLogHandler` in its place.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -61,7 +61,7 @@ public data class HttpHeaderTransform(
  *
  * It returns normally to succeed and throws a `MaplibreException` that carries a failure status to
  * fail, and native receives that status. If it throws anything else, native receives
- * `MLN_STATUS_NATIVE_ERROR`, and the binding reports it as a `CallbackException`.
+ * `Status.NATIVE_ERROR`, and the binding reports it as a `CallbackException`.
  *
  * See `mln_http_header_transform_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -120,7 +120,9 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
   }
 
 /**
- * Installs a process-global MapLibre Native log callback.
+ * Installs a process-global MapLibre Native log callback. The callback runs synchronously on the
+ * thread that emits the record, or on a MapLibre background thread for a severity that
+ * `GeneratedApi.setLogAsyncSeverityMask()` dispatches asynchronously.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -132,7 +134,8 @@ public fun GeneratedApi.setLogCallback(handler: LogHandler): Unit =
   }
 
 /**
- * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+ * Registers or replaces the runtime-scoped outgoing HTTP header transform. The callback runs
+ * synchronously on a MapLibre worker or network thread.
  *
  * See `mln_runtime_set_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

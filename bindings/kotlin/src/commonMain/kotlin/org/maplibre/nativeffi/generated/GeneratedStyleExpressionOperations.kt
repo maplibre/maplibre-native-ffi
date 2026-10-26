@@ -41,7 +41,7 @@ public abstract class GeneratedStyleExpressionOperations internal constructor() 
     }
 
   /**
-   * Copies what a parsed expression depends on into out_info.
+   * Copies what a parsed expression depends on.
    *
    * See `mln_style_expression_get_info` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

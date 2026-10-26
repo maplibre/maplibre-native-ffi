@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .. import async_hosts
+from .. import async_hosts, docs
 from ..compiler import compile_api
 from ..model import Api
 from ..names import type_name
+from ..protocol import COMPLETION_RESULT
 from ..semantic import (
     BoundApi,
     OperationPlan,
@@ -26,11 +27,15 @@ from .typescript_values import (
     OWNER_MEMBERS,
     Unsupported,
     Values,
+    enum_members,
     identifier,
     is_counted,
+    native_fields,
     owner_class,
     parameter_name,
     public_name,
+    registration,
+    union_kinds,
 )
 
 TS_DIRECTORY = "bindings/typescript/src"
@@ -597,6 +602,12 @@ def lower_function(
     return lowered
 
 
+def owner_native(entry: Lowered) -> str | None:
+    """The handle whose class declares a method: its receiver, or the handle
+    that a factory creates as a static method."""
+    return entry.owner or entry.plan.factory
+
+
 def attachment_name(owned: OwnedOutputPlan) -> str:
     return "New" + owner_class(owned.handle).removesuffix("Handle")
 
@@ -635,6 +646,79 @@ def lower(api: Api | BoundApi):
     for name in async_hosts.rule_answered_operations(bound, registrations):
         unsupported.pop(name, None)
     return bound, values, natives, lowered, unsupported
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How TypeScript spells the C declarations that its summaries name."""
+    return bound.symbols("typescript", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    # The names come from the same lowering that declares them, so a summary
+    # names only what this binding generates.
+    _, values, _, lowered, _ = lower(bound)
+    methods = {entry.plan.name: entry for entry in lowered}
+    # A record that holds only a union presents the union under its own name.
+    holders = {
+        member.value.native: value
+        for value in values.used.values()
+        if (member := value.union_member)
+    }
+
+    def type_(native: str) -> str | None:
+        if native in bound.public_handles:
+            return owner_class(bound.public_handles[native])
+        value = holders.get(native) or values.used.get(native)
+        return public_name(value.native) if value else None
+
+    def operation(plan: OperationPlan) -> str | None:
+        entry = methods.get(plan.name)
+        if entry is None:
+            return None
+        owner = owner_native(entry)
+        if owner is None:
+            return entry.method
+        return f"{owner_class(bound.handles[owner])}.{entry.method}"
+
+    def constant(value, member: str) -> str | None:
+        typ = type_(value.native)
+        name = next((m for m, c, _ in enum_members(value) if c == member), None)
+        return f"{typ}.{name}" if typ and name else None
+
+    def field(value, member) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.union_member:
+            return None
+        if value.kind == "union":
+            # A union's members are its variants, which `kind` tells apart.
+            kind = next(k for _, k, arm in union_kinds(value) if arm == member.name)
+            return f'{typ} & {{ kind: "{kind}" }}'
+        if value.registration:
+            entry = registration(bound, value)
+            if entry.native and member in entry.native:
+                return f"{native_fields(typ)}.{identifier(member.name)}"
+        if member not in values.fields(value):
+            return None
+        return f"{typ}.{identifier(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        typ = type_(value.native)
+        if typ is None or value.registration:
+            return None
+        return f"{typ}.{identifier(mask_flag.member)}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{identifier(name)}"
+            for name in ("generation", "render_update_generation")
+        },
+    )
 
 
 def generate(api: Api | BoundApi) -> dict[str, str]:

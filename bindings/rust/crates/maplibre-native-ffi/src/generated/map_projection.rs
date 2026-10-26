@@ -2,7 +2,7 @@
 use super::*;
 
 native_owner! {
-    /// Owns one `mln_map_projection` native handle.
+    /// Owns one native handle.
     ///
     /// A standalone projection of one map view.
     ///
@@ -30,7 +30,7 @@ impl MapProjectionHandle {
         Ok(MapProjectionHandle::adopt(out_projection, None)?)
     }
 
-    /// Copies the projection camera into out_camera.
+    /// Copies the projection camera.
     ///
     /// See `mln_map_projection_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

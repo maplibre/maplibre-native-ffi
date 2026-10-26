@@ -86,7 +86,14 @@ record that only such functions take.
 
 The header comment is the caller's contract. List every status that a function
 returns under `Returns:`, the outcomes of an asynchronous function under
-`Completes with:`, and the threads that a callback runs on.
+`Completes with:`, and the threads that a callback runs on under `Threads:`.
 
 Every binding copies the comment's first paragraph, so write one that stands
-alone as a summary, and keep the comment directly above its declaration.
+alone as a summary, and keep the comment directly above its declaration. A
+binding spells each C name in the paragraph as its own symbol and drops a
+sentence that names something it does not expose, such as a queue member or an
+output parameter, so the first sentence names only what every binding exposes.
+Leave what bindings hide to later paragraphs: borrowing, queue mode, presence
+masks, output parameters, and restatements of the C type. Bindings append a
+callback's `Threads:` paragraph to the summaries of the callback, the
+registration struct that holds it, and a function that takes that struct.

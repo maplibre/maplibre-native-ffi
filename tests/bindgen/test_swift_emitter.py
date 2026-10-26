@@ -166,6 +166,23 @@ class SwiftEmitterTests(unittest.TestCase):
         definition = values.split("public enum OfflineRegionDefinition:")[1]
         self.assertIn("case unknown(UInt32, Data)", definition.split("\n}")[0])
 
+    def test_a_summary_names_the_swift_symbols_of_c_declarations(self):
+        values = swift.generate(real_api())["Generated/Values/GeneratedMapValues.swift"]
+        summary = " ".join(
+            line.strip().removeprefix("///").strip()
+            for line in values.split(
+                "public static let `cancelled`: CameraTransitionOutcome"
+            )[0]
+            .rsplit("public static let", 1)[1]
+            .splitlines()[1:]
+        )
+        self.assertIn(
+            "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, "
+            "or `GesturePhase.cancel` ended the transitions",
+            summary,
+        )
+        self.assertNotIn("mln_map_cancel_transitions", summary)
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")
         clang = require_tool(self, "clang")

@@ -35,12 +35,12 @@ public extension RenderSessionHandle {
     } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
   }
 
-  /// Ends every frame demand that has not started with
-  /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
-  /// finished. A running demand finishes its attempt and ends any wait for a
-  /// map update or a free slot. After completion, a new frame demand is
-  /// required to render again, except that a pending still image submits its
-  /// next demand itself; see `mln_map_request_still_image()`.
+  /// Ends every frame demand that has not started with `RenderResult.noUpdate`
+  /// and completes after earlier driver work has finished. A running demand
+  /// finishes its attempt and ends any wait for a map update or a free slot.
+  /// After completion, a new frame demand is required to render again, except
+  /// that a pending still image submits its next demand itself; see
+  /// `MapHandle.requestStillImage()`.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -115,9 +115,7 @@ public extension RenderSessionHandle {
     ) }
   }
 
-  /// Drains every currently queued terminal frame result into an independently
-  /// owned batch and borrows its view. The records remain stable until the
-  /// batch is released.
+  /// Drains every currently queued terminal frame result.
   ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -243,9 +241,9 @@ public extension RenderSessionHandle {
 
   /// Services every queued item for a caller-graphics-thread driver. The first
   /// successful service call fixes the session's graphics-thread identity;
-  /// later calls from another native thread return `MLN_STATUS_WRONG_THREAD`.
-  /// The target context must be current. Core-worker sessions return
-  /// `MLN_STATUS_INVALID_STATE`.
+  /// later calls from another native thread return `Status.wrongThread`. The
+  /// target context must be current. Core-worker sessions return
+  /// `Status.invalidState`.
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

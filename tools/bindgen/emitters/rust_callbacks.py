@@ -1,7 +1,15 @@
 """Retained callback descriptors and scoped responses."""
 
 from ..semantic import required_callbacks
-from .rust import Unsupported, doc, identifier, is_text, native_call, native_identifier
+from .rust import (
+    Unsupported,
+    doc,
+    identifier,
+    is_text,
+    native_call,
+    native_identifier,
+    symbols,
+)
 from .rust_dynamic_values import decode, encode
 
 
@@ -110,7 +118,7 @@ def failure_value(callback):
     return f"sys::{failure}"
 
 
-def callback_doc(summary, callback, indent):
+def callback_doc(values, summary, callback, indent):
     """A callback field's doc, which names the arguments that a closure bound
     cannot, and how a status callback's error reaches native."""
     paragraphs = []
@@ -122,7 +130,7 @@ def callback_doc(summary, callback, indent):
             [
                 "An `Err` of `Error::Status` with a failure status answers native",
                 "that status. Any other error, or a panic, reaches the reporter and",
-                f"answers `{callback.failure}`.",
+                f"answers `{symbols(values.bound)(callback.failure)}`.",
             ]
         )
     lines = [summary] if summary else []
@@ -241,7 +249,10 @@ def declaration(values, value):
         function = callback_function(values, callback)
         stored = f"std::sync::Arc<dyn {function}>"
         summary = callback_doc(
-            doc(values.bound, f"{value.native}.{field.name}", "    "), callback, "    "
+            values,
+            doc(values.bound, f"{value.native}.{field.name}", "    "),
+            callback,
+            "    ",
         )
         if field.name in required:
             fields.append(f"{summary}    pub {public}: {stored},")

@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Resource provider state.
+/// Resource provider state. The callback runs synchronously on a MapLibre
+/// thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_provider</c> in the <see

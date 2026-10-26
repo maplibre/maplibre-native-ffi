@@ -65,6 +65,11 @@ typedef enum mln_log_event : uint32_t {
  *
  * A handler in queue mode consumes each record without a callback and queues
  * a copy as an mln_log_delivery.
+ *
+ * Threads:
+ * The callback runs synchronously on the thread that emits the record, or on a
+ * MapLibre background thread for a severity that
+ * mln_log_set_async_severity_mask() dispatches asynchronously.
  */
 MLN_BINDING(
   "failure=false;delivery=MLN_DELIVERY_TYPE_LOG_RECORD;queue_result=true"
@@ -75,10 +80,10 @@ typedef bool (*mln_log_callback)(
 );
 
 /**
- * Process-global log callback or queue state.
+ * Process-global log callback.
  *
- * The struct itself is borrowed for mln_log_set_callback(). Exactly one of
- * callback and queue is set.
+ * In queue mode, a queue takes the callback's place: exactly one of callback
+ * and queue is set. The struct itself is borrowed for mln_log_set_callback().
  */
 typedef struct mln_log_handler {
   uint32_t size;

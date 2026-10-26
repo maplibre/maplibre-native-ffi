@@ -16,16 +16,29 @@ from tools.bindgen.emitters.rust import (
     native_call,
 )
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
+from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     DisposeSupport,
     HandlePlan,
     OperationPlan,
+    ParameterPlan,
     output_member,
     required_member,
 )
 
-from .python_values import Values, enum_type, ok, public_name, rust_field, scalar_type
+from .python_values import (
+    Values,
+    enum_member,
+    enum_type,
+    field_name,
+    ok,
+    public_name,
+    rust_field,
+    scalar_type,
+    scope_name,
+    variant_name,
+)
 
 SCALARS = {
     "double": ("f64", "float"),
@@ -176,6 +189,136 @@ def owned_native(value, expression, callbacks=False):
     return f"unsafe {{ {OWNERS[value.native]}::adopt(py, {expression}, {roots}) }}"
 
 
+def receiver_input(plan: OperationPlan) -> tuple[ParameterPlan | None, bool]:
+    """The input that an operation is a method of, with the handle or response
+    that a pointer refers to as its value, and whether it is a pointer."""
+    name = plan.receiver or plan.scoped_receiver
+    receiver = next((p for p in plan.inputs if p.name == name), None)
+    pointer = receiver is not None and receiver.value.kind == "reference"
+    if pointer and receiver.value.element:
+        receiver = replace(receiver, value=receiver.value.element)
+    return receiver, pointer
+
+
+def releases(plan: OperationPlan) -> bool:
+    """Whether an operation is its receiver's release, which `close` presents."""
+    receiver, _ = receiver_input(plan)
+    return bool(
+        receiver
+        and receiver.value.handle
+        and plan.name == receiver.value.handle.release
+    )
+
+
+def method_name(plan: OperationPlan) -> str:
+    """The Python name of an operation: a method, factory, or module function."""
+    name = "close" if releases(plan) else plan.member
+    if plan.view:
+        name = plan.view.stem
+    if iskeyword(name) or name in RUST_KEYWORDS:
+        name += "_"
+    return name
+
+
+def owner_name(handle: HandlePlan) -> str:
+    """The class that owns a public handle."""
+    return pascal(handle.stem) + "Handle"
+
+
+def symbols(bound: BoundApi) -> docs.Symbol:
+    """How Python spells the C declarations that its summaries name."""
+    return bound.symbols("python", _symbols)
+
+
+def _symbols(bound: BoundApi) -> docs.Symbol:
+    from .python_callbacks import callback_types
+
+    owners = {
+        native: owner_name(handle) for native, handle in bound.public_handles.items()
+    }
+    protocols = callback_types(bound.public_values.values())
+    # A record that holds only a union presents the union under its own name.
+    holders = {
+        member.value.native: value
+        for value in bound.values.values()
+        if (member := value.union_member)
+    }
+    # The records whose members a union's variants are named after.
+    parents = {
+        field.value.native: value
+        for value in bound.public_values.values()
+        if value.kind == "record"
+        for field in value.fields
+        if field.value.kind == "union"
+    }
+
+    def type_(native: str) -> str | None:
+        if native in owners:
+            return owners[native]
+        if native in protocols:
+            return public_name(native)
+        value = holders.get(native) or bound.values.get(native)
+        # The completion runtime presents a command's result as
+        # `CommandCompletion`, and a slice is presented as its array alone.
+        if (
+            value is None
+            or value.native == COMPLETION_RESULT
+            or value.native in bound.slices
+            or value.kind not in {"record", "enum"}
+        ):
+            return None
+        return scope_name(value.native) if value.response else public_name(value.native)
+
+    def operation(plan: OperationPlan) -> str | None:
+        if plan.name in bound.unsupported:
+            return None
+        receiver, _ = receiver_input(plan)
+        if plan.scoped_receiver:
+            owner = scope_name(receiver.value.native)
+        elif receiver or plan.factory:
+            owner = owners.get(receiver.value.native if receiver else plan.factory)
+            if owner is None:
+                return None
+        else:
+            return method_name(plan)
+        return f"{owner}.{method_name(plan)}"
+
+    def constant(value, member: str) -> str | None:
+        return f"{public_name(value.native)}.{enum_member(value, member)}"
+
+    def field(value, member) -> str | None:
+        if value.kind == "union":
+            parent = parents.get(value.native)
+            return variant_name(parent, member) if parent else None
+        typ = type_(value.native)
+        registration = value.registration
+        # A registration's context and release are the binding's own.
+        if (
+            typ is None
+            or value.union_member
+            or registration
+            and member.name in {registration.user_data, registration.release}
+        ):
+            return None
+        return f"{typ}.{field_name(member.name)}"
+
+    def flag(value, mask_flag) -> str | None:
+        return f"{public_name(value.native)}.{mask_flag.member}"
+
+    return docs.resolver(
+        bound,
+        type=type_,
+        operation=operation,
+        constant=constant,
+        field=field,
+        flag=flag,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{name}"
+            for name in ("generation", "render_update_generation")
+        },
+    )
+
+
 def operation(
     plan: OperationPlan, values: Values, *, discard=False, exit=False
 ) -> tuple[str, str, str, str, str | None]:
@@ -191,19 +334,15 @@ def operation(
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
         )
-    receiver_name = plan.receiver or plan.scoped_receiver
-    receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
+    receiver, receiver_pointer = receiver_input(plan)
     scoped = plan.scoped_receiver is not None
-    receiver_pointer = receiver is not None and receiver.value.kind == "reference"
-    if receiver_pointer and receiver.value.element:
-        receiver = replace(receiver, value=receiver.value.element)
     if receiver is not None and receiver.value.native not in OWNERS and not scoped:
         raise unsupported(function, "receiver needs a supported handle owner")
     if plan.factory and plan.factory not in OWNERS:
         raise unsupported(function, "factory needs a supported handle owner")
     native_owner = receiver.value.native if receiver else plan.factory or "mln"
     owner = (
-        public_name(native_owner) + "Scope"
+        scope_name(native_owner)
         if scoped
         else OWNERS[native_owner]
         if receiver or plan.factory
@@ -211,18 +350,8 @@ def operation(
     )
     if scoped:
         values.supported(receiver.value)
-    name = plan.member
-    release = bool(
-        receiver
-        and receiver.value.handle
-        and plan.name == receiver.value.handle.release
-    )
-    if release:
-        name = "close"
-    if plan.view:
-        name = plan.view.stem
-    if iskeyword(name) or name in RUST_KEYWORDS:
-        name += "_"
+    release = releases(plan)
+    name = method_name(plan)
     if not safe_identifier(name):
         raise unsupported(function, f"method identifier {name!r} is not safe")
     if exit:
@@ -754,6 +883,7 @@ def operation(
     )
     documentation = docs.docstring(
         values.api.doc(function.name),
+        symbols(values.api),
         "        ",
         ("Native resources remain valid only inside the `with` block.",)
         if plan.view
@@ -883,10 +1013,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     api = bound.source
     OWNERS.clear()
     OWNERS.update(
-        {
-            name: pascal(handle.stem) + "Handle"
-            for name, handle in bound.public_handles.items()
-        }
+        {name: owner_name(handle) for name, handle in bound.public_handles.items()}
     )
     RUNTIME_EXPORTS.clear()
     RUNTIME_EXPORTS.update(bound.source.runtime_exports)
@@ -975,7 +1102,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             owner, bound.handles[native_owner], bound
         )
     scope_owners = {
-        name: public_name(name) + "Scope"
+        name: scope_name(name)
         for name, value in values.records.items()
         if value.response
     }
@@ -1107,13 +1234,13 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         dispose = (
             f"""
     def dispose(self) -> None:
-{docs.docstring(bound.doc(handle.dispose), "        ")}        self._native._exit()
+{docs.docstring(bound.doc(handle.dispose), symbols(bound), "        ")}        self._native._exit()
 """
             if public_dispose(handle)
             else ""
         )
         owner_classes.append(f'''class {owner}(_{owner}Operations, {mixin}):
-{docs.docstring(bound.doc(native), "    ")}    __module__ = "maplibre_native_ffi"
+{docs.docstring(bound.doc(native), symbols(bound), "    ")}    __module__ = "maplibre_native_ffi"
     _handle_name = "{owner}"
 
     def __init__(self):

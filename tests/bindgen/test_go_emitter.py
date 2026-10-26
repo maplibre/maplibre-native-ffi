@@ -86,6 +86,15 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("func RuntimeCreate(", source)
         self.assertIn("func SetLogCallback(handler LogHandler) error {", source)
 
+    def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "// MapHandle.CancelTransitions(), MapHandle.CancelCameraTransition(), or\n"
+            "// GesturePhaseCancel ended the transitions,",
+            source,
+        )
+        self.assertNotIn("// mln_map_cancel_transitions()", source)
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(
@@ -129,7 +138,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn("), C.MLN_STATUS_NATIVE_ERROR))", source)
         self.assertIn(
             "// answers native that status. Any other error, or a panic, is logged and\n"
-            "// answers MLN_STATUS_NATIVE_ERROR.\n"
+            "// answers StatusNativeError.\n"
             "Callback func(kind ResourceKind",
             source,
         )

@@ -26,8 +26,7 @@ public sealed record MapOptions
     public bool FastPforEnabled { get; init; }
 
     /// <summary>
-    /// Map-originated event types this map queues, as a bitwise OR of
-    /// <c>mln_runtime_event_flag</c> values.
+    /// Map-originated event types this map queues.
     /// </summary>
     public RuntimeEventFlag? EventMask { get; init; }
 }

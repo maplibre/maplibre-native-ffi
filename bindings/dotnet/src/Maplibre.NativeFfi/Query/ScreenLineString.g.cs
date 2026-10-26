@@ -17,7 +17,7 @@ public readonly partial record struct ScreenLineString
     }
 
     /// <summary>
-    /// Points. Null only when point_count is 0.
+    /// Points.
     /// </summary>
     public ImmutableArray<ScreenPoint> Points
     {

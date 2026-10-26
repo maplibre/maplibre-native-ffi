@@ -239,6 +239,13 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         self.assertIn("from ._generated_operations import set_level_volume", exports)
         self.assertNotIn("import create", exports)
 
+    def test_docs_name_the_python_symbols_of_c_declarations(self):
+        values = python.generate(real_api())[
+            "python/maplibre_native_ffi/_generated_values.py"
+        ]
+        self.assertIn("    `MapHandle.cancel_camera_transition()` matches.\n", values)
+        self.assertNotIn("`mln_map_cancel_camera_transition()`", values)
+
     def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):
         native = python.generate(real_api())["src/generated_operations.rs"]
 

@@ -1,6 +1,7 @@
 """Render native ownership transitions for Swift handle wrappers."""
 
 from ..model import ModelError
+from ..names import camel
 
 # The handles that mln_runtime_event_source_type names as an event's source.
 EVENT_SOURCES = {"mln_runtime", "mln_map"}
@@ -16,12 +17,7 @@ def consumed(plan, owner, values):
                 f"Swift: {function.name}: unconditional consumption requires a void immediate release"
             ]
         )
-    receiver = next(
-        parameter for parameter in plan.inputs if parameter.name == plan.receiver
-    )
-    handle = receiver.value.handle or (
-        receiver.value.element.handle if receiver.value.element else None
-    )
+    handle = receiver_handle(plan)
     if not handle:
         raise ModelError(
             [
@@ -32,7 +28,7 @@ def consumed(plan, owner, values):
 
     documented = member_doc(values.bound, function.name)
     if len(plan.inputs) != 1 or not plan.release:
-        from .swift import camel, identifier
+        from .swift import identifier
         from .swift_dynamic_values import encode
 
         declarations, args = [], []
@@ -46,7 +42,7 @@ def consumed(plan, owner, values):
             args.append(encode(values, parameter.value, local))
         # A release with inputs is idempotent. An answer that consumes its
         # receiver keeps its name, and a repeated one reaches native.
-        name = "release" if plan.release else identifier(camel(plan.member))
+        name = "release" if plan.release else identifier(method_name(plan))
         idempotent = "" if plan.release else "idempotent: false"
         return (
             f"""public extension {owner} {{
@@ -62,15 +58,7 @@ def consumed(plan, owner, values):
 """,
             None,
         )
-    # A release that is also the dispose closes asynchronously, so its
-    # synchronous form is the dispose.
-    method = (
-        "close"
-        if function.name == handle.release and not handle.dispose_completion
-        else "discard"
-        if function.name == handle.discard
-        else "dispose"
-    )
+    method = disposal(plan, handle)
     # The closure's parameters select the overload: a status-returning close
     # takes the diagnostic, so its status is always checked. A void release
     # can't fail, so its close doesn't throw.
@@ -100,6 +88,46 @@ internal func startClose() throws -> NativeFuture<Void>? {{
             return asynchronous + synchronous, owner
         return asynchronous, owner
     return synchronous, owner
+
+
+def receiver_handle(plan):
+    """The handle that a consuming operation's receiver holds, if any."""
+    receiver = next(
+        parameter for parameter in plan.inputs if parameter.name == plan.receiver
+    )
+    return receiver.value.handle or (
+        receiver.value.element.handle if receiver.value.element else None
+    )
+
+
+def disposal(plan, handle):
+    """The synchronous method of a release, dispose, or discard of `handle`.
+
+    A release that is also the dispose closes asynchronously, so its
+    synchronous form is the dispose.
+    """
+    function = plan.function
+    return (
+        "close"
+        if function.name == handle.release and not handle.dispose_completion
+        else "discard"
+        if function.name == handle.discard
+        else "dispose"
+    )
+
+
+def method_name(plan):
+    """The name of the method that consumes an operation's receiver.
+
+    A release with inputs is `release`, and an answer that consumes its
+    receiver keeps its own name. A release with a completion is the
+    asynchronous `close`, even when it also has a synchronous form.
+    """
+    if len(plan.inputs) != 1 or not plan.release:
+        return "release" if plan.release else camel(plan.member)
+    if plan.completion:
+        return "close"
+    return disposal(plan, receiver_handle(plan))
 
 
 def disposer_arguments(handle, function, raw):

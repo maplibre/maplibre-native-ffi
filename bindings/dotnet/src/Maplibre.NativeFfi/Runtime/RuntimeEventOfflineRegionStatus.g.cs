@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Payload for <c>MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED</c>.
+/// Payload for <c>RuntimeEventType.OfflineRegionStatusChanged</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_offline_region_status</c> in the <see

@@ -35,7 +35,7 @@ export interface AnimationOptions {
   /**
    * Average fly velocity in screenfuls per second. Must be positive and finite;
    * absent selects 1.2. A flight whose derived duration is too long to
-   * represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+   * represent fails its completion with `Status.nativeError`. An explicit
    * duration overrides velocity.
    */
   velocity?: number;
@@ -46,7 +46,7 @@ export interface AnimationOptions {
   easing?: UnitBezier;
   /**
    * Caller-chosen identity of the command that these options animate, which
-   * `mln_map_cancel_camera_transition()` matches.
+   * `MapHandle.cancelCameraTransition()` matches.
    */
   transitionId?: bigint;
   /**
@@ -63,7 +63,7 @@ export interface AnimationOptions {
  */
 export interface BoundOptions {
   /**
-   * Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
+   * Geographic bounds that the camera center stays inside.
    */
   bounds?: LatLngBounds;
   minZoom?: number;
@@ -74,8 +74,8 @@ export interface BoundOptions {
    * Selects the unbounded geographic constraint, which leaves every camera
    * center unconstrained and lets the map pan freely across the antimeridian.
    * This differs from world bounds of -90/-180 to 90/180, which clamp longitude
-   * to that range. Mutually exclusive with `MLN_BOUND_OPTION_BOUNDS`, and
-   * leaves `mln_bound_options.bounds` unread.
+   * to that range. Mutually exclusive with `BoundOptions.bounds`, which it
+   * leaves unread.
    */
   unbounded?: boolean;
 }
@@ -184,7 +184,7 @@ export interface CameraOptions {
 }
 
 /**
- * Camera result borrowed for an ordered camera-query completion.
+ * Camera result of an ordered camera query.
  *
  * See `mln_camera_query_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -195,7 +195,7 @@ export interface CameraQueryResult {
 }
 
 /**
- * The end of one camera command's transitions, borrowed for the callback.
+ * The end of one camera command's transitions.
  *
  * See `mln_camera_transition_end` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -206,14 +206,14 @@ export interface CameraTransitionEnd {
    * Generation of the published snapshot that shows the camera where the
    * transitions left it. The map events of the change that ended them carry
    * this generation and are queued before the callback runs. Zero for
-   * `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+   * `CameraTransitionOutcome.closed`.
    */
   readonly generation: bigint;
 }
 
 /**
- * Callback or queue state that one camera command copies to report the end of
- * its transitions.
+ * Callback that one camera command copies to report the end of its transitions.
+ * The callback runs on the runtime worker.
  *
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -233,9 +233,9 @@ export const CameraTransitionOutcome = {
    */
   completed: 0,
   /**
-   * `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
-   * `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
-   * before it started them.
+   * `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or
+   * `GesturePhase.cancel` ended the transitions, or the command failed before
+   * it started them.
    */
   cancelled: 1,
   /**
@@ -262,7 +262,7 @@ export interface CameraUpdate {
 }
 
 /**
- * Camera transition behavior for `mln_camera_update`.
+ * Camera transition behavior for `CameraUpdate`.
  *
  * See `mln_camera_update_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -291,7 +291,7 @@ export interface CanonicalTileId {
 }
 
 /**
- * Map constraint modes used by `mln_map_viewport_options`.
+ * Map constraint modes used by `MapViewportOptions`.
  *
  * See `mln_constrain_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -308,18 +308,19 @@ export type ConstrainMode =
   | (number & {});
 
 /**
- * Options for custom geometry sources.
+ * Options for custom geometry sources. The callback may run on any native
+ * worker thread, concurrently with runtime and map calls.
  *
  * See `mln_custom_geometry_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomGeometrySourceOptions {
   /**
-   * Tile fetch callback. Required in callback mode; null in queue mode.
+   * Tile fetch callback.
    */
   fetchTile: (tileId: CanonicalTileId) => void;
   /**
-   * Optional best-effort tile cancel callback. Null in queue mode.
+   * Optional best-effort tile cancel callback.
    */
   cancelTile?: (tileId: CanonicalTileId) => void;
   minZoom?: number;
@@ -332,18 +333,19 @@ export interface CustomGeometrySourceOptions {
 }
 
 /**
- * Options for custom MVT vector sources.
+ * Options for custom MVT vector sources. The callback may run on any native
+ * worker thread, concurrently with runtime and map calls.
  *
  * See `mln_custom_mvt_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomMvtVectorSourceOptions {
   /**
-   * Tile fetch callback. Required in callback mode; null in queue mode.
+   * Tile fetch callback.
    */
   fetchTile: (tileId: CanonicalTileId) => void;
   /**
-   * Optional best-effort tile cancel callback. Null in queue mode.
+   * Optional best-effort tile cancel callback.
    */
   cancelTile?: (tileId: CanonicalTileId) => void;
   minZoom?: number;
@@ -410,7 +412,7 @@ export interface EglContextDescriptor {
  */
 export interface FeatureStateSelector {
   /**
-   * Source ID. Required. Borrowed for the duration of the call.
+   * Source ID. Required.
    */
   sourceId: string;
   /**
@@ -439,13 +441,13 @@ export interface FeatureStateSelector {
  */
 export interface FrameDemand {
   /**
-   * A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
-   * newer map update exists, without presenting.
+   * Frame-demand policy. Zero renders only when a newer map update exists,
+   * without presenting.
    */
   flags?: FrameDemandFlag;
   /**
-   * Host identity returned with the terminal frame result. Any value except
-   * `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+   * Host identity returned with the terminal frame result. Any value except the
+   * maximum uint64_t value.
    */
   token?: bigint;
 }
@@ -468,17 +470,17 @@ export const FrameDemandFlag = {
    */
   present: 2,
   /**
-   * Without `MLN_FRAME_DEMAND_FORCE`, a demand that would finish with
-   * `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the map's
-   * next update, a target replacement, or an applied resize. A waiting demand
-   * holds no ring slot. A later demand with the same flags supersedes it, a
-   * barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach,
-   * abandon, or the quarantine of the ring's last usable slot end it with
-   * `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
-   * the results of demands accepted after it. The flag does not pace: a host
-   * that re-arms a waiting demand as each result arrives renders every update
-   * the map publishes, and a command that arrives while a frame renders appears
-   * in a later frame. To show several commands in one frame, submit them in a
+   * Without `FrameDemandFlag.force`, a demand that would finish with
+   * `RenderResult.noUpdate` waits instead, and runs again after the map's next
+   * update, a target replacement, or an applied resize. A waiting demand holds
+   * no ring slot. A later demand with the same flags supersedes it, a barrier
+   * ends its wait with `RenderResult.noUpdate`, and detach, abandon, or the
+   * quarantine of the ring's last usable slot end it with
+   * `RenderResult.targetNotReady`. A waiting demand's result can follow the
+   * results of demands accepted after it. The flag does not pace: a host that
+   * re-arms a waiting demand as each result arrives renders every update the
+   * map publishes, and a command that arrives while a frame renders appears in
+   * a later frame. To show several commands in one frame, submit them in a
    * command group, or arm demands once per display frame.
    */
   waitForUpdate: 4,
@@ -524,7 +526,7 @@ export interface GeoJsonSourceOptions {
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
    * whose members follow the MapLibre Style Spec clusterProperties form, or
-   * empty for none. The UTF-8 bytes are borrowed for the call.
+   * empty for none.
    */
   clusterProperties?: unknown;
   /**
@@ -567,7 +569,7 @@ export const GesturePhase = {
   none: 0,
   /**
    * Marks a gesture as in progress before the camera write. It does not cancel
-   * running transitions; use `mln_map_cancel_transitions()` for that.
+   * running transitions; use `MapHandle.cancelTransitions()` for that.
    */
   begin: 1,
   /**
@@ -658,14 +660,14 @@ export interface HttpHeaderRule {
    */
   url?: string;
   /**
-   * The headers to set. Registration validates each one as
-   * `mln_http_header_transform_response_set_header()` does.
+   * The headers to set.
    */
   headers?: readonly HttpHeader[];
 }
 
 /**
- * HTTP header transform state: a callback, or native header rules.
+ * HTTP header transform state: a callback, or native header rules. The callback
+ * runs synchronously on a MapLibre worker or network thread.
  *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -758,7 +760,9 @@ export const LogEvent = {
 export type LogEvent = (typeof LogEvent)[keyof typeof LogEvent] | (number & {});
 
 /**
- * Process-global log callback or queue state.
+ * Process-global log callback. The callback runs synchronously on the thread
+ * that emits the record, or on a MapLibre background thread for a severity that
+ * `setLogAsyncSeverityMask()` dispatches asynchronously.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -824,7 +828,7 @@ export interface LogicalExtent {
 }
 
 /**
- * Debug overlay mask values for `mln_map_set_debug_options()`.
+ * Debug overlay mask values for `MapHandle.setDebugOptions()`.
  *
  * See `mln_map_debug_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -884,8 +888,7 @@ export interface MapOptions {
    */
   fastPforEnabled?: boolean;
   /**
-   * Map-originated event types this map queues, as a bitwise OR of
-   * `mln_runtime_event_flag` values.
+   * Map-originated event types this map queues.
    */
   eventMask?: RuntimeEventFlag;
 }
@@ -898,7 +901,7 @@ export interface MapOptions {
  */
 export interface MapSnapshot {
   /**
-   * Debug overlay mask of `mln_map_debug_flag` values.
+   * Debug overlays that the map draws.
    */
   readonly debugOptions: MapDebugFlag;
   readonly generation: bigint;
@@ -927,7 +930,7 @@ export interface MapSnapshot {
   readonly freeCamera: FreeCameraOptions;
   /**
    * The map's camera, extent, projection mode, and viewport options.
-   * `mln_map_projection_create()` converts coordinates for this view.
+   * `MapProjectionHandle.create()` converts coordinates for this view.
    */
   readonly view: MapView;
 }
@@ -1147,7 +1150,7 @@ export type NetworkStatus =
   | (number & {});
 
 /**
- * Map north orientation values used by `mln_map_viewport_options`.
+ * Map north orientation values used by `MapViewportOptions`.
  *
  * See `mln_north_orientation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1175,7 +1178,7 @@ export interface OfflineGeometryRegionDefinition {
    */
   styleUrl?: string;
   /**
-   * UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
+   * UTF-8 GeoJSON Geometry. Required.
    */
   geometry: unknown;
   minZoom?: number;
@@ -1590,7 +1593,8 @@ export interface Quaternion {
 
 /**
  * Host lock on the graphics queue that a session shares with its host, copied
- * by a successful attach.
+ * by a successful attach. The callback runs on the session's graphics thread or
+ * on the thread that abandons the session.
  *
  * See `mln_queue_lock` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1698,7 +1702,7 @@ export type RenderDriverKind =
 
 /**
  * Terminal result of one frame demand, held by an owned frame-result batch and
- * copied by `mln_acquired_frame_get_result()`.
+ * copied by `AcquiredFrameHandle.getResult()`.
  *
  * See `mln_render_frame_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1708,36 +1712,36 @@ export interface RenderFrameResult {
   readonly token: bigint;
   /**
    * Generation of the map render update the demand evaluated. When disposition
-   * is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
-   * with `mln_completion_result.render_update_generation` to find the first
-   * frame that includes a command.
+   * is `RenderResult.rendered`, the frame drew that update; compare it with
+   * `CommandCompletion.renderUpdateGeneration` to find the first frame that
+   * includes a command.
    */
   readonly mapUpdateGeneration: bigint;
   /**
    * The session's target generation when the demand reached its result. See
-   * `mln_render_session_snapshot.generation`.
+   * `RenderSessionSnapshot.generation`.
    */
   readonly generation: bigint;
   /**
    * Position of the frame among the frames that the session rendered, counting
-   * from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+   * from one. Zero unless disposition is `RenderResult.rendered`.
    */
   readonly frameGeneration: bigint;
   /**
    * Whether the map asked for another frame while it rendered this one, as
    * during an ongoing paint transition. Set only when disposition is
-   * `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It matches
-   * the needs_repaint field of `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A
-   * camera transition does not set it: the map publishes an update for each of
-   * the transition's frames instead, which a render-if-needed demand renders.
+   * `RenderResult.rendered`, and false for every other outcome. It matches the
+   * needs_repaint field of `RuntimeEventType.mapRenderFrameFinished`. A camera
+   * transition does not set it: the map publishes an update for each of the
+   * transition's frames instead, which a render-if-needed demand renders.
    */
   readonly needsRepaint: boolean;
   /**
    * The view that this frame drew, from the transform of the map update that it
    * rendered. A host that displays the frame builds its projection with
-   * `mln_map_projection_create()` to place overlays where the frame drew their
+   * `MapProjectionHandle.create()` to place overlays where the frame drew their
    * coordinates. Zero, with a size of zero, unless disposition is
-   * `MLN_RENDER_RESULT_RENDERED`.
+   * `RenderResult.rendered`.
    */
   readonly view: MapView;
 }
@@ -1771,9 +1775,9 @@ export const RenderResult = {
   /**
    * No newer map update was available, the map had no complete frame to draw,
    * or the update extent differed from the target. The map publishes another
-   * update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
-   * waits for that update instead, and finishes with this result only when a
-   * barrier ends its wait.
+   * update when it has one. A demand with `FrameDemandFlag.waitForUpdate` waits
+   * for that update instead, and finishes with this result only when a barrier
+   * ends its wait.
    */
   noUpdate: 1,
   /**
@@ -1806,18 +1810,18 @@ export interface RenderSessionAttachOptions {
    */
   driver: RenderDriverKind;
   /**
-   * Requested slot count of a session-owned texture ring, up to
-   * `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
-   * frame while the session renders its replacement. Private targets grant one
-   * slot regardless of this value. A borrowed texture ring's depth is its
-   * texture count, so borrowed and other targets ignore this value.
+   * Requested slot count of a session-owned texture ring, up to 8. Zero selects
+   * 2, so the host can retain one frame while the session renders its
+   * replacement. Private targets grant one slot regardless of this value. A
+   * borrowed texture ring's depth is its texture count, so borrowed and other
+   * targets ignore this value.
    */
   requestedTextureRingDepth?: number;
   /**
    * Producer synchronization for acquired texture frames.
-   * `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
-   * and a caller-graphics-thread driver. Other targets support only CPU
-   * completion and fail an unsupported request.
+   * `GpuSyncKind.openGlFence` requires a shared EGL or WGL texture target and a
+   * caller-graphics-thread driver. Other targets support only CPU completion
+   * and fail an unsupported request.
    */
   producerSyncKind?: GpuSyncKind;
   /**
@@ -1832,7 +1836,7 @@ export interface RenderSessionAttachOptions {
   /**
    * Host lock on the graphics queue, disabled by default. Only Vulkan targets
    * accept an enabled lock; other backends fail the attach with
-   * `MLN_STATUS_UNSUPPORTED`.
+   * `Status.unsupported`.
    */
   queueLock?: QueueLock;
 }
@@ -1922,8 +1926,8 @@ export const RenderSessionState = {
   detached: 4,
   /**
    * A frame or driver task failed and the session can no longer render. The map
-   * reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed
-   * attach reports it through its completion instead.
+   * reports the failure as `RuntimeEventType.mapRenderError`. A failed attach
+   * reports it through its completion instead.
    */
   targetLost: 5,
   abandoned: 6,
@@ -1934,7 +1938,7 @@ export type RenderSessionState =
   | (number & {});
 
 /**
- * One rendered-feature query hit borrowed for a completion callback.
+ * One rendered-feature query hit.
  *
  * See `mln_rendered_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -1976,7 +1980,7 @@ export type RenderedQueryGeometry =
   | { readonly kind: "lineString"; readonly value: ScreenLineString };
 
 /**
- * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+ * Rendering statistics of one finished frame.
  *
  * See `mln_rendering_stats` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2033,9 +2037,9 @@ export type ResourceKind =
   | (number & {});
 
 /**
- * The resource kinds that a route or rule matches, one bit per
- * `mln_resource_kind` value. Registration rejects unknown bits.
- * `MLN_RESOURCE_KIND_FLAG_ALL`, like zero, selects every resource kind.
+ * The resource kinds that a route or rule matches, one bit per `ResourceKind`
+ * value. Registration rejects unknown bits. `ResourceKindFlag.all`, like zero,
+ * selects every resource kind.
  *
  * See `mln_resource_kind_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2074,7 +2078,8 @@ export type ResourcePriority =
   | (number & {});
 
 /**
- * Resource provider state.
+ * Resource provider state. The callback runs synchronously on a MapLibre
+ * thread.
  *
  * See `mln_resource_provider` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2111,7 +2116,10 @@ export interface ResourceRange {
 }
 
 /**
- * Cancel callback or queue state for one handled resource request.
+ * Cancel callback for one handled resource request. The callback runs on the
+ * thread that discards the request, never a host thread: the runtime's native
+ * scheduler thread when a committed map or runtime command discards it, such as
+ * a style change or map destruction, and a MapLibre worker thread otherwise.
  *
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2153,7 +2161,7 @@ export interface ResourceResponse {
   status?: ResourceResponseStatus;
   errorReason?: ResourceErrorReason;
   /**
-   * Response bytes. May be null only when byte_count is 0.
+   * Response bytes.
    */
   bytes?: Uint8Array;
   errorMessage?: string;
@@ -2209,7 +2217,7 @@ export type ResourceStoragePolicy =
   | (number & {});
 
 /**
- * Resource transform state.
+ * Resource transform state. The callback runs on a MapLibre network thread.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2239,21 +2247,20 @@ export interface RuntimeEvent {
   readonly type: RuntimeEventType;
   readonly sourceType: RuntimeEventSourceType;
   /**
-   * Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
+   * Source handle: the `RuntimeHandle` or `MapHandle` that source_type selects.
    */
   readonly source: bigint;
   /**
    * Map snapshot generation that the event reports, or zero when source_type is
-   * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+   * `RuntimeEventSourceType.runtime`.
    */
   readonly generation: bigint;
   /**
-   * Secondary event detail whose meaning type selects; see
-   * `mln_runtime_event_type`.
+   * Secondary event detail whose meaning type selects; see `RuntimeEventType`.
    */
   readonly code: number;
   /**
-   * Borrowed UTF-8 message bytes, empty when this event carries no message.
+   * UTF-8 message, empty when this event carries no message.
    */
   readonly message: string;
   /**
@@ -2309,7 +2316,8 @@ export const RuntimeEventFlag = {
 export type RuntimeEventFlag = bigint;
 
 /**
- * Runtime and map event delivery. Exactly one of callback and queue is set.
+ * Runtime and map event callback. Map events arrive on the runtime's native
+ * scheduler thread, and offline events may arrive on a MapLibre worker thread.
  *
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2317,7 +2325,7 @@ export type RuntimeEventFlag = bigint;
 export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+ * Payload for `RuntimeEventType.offlineRegionResponseError`.
  *
  * See `mln_runtime_event_offline_region_response_error` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2328,7 +2336,7 @@ export interface RuntimeEventOfflineRegionResponseError {
 }
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+ * Payload for `RuntimeEventType.offlineRegionStatusChanged`.
  *
  * See `mln_runtime_event_offline_region_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2339,7 +2347,7 @@ export interface RuntimeEventOfflineRegionStatus {
 }
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+ * Payload for `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
  *
  * See `mln_runtime_event_offline_region_tile_count_limit` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2379,7 +2387,7 @@ export type RuntimeEventPayload =
     };
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+ * Payload for `RuntimeEventType.mapRenderFrameFinished`.
  *
  * See `mln_runtime_event_render_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2398,7 +2406,7 @@ export interface RuntimeEventRenderFrame {
 }
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+ * Payload for `RuntimeEventType.mapRenderMapFinished`.
  *
  * See `mln_runtime_event_render_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2408,7 +2416,7 @@ export interface RuntimeEventRenderMap {
 }
 
 /**
- * Source kinds used by `mln_runtime_event.source_type`.
+ * Source kinds used by `RuntimeEvent.sourceType`.
  *
  * See `mln_runtime_event_source_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2423,7 +2431,7 @@ export type RuntimeEventSourceType =
   | (number & {});
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+ * Payload for `RuntimeEventType.mapTileAction`.
  *
  * See `mln_runtime_event_tile_action` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2434,7 +2442,7 @@ export interface RuntimeEventTileAction {
 }
 
 /**
- * Runtime event types carried by `mln_runtime_event.type`.
+ * Runtime event types carried by `RuntimeEvent.type`.
  *
  * See `mln_runtime_event_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2503,7 +2511,7 @@ export interface ScreenBox {
  */
 export interface ScreenLineString {
   /**
-   * Points. Null only when point_count is 0.
+   * Points.
    */
   points?: readonly ScreenPoint[];
 }
@@ -2521,7 +2529,7 @@ export interface ScreenPoint {
 }
 
 /**
- * One source-feature query hit borrowed for a completion callback.
+ * One source-feature query hit.
  *
  * See `mln_source_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -2728,7 +2736,7 @@ export type StyleExpressionTypeKind =
   | (number & {});
 
 /**
- * One complete runtime style image, borrowed for a completion callback.
+ * One complete runtime style image.
  *
  * See `mln_style_image_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2785,13 +2793,11 @@ export interface StyleImageInfo {
  */
 export interface StyleImageOptions {
   /**
-   * Horizontally stretchable intervals. Borrowed for the call and copied before
-   * return. May be null only when stretch_x_count is 0.
+   * Horizontally stretchable intervals.
    */
   stretchX?: readonly ImageStretch[];
   /**
-   * Vertically stretchable intervals. Borrowed for the call and copied before
-   * return. May be null only when stretch_y_count is 0.
+   * Vertically stretchable intervals.
    */
   stretchY?: readonly ImageStretch[];
   /**
@@ -2833,7 +2839,7 @@ export type StyleImageTextFit =
   | (number & {});
 
 /**
- * One style layer, borrowed for a completion callback.
+ * One style layer.
  *
  * See `mln_style_layer_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2897,7 +2903,7 @@ export type StyleRasterDemEncoding =
   | (number & {});
 
 /**
- * Complete metadata of one style source, borrowed for a completion callback.
+ * Complete metadata of one style source.
  *
  * See `mln_style_source_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3066,14 +3072,14 @@ export interface TextureImageInfo {
 }
 
 /**
- * Texture readback borrowed for a completion callback.
+ * Texture readback.
  *
  * See `mln_texture_readback_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface TextureReadbackResult {
   /**
-   * Borrowed pixel bytes, valid only during the callback.
+   * Pixel bytes.
    */
   readonly data: Uint8Array;
   readonly info: TextureImageInfo;
@@ -3094,7 +3100,7 @@ export interface TileId {
 }
 
 /**
- * Tile LOD algorithms used by `mln_map_tile_options`.
+ * Tile LOD algorithms used by `MapTileOptions`.
  *
  * See `mln_tile_lod_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3172,7 +3178,7 @@ export interface Vec3 {
 }
 
 /**
- * Viewport orientation modes used by `mln_map_viewport_options`.
+ * Viewport orientation modes used by `MapViewportOptions`.
  *
  * See `mln_viewport_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3272,7 +3278,7 @@ export interface VulkanContextDescriptor {
   /**
    * Borrowed graphics VkQueue. Required. The session's driver submits to it
    * from its own thread, so a host that uses the same queue passes
-   * `mln_render_session_attach_options.queue_lock` at attach.
+   * `RenderSessionAttachOptions.queueLock` at attach.
    */
   graphicsQueue: bigint;
   /**
@@ -3390,7 +3396,8 @@ export interface VulkanTextureFrame {
 /**
  * Receiver wake callback copied by a successful owning call. The callback
  * schedules service by the receiver and returns without waiting for another
- * thread.
+ * thread. Native code may invoke the callback from any thread, and calls may
+ * coalesce or overlap.
  *
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

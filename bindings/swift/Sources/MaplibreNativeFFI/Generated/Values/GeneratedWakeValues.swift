@@ -5,7 +5,8 @@ import Foundation
 
 /// Receiver wake callback copied by a successful owning call. The callback
 /// schedules service by the receiver and returns without waiting for another
-/// thread.
+/// thread. Native code may invoke the callback from any thread, and calls may
+/// coalesce or overlap.
 ///
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -33,7 +34,8 @@ private func invokeWakeCallback(user_data: UnsafeMutableRawPointer?) {
   box.value.callback?()
 }
 
-/// Schedules service by the receiver that owns a queue or driver.
+/// Schedules service by the receiver that owns a queue or driver. Native code
+/// may invoke the callback from any thread, and calls may coalesce or overlap.
 ///
 /// See `mln_wake_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

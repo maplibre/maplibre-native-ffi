@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One complete runtime style image, borrowed for a completion callback.
+/// One complete runtime style image.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_info</c> in the <see

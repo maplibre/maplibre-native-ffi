@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Map north orientation values used by <c>mln_map_viewport_options</c>.
+/// Map north orientation values used by <c>MapViewportOptions</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_north_orientation</c> in the <see

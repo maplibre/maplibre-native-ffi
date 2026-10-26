@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Adds a custom geometry source.
+  /// Adds a custom geometry source. The callback may run on any native worker
+  /// thread, concurrently with runtime and map calls.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -24,7 +25,8 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a custom MVT vector source.
+  /// Adds a custom MVT vector source. The callback may run on any native worker
+  /// thread, concurrently with runtime and map calls.
   ///
   /// See `mln_map_add_custom_mvt_vector_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -172,8 +174,7 @@ public extension MapHandle {
     }
   }
 
-  /// Queries the global-state JSON object, including style defaults. Completion
-  /// borrows one `mln_buffer_view` for the duration of the callback.
+  /// Queries the global-state JSON object, including style defaults.
   ///
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

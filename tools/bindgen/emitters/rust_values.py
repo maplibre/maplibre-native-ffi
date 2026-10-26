@@ -167,25 +167,19 @@ class Values:
             return "pub use maplibre_core::Status;\nimpl ToNative<i32> for Status { fn to_native(&self, _: &mut InputArena) -> Result<i32> { Ok(self.as_raw()) } }\nimpl FromNative<i32> for Status { unsafe fn from_native(raw: i32) -> Result<Self> { Ok(Self::from_raw(raw)) } }\n"
         public = pascal(value.native)
         raw = self.scalar(value) or "u32"
-        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         if value.enum_kind == "bitmask":
-            # bitflags treats a zero flag as contained in every value, so the
-            # empty set stands for it.
             members = "\n".join(
-                f"{doc(self.bound, key, '    ')}    const {key.removeprefix(prefix)} = {number};"
+                f"{doc(self.bound, key, '    ')}    const {name} = {number};"
                 for key, number in value.enum_values
-                if number != 0
+                if (name := enum_member(value, key))
             )
             return f"native_flags! {{\n{doc(self.bound, value.native)}pub struct {public}: {raw} {{\n{members}\n}}\n}}\n"
-        variants = [
-            (pascal(key.removeprefix(prefix).lower()), number, key)
-            for key, number in value.enum_values
-        ]
         # Aliased C enum constants share one Rust variant.
-        unique = {}
-        for variant in variants:
-            unique.setdefault(variant[1], variant)
-        variants = list(unique.values())
+        variants = [
+            (enum_member(value, key), number, key)
+            for key, number in value.enum_values
+            if key == _first_constant(value, number)
+        ]
         unknown = (
             "Unrecognized"
             if any(name == "Unknown" for name, _, _ in variants)
@@ -208,6 +202,21 @@ class Values:
         return "\n".join(
             self.declaration(value) for _, value in sorted(self.used.items())
         )
+
+
+def _first_constant(value: ValuePlan, number: int) -> str:
+    return next(key for key, known in value.enum_values if known == number)
+
+
+def enum_member(value: ValuePlan, key: str) -> str | None:
+    """The Rust name of an enum constant: a bitflags constant, or a variant,
+    which aliased constants share. bitflags treats a zero flag as contained in
+    every value, so the empty set stands for it, and it has no name."""
+    prefix = enum_member_prefix((known for known, _ in value.enum_values), value.native)
+    number = dict(value.enum_values)[key]
+    if value.enum_kind == "bitmask":
+        return key.removeprefix(prefix) if number != 0 else None
+    return pascal(_first_constant(value, number).removeprefix(prefix).lower())
 
 
 def union_enum(values: Values, owner: ValuePlan) -> str:

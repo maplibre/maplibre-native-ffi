@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record BoundOptions
 {
     /// <summary>
-    /// Read when fields contains <c>MLN_BOUND_OPTION_BOUNDS</c>.
+    /// Geographic bounds that the camera center stays inside.
     /// </summary>
     public LatLngBounds? Bounds { get; init; }
     public double? MinZoom { get; init; }
@@ -25,8 +25,7 @@ public sealed record BoundOptions
     /// center unconstrained and lets the map pan freely across the
     /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
     /// which clamp longitude to that range. Mutually exclusive with
-    /// <c>MLN_BOUND_OPTION_BOUNDS</c>, and leaves
-    /// <c>mln_bound_options.bounds</c> unread.
+    /// <c>BoundOptions.Bounds</c>, which it leaves unread.
     /// </summary>
     public bool Unbounded { get; init; }
 }

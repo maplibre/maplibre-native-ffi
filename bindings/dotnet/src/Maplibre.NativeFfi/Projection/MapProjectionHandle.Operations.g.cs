@@ -75,7 +75,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Copies the projection camera into out_camera.
+    /// Copies the projection camera.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_get_camera</c> in the <see

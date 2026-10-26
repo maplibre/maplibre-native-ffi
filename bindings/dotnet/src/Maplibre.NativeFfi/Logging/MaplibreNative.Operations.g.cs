@@ -35,7 +35,11 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Installs a process-global MapLibre Native log callback.
+    /// Installs a process-global MapLibre Native log callback. The callback
+    /// runs synchronously on the thread that emits the record, or on a MapLibre
+    /// background thread for a severity that
+    /// <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
+    /// asynchronously.
     /// </summary>
     /// <remarks>
     /// See <c>mln_log_set_callback</c> in the <see

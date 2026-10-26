@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// HTTP header transform state: a callback, or native header rules.
+/// HTTP header transform state: a callback, or native header rules. The
+/// callback runs synchronously on a MapLibre worker or network thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_http_header_transform</c> in the <see

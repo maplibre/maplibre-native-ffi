@@ -112,9 +112,10 @@ public sealed unsafe partial class ResourceRequestHandle
 
     /// <summary>
     /// Registers a callback that runs when MapLibre cancels a C API resource
-    /// provider request. A request that is already cancelled registers nothing
-    /// and reports true through out_cancelled, and the caller handles that
-    /// cancellation itself.
+    /// provider request. The callback runs on the thread that discards the
+    /// request, never a host thread: the runtime's native scheduler thread when
+    /// a committed map or runtime command discards it, such as a style change
+    /// or map destruction, and a MapLibre worker thread otherwise.
     /// </summary>
     /// <remarks>
     /// See <c>mln_resource_request_set_cancel_callback</c> in the <see
