@@ -50,7 +50,8 @@ mkdir -p "$work/ets/hypium"
 cp -R "$hypium/package/." "$work/ets/hypium/"
 find "$work/ets/hypium" -type f ! -name '*.js' -delete
 # Hypium's startup timer can strand the idle OHOS loop before the first case.
-# Reuse the test addon's async-work turn until the image fixes upstream I91FXR.
+# Reuse the test addon's async-work turn until the image includes the fix for:
+# https://gitee.com/openharmony/ability_ability_runtime/issues/I91FXR
 # The package uses CRLF, while the carried patch uses repository line endings.
 perl -pi -e 's/\r$//' "$work/ets/hypium/src/main/core.js"
 patch --batch --forward --fuzz=0 -p1 -d "$work/ets/hypium" \
