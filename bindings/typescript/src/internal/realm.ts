@@ -28,7 +28,8 @@ const THREAD = 4;
 
 // The token that the queue's own wake posts.
 const QUEUE = 0;
-const MAX_TOKEN = 0x7fffffff;
+// The addon packs a token into 24 bits, beside a message kind or a decoder.
+const MAX_TOKEN = 0xffffff;
 
 /** The callback roots of one owner, or of the realm for global calls. */
 export interface RootHolder {

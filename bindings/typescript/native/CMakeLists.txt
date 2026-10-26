@@ -1,4 +1,5 @@
-# The Node-API addon of the TypeScript binding.
+# The Node-API addon of the TypeScript binding, or its browser module for an
+# Emscripten preset, which emscripten.cmake links.
 #
 # The presets include the root presets, so a preset name selects the same
 # toolchain, libc floor, and target as the native build. The addon embeds the
@@ -20,6 +21,26 @@ get_filename_component(
 set(MLN_FFI_NATIVE_PREFIX
     "${MLN_FFI_ROOT}/build/${MLN_FFI_ARTIFACT_NAME}/install"
     CACHE PATH "Install prefix of the native build that the addon embeds")
+
+# Every Node-API function the addon calls belongs to version 8.
+add_compile_definitions(NAPI_VERSION=8)
+
+find_library(
+  MLN_FFI_NATIVE_ARCHIVE
+  NAMES libmaplibre-native-c.a
+  PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+  REQUIRED)
+# The archives that ship beside the complete one, such as the Rust platform
+# layer.
+file(GLOB MLN_FFI_COMPANION_ARCHIVES
+     "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
+set(MLN_FFI_SOURCES generated_addon.c generated_values.c realm.c runtime.c)
+
+if(EMSCRIPTEN)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/emscripten.cmake")
+  return()
+endif()
+
 set(MLN_FFI_NODE_API_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/../node_modules/node-api-headers/include"
     CACHE PATH "Node-API headers")
@@ -30,9 +51,6 @@ if(NOT EXISTS "${MLN_FFI_NODE_API_HEADERS}/node_api.h")
       "node_api.h not found in ${MLN_FFI_NODE_API_HEADERS}; "
       "install the TypeScript binding's packages first")
 endif()
-
-# Every Node-API function the addon calls belongs to version 8.
-add_compile_definitions(NAPI_VERSION=8)
 
 include(CheckLinkerFlag)
 if(NOT APPLE)
@@ -89,11 +107,6 @@ function(mln_ffi_node_module target)
   endif()
 endfunction()
 
-find_library(
-  MLN_FFI_NATIVE_ARCHIVE
-  NAMES libmaplibre-native-c.a
-  PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
-  REQUIRED)
 file(READ "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/artifact.json"
      MLN_FFI_ARTIFACT)
 string(
@@ -120,15 +133,9 @@ if(MLN_FFI_FRAMEWORK_COUNT GREATER 0)
          "$<LINK_LIBRARY:FRAMEWORK,${framework}>")
   endforeach()
 endif()
-# The archives that ship beside the complete one, such as the Rust platform
-# layer.
-file(GLOB MLN_FFI_COMPANION_ARCHIVES
-     "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
 
 # The shipped module: the binding runtime over the embedded core.
-add_library(
-  maplibre_native_ffi
-  MODULE generated_addon.c generated_values.c realm.c runtime.c)
+add_library(maplibre_native_ffi MODULE ${MLN_FFI_SOURCES})
 mln_ffi_node_module(maplibre_native_ffi)
 # The source headers come first, for the binding runtime header that the
 # install leaves out; the install prefix supplies the upstream plugin header.

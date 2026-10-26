@@ -1011,8 +1011,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test emscripten-wasm32-webgl
+        run: mise run //bindings/typescript:build emscripten-wasm32-webgl
       - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/kotlin:test emscripten-wasm32-webgl
+      - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1026,7 +1031,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan
@@ -1070,6 +1075,11 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
+        run: mise run //bindings/typescript:build emscripten-wasm32-webgpu
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test emscripten-wasm32-webgpu
       - name: Upload native artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1080,7 +1090,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
         run: exit 1
     needs:
       - plan

@@ -180,6 +180,9 @@ importers:
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
+      emnapi:
+        specifier: 2.0.0-beta.2
+        version: 2.0.0-beta.2
       node-api-headers:
         specifier: ^1.9.0
         version: 1.9.0
@@ -2050,6 +2053,14 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  emnapi@2.0.0-beta.2:
+    resolution: {integrity: sha512-ZO2KS7bFQNo8zcDl5nWW55nvZBfC+msrGRezZn6OoJJQKXGOWVp6RYw25wdJkDIIADrAJjf4XEQAbtancmeH7w==}
+    peerDependencies:
+      node-addon-api: '>= 6.1.0'
+    peerDependenciesMeta:
+      node-addon-api:
+        optional: true
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -5031,6 +5042,8 @@ snapshots:
   dset@3.1.4: {}
 
   eastasianwidth@0.2.0: {}
+
+  emnapi@2.0.0-beta.2: {}
 
   emoji-regex@10.6.0: {}
 

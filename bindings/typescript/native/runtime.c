@@ -538,6 +538,20 @@ napi_value mln_ts_missing_value(napi_env env) {
   return NULL;
 }
 
+#ifdef __EMSCRIPTEN__
+// emnapi enters a WebAssembly module through napi_register_wasm_v1, and asks it
+// for the Node-API version that it targets.
+NAPI_MODULE_EXPORT napi_value
+napi_register_module_v1(napi_env env, napi_value exports);
+NAPI_MODULE_EXPORT napi_value
+napi_register_wasm_v1(napi_env env, napi_value exports) {
+  return napi_register_module_v1(env, exports);
+}
+NAPI_MODULE_EXPORT int32_t node_api_module_get_api_version_v1(void) {
+  return NAPI_VERSION;
+}
+#endif
+
 #ifdef __OHOS__
 // OpenHarmony registers modules by library name rather than through the
 // exported napi_register_module_v1.

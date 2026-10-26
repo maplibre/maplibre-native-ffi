@@ -5,7 +5,7 @@
 "core:deno" = "{{vars.deno_version}}"
 
 [tasks.build]
-description = "Build the Node-API addon against a native preset's archive."
+description = "Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."
 extends = "ffi:preset"
 # mise stops the native build when the preset check fails, so an unsupported
 # preset fails before the native library builds.
@@ -23,6 +23,12 @@ cmake --workflow --preset "$usage_preset"
 addon="build/$usage_preset/install/maplibre_native_ffi.node"
 nm=nm
 case "$usage_preset" in
+  emscripten-*)
+    # A browser module exports what its link names, which emnapi's loader
+    # calls, and carries no dynamic symbol table to check.
+    ls "build/$usage_preset/install/maplibre_native_ffi".{mjs,wasm}
+    exit 0
+    ;;
   linux-gnu-*)
     # Only mise.linux.toml defines the floor, and this script renders on every
     # host.

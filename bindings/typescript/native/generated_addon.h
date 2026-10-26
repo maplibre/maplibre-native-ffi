@@ -42,7 +42,12 @@ enum {
   MLN_TS_DECODE_STYLE_SOURCE_INFO_OPTIONAL,
   MLN_TS_DECODE_STYLE_TRANSITION_OPTIONS,
   MLN_TS_DECODE_TEXTURE_READBACK_RESULT,
+  MLN_TS_DECODER_END,
 };
+_Static_assert(
+  MLN_TS_DECODER_END <= MLN_TS_MAX_DECODERS,
+  "a completion names each decoder beside its token"
+);
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result

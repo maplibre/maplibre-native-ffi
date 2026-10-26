@@ -35,6 +35,9 @@ typedef napi_value (*mln_ts_decoder)(
   napi_env env, const mln_completion_result* result
 );
 
+/** The decoders that a completion's user data can name, beside its token. */
+#define MLN_TS_MAX_DECODERS 256
+
 /**
  * The generated completion decoders, by the constant that an export records
  * in its completion. An operation without a value has a NULL entry.

@@ -728,7 +728,9 @@ class NativeValues:
             " * its completion. */\n"
             "enum {\n  MLN_TS_NO_DECODER,\n"
             + "".join(f"  {self.decoder_id(name)},\n" for name in sorted(self.decoders))
-            + "};\n"
+            + "  MLN_TS_DECODER_END,\n};\n"
+            + "_Static_assert(\n  MLN_TS_DECODER_END <= MLN_TS_MAX_DECODERS,\n"
+            + '  "a completion names each decoder beside its token"\n);\n'
         )
 
     def decoder_table(self) -> str:

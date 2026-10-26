@@ -44,16 +44,19 @@ enum {
   MLN_TS_RECEIVE_THREAD = 4,
 };
 
-// Tokens stay below 2^31, so a shifted token fits the data on every target.
-#define MLN_TS_MAX_TOKEN 0x7fffffff
+// Tokens fit 24 bits, so a shifted token fits the data of a 32-bit pointer,
+// as on wasm32. The TypeScript half allocates them below the same limit.
+#define MLN_TS_MAX_TOKEN 0xffffff
 
-// A completion's user data carries its token in the low 32 bits and, above
+// A completion's user data carries its token in the low 24 bits and, above
 // them, the decoder that its export recorded, so the addon alone chooses how
 // to read a completion's value.
+#define MLN_TS_DECODER_SHIFT 24
 _Static_assert(
-  UINTPTR_MAX > UINT32_MAX, "a completion's user data holds a decoder"
+  MLN_TS_DECODER_SHIFT + 8 <= sizeof(uintptr_t) * 8 &&
+    MLN_TS_MAX_DECODERS <= 256,
+  "a completion's user data holds a decoder above its token"
 );
-#define MLN_TS_DECODER_SHIFT 32
 
 /**
  * What native threads reach of a realm. A poster calls the threadsafe function
@@ -679,7 +682,9 @@ static napi_value drain(napi_env env, napi_callback_info info) {
       !mln_ts_set_index(env, entry, 0, type) ||
       !mln_ts_set_index(
         env, entry, 1,
-        mln_ts_number(env, (uint32_t)(uintptr_t)delivery->user_data)
+        mln_ts_number(
+          env, (uint32_t)((uintptr_t)delivery->user_data & MLN_TS_MAX_TOKEN)
+        )
       ) ||
       !mln_ts_set_index(env, entry, 2, payload) ||
       !mln_ts_set_index(env, entries, (uint32_t)index, entry)

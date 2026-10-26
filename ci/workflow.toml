@@ -133,11 +133,13 @@ commands = [{ task = "//bindings/typescript:test" }]
 # The browser suites run against the Emscripten build in headless Chromium. The
 # Kotlin/Wasm suite runs on the page and links its own module from the package.
 # The canary passes only when a test that fails on purpose fails the Kotlin/Wasm
-# run, and one backend is enough to show that.
+# run, and one backend is enough to show that. The TypeScript browser module
+# links against the same build.
 [[suites]]
 platforms = ["emscripten"]
 commands = [
   { task = "//bindings/rust:test" },
+  { task = "//bindings/typescript:build" },
   { task = "//bindings/kotlin:test" },
   { task = "//bindings/kotlin:test:wasm-canary", include = [
     "emscripten-wasm32-webgl",
