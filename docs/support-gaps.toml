@@ -77,11 +77,53 @@ reason = "The Dart SDK does not support FreeBSD, and only a community port exist
 link = "https://github.com/dart-lang/sdk/issues/52374"
 
 [[gap]]
+language = "dart"
+platform = "ios-maccatalyst"
+status = "blocked"
+reason = "Flutter does not target Mac Catalyst, and Dart's build hooks build iOS code only for the device and simulator."
+link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/ios_sdk.dart"
+
+[[gap]]
+language = "dart"
+platform = "ohos"
+status = "blocked"
+reason = "Neither the Dart SDK nor Flutter targets OpenHarmony, and Dart's build hooks have no OpenHarmony OS."
+link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
+
+[[gap]]
+language = "dart"
+platform = "tvos"
+status = "blocked"
+reason = "Neither the Dart SDK nor Flutter targets tvOS."
+link = "https://github.com/flutter/flutter/issues/47928"
+
+[[gap]]
+language = "dart"
+platform = "visionos"
+status = "blocked"
+reason = "Neither Flutter nor Dart's build hooks target visionOS."
+link = "https://github.com/flutter/flutter/issues/142933"
+
+[[gap]]
 language = "dotnet"
 platform = "freebsd"
 status = "blocked"
 reason = "Microsoft ships no .NET for FreeBSD, and the ports tree carries .NET 9, older than the binding's `net10.0`."
 link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/requirements/freebsd-requirements.md"
+
+[[gap]]
+language = "dotnet"
+platform = "ohos"
+status = "blocked"
+reason = "The .NET port to OpenHarmony is still landing on the runtime's main branch, so no release supports it, including the binding's `net10.0`."
+link = "https://github.com/dotnet/runtime/issues/132866"
+
+[[gap]]
+language = "dotnet"
+platform = "visionos"
+status = "blocked"
+reason = ".NET's Apple workloads cover iOS, tvOS, Mac Catalyst, and macOS, but not visionOS."
+link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
 
 [[gap]]
 language = "go"
@@ -123,6 +165,20 @@ language = "swift"
 platform = "emscripten"
 status = "blocked"
 reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
+
+[[gap]]
+language = "swift"
+platform = "ohos"
+status = "blocked"
+reason = "Swift has no OpenHarmony target, and Swift.org ships no OpenHarmony SDK. The only port, a community Swift 6.0.3 toolchain, runs on aarch64 devices alone, so it cannot cross-compile from Linux or macOS or reach the x64 emulator that CI uses, and it does not promise SwiftPM."
+link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
+
+[[gap]]
+language = "zig"
+platform = "emscripten"
+status = "blocked"
+reason = "Zig 0.17.0 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
+link = "https://github.com/ziglang/zig/issues/22807"
 
 [[gap]]
 language = "zig"
@@ -302,9 +358,3 @@ language = "zig"
 platform = "freebsd"
 status = "path-known"
 reason = "Zig 0.17 targets FreeBSD 14. Add the target to `build.zig` and run the suite in the FreeBSD VM."
-
-[[gap]]
-language = "zig"
-platform = "emscripten"
-status = "path-known"
-reason = "Link the installed archives through an `emcc` final link, and add browser fixtures and tests."
