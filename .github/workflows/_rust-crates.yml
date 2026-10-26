@@ -46,14 +46,8 @@ jobs:
         with:
           cache: false
           install_args: core:rust python
-      # The workspace patches crates.io from the verifier checkout, so Cargo
-      # needs it to resolve; the native sources are not needed.
       - name: Prepare the crates
-        run: |
-          set -euo pipefail
-
-          mise deps rustls-platform-verifier
-          mise run --no-deps //bindings/rust:prepare-release "$PUBLISH_TAG"
+        run: mise run --no-deps //bindings/rust:prepare-release "$PUBLISH_TAG"
       - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
         id: auth
       # In dependency order, skipping a crate that crates.io already has, so a

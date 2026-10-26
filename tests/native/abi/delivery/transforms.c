@@ -10,7 +10,7 @@
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 #include "support/http_server.h"
 #endif
 
@@ -23,7 +23,7 @@
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static mln_buffer_view copy_view(const char* text) {
   const size_t size = strlen(text);
   char* copy = malloc(size);
@@ -146,7 +146,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 
 static mln_delivery_batch await_transform(
   mln_delivery_queue queue, void* tag,
@@ -325,7 +325,7 @@ static void retirement_follows_the_last_transform(void) {
 
 #endif
 
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 
 static void load_style(mln_runtime runtime, const char* url) {
   mln_map map = mln_test_create_map(runtime);
@@ -497,12 +497,12 @@ static void header_rules_match_the_rewritten_url(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_queue_transform_rejects_an_invalid_shape);
   RUN_TEST(rule_registrations_reject_an_invalid_rule);
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(the_host_answers_a_drained_transform);
   RUN_TEST(an_unanswered_transform_keeps_its_url);
   RUN_TEST(retirement_follows_the_last_transform);
 #endif
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(the_first_matching_header_rule_supplies_its_headers);
   RUN_TEST(header_rules_match_the_rewritten_url);
 #endif

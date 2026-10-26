@@ -136,13 +136,12 @@ scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
 # A copy of the workspace stands in for the release checkout, which the release
-# prepares in place. The workspace patches crates.io from build/dependencies.
+# prepares in place.
 workspace="$scratch/workspace"
-mkdir -p "$workspace/build"
+mkdir -p "$workspace"
 git ls-files -z --cached --others --exclude-standard -- \
   Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust examples/rust-map src/platform/rust |
   tar -c --null -T - | tar -x -C "$workspace"
-ln -s "$MISE_MONOREPO_ROOT/build/dependencies" "$workspace/build/dependencies"
 printf '%s  %s\n' "$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" "$(basename "$archive")" \
   >"$scratch/SHA256SUMS"
 python3 ci/rust_release.py "$workspace" "$tag" --checksums "$scratch/SHA256SUMS"

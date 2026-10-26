@@ -5,7 +5,7 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 #include "support/http_server.h"
 #endif
 
@@ -203,7 +203,7 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
   }
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 
 // Rewrites URLs whose path starts /a/ to /b/, and counts its calls.
 typedef struct rewriting_transform {
@@ -424,7 +424,7 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
 
 #endif
 
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 
 static const char token_header[] = "X-Test-Token";
 static const char token_value[] = "secret-token";
@@ -595,11 +595,11 @@ MLN_TEST_GROUP {
   RUN_TEST(resource_transform_registration_validates_its_descriptor);
   RUN_TEST(header_transform_registration_validates_its_descriptor);
   RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(a_resource_transform_rewrites_until_cleared);
   RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
 #endif
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(a_header_transform_adds_headers_until_cleared);
   RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
   RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);

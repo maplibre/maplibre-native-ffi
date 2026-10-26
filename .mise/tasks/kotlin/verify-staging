@@ -107,10 +107,6 @@ def native_licenses(backend: str, target: str) -> set[str]:
     licenses = set(COMMON_NATIVE_LICENSES)
     if target.startswith(("android-", "linux-", "windows-")):
         licenses.add("rust.md")
-    if target.startswith("android-"):
-        licenses.update(
-            {"kotlin.txt", "kotlin-notice.txt", "rustls-platform-verifier-notice.txt"}
-        )
     if target.startswith(("linux-", "windows-")):
         licenses.update({"libuv-extra.txt", "libuv.txt", "zlib.txt"})
     if backend == "vulkan":
@@ -310,8 +306,6 @@ def verify_android(root: pathlib.Path) -> None:
             raise SystemExit(
                 "the core Android AAR is missing META-INF/licenses/android-ndk/NOTICE"
             )
-        if any("rustls" in name for name in names):
-            raise SystemExit("the core Android AAR still carries the Rustls helper")
         if "org.maplibre.nativeffi.internal.c.Upcalls" not in aar_keep_rules(aar):
             raise SystemExit(
                 "the core Android AAR is missing the JNI shim's consumer keep rule"

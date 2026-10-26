@@ -6,7 +6,7 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 #include "support/http_server.h"
 #endif
 
@@ -42,7 +42,7 @@ NETWORK_STATUS_CASE(the_network_status_rejects_a_value_that_names_no_status) {
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_status"));
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 
 static const char cached_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
@@ -88,7 +88,7 @@ NETWORK_STATUS_CASE(a_cached_style_reloads_from_the_database_while_offline) {
 
 MLN_TEST_GROUP {
   RUN_TEST(the_network_status_rejects_a_value_that_names_no_status);
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(a_cached_style_reloads_from_the_database_while_offline);
 #endif
 }

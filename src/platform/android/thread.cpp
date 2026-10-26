@@ -11,7 +11,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
-#include "platform/android/i18n.hpp"
+#include "platform/android/java_vm.hpp"
 
 namespace mln::platform {
 

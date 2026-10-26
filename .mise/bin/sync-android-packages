@@ -5,10 +5,9 @@ set -euo pipefail
 # tool's post-install step or, through `//:android-sdk-packages`, against an SDK
 # mise does not own.
 #
-# The `android-*` CMake presets resolve their toolchain file out of the NDK, and
-# they build the TLS helper dex against the platform's android.jar with the
-# build tools' R8, so an SDK without those builds nothing. Gradle can fetch most of
-# these itself, but not for a plain `mise run build android-arm64-vulkan`.
+# The `android-*` CMake presets resolve their toolchain file out of the NDK, so an
+# SDK without it builds nothing. Gradle can fetch most of these itself, but not
+# the NDK for a plain `mise run build android-arm64-vulkan`.
 #
 # Installing a package accepts its license, which asking for an Android build is
 # taken as consent for. A contributor who would rather not have that happen installs
@@ -46,11 +45,11 @@ if [[ -z "$compile_sdk" ]]; then
 fi
 packages=(
   "ndk;${ndk_version}|ndk/${ndk_version}"
-  "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
-  "build-tools;${build_tools_version}|build-tools/${build_tools_version}"
 )
 if [[ "${6:-}" != --native-only ]]; then
   packages+=(
+    "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
+    "build-tools;${build_tools_version}|build-tools/${build_tools_version}"
     "cmake;${cmake_version}|cmake/${cmake_version}"
     "platform-tools|platform-tools"
   )

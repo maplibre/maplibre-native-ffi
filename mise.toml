@@ -89,9 +89,6 @@ flutter_version = "3.47.7"
 hk_version = "2.8.1"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
-# The Kotlin compiler that builds the Android TLS helper, which needs no match
-# with the Kotlin that Gradle builds the binding with.
-kotlin_version = "2.4.21"
 libxml2_version = "2.13.9"
 node_version = "26.12.1"
 ninja_version = "1.13.2"
@@ -160,7 +157,6 @@ sccache = "{{vars.sccache_version}}"
 # The Android SDK packages the CMake presets and the Gradle builds resolve. They are
 # environment variables because Gradle reads them, and they come from `[vars]`
 # because the tool's post-install step takes them as arguments.
-MLN_FFI_ANDROID_BUILD_TOOLS_VERSION = "{{vars.android_build_tools_version}}"
 MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
 MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
 # The API level of the shared emulator that Android device tasks look for when
@@ -197,21 +193,6 @@ auto = true
 [deps.submodules]
 auto = true
 run = ".mise/bin/sync-submodules"
-
-[deps.rustls-platform-verifier]
-auto = true
-description = "Acquire and patch the Android platform certificate verifier"
-sources = [
-  ".mise/bin/sync-rustls-platform-verifier",
-  ".mise/bin/sync-rustls-platform-verifier.ps1",
-  "patches/rustls-platform-verifier/*.patch",
-]
-outputs = [
-  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
-  "build/dependencies/rustls-platform-verifier/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt",
-]
-run = ".mise/bin/sync-rustls-platform-verifier"
-timeout = "2m"
 
 [hooks]
 # The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
@@ -266,18 +247,12 @@ run = [
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 sources = [
-  ".mise/bin/sync-rustls-platform-verifier",
   "CMakeLists.txt",
   "CMakePresets.json",
   "Cargo.lock",
   "Cargo.toml",
   "LICENSE",
   "mise.toml",
-  "build/dependencies/rustls-platform-verifier/android-release-support/Cargo.toml",
-  "build/dependencies/rustls-platform-verifier/android-release-support/src/**/*.rs",
-  "build/dependencies/rustls-platform-verifier/android/rustls-platform-verifier/src/main/**/*.kt",
-  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
-  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/src/**/*.rs",
   "build/*/.native-package-install",
   "cmake/**/*",
   "include/**/*",
@@ -298,12 +273,7 @@ run = [
   { task = "//:check-cross-sdk", args = [
     "{{usage.preset}}",
   ] },
-  '''
-  case "$usage_preset" in
-    android-*) mise run //:_android-workflow "$usage_preset" ;;
-    *) .mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset" ;;
-  esac
-  ''',
+  '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
 ]
@@ -480,14 +450,6 @@ run = 'python3 scripts/check-exports.py "$usage_preset"'
 [tasks.check-export-calls]
 description = "Check that the C tests call every exported function by name."
 run = 'python3 scripts/check-export-calls.py "$@"'
-
-# Android builds compile the TLS helper with the Kotlin compiler, then shrink it
-# with R8, both on the JDK, so only their workflow installs the two.
-[tasks._android-workflow]
-hide = true
-usage = 'arg "<preset>"'
-tools = { "core:java" = "{{vars.java_version}}", kotlin = "{{vars.kotlin_version}}" }
-run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
 
 [tasks."android-sdk-packages"]
 description = "Install the pinned packages into the selected Android SDK."

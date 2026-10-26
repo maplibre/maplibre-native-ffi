@@ -12,7 +12,7 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 #include "support/http_server.h"
 #endif
 
@@ -141,7 +141,7 @@ static void a_local_pmtiles_archive_renders(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 
 typedef enum style_outcome {
   STYLE_LOADS,
@@ -389,7 +389,7 @@ static void an_unclassified_transport_error_fails_the_style(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_percent_encoded_file_url_loads_its_file);
   RUN_TEST(a_local_pmtiles_archive_renders);
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(the_http_transport_follows_each_status);
   RUN_TEST(a_refused_connection_fails_the_load);
   RUN_TEST(a_not_modified_response_revalidates_the_cached_style);

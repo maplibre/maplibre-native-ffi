@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AndroidTlsVerificationTest serves TLS on a loopback socket, which needs INTERNET. -->
+<!-- The HTTP and TLS tests serve on loopback sockets, which needs INTERNET. The
+     network security configuration permits plain HTTP to 127.0.0.1 alone, so a
+     test can show that the native client follows it. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET" />
+  <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

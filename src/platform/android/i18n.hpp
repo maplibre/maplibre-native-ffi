@@ -51,9 +51,6 @@ struct Currency {
 
 void initialize_i18n(JNIEnv& env);
 
-void attach_thread();
-void detach_thread();
-
 auto attached_environment() -> jni::UniqueEnv;
 
 [[noreturn]] void throw_java_error(JNIEnv& env);

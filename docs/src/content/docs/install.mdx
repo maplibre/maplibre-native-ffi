@@ -589,6 +589,10 @@ Android platform initialization is required once per process, before creating
 a runtime. Pass an `android.content.Context`; every binding exposes this call
 under its own name.
 
+Requests go through the platform's HTTP stack, so they follow the app's
+[network security configuration](https://developer.android.com/privacy-and-security/security-config):
+an `http://` URL loads only where the app permits cleartext traffic.
+
 ### iOS
 
 iOS runs the Metal backend, on the device, in the simulator, and under Mac

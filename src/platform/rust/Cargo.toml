@@ -37,24 +37,21 @@ icu_locale_core = "2.4.0"
 icu_provider = "2.4.0"
 writeable = "0.6"
 
-# The browser gets its HTTP from emscripten_fetch instead, so it needs none of
-# the transport stack: no sockets, no TLS, no worker pool.
-[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+# The browser gets its HTTP from emscripten_fetch and Android from
+# HttpURLConnection, so neither needs the transport stack: no sockets, no TLS,
+# no worker pool.
+[target.'cfg(not(any(target_os = "emscripten", target_os = "android")))'.dependencies]
 http = "1.4"
 threadpool = "1.8.1"
 
-[target.'cfg(target_os = "android")'.dependencies]
-jni = { version = "0.21.1", default-features = false }
-rustls-platform-verifier = "0.6.2"
-
-[target.'cfg(all(not(target_os = "emscripten"), target_os = "windows"))'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 ureq = { version = "3", default-features = false, features = [
   "native-tls",
   "gzip",
   "socks-proxy",
 ] }
 
-[target.'cfg(all(not(target_os = "emscripten"), not(target_os = "windows")))'.dependencies]
+[target.'cfg(not(any(target_os = "emscripten", target_os = "android", target_os = "windows")))'.dependencies]
 ureq = { version = "3", default-features = false, features = [
   "rustls",
   "gzip",

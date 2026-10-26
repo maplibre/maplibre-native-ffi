@@ -1,22 +1,13 @@
-#include <atomic>
 #include <string>
 
 #include <mln/util/exception.hpp>
 
 #include "platform/android/i18n.hpp"
 
+#include "platform/android/java_vm.hpp"
+
 namespace mln::platform::android {
 namespace {
-
-auto java_vm() -> std::atomic<JavaVM*>& {
-  static std::atomic<JavaVM*> instance{nullptr};
-  return instance;
-}
-
-auto thread_environment() -> jni::UniqueEnv& {
-  thread_local jni::UniqueEnv instance;
-  return instance;
-}
 
 auto default_locale(JNIEnv& env) -> jni::Local<jni::Object<Locale>> {
   const auto& cls = jni::Class<Locale>::Singleton(env);
@@ -34,24 +25,13 @@ void initialize_i18n(JNIEnv& env) {
     jni::Class<RuleBasedCollator>::Singleton(env);
     jni::Class<NumberFormat>::Singleton(env);
     jni::Class<Currency>::Singleton(env);
-    java_vm().store(&jni::GetJavaVM(env), std::memory_order_release);
   } catch (const jni::PendingJavaException&) {
     throw_java_error(env);
   }
 }
 
-void attach_thread() {
-  auto* jvm = java_vm().load(std::memory_order_acquire);
-  auto& environment = thread_environment();
-  if (jvm != nullptr && !environment) {
-    environment = jni::GetAttachedEnv(*jvm);
-  }
-}
-
-void detach_thread() { thread_environment().reset(); }
-
 auto attached_environment() -> jni::UniqueEnv {
-  auto* jvm = java_vm().load(std::memory_order_acquire);
+  auto* jvm = java_vm();
   if (jvm == nullptr) {
     throw util::LocaleException(
       "Android platform services are not initialized; call mln_android_init"

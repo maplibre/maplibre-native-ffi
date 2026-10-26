@@ -7,11 +7,7 @@
 #ifdef __ANDROID__
 #include "platform/android/asset_manager.hpp"
 #include "platform/android/i18n.hpp"
-
-extern "C" auto mlnffi_rust_android_init_tls_verifier(
-  void* jni_env, void* context
-) -> char*;
-extern "C" auto mlnffi_rust_android_error_free(char* error) -> void;
+#include "platform/android/java_vm.hpp"
 #endif
 
 auto mln_android_init(
@@ -27,13 +23,9 @@ auto mln_android_init(
     mln::core::set_thread_error("Android initialization is not supported");
     return MLN_STATUS_UNSUPPORTED;
 #else
-    mln::platform::android::initialize_i18n(*static_cast<JNIEnv*>(jni_env));
-    auto* error = mlnffi_rust_android_init_tls_verifier(jni_env, context);
-    if (error != nullptr) {
-      mln::core::set_thread_error(error);
-      mlnffi_rust_android_error_free(error);
-      return MLN_STATUS_NATIVE_ERROR;
-    }
+    auto& env = *static_cast<JNIEnv*>(jni_env);
+    mln::platform::android::initialize_java_vm(env);
+    mln::platform::android::initialize_i18n(env);
 
     const auto* asset_error =
       mln::platform::android_retain_asset_manager(jni_env, context);

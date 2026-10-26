@@ -105,7 +105,8 @@ fn http_agent() -> &'static ureq::Agent {
 
         let mut config_builder = ureq::config::Config::builder()
             .http_status_as_error(false)
-            // Redirects are handled manually so each hop can be checked on Android.
+            // Redirects are handled manually so a hop that leaves the origin drops
+            // the sensitive headers.
             .max_redirects(0)
             .timeout_connect(Some(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECONDS)))
             .tls_config(tls_builder.build());
@@ -190,13 +191,6 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     let mut headers = request.headers;
 
     for _ in 0..=HTTP_MAX_REDIRECTS {
-        if is_https_url(&url) && !crate::android::tls_verifier_initialized() {
-            return http_error(
-                HTTP_ERROR_OTHER,
-                "Android TLS verifier is not initialized; call mln_android_init before HTTPS requests",
-            );
-        }
-
         let agent = http_agent();
         let mut builder = agent.get(&url);
         let has_accept_encoding = headers
@@ -583,11 +577,6 @@ fn map_transport_error(error: &ureq::Error) -> u8 {
         | ureq::Error::ConnectProxyFailed(_) => HTTP_ERROR_CONNECTION,
         _ => HTTP_ERROR_OTHER,
     }
-}
-
-fn is_https_url(url: &str) -> bool {
-    url.get(..8)
-        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
 }
 
 fn http_error(reason: u8, message: &str) -> MlnRustHttpResponse {

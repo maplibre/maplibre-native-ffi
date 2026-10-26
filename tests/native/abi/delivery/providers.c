@@ -7,7 +7,7 @@
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 #include "support/http_server.h"
 #endif
 
@@ -470,7 +470,7 @@ static void routes_step_by_their_declared_size(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 
 // A callback provider that answers every request it sees with an empty style.
 static void answer_with_style(
@@ -682,7 +682,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
   RUN_TEST(invalid_routes_are_rejected);
   RUN_TEST(routes_step_by_their_declared_size);
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(routes_filter_a_callback_provider);
   RUN_TEST(routes_filter_a_queue_provider);
   RUN_TEST(a_drained_request_can_pass_through_once);

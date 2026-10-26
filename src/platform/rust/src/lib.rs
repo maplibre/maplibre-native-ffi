@@ -1,9 +1,8 @@
-// The browser takes its HTTP from emscripten_fetch and has no JNI, so neither
-// module is built there. Image decoding is shared by every platform, and only
-// Linux, FreeBSD, and Windows take their locale services from here.
-#[cfg(not(target_os = "emscripten"))]
-mod android;
-#[cfg(not(target_os = "emscripten"))]
+// The browser takes its HTTP from emscripten_fetch and Android from
+// HttpURLConnection, so neither builds the HTTP client. Image decoding is shared
+// by every platform, and only Linux, FreeBSD, and Windows take their locale
+// services from here.
+#[cfg(not(any(target_os = "emscripten", target_os = "android")))]
 mod http_client;
 #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 mod i18n;

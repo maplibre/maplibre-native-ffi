@@ -1,10 +1,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -14,16 +12,10 @@
 #include <mln/storage/resource_options.hpp>
 #include <mln/storage/response.hpp>
 #include <mln/util/async_request.hpp>
-#include <mln/util/async_task.hpp>
-#include <mln/util/chrono.hpp>
 #include <mln/util/client_options.hpp>
-#include <mln/util/http_header.hpp>
-#include <mln/util/string.hpp>
-#include <mln/util/url.hpp>
 
+#include "../http_transport.hpp"
 #include "../offline_url.hpp"
-#include "maplibre_native_c.h"
-#include "runtime/runtime.hpp"
 
 extern "C" {
 
@@ -71,44 +63,43 @@ auto optionalCString(char* value) -> std::optional<std::string> {
   return std::string{value};
 }
 
-auto isHTTPURL(const std::string& url) -> bool {
-  const auto parsed = mln::util::URL{url};
-  const auto scheme =
-    std::string_view{url}.substr(parsed.scheme.first, parsed.scheme.second);
-  auto equalsIgnoringASCIICase = [scheme](std::string_view expected) {
-    if (scheme.size() != expected.size()) return false;
-    for (std::size_t index = 0; index < scheme.size(); ++index) {
-      const auto actual = static_cast<unsigned char>(scheme[index]);
-      const auto lowered = static_cast<char>(
-        actual >= 'A' && actual <= 'Z' ? actual + ('a' - 'A') : actual
-      );
-      if (lowered != expected[index]) return false;
-    }
-    return true;
-  };
-  return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
-}
-
-auto resourceKindToAbi(mln::Resource::Kind kind) -> mln_resource_kind {
-  switch (kind) {
-    case mln::Resource::Kind::Style:
-      return MLN_RESOURCE_KIND_STYLE;
-    case mln::Resource::Kind::Source:
-      return MLN_RESOURCE_KIND_SOURCE;
-    case mln::Resource::Kind::Tile:
-      return MLN_RESOURCE_KIND_TILE;
-    case mln::Resource::Kind::Glyphs:
-      return MLN_RESOURCE_KIND_GLYPHS;
-    case mln::Resource::Kind::SpriteImage:
-      return MLN_RESOURCE_KIND_SPRITE_IMAGE;
-    case mln::Resource::Kind::SpriteJSON:
-      return MLN_RESOURCE_KIND_SPRITE_JSON;
-    case mln::Resource::Kind::Image:
-      return MLN_RESOURCE_KIND_IMAGE;
-    case mln::Resource::Kind::Unknown:
-    default:
-      return MLN_RESOURCE_KIND_UNKNOWN;
+auto makeResponse(
+  const mln::Resource& resource, const MlnRustHttpResponse& rustResponse
+) -> mln::Response {
+  using Reason = mln::Response::Error::Reason;
+  if (rustResponse.error != nullptr) {
+    return mln::platform::http::error_response(
+      rustResponse.error_reason == rustHttpErrorConnection ? Reason::Connection
+                                                           : Reason::Other,
+      std::string{rustResponse.error}
+    );
   }
+
+  auto body = std::shared_ptr<const std::string>{};
+  if (rustResponse.data_len != 0) {
+    if (rustResponse.data == nullptr) {
+      return mln::platform::http::error_response(
+        Reason::Other, "HTTP response missing body data"
+      );
+    }
+    body = std::make_shared<std::string>(
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      reinterpret_cast<const char*>(rustResponse.data), rustResponse.data_len
+    );
+  }
+
+  return mln::platform::http::make_response(
+    resource, rustResponse.status_code,
+    {
+      .etag = optionalCString(rustResponse.etag),
+      .modified = optionalCString(rustResponse.modified),
+      .cache_control = optionalCString(rustResponse.cache_control),
+      .expires = optionalCString(rustResponse.expires),
+      .retry_after = optionalCString(rustResponse.retry_after),
+      .x_rate_limit_reset = optionalCString(rustResponse.x_rate_limit_reset),
+    },
+    std::move(body)
+  );
 }
 
 class RustHttpResponse {
@@ -181,174 +172,36 @@ class HTTPFileSource::Impl {
   ClientOptions client_options_;
 };
 
-class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
- public:
-  HTTPRequestState(Resource resource_, FileSource::Callback callback_)
-      : resource(std::move(resource_)), callback(std::move(callback_)) {}
-
-  void startAsyncTask() {
-    auto weak = std::weak_ptr<HTTPRequestState>{shared_from_this()};
-    async = std::make_unique<util::AsyncTask>([weak] {
-      if (auto state = weak.lock()) {
-        state->deliver();
-      }
-    });
-  }
-
-  void cancel() {
-    auto asyncToDestroy = std::unique_ptr<util::AsyncTask>{};
-    {
-      std::scoped_lock lock(mutex);
-      canceled = true;
-      callback = nullptr;
-      asyncToDestroy = std::move(async);
-    }
-  }
-
-  void complete(const MlnRustHttpResponse& rustResponse) {
-    std::scoped_lock lock(mutex);
-    if (canceled || async == nullptr) {
-      return;
-    }
-
-    response = makeResponse(rustResponse);
-    async->send();
-  }
-
- private:
-  auto makeResponse(const MlnRustHttpResponse& rustResponse) const -> Response {
-    auto result = Response{};
-
-    auto etag = optionalCString(rustResponse.etag);
-    if (etag) {
-      result.etag = std::move(etag);
-    }
-
-    auto modified = optionalCString(rustResponse.modified);
-    if (modified) {
-      result.modified = util::parseTimestamp(modified->c_str());
-    }
-
-    auto cacheControlExpiration = std::optional<Timestamp>{};
-    auto cacheControl = optionalCString(rustResponse.cache_control);
-    if (cacheControl) {
-      const auto parsed = http::CacheControl::parse(*cacheControl);
-      cacheControlExpiration = parsed.toTimePoint();
-      if (cacheControlExpiration) {
-        result.expires = cacheControlExpiration;
-      }
-      result.mustRevalidate = parsed.mustRevalidate;
-    }
-
-    auto expires = optionalCString(rustResponse.expires);
-    if (expires && !cacheControlExpiration) {
-      result.expires = util::parseTimestamp(expires->c_str());
-    }
-
-    if (rustResponse.error != nullptr) {
-      auto reason = Response::Error::Reason::Other;
-      if (rustResponse.error_reason == rustHttpErrorConnection) {
-        reason = Response::Error::Reason::Connection;
-      }
-      result.error = std::make_unique<Response::Error>(
-        reason, std::string{rustResponse.error}
-      );
-      return result;
-    }
-
-    const auto code = rustResponse.status_code;
-    if (code == 200 || code == 206) {
-      if (rustResponse.data_len == 0) {
-        result.data = std::make_shared<std::string>();
-      } else if (rustResponse.data == nullptr) {
-        result.error = std::make_unique<Response::Error>(
-          Response::Error::Reason::Other, "HTTP response missing body data"
-        );
-        return result;
-      } else {
-        result.data = std::make_shared<std::string>(
-          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<const char*>(rustResponse.data),
-          rustResponse.data_len
-        );
-      }
-    } else if (
-      code == 204 || (code == 404 && resource.kind == Resource::Kind::Tile)
-    ) {
-      result.noContent = true;
-    } else if (code == 304) {
-      result.notModified = true;
-    } else if (code == 404) {
-      result.error = std::make_unique<Response::Error>(
-        Response::Error::Reason::NotFound, "HTTP status code 404"
-      );
-    } else if (code == 429) {
-      result.error = std::make_unique<Response::Error>(
-        Response::Error::Reason::RateLimit, "HTTP status code 429",
-        http::parseRetryHeaders(
-          optionalCString(rustResponse.retry_after),
-          optionalCString(rustResponse.x_rate_limit_reset)
-        )
-      );
-    } else if (code >= 500 && code < 600) {
-      result.error = std::make_unique<Response::Error>(
-        Response::Error::Reason::Server,
-        std::string{"HTTP status code "} + util::toString(code)
-      );
-    } else {
-      result.error = std::make_unique<Response::Error>(
-        Response::Error::Reason::Other,
-        std::string{"HTTP status code "} + util::toString(code)
-      );
-    }
-
-    return result;
-  }
-
-  void deliver() {
-    auto callbackCopy = FileSource::Callback{};
-    auto responseCopy = Response{};
-
-    {
-      std::scoped_lock lock(mutex);
-      if (canceled || !callback) {
-        return;
-      }
-
-      callbackCopy = callback;
-      responseCopy = response;
-    }
-
-    callbackCopy(responseCopy);
-  }
-
-  Resource resource;
-  FileSource::Callback callback;
-  Response response;
-  std::unique_ptr<util::AsyncTask> async;
-  std::mutex mutex;
-  bool canceled = false;
-};
-
 class HTTPRequest : public AsyncRequest {
  public:
   HTTPRequest(
     const Resource& resource, void* platformContext,
     FileSource::Callback callback
   )
-      : state(
-          std::make_shared<HTTPRequestState>(resource, std::move(callback))
+      : delivery(
+          std::make_shared<platform::http::Delivery>(
+            resource, std::move(callback)
+          )
         ) {
-    state->startAsyncTask();
+    delivery->start();
 
-    auto url = mln::platform::offline_url(resource);
-    auto headers = makeHeaders(resource, url, platformContext);
+    auto url = platform::offline_url(resource);
+    const auto headers =
+      platform::http::request_headers(resource, url, platformContext);
+    auto rustHeaders = std::vector<MlnRustHttpHeader>{};
+    rustHeaders.reserve(headers.size());
+    for (const auto& header : headers) {
+      rustHeaders.push_back(
+        {header.name.c_str(), header.value.c_str(), header.sensitive}
+      );
+    }
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-    auto* stateForCallback = new std::shared_ptr<HTTPRequestState>{state};
+    auto* deliveryForCallback =
+      new std::shared_ptr<platform::http::Delivery>{delivery};
     handle =
       std::make_unique<RustHttpRequestHandle>(mlnffi_rust_http_request_start(
-        url.c_str(), headers.data(), headers.size(), onComplete,
-        stateForCallback
+        url.c_str(), rustHeaders.data(), rustHeaders.size(), onComplete,
+        deliveryForCallback
       ));
   }
 
@@ -357,75 +210,22 @@ class HTTPRequest : public AsyncRequest {
   HTTPRequest(HTTPRequest&&) = delete;
   auto operator=(HTTPRequest&&) -> HTTPRequest& = delete;
 
-  ~HTTPRequest() override { state->cancel(); }
+  ~HTTPRequest() override { delivery->cancel(); }
 
  private:
-  static auto makeHeaders(
-    const Resource& resource, const std::string& url, void* platformContext
-  ) -> std::vector<MlnRustHttpHeader> {
-    header_storage.clear();
-    auto headers = std::vector<MlnRustHttpHeader>{};
-
-    if (resource.dataRange) {
-      header_storage.emplace_back(
-        "Range", std::string{"bytes="} +
-                   std::to_string(resource.dataRange->first) + "-" +
-                   std::to_string(resource.dataRange->second)
-      );
-    }
-
-    if (resource.priorEtag) {
-      header_storage.emplace_back("If-None-Match", *resource.priorEtag);
-    } else if (resource.priorModified) {
-      header_storage.emplace_back(
-        "If-Modified-Since", util::rfc1123(*resource.priorModified)
-      );
-    }
-
-    header_storage.emplace_back("User-Agent", "MapLibreNative/1.0");
-
-    auto transformed =
-      isHTTPURL(url)
-        ? mln::core::invoke_http_header_transform(
-            platformContext, resourceKindToAbi(resource.kind), url.c_str()
-          )
-        : mln::core::HttpHeaders{};
-    const auto nativeHeaderCount = header_storage.size();
-    header_storage.reserve(header_storage.size() + transformed.size());
-    for (auto& header : transformed) {
-      header_storage.push_back(std::move(header));
-    }
-
-    headers.reserve(header_storage.size());
-    for (std::size_t index = 0; index < header_storage.size(); ++index) {
-      const auto& [name, value] = header_storage[index];
-      headers.push_back(
-        {name.c_str(), value.c_str(), index >= nativeHeaderCount}
-      );
-    }
-
-    return headers;
-  }
-
   static void onComplete(void* userData, MlnRustHttpResponse response) {
-    auto stateHolder = std::unique_ptr<std::shared_ptr<HTTPRequestState>>{
-      static_cast<std::shared_ptr<HTTPRequestState>*>(userData),
+    auto deliveryHolder =
+      std::unique_ptr<std::shared_ptr<platform::http::Delivery>>{
+        static_cast<std::shared_ptr<platform::http::Delivery>*>(userData),
     };
     auto rustResponse = RustHttpResponse{response};
-    (*stateHolder)->complete(rustResponse.get());
+    auto& delivery = **deliveryHolder;
+    delivery.complete(makeResponse(delivery.resource, rustResponse.get()));
   }
 
-  static thread_local std::vector<std::pair<std::string, std::string>>
-    header_storage;
-
-  std::shared_ptr<HTTPRequestState> state;
+  std::shared_ptr<platform::http::Delivery> delivery;
   std::unique_ptr<RustHttpRequestHandle> handle;
 };
-
-// Each thread's storage is freed when the thread ends; see
-// mln_ffi_no_static_destructors_option.
-[[clang::always_destroy]] thread_local std::vector<
-  std::pair<std::string, std::string>> HTTPRequest::header_storage;
 
 HTTPFileSource::HTTPFileSource(
   const ResourceOptions& resourceOptions, const ClientOptions& clientOptions

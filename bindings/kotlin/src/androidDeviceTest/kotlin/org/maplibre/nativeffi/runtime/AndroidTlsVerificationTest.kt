@@ -21,9 +21,8 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
 /**
- * Native HTTPS verifies through the platform trust manager, which the library reaches through the
- * Java helper that it embeds and loads itself. The test APK carries no copy of the helper, so only
- * the embedded one can report the trust manager's UnknownIssuer.
+ * Native HTTPS verifies through the platform's HttpURLConnection, so a certificate that no trusted
+ * root issued fails the handshake there.
  */
 class AndroidTlsVerificationTest {
   @Test
@@ -39,7 +38,7 @@ class AndroidTlsVerificationTest {
             it.sourceType == RuntimeEventSourceType.MAP &&
               it.type == RuntimeEventType.MAP_LOADING_FAILED
           }
-        assertContains(failure.message, "UnknownIssuer")
+        assertContains(failure.message, "SSLHandshakeException")
       }
     }
   }

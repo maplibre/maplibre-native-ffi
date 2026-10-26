@@ -30,6 +30,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Whether a case can drive the platform's own HTTP client against the loopback
+// server in support/http_server.h. The browser has no sockets, and Android's
+// client calls Java, which these executables run without; the Kotlin device
+// suite covers Android's client instead.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#define MLN_TEST_PLATFORM_HTTP 0
+#else
+#define MLN_TEST_PLATFORM_HTTP 1
+#endif
+
 #include "env.h"
 #include "harness.h"
 #include "render.h"

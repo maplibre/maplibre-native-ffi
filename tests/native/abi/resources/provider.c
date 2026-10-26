@@ -3,11 +3,11 @@
 // provider's answer reaches the map, including through the ambient cache.
 
 #include "support/map.h"
-#if !defined(__EMSCRIPTEN__)
-#include "support/http_server.h"
-#endif
 #include "support/resources.h"
 #include "support/test_support.h"
+#if MLN_TEST_PLATFORM_HTTP
+#include "support/http_server.h"
+#endif
 
 static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";
@@ -995,7 +995,7 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   mln_test_provider_destroy(provider);
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
 static void hand_back_inline(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -1063,7 +1063,7 @@ static void a_callback_request_can_pass_through_inline_or_later(void) {
 #endif
 
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(a_callback_request_can_pass_through_inline_or_later);
 #endif
   RUN_TEST(resource_provider_registration_validates_its_descriptor);

@@ -53,7 +53,9 @@ function(mln_ffi_configure_platform target)
   set(MLN_FFI_ANDROID_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/android/file_sources.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/i18n.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/java_vm.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/collator.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/number_format.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
@@ -61,7 +63,6 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
