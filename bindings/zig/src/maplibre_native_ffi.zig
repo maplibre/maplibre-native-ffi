@@ -5629,6 +5629,8 @@ pub const StyleImageInfo = struct {
     pixel_ratio: f32 = 0,
     /// Whether the image is a signed distance field icon.
     sdf: bool = false,
+    /// Whether the map keeps the image once no loaded tile uses it.
+    keep_unused: bool = false,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_info) status.Error!StyleImageInfo {
         return .{
@@ -5650,6 +5652,7 @@ pub const StyleImageInfo = struct {
             .text_fit_height = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
             .pixel_ratio = raw.pixel_ratio,
             .sdf = raw.sdf,
+            .keep_unused = raw.keep_unused,
         };
     }
 };
@@ -5673,6 +5676,8 @@ pub const StyleImageOptions = struct {
     pixel_ratio: ?f32 = null,
     /// Whether the image is a signed distance field icon. Absent selects false.
     sdf: ?bool = null,
+    /// Keeps the image once no loaded tile uses it. Absent selects false.
+    keep_unused: ?bool = null,
     pub fn toNative(self: StyleImageOptions, allocator: std.mem.Allocator) status.Error!c.mln_style_image_options {
         var raw = std.mem.zeroes(c.mln_style_image_options);
         raw.fields = 0;
@@ -5700,6 +5705,7 @@ pub const StyleImageOptions = struct {
         marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
         marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, self.pixel_ratio);
         marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, self.sdf);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED, &raw.keep_unused, self.keep_unused);
         return raw;
     }
 
@@ -5720,6 +5726,7 @@ pub const StyleImageOptions = struct {
             .text_fit_height = if (raw.fields & c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
             .pixel_ratio = if (raw.fields & c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0) raw.pixel_ratio else null,
             .sdf = if (raw.fields & c.MLN_STYLE_IMAGE_OPTION_SDF != 0) raw.sdf else null,
+            .keep_unused = if (raw.fields & c.MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED != 0) raw.keep_unused else null,
         };
     }
 };

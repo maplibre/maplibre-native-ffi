@@ -1494,6 +1494,7 @@ StyleImageInfo _readStyleImageInfo(
       : null,
   pixelRatio: source.pixel_ratio,
   sdf: source.sdf,
+  keepUnused: source.keep_unused,
 );
 
 StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
@@ -1641,6 +1642,10 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   if (value.sdf != null) {
     result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_SDF;
     result.ref.sdf = value.sdf!;
+  }
+  if (value.keepUnused != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
+    result.ref.keep_unused = value.keepUnused!;
   }
   return result;
 }

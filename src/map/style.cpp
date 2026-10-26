@@ -427,7 +427,7 @@ auto validate_style_image_options(const mln_style_image_options* options)
     MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_STRETCH_X |
     MLN_STYLE_IMAGE_OPTION_STRETCH_Y | MLN_STYLE_IMAGE_OPTION_CONTENT |
     MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
-    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT | MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_style_image_options.fields contains unknown bits"
@@ -556,6 +556,9 @@ auto effective_style_image_options(const mln_style_image_options* options)
     has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
   ) {
     result.text_fit_height = options->text_fit_height;
+  }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED)) {
+    result.keep_unused = options->keep_unused;
   }
   return result;
 }
@@ -863,7 +866,8 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
     .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .pixel_ratio = 1.0F,
-    .sdf = false
+    .sdf = false,
+    .keep_unused = false
   };
 }
 
@@ -1623,8 +1627,20 @@ auto make_style_image(
   };
 }
 
-auto map_set_style_image(MapObject& live, mln::style::Image&& image)
-  -> mln_status {
+auto style_image_keeps_unused(const mln_style_image_options* options) -> bool {
+  return effective_style_image_options(options).keep_unused;
+}
+
+auto map_set_style_image(
+  MapObject& live, mln::style::Image&& image, bool keep_unused
+) -> mln_status {
+  // The set changes before the style, so a failed allocation leaves the style
+  // unchanged.
+  if (keep_unused) {
+    live.kept_style_images.insert(image.getID());
+  } else {
+    live.kept_style_images.erase(image.getID());
+  }
   map_native(live).getStyle().addImage(
     std::make_unique<mln::style::Image>(std::move(image.baseImpl))
   );
@@ -1640,17 +1656,19 @@ auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
     return MLN_STATUS_NOT_FOUND;
   }
   style.removeImage(id);
+  live.kept_style_images.erase(id);
   return MLN_STATUS_OK;
 }
 
 auto map_get_style_image(
   MapObject& live, mln_buffer_view image_id, StyleImageRecord& out_image
 ) -> bool {
-  const auto found =
-    map_native(live).getStyle().getImage(string_from_view(image_id));
+  const auto id = string_from_view(image_id);
+  const auto found = map_native(live).getStyle().getImage(id);
   if (!found) {
     return false;
   }
+  out_image.keep_unused = live.kept_style_images.contains(id);
 
   // Image's copy shares the style's immutable image data. Image declares no
   // assignment, so the record constructs its copy in place.
@@ -1698,7 +1716,8 @@ auto style_image_info(const StyleImageRecord& record) noexcept
     .text_fit_width = text_fit(image.getTextFitWidth()),
     .text_fit_height = text_fit(image.getTextFitHeight()),
     .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf()
+    .sdf = image.isSdf(),
+    .keep_unused = record.keep_unused
   };
 }
 

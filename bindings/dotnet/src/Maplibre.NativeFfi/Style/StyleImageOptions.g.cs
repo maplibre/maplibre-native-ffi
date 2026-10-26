@@ -55,4 +55,9 @@ public sealed record StyleImageOptions
     /// Whether the image is a signed distance field icon. Absent selects false.
     /// </summary>
     public bool? Sdf { get; init; }
+
+    /// <summary>
+    /// Keeps the image once no loaded tile uses it. Absent selects false.
+    /// </summary>
+    public bool? KeepUnused { get; init; }
 }

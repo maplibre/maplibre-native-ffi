@@ -668,6 +668,10 @@ internal fun NativeArena.putStyleImageOptions(target: Long, value: StyleImageOpt
     fields = fields or 2u
     writeBool(target + w(52, 68), it)
   }
+  value.keepUnused?.let {
+    fields = fields or 128u
+    writeBool(target + w(53, 69), it)
+  }
   writeU32(target + 4, fields)
 }
 
@@ -1184,6 +1188,7 @@ internal fun readStyleImageInfo(source: Long): StyleImageInfo {
       if ((fields and 4u) != 0u) StyleImageTextFit(readU32(source + w(56, 84))) else null,
     pixelRatio = readF32(source + w(60, 88)),
     sdf = readBool(source + w(64, 92)),
+    keepUnused = readBool(source + w(65, 93)),
   )
 }
 

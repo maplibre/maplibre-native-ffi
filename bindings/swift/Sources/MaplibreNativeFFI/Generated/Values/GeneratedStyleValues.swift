@@ -496,6 +496,8 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   public var pixelRatio: Float
   /// Whether the image is a signed distance field icon.
   public var sdf: Bool
+  /// Whether the map keeps the image once no loaded tile uses it.
+  public var keepUnused: Bool
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
@@ -506,7 +508,8 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     textFitWidth: StyleImageTextFit? = nil,
     textFitHeight: StyleImageTextFit? = nil,
     pixelRatio: Float = 0,
-    sdf: Bool = false
+    sdf: Bool = false,
+    keepUnused: Bool = false
   ) {
     self.width = width
     self.height = height
@@ -518,6 +521,7 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     self.textFitHeight = textFitHeight
     self.pixelRatio = pixelRatio
     self.sdf = sdf
+    self.keepUnused = keepUnused
   }
 
   init(
@@ -550,6 +554,7 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
       StyleImageTextFit(rawValue: raw.text_fit_height.rawValue) : nil
     pixelRatio = raw.pixel_ratio
     sdf = raw.sdf
+    keepUnused = raw.keep_unused
   }
 }
 
@@ -572,6 +577,8 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   public var pixelRatio: Float?
   /// Whether the image is a signed distance field icon. Absent selects false.
   public var sdf: Bool?
+  /// Keeps the image once no loaded tile uses it. Absent selects false.
+  public var keepUnused: Bool?
   public init(
     stretchX: [ImageStretch]? = nil,
     stretchY: [ImageStretch]? = nil,
@@ -579,7 +586,8 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     textFitWidth: StyleImageTextFit? = nil,
     textFitHeight: StyleImageTextFit? = nil,
     pixelRatio: Float? = nil,
-    sdf: Bool? = nil
+    sdf: Bool? = nil,
+    keepUnused: Bool? = nil
   ) {
     self.stretchX = stretchX
     self.stretchY = stretchY
@@ -588,6 +596,7 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     self.textFitHeight = textFitHeight
     self.pixelRatio = pixelRatio
     self.sdf = sdf
+    self.keepUnused = keepUnused
   }
 
   init(
@@ -617,6 +626,8 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     pixelRatio = raw.fields & MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
       .rawValue != 0 ? raw.pixel_ratio : nil
     sdf = raw.fields & MLN_STYLE_IMAGE_OPTION_SDF.rawValue != 0 ? raw.sdf : nil
+    keepUnused = raw.fields & MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED
+      .rawValue != 0 ? raw.keep_unused : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_options {
@@ -651,6 +662,10 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     }
     if let item = sdf {
       raw.fields |= MLN_STYLE_IMAGE_OPTION_SDF.rawValue; raw.sdf = item
+    }
+    if let item = keepUnused {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED.rawValue; raw
+        .keep_unused = item
     }
     return raw
   }

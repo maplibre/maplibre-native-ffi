@@ -4346,6 +4346,8 @@ type StyleImageInfo struct {
 	PixelRatio float32
 	// Whether the image is a signed distance field icon.
 	Sdf bool
+	// Whether the map keeps the image once no loaded tile uses it.
+	KeepUnused bool
 }
 
 func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
@@ -4376,6 +4378,7 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
+	result.KeepUnused = bool(raw.keep_unused)
 	return result
 }
 
@@ -4399,6 +4402,8 @@ type StyleImageOptions struct {
 	PixelRatio *float32
 	// Whether the image is a signed distance field icon. Absent selects false.
 	Sdf *bool
+	// Keeps the image once no loaded tile uses it. Absent selects false.
+	KeepUnused *bool
 }
 
 func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln_style_image_options {
@@ -4432,6 +4437,7 @@ func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.mln_style_image_text_fit])
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, input.PixelRatio, arena, bindingNumber[float32, C.float])
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, input.Sdf, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED, &raw.keep_unused, input.KeepUnused, arena, bindingBool[bool, C.bool])
 	return raw
 }
 

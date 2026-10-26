@@ -2050,6 +2050,7 @@ internal static unsafe class GeneratedValues
                 : null,
             PixelRatio = value.pixel_ratio,
             Sdf = value.sdf != 0,
+            KeepUnused = value.keep_unused != 0,
         };
 
     internal static mln_style_image_options NativeStyleImageOptions(
@@ -2105,6 +2106,12 @@ internal static unsafe class GeneratedValues
             value.Sdf,
             ref native.sdf,
             MLN_STYLE_IMAGE_OPTION_SDF,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.KeepUnused,
+            ref native.keep_unused,
+            MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED,
             static present => (byte)(present ? 1 : 0)
         );
         return native;

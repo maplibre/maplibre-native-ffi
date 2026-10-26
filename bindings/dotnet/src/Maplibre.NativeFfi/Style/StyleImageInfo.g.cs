@@ -76,4 +76,9 @@ public sealed record StyleImageInfo
     /// Whether the image is a signed distance field icon.
     /// </summary>
     public bool Sdf { get; init; }
+
+    /// <summary>
+    /// Whether the map keeps the image once no loaded tile uses it.
+    /// </summary>
+    public bool KeepUnused { get; init; }
 }

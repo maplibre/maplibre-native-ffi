@@ -741,12 +741,14 @@ auto mln_map_set_style_image(
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
+    const auto keep_unused = mln::core::style_image_keeps_unused(options);
     return mln::core::submit_map_command(
       map,
-      [image = mln::core::make_style_image(image_id, *image, options)](
-        mln::core::MapObject& live
-      ) mutable -> mln_status {
-        return mln::core::map_set_style_image(live, std::move(image));
+      [image = mln::core::make_style_image(image_id, *image, options),
+       keep_unused](mln::core::MapObject& live) mutable -> mln_status {
+        return mln::core::map_set_style_image(
+          live, std::move(image), keep_unused
+        );
       },
       completion
     );

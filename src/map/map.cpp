@@ -678,6 +678,10 @@ class HeadlessObserver final : public mln::MapObserver {
   // The release callbacks this owes are map state, not an event, so the
   // reconciliation runs whatever the mask selects.
   void onDidFinishLoadingStyle() override {
+    // The style has dropped every runtime image by now. A load that fails
+    // never gets here, so the images it leaves stay kept.
+    if (const auto map = event_state_->owner.lock())
+      map->kept_style_images.clear();
     // The event is queued before the reconciliation, and the registry is held
     // by a local share across it, because reconcile() runs host release
     // callbacks. Nothing may touch this observer or its members after host code
@@ -728,6 +732,11 @@ class HeadlessObserver final : public mln::MapObserver {
       return;
     }
     queue_fresh(MLN_RUNTIME_EVENT_MAP_IDLE);
+  }
+
+  bool onCanRemoveUnusedStyleImage(const std::string& image_id) override {
+    const auto map = event_state_->owner.lock();
+    return map == nullptr || !map->kept_style_images.contains(image_id);
   }
 
   void onStyleImageMissing(const std::string& image_id) override {

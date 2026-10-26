@@ -224,6 +224,7 @@ typedef enum MLN_BINDING(
   MLN_STYLE_IMAGE_OPTION_CONTENT = 1U << 4U,
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 1U << 5U,
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
+  MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED = 1U << 7U,
 } mln_style_image_option_field;
 
 /** A set of mln_style_image_option_field bits. */
@@ -615,6 +616,13 @@ typedef struct mln_style_image_options {
   /** Whether the image is a signed distance field icon. Absent selects false.
    */
   bool sdf MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_SDF");
+  /**
+   * Keeps the image once no loaded tile uses it. Absent selects false.
+   *
+   * mln_map_set_style_image() describes the images that MapLibre drops.
+   */
+  bool keep_unused
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED");
 } mln_style_image_options;
 
 /**
@@ -655,6 +663,8 @@ typedef struct mln_style_image_info {
   float pixel_ratio;
   /** Whether the image is a signed distance field icon. */
   bool sdf;
+  /** Whether the map keeps the image once no loaded tile uses it. */
+  bool keep_unused;
 } mln_style_image_info;
 
 /**
@@ -1299,6 +1309,13 @@ MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
  *
  * Runtime style images belong to the current style. Loading another style URL
  * or JSON document drops images that were added to the previous style.
+ *
+ * MapLibre also drops an image that it reported through
+ * MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING before this call set it, once no
+ * loaded tile uses the image. A tile that needs the image again reports it
+ * missing again. Set keep_unused in options to keep such an image until it is
+ * removed or replaced. Replacing an image replaces its options, keep_unused
+ * included.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.

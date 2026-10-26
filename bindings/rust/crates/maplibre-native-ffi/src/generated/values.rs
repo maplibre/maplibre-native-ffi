@@ -4542,6 +4542,8 @@ pub struct StyleImageInfo {
     pub pixel_ratio: f32,
     /// Whether the image is a signed distance field icon.
     pub sdf: bool,
+    /// Whether the map keeps the image once no loaded tile uses it.
+    pub keep_unused: bool,
 }
 impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
     unsafe fn from_native(raw: sys::mln_style_image_info) -> Result<Self> {
@@ -4566,6 +4568,7 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
             },
             pixel_ratio: raw.pixel_ratio,
             sdf: raw.sdf,
+            keep_unused: raw.keep_unused,
         })
     }
 }
@@ -4590,6 +4593,8 @@ pub struct StyleImageOptions {
     pub pixel_ratio: Option<f32>,
     /// Whether the image is a signed distance field icon. Absent selects false.
     pub sdf: Option<bool>,
+    /// Keeps the image once no loaded tile uses it. Absent selects false.
+    pub keep_unused: Option<bool>,
 }
 impl ToNative<sys::mln_style_image_options> for StyleImageOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_image_options> {
@@ -4627,6 +4632,10 @@ impl ToNative<sys::mln_style_image_options> for StyleImageOptions {
         if let Some(item) = &self.sdf {
             raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
             raw.sdf = *item;
+        }
+        if let Some(item) = &self.keep_unused {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
+            raw.keep_unused = *item;
         }
         Ok(raw)
     }

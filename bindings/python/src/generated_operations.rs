@@ -1347,6 +1347,7 @@ fn generated_copy_mln_style_image_info(
     )?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
     dict.set_item("sdf", generated_value(py, value.sdf)?)?;
+    dict.set_item("keep_unused", generated_value(py, value.keep_unused)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2996,6 +2997,10 @@ fn generated_input_mln_style_image_options<'py>(
     if let Some(field) = generated_present(value, "sdf")? {
         raw.sdf = field.extract::<bool>()?;
         raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+    }
+    if let Some(field) = generated_present(value, "keep_unused")? {
+        raw.keep_unused = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
     }
     Ok(raw)
 }

@@ -2274,6 +2274,10 @@ napi_value mln_ts_read_style_image_info(
     return NULL;
   if (!mln_ts_set(env, result, "sdf", mln_ts_bool(env, source->sdf)))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "keepUnused", mln_ts_bool(env, source->keep_unused)
+      ))
+    return NULL;
   return result;
 }
 
@@ -5811,6 +5815,16 @@ bool mln_ts_write_style_image_options(
       out->sdf = flag;
     }
     out->fields |= MLN_STYLE_IMAGE_OPTION_SDF;
+  }
+  if (!mln_ts_member(call, value, "keepUnused", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "keepUnused");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->keep_unused = flag;
+    }
+    out->fields |= MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
   }
   return true;
 }

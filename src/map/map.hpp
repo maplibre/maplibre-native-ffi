@@ -72,6 +72,7 @@ struct StyleImageRecord {
   uint32_t fields = 0;
   std::vector<mln_image_stretch> stretch_x;
   std::vector<mln_image_stretch> stretch_y;
+  bool keep_unused = false;
 };
 
 struct StyleOperationResult {
@@ -261,6 +262,7 @@ auto make_style_image(
   mln_buffer_view image_id, const mln_premultiplied_rgba8_image& image,
   const mln_style_image_options* options
 ) -> mln::style::Image;
+auto style_image_keeps_unused(const mln_style_image_options* options) -> bool;
 auto validate_image_source_coordinates(
   const mln_lat_lng* coordinates, size_t coordinate_count
 ) -> mln_status;
@@ -370,8 +372,9 @@ auto map_set_custom_vector_source_tile_error(
 auto map_invalidate_custom_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
-auto map_set_style_image(MapObject& live, mln::style::Image&& image)
-  -> mln_status;
+auto map_set_style_image(
+  MapObject& live, mln::style::Image&& image, bool keep_unused
+) -> mln_status;
 auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   -> mln_status;
 auto map_get_style_image(

@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 
 #include "execution/control_state.hpp"
 #include "execution/retirement.hpp"
@@ -56,6 +57,9 @@ struct MapObject {
   bool snapshot_config_dirty = true;
   bool snapshot_camera_dirty = true;
   bool still_image_request_pending = false;
+  // Worker-owned IDs of the style images that the host set with keep_unused.
+  // A successful style load clears it along with the images.
+  std::unordered_set<std::string> kept_style_images;
   // Any-thread map-owned feature state; render sessions pull coalesced
   // snapshots and push diffs into their renderer.
   FeatureStateStore feature_state;
