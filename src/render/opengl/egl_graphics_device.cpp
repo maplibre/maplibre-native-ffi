@@ -16,12 +16,19 @@
 #include "render/opengl/opengl_texture_session.hpp"
 #include "render/render_session_common.hpp"
 
+// Android and OpenHarmony define __linux__ too, but their EGL serves their
+// own window systems through the default display and lists no devices.
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+#define MLN_FFI_EGL_DEVICE_PLATFORMS 1
+#endif
+
 namespace mln::core {
 namespace {
 
 // Extension values, spelled out because the EGL headers that a platform ships
 // differ in which extensions they declare.
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
 constexpr auto egl_platform_device = EGLenum{0x313F};
 constexpr auto egl_platform_surfaceless_mesa = EGLenum{0x31DD};
 #elif defined(__APPLE__)
@@ -35,7 +42,7 @@ constexpr auto egl_platform_angle_device_type_hardware = EGLint{0x320A};
 using GetPlatformDisplay = EGLDisplay (*)(
   EGLenum platform, void* native_display, const EGLint* attributes
 );
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
 using QueryDevices =
   EGLBoolean (*)(EGLint max_devices, void** devices, EGLint* device_count);
 #endif
@@ -99,7 +106,7 @@ auto choose(EGLDisplay display, const char* platform) -> DisplayChoice {
   };
 }
 
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
 auto device_display(uint32_t index, DisplayChoice& out_choice) -> mln_status {
   const auto get_platform_display =
     egl_extension<GetPlatformDisplay>("eglGetPlatformDisplayEXT");
@@ -147,7 +154,7 @@ auto device_display(uint32_t index, DisplayChoice& out_choice) -> mln_status {
 // Android and OpenHarmony keep the default display, which serves their own
 // window systems.
 auto default_display() -> DisplayChoice {
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
   if (
     const auto get_platform_display =
       egl_extension<GetPlatformDisplay>("eglGetPlatformDisplayEXT");
@@ -244,7 +251,7 @@ auto create_backend_graphics_device(
       return MLN_STATUS_NATIVE_ERROR;
     }
   } else {
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
     const auto status = device_display(options.adapter_index, choice);
     if (status != MLN_STATUS_OK) {
       return status;
