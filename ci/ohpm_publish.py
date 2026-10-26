@@ -42,7 +42,7 @@ def manifest(har: pathlib.Path) -> dict:
         member = archive.extractfile("package/oh-package.json5")
         if member is None:
             raise SystemExit(f"{har} has no package/oh-package.json5")
-        # The manifest in bindings/typescript/ohpm/package is JSON.
+        # pack-ohpm.sh writes the manifest as JSON.
         return json.load(member)
 
 

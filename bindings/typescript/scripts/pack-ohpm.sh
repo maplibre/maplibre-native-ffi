@@ -5,9 +5,10 @@
 #
 # A user installs one package, such as @maplibre/native-ffi-opengl. OHPM has
 # no per-platform packages, so a backend's HAR holds the files in ohpm/package,
-# the bundled ArkTS entry, and, for each ABI that a preset names, the addon and
-# the shared C++ runtime that the build task installed. Every package takes the
-# same version, 0.0.0 unless --version names one.
+# the manifest in ohpm/oh-package.json, the bundled ArkTS entry, and, for each
+# ABI that a preset names, the addon and the shared C++ runtime that the build
+# task installed. Every package takes the same version, 0.0.0 unless --version
+# names one.
 set -euo pipefail
 
 usage="usage: pack-ohpm.sh [--version <version>] <out dir> <preset>..."
@@ -48,10 +49,11 @@ for preset in "$@"; do
     mkdir -p "$package"
     cp -R "$binding/ohpm/package/." "$staging/bundle/." "$package/"
     cp "$binding/../../LICENSE" "$package/"
-    manifest="$package/oh-package.json5"
+    # The formatter writes a .json5 file in JSON5's own style, which jq cannot
+    # read, so the manifest is kept as JSON, which JSON5 readers accept too.
     jq --arg name "@maplibre/native-ffi-$backend" --arg version "$version" \
-      '.name = $name | .version = $version' "$manifest" >"$manifest.new"
-    mv "$manifest.new" "$manifest"
+      '.name = $name | .version = $version' "$binding/ohpm/oh-package.json" \
+      >"$package/oh-package.json5"
     # OHPM's review rejects a package whose changelog does not name its version.
     printf '\n## %s\n\nSee the [release notes](%s/v%s).\n' "$version" \
       https://github.com/maplibre/maplibre-native-ffi/releases/tag "$version" \

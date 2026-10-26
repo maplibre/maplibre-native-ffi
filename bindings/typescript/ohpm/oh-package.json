@@ -1,0 +1,30 @@
+{
+  "name": "@maplibre/native-ffi-opengl",
+  "version": "0.0.0",
+  "description": "Low-level ArkTS bindings for the MapLibre Native C API on OpenHarmony.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "author": { "name": "MapLibre", "url": "https://maplibre.org" },
+  "license": "BSD-2-Clause",
+  "repository": "https://github.com/maplibre/maplibre-native-ffi",
+  "homepage": "https://maplibre.org/maplibre-native-ffi/",
+  "bugs": { "url": "https://github.com/maplibre/maplibre-native-ffi/issues" },
+  "compatibleSdkVersion": 12,
+  "compatibleSdkType": "OpenHarmony",
+  "obfuscated": false,
+  "nativeComponents": [
+    {
+      "name": "libmaplibre_native_ffi.so",
+      "compatibleSdkVersion": 12,
+      "compatibleSdkType": "OpenHarmony"
+    },
+    {
+      "name": "libc++_shared.so",
+      "compatibleSdkVersion": 12,
+      "compatibleSdkType": "OpenHarmony"
+    }
+  ],
+  "dependencies": {
+    "libmaplibre_native_ffi.so": "file:./src/main/cpp/types/libmaplibre_native_ffi"
+  }
+}
