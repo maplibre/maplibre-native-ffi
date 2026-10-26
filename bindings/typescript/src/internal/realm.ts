@@ -157,9 +157,12 @@ let pending = 0;
 
 /** Holds the event loop open until the matching unhold(). */
 export function hold(): void {
-  if (pending++ === 0) {
+  // Counts only a hold that took, so a call that throws here, such as a
+  // browser page's call before loadModule(), leaves nothing held.
+  if (pending === 0) {
     native.setReferenced(true);
   }
+  pending++;
 }
 
 export function unhold(): void {
@@ -171,8 +174,8 @@ export function unhold(): void {
 /** Registers a pending completion and returns its token. */
 export function addCompletion(completion: PendingCompletion): number {
   const token = allocateToken();
-  completions.set(token, completion);
   hold();
+  completions.set(token, completion);
   return token;
 }
 
@@ -186,8 +189,8 @@ export function removeCompletion(token: number): void {
 /** Registers a pending thread start and returns its token. */
 export function addThreadStart(settle: PendingThreadStart): number {
   const token = allocateToken();
-  threadStarts.set(token, settle);
   hold();
+  threadStarts.set(token, settle);
   return token;
 }
 
