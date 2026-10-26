@@ -11,12 +11,12 @@ import javax.net.ssl.SSLSocket
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertContains
+import org.maplibre.nativeffi.ResourceRoute
+import org.maplibre.nativeffi.RuntimeEventSourceType
+import org.maplibre.nativeffi.RuntimeEventType
+import org.maplibre.nativeffi.UrlMatchFlag
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.ResourceRoute
-import org.maplibre.nativeffi.generated.RuntimeEventSourceType
-import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.UrlMatchFlag
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 

@@ -8,25 +8,25 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.withContext
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.generated.EglContextDescriptor
-import org.maplibre.nativeffi.generated.FrameDemand
-import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.OpenGlClientApi
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenGlContextOwnership
-import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.EglContextDescriptor
+import org.maplibre.nativeffi.FrameDemand
+import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.MapMode
+import org.maplibre.nativeffi.NativePointer
+import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.OpenGlClientApi
+import org.maplibre.nativeffi.OpenGlContextDescriptor
+import org.maplibre.nativeffi.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.OpenGlContextOwnership
+import org.maplibre.nativeffi.OpenGlOwnedTextureDescriptor
+import org.maplibre.nativeffi.RenderDriverKind
+import org.maplibre.nativeffi.RenderResult
+import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.graphicsProperties
 import org.maplibre.nativeffi.libraryProperties
-import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.loadNativeLibrary
 import org.maplibre.nativeffi.render.TestBackend
 import org.maplibre.nativeffi.render.TestGraphics
 import org.maplibre.nativeffi.render.withOwnedTexture
@@ -74,7 +74,7 @@ object RenderSessionExitProbe {
 
   @JvmStatic
   fun main(args: Array<String>) {
-    Maplibre.loadNativeLibrary()
+    loadNativeLibrary()
     when (args.single()) {
       "live" -> exitWithParkedDemand()
       "callback" -> exitFromCompletion()

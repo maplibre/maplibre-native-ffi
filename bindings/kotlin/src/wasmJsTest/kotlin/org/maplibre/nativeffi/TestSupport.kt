@@ -2,8 +2,6 @@
 
 package org.maplibre.nativeffi
 
-import org.maplibre.nativeffi.generated.Wake
-import org.maplibre.nativeffi.generated.writeWake
 import org.maplibre.nativeffi.internal.c.word
 import org.maplibre.nativeffi.internal.call.NativeCall
 import org.maplibre.nativeffi.internal.callback.CallbackOwner

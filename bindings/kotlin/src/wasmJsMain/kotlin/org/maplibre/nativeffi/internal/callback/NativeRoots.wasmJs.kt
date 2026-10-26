@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.internal.callback
 
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 
 // Native threads never read a root on wasm: the page looks each one up as it delivers. The wake
 // shim posts a token in the upper 30 bits of a 32-bit word, and token 0 names the delivery queue's

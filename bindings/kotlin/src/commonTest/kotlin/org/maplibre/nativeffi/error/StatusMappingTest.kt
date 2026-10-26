@@ -3,7 +3,8 @@ package org.maplibre.nativeffi.error
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.status.checkStatus
 
 /** How a failed status becomes a Kotlin exception. */

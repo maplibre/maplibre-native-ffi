@@ -173,21 +173,21 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         )
         self.assertEqual(kotlin.source_sets(frozenset({"web"})), ["wasmJsMain"])
         generated = kotlin.generate(api())
-        root = "org/maplibre/nativeffi/generated"
-        common = generated[f"src/commonMain/kotlin/{root}/GeneratedMapOperations.kt"]
+        root = "org/maplibre/nativeffi"
+        common = generated[f"src/commonMain/kotlin/{root}/MapHandle.kt"]
         self.assertIn("public fun redraw(", common)
         self.assertNotIn("useMetal", common)
         self.assertNotIn("attachCanvas", common)
         for source_set in ("jvmMain", "appleMain"):
             stem = source_set.removesuffix("Main")
             self.assertIn(
-                "public fun GeneratedMapOperations.useMetal(",
+                "public fun MapHandle.useMetal(",
                 generated[
                     f"src/{source_set}/kotlin/{root}/Generated{stem[0].upper()}{stem[1:]}Operations.kt"
                 ],
             )
         self.assertIn(
-            "public fun GeneratedMapOperations.attachCanvas(",
+            "public fun MapHandle.attachCanvas(",
             generated[f"src/wasmJsMain/kotlin/{root}/GeneratedWasmJsOperations.kt"],
         )
 

@@ -1,14 +1,14 @@
 package org.maplibre.nativeffi.render
 
-import org.maplibre.nativeffi.generated.AcquiredFrameHandle
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.attachMetalOwnedTexture
-import org.maplibre.nativeffi.generated.attachVulkanOwnedTexture
-import org.maplibre.nativeffi.generated.withMetalTexture
-import org.maplibre.nativeffi.generated.withVulkanTexture
+import org.maplibre.nativeffi.AcquiredFrameHandle
+import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.attachMetalOwnedTexture
+import org.maplibre.nativeffi.attachVulkanOwnedTexture
+import org.maplibre.nativeffi.withMetalTexture
+import org.maplibre.nativeffi.withVulkanTexture
 
 internal actual fun TestGraphics.attachBackendOwnedTexture(
   map: MapHandle,

@@ -12,28 +12,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.LogEvent
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.MapOptions
-import org.maplibre.nativeffi.generated.ResourceErrorReason
-import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.ResourceRequestHandle
-import org.maplibre.nativeffi.generated.ResourceRequestInfo
-import org.maplibre.nativeffi.generated.ResourceResponse
-import org.maplibre.nativeffi.generated.ResourceResponseStatus
-import org.maplibre.nativeffi.generated.ResourceRoute
-import org.maplibre.nativeffi.generated.RuntimeEvent
-import org.maplibre.nativeffi.generated.RuntimeEventHandler
-import org.maplibre.nativeffi.generated.RuntimeEventSourceType
-import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.UrlMatchFlag
-import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
 internal val TEST_TIMEOUT: Duration = 60.seconds

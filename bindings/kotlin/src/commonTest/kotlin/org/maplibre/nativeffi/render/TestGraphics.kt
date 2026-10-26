@@ -2,30 +2,32 @@ package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import org.maplibre.nativeffi.generated.AcquiredFrameHandle
-import org.maplibre.nativeffi.generated.EglContextDescriptor
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.MetalContextDescriptor
-import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.OpenGlClientApi
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenGlContextOwnership
-import org.maplibre.nativeffi.generated.OpenGlContextProviderFlag
-import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.RenderBackendFlag
-import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.VulkanContextDescriptor
-import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.WebGlContextDescriptor
-import org.maplibre.nativeffi.generated.WebGlContextKind
-import org.maplibre.nativeffi.generated.WebGpuContextDescriptor
-import org.maplibre.nativeffi.generated.WebGpuOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.WglContextDescriptor
+import org.maplibre.nativeffi.AcquiredFrameHandle
+import org.maplibre.nativeffi.EglContextDescriptor
+import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.MetalContextDescriptor
+import org.maplibre.nativeffi.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.NativePointer
+import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.OpenGlClientApi
+import org.maplibre.nativeffi.OpenGlContextDescriptor
+import org.maplibre.nativeffi.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.OpenGlContextOwnership
+import org.maplibre.nativeffi.OpenGlContextProviderFlag
+import org.maplibre.nativeffi.OpenGlOwnedTextureDescriptor
+import org.maplibre.nativeffi.RenderBackendFlag
+import org.maplibre.nativeffi.RenderDriverKind
+import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.VulkanContextDescriptor
+import org.maplibre.nativeffi.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.WebGlContextDescriptor
+import org.maplibre.nativeffi.WebGlContextKind
+import org.maplibre.nativeffi.WebGpuContextDescriptor
+import org.maplibre.nativeffi.WebGpuOwnedTextureDescriptor
+import org.maplibre.nativeffi.WglContextDescriptor
+import org.maplibre.nativeffi.openGlSupportedContextProviderMask
+import org.maplibre.nativeffi.supportedRenderBackendMask
 
 /**
  * The handles of a test graphics context, as addresses. Only its backend's fields are set. A WebGL
@@ -103,13 +105,13 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
   companion object {
     /** The one backend the loaded library renders with. */
     fun ofBuild(): TestBackend {
-      val backends = GeneratedApi.supportedRenderBackendMask()
+      val backends = supportedRenderBackendMask()
       return when {
         RenderBackendFlag.METAL in backends -> METAL
         RenderBackendFlag.VULKAN in backends -> VULKAN
         RenderBackendFlag.WEB_GPU in backends -> WEBGPU
         RenderBackendFlag.OPEN_GL in backends -> {
-          val providers = GeneratedApi.openGlSupportedContextProviderMask()
+          val providers = openGlSupportedContextProviderMask()
           when {
             OpenGlContextProviderFlag.WGL in providers -> WGL
             OpenGlContextProviderFlag.WEB_GL in providers -> WEBGL

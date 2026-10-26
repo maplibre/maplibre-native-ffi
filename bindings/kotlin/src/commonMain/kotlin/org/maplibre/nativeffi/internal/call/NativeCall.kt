@@ -4,7 +4,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import org.maplibre.nativeffi.generated.RenderSessionHandle
+import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.DiagnosticLayout
@@ -23,7 +24,6 @@ import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readI64
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.checkStatus
-import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /** Callback registrations remain rooted only if the native call accepts them. */
 internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeArena() {

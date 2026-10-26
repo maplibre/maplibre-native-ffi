@@ -10,7 +10,7 @@ import kotlinx.coroutines.async
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.runSuspendTest
 
-/** The one module load that every `Maplibre.loadModule` caller shares. */
+/** The one module load that every `loadWasmModule` caller shares. */
 class SharedLoadTest {
   @Test
   fun aCancelledCallerLeavesTheLoadToTheOthers() = runSuspendTest {

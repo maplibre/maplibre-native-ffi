@@ -2,8 +2,9 @@ package org.maplibre.nativeffi.internal.async
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.c.UpcallStubs
@@ -19,7 +20,6 @@ import org.maplibre.nativeffi.internal.memory.readViewString
 import org.maplibre.nativeffi.internal.memory.writeAddress
 import org.maplibre.nativeffi.internal.memory.writeI64
 import org.maplibre.nativeffi.internal.memory.writeU32
-import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * Bridges one native completion into an eager Kotlin [Deferred].

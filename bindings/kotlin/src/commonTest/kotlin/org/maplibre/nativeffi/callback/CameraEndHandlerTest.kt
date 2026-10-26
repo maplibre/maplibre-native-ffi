@@ -4,17 +4,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.AnimationOptions
+import org.maplibre.nativeffi.CameraDelta
+import org.maplibre.nativeffi.CameraOptions
+import org.maplibre.nativeffi.CameraTransitionEnd
+import org.maplibre.nativeffi.CameraTransitionHandler
+import org.maplibre.nativeffi.CameraTransitionOutcome
+import org.maplibre.nativeffi.CameraUpdate
+import org.maplibre.nativeffi.CameraUpdateMode
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.AnimationOptions
-import org.maplibre.nativeffi.generated.CameraDelta
-import org.maplibre.nativeffi.generated.CameraOptions
-import org.maplibre.nativeffi.generated.CameraTransitionEnd
-import org.maplibre.nativeffi.generated.CameraTransitionHandler
-import org.maplibre.nativeffi.generated.CameraTransitionOutcome
-import org.maplibre.nativeffi.generated.CameraUpdate
-import org.maplibre.nativeffi.generated.CameraUpdateMode
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 

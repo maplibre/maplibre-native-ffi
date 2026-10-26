@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.maplibre.nativeffi.generated.RenderSessionState
+import org.maplibre.nativeffi.RenderSessionState
 import org.maplibre.nativeffi.render.withOwnedTexture
 import org.maplibre.nativeffi.runSuspendTest
 

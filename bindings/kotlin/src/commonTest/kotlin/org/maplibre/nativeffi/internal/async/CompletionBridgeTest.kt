@@ -4,10 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.LatLng
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.readLatLng
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.memory.NativeArena
@@ -19,8 +19,8 @@ import org.maplibre.nativeffi.internal.memory.writeI32
 import org.maplibre.nativeffi.internal.memory.writeSize
 import org.maplibre.nativeffi.internal.memory.writeU32
 import org.maplibre.nativeffi.internal.memory.writeU64
+import org.maplibre.nativeffi.readLatLng
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * A completion submitted through the completion bridge, which the test delivers and releases by

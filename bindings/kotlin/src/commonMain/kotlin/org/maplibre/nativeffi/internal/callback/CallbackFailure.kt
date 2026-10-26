@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.internal.callback
 
-import org.maplibre.nativeffi.error.CallbackException
+import org.maplibre.nativeffi.CallbackException
 
 /**
  * Hands [failure] to the platform's handler for an exception that no caller can receive: the

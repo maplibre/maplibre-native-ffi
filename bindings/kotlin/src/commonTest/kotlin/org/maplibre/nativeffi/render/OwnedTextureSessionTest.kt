@@ -7,15 +7,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.GpuSync
+import org.maplibre.nativeffi.GpuSyncKind
+import org.maplibre.nativeffi.RenderResult
+import org.maplibre.nativeffi.RenderSessionState
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.GpuSync
-import org.maplibre.nativeffi.generated.GpuSyncKind
-import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.use as useAndAwaitRelease
+import org.maplibre.nativeffi.use as useAndAwaitRelease
 
 /**
  * The render session shapes over an owned texture on the build's backend, which the caller drives
@@ -55,7 +55,7 @@ class OwnedTextureSessionTest {
 
       val frame = assertNotNull(session.acquireFrame())
       assertEquals(32u to 16u, TestGraphics.frameTextureSize(frame))
-      frame.release()
+      frame.release(null)
     }
   }
 
@@ -85,7 +85,7 @@ class OwnedTextureSessionTest {
         kind = sync.kind
         val handle = sync.handle
         // The view borrows the frame, so neither the frame nor its session can go away under it.
-        assertFailsWithStatus(Status.BUSY) { frame.release() }
+        assertFailsWithStatus(Status.BUSY) { frame.release(null) }
         assertFailsWithStatus(Status.BUSY) { session.abandon() }
         // Discarding another frame leaves this view readable until its block ends.
         assertFalse(sibling.isClosed)
@@ -97,7 +97,7 @@ class OwnedTextureSessionTest {
       // Only the sync object that the frame lends expires with the block.
       assertEquals(kind, escaped!!.kind)
       assertFailsWith<IllegalStateException> { escaped.handle }
-      frame.release()
+      frame.release(null)
       assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
     }
   }

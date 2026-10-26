@@ -3,10 +3,10 @@ package org.maplibre.nativeffi.runtime
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlinx.cinterop.*
-import org.maplibre.nativeffi.generated.readEventBatchView
 import org.maplibre.nativeffi.internal.cinterop.mln_event_batch_view
 import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event
 import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event_payload
+import org.maplibre.nativeffi.readEventBatchView
 import platform.posix.memset
 
 /**

@@ -105,21 +105,14 @@ def placement(plan) -> list[str] | None:
     return None if platforms is None else source_sets(platforms)
 
 
-# The C functions that the handwritten `Maplibre` objects own, on the targets
-# that can call them, so the generated API leaves them out. Their native
-# declarations stay, because those objects call them. Each maps to the member
-# that a host calls.
-HANDWRITTEN = {
-    "mln_android_init": "Maplibre.initialize",
-    "mln_plugin_get_register_function_v1": "Maplibre.getPluginRegisterFunctionV1",
-}
-# The object that declares the common receiverless operations.
-API_OBJECT = "GeneratedApi"
+# The C functions that handwritten functions own, on the targets that can call
+# them, so the generated API leaves them out. Their native declarations stay,
+# because those functions call them. Each maps to the function a host calls.
+HANDWRITTEN = {"mln_android_init": "initAndroid"}
 # The factories of the native registrations, which only the threaded targets
 # can pass (see kotlin_callbacks).
 NATIVE_REGISTRATIONS = (
-    "src/threadedMain/kotlin/org/maplibre/nativeffi/generated/"
-    "GeneratedNativeRegistrations.kt"
+    "src/threadedMain/kotlin/org/maplibre/nativeffi/GeneratedNativeRegistrations.kt"
 )
 JNI = "src/androidMain/jni/mln_jni_generated.c"
 WASM_GLUE = "wasm/mln_kw_generated.c"
@@ -135,8 +128,6 @@ import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
-import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.runtime.CommandCompletion
 """
 
 # What a call that waits for a thread to start does on each target, which the C
@@ -212,7 +203,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         elif plan.factory:
             owner = owner_name(bound.handles[plan.factory])
         else:
-            owner = API_OBJECT
+            return public_method(plan)
         return f"{owner}.{public_method(plan)}"
 
     def constant(value, member: str) -> str | None:
@@ -370,6 +361,14 @@ def delivery_functions(bound):
     }
 
 
+def top_level(source: str) -> str:
+    """A member method's source as a top-level function of the package, which
+    is how the binding declares a process global."""
+    if not source.startswith("  public "):
+        raise ValueError(f"not a member method: {source[:40]}")
+    return source[2:]
+
+
 def companion(bound, plan) -> str:
     """The companion object that declares a factory: its handle's owner's."""
     return owner_name(bound.handles[plan.factory]) + ".Companion"
@@ -397,9 +396,12 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     for owner in generated_owners(bound):
         groups.setdefault(owner, [])
     outputs = {}
+    # The members that each handle's owner declares, and the declarations that
+    # follow it.
+    members: dict[str, tuple[list[str], str]] = {}
     for receiver, plans in groups.items():
         family = value_name(receiver) if receiver else None
-        class_name = f"Generated{family}Operations" if receiver else API_OBJECT
+        class_name = owner_name(bound.handles[receiver]) if receiver else None
         for plan in plans:
             if (sets := placement(plan)) is None:
                 continue
@@ -407,7 +409,11 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             extended = companion(bound, plan) if plan.factory else class_name
             extensions = [
                 operation_doc(bound, plan)
-                + platform_extension(rendered[plan.name], extended, method)
+                + (
+                    platform_extension(rendered[plan.name], extended, method)
+                    if extended
+                    else top_level(rendered[plan.name])
+                )
             ]
             if plan.receiver and plan.completion and plan.completion.discardable:
                 extensions.append(
@@ -421,75 +427,68 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 platform_extensions.setdefault(name, []).extend(extensions)
         gated = [plan for plan in plans if placement(plan)]
         common = [plan for plan in plans if not placement(plan)]
-        bodies = [
+        if not receiver:
+            outputs[f"{COMMON}/GeneratedGlobals.kt"] = (
+                "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+                "package org.maplibre.nativeffi\n\n"
+                + OPERATION_IMPORTS
+                + "\n"
+                + "\n".join(
+                    operation_doc(bound, plan) + top_level(rendered[plan.name])
+                    for plan in common
+                )
+            )
+            continue
+        body = [
             operation_doc(bound, plan, "  ") + rendered[plan.name] for plan in common
         ]
-        header = (
-            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"
+        if callback_owner(bound, receiver):
+            body.insert(
+                0, "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"
+            )
+        trailer = ""
+        commands = [p for p in common if p.completion and p.completion.discardable]
+        split_commands = any(
+            p.name in discards
+            for p in bound.operations
+            if p.receiver and receiver_value(p).native == receiver
+            for discards in values.split_discards.values()
         )
-        if receiver:
-            members = [
-                f"  internal abstract val binding: {kotlin_owners.state_type(receiver, plans)}\n"
-            ]
-            if callback_owner(bound, receiver):
-                members.append(
-                    "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"
+        gated_commands = any(p.completion and p.completion.discardable for p in gated)
+        if commands or split_commands or gated_commands:
+            view = f"{family}Discarding"
+            body.append(
+                "  /**\n"
+                "   * This handle's commands without their completions. A discarding call returns once native\n"
+                "   * accepts the command, and native logs a command that fails as a warning.\n"
+                "   */\n"
+                f"  public val discarding: {view} get() = {view}(this)\n"
+            )
+            trailer = (
+                f"\n/** The commands of a [{class_name}] that drop their completions. */\n"
+                f"@JvmInline\npublic value class {view} internal constructor(internal val owner: {class_name}) {{\n"
+                f"  internal val binding get() = owner.binding\n"
+                + (
+                    "  internal val bindingCallbacks get() = owner.bindingCallbacks\n"
+                    if any(p.registrations for p in commands) or split_commands
+                    else ""
                 )
-            source = (
-                header
-                + f"public abstract class {class_name} internal constructor() {{\n"
-                + "".join(members)
-                + "\n".join(bodies)
+                + "\n".join(
+                    f"  /** [{class_name}.{method_name(p)}] without its completion. */\n"
+                    + operation(p, values, native, discard=True)
+                    for p in commands
+                )
                 + "}\n"
             )
-            commands = [p for p in common if p.completion and p.completion.discardable]
-            split_commands = any(
-                p.name in discards
-                for p in bound.operations
-                if p.receiver and receiver_value(p).native == receiver
-                for discards in values.split_discards.values()
-            )
-            gated_commands = any(
-                p.completion and p.completion.discardable for p in gated
-            )
-            if commands or split_commands or gated_commands:
-                view = f"{family}Discarding"
-                owner = owner_name(bound.handles[receiver])
-                source = source.removesuffix("}\n") + (
-                    "  /**\n"
-                    "   * This handle's commands without their completions. A discarding call returns once native\n"
-                    "   * accepts the command, and native logs a command that fails as a warning.\n"
-                    "   */\n"
-                    f"  public val discarding: {view} get() = {view}(this)\n}}\n\n"
-                    f"/** The commands of a [{owner}] that drop their completions. */\n"
-                    f"@JvmInline\npublic value class {view} internal constructor(internal val owner: {class_name}) {{\n"
-                    f"  internal val binding get() = owner.binding\n"
-                    + (
-                        "  internal val bindingCallbacks get() = owner.bindingCallbacks\n"
-                        if any(p.registrations for p in commands) or split_commands
-                        else ""
-                    )
-                    + "\n".join(
-                        f"  /** [{owner}.{method_name(p)}] without its completion. */\n"
-                        + operation(p, values, native, discard=True)
-                        for p in commands
-                    )
-                    + "}\n"
-                )
-        else:
-            source = (
-                header + f"public object {API_OBJECT} {{\n" + "\n".join(bodies) + "}\n"
-            )
-        outputs[f"{COMMON}/generated/{class_name}.kt"] = source
+        members[receiver] = (body, trailer)
     for name, extensions in sorted(platform_extensions.items()):
         stem = name.removesuffix("Main")
         outputs[
-            f"src/{name}/kotlin/org/maplibre/nativeffi/generated/"
+            f"src/{name}/kotlin/org/maplibre/nativeffi/"
             f"Generated{stem[0].upper()}{stem[1:]}Operations.kt"
         ] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "package org.maplibre.nativeffi.generated\n\n"
+            "package org.maplibre.nativeffi\n\n"
             + OPERATION_IMPORTS
             + "\n"
             + "\n".join(extensions)
@@ -503,18 +502,20 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 continue
             plan = bound.operations_by_name[function.name]
             if plan.receiver:
-                receiver = (
-                    f"Generated{value_name(receiver_value(plan).native)}Operations"
-                )
+                receiver = owner_name(bound.handles[receiver_value(plan).native])
             elif plan.scoped_receiver:
                 receiver = kotlin_callbacks.scoped_response(plan)
             elif plan.factory:
                 receiver = companion(bound, plan)
             else:
-                receiver = API_OBJECT
+                receiver = None
             extensions.append(
                 operation_doc(bound, plan)
-                + extension(split[lowering][function.name], receiver)
+                + (
+                    extension(split[lowering][function.name], receiver)
+                    if receiver
+                    else top_level(split[lowering][function.name])
+                )
             )
             if function.name in values.split_discards[lowering]:
                 family = value_name(receiver_value(plan).native)
@@ -528,9 +529,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 )
         declarations = kotlin_callbacks.split_declarations(values, lowering)
         codecs = values.split_codecs(lowering)
-        outputs[f"{directory}/generated/{file}.kt"] = (
+        outputs[f"{directory}/{file}.kt"] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "package org.maplibre.nativeffi.generated\n\n"
+            "package org.maplibre.nativeffi\n\n"
             + OPERATION_IMPORTS
             + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
             + "\n\n".join([*declarations, *codecs])
@@ -546,23 +547,23 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             bound,
             [bound.operations_by_name[f.name] for f in functions],
             factories,
+            members,
             OPERATION_IMPORTS,
         )
     )
-    outputs[f"{COMMON}/generated/GeneratedOwnerDisposal.kt"] = (
+    outputs[f"{COMMON}/GeneratedOwnerDisposal.kt"] = (
         "// Generated from handle disposal relationships by tools/bindgen. Do not edit.\n"
-        "package org.maplibre.nativeffi.generated\n\n"
+        "package org.maplibre.nativeffi\n\n"
         "import org.maplibre.nativeffi.internal.c.C\n"
         "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n\n"
         + owner_disposal(bound, native)
     )
-    outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = values.codecs()
-    outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
+    outputs[f"{COMMON}/GeneratedCodecs.kt"] = values.codecs()
+    outputs[f"{COMMON}/GeneratedValues.kt"] = values.common()
     outputs[NATIVE_REGISTRATIONS] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        "package org.maplibre.nativeffi.generated\n\n"
-        "import org.maplibre.nativeffi.internal.callback.NativeRegistration\n"
-        "import org.maplibre.nativeffi.render.NativePointer\n\n"
+        "package org.maplibre.nativeffi\n\n"
+        "import org.maplibre.nativeffi.internal.callback.NativeRegistration\n\n"
         + "\n\n".join(kotlin_callbacks.native_factories(values))
         + "\n"
     )

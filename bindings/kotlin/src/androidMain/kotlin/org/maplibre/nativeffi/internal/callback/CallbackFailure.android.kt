@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.internal.callback
 
 import android.util.Log
-import org.maplibre.nativeffi.error.CallbackException
+import org.maplibre.nativeffi.CallbackException
 
 internal actual fun platformReportUncaught(failure: Throwable) {
   // Android's default uncaught exception handler ends the process, which would undo the

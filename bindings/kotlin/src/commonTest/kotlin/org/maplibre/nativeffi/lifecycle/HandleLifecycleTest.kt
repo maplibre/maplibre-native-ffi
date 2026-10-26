@@ -9,21 +9,21 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.use as useAndClose
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.GeoJsonSourceDataHandle
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeFixture
+import org.maplibre.nativeffi.RuntimeHandle
+import org.maplibre.nativeffi.RuntimeOptions
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.GeoJsonSourceDataHandle
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
+import org.maplibre.nativeffi.use
 
 /** How the generated owners close and keep their parents. */
 class HandleLifecycleTest {

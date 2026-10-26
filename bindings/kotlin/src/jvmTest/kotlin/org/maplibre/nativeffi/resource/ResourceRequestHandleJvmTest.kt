@@ -3,12 +3,12 @@ package org.maplibre.nativeffi.resource
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.ResourceRequestCancelHandler
+import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
-import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 

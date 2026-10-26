@@ -2,9 +2,9 @@ package org.maplibre.nativeffi.browser
 
 import kotlin.test.Test
 import kotlin.test.fail
+import org.maplibre.nativeffi.RuntimeHandle
+import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.runSuspendTest
 
 /**

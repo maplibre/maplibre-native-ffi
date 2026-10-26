@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.internal.status
 
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 
 /**
  * Returns normally for OK and throws the [MaplibreException] for any other [status], reading the

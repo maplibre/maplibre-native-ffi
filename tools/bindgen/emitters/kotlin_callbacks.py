@@ -809,15 +809,14 @@ def callback_result(value, expression, values):
 # JvmStatic is an optional expectation, which only shared source sets can name.
 JVM_STATIC = "import kotlin.jvm.JvmStatic\n"
 UPCALL_IMPORTS = (
-    "import org.maplibre.nativeffi.generated.*\n"
+    "import org.maplibre.nativeffi.*\n"
     "import org.maplibre.nativeffi.internal.async.CompletionBridge\n"
     "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
     "import org.maplibre.nativeffi.internal.callback.contain\n"
     "import org.maplibre.nativeffi.internal.callback.statusUpcall\n"
     "import org.maplibre.nativeffi.internal.callback.upcall\n"
     "import org.maplibre.nativeffi.internal.callback.withCallbackScope\n"
-    "import org.maplibre.nativeffi.internal.memory.*\n"
-    "import org.maplibre.nativeffi.render.NativePointer\n\n"
+    "import org.maplibre.nativeffi.internal.memory.*\n\n"
 )
 
 

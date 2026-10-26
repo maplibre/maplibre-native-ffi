@@ -11,8 +11,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.EXPECTED_C_ABI_VERSION
+import org.maplibre.nativeffi.cVersion
+import org.maplibre.nativeffi.loadNativeLibrary
 import org.maplibre.nativeffi.runChildJvm
 
 /** How the JVM binding finds the native library. */
@@ -20,9 +21,9 @@ import org.maplibre.nativeffi.runChildJvm
 class NativeLibraryTest {
   @Test
   fun theLibraryLoadsFromJavaLibraryPath() {
-    Maplibre.loadNativeLibrary()
+    loadNativeLibrary()
     assertEquals("java.library.path", NativeLibrary.loadedSource().get())
-    assertEquals(Maplibre.EXPECTED_C_ABI_VERSION.toUInt(), GeneratedApi.cVersion())
+    assertEquals(EXPECTED_C_ABI_VERSION.toUInt(), cVersion())
   }
 
   @Test

@@ -6,22 +6,22 @@ import kotlin.system.exitProcess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.LogEvent
+import org.maplibre.nativeffi.LogHandler
+import org.maplibre.nativeffi.LogSeverity
+import org.maplibre.nativeffi.LogSeverityFlag
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.RuntimeHandle
+import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.LogEvent
-import org.maplibre.nativeffi.generated.LogHandler
-import org.maplibre.nativeffi.generated.LogSeverity
-import org.maplibre.nativeffi.generated.LogSeverityFlag
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.setLogCallback
 import org.maplibre.nativeffi.libraryProperties
+import org.maplibre.nativeffi.loadNativeLibrary
 import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.use
+import org.maplibre.nativeffi.setLogAsyncSeverityMask
+import org.maplibre.nativeffi.setLogCallback
 import org.maplibre.nativeffi.smallMapOptions
+import org.maplibre.nativeffi.use
 
 /**
  * A JVM that has received native log records exits with the callback installed, both after closing
@@ -49,9 +49,9 @@ object LogProcessExitProbe {
     val callbackState = args.single()
     require(callbackState in setOf("installed", "live"))
     val received = CountDownLatch(1)
-    Maplibre.loadNativeLibrary()
-    GeneratedApi.setLogAsyncSeverityMask(LogSeverityFlag.WARNING)
-    GeneratedApi.setLogCallback(
+    loadNativeLibrary()
+    setLogAsyncSeverityMask(LogSeverityFlag.WARNING)
+    setLogCallback(
       LogHandler { severity, event, _, _ ->
         if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {
           received.countDown()

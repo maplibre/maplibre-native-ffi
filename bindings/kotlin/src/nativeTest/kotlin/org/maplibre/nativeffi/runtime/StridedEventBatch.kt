@@ -2,8 +2,8 @@ package org.maplibre.nativeffi.runtime
 
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import org.maplibre.nativeffi.generated.RuntimeEvent
-import org.maplibre.nativeffi.generated.RuntimeEventPayload
+import org.maplibre.nativeffi.RuntimeEvent
+import org.maplibre.nativeffi.RuntimeEventPayload
 
 /**
  * The number of events in the batch that [RuntimeEventNativeTest] builds by hand. The events lie a

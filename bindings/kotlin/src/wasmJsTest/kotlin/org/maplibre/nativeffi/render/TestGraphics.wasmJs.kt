@@ -2,13 +2,13 @@ package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import org.maplibre.nativeffi.generated.AcquiredFrameHandle
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.attachWebGpuOwnedTexture
-import org.maplibre.nativeffi.generated.withWebGpuTexture
+import org.maplibre.nativeffi.AcquiredFrameHandle
+import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.attachWebGpuOwnedTexture
+import org.maplibre.nativeffi.withWebGpuTexture
 
 // The page is the only thread that runs Kotlin, so it drives graphics too.
 internal actual val testGraphicsThread: CoroutineDispatcher = Dispatchers.Default

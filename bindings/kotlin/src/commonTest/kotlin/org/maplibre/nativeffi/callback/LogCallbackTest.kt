@@ -3,10 +3,10 @@ package org.maplibre.nativeffi.callback
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.LogEvent
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.clearLogCallback
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setTestLogCallback
@@ -39,7 +39,7 @@ class LogCallbackTest {
         )
       }
     } finally {
-      GeneratedApi.clearLogCallback()
+      clearLogCallback()
     }
     awaitDeliveries()
     assertEquals(base, roots.rootCountForTesting())

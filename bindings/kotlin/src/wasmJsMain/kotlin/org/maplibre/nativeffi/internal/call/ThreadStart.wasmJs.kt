@@ -5,7 +5,7 @@ package org.maplibre.nativeffi.internal.call
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.internal.status.checkStatus
 

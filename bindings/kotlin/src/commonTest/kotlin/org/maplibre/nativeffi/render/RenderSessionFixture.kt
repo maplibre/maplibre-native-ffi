@@ -9,22 +9,22 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.maplibre.nativeffi.FrameDemand
+import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.MapFixture
+import org.maplibre.nativeffi.MapMode
+import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.RenderDriverKind
+import org.maplibre.nativeffi.RenderFrameResult
+import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.RenderSessionCapabilityFlag
+import org.maplibre.nativeffi.RenderSessionHandle
+import org.maplibre.nativeffi.RenderSessionState
+import org.maplibre.nativeffi.ResourceProvider
+import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.WAIT_TIMEOUT
+import org.maplibre.nativeffi.Wake
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.FrameDemand
-import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.NewRenderSession
-import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderFrameResult
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
-import org.maplibre.nativeffi.generated.RenderSessionHandle
-import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
@@ -112,7 +112,7 @@ internal class RenderSessionFixture(
   private fun releaseFrames() {
     while (true) {
       val frame = session.acquireFrame() ?: return
-      frame.release()
+      frame.release(null)
     }
   }
 

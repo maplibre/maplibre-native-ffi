@@ -5,10 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.maplibre.nativeffi.generated.CameraTransitionEnd
-import org.maplibre.nativeffi.generated.CameraTransitionHandler
-import org.maplibre.nativeffi.generated.CameraTransitionOutcome
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.CameraTransitionEnd
+import org.maplibre.nativeffi.CameraTransitionHandler
+import org.maplibre.nativeffi.CameraTransitionOutcome
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.async.callCompletion
 import org.maplibre.nativeffi.internal.async.callCompletionRelease
 import org.maplibre.nativeffi.internal.c.CompletionLayout

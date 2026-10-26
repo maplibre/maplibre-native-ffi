@@ -4,21 +4,21 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.error.AbiVersionMismatchException
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.AbiVersionMismatchException
+import org.maplibre.nativeffi.EXPECTED_C_ABI_VERSION
+import org.maplibre.nativeffi.Status
 
 class AbiVersionTest {
   @Test
   fun abiVersionMismatchReportsActualAndExpectedVersions() {
     val error =
       assertFailsWith<AbiVersionMismatchException> {
-        checkAbiVersion(Maplibre.EXPECTED_C_ABI_VERSION + 1)
+        checkAbiVersion(EXPECTED_C_ABI_VERSION + 1)
       }
 
-    assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1, error.actualVersion)
-    assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
+    assertEquals(EXPECTED_C_ABI_VERSION + 1, error.actualVersion)
+    assertEquals(EXPECTED_C_ABI_VERSION, error.expectedVersion)
     assertEquals(Status.UNSUPPORTED, error.status)
-    assertTrue(error.diagnostic.contains("expected ${Maplibre.EXPECTED_C_ABI_VERSION}"))
+    assertTrue(error.diagnostic.contains("expected ${EXPECTED_C_ABI_VERSION}"))
   }
 }

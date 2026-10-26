@@ -18,7 +18,7 @@ from support import (
 from tools.bindgen.emitters import kotlin, kotlin_callbacks
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
-GENERATED = "src/commonMain/kotlin/org/maplibre/nativeffi/generated"
+GENERATED = "src/commonMain/kotlin/org/maplibre/nativeffi"
 
 # A handle whose dispose is also its release and takes an optional completion,
 # as the render session's does.
@@ -201,11 +201,11 @@ class KotlinLayoutTests(unittest.TestCase):
     def test_a_frame_has_no_scoped_cleanup(self):
         owners = kotlin.generate(real_api())
         # A frame's release needs the host's consumer sync and its discard
-        # quarantines a slot, so a frame has no `use`.
-        self.assertNotIn(
-            "AutoCloseable",
-            owners[f"{GENERATED}/AcquiredFrameHandle.kt"],
-        )
+        # quarantines a slot, so a frame has no `use`, and its release states
+        # the consumer's completion.
+        frame = owners[f"{GENERATED}/AcquiredFrameHandle.kt"]
+        self.assertNotIn("AutoCloseable", frame)
+        self.assertIn("public fun release(consumerCompletion: GpuSync?): Unit =", frame)
 
     def test_every_owner_has_the_same_handle_members(self):
         owners = kotlin.generate(real_api())
@@ -233,42 +233,38 @@ class KotlinLayoutTests(unittest.TestCase):
         # `use` awaits the release.
         for handle in ("Runtime", "Map"):
             owner = owners[f"{GENERATED}/{handle}Handle.kt"]
-            self.assertIn(
-                "org.maplibre.nativeffi.runtime.AsyncReleasable, AutoCloseable {",
-                owner,
-            )
+            self.assertIn(") : AsyncReleasable, AutoCloseable {", owner)
             self.assertIn("public override fun close() { dispose() }", owner)
+        # A release that completes at once is the handle's only `close()`.
+        projection = owners[f"{GENERATED}/MapProjectionHandle.kt"]
         self.assertIn(
-            "public override fun close() { release() }",
-            owners[f"{GENERATED}/MapProjectionHandle.kt"],
+            "public override fun close(): Unit = nativeClose(this, binding) "
+            "{ C.mln_map_projection_release(handle) }",
+            projection,
         )
+        self.assertNotIn("fun release(", projection)
 
     def test_a_dispose_with_a_completion_is_the_release_and_the_dispose(self):
         outputs = kotlin.generate(parse(DISPOSE_WITH_COMPLETION))
-        operations = outputs[f"{GENERATED}/GeneratedLeaseOperations.kt"]
+        owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
         # The release reports retirement through the completion, and the
         # dispose, like every disposer, passes none.
         self.assertIn(
-            "public fun release(): Deferred<Unit> = nativeRetire(this, binding) "
+            "public override fun release(): Deferred<Unit> = nativeRetire(this, binding) "
             "{ check(C.mln_lease_dispose(handle, completion, diagnostic)) }",
-            operations,
+            owner,
         )
         self.assertIn(
             "public fun dispose(): Unit = nativeClose(this, binding) "
             "{ check(C.mln_lease_dispose(handle, 0L, diagnostic)) }",
-            operations,
+            owner,
         )
         self.assertIn(
             "C.mln_lease_dispose(handle, 0L, diagnostic)",
             outputs[f"{GENERATED}/GeneratedOwnerDisposal.kt"],
         )
         # The suspending `use` awaits the release, and `use` disposes.
-        owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
-        self.assertIn(
-            "GeneratedLeaseOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable, "
-            "AutoCloseable {",
-            owner,
-        )
+        self.assertIn(") : AsyncReleasable, AutoCloseable {", owner)
         self.assertIn("public override val isClosed: Boolean", owner)
         self.assertIn("public override fun close() { dispose() }", owner)
 
@@ -276,7 +272,7 @@ class KotlinLayoutTests(unittest.TestCase):
         outputs = kotlin.generate(
             parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         )
-        api = outputs[f"{GENERATED}/GeneratedApi.kt"]
+        api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]
         # The drain copies the slice, then releases the batch even if the copy
         # throws, and nothing queued reads as an empty list.
         self.assertIn("public fun drainReadings(): List<Reading> =", api)
@@ -320,7 +316,7 @@ class KotlinLayoutTests(unittest.TestCase):
         # The ABI version check reads the C version, so reading it skips it.
         self.assertIn(
             "fun cVersion(): UInt = nativeUncheckedCall {",
-            outputs[f"{GENERATED}/GeneratedApi.kt"],
+            outputs[f"{GENERATED}/GeneratedGlobals.kt"],
         )
 
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
@@ -333,9 +329,11 @@ class KotlinLayoutTests(unittest.TestCase):
             "public suspend fun create(options: RuntimeOptions): RuntimeHandle =",
             runtime.split("public companion object {")[1],
         )
-        api = outputs[f"{GENERATED}/GeneratedApi.kt"]
+        api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]
+        # Globals are top-level functions of the package.
+        self.assertNotIn("object ", api)
         self.assertNotIn("Create(", api)
-        self.assertIn("public fun clearLogCallback(): Unit =", api)
+        self.assertIn("\npublic fun clearLogCallback(): Unit =", api)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
@@ -414,7 +412,7 @@ class KotlinLayoutTests(unittest.TestCase):
             threaded,
         )
         callbacks = outputs[
-            "src/threadedMain/kotlin/org/maplibre/nativeffi/generated/GeneratedThreadedCallbacks.kt"
+            "src/threadedMain/kotlin/org/maplibre/nativeffi/GeneratedThreadedCallbacks.kt"
         ]
         self.assertIn("message: String): Boolean\n", callbacks)
         self.assertIn("outResponse: HttpHeaderTransformResponse)\n", callbacks)

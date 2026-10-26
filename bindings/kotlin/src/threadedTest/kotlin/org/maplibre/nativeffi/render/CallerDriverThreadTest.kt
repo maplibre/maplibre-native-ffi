@@ -1,8 +1,8 @@
 package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
 
 /** A caller-driven session that a second Kotlin thread tries to service. */

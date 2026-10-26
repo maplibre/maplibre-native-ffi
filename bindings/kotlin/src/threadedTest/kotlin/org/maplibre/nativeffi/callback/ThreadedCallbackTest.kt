@@ -5,19 +5,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.HttpHeaderTransform
+import org.maplibre.nativeffi.HttpHeaderTransformResponse
+import org.maplibre.nativeffi.LogEvent
+import org.maplibre.nativeffi.LogHandler
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.clearLogCallback
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.HttpHeaderTransform
-import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
-import org.maplibre.nativeffi.generated.LogEvent
-import org.maplibre.nativeffi.generated.LogHandler
-import org.maplibre.nativeffi.generated.setHeader
-import org.maplibre.nativeffi.generated.setHttpHeaderTransform
-import org.maplibre.nativeffi.generated.setLogCallback
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.setHeader
+import org.maplibre.nativeffi.setHttpHeaderTransform
+import org.maplibre.nativeffi.setLogCallback
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -31,7 +31,7 @@ class ThreadedCallbackTest {
     val base = roots.rootCountForTesting()
     val parsed = CompletableDeferred<LogEvent>()
     try {
-      GeneratedApi.setLogCallback(
+      setLogCallback(
         LogHandler { _, event, _, _ ->
           if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
           // Leave the record to MapLibre's own logger as well.
@@ -47,7 +47,7 @@ class ThreadedCallbackTest {
         assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
       }
     } finally {
-      GeneratedApi.clearLogCallback()
+      clearLogCallback()
     }
     assertEquals(base, roots.rootCountForTesting())
   }

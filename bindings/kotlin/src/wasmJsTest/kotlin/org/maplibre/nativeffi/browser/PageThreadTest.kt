@@ -10,12 +10,12 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.RuntimeEventType
+import org.maplibre.nativeffi.RuntimeHandle
+import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.TestSupport
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.requestCollection

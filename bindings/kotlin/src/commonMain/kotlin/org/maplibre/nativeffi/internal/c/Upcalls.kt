@@ -2,7 +2,7 @@
 package org.maplibre.nativeffi.internal.c
 
 import kotlin.jvm.JvmStatic
-import org.maplibre.nativeffi.generated.*
+import org.maplibre.nativeffi.*
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.callback.CallbackRoots
 import org.maplibre.nativeffi.internal.callback.contain

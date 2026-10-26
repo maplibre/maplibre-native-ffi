@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.internal.callback
 
-import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.MaplibreException
 
 /**
  * Runs [block] for an upcall of the C [callback] type, which native cannot receive an exception

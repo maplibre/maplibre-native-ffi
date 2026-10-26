@@ -10,25 +10,27 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.await
+import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptor
-import org.maplibre.nativeffi.generated.OpenGlContextDescriptorData
-import org.maplibre.nativeffi.generated.OpenGlContextOwnership
-import org.maplibre.nativeffi.generated.OpenGlOwnedTextureDescriptor
-import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.generated.WebGlContextDescriptor
-import org.maplibre.nativeffi.generated.WebGlContextKind
-import org.maplibre.nativeffi.generated.WebGpuBorrowedTexture
-import org.maplibre.nativeffi.generated.WebGpuBorrowedTextureDescriptor
-import org.maplibre.nativeffi.generated.WebGpuContextDescriptor
-import org.maplibre.nativeffi.generated.attachWebGpuBorrowedTexture
-import org.maplibre.nativeffi.generated.withWebGpuTexture
+import org.maplibre.nativeffi.MapMode
+import org.maplibre.nativeffi.NativePointer
+import org.maplibre.nativeffi.OpenGlContextDescriptor
+import org.maplibre.nativeffi.OpenGlContextDescriptorData
+import org.maplibre.nativeffi.OpenGlContextOwnership
+import org.maplibre.nativeffi.OpenGlOwnedTextureDescriptor
+import org.maplibre.nativeffi.RenderDriverKind
+import org.maplibre.nativeffi.RenderResult
+import org.maplibre.nativeffi.WebGlContextDescriptor
+import org.maplibre.nativeffi.WebGlContextKind
+import org.maplibre.nativeffi.WebGpuBorrowedTexture
+import org.maplibre.nativeffi.WebGpuBorrowedTextureDescriptor
+import org.maplibre.nativeffi.WebGpuContextDescriptor
+import org.maplibre.nativeffi.WebGraphics
+import org.maplibre.nativeffi.attachWebGpuBorrowedTexture
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
+import org.maplibre.nativeffi.withWebGpuTexture
 
 /**
  * Graphics objects that the page creates, imported through [WebGraphics], render a caller-driven
@@ -87,7 +89,7 @@ class WebGraphicsTest {
         readCenterPixel(pageDevice, named, WIDTH, HEIGHT)
       }
       assertEquals("255,0,0,255", center.await<JsString>().toString())
-      frame.release()
+      frame.release(null)
 
       complete(session.detach())
     }

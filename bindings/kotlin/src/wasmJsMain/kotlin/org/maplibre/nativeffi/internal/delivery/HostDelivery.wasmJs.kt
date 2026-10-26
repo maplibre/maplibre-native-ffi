@@ -2,7 +2,7 @@
 
 package org.maplibre.nativeffi.internal.delivery
 
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.Deliveries
 import org.maplibre.nativeffi.internal.c.DeliveryBatchViewLayout

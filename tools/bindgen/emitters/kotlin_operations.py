@@ -84,7 +84,16 @@ def receiver_value(plan):
 
 
 def method_name(plan):
-    """Name an operation's method after its language-neutral member."""
+    """Name an operation's method after its language-neutral member. A release
+    that takes nothing but its handle and completes at once is the owner's
+    `close()`, as in the other bindings."""
+    if (
+        plan.receiver
+        and receiver_value(plan).handle.release == plan.name
+        and not plan.completion
+        and len(plan.inputs) == 1
+    ):
+        return "close"
     return identifier(plan.member)
 
 
@@ -195,10 +204,11 @@ def outputs_signature(plan, values):
     return result_name
 
 
-def declaration(params):
-    """Kotlin parameter declarations, defaulting each nullable parameter to null."""
+def declaration(params, *, defaults=True):
+    """Kotlin parameter declarations, defaulting each nullable parameter to null
+    unless [defaults] is false."""
     return ", ".join(
-        f"{local}: {typ}" + (" = null" if typ.endswith("?") else "")
+        f"{local}: {typ}" + (" = null" if defaults and typ.endswith("?") else "")
         for local, typ in params
     )
 
@@ -586,7 +596,7 @@ def owned(plan, values, native):
         if not parent_param:
             raise Unsupported("owned result requires parent")
         parent = ", " + (
-            f"this@Generated{name(receiver_value(plan).native)}Operations as {values.public(parent_param.value)}"
+            f"this@{owner_name(receiver_value(plan).handle)}"
             if parent_param.name == plan.receiver
             else parameter_name(parent_param.name)
         )
@@ -678,7 +688,10 @@ def lifecycle(plan, values, native):
             f"val holder = {values.storage(slot)}.also {{ writeI64(it, handle) }}"
         )
         arguments[receiver_index] = "holder"
-    parameters = declaration(params)
+    # A release states its arguments, such as the frame consumer's GPU
+    # completion, which a default would claim.
+    releases = receiver_value(plan).handle.release == plan.name
+    parameters = declaration(params, defaults=not releases)
 
     def body(*completion):
         call = native.checked(plan.function, [*arguments, *completion])

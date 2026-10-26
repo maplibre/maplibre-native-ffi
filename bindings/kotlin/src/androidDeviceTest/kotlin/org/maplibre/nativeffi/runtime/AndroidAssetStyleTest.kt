@@ -4,13 +4,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NETWORK_URLS
+import org.maplibre.nativeffi.RuntimeEventSourceType
+import org.maplibre.nativeffi.RuntimeEventType
+import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.RuntimeEventSourceType
-import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.render.withOwnedTexture
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap

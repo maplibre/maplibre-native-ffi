@@ -4,10 +4,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.withTimeout
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.LogEvent
-import org.maplibre.nativeffi.generated.LogHandler
-import org.maplibre.nativeffi.generated.setLogCallback
 
 /** A native thread that starts running [block] at construction. */
 internal expect class TestThread(block: () -> Unit) {
@@ -29,7 +25,7 @@ internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): Te
 internal actual suspend fun awaitDeliveries() {}
 
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
-  GeneratedApi.setLogCallback(
+  setLogCallback(
     LogHandler { _, event, _, _ ->
       callback(event)
       true

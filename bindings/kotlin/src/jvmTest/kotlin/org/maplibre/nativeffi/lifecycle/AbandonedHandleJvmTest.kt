@@ -6,8 +6,8 @@ import kotlin.system.exitProcess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.libraryProperties
+import org.maplibre.nativeffi.loadNativeLibrary
 import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
 
@@ -37,7 +37,7 @@ object AbandonedMapProbe {
       println("[${thread.name}] ${error.message}")
       if (error.message?.startsWith("Leaked MapHandle ") == true) reported.countDown()
     }
-    Maplibre.loadNativeLibrary()
+    loadNativeLibrary()
     runSuspendTest { abandonAMapAndAwaitItsDisposal() }
     // The report follows the disposal that cancelled the request.
     check(reported.await(REPORT_WAIT_SECONDS, TimeUnit.SECONDS)) { "the map was never reported" }

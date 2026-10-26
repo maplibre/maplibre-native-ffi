@@ -7,34 +7,34 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.AnimationOptions
+import org.maplibre.nativeffi.CameraOptions
+import org.maplibre.nativeffi.CameraTransitionEnd
+import org.maplibre.nativeffi.CameraTransitionHandler
+import org.maplibre.nativeffi.CameraTransitionOutcome
+import org.maplibre.nativeffi.CameraUpdate
+import org.maplibre.nativeffi.CameraUpdateMode
+import org.maplibre.nativeffi.FeatureStateSelector
+import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.LatLng
+import org.maplibre.nativeffi.LogSeverityFlag
+import org.maplibre.nativeffi.MapMode
+import org.maplibre.nativeffi.MapProjectionHandle
+import org.maplibre.nativeffi.OfflineRegionDefinition
+import org.maplibre.nativeffi.PremultipliedRgba8Image
+import org.maplibre.nativeffi.Status
+import org.maplibre.nativeffi.StyleExpressionHandle
+import org.maplibre.nativeffi.StyleExpressionInputs
+import org.maplibre.nativeffi.StyleImageOptions
+import org.maplibre.nativeffi.UrlMatchFlag
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.generated.AnimationOptions
-import org.maplibre.nativeffi.generated.CameraOptions
-import org.maplibre.nativeffi.generated.CameraTransitionEnd
-import org.maplibre.nativeffi.generated.CameraTransitionHandler
-import org.maplibre.nativeffi.generated.CameraTransitionOutcome
-import org.maplibre.nativeffi.generated.CameraUpdate
-import org.maplibre.nativeffi.generated.CameraUpdateMode
-import org.maplibre.nativeffi.generated.FeatureStateSelector
-import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.LogSeverityFlag
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.MapProjectionHandle
-import org.maplibre.nativeffi.generated.OfflineRegionDefinition
-import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
-import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.StyleExpressionHandle
-import org.maplibre.nativeffi.generated.StyleExpressionInputs
-import org.maplibre.nativeffi.generated.StyleImageOptions
-import org.maplibre.nativeffi.generated.UrlMatchFlag
-import org.maplibre.nativeffi.generated.writeOfflineRegionDefinition
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readCString
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.setNetworkStatus
 import org.maplibre.nativeffi.withMap
+import org.maplibre.nativeffi.writeOfflineRegionDefinition
 
 /**
  * One representative of each generated value shape against the real library. The conversions are
@@ -172,7 +172,7 @@ class GeneratedShapesTest {
     withMap {
       // The binding passes an unknown enum value through unchanged, and native rejects it.
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-        GeneratedApi.setNetworkStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
+        setNetworkStatus(org.maplibre.nativeffi.NetworkStatus(900u))
       }
 
       // Cancelling the largest identity ends the ease that carries it, so the identity crossed

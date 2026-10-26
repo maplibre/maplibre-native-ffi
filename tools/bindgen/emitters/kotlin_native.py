@@ -842,7 +842,7 @@ class NativeShims:
             + "@file:OptIn(ExperimentalWasmJsInterop::class)\n\n"
             + f"package {PACKAGE}\n\n"
             + "import org.maplibre.nativeffi.internal.call.ThreadStart\n\n"
-            + "/** The C wrapper behind each C function, in the module that `Maplibre.loadModule` loads. */\n"
+            + "/** The C wrapper behind each C function, in the module that `loadWasmModule` loads. */\n"
             + "internal actual object C {\n"
             + "\n".join(functions)
             + "\n}\n\n"
@@ -852,8 +852,8 @@ class NativeShims:
         upcall_stubs = (
             HEADER
             + f"package {PACKAGE}\n\n"
-            + "import org.maplibre.nativeffi.error.MaplibreException\n"
-            + "import org.maplibre.nativeffi.generated.Status\n"
+            + "import org.maplibre.nativeffi.MaplibreException\n"
+            + "import org.maplibre.nativeffi.Status\n"
             + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
             + "/**\n"
             + " * The browser module serves a wake through its wake shim, which posts the wake to the page. Every\n"
@@ -951,7 +951,7 @@ class NativeShims:
         return (
             HEADER
             + f"package {PACKAGE}\n\n"
-            + "import org.maplibre.nativeffi.generated.*\n"
+            + "import org.maplibre.nativeffi.*\n"
             + "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
             + "import org.maplibre.nativeffi.internal.memory.*\n\n"
             + "/**\n"

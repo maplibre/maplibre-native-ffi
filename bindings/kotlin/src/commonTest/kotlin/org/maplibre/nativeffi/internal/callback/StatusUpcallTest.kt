@@ -5,9 +5,9 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.maplibre.nativeffi.error.CallbackException
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.CallbackException
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.interceptUncaught
 
 /** How the upcall of a status callback turns what its host callback does into a status. */

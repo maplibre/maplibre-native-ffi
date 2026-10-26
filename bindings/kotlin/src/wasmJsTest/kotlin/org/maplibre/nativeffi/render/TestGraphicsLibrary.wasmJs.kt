@@ -4,6 +4,10 @@ package org.maplibre.nativeffi.render
 
 import kotlin.js.Promise
 import kotlinx.coroutines.await
+import org.maplibre.nativeffi.ImportedWebGpuObject
+import org.maplibre.nativeffi.NativePointer
+import org.maplibre.nativeffi.RegisteredWebGlContext
+import org.maplibre.nativeffi.WebGraphics
 import org.maplibre.nativeffi.internal.c.unsignedWord
 import org.maplibre.nativeffi.internal.memory.NativeMemory
 

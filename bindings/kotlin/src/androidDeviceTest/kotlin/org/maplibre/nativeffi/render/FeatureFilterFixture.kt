@@ -1,14 +1,14 @@
 package org.maplibre.nativeffi.render
 
 import kotlin.test.assertEquals
-import org.maplibre.nativeffi.generated.CameraOptions
-import org.maplibre.nativeffi.generated.CameraUpdate
-import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.RenderedFeatureQueryOptions
-import org.maplibre.nativeffi.generated.RenderedQueryGeometry
-import org.maplibre.nativeffi.generated.ScreenBox
-import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.generated.SourceFeatureQueryOptions
+import org.maplibre.nativeffi.CameraOptions
+import org.maplibre.nativeffi.CameraUpdate
+import org.maplibre.nativeffi.LatLng
+import org.maplibre.nativeffi.RenderedFeatureQueryOptions
+import org.maplibre.nativeffi.RenderedQueryGeometry
+import org.maplibre.nativeffi.ScreenBox
+import org.maplibre.nativeffi.ScreenPoint
+import org.maplibre.nativeffi.SourceFeatureQueryOptions
 
 /**
  * Renders one point feature per entry of [properties], with ids `case-0`, `case-1`, and so on, and

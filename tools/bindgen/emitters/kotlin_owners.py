@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from .kotlin_operations import disposal_method, method_name, needs_read, receiver_value
 from .kotlin_values import doc, generated_owners, name, owner_name
 
-ASYNC_RELEASABLE = "org.maplibre.nativeffi.runtime.AsyncReleasable"
+ASYNC_RELEASABLE = "AsyncReleasable"
 # The handles that `mln_runtime_event_source_type` names as an event's source.
 EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
 
@@ -54,7 +54,7 @@ def releases(bound, native, plans):
         result = [Release(ASYNC_RELEASABLE, "release", method)]
         if handle.dispose:
             result.append(Release("AutoCloseable", "close", disposal_method(handle)))
-    elif all(defaulted(p) for p in extra):
+    elif not extra:
         result = [Release("AutoCloseable", "close", method)]
     else:
         return []
@@ -66,35 +66,33 @@ def releases(bound, native, plans):
     return result
 
 
-def defaulted(parameter):
-    return parameter.value.nullable
-
-
-def generate_owners(bound, plans, factories, imports):
-    """Every handle's owner. The owner of a handle with factories has a
-    companion object, which declares the common factories and which the
-    factories of only some source sets extend."""
+def generate_owners(bound, plans, factories, members, imports):
+    """Every handle's owner, which declares its handle's operations. The owner
+    of a handle with factories has a companion object, which declares the
+    common factories and which the factories of only some source sets extend."""
     return {
-        f"src/commonMain/kotlin/org/maplibre/nativeffi/generated/{owner_name(bound.handles[native])}.kt": owner(
-            bound,
-            native,
-            plans,
-            factories.get(native, []),
-            imports
-            if any(plan.factory == native for plan in plans)
-            else "import org.maplibre.nativeffi.internal.lifecycle.*\n",
+        f"src/commonMain/kotlin/org/maplibre/nativeffi/{owner_name(bound.handles[native])}.kt": owner(
+            bound, native, plans, factories.get(native, []), members[native], imports
         )
         for native in generated_owners(bound)
     }
 
 
-def owner(bound, native, plans, factories, imports):
+def owner(bound, native, plans, factories, members, imports):
     handle = bound.handles[native]
     family = name(native)
     owner_class = owner_name(handle)
     closes = releases(bound, native, plans)
-    supertypes = [f"Generated{family}Operations()"]
-    supertypes.extend(release.interface for release in closes)
+    supertypes = [release.interface for release in closes]
+    operations, trailer = members
+    for release in closes:
+        if release.inherited:
+            # The release operation itself implements the interface's member.
+            head = f"  public fun {release.member}("
+            index = next(i for i, body in enumerate(operations) if head in body)
+            operations[index] = operations[index].replace(
+                head, f"  public override fun {release.member}(", 1
+            )
     parameters = ["handle: Long"]
     if handle.parent:
         # The owner, not its state, keeps the parent reachable, so leak cleanup
@@ -104,7 +102,7 @@ def owner(bound, native, plans, factories, imports):
         )
     dispose = family[0].lower() + family[1:]
     body = [
-        f'  internal override val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
+        f'  internal val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
         '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)',
         "  /**\n"
         + (
@@ -129,8 +127,9 @@ def owner(bound, native, plans, factories, imports):
         body.append(
             f"  public override fun close() {{ {release.method}() }}"
             if release.member == "close"
-            else f"  public override fun release(): kotlinx.coroutines.Deferred<Unit> = {release.method}()"
+            else f"  public override fun release(): Deferred<Unit> = {release.method}()"
         )
+    body.extend(operations)
     body.append(
         f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"'
     )
@@ -145,13 +144,16 @@ def owner(bound, native, plans, factories, imports):
         )
     return (
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"
-        "package org.maplibre.nativeffi.generated\n\n"
+        "package org.maplibre.nativeffi\n\n"
         + imports
         + "\n"
         + doc(bound, native)
         + f"public class {owner_class} internal constructor(\n  "
         + ",\n  ".join(parameters)
-        + f",\n) : {', '.join(supertypes)} {{\n"
+        + ",\n)"
+        + (f" : {', '.join(supertypes)}" if supertypes else "")
+        + " {\n"
         + "\n".join(body)
         + "\n}\n"
+        + trailer
     )

@@ -3,8 +3,8 @@ package org.maplibre.nativeffi.internal.lifecycle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.generated.MetalTextureFrame
-import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.MetalTextureFrame
+import org.maplibre.nativeffi.NativePointer
 
 class ViewScopeTest {
   @Test
