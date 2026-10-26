@@ -351,16 +351,17 @@ class TextureSessionBackend {
     return MLN_STATUS_OK;
   }
 
-  // Keeps the graphics device that this backend's objects belong to. The base
-  // is destroyed after every member of the derived backend, so the device
-  // outlives the objects made on it, and a backend that detach or abandon
-  // keeps forever keeps its device too.
-  void retain_device(std::shared_ptr<const void> device) noexcept {
-    device_ = std::move(device);
+  // Keeps something that this backend's objects belong to, such as the
+  // graphics device they were made on. The base is destroyed after every
+  // member of the derived backend, so what it keeps outlives the objects made
+  // on it, and a backend that detach or abandon keeps forever keeps it too.
+  // What it keeps is destroyed in no particular order.
+  void retain(std::shared_ptr<const void> object) {
+    retained_.push_back(std::move(object));
   }
 
  private:
-  std::shared_ptr<const void> device_;
+  std::vector<std::shared_ptr<const void>> retained_;
 };
 
 // The scheduler mbgl sees as current while a render session renders. Work

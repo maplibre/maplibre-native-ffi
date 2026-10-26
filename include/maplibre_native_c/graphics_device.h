@@ -43,7 +43,8 @@ typedef struct mln_graphics_device_options {
    * vkEnumeratePhysicalDevices(), and its default prefers a discrete GPU, then
    * an integrated one, then any other. EGL lists devices with
    * eglQueryDevicesEXT() on Linux and FreeBSD, and its default display takes
-   * the platform's own choice.
+   * the platform's own choice. WGL has one adapter, the driver of the primary
+   * display.
    */
   uint32_t adapter_index
     MLN_BINDING("mask=fields;bit=MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX");
@@ -64,9 +65,9 @@ typedef struct mln_graphics_device_texture_descriptor {
  *
  * The device lets a host render to a texture and read its pixels without
  * creating graphics objects of its own: a Metal device, a Vulkan instance,
- * device, and graphics queue, or an EGL display and config. Any number of
- * texture sessions can share one device. A Vulkan device synchronizes its
- * queue among those sessions.
+ * device, and graphics queue, an EGL display and config, or a hidden window
+ * for WGL. Any number of texture sessions can share one device. A Vulkan
+ * device synchronizes its queue among those sessions.
  *
  * The device is not tied to a thread, so any thread may use or release it.
  *
@@ -75,7 +76,7 @@ typedef struct mln_graphics_device_texture_descriptor {
  * - MLN_STATUS_INVALID_ARGUMENT when options is undersized or carries unknown
  *   fields, or out_device is null or *out_device is not MLN_HANDLE_NULL.
  * - MLN_STATUS_UNSUPPORTED when this build's backend cannot create a device:
- *   WebGPU, and OpenGL on WGL or WebGL.
+ *   WebGPU, and OpenGL on WebGL.
  * - MLN_STATUS_NATIVE_ERROR when the graphics API is unavailable, has no
  *   adapter at adapter_index, or fails to create the device.
  */

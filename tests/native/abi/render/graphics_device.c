@@ -1,12 +1,14 @@
 // Graphics devices that native code creates, and the readback-only texture
-// targets that render on them. Metal, Vulkan, and EGL builds create a device;
-// every other build reports that it cannot, after it validates the call.
+// targets that render on them. Metal, Vulkan, EGL, and WGL builds create a
+// device; browser builds report that they cannot, after they validate the
+// call.
 
 #include "support/frames.h"
 #include "support/test_support.h"
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL) || \
-  defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL)
+#if defined(MLN_FFI_TEST_BACKEND_METAL) ||                                    \
+  defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL) || \
+  defined(MLN_FFI_TEST_OPENGL_WGL)
 #define DEVICE_SUPPORTED 1
 #endif
 

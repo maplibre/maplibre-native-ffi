@@ -20,9 +20,9 @@ Create a static map at the image size.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
-Create a graphics device for the build's render backend. Metal, Vulkan, and EGL
-builds can create one. Other builds attach an owned texture target on a context
-that the host creates.
+Create a graphics device for the build's render backend. Every native build
+can create one. A browser build attaches an owned texture target on a context
+that the host creates in JavaScript.
 
 <Code code={region(stillImage, "device")} lang="c" title="still-image.c" />
 

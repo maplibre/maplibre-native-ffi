@@ -70,10 +70,12 @@ auto validate_graphics_device_texture_descriptor(
 
 }  // namespace
 
-#if !defined(MLN_RENDER_BACKEND_METAL) && \
-  !defined(MLN_RENDER_BACKEND_VULKAN) && !defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-// WebGPU, WGL, and WebGL hosts create their own device or context, so these
-// builds carry no way to make one.
+#if !defined(MLN_RENDER_BACKEND_METAL) &&  \
+  !defined(MLN_RENDER_BACKEND_VULKAN) &&   \
+  !defined(MLN_FFI_OPENGL_PROVIDER_EGL) && \
+  !defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+// A browser host creates its WebGPU device or WebGL context in JavaScript, so
+// these builds carry no way to make one.
 auto create_backend_graphics_device(
   const mln_graphics_device_options& options,
   std::shared_ptr<GraphicsDevice>& out_device
@@ -164,7 +166,7 @@ auto graphics_device_texture_attach_start(
         mln::Size{target.physical_width, target.physical_height}, backend
       );
       if (backend != nullptr) {
-        backend->retain_device(device);
+        backend->retain(device);
         target.texture.backend = std::move(backend);
       }
       return status;

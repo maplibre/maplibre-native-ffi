@@ -196,6 +196,9 @@ function(mln_ffi_configure_renderer target)
       list(APPEND MLN_FFI_OPENGL_SOURCES
            ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)
     endif()
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
+    list(APPEND MLN_FFI_OPENGL_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_graphics_device.cpp)
   endif()
   set_source_files_properties(
     ${MLN_FFI_OPENGL_SOURCES}
