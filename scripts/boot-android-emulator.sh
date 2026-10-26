@@ -192,6 +192,10 @@ else
   case "$(uname -s)" in
     Darwin | CYGWIN* | MINGW* | MSYS*) launcher+=(-accel on) ;;
     Linux)
+      # The emulator's renderer makes JIT code executable in memory that its
+      # bundled tcmalloc takes with sbrk, which SELinux refuses as execheap on
+      # Fedora. Memory that tcmalloc maps instead needs only execmem.
+      export TCMALLOC_SKIP_SBRK=true
       if [[ -r /dev/kvm && -w /dev/kvm ]]; then
         launcher+=(-accel on)
       else
