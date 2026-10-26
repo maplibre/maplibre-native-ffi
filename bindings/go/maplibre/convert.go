@@ -33,6 +33,19 @@ func bindingArray[In, Out any](items []In, arena *bindingArena, convert func(In,
 	return pointer
 }
 
+// cgo presents a C union as a byte array without the union's alignment, so
+// a variant moves in and out of it by copy rather than through a typed
+// pointer, which checkptr rejects when the storage is misaligned.
+
+func bindingUnionStore[T any](storage []byte, value T) {
+	copy(storage, unsafe.Slice((*byte)(unsafe.Pointer(&value)), unsafe.Sizeof(value)))
+}
+
+func bindingUnionLoad[T any](storage []byte) (value T) {
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(&value)), unsafe.Sizeof(value)), storage)
+	return value
+}
+
 func bindingNumber[In, Out ~int8 | ~int16 | ~int32 | ~int64 | ~int | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uint | ~uintptr | ~float32 | ~float64](value In, _ *bindingArena) Out {
 	return Out(value)
 }

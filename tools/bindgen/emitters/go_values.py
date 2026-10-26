@@ -182,9 +182,11 @@ class Values:
         its tag into `tag`."""
         arms = []
         for variant in union.fields:
-            write = f"*(*C.{variant.value.native})(unsafe.Pointer(&{dest}))"
+            converter = self.converter(variant.value)
+            if converter is None:
+                self.fail(variant.value, "missing union variant conversion")
             arms.append(
-                f"case {variant_name(self.union_name(union), variant)}: {self.native(variant.value, 'variant.Value', write)}"
+                f"case {variant_name(self.union_name(union), variant)}: bindingUnionStore({dest}[:], {converter}(variant.Value, arena))"
             )
         # A pointer to a variant, or a type embedding one, also satisfies the
         # sealed interface, so every union rejects what the switch doesn't name.
@@ -312,7 +314,7 @@ class Values:
         tag = f"{scope}.{native_identifier(value.tag)}"
         arms = []
         for f in value.fields:
-            read = f"*(*C.{f.value.native})(unsafe.Pointer(&{expr}))"
+            read = f"bindingUnionLoad[C.{f.value.native}]({expr}[:])"
             arms.append(
                 f"case C.{f.presence.variant}: return {variant_name(self.union_name(value), f)}{{Value: {self.copy(f.value, read)}}}"
             )

@@ -63,7 +63,7 @@ func (event runtimeEventForTest) withMessage(message string) runtimeEventForTest
 // for the arm payloadType names.
 func withPayload[T any](event runtimeEventForTest, payloadType C.mln_runtime_event_payload_type, payload T) runtimeEventForTest {
 	event.raw.payload_type = payloadType
-	*(*T)(unsafe.Pointer(&event.raw.payload)) = payload
+	bindingUnionStore(event.raw.payload[:], payload)
 	return event
 }
 

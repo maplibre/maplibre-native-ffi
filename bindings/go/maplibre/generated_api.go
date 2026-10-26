@@ -3008,9 +3008,9 @@ func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition
 func copyOfflineRegionDefinition(raw C.mln_offline_region_definition) OfflineRegionDefinition {
 	switch raw._type {
 	case C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
-		return OfflineRegionDefinitionTilePyramidVariant{Value: copyOfflineTilePyramidRegionDefinition((*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data))))}
+		return OfflineRegionDefinitionTilePyramidVariant{Value: copyOfflineTilePyramidRegionDefinition(bindingUnionLoad[C.mln_offline_tile_pyramid_region_definition](raw.data[:]))}
 	case C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
-		return OfflineRegionDefinitionGeometryVariant{Value: copyOfflineGeometryRegionDefinition((*(*C.mln_offline_geometry_region_definition)(unsafe.Pointer(&raw.data))))}
+		return OfflineRegionDefinitionGeometryVariant{Value: copyOfflineGeometryRegionDefinition(bindingUnionLoad[C.mln_offline_geometry_region_definition](raw.data[:]))}
 	}
 	return UnknownVariant{Tag: uint32(raw._type)}
 }
@@ -3024,9 +3024,9 @@ func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *binding
 	raw._type = C.mln_offline_region_definition_type(input.bindingTag())
 	switch variant := input.(type) {
 	case OfflineRegionDefinitionTilePyramidVariant:
-		*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data)) = nativeOfflineTilePyramidRegionDefinition(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeOfflineTilePyramidRegionDefinition(variant.Value, arena))
 	case OfflineRegionDefinitionGeometryVariant:
-		*(*C.mln_offline_geometry_region_definition)(unsafe.Pointer(&raw.data)) = nativeOfflineGeometryRegionDefinition(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeOfflineGeometryRegionDefinition(variant.Value, arena))
 	default:
 		arena.fail("unknown input union variant")
 	}
@@ -3205,11 +3205,11 @@ func nativeOpenGlContextDescriptor(input OpenGlContextDescriptor, arena *binding
 	raw.platform = C.mln_open_gl_context_platform(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
 	case OpenGlContextDescriptorDataWglVariant:
-		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWglContextDescriptor(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeWglContextDescriptor(variant.Value, arena))
 	case OpenGlContextDescriptorDataEglVariant:
-		*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeEglContextDescriptor(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeEglContextDescriptor(variant.Value, arena))
 	case OpenGlContextDescriptorDataWebGlVariant:
-		*(*C.mln_web_gl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWebGlContextDescriptor(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeWebGlContextDescriptor(variant.Value, arena))
 	default:
 		arena.fail("unknown input union variant")
 	}
@@ -3699,11 +3699,11 @@ func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingAren
 	raw._type = C.mln_rendered_query_geometry_type(input.bindingTag())
 	switch variant := input.(type) {
 	case RenderedQueryGeometryPointVariant:
-		*(*C.mln_screen_point)(unsafe.Pointer(&raw.data)) = nativeScreenPoint(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeScreenPoint(variant.Value, arena))
 	case RenderedQueryGeometryBoxVariant:
-		*(*C.mln_screen_box)(unsafe.Pointer(&raw.data)) = nativeScreenBox(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeScreenBox(variant.Value, arena))
 	case RenderedQueryGeometryLineStringVariant:
-		*(*C.mln_screen_line_string)(unsafe.Pointer(&raw.data)) = nativeScreenLineString(variant.Value, arena)
+		bindingUnionStore(raw.data[:], nativeScreenLineString(variant.Value, arena))
 	default:
 		arena.fail("unknown input union variant")
 	}
@@ -3964,21 +3964,21 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
-			return RuntimeEventPayloadRenderFrameVariant{Value: copyRuntimeEventRenderFrame((*(*C.mln_runtime_event_render_frame)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadRenderFrameVariant{Value: copyRuntimeEventRenderFrame(bindingUnionLoad[C.mln_runtime_event_render_frame](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP:
-			return RuntimeEventPayloadRenderMapVariant{Value: copyRuntimeEventRenderMap((*(*C.mln_runtime_event_render_map)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadRenderMapVariant{Value: copyRuntimeEventRenderMap(bindingUnionLoad[C.mln_runtime_event_render_map](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
-			return RuntimeEventPayloadTileActionVariant{Value: copyRuntimeEventTileAction((*(*C.mln_runtime_event_tile_action)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadTileActionVariant{Value: copyRuntimeEventTileAction(bindingUnionLoad[C.mln_runtime_event_tile_action](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS:
-			return RuntimeEventPayloadOfflineRegionStatusVariant{Value: copyRuntimeEventOfflineRegionStatus((*(*C.mln_runtime_event_offline_region_status)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadOfflineRegionStatusVariant{Value: copyRuntimeEventOfflineRegionStatus(bindingUnionLoad[C.mln_runtime_event_offline_region_status](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
-			return RuntimeEventPayloadOfflineRegionResponseErrorVariant{Value: copyRuntimeEventOfflineRegionResponseError((*(*C.mln_runtime_event_offline_region_response_error)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadOfflineRegionResponseErrorVariant{Value: copyRuntimeEventOfflineRegionResponseError(bindingUnionLoad[C.mln_runtime_event_offline_region_response_error](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-			return RuntimeEventPayloadOfflineRegionTileCountLimitVariant{Value: copyRuntimeEventOfflineRegionTileCountLimit((*(*C.mln_runtime_event_offline_region_tile_count_limit)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadOfflineRegionTileCountLimitVariant{Value: copyRuntimeEventOfflineRegionTileCountLimit(bindingUnionLoad[C.mln_runtime_event_offline_region_tile_count_limit](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
-			return RuntimeEventPayloadGlyphsVariant{Value: copyRuntimeEventGlyphs((*(*C.mln_runtime_event_glyphs)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadGlyphsVariant{Value: copyRuntimeEventGlyphs(bindingUnionLoad[C.mln_runtime_event_glyphs](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
-			return RuntimeEventPayloadSpriteVariant{Value: copyRuntimeEventSprite((*(*C.mln_runtime_event_sprite)(unsafe.Pointer(&raw.payload))))}
+			return RuntimeEventPayloadSpriteVariant{Value: copyRuntimeEventSprite(bindingUnionLoad[C.mln_runtime_event_sprite](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_NONE:
 			return nil
 		}
