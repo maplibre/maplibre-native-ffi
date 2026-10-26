@@ -134,5 +134,3 @@ if [[ -n "$zig_shim_stash" ]]; then
   mv "$zig_shim_stash/zig-shim" "$build_dir/"
   rmdir "$zig_shim_stash"
 fi
-
-touch "$build_dir/.native-package-install"

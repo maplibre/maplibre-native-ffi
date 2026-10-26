@@ -246,23 +246,6 @@ run = [
 [tasks.build-preset]
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-sources = [
-  "CMakeLists.txt",
-  "CMakePresets.json",
-  "Cargo.lock",
-  "Cargo.toml",
-  "LICENSE",
-  "mise.toml",
-  "build/*/.native-package-install",
-  "cmake/**/*",
-  "include/**/*",
-  "patches/**/*",
-  "src/**/*",
-  "tests/graphics/**/*",
-  "tests/native/**/*",
-  "third_party/**/*",
-]
-outputs = { auto = true }
 # The loader component holds the graphics implementation a host supplies for
 # itself, which the package deliberately leaves out. Installing it here is what
 # lets the fixtures and examples drive the API the way a host does; presets
