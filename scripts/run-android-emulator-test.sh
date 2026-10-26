@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs native test executables on ANDROID_SERIAL or on the shared emulator for
-# the ABI and API level, which boot-android-emulator.sh boots when it is not
-# running yet.
+# the ABI and API level, which tools/devices/android-emulator boots when it is
+# not running yet.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
@@ -86,7 +86,7 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
 fi
 
 # Says whether the emulator at the serial still runs, and if it exited, prints
-# the tail of the log that boot-android-emulator.sh started it with, which holds
+# the tail of the log that tools/devices/android-emulator started it with, which holds
 # the reason the emulator gives. A device that is no emulator reports nothing.
 report_emulator_state() {
   local log_dir=${TMPDIR:-/tmp}
@@ -138,7 +138,7 @@ run_adb() {
 
 # An explicit serial selects a connected device. Otherwise the shared emulator
 # for the ABI and API level runs the tests, booted first if it is not running.
-serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
+emulator="$MISE_MONOREPO_ROOT/tools/devices/android-emulator"
 if [[ -n "${ANDROID_SERIAL:-}" ]]; then
   serial=$ANDROID_SERIAL
   device_abi=$(run_adb "the ABI query" shell getprop ro.product.cpu.abi | tr -d '\r')
@@ -150,9 +150,9 @@ if [[ -n "${ANDROID_SERIAL:-}" ]]; then
   fi
 else
   emulator_api=${emulator_api:-${MLN_FFI_ANDROID_EMULATOR_API:?MLN_FFI_ANDROID_EMULATOR_API must name the default emulator API level}}
-  if ! serial=$("$serial_script" "$abi" "$emulator_api"); then
+  if ! serial=$("$emulator" serial "$abi" --api "$emulator_api"); then
     mise run //:android-emulator:boot "$abi" --api "$emulator_api"
-    serial=$("$serial_script" "$abi" "$emulator_api")
+    serial=$("$emulator" serial "$abi" --api "$emulator_api")
   fi
 fi
 avd_name=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n 's/\r$//;1p') || avd_name=

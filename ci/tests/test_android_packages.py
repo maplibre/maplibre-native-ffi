@@ -134,10 +134,11 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
         return subprocess.run(
             [
                 "bash",
-                str(ROOT / "scripts/boot-android-emulator.sh"),
-                "26",
+                str(ROOT / "tools/devices/android-emulator"),
+                "boot",
                 "x86_64",
-                "37.3.5",
+                "--api",
+                "26",
             ],
             env=self.environment | {"SDK_FAILURES": str(failures)},
             check=False,

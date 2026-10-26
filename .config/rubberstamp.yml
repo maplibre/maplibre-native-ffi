@@ -318,6 +318,7 @@ ci:
               - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
               - .mise/tasks/kotlin/verify-android-multi-abi
+              - tools/devices/android-emulator
               - third_party/maplibre-native
           then: apply
     ohos:

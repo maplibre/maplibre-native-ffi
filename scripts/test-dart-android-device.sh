@@ -17,7 +17,7 @@ fi
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
   mise run //:android-emulator:boot "$abi" --api "$api"
 fi
-serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi" "$api")
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-emulator" serial "$abi" --api "$api")
 # adb can briefly report an already booted emulator offline while its server starts.
 perl -e 'alarm shift; exec @ARGV' 30 \
   "$ANDROID_HOME/platform-tools/adb" -s "$serial" wait-for-device

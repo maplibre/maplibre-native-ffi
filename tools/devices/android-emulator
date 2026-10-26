@@ -1,0 +1,356 @@
+#!/usr/bin/env bash
+# Boots, stops, or names the shared Android emulator for an ABI and API level.
+#
+#   tools/devices/android-emulator {boot|stop|serial} <abi> [--api <api>]
+#
+# Every checkout and session on the machine shares one emulator per API level
+# and ABI. It runs the AVD api-<api>-<abi> from the user's AVD home at a fixed
+# console port, so its serial is always the same:
+#
+#   API 36 arm64-v8a  emulator-5584      API 26 x86_64     emulator-5580
+#   API 36 x86_64     emulator-5582      API 26 arm64-v8a  emulator-5578
+#
+# adb takes the port after the console's and finds an emulator on its own when
+# that port is between 5555 and 5585, so the serial survives an adb restart.
+#
+#   boot    Boots the emulator headless and waits until it is ready, or reuses
+#           it, whoever started it. Installs the emulator, platform-tools, and
+#           system image packages and creates the AVD on first run, which is
+#           also when their licenses are accepted. The emulator keeps running
+#           afterwards, and its log goes to the temporary directory, where
+#           scripts/run-android-emulator-test.sh finds it.
+#   stop    Stops the emulator, whoever started it. Any session on the machine
+#           may be using it, so no task stops it on its own; this is for a
+#           person who knows that none is. Other emulators keep running.
+#   serial  Prints ANDROID_SERIAL when it is set, otherwise the emulator's
+#           serial once it has booted. Prints nothing and exits 1 when it has
+#           not, so a caller can boot it and ask again.
+#
+# The API level defaults to MLN_FFI_ANDROID_EMULATOR_API.
+set -euo pipefail
+
+usage="usage: tools/devices/android-emulator {boot|stop|serial} <abi> [--api <api>]"
+command=${1:-}
+abi=${2:-}
+case "$command" in
+  boot | stop | serial) ;;
+  *)
+    echo "$usage" >&2
+    exit 2
+    ;;
+esac
+api=${MLN_FFI_ANDROID_EMULATOR_API:-}
+if (($# == 4)) && [[ "$3" == --api ]]; then
+  api=$4
+elif (($# != 2)); then
+  echo "$usage" >&2
+  exit 2
+fi
+case "$api $abi" in
+  "36 arm64-v8a") port=5584 ;;
+  "36 x86_64") port=5582 ;;
+  "26 x86_64") port=5580 ;;
+  "26 arm64-v8a") port=5578 ;;
+  *)
+    echo "No shared Android emulator runs API ${api:-<none>} $abi. The supported pairs are API 36 arm64-v8a, API 36 x86_64, API 26 x86_64, and API 26 arm64-v8a." >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$command" == serial && -n "${ANDROID_SERIAL:-}" ]]; then
+  printf '%s\n' "$ANDROID_SERIAL"
+  exit 0
+fi
+
+serial="emulator-$port"
+avd_name="api-$api-$abi"
+image="system-images;android-$api;default;$abi"
+# Emulators before this revision can hang for good when a guest process exits
+# while it still owns GLES objects (gfxstream b/561516389). Until the stable
+# channel carries the fix, the update comes from the dev channel.
+minimum_emulator_version=37.3.5
+sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
+log_dir=${TMPDIR:-/tmp}
+log_file="${log_dir%/}/android-emulator-$avd_name.log"
+# The default AVD home, named so that avdmanager and the emulator use the same
+# directory.
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
+# adb arrives with platform-tools, which boot installs, so an SDK that has never
+# had it yet reaches that step rather than failing here.
+adb="$sdk_root/platform-tools/adb"
+# The emulator takes the AVD as `-avd <name>` or `@<name>`.
+avd_pattern="(-avd |@)$avd_name( |\$)"
+
+# A call to an emulator that is still booting can block indefinitely, and a
+# boot waits by asking again, so each call that misses its deadline answers
+# that the emulator is not ready yet. The call is named, since which one blocks
+# is not yet known.
+bounded_adb() {
+  local status=0
+  # The group also takes the shell's report of the alarm that ends the call.
+  { perl -e 'alarm shift; exec @ARGV' 30 "$adb" "$@" </dev/null 2>/dev/null; } 2>/dev/null ||
+    status=$?
+  if ((status == 128 + 14)); then
+    echo "android-emulator: adb $* missed its 30-second deadline." >&2
+    if [[ -n "${MLN_FFI_ANDROID_DIAGNOSTICS_DIR:-}" ]]; then
+      # Diagnostics must neither hold up the next readiness check indefinitely
+      # nor write into the serial that the caller captures from stdout.
+      perl -e 'alarm shift; exec @ARGV' 40 python3 \
+        "$(dirname "$0")/../../ci/android_emulator_diagnostics.py" "$avd_name" "$@" >&2 ||
+        echo "android-emulator: emulator diagnostics failed." >&2
+    fi
+  fi
+  return "$status"
+}
+
+# Prints the AVD that the emulator at the port runs, booted or not. Prints
+# nothing when no emulator answers there.
+port_avd() {
+  [[ -x "$adb" ]] || return 0
+  bounded_adb -s "$serial" emu avd name | sed -n 's/\r$//;1p' || true
+}
+
+# Fails when the port runs some other AVD.
+check_not_foreign() {
+  local running=$1
+  if [[ -n "$running" && "$running" != "$avd_name" ]]; then
+    echo "$serial runs the AVD $running, not $avd_name; stop it to free the port." >&2
+    exit 1
+  fi
+}
+
+ready() {
+  local running
+  running=$(port_avd)
+  check_not_foreign "$running"
+  [[ "$running" == "$avd_name" ]] || return 1
+  # The console answers without the adb server, but a server that has just
+  # started knows no device until its first scan, which `adb devices` awaits.
+  bounded_adb devices >/dev/null &&
+    bounded_adb -s "$serial" shell getprop sys.boot_completed | tr -d '\r' | grep -qx 1
+}
+
+# The console listens on an even port and adb on the next one, whoever started
+# the emulator and whether or not adb knows it yet.
+port_bound() {
+  (: <"/dev/tcp/127.0.0.1/$port") 2>/dev/null || (: <"/dev/tcp/127.0.0.1/$((port + 1))") 2>/dev/null
+}
+
+# Prints the PID of an emulator process that runs the AVD, and the console port
+# its command line names, which is empty when it names none.
+avd_process() {
+  local pid
+  pid=$(pgrep -f -- "$avd_pattern" | head -n1)
+  [[ -n "$pid" ]] || return 1
+  printf '%s %s\n' "$pid" "$(ps -o command= -p "$pid" | sed -n 's/.* -port \([0-9]*\).*/\1/p')"
+}
+
+case "$command" in
+  serial)
+    ready || exit 1
+    printf '%s\n' "$serial"
+    exit 0
+    ;;
+  stop)
+    if [[ "$(port_avd)" == "$avd_name" ]]; then
+      target=$serial
+    elif process=$(avd_process); then
+      # An older checkout may have started the AVD at another port.
+      target=${process#* }
+      target=${target:+emulator-$target}
+    else
+      echo "Android emulator $avd_name is not running."
+      exit 0
+    fi
+    # `emu kill` lets the guest shut down; the signals below are for an
+    # emulator that no longer answers adb.
+    if [[ -n "$target" ]]; then
+      bounded_adb -s "$target" emu kill >/dev/null || true
+    fi
+    for ((attempt = 0; attempt < 30; attempt++)); do
+      pgrep -f -- "$avd_pattern" >/dev/null || exit 0
+      sleep 1
+    done
+    pkill -f -- "$avd_pattern" || true
+    sleep 5
+    if pgrep -f -- "$avd_pattern" >/dev/null; then
+      pkill -KILL -f -- "$avd_pattern" || true
+    fi
+    exit 0
+    ;;
+esac
+
+if ready; then
+  echo "Android emulator $avd_name is ready at $serial."
+  exit 0
+fi
+
+# An older checkout may have started the AVD at another port. The AVD is
+# locked while it runs, so it cannot also run at this one.
+if process=$(avd_process) && [[ "${process#* }" != "$port" ]]; then
+  other_port=${process#* }
+  echo "Android emulator $avd_name already runs as process ${process%% *}${other_port:+ at emulator-$other_port}, not at $serial." >&2
+  echo "Stop it once with \`mise run //:android-emulator:stop $abi --api $api\`; the next boot starts it at $serial." >&2
+  exit 1
+fi
+
+sdkmanager=
+for tools_dir in "$sdk_root"/cmdline-tools/latest/bin "$sdk_root"/cmdline-tools/*/bin; do
+  if [[ -x "$tools_dir/sdkmanager" ]]; then
+    sdkmanager="$tools_dir/sdkmanager"
+    avdmanager="$tools_dir/avdmanager"
+    break
+  fi
+done
+if [[ -z "$sdkmanager" ]]; then
+  echo "No sdkmanager under $sdk_root/cmdline-tools." >&2
+  exit 1
+fi
+
+# Installs packages from the given channel and the more stable ones.
+install_packages() {
+  local channel=$1
+  shift
+  echo "Installing Android SDK packages: $*"
+  # One `y` per license prompt, as a here-string rather than a pipe: `yes` would
+  # take a SIGPIPE when sdkmanager stops reading, and that becomes the
+  # pipeline's status.
+  local accepts install_status
+  accepts="$(printf 'y\n%.0s' "$@")"
+  for attempt in 1 2 3; do
+    if "$sdkmanager" --sdk_root="$sdk_root" --channel="$channel" --install "$@" <<<"$accepts"; then
+      return
+    else
+      install_status=$?
+    fi
+    if ((attempt == 3)); then
+      echo "Android SDK package installation failed after $attempt attempts." >&2
+      exit "$install_status"
+    fi
+    echo "Android SDK package installation failed (attempt $attempt/3); retrying." >&2
+    sleep "$((attempt * 5))"
+  done
+}
+
+# Each package with the directory that proves it is installed, so a rerun starts
+# no JVM and reaches no network.
+missing=()
+for entry in "platform-tools|platform-tools" "$image|${image//;//}"; do
+  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
+    missing+=("${entry%%|*}")
+  fi
+done
+if ((${#missing[@]})); then
+  install_packages 0 "${missing[@]}"
+fi
+
+emulator_revision() {
+  sed -n 's/^Pkg\.Revision=//p' "$sdk_root/emulator/source.properties" 2>/dev/null |
+    tr -d '\r'
+}
+emulator_current() {
+  [[ "$(printf '%s\n' "$minimum_emulator_version" "$(emulator_revision)" |
+    sort -V | head -n1)" == "$minimum_emulator_version" ]]
+}
+if ! emulator_current; then
+  install_packages 2 emulator
+  if ! emulator_current; then
+    echo "The Android emulator is at revision $(emulator_revision), below $minimum_emulator_version." >&2
+    exit 1
+  fi
+fi
+
+avd_exists() {
+  "$sdk_root/emulator/emulator" -list-avds 2>/dev/null | tr -d '\r' | grep -qx "$avd_name"
+}
+if ! avd_exists; then
+  # avdmanager succeeds without creating anything when the AVD home is missing,
+  # as it is on a fresh runner. `no` declines the custom hardware profile
+  # prompt. Everything the suite depends on is a launch flag below rather than
+  # a stored device setting. When another session creates the AVD at the same
+  # moment, avdmanager fails here, and that session's AVD serves both.
+  mkdir -p "$ANDROID_AVD_HOME"
+  "$avdmanager" create avd --name "$avd_name" --package "$image" --device pixel_6 <<<"no" ||
+    avd_exists
+fi
+
+# Succeeds while the emulator for the port runs, including one that another
+# session has only just started and that has not bound the port yet.
+starting() {
+  local process
+  port_bound && return 0
+  process=$(avd_process) && [[ "${process#* }" == "$port" ]]
+}
+
+pid=
+if starting; then
+  echo "Waiting for the Android emulator at $serial."
+else
+  # The log is appended to, so an emulator that another session launches at the
+  # same moment adds its lines rather than overwriting these.
+  : >"$log_file"
+
+  # SwiftShader draws the GLES and Vulkan targets in software, which is what a
+  # runner without a GPU has. The suite renders offscreen, so no window is
+  # needed and no snapshot is written: a run starts from the installed image.
+  launcher=(
+    "$sdk_root/emulator/emulator"
+    -avd "$avd_name"
+    -port "$port"
+    -no-window
+    -no-audio
+    -no-boot-anim
+    -no-snapshot
+    -no-metrics
+    -gpu swiftshader
+    -memory 4096
+    -camera-back none
+    -camera-front none
+  )
+  case "$(uname -s)" in
+    Darwin | CYGWIN* | MINGW* | MSYS*) launcher+=(-accel on) ;;
+    Linux)
+      # The emulator's renderer makes JIT code executable in memory that its
+      # bundled tcmalloc takes with sbrk, which SELinux refuses as execheap on
+      # Fedora. Memory that tcmalloc maps instead needs only execmem.
+      export TCMALLOC_SKIP_SBRK=true
+      if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+        launcher+=(-accel on)
+      else
+        echo "KVM is inaccessible; using QEMU software emulation." >&2
+        launcher+=(-accel off)
+      fi
+      ;;
+    *) launcher+=(-accel off) ;;
+  esac
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "${launcher[@]}" </dev/null >>"$log_file" 2>&1 &
+  else
+    nohup "${launcher[@]}" </dev/null >>"$log_file" 2>&1 &
+  fi
+  pid=$!
+  echo "Started Android emulator $avd_name as process $pid at $serial."
+fi
+
+# A check can wait on a call that misses its deadline, so the wait is bounded by
+# the clock rather than by the number of checks.
+deadline=$((SECONDS + 600))
+while ((SECONDS < deadline)); do
+  if ready; then
+    echo "Android emulator $avd_name is ready at $serial."
+    exit 0
+  fi
+  # An emulator that finds the AVD locked by another session's launch exits,
+  # and the other session's emulator, at the same port, is then the one to wait
+  # for.
+  if ! { [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; } && ! starting; then
+    echo "Android emulator $avd_name exited before it became ready." >&2
+    [[ ! -f "$log_file" ]] || tail -100 "$log_file" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "Android emulator $avd_name did not become ready within 600 seconds." >&2
+[[ ! -f "$log_file" ]] || tail -100 "$log_file" >&2
+exit 1

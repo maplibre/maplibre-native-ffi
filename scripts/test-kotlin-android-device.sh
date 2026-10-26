@@ -37,7 +37,7 @@ fi
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
   mise run //:android-emulator:boot "$abi" --api "$api"
 fi
-ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi" "$api")
+ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/tools/devices/android-emulator" serial "$abi" --api "$api")
 export ANDROID_SERIAL
 exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \

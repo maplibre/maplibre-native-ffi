@@ -68,8 +68,6 @@ android_ndk_version = "30.0.16248370"
 # image carries no Google APIs and is the smallest image with a full graphics
 # stack.
 android_system_image_api = "36"
-# The oldest emulator the suite runs on; see scripts/boot-android-emulator.sh.
-android_emulator_version = "37.3.5"
 dart_version = "3.13.7"
 dotnet_version = "10.0.402"
 go_version = "1.27.3"
@@ -372,7 +370,6 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
       --library "$build_dir/libmln-native-test-plugin.so"
     )
     if [[ "$usage_preset" == android-x64-egl ]]; then
-      mise run //:android-emulator:boot "$abi" --api 26
       runner+=(--api 26)
     fi
   fi
@@ -425,12 +422,7 @@ flag "--api <api>" default="{{vars.android_system_image_api}}"
 # not part of what .mise/bin/sync-android-packages installs, so asking for a
 # boot is what accepts their licenses and pays for their download.
 tools = { "core:java" = "{{vars.java_version}}" }
-run = '''
-"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" \
-  "$usage_api" \
-  "$usage_abi" \
-  "{{vars.android_emulator_version}}"
-'''
+run = '"$MISE_MONOREPO_ROOT/tools/devices/android-emulator" boot "$usage_abi" --api "$usage_api"'
 
 [tasks."android-emulator:stop"]
 description = "Stop the shared Android emulator for an ABI and API level, which any session on the machine may be using."
@@ -440,7 +432,7 @@ arg "[abi]" default="x86_64" {
 }
 flag "--api <api>" default="{{vars.android_system_image_api}}"
 '''
-run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh" "$usage_api" "$usage_abi"'
+run = '"$MISE_MONOREPO_ROOT/tools/devices/android-emulator" stop "$usage_abi" --api "$usage_api"'
 
 [tasks."ohos-emulator:boot"]
 description = "Boot the shared OpenHarmony emulator, or reuse it, and wait until it is ready."

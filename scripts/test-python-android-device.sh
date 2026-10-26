@@ -49,7 +49,7 @@ mise run //:android-sdk-packages
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
   mise run //:android-emulator:boot "$abi"
 fi
-serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi")
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-emulator" serial "$abi")
 export ANDROID_SERIAL="$serial"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it

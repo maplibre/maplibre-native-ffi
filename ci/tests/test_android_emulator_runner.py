@@ -48,9 +48,9 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         adb.chmod(0o755)
         for name in ("libmaplibre-native-c.so", "test"):
             (self.directory / name).write_text("")
-        # The runner finds the serial script under the repository root, and
+        # The runner finds the emulator script under the repository root, and
         # the emulator's log in the temporary directory.
-        (self.directory / "scripts").symlink_to(ROOT / "scripts")
+        (self.directory / "tools").symlink_to(ROOT / "tools")
         (self.directory / "android-emulator-api-26-x86_64.log").write_text(
             "ERROR | the renderer gave up\n"
         )
@@ -147,34 +147,48 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         self.assertIn("the adbd line", result.stderr)
 
 
-class AndroidDeviceSerialTest(unittest.TestCase):
+class AndroidEmulatorTest(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="android serial ")
+        temporary = tempfile.TemporaryDirectory(prefix="android emulator ")
         self.addCleanup(temporary.cleanup)
-        sdk = Path(temporary.name) / "sdk"
+        self.directory = Path(temporary.name)
+        sdk = self.directory / "sdk"
         (sdk / "platform-tools").mkdir(parents=True)
-        # Two booted emulators run the shared AVDs of one ABI at two API levels.
+        # Booted emulators run the shared x86_64 AVDs at their ports, and an
+        # unrelated AVD holds the port of the API 26 arm64-v8a one. Their
+        # consoles answer at once, but the adb server, which has just started,
+        # finds no device until `adb devices` has awaited its first scan.
+        scanned = self.directory / "scanned"
         adb = sdk / "platform-tools/adb"
         adb.write_text(
             "#!/usr/bin/env bash\n"
             'case "$*" in\n'
-            "  devices) printf 'List of devices attached\\nemulator-5554\\tdevice\\nemulator-5556\\tdevice\\n' ;;\n"
-            '  "-s emulator-5554 emu avd name") printf "api-36-x86_64\\r\\nOK\\r\\n" ;;\n'
-            '  "-s emulator-5556 emu avd name") printf "api-26-x86_64\\r\\nOK\\r\\n" ;;\n'
-            '  *"getprop sys.boot_completed"*) echo 1 ;;\n'
+            f'  devices) touch "{scanned}" ;;\n'
+            f'  *"getprop sys.boot_completed"*) [[ -e "{scanned}" ]] && echo 1 ;;\n'
+            '  "-s emulator-5582 emu avd name") printf "api-36-x86_64\\r\\nOK\\r\\n" ;;\n'
+            '  "-s emulator-5580 emu avd name") printf "api-26-x86_64\\r\\nOK\\r\\n" ;;\n'
+            '  "-s emulator-5578 emu avd name") printf "pixel-fold\\r\\nOK\\r\\n" ;;\n'
             "  *) exit 1 ;;\n"
             "esac\n"
         )
         adb.chmod(0o755)
+        self.commands = self.directory / "commands"
+        self.commands.mkdir()
         self.environment = os.environ | {
             "ANDROID_HOME": str(sdk),
             "ANDROID_SERIAL": "",
             "MLN_FFI_ANDROID_EMULATOR_API": "36",
+            "PATH": f"{self.commands}{os.pathsep}{os.environ['PATH']}",
         }
         self.environment.pop("MLN_FFI_ANDROID_DIAGNOSTICS_DIR", None)
-        self.script = ROOT / "scripts/android-device-serial.sh"
+        self.script = ROOT / "tools/devices/android-emulator"
 
-    def serial(self, *arguments):
+    def write_command(self, name, body):
+        command = self.commands / name
+        command.write_text("#!/usr/bin/env bash\n" + body)
+        command.chmod(0o755)
+
+    def emulator(self, *arguments):
         return subprocess.run(
             ["bash", str(self.script), *arguments],
             env=self.environment,
@@ -184,57 +198,82 @@ class AndroidDeviceSerialTest(unittest.TestCase):
             timeout=10,
         )
 
-    def test_the_emulator_that_runs_the_api_level_is_chosen(self):
-        result = self.serial("x86_64", "26")
+    def test_each_api_level_has_its_own_port(self):
+        result = self.emulator("serial", "x86_64", "--api", "26")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "emulator-5556\n")
+        self.assertEqual(result.stdout, "emulator-5580\n")
 
     def test_the_api_level_defaults_to_the_shared_one(self):
-        result = self.serial("x86_64")
+        result = self.emulator("serial", "x86_64")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "emulator-5554\n")
+        self.assertEqual(result.stdout, "emulator-5582\n")
 
-    def test_no_emulator_runs_another_abi(self):
-        result = self.serial("arm64-v8a", "26")
+    def test_no_emulator_runs_at_the_port(self):
+        result = self.emulator("serial", "arm64-v8a")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual(result.stdout, "")
 
+    def test_a_foreign_avd_at_the_port_is_named(self):
+        result = self.emulator("serial", "arm64-v8a", "--api", "26")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("emulator-5578 runs the AVD pixel-fold", result.stderr)
+
+    def test_an_unsupported_pair_names_the_supported_ones(self):
+        result = self.emulator("serial", "x86_64", "--api", "30")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("API 30 x86_64", result.stderr)
+        self.assertIn("API 26 arm64-v8a", result.stderr)
+
+    def test_the_avd_running_at_another_port_is_not_adopted(self):
+        # An older checkout booted the AVD at the first free port.
+        self.write_command("pgrep", "echo 4242\n")
+        self.write_command(
+            "ps", "echo qemu-system-aarch64 -avd api-36-arm64-v8a -port 5554\n"
+        )
+        result = self.emulator("boot", "arm64-v8a")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "api-36-arm64-v8a already runs as process 4242 at emulator-5554",
+            result.stderr,
+        )
+        self.assertIn("android-emulator:stop arm64-v8a --api 36", result.stderr)
+
     def test_a_failed_collector_preserves_readiness_failure_and_stdout(self):
-        directory = Path(self.environment["ANDROID_HOME"]).parent
-        (directory / "scripts").mkdir()
-        (directory / "ci").mkdir()
-        self.script = directory / "scripts/android-device-serial.sh"
-        shutil.copyfile(ROOT / "scripts/android-device-serial.sh", self.script)
+        (self.directory / "tools/devices").mkdir(parents=True)
+        (self.directory / "ci").mkdir()
+        self.script = self.directory / "tools/devices/android-emulator"
+        shutil.copyfile(ROOT / "tools/devices/android-emulator", self.script)
         # Simulate SIGALRM on each adb call without making the test wait thirty
         # seconds.
-        commands = directory / "commands"
-        commands.mkdir()
-        perl = commands / "perl"
-        perl.write_text(
-            "#!/usr/bin/env bash\n"
-            '[[ "$4" != */adb ]] || exit 142\n'
-            f'exec "{shutil.which("perl")}" "$@"\n'
+        self.write_command(
+            "perl",
+            f'[[ "$4" != */adb ]] || exit 142\nexec "{shutil.which("perl")}" "$@"\n',
         )
-        perl.chmod(0o755)
-        self.environment["PATH"] = f"{commands}{os.pathsep}{os.environ['PATH']}"
-        collector = directory / "ci/android_emulator_diagnostics.py"
+        collector = self.directory / "ci/android_emulator_diagnostics.py"
         collector.write_text(
             "import sys\n"
             "print('collector called:', sys.argv[1:])\n"
             "raise SystemExit(1)\n"
         )
-        result = self.serial("x86_64", "26")
+        result = self.emulator("serial", "x86_64", "--api", "26")
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
         self.assertNotIn("collector called", result.stderr)
         self.environment["MLN_FFI_ANDROID_DIAGNOSTICS_DIR"] = str(
-            directory / "diagnostics"
+            self.directory / "diagnostics"
         )
-        result = self.serial("x86_64", "26")
+        result = self.emulator("serial", "x86_64", "--api", "26")
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
-        self.assertIn("adb devices missed its 30-second deadline", result.stderr)
-        self.assertIn("collector called: ['api-26-x86_64', 'devices']", result.stderr)
+        self.assertIn(
+            "adb -s emulator-5580 emu avd name missed its 30-second deadline",
+            result.stderr,
+        )
+        self.assertIn(
+            "collector called: ['api-26-x86_64', '-s', 'emulator-5580', 'emu', 'avd', 'name']",
+            result.stderr,
+        )
         self.assertIn("emulator diagnostics failed", result.stderr)
 
 
