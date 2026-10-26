@@ -37,15 +37,15 @@ dir = "../.."
 # Catalyst presets run in process.
 run = '''
 case "$usage_preset" in
-  android-* | ohos-* | ios-simulator-*)
+  android-* | ohos-* | ios-simulator-* | visionos-simulator-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-device.sh" "$usage_preset"
     ;;
   emscripten-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
     ;;
   ios-maccatalyst-*) ;;
-  ios-*)
-    echo "The Rust binding tests need a runnable target; test an ios-simulator or ios-maccatalyst preset instead of $usage_preset." >&2
+  ios-* | visionos-*)
+    echo "The Rust binding tests need a runnable target; test an ios-simulator, visionos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

@@ -35,7 +35,12 @@ impl AcquiredFrameHandle {
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub fn get_metal_texture<R>(
         &self,
         callback: impl FnOnce(&MetalTextureFrame) -> R,

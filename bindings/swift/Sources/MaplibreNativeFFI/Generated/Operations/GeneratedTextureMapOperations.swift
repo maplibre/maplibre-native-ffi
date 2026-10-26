@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Starts attachment of a ring of caller-owned Metal textures.
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the
@@ -29,7 +29,7 @@ public extension MapHandle {
     }
   #endif
 
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Starts attachment of a session-owned Metal texture ring.
     ///
     /// See `mln_map_attach_metal_owned_texture` in the

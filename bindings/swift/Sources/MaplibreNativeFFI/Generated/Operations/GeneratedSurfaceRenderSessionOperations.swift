@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Starts an ordered Metal surface replacement.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the

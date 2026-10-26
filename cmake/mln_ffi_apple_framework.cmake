@@ -10,8 +10,9 @@ function(mln_ffi_add_c_api_framework target implementation_target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target} ${implementation_target})
 
-  # App Store processing needs the platform, and MinimumOSVersion on iOS and
-  # tvOS. The publish step replaces the project version with the release's.
+  # App Store processing needs the platform, and MinimumOSVersion on iOS,
+  # tvOS, and visionOS. The publish step replaces the project version with the
+  # release's.
   mln_ffi_apple_is_embedded(embedded)
   mln_ffi_apple_is_simulator(simulator)
   if(NOT embedded)
@@ -20,6 +21,11 @@ function(mln_ffi_add_c_api_framework target implementation_target)
     set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM iPhoneOS)
     if(simulator)
       set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM iPhoneSimulator)
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM XROS)
+    if(simulator)
+      set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM XRSimulator)
     endif()
   else()
     set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM AppleTVOS)
@@ -61,7 +67,7 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     FRAMEWORK DESTINATION Frameworks COMPONENT "${component}")
   mln_ffi_install_apple_dsym(${framework_target} Frameworks "${component}")
 
-  # CMake gives an iOS or tvOS framework a flat bundle, and a macOS or Mac
+  # CMake gives an embedded Apple framework a flat bundle, and a macOS or Mac
   # Catalyst one a versioned bundle.
   set(framework "Frameworks/${MLN_FFI_APPLE_FRAMEWORK_NAME}.framework")
   mln_ffi_apple_is_embedded(embedded)

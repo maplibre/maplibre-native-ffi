@@ -44,6 +44,7 @@ PLATFORM_CFG = {
     "macos": 'target_os = "macos"',
     "ohos": 'target_env = "ohos"',
     "tvos": 'target_os = "tvos"',
+    "visionos": 'target_os = "visionos"',
     "web": 'target_os = "emscripten"',
     "windows": 'target_os = "windows"',
 }

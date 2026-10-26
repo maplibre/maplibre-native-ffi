@@ -111,7 +111,7 @@ REMEDIES = {
     UNSTRIPPED: (
         "An Apple library's local symbols belong in its dSYM. CPack strips "
         "macOS and Mac Catalyst libraries, and mln_ffi_install_apple_dsym "
-        "strips iOS and tvOS ones."
+        "strips embedded Apple ones."
     ),
     MISSING_DSYM: (
         "Debuggers and crash reports find an Apple library's local symbols in "

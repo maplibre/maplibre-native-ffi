@@ -1,5 +1,5 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, Android, iOS, Mac Catalyst, and OpenHarmony presets to their
+# $1. Maps musl, Android, iOS, visionOS, Mac Catalyst, and OpenHarmony presets to their
 # Cargo target. Exports the cross-compilation environment (CC/CXX, linker) from
 # the Zig and Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves
 # `cargo_target` empty for host presets, where Cargo picks its own target and
@@ -12,6 +12,8 @@ case "$1" in
   android-arm-*) cargo_target=armv7-linux-androideabi ;;
   android-arm64-*) cargo_target=aarch64-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
+  visionos-arm64-*) cargo_target=aarch64-apple-visionos ;;
+  visionos-simulator-arm64-*) cargo_target=aarch64-apple-visionos-sim ;;
   ios-arm64-*) cargo_target=aarch64-apple-ios ;;
   ios-maccatalyst-arm64-*) cargo_target=aarch64-apple-ios-macabi ;;
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
@@ -92,6 +94,9 @@ case "$1" in
     # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang"
+    ;;
+  visionos-*)
+    export XROS_DEPLOYMENT_TARGET=1.0
     ;;
   ios-arm64-* | ios-simulator-arm64-*)
     # rustc and the cc crate find the SDK through xcrun themselves. Both target

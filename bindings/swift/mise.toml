@@ -62,6 +62,17 @@ case "$usage_preset" in
       --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
       --triple arm64-apple-tvos15.0
     ;;
+  visionos-arm64-metal)
+    # SwiftPM's native build system does not recognize visionOS triples.
+    exec xcodebuild -quiet \
+      -scheme MaplibreNativeFFI \
+      -sdk xros -destination 'generic/platform=visionOS' \
+      -derivedDataPath .build/visionos -configuration Debug \
+      ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
+      "HEADER_SEARCH_PATHS=\$(inherited) \"$native_install_dir/include\"" \
+      "LIBRARY_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\"" \
+      'OTHER_LDFLAGS=$(inherited) -lmaplibre-native-c' build
+    ;;
   ios-maccatalyst-*)
     # A product build also compiles the DocC plugin's dependencies, whose
     # manifests leave SwiftPM a Catalyst floor the compiler rejects.
@@ -77,6 +88,10 @@ case "$usage_preset" in
     ;;
   tvos-*)
     echo "The Swift binding builds for a tvOS device with tvos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+  visionos-*)
+    echo "The Swift binding builds for a visionOS device with visionos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
     ;;
 esac
@@ -155,6 +170,28 @@ case "$usage_preset" in
       .build/tvos-simulator/arm64-apple-tvos-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
       120
     ;;
+  visionos-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
+    # Xcode recognizes visionOS and supplies its Swift Testing framework.
+    xcodebuild -quiet \
+      -scheme MaplibreNativeFFIIOSSimulatorTests \
+      -sdk xrsimulator -destination 'generic/platform=visionOS Simulator' \
+      -derivedDataPath .build/visionos-simulator -configuration Debug \
+      ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
+      "HEADER_SEARCH_PATHS=\$(inherited) \"$native_install_dir/include\"" \
+      "LIBRARY_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\"" \
+      'OTHER_LDFLAGS=$(inherited) -lmaplibre-native-c' \
+      "LD_RUNPATH_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\" \"$(xcode-select -p)/Platforms/XRSimulator.platform/Developer/Library/Frameworks\"" \
+      build
+    mise run //:visionos-simulator:boot
+    export MLN_FFI_SIMULATOR_RUNTIME=visionOS
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/visionos-simulator/Build/Products/Debug-xrsimulator/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
   ios-maccatalyst-*)
     # swift test loads the bundle into a macOS helper, which rejects a
     # Catalyst image.
@@ -171,8 +208,8 @@ case "$usage_preset" in
       -Xlinker "$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks"
     exec ".build/$usage_preset/arm64-apple-ios-macabi/$usage_configuration/MaplibreNativeFFIIOSSimulatorTests"
     ;;
-  ios-* | tvos-*)
-    echo "The Swift binding tests need a runnable target; test an ios-simulator, tvos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
+  ios-* | tvos-* | visionos-*)
+    echo "The Swift binding tests need a runnable target; test an ios-simulator, tvos-simulator, visionos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

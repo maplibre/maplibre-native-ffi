@@ -6,8 +6,8 @@ set -euo pipefail
 uuid_re='[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}'
 
 usage() {
-  echo "usage: $0 boot <iOS|tvOS>" >&2
-  echo "       $0 find-booted <iOS|tvOS>" >&2
+  echo "usage: $0 boot <iOS|tvOS|visionOS>" >&2
+  echo "       $0 find-booted <iOS|tvOS|visionOS>" >&2
   exit 2
 }
 
@@ -15,6 +15,7 @@ device_filter() {
   case "$1" in
     iOS) printf '%s\n' ' iPhone ' ;;
     tvOS) printf '%s\n' 'Apple TV' ;;
+    visionOS) printf '%s\n' 'Apple Vision Pro' ;;
     *)
       echo "Unknown simulator runtime: $1" >&2
       usage

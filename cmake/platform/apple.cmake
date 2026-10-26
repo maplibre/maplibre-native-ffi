@@ -9,6 +9,10 @@ function(mln_ffi_configure_apple_toolchain_defaults)
      AND CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0"
         CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
+  elseif(NOT CMAKE_OSX_DEPLOYMENT_TARGET
+         AND CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "1.0"
+        CACHE STRING "Minimum visionOS deployment target" FORCE)
   endif()
 endfunction()
 
@@ -43,10 +47,11 @@ function(mln_ffi_apple_is_maccatalyst out_var)
   endif()
 endfunction()
 
-# Whether the target is iOS or tvOS rather than macOS or Mac Catalyst.
+# Whether the target uses an embedded Apple SDK rather than macOS or Mac
+# Catalyst.
 function(mln_ffi_apple_is_embedded out_var)
   mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$" AND NOT maccatalyst)
     set(${out_var} TRUE PARENT_SCOPE)
   else()
     set(${out_var} FALSE PARENT_SCOPE)
@@ -119,6 +124,20 @@ function(mln_ffi_configure_platform_dependencies target)
         PROPERTIES
           MLN_FFI_TARGET_PLATFORM tvos-arm64 MLN_FFI_ZIG_TARGET aarch64-tvos
           MLN_FFI_TEST_SUPPORTED FALSE)
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    if(MLN_FFI_APPLE_SIMULATOR)
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM visionos-simulator-arm64 MLN_FFI_ZIG_TARGET
+          aarch64-visionos-simulator MLN_FFI_TEST_SUPPORTED TRUE)
+    else()
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM visionos-arm64 MLN_FFI_ZIG_TARGET
+          aarch64-visionos MLN_FFI_TEST_SUPPORTED FALSE)
     endif()
   else()
     message(FATAL_ERROR "Unsupported Apple platform: ${CMAKE_SYSTEM_NAME}")

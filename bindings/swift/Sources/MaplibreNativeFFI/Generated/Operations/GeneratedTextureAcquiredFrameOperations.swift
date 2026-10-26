@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Copies Metal-native metadata from an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the

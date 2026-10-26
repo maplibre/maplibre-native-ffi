@@ -20,6 +20,7 @@ INFRASTRUCTURE_STEPS = {
     "Boot OpenHarmony emulator",
     "Boot iOS simulator",
     "Boot tvOS simulator",
+    "Boot visionOS simulator",
 }
 
 

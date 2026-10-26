@@ -207,7 +207,7 @@ private func generationsOfCommandsStarted(
       try await map.updateCamera(update)
     }
     if immediately,
-       #available(macOS 26, iOS 26, macCatalyst 26, tvOS 26, *)
+       #available(macOS 26, iOS 26, macCatalyst 26, tvOS 26, visionOS 26, *)
     {
       tasks.append(Task.immediate(operation: command))
     } else {

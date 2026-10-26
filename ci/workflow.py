@@ -50,6 +50,8 @@ def platform(preset: str) -> str:
         return "ios-simulator"
     if preset.startswith("ios-maccatalyst-"):
         return "ios-maccatalyst"
+    if preset.startswith("visionos-simulator-"):
+        return "visionos-simulator"
     if preset.startswith("tvos-simulator-"):
         return "tvos-simulator"
     return preset.split("-", 1)[0]
@@ -95,6 +97,8 @@ def runner(preset: str) -> str:
         "ios-maccatalyst",
         "tvos",
         "tvos-simulator",
+        "visionos",
+        "visionos-simulator",
     }:
         return MACOS_RUNNER
     if target_platform == "windows":
@@ -200,6 +204,8 @@ def device_boot(preset: str) -> tuple[str, str] | None:
         return "Boot OpenHarmony emulator", "mise run //:ohos-emulator:boot"
     if target_platform == "ios-simulator":
         return "Boot iOS simulator", "mise run //:ios-simulator:boot"
+    if target_platform == "visionos-simulator":
+        return "Boot visionOS simulator", "mise run //:visionos-simulator:boot"
     if target_platform == "tvos-simulator":
         return "Boot tvOS simulator", "mise run //:tvos-simulator:boot"
     return None
@@ -292,6 +298,14 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
+            ]
+        )
+    elif target_platform in {"visionos", "visionos-simulator"}:
+        action = "test" if target_platform == "visionos-simulator" else "build"
+        commands.extend(
+            [
+                f"mise run //bindings/swift:{action} {preset}",
+                f"mise run //bindings/rust:{action} {preset}",
             ]
         )
     elif target_platform in DESKTOP or target_platform == "emscripten":

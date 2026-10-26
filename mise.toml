@@ -133,7 +133,7 @@ sccache = "{{vars.sccache_version}}"
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
 # the native toolchain there. See cmake/toolchains/zig-linux.cmake. Nested
@@ -397,6 +397,8 @@ if [[ "$usage_preset" == linux-musl-* ]]; then
   exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$suite" -f /abi/plugin/
 elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
+elif [[ "$usage_preset" == visionos-simulator-* ]]; then
+  mise run //:apple-simulator:boot visionOS
 elif [[ "$usage_preset" == tvos-simulator-* ]]; then
   mise run //:apple-simulator:boot tvOS
 elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* || "$usage_preset" == android-x64-* ]]; then

@@ -43,7 +43,17 @@ ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The operating systems that a native build targets, as the presets name them.
 # A `platforms=` annotation lists, in this order and without repeats, the ones
 # where a function can do its work; a function without one serves them all.
-PLATFORMS = ("android", "ios", "linux", "macos", "ohos", "tvos", "web", "windows")
+PLATFORMS = (
+    "android",
+    "ios",
+    "linux",
+    "macos",
+    "ohos",
+    "tvos",
+    "visionos",
+    "web",
+    "windows",
+)
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
 # ownership=value, encoding=utf8, so a header never writes

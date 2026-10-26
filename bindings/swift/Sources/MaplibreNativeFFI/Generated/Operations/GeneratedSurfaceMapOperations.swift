@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Starts attachment of a Metal surface target.
     ///
     /// See `mln_map_attach_metal_surface` in the

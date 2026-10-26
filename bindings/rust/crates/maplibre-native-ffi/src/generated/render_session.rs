@@ -383,7 +383,12 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub unsafe fn set_metal_borrowed_texture_target(
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
@@ -410,7 +415,12 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub unsafe fn set_metal_surface_target(
         &self,
         descriptor: &MetalSurfaceDescriptor,

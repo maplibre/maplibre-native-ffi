@@ -47,17 +47,6 @@ platform = "freebsd"
 arch = "arm64"
 backends = ["vulkan", "opengl"]
 
-[[planned]]
-platform = "visionos"
-arch = "arm64"
-backends = ["metal"]
-
-[[planned]]
-platform = "visionos"
-arch = "arm64"
-simulator = true
-backends = ["metal"]
-
 # Languages that cannot reach a platform until an upstream project changes.
 # The reason is Markdown and appears in the matrix and the issue; the link
 # points upstream.
@@ -167,12 +156,6 @@ status = "path-known"
 reason = "Cross-compile with Zig against a FreeBSD 14 sysroot, and run the suite in a FreeBSD VM on the Linux x64 runner. MapLibre Native needs no change."
 
 [[gap]]
-language = "c"
-platform = "visionos"
-status = "path-known"
-reason = "Add presets and XCFramework slices like tvOS's, and run the suite on the Apple Vision Pro simulator. MapLibre Native needs no change."
-
-[[gap]]
 language = "dotnet"
 platform = "android"
 status = "path-known"
@@ -248,12 +231,6 @@ status = "path-known"
 reason = "Add the FreeBSD targets to the build and test tasks, and run the suite in the FreeBSD VM."
 
 [[gap]]
-language = "rust"
-platform = "visionos"
-status = "path-known"
-reason = "Add visionOS to the build script's target and backend selection and to the generated `cfg`s, and a simulator runner."
-
-[[gap]]
 language = "swift"
 platform = "freebsd"
 status = "path-known"
@@ -265,12 +242,6 @@ language = "swift"
 platform = "android"
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
-
-[[gap]]
-language = "swift"
-platform = "visionos"
-status = "path-known"
-reason = "Add visionOS build and simulator test cases, and `os(visionOS)` to the generated platform conditions."
 
 [[gap]]
 language = "typescript"

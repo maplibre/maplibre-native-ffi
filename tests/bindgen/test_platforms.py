@@ -26,7 +26,7 @@ typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
 void mln_map_release(mln_map map);
 typedef struct mln_canvas_target { unsigned int size; double scale; } mln_canvas_target;
 mln_status mln_map_redraw(mln_map map, mln_diagnostic *out_diagnostic);
-BIND("platforms=ios,macos,tvos")
+BIND("platforms=ios,macos,tvos,visionos")
 mln_status mln_map_use_metal(mln_map map, mln_diagnostic *out_diagnostic);
 BIND("platforms=web")
 mln_status mln_map_attach_canvas(mln_map map, const mln_canvas_target *target, mln_diagnostic *out_diagnostic);
@@ -48,7 +48,7 @@ class PlatformAnnotationTests(unittest.TestCase):
             ("web,android", "each platform once, in order"),
             ("macos,macos", "each platform once, in order"),
             (
-                "android,ios,linux,macos,ohos,tvos,web,windows",
+                "android,ios,linux,macos,ohos,tvos,visionos,web,windows",
                 "restates the default",
             ),
         ):
@@ -98,7 +98,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
     def test_rust_compiles_a_function_only_for_the_platforms_it_serves(self):
         source = rust.generate(api())["crates/maplibre-native-ffi/src/generated/map.rs"]
         self.assertIn(
-            '    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]\n'
+            '    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos", target_os = "visionos"))]\n'
             "    pub fn use_metal(",
             source,
         )
@@ -109,7 +109,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
     def test_swift_compiles_a_function_only_for_the_platforms_it_serves(self):
         generated = "\n".join(swift.generate(api()).values())
         self.assertIn(
-            "#if os(iOS) || os(macOS) || os(tvOS)\nfunc `useMetal`() throws {\n",
+            "#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)\nfunc `useMetal`() throws {\n",
             generated,
         )
         self.assertIn("func `redraw`() throws", generated)
@@ -163,7 +163,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
 
     def test_kotlin_puts_a_function_in_the_source_sets_of_its_targets(self):
         self.assertEqual(
-            kotlin.source_sets(frozenset({"ios", "macos", "tvos"})),
+            kotlin.source_sets(frozenset({"ios", "macos", "tvos", "visionos"})),
             ["jvmMain", "appleMain"],
         )
         self.assertEqual(

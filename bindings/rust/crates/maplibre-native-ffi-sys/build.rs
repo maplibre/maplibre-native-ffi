@@ -110,9 +110,10 @@ fn target_platform(os: &str, target_env: &str) -> Result<String, Box<dyn Error>>
     Ok(match (os, target_env) {
         ("linux", "gnu" | "musl") => format!("linux-{target_env}-{arch}"),
         ("linux", "ohos") => format!("ohos-{arch}"),
-        ("ios" | "tvos", "sim") => format!("{os}-simulator-{arch}"),
+        ("ios" | "tvos" | "visionos", "sim") => format!("{os}-simulator-{arch}"),
         ("ios", "macabi") => format!("ios-maccatalyst-{arch}"),
-        ("windows", "msvc") | ("macos" | "ios" | "tvos" | "android" | "emscripten", _) => {
+        ("windows", "msvc")
+        | ("macos" | "ios" | "tvos" | "visionos" | "android" | "emscripten", _) => {
             format!("{os}-{arch}")
         }
         _ => {
@@ -151,7 +152,7 @@ fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
 /// browser, and Vulkan elsewhere.
 fn default_backend(os: &str, target_env: &str) -> &'static str {
     match (os, target_env) {
-        ("macos" | "ios" | "tvos", _) => "metal",
+        ("macos" | "ios" | "tvos" | "visionos", _) => "metal",
         ("android", _) | ("linux", "ohos") => "opengl",
         ("emscripten", _) => "webgpu",
         _ => "vulkan",

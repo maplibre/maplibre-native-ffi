@@ -324,7 +324,9 @@ function(mln_native_test_environment out_environment out_modifications)
   # fixtures out of the tree that happened to compile it first.
   set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures")
   mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+  if(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=visionOS")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
     list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=tvOS")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT maccatalyst)
     list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=iOS")
@@ -604,7 +606,7 @@ function(mln_ffi_add_native_tests)
   mln_native_test_environment(test_environment test_modifications)
   set(registered_tests)
   mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$" AND NOT maccatalyst)
     # A simulator spawns one process per run, so each suite runs as one entry,
     # with the plugin group in an invocation of its own after the ABI suite.
     # Each runner's alarm stays below its entry's timeout, so the runner

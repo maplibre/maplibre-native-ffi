@@ -79,6 +79,7 @@ let package = Package(
     .iOS("15.0"),
     .macCatalyst("15.0"),
     .tvOS("15.0"),
+    .visionOS("1.0"),
   ],
   products: products,
   dependencies: dependencies,

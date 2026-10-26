@@ -171,7 +171,8 @@ def library_symbols(preset: str, library: pathlib.Path, shared: bool) -> set[str
     if library.suffix == ".dll":
         return pe_symbols(library)
     macho = library.suffix == ".dylib" or (
-        not shared and preset.startswith(("macos-", "ios-", "tvos-", "maccatalyst-"))
+        not shared
+        and preset.startswith(("macos-", "ios-", "tvos-", "visionos-", "maccatalyst-"))
     )
     names = nm_symbols(nm_tool(preset), library, dynamic=library.suffix == ".so")
     if macho:

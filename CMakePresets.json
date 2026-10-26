@@ -80,6 +80,17 @@
       }
     },
     {
+      "name": "_visionos-arm64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "toolchainFile": "${fileDir}/cmake/toolchains/apple.cmake",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_NAME": "visionOS",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "1.0"
+      }
+    },
+    {
       "name": "_android",
       "hidden": true,
       "inherits": "_single-config",
@@ -304,10 +315,22 @@
       "cacheVariables": { "CMAKE_OSX_SYSROOT": "appletvos" }
     },
     {
+      "name": "visionos-arm64-metal",
+      "displayName": "visionOS ARM64 Metal",
+      "inherits": ["_visionos-arm64", "_metal"],
+      "cacheVariables": { "CMAKE_OSX_SYSROOT": "xros" }
+    },
+    {
       "name": "tvos-simulator-arm64-metal",
       "displayName": "tvOS Simulator ARM64 Metal",
       "inherits": ["_tvos-arm64", "_metal"],
       "cacheVariables": { "CMAKE_OSX_SYSROOT": "appletvsimulator" }
+    },
+    {
+      "name": "visionos-simulator-arm64-metal",
+      "displayName": "visionOS Simulator ARM64 Metal",
+      "inherits": ["_visionos-arm64", "_metal"],
+      "cacheVariables": { "CMAKE_OSX_SYSROOT": "xrsimulator" }
     },
     {
       "name": "android-arm-egl",
@@ -494,8 +517,22 @@
       "jobs": 0
     },
     {
+      "name": "visionos-arm64-metal",
+      "configurePreset": "visionos-arm64-metal",
+      "targets": ["install"],
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
       "name": "tvos-simulator-arm64-metal",
       "configurePreset": "tvos-simulator-arm64-metal",
+      "targets": ["install"],
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "visionos-simulator-arm64-metal",
+      "configurePreset": "visionos-simulator-arm64-metal",
       "targets": ["install"],
       "configuration": "Release",
       "jobs": 0
@@ -683,6 +720,11 @@
       "inherits": "_test-base"
     },
     {
+      "name": "visionos-simulator-arm64-metal",
+      "configurePreset": "visionos-simulator-arm64-metal",
+      "inherits": "_test-base"
+    },
+    {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "configuration": "Release",
@@ -811,8 +853,20 @@
       "configurations": ["Release"]
     },
     {
+      "name": "visionos-arm64-metal",
+      "configurePreset": "visionos-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
       "name": "tvos-simulator-arm64-metal",
       "configurePreset": "tvos-simulator-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "visionos-simulator-arm64-metal",
+      "configurePreset": "visionos-simulator-arm64-metal",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -1029,10 +1083,24 @@
       ]
     },
     {
+      "name": "visionos-arm64-metal",
+      "steps": [
+        { "type": "configure", "name": "visionos-arm64-metal" },
+        { "type": "build", "name": "visionos-arm64-metal" }
+      ]
+    },
+    {
       "name": "tvos-simulator-arm64-metal",
       "steps": [
         { "type": "configure", "name": "tvos-simulator-arm64-metal" },
         { "type": "build", "name": "tvos-simulator-arm64-metal" }
+      ]
+    },
+    {
+      "name": "visionos-simulator-arm64-metal",
+      "steps": [
+        { "type": "configure", "name": "visionos-simulator-arm64-metal" },
+        { "type": "build", "name": "visionos-simulator-arm64-metal" }
       ]
     },
     {

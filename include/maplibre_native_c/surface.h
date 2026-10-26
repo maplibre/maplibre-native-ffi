@@ -116,7 +116,7 @@ typedef struct mln_open_gl_surface_descriptor {
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_map_attach_metal_surface(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -254,7 +254,7 @@ MLN_API mln_status mln_map_attach_web_gpu_surface(
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;platforms=ios,macos,tvos")
+MLN_BINDING("execution=operation;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_render_session_set_metal_surface_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

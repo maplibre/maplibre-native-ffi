@@ -1756,6 +1756,61 @@ jobs:
     needs:
       - plan
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+  target-visionos-arm64-metal:
+    name: target / visionos-arm64-metal
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: visionos-arm64-metal
+          gradle: false
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build visionos-arm64-metal
+      - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run archive-native visionos-arm64-metal
+      - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
+        run: mise run install-native-package visionos-arm64-metal build/packages/native/dist/maplibre-native-c-visionos-arm64-metal.tar.gz
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/swift:build visionos-arm64-metal
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/rust:build visionos-arm64-metal
+      - name: Upload native artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-package-visionos-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-visionos-arm64-metal.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
+    needs:
+      - plan
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1816,6 +1871,67 @@ jobs:
     needs:
       - plan
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+  target-visionos-simulator-arm64-metal:
+    name: target / visionos-simulator-arm64-metal
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: visionos-simulator-arm64-metal
+          gradle: false
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build visionos-simulator-arm64-metal
+      - name: Boot visionOS simulator
+        id: boot
+        run: mise run //:visionos-simulator:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test visionos-simulator-arm64-metal
+      - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run archive-native visionos-simulator-arm64-metal
+      - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
+        run: mise run install-native-package visionos-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-visionos-simulator-arm64-metal.tar.gz
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/swift:test visionos-simulator-arm64-metal
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/rust:test visionos-simulator-arm64-metal
+      - name: Upload native artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-package-visionos-simulator-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-visionos-simulator-arm64-metal.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        run: exit 1
+    needs:
+      - plan
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
   target-android-arm-egl:
     name: target / android-arm-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2901,7 +3017,9 @@ jobs:
       - target-ios-simulator-arm64-metal
       - target-ios-maccatalyst-arm64-metal
       - target-tvos-arm64-metal
+      - target-visionos-arm64-metal
       - target-tvos-simulator-arm64-metal
+      - target-visionos-simulator-arm64-metal
     steps:
       - name: Check out repository
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
@@ -2990,7 +3108,9 @@ jobs:
       - target-ios-simulator-arm64-metal
       - target-ios-maccatalyst-arm64-metal
       - target-tvos-arm64-metal
+      - target-visionos-arm64-metal
       - target-tvos-simulator-arm64-metal
+      - target-visionos-simulator-arm64-metal
       - target-android-arm-egl
       - target-android-arm-vulkan
       - target-android-arm64-egl

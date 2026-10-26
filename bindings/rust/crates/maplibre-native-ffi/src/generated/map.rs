@@ -229,7 +229,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub unsafe fn attach_metal_borrowed_texture(
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
@@ -263,7 +268,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub unsafe fn attach_metal_owned_texture(
         &self,
         descriptor: &MetalOwnedTextureDescriptor,
@@ -297,7 +307,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
     pub unsafe fn attach_metal_surface(
         &self,
         descriptor: &MetalSurfaceDescriptor,

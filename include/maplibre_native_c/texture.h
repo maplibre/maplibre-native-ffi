@@ -483,7 +483,7 @@ typedef struct mln_texture_readback_result {
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_map_attach_metal_owned_texture(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -526,7 +526,7 @@ MLN_API mln_status mln_map_attach_metal_owned_texture(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_map_attach_metal_borrowed_texture(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -789,7 +789,7 @@ MLN_API mln_status mln_map_attach_web_gpu_borrowed_texture(
  *   one the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;platforms=ios,macos,tvos")
+MLN_BINDING("execution=operation;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
@@ -964,7 +964,7 @@ MLN_API mln_status mln_render_session_read_texture(
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_BINDING("view_owner=frame;platforms=ios,macos,tvos")
+MLN_BINDING("view_owner=frame;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame,
   mln_metal_texture_frame* out_frame MLN_BINDING("direction=out"),

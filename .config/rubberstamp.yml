@@ -230,12 +230,12 @@ ci:
           then: apply
     apple-mobile:
       covers: >-
-        iOS, Mac Catalyst, and tvOS with Metal, on devices and simulators.
-        Builds the native library and the Kotlin, Swift, and Dart bindings,
-        builds the Swift example for iOS, runs simulator tests, and packages the
-        XCFramework. Catches mobile SDK, cross-compilation, and framework
-        packaging problems. Platform-independent code that Linux x64 tests
-        doesn't need it.
+        iOS, Mac Catalyst, tvOS, and visionOS with Metal, on devices and
+        simulators. Builds the native library and the supported Kotlin, Swift,
+        Rust, and Dart bindings, builds the Swift example for iOS, runs
+        simulator tests, and packages the XCFramework. Catches mobile SDK,
+        cross-compilation, and framework packaging problems.
+        Platform-independent code that Linux x64 tests doesn't need it.
       rules:
         - if:
             files:

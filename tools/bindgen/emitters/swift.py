@@ -23,6 +23,7 @@ PLATFORMS = {
     "linux": "os(Linux)",
     "macos": "os(macOS)",
     "tvos": "os(tvOS)",
+    "visionos": "os(visionOS)",
 }
 
 # JSON is text, so it takes and returns a String as UTF-8 text does.

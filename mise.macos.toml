@@ -22,6 +22,10 @@ run = 'bash "$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" boot "$usage_runtim
 description = "Boot an available iPhone simulator and wait until it is ready."
 run = [{ task = "//:apple-simulator:boot", args = ["iOS"] }]
 
+[tasks."visionos-simulator:boot"]
+description = "Boot an available Apple Vision Pro simulator and wait until it is ready."
+run = [{ task = "//:apple-simulator:boot", args = ["visionOS"] }]
+
 [tasks."tvos-simulator:boot"]
 description = "Boot an available Apple TV simulator and wait until it is ready."
 run = [{ task = "//:apple-simulator:boot", args = ["tvOS"] }]

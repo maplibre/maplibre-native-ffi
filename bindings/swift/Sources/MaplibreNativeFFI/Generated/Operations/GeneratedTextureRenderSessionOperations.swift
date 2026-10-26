@@ -18,7 +18,7 @@ public extension RenderSessionHandle {
     ) }
   }
 
-  #if os(iOS) || os(macOS) || os(tvOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Starts an ordered replacement of every texture of a caller-owned Metal
     /// ring.
     ///

@@ -189,7 +189,7 @@ endfunction()
 # Writes a dSYM beside an installed Apple binary from the unstripped build-tree
 # binary, so debuggers and crash reports can name what a stripping install
 # removes. Release builds have no debug information, so the dSYM holds only the
-# symbol table. CMake doesn't strip iOS or tvOS binaries, so this does.
+# symbol table. CMake doesn't strip embedded Apple binaries, so this does.
 function(mln_ffi_install_apple_dsym target destination component)
   if(NOT APPLE)
     return()
@@ -215,7 +215,7 @@ function(mln_ffi_install_apple_dsym target destination component)
       file(REMOVE_RECURSE \"${dsym}/Contents/Resources/Relocations\")")
   mln_ffi_apple_is_embedded(embedded)
   if(embedded)
-    # An iOS or tvOS framework is flat, with its binary at the bundle's root.
+    # An embedded Apple framework is flat, with its binary at the bundle's root.
     set(binary "${bundle}")
     if(framework)
       set(binary "${bundle}/$<TARGET_FILE_NAME:${target}>")
