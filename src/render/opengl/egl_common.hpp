@@ -5,7 +5,7 @@
 #include <cstddef>
 
 #include <EGL/egl.h>
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__APPLE__)
 #include <dlfcn.h>
 #endif
 #if defined(__APPLE__)
@@ -46,8 +46,9 @@ inline auto open_loaded_client_library(const char* library) -> void* {
 }
 #endif
 
-#if defined(__linux__) || defined(__APPLE__)
-// Linux binds a leaf soname to the image already loaded, so it needs no search.
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__APPLE__)
+// Linux and FreeBSD bind a leaf soname to the image already loaded, so it needs
+// no search.
 inline auto open_egl_client_library(const char* library) -> void* {
 #if defined(__APPLE__)
   if (auto* loaded = open_loaded_client_library(library); loaded != nullptr) {

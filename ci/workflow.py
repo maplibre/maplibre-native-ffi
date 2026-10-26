@@ -103,7 +103,9 @@ def runner(preset: str) -> str:
         return MACOS_RUNNER
     if target_platform == "windows":
         return WINDOWS_ARM_RUNNER if target_architecture == "arm64" else WINDOWS_RUNNER
-    if target_platform in {"android", "emscripten", "ohos"}:
+    # FreeBSD cross-compiles on Linux, and its suites run in a FreeBSD virtual
+    # machine there.
+    if target_platform in {"android", "emscripten", "freebsd", "ohos"}:
         return LINUX_RUNNER
     raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
 
@@ -202,6 +204,8 @@ def device_boot(preset: str) -> tuple[str, str] | None:
         return "Boot Android emulator", f"mise run //:android-emulator:boot x86_64{api}"
     if target_platform == "ohos" and preset in EMULATOR_TESTED:
         return "Boot OpenHarmony emulator", "mise run //:ohos-emulator:boot"
+    if target_platform == "freebsd":
+        return "Boot FreeBSD virtual machine", "mise run //:freebsd-vm:boot"
     if target_platform == "ios-simulator":
         return "Boot iOS simulator", "mise run //:ios-simulator:boot"
     if target_platform == "visionos-simulator":

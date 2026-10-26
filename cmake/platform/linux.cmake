@@ -1,9 +1,10 @@
-# The toolchain builds against its selected libc and links its own static C++
-# runtime, rather than taking either from the build host. The glibc target uses
-# an old ABI floor, and the musl target stays independent of a host sysroot.
-# That is what lets each distributed archive stand on its own.
+# The Linux and FreeBSD targets. The toolchain builds against its selected libc
+# and links its own static C++ runtime, rather than taking either from the build
+# host. The glibc and FreeBSD targets use an old ABI floor, and the musl target
+# stays independent of a host sysroot. That is what lets each distributed
+# archive stand on its own.
 #
-# See cmake/toolchains/zig-linux.cmake.
+# See cmake/toolchains/zig.cmake.
 function(mln_ffi_configure_linux_archive_contents target)
   if(NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
     return()
@@ -93,8 +94,8 @@ function(mln_ffi_configure_linux_archive_contents target)
       MLN_FFI_ARCHIVE_RENAME_SYMBOLS
       "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
       # The graphics loaders the test harness links come from the build host.
-      # The glibc test runs there, and the musl test resolves matching loaders
-      # inside its Alpine container.
+      # The glibc test runs there, and the musl and FreeBSD tests resolve
+      # matching loaders inside their Alpine container and virtual machine.
       MLN_FFI_TEST_LINK_OPTIONS
       "LINKER:--allow-shlib-undefined")
 endfunction()
@@ -159,7 +160,10 @@ function(mln_ffi_configure_platform_dependencies target)
     set(target_architecture x64)
     set(zig_architecture x86_64)
   endif()
-  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+  if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    set(target_platform "freebsd-${target_architecture}")
+    set(zig_target "${zig_architecture}-freebsd")
+  elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl")
     set(target_platform "linux-musl-${target_architecture}")
     set(zig_target "${zig_architecture}-linux-musl")
   else()

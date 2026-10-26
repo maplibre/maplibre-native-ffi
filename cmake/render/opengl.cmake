@@ -122,7 +122,7 @@ function(mln_ffi_configure_renderer target)
     # table, because their loader is part of the platform at a fixed location.
     set(MLN_FFI_GL_FUNCTIONS_SOURCE
         ${MLN_FFI_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
-    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Darwin)$")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|Darwin)$")
       set(MLN_FFI_GL_FUNCTIONS_GENERATED
           ${CMAKE_CURRENT_BINARY_DIR}/generated/gl_functions.cpp)
       execute_process(
@@ -189,7 +189,7 @@ function(mln_ffi_configure_renderer target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
-    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Darwin)$")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|Darwin)$")
       # Supplies the EGL entry points, so nothing links an EGL loader.
       list(APPEND MLN_FFI_OPENGL_SOURCES
            ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)

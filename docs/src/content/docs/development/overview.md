@@ -55,6 +55,16 @@ image mise installed. A task reuses it, whoever started it, and a new one
 forwards hdc from the first free port from 55555 on. Run
 `mise run //:ohos-emulator:stop` when no session is using it.
 
+## FreeBSD
+
+The FreeBSD presets cross-compile on a Linux host. `mise run test` runs their
+suites in a FreeBSD virtual machine, which it boots on demand with
+[anyvm](https://github.com/anyvm-org/anyvm) and leaves running. The machine
+needs QEMU, OVMF, and access to `/dev/kvm`; on Ubuntu, install
+`qemu-system-x86`, `qemu-utils`, and `ovmf`. Each checkout gets its own machine,
+which mounts the checkout at the same path and keeps its disk under
+`build/freebsd-vm`. Run `mise run //:freebsd-vm:stop` to shut it down.
+
 ## Debug on a CI runner
 
 [Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox) runs

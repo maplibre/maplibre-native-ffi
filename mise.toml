@@ -72,6 +72,7 @@ android_ndk_version = "30.0.16248370"
 android_system_image_api = "36"
 # The oldest emulator the suite runs on; see scripts/boot-android-emulator.sh.
 android_emulator_version = "37.3.5"
+anyvm_version = "0.7.5"
 bun_version = "1.4.4"
 cargo_about_version = "0.9.2"
 cmake_version = "4.4.4"
@@ -116,6 +117,11 @@ zig_version = "0.17.0"
 ninja = "{{vars.ninja_version}}"
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
+# The FreeBSD suites run in a FreeBSD virtual machine that this QEMU launcher
+# boots on a Linux host. See scripts/boot-freebsd-vm.sh.
+"http:anyvm" = { version = "{{vars.anyvm_version}}", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5", os = [
+  "linux",
+] }
 
 # Node.js ecosystem
 "core:node" = "{{vars.node_version}}"
@@ -133,12 +139,12 @@ sccache = "{{vars.sccache_version}}"
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
-# The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
-# the native toolchain there. See cmake/toolchains/zig-linux.cmake. Nested
-# configs request the same os set so `mise install --monorepo` does not see
-# conflicting option maps for one install destination.
+# The native CMake build compiles the Linux and FreeBSD targets with `zig cc`,
+# so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake.
+# Nested configs request the same os set so `mise install --monorepo` does not
+# see conflicting option maps for one install destination.
 "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
@@ -379,22 +385,27 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # as pages in headless Chromium, four for the ABI suite and one for the internal
 # suite; see scripts/run-browser-test.mjs for how a browser is located. Every
 # target that runs through ctest first runs the Rust platform crate's host unit
-# tests with cargo. Emulator and musl targets run each executable once instead:
-# the suites, then the exit programs, then the ABI suite's plugin group in an
-# invocation of its own, since a plugin registration lasts for the rest of the
-# process.
+# tests with cargo. Emulator, musl, and FreeBSD targets run each executable once
+# instead: the suites, then the exit programs, then the ABI suite's plugin group
+# in an invocation of its own, since a plugin registration lasts for the rest of
+# the process.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
 suite="$build_dir/mln_native_abi_tests"
 internal="$build_dir/mln_native_internal_tests"
 exit_programs=("$build_dir"/mln_native_exit_*)
-if [[ "$usage_preset" == linux-musl-* ]]; then
-  "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$suite" -x /abi/plugin/
-  "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$internal"
+if [[ "$usage_preset" == linux-musl-* || "$usage_preset" == freebsd-* ]]; then
+  if [[ "$usage_preset" == freebsd-* ]]; then
+    runner="$MISE_MONOREPO_ROOT/scripts/run-freebsd-test.sh"
+  else
+    runner="$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh"
+  fi
+  "$runner" "$usage_preset" "$suite" -x /abi/plugin/
+  "$runner" "$usage_preset" "$internal"
   for program in "${exit_programs[@]}"; do
-    "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$program"
+    "$runner" "$usage_preset" "$program"
   done
-  exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$suite" -f /abi/plugin/
+  exec "$runner" "$usage_preset" "$suite" -f /abi/plugin/
 elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
 elif [[ "$usage_preset" == visionos-simulator-* ]]; then
@@ -521,6 +532,14 @@ run = '"$MISE_MONOREPO_ROOT/scripts/boot-ohos-emulator.sh"'
 [tasks."ohos-emulator:stop"]
 description = "Stop the shared OpenHarmony emulator, which any session on the machine may be using."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
+
+[tasks."freebsd-vm:boot"]
+description = "Boot this checkout's FreeBSD virtual machine, or reuse it, and wait until it is ready."
+run = '"$MISE_MONOREPO_ROOT/scripts/boot-freebsd-vm.sh"'
+
+[tasks."freebsd-vm:stop"]
+description = "Shut down this checkout's FreeBSD virtual machine."
+run = '"$MISE_MONOREPO_ROOT/scripts/stop-freebsd-vm.sh"'
 
 [tasks.check]
 tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [

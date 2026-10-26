@@ -81,7 +81,7 @@ if(MLN_FFI_ARTIFACT_NAME)
   set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
   set(CPACK_MONOLITHIC_INSTALL ON)
   # Apple packages keep the stripped symbols in a dSYM beside each binary.
-  if(APPLE OR CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS)$")
+  if(APPLE OR CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|FreeBSD|OHOS)$")
     set(CPACK_STRIP_FILES ON)
   endif()
   include(CPack)

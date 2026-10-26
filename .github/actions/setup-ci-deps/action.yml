@@ -172,13 +172,27 @@ runs:
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes qemu-system-x86
 
+    # The FreeBSD suites run in a virtual machine that anyvm boots from a UEFI
+    # disk image.
+    - name: Install the FreeBSD virtual machine host
+      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'freebsd-') }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes \
+          ovmf \
+          qemu-system-x86 \
+          qemu-utils
+
     # The hosted runner exposes /dev/kvm, and this rule grants the runner
-    # process access to hardware acceleration. Without it both emulators fall
-    # back to software emulation, which no job here has the time budget for.
+    # process access to hardware acceleration. Without it the emulators and the
+    # FreeBSD virtual machine fall back to software emulation, which no job here
+    # has the time budget for.
     - name: Enable KVM for the emulator
       if:
         ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' ||
-        startsWith(inputs.target, 'android-x64-')) }}
+        startsWith(inputs.target, 'android-x64-') || startsWith(inputs.target,
+        'freebsd-')) }}
       shell: bash
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

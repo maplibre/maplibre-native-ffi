@@ -4,7 +4,7 @@ run = "uv build --wheel --out-dir dist ."
 
 # The extension embeds the native archive, so a wheel carries one binary and
 # needs no repair. On Linux the link goes through zig: the archive is built
-# against the glibc in cmake/toolchains/zig-linux.cmake, and the host's linker
+# against the glibc in cmake/toolchains/zig.cmake, and the host's linker
 # would bind its libm references to the build machine's glibc instead.
 [tasks.build-runtime]
 description = "Build the runtime wheel for a preset's render backend into dist/."

@@ -1278,6 +1278,31 @@ url = "https://dl.google.com/go/go1.27.3.windows-arm64.zip"
 checksum = "sha256:f26081f438319757f8a1b46d7d0b2c5ec7583d4038e485e0aa725cfde7885fff"
 url = "https://dl.google.com/go/go1.27.3.windows-amd64.zip"
 
+[[tools."http:anyvm"]]
+version = "0.7.5"
+backend = "http:anyvm"
+specifiers = ["0.7.5"]
+
+[tools."http:anyvm"."platforms.linux-arm64"]
+checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5"
+url = "https://github.com/anyvm-org/anyvm/releases/download/v0.7.5/anyvm.py"
+
+[tools."http:anyvm"."platforms.linux-x64"]
+checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5"
+url = "https://github.com/anyvm-org/anyvm/releases/download/v0.7.5/anyvm.py"
+
+[tools."http:anyvm"."platforms.macos-arm64"]
+checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5"
+url = "https://github.com/anyvm-org/anyvm/releases/download/v0.7.5/anyvm.py"
+
+[tools."http:anyvm"."platforms.windows-arm64"]
+checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5"
+url = "https://github.com/anyvm-org/anyvm/releases/download/v0.7.5/anyvm.py"
+
+[tools."http:anyvm"."platforms.windows-x64"]
+checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5"
+url = "https://github.com/anyvm-org/anyvm/releases/download/v0.7.5/anyvm.py"
+
 [[tools.java]]
 version = "zulu-25.36.205.0"
 backend = "core:java"
@@ -1454,7 +1479,7 @@ specifiers = ["1.99.1"]
 [tools.rust.options]
 components = "clippy,rust-src,rustfmt"
 profile = "minimal"
-targets = "aarch64-apple-ios,aarch64-apple-ios-macabi,aarch64-apple-ios-sim,aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-musl,aarch64-unknown-linux-ohos,armv7-linux-androideabi,wasm32-unknown-emscripten,x86_64-linux-android,x86_64-pc-windows-msvc,x86_64-unknown-linux-musl,x86_64-unknown-linux-ohos"
+targets = "aarch64-apple-ios,aarch64-apple-ios-macabi,aarch64-apple-ios-sim,aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-musl,aarch64-unknown-linux-ohos,armv7-linux-androideabi,wasm32-unknown-emscripten,x86_64-linux-android,x86_64-pc-windows-msvc,x86_64-unknown-freebsd,x86_64-unknown-linux-musl,x86_64-unknown-linux-ohos"
 
 [[tools.sccache]]
 version = "0.18.0"

@@ -8,7 +8,7 @@
 
 #include "render/opengl/egl_common.hpp"
 
-#if !defined(__linux__) && !defined(__APPLE__)
+#if !defined(__linux__) && !defined(__FreeBSD__) && !defined(__APPLE__)
 // Without dlopen the resolver returns null for every entry point. Platforms
 // without one link their loader instead of generating this table.
 #error "the generated GL table needs a POSIX dynamic loader"

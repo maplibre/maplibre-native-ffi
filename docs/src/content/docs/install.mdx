@@ -43,12 +43,12 @@ cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
 On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
-the executable. Linux and macOS executables find the library through the rpath
-that pkg-config adds.
+the executable. Linux, FreeBSD, and macOS executables find the library through
+the rpath that pkg-config adds.
 
-Linux prefixes also carry a complete static archive. A static musl executable
-can link it for the non-rendering APIs, but rendering loads EGL or Vulkan
-drivers at run time and needs a dynamic loader.
+Linux and FreeBSD prefixes also carry a complete static archive. A static musl
+executable can link it for the non-rendering APIs, but rendering loads EGL or
+Vulkan drivers at run time and needs a dynamic loader.
 
 ### Add the XCFramework to an Apple app
 
@@ -527,6 +527,11 @@ nor EGL, so a host that chooses one of those backends loads
 
 Windows runs the Vulkan and OpenGL backends, with WGL as the OpenGL context
 provider.
+
+### FreeBSD
+
+FreeBSD 14.0 and later runs the Vulkan and OpenGL backends on x64, with EGL as
+the OpenGL context provider. Only the C library ships for FreeBSD so far.
 
 ### Android
 

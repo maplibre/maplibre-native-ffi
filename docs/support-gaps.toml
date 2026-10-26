@@ -39,11 +39,6 @@ backends = ["vulkan", "opengl"]
 
 [[planned]]
 platform = "freebsd"
-arch = "x64"
-backends = ["vulkan", "opengl"]
-
-[[planned]]
-platform = "freebsd"
 arch = "arm64"
 backends = ["vulkan", "opengl"]
 
@@ -204,12 +199,6 @@ language = "c"
 platform = "windows-mingw"
 status = "path-known"
 reason = "Build with llvm-mingw and a static libc++, link the Rust platform crate for `*-pc-windows-gnullvm`, and run the suite on the Windows runners. MapLibre Native needs no change."
-
-[[gap]]
-language = "c"
-platform = "freebsd"
-status = "path-known"
-reason = "Cross-compile with Zig against a FreeBSD 14 sysroot, and run the suite in a FreeBSD VM on the Linux x64 runner. MapLibre Native needs no change."
 
 [[gap]]
 language = "dotnet"

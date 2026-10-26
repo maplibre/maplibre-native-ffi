@@ -1,20 +1,29 @@
-# Builds the Linux targets with `zig cc` / `zig c++` against the selected libc
-# and LLVM libc++, rather than the build host's GCC, libc, and libstdc++.
+# Builds the Linux and FreeBSD targets with `zig cc` / `zig c++` against the
+# selected libc and LLVM libc++, rather than the build host's GCC, libc, and
+# libstdc++.
 #
-# This sets the glibc floor from the toolchain instead of from whichever image
+# This sets the libc floor from the toolchain instead of from whichever image
 # the build runs on, and leaves the artifacts free of any libstdc++ ABI
 # requirement. Kotlin/Native's bundled Linux sysroot is the tightest consumer:
 # it supplies glibc 2.19 and GCC 8.3, and it statically links its own libstdc++
 # into every consumer binary.
 #
 # A same-architecture glibc preset is a native build, so CMAKE_SYSTEM_NAME stays
-# unset and try_run, find_package, and test binaries work on the host. Musl is
-# always a cross build and runs its test binaries inside Alpine.
+# unset and try_run, find_package, and test binaries work on the host. Musl and
+# FreeBSD are always cross builds, and run their test binaries inside Alpine
+# and a FreeBSD virtual machine.
 
 if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-  message(FATAL_ERROR "cmake/toolchains/zig-linux.cmake targets Linux hosts")
+  message(FATAL_ERROR "cmake/toolchains/zig.cmake targets Linux hosts")
 endif()
 
+set(MLN_FFI_ZIG_OS "linux"
+    CACHE STRING "Target operating system (linux or freebsd)")
+set_property(CACHE MLN_FFI_ZIG_OS PROPERTY STRINGS linux freebsd)
+if(NOT MLN_FFI_ZIG_OS MATCHES "^(linux|freebsd)$")
+  message(
+    FATAL_ERROR "Unsupported Zig target operating system: ${MLN_FFI_ZIG_OS}")
+endif()
 set(MLN_FFI_ZIG_GLIBC "2.17"
     CACHE STRING "Oldest glibc release the Linux artifacts may require")
 set(MLN_FFI_ZIG_LIBC "gnu"
@@ -23,9 +32,18 @@ set_property(CACHE MLN_FFI_ZIG_LIBC PROPERTY STRINGS gnu musl)
 if(NOT MLN_FFI_ZIG_LIBC MATCHES "^(gnu|musl)$")
   message(FATAL_ERROR "Unsupported Linux libc ABI: ${MLN_FFI_ZIG_LIBC}")
 endif()
+# Zig links FreeBSD's libc from its own stubs, which start at 14.0.
+set(MLN_FFI_ZIG_FREEBSD "14.0"
+    CACHE STRING "Oldest FreeBSD release the FreeBSD artifacts may require")
 
-list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MLN_FFI_TARGET_ARCHITECTURE
-     MLN_FFI_ZIG_GLIBC MLN_FFI_ZIG_LIBC)
+list(
+  APPEND
+  CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+  MLN_FFI_TARGET_ARCHITECTURE
+  MLN_FFI_ZIG_OS
+  MLN_FFI_ZIG_GLIBC
+  MLN_FFI_ZIG_LIBC
+  MLN_FFI_ZIG_FREEBSD)
 
 if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
   set(MLN_FFI_ZIG_ARCH "aarch64")
@@ -33,17 +51,24 @@ else()
   set(MLN_FFI_ZIG_ARCH "x86_64")
 endif()
 
-if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+if(MLN_FFI_ZIG_OS STREQUAL "freebsd")
+  set(MLN_FFI_ZIG_TRIPLE
+      "${MLN_FFI_ZIG_ARCH}-freebsd.${MLN_FFI_ZIG_FREEBSD}-none")
+elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl")
   set(MLN_FFI_ZIG_TRIPLE "${MLN_FFI_ZIG_ARCH}-linux-musl")
 else()
   set(MLN_FFI_ZIG_TRIPLE "${MLN_FFI_ZIG_ARCH}-linux-gnu.${MLN_FFI_ZIG_GLIBC}")
 endif()
 
 # A musl target is a cross build even when its architecture matches a glibc
-# host. Marking it as one keeps configure-time probes from executing binaries
-# through the wrong dynamic loader.
-if(MLN_FFI_ZIG_LIBC STREQUAL "musl"
-   OR NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "${MLN_FFI_ZIG_ARCH}")
+# host, as a FreeBSD target always is. Marking it as one keeps configure-time
+# probes from executing binaries through the wrong dynamic loader.
+if(MLN_FFI_ZIG_OS STREQUAL "freebsd")
+  set(CMAKE_SYSTEM_NAME FreeBSD)
+  set(CMAKE_SYSTEM_VERSION "${MLN_FFI_ZIG_FREEBSD}")
+  set(CMAKE_SYSTEM_PROCESSOR "${MLN_FFI_ZIG_ARCH}")
+elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl"
+       OR NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "${MLN_FFI_ZIG_ARCH}")
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_PROCESSOR "${MLN_FFI_ZIG_ARCH}")
 endif()

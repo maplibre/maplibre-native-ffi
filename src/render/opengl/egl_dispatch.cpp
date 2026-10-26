@@ -1,5 +1,5 @@
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL) && \
-  (defined(__linux__) || defined(__APPLE__))
+  (defined(__linux__) || defined(__FreeBSD__) || defined(__APPLE__))
 
 // The EGL entry points the library and its vendored sources call, defined here
 // so nothing links against an EGL loader. The loader is opened on first use.

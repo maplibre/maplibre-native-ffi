@@ -210,6 +210,18 @@ ci:
             files:
               - third_party/maplibre-native
           then: apply
+    freebsd:
+      covers: >-
+        FreeBSD x64 with OpenGL (EGL) and Vulkan. Cross-compiles the native
+        library on Linux and runs the C tests in a FreeBSD virtual machine.
+        Catches assumptions that only Linux holds, in platform conditionals, the
+        Zig toolchain, and the Rust platform crate. Platform-independent code
+        that Linux x64 tests doesn't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
     macos:
       covers: >-
         macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the

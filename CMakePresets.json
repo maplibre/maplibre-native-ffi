@@ -24,14 +24,14 @@
       "name": "_linux-x64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${fileDir}/cmake/toolchains/zig-linux.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/zig.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "x64" }
     },
     {
       "name": "_linux-arm64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${fileDir}/cmake/toolchains/zig-linux.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/zig.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "arm64" }
     },
     {
@@ -45,6 +45,16 @@
       "hidden": true,
       "inherits": "_linux-arm64",
       "cacheVariables": { "MLN_FFI_ZIG_LIBC": "musl" }
+    },
+    {
+      "name": "_freebsd-x64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "toolchainFile": "${fileDir}/cmake/toolchains/zig.cmake",
+      "cacheVariables": {
+        "MLN_FFI_TARGET_ARCHITECTURE": "x64",
+        "MLN_FFI_ZIG_OS": "freebsd"
+      }
     },
     {
       "name": "_macos-arm64",
@@ -259,6 +269,16 @@
       "inherits": ["_linux-musl-arm64", "_vulkan"]
     },
     {
+      "name": "freebsd-x64-egl",
+      "displayName": "FreeBSD x64 EGL",
+      "inherits": ["_freebsd-x64", "_egl"]
+    },
+    {
+      "name": "freebsd-x64-vulkan",
+      "displayName": "FreeBSD x64 Vulkan",
+      "inherits": ["_freebsd-x64", "_vulkan"]
+    },
+    {
       "name": "emscripten-wasm32-webgl",
       "displayName": "Browser WASM32 WebGL",
       "inherits": ["_emscripten-wasm32", "_webgl"]
@@ -461,6 +481,18 @@
     {
       "name": "linux-musl-arm64-vulkan",
       "configurePreset": "linux-musl-arm64-vulkan",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "freebsd-x64-egl",
+      "configurePreset": "freebsd-x64-egl",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "freebsd-x64-vulkan",
+      "configurePreset": "freebsd-x64-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
@@ -685,6 +717,16 @@
       "inherits": "_test-base"
     },
     {
+      "name": "freebsd-x64-egl",
+      "configurePreset": "freebsd-x64-egl",
+      "inherits": "_test-base"
+    },
+    {
+      "name": "freebsd-x64-vulkan",
+      "configurePreset": "freebsd-x64-vulkan",
+      "inherits": "_test-base"
+    },
+    {
       "name": "macos-arm64-metal",
       "configurePreset": "macos-arm64-metal",
       "inherits": "_test-base"
@@ -807,6 +849,18 @@
     {
       "name": "linux-musl-arm64-vulkan",
       "configurePreset": "linux-musl-arm64-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "freebsd-x64-egl",
+      "configurePreset": "freebsd-x64-egl",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "freebsd-x64-vulkan",
+      "configurePreset": "freebsd-x64-vulkan",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -1024,6 +1078,20 @@
       "steps": [
         { "type": "configure", "name": "linux-musl-arm64-vulkan" },
         { "type": "build", "name": "linux-musl-arm64-vulkan" }
+      ]
+    },
+    {
+      "name": "freebsd-x64-egl",
+      "steps": [
+        { "type": "configure", "name": "freebsd-x64-egl" },
+        { "type": "build", "name": "freebsd-x64-egl" }
+      ]
+    },
+    {
+      "name": "freebsd-x64-vulkan",
+      "steps": [
+        { "type": "configure", "name": "freebsd-x64-vulkan" },
+        { "type": "build", "name": "freebsd-x64-vulkan" }
       ]
     },
     {

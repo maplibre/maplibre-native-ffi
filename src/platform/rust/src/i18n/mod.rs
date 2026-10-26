@@ -1,17 +1,17 @@
 //! Locale-sensitive style expressions on the platforms whose C++ side takes its
-//! locale services from here: Linux, from ICU4X, and Windows, from the ICU that
-//! ships with the system.
+//! locale services from here: Linux and FreeBSD, from ICU4X, and Windows, from
+//! the ICU that ships with the system.
 
 use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::{ptr, slice};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod icu4x;
 #[cfg(windows)]
 mod windows;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use icu4x as backend;
 #[cfg(windows)]
 use windows as backend;

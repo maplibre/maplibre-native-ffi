@@ -17,10 +17,10 @@ image = { version = "0.25.8", default-features = false, features = [
   "webp",
 ] }
 
-# Linux has no portable locale services, so its locale-sensitive style
-# expressions use ICU4X with compiled CLDR data. Currency patterns come from the
-# experimental crate, which needs the matching ICU4X release.
-[target.'cfg(target_os = "linux")'.dependencies]
+# Linux and FreeBSD have no portable locale services, so their locale-sensitive
+# style expressions use ICU4X with compiled CLDR data. Currency patterns come
+# from the experimental crate, which needs the matching ICU4X release.
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 fixed_decimal = { version = "0.7.3", features = ["ryu"] }
 icu_collator = "2.4.0"
 icu_decimal = "2.4.0"

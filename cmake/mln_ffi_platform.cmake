@@ -1,5 +1,5 @@
 function(mln_ffi_validate_platform)
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
     return()
   endif()
 
@@ -9,12 +9,13 @@ function(mln_ffi_validate_platform)
     set(MLN_FFI_DETECTED_ARCHITECTURE arm64)
   else()
     message(
-      FATAL_ERROR "Unsupported Linux architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+      FATAL_ERROR
+        "Unsupported ${CMAKE_SYSTEM_NAME} architecture: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
   if(NOT MLN_FFI_TARGET_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
     message(
       FATAL_ERROR
-        "Linux preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+        "${CMAKE_SYSTEM_NAME} preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
   endif()
 endfunction()
 
@@ -31,7 +32,7 @@ function(mln_ffi_select_platform)
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/platform/emscripten.cmake")
   elseif(APPLE)
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/platform/apple.cmake")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  elseif(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/platform/linux.cmake")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/platform/android.cmake")

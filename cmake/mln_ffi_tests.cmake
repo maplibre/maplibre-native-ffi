@@ -42,9 +42,10 @@ function(mln_native_active_file_tags out_var)
   if(EMSCRIPTEN)
     list(APPEND tags emscripten)
   endif()
-  # Linux, OpenHarmony, and Windows evaluate locale expressions with ICU: ICU4X
-  # on Linux and the system's ICU4C on OpenHarmony and Windows.
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|OHOS|Windows)$")
+  # Linux, FreeBSD, OpenHarmony, and Windows evaluate locale expressions with
+  # ICU: ICU4X on Linux and FreeBSD and the system's ICU4C on OpenHarmony and
+  # Windows.
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|OHOS|Windows)$")
     list(APPEND tags icu)
   endif()
   set(${out_var} ${tags} PARENT_SCOPE)

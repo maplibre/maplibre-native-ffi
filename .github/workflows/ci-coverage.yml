@@ -972,6 +972,102 @@ jobs:
     needs:
       - plan
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
+  target-freebsd-x64-egl:
+    name: target / freebsd-x64-egl
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: freebsd-x64-egl
+          gradle: false
+      - id: build
+        run: mise run build freebsd-x64-egl
+      - name: Boot FreeBSD virtual machine
+        id: boot
+        run: mise run //:freebsd-vm:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test freebsd-x64-egl
+      - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run archive-native freebsd-x64-egl
+      - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
+        run: mise run install-native-package freebsd-x64-egl build/packages/native/dist/maplibre-native-c-freebsd-x64-egl.tar.gz
+      - name: Upload native artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-package-freebsd-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-freebsd-x64-egl.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure') }}
+        run: exit 1
+    needs:
+      - plan
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'freebsd')
+  target-freebsd-x64-vulkan:
+    name: target / freebsd-x64-vulkan
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: freebsd-x64-vulkan
+          gradle: false
+      - id: build
+        run: mise run build freebsd-x64-vulkan
+      - name: Boot FreeBSD virtual machine
+        id: boot
+        run: mise run //:freebsd-vm:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test freebsd-x64-vulkan
+      - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run archive-native freebsd-x64-vulkan
+      - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
+        run: mise run install-native-package freebsd-x64-vulkan build/packages/native/dist/maplibre-native-c-freebsd-x64-vulkan.tar.gz
+      - name: Upload native artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-package-freebsd-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-freebsd-x64-vulkan.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure') }}
+        run: exit 1
+    needs:
+      - plan
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'freebsd')
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -3109,6 +3205,8 @@ jobs:
       - target-linux-musl-x64-vulkan
       - target-linux-musl-arm64-egl
       - target-linux-musl-arm64-vulkan
+      - target-freebsd-x64-egl
+      - target-freebsd-x64-vulkan
       - target-emscripten-wasm32-webgl
       - target-emscripten-wasm32-webgpu
       - target-macos-arm64-metal

@@ -1,10 +1,10 @@
 // The browser takes its HTTP from emscripten_fetch and has no JNI, so neither
 // module is built there. Image decoding is shared by every platform, and only
-// Linux and Windows take their locale services from here.
+// Linux, FreeBSD, and Windows take their locale services from here.
 #[cfg(not(target_os = "emscripten"))]
 mod android;
 #[cfg(not(target_os = "emscripten"))]
 mod http_client;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 mod i18n;
 mod image;
