@@ -57,12 +57,9 @@ cascade = true
 shell = "bash -e -c"
 
 [vars]
-jactionlint_version = "2.3.0"
-# The Android SDK tool installs the command-line tools and nothing else, so this is
-# their version; the packages below are what .mise/bin/sync-android-packages adds.
-# Gradle reads the package versions from the environment, which `[env]` sets from
-# these.
-android_cmdline_tools_version = "23.0"
+# The Android SDK packages that .mise/bin/sync-android-packages adds to the
+# command-line tools. Gradle reads the package versions from the environment,
+# which `[env]` sets from these.
 android_build_tools_version = "36.0.0"
 android_cmake_version = "4.1.2"
 # NDK r30 is the 2026 LTS. Update this pin through validated toolchain upgrades.
@@ -73,81 +70,57 @@ android_ndk_version = "30.0.16248370"
 android_system_image_api = "36"
 # The oldest emulator the suite runs on; see scripts/boot-android-emulator.sh.
 android_emulator_version = "37.3.5"
-anyvm_version = "0.7.5"
-bun_version = "1.4.4"
-cargo_about_version = "0.9.2"
-cmake_version = "4.4.4"
 dart_version = "3.13.7"
-deno_version = "2.9.8"
 dotnet_version = "10.0.402"
-doxygen_version = "1.18.0"
-dprint_version = "0.64.3"
-emsdk_version = "6.0.13"
 go_version = "1.27.3"
-doc2go_version = "0.12.2"
-flutter_version = "3.47.7"
-hk_version = "2.8.1"
 java_version = "zulu-25.36.205.0"
-jvl_version = "2026.05.03"
-libxml2_version = "2.13.9"
-node_version = "26.12.1"
-ninja_version = "1.13.2"
 ohos_sdk_version = "6.1"
-pnpm_version = "12.15.0"
 python_version = "3.15.1"
-rust_version = "1.99.1"
-sccache_version = "0.18.0"
 sdl3_version = "3.4"
-shellcheck_version = "0.11.0"
-swift_version = "6.4.1"
-swiftformat_version = "0.64.1"
-uv_version = "0.13.5"
-zig_version = "0.17.0"
 
 [tools]
 # Repository and native tooling
-"aqua:jdx/hk" = "{{vars.hk_version}}" # Linter orchestration
-"aqua:dprint/dprint" = "{{vars.dprint_version}}" # Formatter orchestration
-"github:sargunv/jvl" = "{{vars.jvl_version}}" # JSON validator
-"github:jdx/jactionlint" = "{{vars.jactionlint_version}}" # GH Actions linter
-"aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by jactionlint)
-"aqua:Kitware/CMake" = "{{vars.cmake_version}}"
-ninja = "{{vars.ninja_version}}"
-"github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
-sccache = "{{vars.sccache_version}}"
+# hk.pkl names hk's Pkl package by version, so hk installs the version it names.
+"aqua:jdx/hk" = "{{ read_file(path='hk.pkl') | split(pat='/hk@') | nth(n=1) | split(pat='#') | first }}" # Linter orchestration
+"aqua:dprint/dprint" = "0.64.3" # Formatter orchestration
+"github:sargunv/jvl" = "2026.05.03" # JSON validator
+"github:jdx/jactionlint" = "2.3.0" # GH Actions linter
+"aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by jactionlint)
+"aqua:Kitware/CMake" = "4.4.4"
+ninja = "1.13.2"
+"github:EmbarkStudios/cargo-about" = "0.9.2" # Rust dependency notices
+sccache = "0.18.0"
 # The FreeBSD suites run in a FreeBSD virtual machine that this QEMU launcher
 # boots on a Linux host. See scripts/boot-freebsd-vm.sh.
-"http:anyvm" = { version = "{{vars.anyvm_version}}", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5", os = [
+"http:anyvm" = { version = "0.7.5", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5", os = [
   "linux",
 ] }
 
 # Node.js ecosystem
-"core:node" = "{{vars.node_version}}"
-"aqua:pnpm/pnpm" = "{{vars.pnpm_version}}"
+"core:node" = "26.12.1"
+"aqua:pnpm/pnpm" = "12.15.0"
 
 # Python ecosystem
 "core:python" = "{{vars.python_version}}"
-"aqua:astral-sh/uv" = "{{vars.uv_version}}"
+"aqua:astral-sh/uv" = "0.13.5"
 
 # SwiftFormat is a standalone repository formatter and does not require the
 # Swift compiler.
-"github:nicklockwood/SwiftFormat" = { version = "{{vars.swiftformat_version}}", no_app = true, rename_exe = "swiftformat" }
+"github:nicklockwood/SwiftFormat" = { version = "0.64.1", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
+"core:rust" = { version = "1.99.1", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux and FreeBSD targets with `zig cc`,
-# so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake.
-# Nested configs request the same os set so `mise install --monorepo` does not
-# see conflicting option maps for one install destination.
-"core:zig" = { version = "{{vars.zig_version}}", os = [
-  "linux",
-  "macos",
-  "windows/x64",
-] }
+# so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake. The
+# Zig binding, its examples, and the docs use this same install. Zig 0.17.0 is
+# unusable on Windows ARM64: the native aarch64 build exits non-zero with no
+# diagnostic while loading build.zig, and the x64 build under emulation hangs
+# until the job timeout.
+"core:zig" = { version = "0.17.0", os = ["linux", "macos", "windows/x64"] }
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
@@ -515,11 +488,7 @@ description = "Shut down this checkout's FreeBSD virtual machine."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-freebsd-vm.sh"'
 
 [tasks.check]
-tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
-  "linux",
-  "macos",
-  "windows/x64",
-] } }
+tools = { "core:dart" = "{{vars.dart_version}}" }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise run //docs:install
@@ -527,11 +496,7 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
-  "linux",
-  "macos",
-  "windows/x64",
-] } }
+tools = { "core:dart" = "{{vars.dart_version}}" }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise run //docs:install

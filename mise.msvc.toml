@@ -5,7 +5,6 @@
 # mise.windows.toml on a Windows host.
 
 [vars]
-xwin_version = "0.10.0"
 # The runtime and SDK that Visual Studio 2022 17.14 installs.
 msvc_crt_version = "14.44.17.14"
 windows_sdk_version = "10.0.26100"
@@ -13,7 +12,7 @@ windows_sdk_version = "10.0.26100"
 [tools]
 # The post-install step downloads the packages from Microsoft and lays them out
 # as a /winsysroot tree, which accepts Microsoft's license for them.
-"github:Jake-Shadle/xwin" = { version = "{{vars.xwin_version}}", os = [
+"github:Jake-Shadle/xwin" = { version = "0.10.0", os = [
   "linux",
 ], postinstall = 'bash .mise/bin/sync-msvc-sysroot "$MISE_TOOL_INSTALL_PATH" {{vars.msvc_crt_version}} {{vars.windows_sdk_version}}' }
 

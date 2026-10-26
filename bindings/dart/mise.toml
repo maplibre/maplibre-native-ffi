@@ -1,6 +1,6 @@
 [tools]
 "core:dart" = "{{vars.dart_version}}"
-"core:flutter" = { version = "{{vars.flutter_version}}", os = [
+"core:flutter" = { version = "3.47.7", os = [
   "linux/x64",
   "macos/arm64",
   "windows/x64",

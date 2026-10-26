@@ -1,6 +1,6 @@
 [tools]
 "core:go" = "{{vars.go_version}}"
-"github:abhinav/doc2go" = "{{vars.doc2go_version}}"
+"github:abhinav/doc2go" = "0.12.2"
 
 [tasks.api]
 description = "Generate doc2go HTML API reference for the Go binding."

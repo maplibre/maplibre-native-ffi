@@ -1,8 +1,8 @@
 [tools]
 # Node, Bun, and Deno run the same addon and the same suite. Bun and Deno are
 # declared here because only this binding uses them.
-"core:bun" = "{{vars.bun_version}}"
-"core:deno" = "{{vars.deno_version}}"
+"core:bun" = "1.4.4"
+"core:deno" = "2.9.8"
 
 [tasks.build]
 description = "Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."

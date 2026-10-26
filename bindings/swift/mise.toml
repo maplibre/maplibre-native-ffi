@@ -1,15 +1,9 @@
 [tools]
-"core:swift" = { version = "{{vars.swift_version}}", os = [
-  "linux/x64",
-  "linux/arm64",
-] }
+"core:swift" = { version = "6.4.1", os = ["linux/x64", "linux/arm64"] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
 # libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
-"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = [
-  "linux/x64",
-  "linux/arm64",
-] }
+"conda:libxml2" = { version = "2.13.9", os = ["linux/x64", "linux/arm64"] }
 
 # The manifest adds the DocC plugin only under this variable, so consumers
 # don't resolve it. Every task here sets it, so the repository's
