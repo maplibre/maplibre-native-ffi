@@ -2,13 +2,6 @@
   "name": "docs",
   "private": "true",
   "type": "module",
-  "scripts": {
-    "generate-support-matrix": "python scripts/generate-support-matrix.py",
-    "generate-versions": "python scripts/generate-versions.py",
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
-  },
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.5",
     "@astrojs/starlight": "^0.42.6",

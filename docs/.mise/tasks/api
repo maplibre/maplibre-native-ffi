@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#MISE description="Generate every language's API reference into public/reference"
+#MISE shell="bash"
+#MISE depends=[{ task = "//:build", args = ["{{vars.host_native_preset}}"] }, "//bindings/kotlin:api", "//bindings/dart:api", "//bindings/python:api", "//bindings/dotnet:api", "//bindings/go:api", "//bindings/swift:api", "//bindings/typescript:api"]
+#MISE env={ MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = "{{config_root}}/../build/{{vars.host_native_preset}}/install" }
+set -euo pipefail
+
+reference="$PWD/public/reference"
+rm -rf "$reference" doxygen/gen
+mkdir -p "$reference" doxygen/gen
+
+doxygen doxygen/Doxyfile
+cp -a doxygen/gen/html/. "$reference/c/"
+
+(
+  cd ..
+  cargo doc -p maplibre-native-ffi --no-deps
+  cp -a target/doc/. "$reference/rust/"
+  zig build docs --prefix "$reference/zig"
+)
+
+# Each binding's api task, a dependency above, wrote its HTML here.
+cp -a ../bindings/kotlin/build/dokka/html/. "$reference/kotlin/"
+cp -a ../bindings/dart/.dart_tool/api-docs/. "$reference/dart/"
+cp -a ../bindings/python/build/pdoc/. "$reference/python/"
+cp -a ../bindings/dotnet/build/docfx/. "$reference/dotnet/"
+cp -a ../bindings/go/build/doc2go/. "$reference/go/"
+cp -a ../build/docc/. "$reference/swift/"
+cp -a ../bindings/typescript/build/typedoc/. "$reference/typescript/"

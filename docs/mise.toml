@@ -10,103 +10,6 @@
   "windows/x64",
 ] }
 
-[tasks."api:c"]
-run = [
-  "rm -rf doxygen/gen public/reference/c",
-  "mkdir -p doxygen/gen public/reference",
-  "doxygen doxygen/Doxyfile",
-  "cp -a doxygen/gen/html/. public/reference/c/",
-]
-
-[tasks."api:rust"]
-depends = ["//:build"]
-dir = ".."
-run = '''
-rm -rf docs/public/reference/rust
-mkdir -p docs/public/reference
-MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
-  cargo doc -p maplibre-native-ffi --no-deps
-cp -a target/doc/. docs/public/reference/rust/
-'''
-
-[tasks."api:zig"]
-dir = ".."
-run = '''
-rm -rf docs/public/reference/zig
-mkdir -p docs/public/reference
-zig build docs --prefix docs/public/reference/zig
-'''
-
-[tasks."api:kotlin"]
-depends = ["//bindings/kotlin:api"]
-run = '''
-rm -rf public/reference/kotlin
-mkdir -p public/reference
-cp -a ../bindings/kotlin/build/dokka/html/. public/reference/kotlin/
-'''
-
-[tasks."api:dart"]
-depends = ["//bindings/dart:api"]
-run = '''
-rm -rf public/reference/dart
-mkdir -p public/reference
-cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
-'''
-
-[tasks."api:python"]
-depends = ["//bindings/python:api"]
-run = '''
-rm -rf public/reference/python
-mkdir -p public/reference
-cp -a ../bindings/python/build/pdoc/. public/reference/python/
-'''
-
-[tasks."api:dotnet"]
-depends = ["//bindings/dotnet:api"]
-run = '''
-rm -rf public/reference/dotnet
-mkdir -p public/reference
-cp -a ../bindings/dotnet/build/docfx/. public/reference/dotnet/
-'''
-
-[tasks."api:go"]
-depends = ["//bindings/go:api"]
-run = '''
-rm -rf public/reference/go
-mkdir -p public/reference
-cp -a ../bindings/go/build/doc2go/. public/reference/go/
-'''
-
-[tasks."api:swift"]
-depends = ["//bindings/swift:api"]
-run = '''
-rm -rf public/reference/swift
-mkdir -p public/reference
-cp -a ../build/docc/. public/reference/swift/
-'''
-
-[tasks."api:typescript"]
-depends = ["//bindings/typescript:api"]
-run = '''
-rm -rf public/reference/typescript
-mkdir -p public/reference
-cp -a ../bindings/typescript/build/typedoc/. public/reference/typescript/
-'''
-
-[tasks.api]
-run = [
-  { task = "api:c" },
-  { task = "api:rust" },
-  { task = "api:zig" },
-  { task = "api:kotlin" },
-  { task = "api:dart" },
-  { task = "api:python" },
-  { task = "api:dotnet" },
-  { task = "api:go" },
-  { task = "api:swift" },
-  { task = "api:typescript" },
-]
-
 [tasks.install]
 run = "pnpm exec astro sync"
 
@@ -137,7 +40,9 @@ for file in docs/snippets/c/*.c; do
 done
 '''
 
-[tasks.dev]
+# Everything the site reads besides its own sources.
+[tasks.prepare]
+hide = true
 depends = [
   "api",
   "install",
@@ -145,33 +50,21 @@ depends = [
   "generate-versions",
   "check-snippets",
 ]
-run = "pnpm run dev"
+
+[tasks.dev]
+depends = ["prepare"]
+run = "pnpm exec astro dev"
 
 [tasks.build]
-depends = [
-  "api",
-  "install",
-  "generate-support-matrix",
-  "generate-versions",
-  "check-snippets",
-]
-run = "pnpm run build"
+depends = ["prepare"]
+run = "pnpm exec astro build"
 
 [tasks.preview]
-depends = [
-  "api",
-  "install",
-  "generate-support-matrix",
-  "generate-versions",
-  "check-snippets",
-]
-run = "pnpm run preview"
-
-[tasks.astro]
-run = "pnpm exec astro"
+depends = ["prepare"]
+run = "pnpm exec astro preview"
 
 [tasks.generate-support-matrix]
-run = "pnpm run generate-support-matrix"
+run = "python scripts/generate-support-matrix.py"
 
 [tasks.support-issue]
 description = "Print the support tracking issue body from the generated matrix"
@@ -180,4 +73,4 @@ run = "python scripts/render-support-issue.py"
 
 [tasks.generate-versions]
 description = "Write the release versions the pages quote into src/generated"
-run = "pnpm run generate-versions"
+run = "python scripts/generate-versions.py"
