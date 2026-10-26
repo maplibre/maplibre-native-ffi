@@ -36,7 +36,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   private func validateMetalBackend() {
-    let backends = Maplibre.supportedRenderBackendMask()
+    let backends = supportedRenderBackendMask()
     log.info("native render backends: \(renderBackendLabel(backends))")
     guard backends.contains(.metal) else {
       fatalError("the loaded MapLibre native library does not support Metal")
@@ -78,7 +78,7 @@ private func installCApiLogging() {
     category: "MapLibre"
   )
   do {
-    try Maplibre.setLogCallback(handler: LogHandler {
+    try setLogCallback(handler: LogHandler {
       severity, event, code, message in
       log.info(
         "severity=\(String(describing: severity), privacy: .public) event=\(String(describing: event), privacy: .public) code=\(code): \(message, privacy: .public)"
@@ -95,7 +95,7 @@ private func installCApiLogging() {
 
 private func clearCApiLogging() {
   do {
-    try Maplibre.clearLogCallback()
+    try clearLogCallback()
   } catch {
     let log = Logger(
       subsystem: "org.maplibre.nativeffi.examples.swift-map-ios",

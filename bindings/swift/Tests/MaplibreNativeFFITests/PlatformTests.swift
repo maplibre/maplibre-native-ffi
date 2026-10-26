@@ -10,7 +10,7 @@ import Testing
   /// API lets a host exit at any point, so nothing is closed first.
   @Test func exitingWithLiveHandlesAndCallbacksIsClean() async {
     await #expect(processExitsWith: .success) {
-      try Maplibre.setLogCallback(handler: LogHandler { _, _, _, _ in true })
+      try setLogCallback(handler: LogHandler { _, _, _, _ in true })
       let runtime = try MapFixture.makeRuntime()
       try await runtime.setResourceProvider(denyingProvider(
         routes: ["custom://exit.json": Data(emptyStyle.utf8)]

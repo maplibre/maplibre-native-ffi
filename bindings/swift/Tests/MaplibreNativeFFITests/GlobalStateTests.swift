@@ -11,9 +11,9 @@ struct GlobalStateTests {
   @Test func replacingTheLogCallbackReleasesThePreviousOne() async throws {
     let records = LockedBox([LogSeverity]())
     let releases = LockedBox(0)
-    defer { try? Maplibre.clearLogCallback() }
+    defer { try? clearLogCallback() }
 
-    try Maplibre.setLogCallback(handler: recordingHandler(
+    try setLogCallback(handler: recordingHandler(
       into: records,
       releasing: releases
     ))
@@ -27,14 +27,14 @@ struct GlobalStateTests {
     }
     #expect(releases.value == 0)
 
-    try Maplibre.setLogCallback(handler: recordingHandler(
+    try setLogCallback(handler: recordingHandler(
       into: LockedBox([]),
       releasing: releases
     ))
     await awaitCondition("the replaced callback's release") {
       releases.value == 1
     }
-    try Maplibre.clearLogCallback()
+    try clearLogCallback()
     await awaitCondition("the cleared callback's release") {
       releases.value == 2
     }
@@ -45,8 +45,8 @@ struct GlobalStateTests {
   @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
     let capture = ReportCapture()
     defer { capture.finish() }
-    defer { try? Maplibre.clearLogCallback() }
-    try Maplibre.setLogCallback(handler: LogHandler { _, _, _, _ in
+    defer { try? clearLogCallback() }
+    try setLogCallback(handler: LogHandler { _, _, _, _ in
       throw CallbackFailure()
     })
     let report =

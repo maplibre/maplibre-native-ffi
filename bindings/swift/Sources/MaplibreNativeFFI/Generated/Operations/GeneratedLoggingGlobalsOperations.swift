@@ -3,37 +3,35 @@
 internal import MaplibreNativeC
 import Foundation
 
-public extension Maplibre {
-  /// Clears the process-global log callback.
-  ///
-  /// See `mln_log_clear_callback` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func clearLogCallback() throws {
-    try nativeInvoke { _, _, diagnostic in mln_log_clear_callback(diagnostic) }
-  }
+/// Clears the process-global log callback.
+///
+/// See `mln_log_clear_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+public func clearLogCallback() throws {
+  try nativeInvoke { _, _, diagnostic in mln_log_clear_callback(diagnostic) }
+}
 
-  /// Controls which log severities MapLibre Native may dispatch asynchronously.
-  ///
-  /// See `mln_log_set_async_severity_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func setLogAsyncSeverityMask(_ bindingArg0: LogSeverityFlag) throws {
-    try nativeInvoke { _, _, diagnostic in mln_log_set_async_severity_mask(
-      bindingArg0.rawValue,
-      diagnostic
-    ) }
-  }
+/// Controls which log severities MapLibre Native may dispatch asynchronously.
+///
+/// See `mln_log_set_async_severity_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+public func setLogAsyncSeverityMask(_ bindingArg0: LogSeverityFlag) throws {
+  try nativeInvoke { _, _, diagnostic in mln_log_set_async_severity_mask(
+    bindingArg0.rawValue,
+    diagnostic
+  ) }
+}
 
-  /// Installs a process-global MapLibre Native log callback. The callback runs
-  /// synchronously on the thread that emits the record, or on a MapLibre
-  /// background thread for a severity that `Maplibre.setLogAsyncSeverityMask()`
-  /// dispatches asynchronously.
-  ///
-  /// See `mln_log_set_callback` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func setLogCallback(handler bindingArg0: LogHandler) throws {
-    try nativeInvoke { _, arena, diagnostic in try mln_log_set_callback(
-      arena.store(bindingArg0.nativeValue(arena: arena)),
-      diagnostic
-    ) }
-  }
+/// Installs a process-global MapLibre Native log callback. The callback runs
+/// synchronously on the thread that emits the record, or on a MapLibre
+/// background thread for a severity that `setLogAsyncSeverityMask()` dispatches
+/// asynchronously.
+///
+/// See `mln_log_set_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+public func setLogCallback(handler bindingArg0: LogHandler) throws {
+  try nativeInvoke { _, arena, diagnostic in try mln_log_set_callback(
+    arena.store(bindingArg0.nativeValue(arena: arena)),
+    diagnostic
+  ) }
 }

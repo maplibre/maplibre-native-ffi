@@ -127,9 +127,9 @@ class SwiftEmitterTests(unittest.TestCase):
         # A call that returns a value cannot fail, and reading the C version
         # skips the ABI version check, which reads it.
         words = " ".join(values.split())
-        self.assertIn("static func `cVersion`() -> UInt32 { mln_c_version() }", words)
+        self.assertIn("public func `cVersion`() -> UInt32 { mln_c_version() }", words)
         self.assertIn(
-            "static func `supportedRenderBackendMask`() -> RenderBackendFlag { "
+            "public func `supportedRenderBackendMask`() -> RenderBackendFlag { "
             "nativeDirect {",
             words,
         )
@@ -146,10 +146,12 @@ class SwiftEmitterTests(unittest.TestCase):
             "-> RuntimeHandle {",
             runtime.split("public extension RuntimeHandle {")[1],
         )
-        self.assertIn(
-            "static func `clearLogCallback`() throws {",
-            outputs["Generated/Operations/GeneratedLoggingGlobalsOperations.swift"],
-        )
+        # A process global is a function of the module, not a type's member.
+        logging = outputs[
+            "Generated/Operations/GeneratedLoggingGlobalsOperations.swift"
+        ]
+        self.assertIn("\npublic func `clearLogCallback`() throws {", logging)
+        self.assertNotIn("extension", logging)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = "".join(

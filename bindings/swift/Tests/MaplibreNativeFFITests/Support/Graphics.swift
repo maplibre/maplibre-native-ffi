@@ -15,7 +15,7 @@ final class TestGraphics: @unchecked Sendable {
   private let context: mln_test_graphics_context
 
   init() throws {
-    let backends = Maplibre.supportedRenderBackendMask()
+    let backends = supportedRenderBackendMask()
     backend = if backends.contains(.metal) {
       MLN_TEST_GRAPHICS_BACKEND_METAL
     } else if backends.contains(.vulkan) {

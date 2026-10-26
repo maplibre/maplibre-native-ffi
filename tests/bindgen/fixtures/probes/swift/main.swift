@@ -14,9 +14,9 @@ func check(
 // A library that reports another C ABI version fails the program's first call
 // before it reaches C, except the version query, which the check itself makes.
 if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
-  check(Maplibre.cVersion() != expectedCAbiVersion, "the version query checked")
+  check(cVersion() != expectedCAbiVersion, "the version query checked")
   do {
-    _ = try Maplibre.keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
+    _ = try keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
     check(false, "a mismatched C ABI version was not reported")
   } catch let error as AbiVersionMismatchError {
     check(
@@ -29,7 +29,7 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
 
 // A record built from its initializer defaults is zeroed with its size set,
 // including its nested record.
-try Maplibre.probeSettingsCheck(ProbeSettings())
+try probeSettingsCheck(ProbeSettings())
 
 let point = ProbePoint(type: 9.5, gain: 3.25)
 let input = ProbeOptions(
@@ -38,18 +38,18 @@ let input = ProbeOptions(
   left: [point],
   right: [point, point]
 )
-let output = try Maplibre.probeRoundtrip(input: input)
+let output = try probeRoundtrip(input: input)
 check(output == input, "round trip: \(output)")
 try check(
-  Maplibre.probeRoundtrip(input: ProbeOptions(left: [])).left == [],
+  probeRoundtrip(input: ProbeOptions(left: [])).left == [],
   "present empty array"
 )
 try check(
-  Maplibre.probeRoundtrip(input: ProbeOptions()) == ProbeOptions(),
+  probeRoundtrip(input: ProbeOptions()) == ProbeOptions(),
   "absent fields"
 )
 
-let entry = try Maplibre.keywordCombine(
+let entry = try keywordCombine(
   defer: 5,
   self: 2,
   raw: 7,
@@ -60,7 +60,7 @@ check(
   "keyword parameters: \(entry)"
 )
 do {
-  _ = try Maplibre.probeRoundtrip(input: ProbeOptions(right: Array(
+  _ = try probeRoundtrip(input: ProbeOptions(right: Array(
     repeating: point,
     count: 9
   )))
@@ -78,12 +78,12 @@ do {
 
 // A status that the C API declares as absence returns nil, and any other
 // failure still reports its diagnostic.
-try check(Maplibre.probeTakeParcel() == nil, "absent parcel")
-let parcel = try Maplibre.probeTakeParcel()
+try check(probeTakeParcel() == nil, "absent parcel")
+let parcel = try probeTakeParcel()
 check(parcel?.id == 42, "published parcel: \(String(describing: parcel))")
 try parcel?.close()
 do {
-  _ = try Maplibre.probeTakeParcel()
+  _ = try probeTakeParcel()
   check(false, "an exhausted parcel was not reported")
 } catch let error as MaplibreError {
   check(
@@ -100,14 +100,14 @@ check(readings == [7, 9], "strided readings: \(readings)")
 try check(ledger.drain().isEmpty, "drained readings")
 try ledger.close()
 
-try check(Maplibre.probeReadLevel() == nil, "absent level")
-try check(Maplibre.probeReadLevel() == 0.5, "published level")
+try check(probeReadLevel() == nil, "absent level")
+try check(probeReadLevel() == 0.5, "published level")
 
 // Caller-sized text that fits the runtime's first storage, and text that
 // does not, which the runtime fetches again with enough storage.
-try check(Maplibre.probeZerosJson(count: 0) == "[]", "empty text")
-try check(Maplibre.probeZerosJson(count: 3) == "[0,0,0]", "short text")
-let longText = try Maplibre.probeZerosJson(count: 300)
+try check(probeZerosJson(count: 0) == "[]", "empty text")
+try check(probeZerosJson(count: 3) == "[0,0,0]", "short text")
+let longText = try probeZerosJson(count: 300)
 check(
   longText.utf8.count == 601 && longText.hasPrefix("[0,0,")
     && longText.hasSuffix(",0]"),
@@ -122,7 +122,7 @@ let batchPoints = [
   ProbeBatchPoint(x: -3, y: 17),
 ]
 try check(
-  Maplibre.probeBatchPoints(batchPoints) == [
+  probeBatchPoints(batchPoints) == [
     ProbeBatchPoint(x: 5, y: 3),
     ProbeBatchPoint(x: 11, y: 8),
     ProbeBatchPoint(x: 17, y: -2),
@@ -130,14 +130,14 @@ try check(
   "caller-sized points"
 )
 try check(
-  Maplibre.probeBatchScores(points: batchPoints) == [7, 18, 14],
+  probeBatchScores(points: batchPoints) == [7, 18, 14],
   "caller-sized scalars"
 )
 try check(
-  Maplibre.probeBatchPoints([]).isEmpty,
+  probeBatchPoints([]).isEmpty,
   "empty caller-sized points"
 )
 try check(
-  Maplibre.probeBatchScores(points: []).isEmpty,
+  probeBatchScores(points: []).isEmpty,
   "empty caller-sized scalars"
 )

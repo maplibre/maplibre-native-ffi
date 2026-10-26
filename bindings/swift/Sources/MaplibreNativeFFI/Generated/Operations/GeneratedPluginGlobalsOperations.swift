@@ -4,15 +4,13 @@ internal import MaplibreNativeC
 internal import MaplibreNativeC.Plugin
 import Foundation
 
-public extension Maplibre {
-  /// Returns the process-wide plugin registration entry point; never null.
-  ///
-  /// See `mln_plugin_get_register_function_v1` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-  static func getPluginRegisterFunctionV1() -> NativePointer {
-    nativeDirect { NativePointer(bitPattern: unsafeBitCast(
-      mln_plugin_get_register_function_v1(),
-      to: UInt.self
-    )) }
-  }
+/// Returns the process-wide plugin registration entry point; never null.
+///
+/// See `mln_plugin_get_register_function_v1` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
+public func getPluginRegisterFunctionV1() -> NativePointer {
+  nativeDirect { NativePointer(bitPattern: unsafeBitCast(
+    mln_plugin_get_register_function_v1(),
+    to: UInt.self
+  )) }
 }

@@ -3,38 +3,36 @@
 internal import MaplibreNativeC
 import Foundation
 
-public extension Maplibre {
-  /// Converts spherical Mercator projected meters to a geographic coordinate.
-  ///
-  /// See `mln_lat_lng_for_projected_meters` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  static func latLngForProjectedMeters(_ bindingArg0: ProjectedMeters) throws
-    -> LatLng
-  {
-    var value0 = mln_lat_lng()
-    return try nativeInvoke { _, _, diagnostic in
-      mln_lat_lng_for_projected_meters(
-        bindingArg0.nativeValue(),
-        &value0,
-        diagnostic
-      )
-    } result: { LatLng(raw: value0) }
-  }
+/// Converts spherical Mercator projected meters to a geographic coordinate.
+///
+/// See `mln_lat_lng_for_projected_meters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+public func latLngForProjectedMeters(_ bindingArg0: ProjectedMeters) throws
+  -> LatLng
+{
+  var value0 = mln_lat_lng()
+  return try nativeInvoke { _, _, diagnostic in
+    mln_lat_lng_for_projected_meters(
+      bindingArg0.nativeValue(),
+      &value0,
+      diagnostic
+    )
+  } result: { LatLng(raw: value0) }
+}
 
-  /// Converts a geographic coordinate to spherical Mercator projected meters.
-  ///
-  /// See `mln_projected_meters_for_lat_lng` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  static func projectedMetersForLatLng(coordinate bindingArg0: LatLng) throws
-    -> ProjectedMeters
-  {
-    var value0 = mln_projected_meters()
-    return try nativeInvoke { _, _, diagnostic in
-      mln_projected_meters_for_lat_lng(
-        bindingArg0.nativeValue(),
-        &value0,
-        diagnostic
-      )
-    } result: { ProjectedMeters(raw: value0) }
-  }
+/// Converts a geographic coordinate to spherical Mercator projected meters.
+///
+/// See `mln_projected_meters_for_lat_lng` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+public func projectedMetersForLatLng(coordinate bindingArg0: LatLng) throws
+  -> ProjectedMeters
+{
+  var value0 = mln_projected_meters()
+  return try nativeInvoke { _, _, diagnostic in
+    mln_projected_meters_for_lat_lng(
+      bindingArg0.nativeValue(),
+      &value0,
+      diagnostic
+    )
+  } result: { ProjectedMeters(raw: value0) }
 }

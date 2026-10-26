@@ -21,27 +21,25 @@ public extension HttpHeaderTransformResponse {
   }
 }
 
-public extension Maplibre {
-  /// Reads MapLibre Native's process-global network status.
-  ///
-  /// See `mln_network_get_status` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func getNetworkStatus() throws -> NetworkStatus {
-    var value0 = mln_network_status(rawValue: 0)
-    return try nativeInvoke { _, _, diagnostic in mln_network_get_status(
-      &value0,
-      diagnostic
-    ) } result: { NetworkStatus(rawValue: value0.rawValue) }
-  }
+/// Reads MapLibre Native's process-global network status.
+///
+/// See `mln_network_get_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public func getNetworkStatus() throws -> NetworkStatus {
+  var value0 = mln_network_status(rawValue: 0)
+  return try nativeInvoke { _, _, diagnostic in mln_network_get_status(
+    &value0,
+    diagnostic
+  ) } result: { NetworkStatus(rawValue: value0.rawValue) }
+}
 
-  /// Sets MapLibre Native's process-global network status.
-  ///
-  /// See `mln_network_set_status` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func setNetworkStatus(_ bindingArg0: NetworkStatus) throws {
-    try nativeInvoke { _, _, diagnostic in mln_network_set_status(
-      mln_network_status(rawValue: bindingArg0.rawValue),
-      diagnostic
-    ) }
-  }
+/// Sets MapLibre Native's process-global network status.
+///
+/// See `mln_network_set_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public func setNetworkStatus(_ bindingArg0: NetworkStatus) throws {
+  try nativeInvoke { _, _, diagnostic in mln_network_set_status(
+    mln_network_status(rawValue: bindingArg0.rawValue),
+    diagnostic
+  ) }
 }

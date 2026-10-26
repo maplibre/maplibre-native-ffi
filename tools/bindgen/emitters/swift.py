@@ -111,9 +111,9 @@ def receiver_native(plan: OperationPlan) -> str | None:
     )
 
 
-def owner_type(plan: OperationPlan, bound: BoundApi) -> str:
-    """The type that declares an operation: its receiver's, its factory's, or
-    `Maplibre` for a process global."""
+def owner_type(plan: OperationPlan, bound: BoundApi) -> str | None:
+    """The type that declares an operation: its receiver's or its factory's. A
+    process global is a function of the module, which no type declares."""
     from .swift_ownership import owner_name
 
     receiver = receiver_native(plan)
@@ -123,7 +123,7 @@ def owner_type(plan: OperationPlan, bound: BoundApi) -> str:
         return owner_name(bound.handles[receiver])
     if plan.factory:
         return owner_name(bound.handles[plan.factory])
-    return "Maplibre"
+    return None
 
 
 def method_name(plan: OperationPlan) -> str:
@@ -179,7 +179,8 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         owner = receiver_native(plan) or plan.factory
         if owner is not None and type_(owner) is None:
             return None
-        return f"{owner_type(plan, bound)}.{method_name(plan)}"
+        declared = owner_type(plan, bound)
+        return f"{declared}.{method_name(plan)}" if declared else method_name(plan)
 
     def constant(value, member: str) -> str | None:
         return f"{values.public(value)}.{enum_member(value, member)}"
@@ -366,8 +367,12 @@ def operation(
     call = native_call(function, *args)
     if "try " in call:
         call = "try " + call
-    doc_comment = member_doc(value_types.bound, function.name)
-    modifier = "" if receiver else "static "
+    if owner is None:
+        doc_comment = doc(value_types.bound, function.name)
+        modifier = "public "
+    else:
+        doc_comment = member_doc(value_types.bound, function.name)
+        modifier = "" if receiver else "static "
     target = ""
     if plan.scoped_receiver:
         target = "owner: self"

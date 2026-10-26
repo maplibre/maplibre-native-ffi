@@ -3,37 +3,33 @@
 internal import MaplibreNativeC
 import Foundation
 
-public extension Maplibre {
-  /// Computes the physical device-pixel size of a logical extent.
-  ///
-  /// See `mln_logical_extent_physical_size` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func logicalExtentPhysicalSize(_ bindingArg0: LogicalExtent) throws
-    -> (width: UInt32, height: UInt32)
-  {
-    var value0: UInt32 = 0
-    var value1: UInt32 = 0
-    return try nativeInvoke { _, _, diagnostic in
-      mln_logical_extent_physical_size(
-        bindingArg0.nativeValue(),
-        &value0,
-        &value1,
-        diagnostic
-      )
-    } result: { (value0, value1) }
-  }
+/// Computes the physical device-pixel size of a logical extent.
+///
+/// See `mln_logical_extent_physical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public func logicalExtentPhysicalSize(_ bindingArg0: LogicalExtent) throws
+  -> (width: UInt32, height: UInt32)
+{
+  var value0: UInt32 = 0
+  var value1: UInt32 = 0
+  return try nativeInvoke { _, _, diagnostic in
+    mln_logical_extent_physical_size(
+      bindingArg0.nativeValue(),
+      &value0,
+      &value1,
+      diagnostic
+    )
+  } result: { (value0, value1) }
+}
 
-  /// Returns OpenGL context providers supported by this build.
-  ///
-  /// See `mln_open_gl_supported_context_provider_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func openGlSupportedContextProviderMask()
-    -> OpenGlContextProviderFlag
-  {
-    nativeDirect {
-      OpenGlContextProviderFlag(
-        rawValue: mln_open_gl_supported_context_provider_mask()
-      )
-    }
+/// Returns OpenGL context providers supported by this build.
+///
+/// See `mln_open_gl_supported_context_provider_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public func openGlSupportedContextProviderMask() -> OpenGlContextProviderFlag {
+  nativeDirect {
+    OpenGlContextProviderFlag(
+      rawValue: mln_open_gl_supported_context_provider_mask()
+    )
   }
 }
