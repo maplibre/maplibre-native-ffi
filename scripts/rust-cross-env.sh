@@ -69,6 +69,10 @@ case "$1" in
     fi
     export "CC_$target_env=$compiler"
     export "CXX_$target_env=$compiler_cxx"
+    # Zig instruments unoptimized C with UBSan, whose runtime rust-lld does not
+    # link, and a debug test build compiles its C dependencies unoptimized.
+    export "CFLAGS_$target_env=-fno-sanitize=undefined"
+    export "CXXFLAGS_$target_env=-fno-sanitize=undefined"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
     export "CARGO_TARGET_${target_env_upper}_RUNNER=$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh $1"
     export "$rustflags_variable=${rustflags# }"
