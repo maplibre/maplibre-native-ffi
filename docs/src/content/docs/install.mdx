@@ -35,7 +35,9 @@ context provider in place of the backend: `egl`, `wgl`, or `webgl`.
 ### Build against a prefix
 
 Download `maplibre-native-c-<preset>.tar.gz` and unpack it. The archive root is
-the install prefix.
+the install prefix. Its `share/maplibre-native-c/artifact.json` records the
+release `version` and the commit it was built from as `gitSha`, which matches a
+snapshot archive to its source after the snapshot moves on.
 
 ```bash frame="terminal"
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig

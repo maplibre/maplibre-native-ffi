@@ -134,10 +134,25 @@ def framework_plist_bytes(content: bytes, version: str) -> bytes:
     return plistlib.dumps(plist)
 
 
-def rewrite_archive(archive: pathlib.Path, version: str) -> None:
+def descriptor_bytes(content: bytes, version: str, sha: str) -> bytes:
+    """The artifact descriptor with the published version and source commit.
+
+    Nothing in this repository reads `gitSha` or `version`. They are there for
+    consumers who unpack an archive, such as one from the rolling snapshot
+    release, and need to match it to the commit it was built from.
+    """
+    descriptor = json.loads(content)
+    descriptor["gitSha"] = sha
+    descriptor["version"] = version
+    return (json.dumps(descriptor, indent=2) + "\n").encode()
+
+
+def rewrite_archive(archive: pathlib.Path, version: str, sha: str) -> None:
     root = archive.name.removesuffix(ARCHIVE_SUFFIX)
     pkg_config_name = f"{root}/share/pkgconfig/maplibre-native-c.pc"
+    descriptor_name = f"{root}/share/maplibre-native-c/artifact.json"
     found_pkg_config = False
+    found_descriptor = False
 
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{archive.name}.", dir=archive.parent
@@ -167,6 +182,11 @@ def rewrite_archive(archive: pathlib.Path, version: str) -> None:
                     member.size = len(content)
                     output.addfile(member, io.BytesIO(content))
                     found_pkg_config = True
+                elif member.name == descriptor_name:
+                    content = descriptor_bytes(source_file.read(), version, sha)
+                    member.size = len(content)
+                    output.addfile(member, io.BytesIO(content))
+                    found_descriptor = True
                 elif FRAMEWORK_INFO_PLIST.search(member.name):
                     content = framework_plist_bytes(source_file.read(), version)
                     member.size = len(content)
@@ -175,6 +195,8 @@ def rewrite_archive(archive: pathlib.Path, version: str) -> None:
                     output.addfile(member, source_file)
         if not found_pkg_config:
             raise SystemExit(f"{archive.name} is missing maplibre-native-c.pc")
+        if not found_descriptor:
+            raise SystemExit(f"{archive.name} is missing artifact.json")
         os.replace(temporary_path, archive)
     finally:
         temporary_path.unlink(missing_ok=True)
@@ -271,7 +293,7 @@ def prepare_assets(
     sha = required_env("PUBLISH_SHA")
     archives = native_archives(release_dir, package_presets(root))
     for archive in archives:
-        rewrite_archive(archive, version)
+        rewrite_archive(archive, version, sha)
     xcframework = release_dir / XCFRAMEWORK_NAME
     if not xcframework.is_file():
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")

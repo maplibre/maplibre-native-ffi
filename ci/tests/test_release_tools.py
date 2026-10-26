@@ -85,6 +85,11 @@ def create_archive(path: pathlib.Path, preset: str) -> None:
             f"{root}/share/pkgconfig/maplibre-native-c.pc",
             b"Name: maplibre-native-c\nVersion: 0.1.0\n",
         )
+        add_bytes(
+            archive,
+            f"{root}/share/maplibre-native-c/artifact.json",
+            json.dumps({"targetPlatform": "linux-gnu-x64"}).encode(),
+        )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
 
 
@@ -236,6 +241,11 @@ class NativePackageReleaseTest(unittest.TestCase):
             pkg_config = package.extractfile(
                 f"maplibre-native-c-{self.preset}/share/pkgconfig/maplibre-native-c.pc"
             ).read()
+            descriptor = json.load(
+                package.extractfile(
+                    f"maplibre-native-c-{self.preset}/share/maplibre-native-c/artifact.json"
+                )
+            )
         checksums = dict(
             reversed(line.split("  "))
             for line in (self.release_dir / "SHA256SUMS").read_text().splitlines()
@@ -243,6 +253,10 @@ class NativePackageReleaseTest(unittest.TestCase):
         notes = (self.release_dir / "RELEASE_NOTES.md").read_text()
 
         self.assertIn(f"Version: {version}".encode(), pkg_config)
+        self.assertEqual(
+            descriptor,
+            {"targetPlatform": "linux-gnu-x64", "gitSha": self.sha, "version": version},
+        )
         self.assertEqual(
             checksums,
             {
