@@ -462,9 +462,8 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
-        # 2026.10.18 extracts zip archives that contain read-only files on
-        # Windows (jdx/mise#14869).
-        version: 2026.10.18
+        # Match `min_version` in mise.toml.
+        version: 2026.10.19
         cache: false
         bootstrap: true
         # The files phase installs Linux packages. Skip it on Windows so
