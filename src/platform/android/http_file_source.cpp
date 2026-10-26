@@ -540,6 +540,11 @@ class HTTPRequest : public AsyncRequest {
         transfer(std::make_shared<Transfer>()) {
     delivery->start();
 
+    // The host's header transform runs for every request, as on the other
+    // targets, even one that then fails.
+    auto url = platform::offline_url(resource);
+    auto headers =
+      platform::http::request_headers(resource, url, platformContext);
     auto* const jvm = platform::android::java_vm();
     if (jvm == nullptr) {
       delivery->complete(
@@ -552,9 +557,6 @@ class HTTPRequest : public AsyncRequest {
       return;
     }
 
-    auto url = platform::offline_url(resource);
-    auto headers =
-      platform::http::request_headers(resource, url, platformContext);
     Workers::instance(*jvm).post(
       [delivery = delivery, transfer = transfer, url = std::move(url),
        headers = std::move(headers)](JNIEnv& env) mutable {

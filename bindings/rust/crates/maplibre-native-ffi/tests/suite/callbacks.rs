@@ -131,6 +131,10 @@ fn a_panicking_void_callback_is_contained_and_reported() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "android",
+    ignore = "Android's HTTP stack calls Java, which test executables run without"
+)]
 fn a_failing_callback_is_contained_and_its_error_is_reported() {
     let _global = global_state();
     let reports = capture_reports();
@@ -275,6 +279,10 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "android",
+    ignore = "Android's HTTP stack calls Java, which test executables run without"
+)]
 fn a_transform_hands_its_request_to_another_thread_and_answers_later() {
     let fixture = Fixture::new();
     let server = LoopbackServer::start("/rewritten.json", BACKGROUND_STYLE_JSON);
@@ -308,6 +316,10 @@ fn a_transform_hands_its_request_to_another_thread_and_answers_later() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "android",
+    ignore = "Android's HTTP stack calls Java, which test executables run without"
+)]
 fn a_provider_receives_only_the_requests_its_routes_match() {
     let fixture = Fixture::new();
     let server = LoopbackServer::start("/native/style.json", BACKGROUND_STYLE_JSON);

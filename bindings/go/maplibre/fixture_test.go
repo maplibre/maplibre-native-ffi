@@ -184,8 +184,14 @@ func (f *fixture) serveStyle(t *testing.T, url string) {
 // each path in bodies, and installs a provider that passes the server's
 // requests through to the built-in HTTP stack and denies the rest. It returns
 // the server's base URL. Resource transforms apply on that stack only.
+//
+// Android's stack calls Java, which a test executable runs without, so a test
+// that needs it skips there; the Kotlin device suite covers that stack.
 func (f *fixture) serveLoopback(t *testing.T, bodies map[string]string) string {
 	t.Helper()
+	if stdruntime.GOOS == "android" {
+		t.Skip("Android's HTTP stack calls Java, which test executables run without")
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := bodies[r.URL.Path]
 		if !ok {

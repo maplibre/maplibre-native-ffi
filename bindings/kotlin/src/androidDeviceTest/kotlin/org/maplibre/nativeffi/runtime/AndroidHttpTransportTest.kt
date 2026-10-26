@@ -56,19 +56,19 @@ class AndroidHttpTransportTest {
         ),
       )
       .use { server ->
-        loadStyle(server.url("/ok.json"))
+        loadStyleUrl(server.url("/ok.json"))
         assertContains(loadingFailure(server.url("/missing.json")), "404")
         assertContains(loadingFailure(server.url("/server-error.json")), "500")
 
         val okRequests = server.requests("/ok.json").size
-        loadStyle(server.url("/found.json"))
+        loadStyleUrl(server.url("/found.json"))
         assertEquals(okRequests + 1, server.requests("/ok.json").size)
 
         val missingRequests = server.requests("/missing.json").size
         assertContains(loadingFailure(server.url("/to-missing.json")), "404")
         assertEquals(missingRequests + 1, server.requests("/missing.json").size)
 
-        loadStyle(server.url("/gzipped.json"))
+        loadStyleUrl(server.url("/gzipped.json"))
       }
   }
 
@@ -196,8 +196,8 @@ class AndroidHttpTransportTest {
               runtime
                 .setHttpHeaderTransform(HttpHeaderTransform(rules = listOf(rule)))
                 .awaitWithin("the header transform")
-              loadStyle(origin.url("/same.json"))
-              loadStyle(origin.url("/cross.json"))
+              loadStyleUrl(origin.url("/same.json"))
+              loadStyleUrl(origin.url("/cross.json"))
             }
             assertEquals("secret", origin.requests("/same.json").single().headers[TOKEN_KEY])
             assertEquals("secret", origin.requests("/style.json").single().headers[TOKEN_KEY])
@@ -212,18 +212,18 @@ class AndroidHttpTransportTest {
     LoopbackServer(mapOf("/ok.json" to Route(body = EMPTY_STYLE_JSON.encodeToByteArray()))).use {
       server ->
       // The configuration permits plain HTTP to 127.0.0.1 alone.
-      loadStyle(server.url("/ok.json"))
+      loadStyleUrl(server.url("/ok.json"))
       val refused = server.url("/ok.json").replace(HOST, "localhost")
       assertContains(loadingFailure(refused), "CLEARTEXT")
       assertEquals(1, server.requests("/ok.json").size)
     }
   }
 
-  private suspend fun loadStyle(url: String) {
-    withMap(provider = nativeHttp()) { loadStyle(url) }
+  private suspend fun loadStyleUrl(url: String) {
+    withMap(provider = nativeHttp()) { loadStyleUrl(url) }
   }
 
-  private suspend fun MapFixture.loadStyle(url: String) {
+  private suspend fun MapFixture.loadStyleUrl(url: String) {
     map.setStyleUrl(url).awaitWithin("the style command for $url")
     awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
   }
