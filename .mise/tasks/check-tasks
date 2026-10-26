@@ -9,7 +9,8 @@
 the environments that are loaded, so each config root is validated from its own
 directory once per `mise.<env>.toml` and once with none. `usage lint` reads one
 spec at a time, so each task's spec is linted on its own: an inline `usage`, or
-a file task's `USAGE` comment lines.
+a file task's `USAGE` comment lines. A task an environment overrides is linted
+once per distinct spec.
 """
 
 import concurrent.futures
@@ -65,10 +66,7 @@ def usage_spec(task: dict) -> str:
     return "\n".join(match[1] for line in lines if (match := USAGE_LINE.match(line)))
 
 
-def lint_usage(task: dict) -> list[str]:
-    spec = usage_spec(task)
-    if not spec:
-        return []
+def lint_usage(env: str | None, name: str, spec: str) -> list[str]:
     result = subprocess.run(
         ["usage", "lint", "--warnings-as-errors", "-"],
         check=False,
@@ -79,7 +77,7 @@ def lint_usage(task: dict) -> list[str]:
     return (
         []
         if result.returncode == 0
-        else [f"usage: {task['name']}:\n{result.stdout}{result.stderr}"]
+        else [f"usage: {name} (env {env or '(none)'}):\n{result.stdout}{result.stderr}"]
     )
 
 
@@ -90,12 +88,15 @@ def main() -> int:
         if path.name.count(".") == 2 and path.name != "mise.local.toml"
     )
     jobs = []
-    tasks = {}
+    tasks = set()
+    specs = {}
     for env in envs:
         by_root: dict[str, list[str]] = {}
         for task in list_tasks(env):
             by_root.setdefault(task["name"].split(":", 1)[0], []).append(task["name"])
-            tasks.setdefault(task["name"], task)
+            tasks.add(task["name"])
+            if spec := usage_spec(task):
+                specs.setdefault((task["name"], spec), env)
         jobs += [(env, root, names) for root, names in by_root.items()]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
@@ -106,7 +107,9 @@ def main() -> int:
         ]
         problems += [
             problem
-            for found in pool.map(lint_usage, tasks.values())
+            for found in pool.map(
+                lambda item: lint_usage(item[1], *item[0]), specs.items()
+            )
             for problem in found
         ]
 
