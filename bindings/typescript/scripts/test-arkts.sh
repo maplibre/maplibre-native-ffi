@@ -49,6 +49,12 @@ hypium="$(mise where http:hypium)"
 mkdir -p "$work/ets/hypium"
 cp -R "$hypium/package/." "$work/ets/hypium/"
 find "$work/ets/hypium" -type f ! -name '*.js' -delete
+# Hypium's startup timer can strand the idle OHOS loop before the first case.
+# Reuse the test addon's async-work turn until the image fixes upstream I91FXR.
+# The package uses CRLF, while the carried patch uses repository line endings.
+perl -pi -e 's/\r$//' "$work/ets/hypium/src/main/core.js"
+patch --batch --forward --fuzz=0 -p1 -d "$work/ets/hypium" \
+  <"$binding/test/arkts/hypium-startup.patch"
 perl -pi -e 's#from "\@ohos/hypium"#from "./hypium/index"#' "$work/ets/TestRunner.js"
 cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
