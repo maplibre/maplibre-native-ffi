@@ -1,6 +1,6 @@
 ---
 title: Render a static image
-description: Attach an owned texture target, request one still image, and read the finished pixels.
+description: Attach a texture target on a graphics device, request one still image, and read the finished pixels.
 sidebar:
   order: 7
 ---
@@ -11,14 +11,24 @@ import { region } from "../../../snippets";
 import stillImage from "../../../../snippets/c/still-image.c?raw";
 
 A still image renders one frame into a session-owned texture and reads its
-pixels back to the CPU.
+pixels back to the CPU. The texture lives on a graphics device that native code
+creates, so the host needs no graphics code of its own.
 
 ## Request one image
 
-Create a static map, and attach an owned texture target at the image size. For
-CPU readback, use OpenGL on a private EGL or WGL context.
+Create a static map at the image size.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
+
+Create a graphics device for the build's render backend. Metal, Vulkan, and EGL
+builds can create one. Other builds attach an owned texture target on a context
+that the host creates.
+
+<Code code={region(stillImage, "device")} lang="c" title="still-image.c" />
+
+Attach a texture target on the device at the image size, with a core-worker
+driver. The session keeps its own reference to the device, so you can release
+the device once the attach call returns.
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 

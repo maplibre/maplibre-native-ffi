@@ -3694,6 +3694,43 @@ bool mln_ts_write_gpu_sync(
   return true;
 }
 
+bool mln_ts_write_graphics_device_options(
+  mln_ts_call* call, napi_value value, mln_graphics_device_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "adapterIndex", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "adapterIndex");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->adapter_index = (uint32_t)number;
+    }
+    out->fields |= MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
+  }
+  return true;
+}
+
+bool mln_ts_write_graphics_device_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_graphics_device_texture_descriptor* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "extent", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "extent");
+  memset(&out->extent, 0, sizeof out->extent);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
+    return false;
+  return true;
+}
+
 bool mln_ts_write_http_header(
   mln_ts_call* call, napi_value value, mln_http_header* out, const char* path
 ) {

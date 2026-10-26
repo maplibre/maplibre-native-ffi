@@ -16,6 +16,8 @@ mod acquired_frame;
 pub use acquired_frame::*;
 mod geo_json_source_data;
 pub use geo_json_source_data::*;
+mod graphics_device;
+pub use graphics_device::*;
 mod map;
 pub use map::*;
 mod map_projection;
@@ -37,6 +39,8 @@ pub use global::*;
 static_assertions::assert_impl_all!(AcquiredFrameHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(GeoJsonSourceDataHandle: Send, Sync);
+#[cfg(test)]
+static_assertions::assert_impl_all!(GraphicsDeviceHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(MapHandle: Send, Sync);
 #[cfg(test)]

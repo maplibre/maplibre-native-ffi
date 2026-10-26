@@ -4,6 +4,7 @@
 #include "delivery/delivery_queue.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
+#include "render/graphics_device.hpp"
 #include "render/render_session_common.hpp"
 #include "resources/custom_resource_provider.hpp"
 #include "resources/resource_transform.hpp"
@@ -26,6 +27,9 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         return MLN_STATUS_OK;
       case core::HandleKind::GeoJsonSourceData:
         core::geojson_source_data_release(handle);
+        return MLN_STATUS_OK;
+      case core::HandleKind::GraphicsDevice:
+        core::graphics_device_release(handle);
         return MLN_STATUS_OK;
       case core::HandleKind::Map:
         return core::dispose_map(handle);

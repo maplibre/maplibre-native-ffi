@@ -142,6 +142,11 @@ typedef uint64_t mln_style_expression MLN_BINDING(
   "kind=handle;release=mln_style_expression_release;"
   "dispose=mln_style_expression_release"
 );
+/** A GPU device that native code creates for texture render targets. */
+typedef uint64_t mln_graphics_device MLN_BINDING(
+  "kind=handle;release=mln_graphics_device_release;"
+  "dispose=mln_graphics_device_release"
+);
 /** A standalone projection of one map view. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_release;"

@@ -1976,6 +1976,20 @@ public data class GeoJsonSourceOptions(
 )
 
 /**
+ * Options for creating a graphics device.
+ *
+ * See `mln_graphics_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+ */
+public data class GraphicsDeviceOptions(
+  /**
+   * The adapter to create the device on, as a position in the graphics API's own list of adapters,
+   * from zero. Without it, the backend picks its default adapter.
+   */
+  public val adapterIndex: UInt? = null,
+)
+
+/**
  * Lower-level Spherical Mercator projected-meter coordinate.
  *
  * See `mln_projected_meters` in the
@@ -2163,34 +2177,17 @@ public data class CameraDelta(
 )
 
 /**
- * One caller-owned Metal texture of a borrowed texture ring.
+ * Attachment options for a graphics device texture target.
  *
- * See `mln_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_graphics_device_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
  */
-public data class MetalBorrowedTexture(
-  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
-  public val texture: NativePointer,
-)
-
-/**
- * Metal attachment options for a borrowed texture target.
- *
- * See `mln_metal_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTextureDescriptor(
+public data class GraphicsDeviceTextureDescriptor(
   /**
-   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
-   * scale_factor that differs from the map's is accepted and logged as a warning.
+   * Logical texture extent. Required. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   public val extent: LogicalExtent,
-  /** Physical texture width in device pixels. Required. */
-  public val physicalWidth: UInt,
-  /** Physical texture height in device pixels. Required. */
-  public val physicalHeight: UInt,
-  /** The ring's textures, one per slot, in slot order. Required. */
-  public val textures: List<MetalBorrowedTexture>,
 )
 
 /**
@@ -2227,6 +2224,37 @@ public data class RenderSessionAttachOptions(
    * lock; other backends fail the attach with `Status.UNSUPPORTED`.
    */
   public val queueLock: QueueLock = QueueLock(),
+)
+
+/**
+ * One caller-owned Metal texture of a borrowed texture ring.
+ *
+ * See `mln_metal_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class MetalBorrowedTexture(
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
+  public val texture: NativePointer,
+)
+
+/**
+ * Metal attachment options for a borrowed texture target.
+ *
+ * See `mln_metal_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class MetalBorrowedTextureDescriptor(
+  /**
+   * Logical texture extent. Required. physical_width and physical_height give the texture's size. A
+   * scale_factor that differs from the map's is accepted and logged as a warning.
+   */
+  public val extent: LogicalExtent,
+  /** Physical texture width in device pixels. Required. */
+  public val physicalWidth: UInt,
+  /** Physical texture height in device pixels. Required. */
+  public val physicalHeight: UInt,
+  /** The ring's textures, one per slot, in slot order. Required. */
+  public val textures: List<MetalBorrowedTexture>,
 )
 
 /**

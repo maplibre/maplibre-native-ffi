@@ -26,6 +26,8 @@ from ._generated_values import (
     FreeCameraOptions,
     GeoJsonSourceOptions,
     GpuSync,
+    GraphicsDeviceOptions,
+    GraphicsDeviceTextureDescriptor,
     HttpHeaderTransform,
     LatLng,
     LatLngBounds,
@@ -95,6 +97,7 @@ if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
         GeoJsonSourceDataHandle,
+        GraphicsDeviceHandle,
         MapHandle,
         MapProjectionHandle,
         RenderSessionHandle,
@@ -106,6 +109,11 @@ if TYPE_CHECKING:
 class LogicalExtentPhysicalSizeResult(NamedTuple):
     width: int
     height: int
+
+
+class MapAttachGraphicsDeviceTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    ready: Future[None]
 
 
 class MapAttachMetalBorrowedTextureResult(NamedTuple):
@@ -270,6 +278,31 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
         return self._native.close()
 
 
+class _GraphicsDeviceHandleOperations(GeneratedOperations):
+    _native: _native._GraphicsDeviceHandle
+
+    @classmethod
+    def create(
+        cls, options: GraphicsDeviceOptions | None = None
+    ) -> GraphicsDeviceHandle:
+        """Creates a graphics device for this build's render backend.
+
+        See `mln_graphics_device_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+        """
+        return _adopt_value(
+            _native._GraphicsDeviceHandle.create(options), "GraphicsDeviceHandle", None
+        )
+
+    def close(self) -> None:
+        """Releases a graphics device.
+
+        See `mln_graphics_device_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+        """
+        return self._native.close()
+
+
 class _HttpHeaderTransformResponseScopeOperations(GeneratedOperations):
     _native: _native._HttpHeaderTransformResponseScope
 
@@ -378,6 +411,26 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.apply_camera_delta(delta)
+
+    def attach_graphics_device_texture(
+        self,
+        device: GraphicsDeviceHandle,
+        descriptor: GraphicsDeviceTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> MapAttachGraphicsDeviceTextureResult:
+        """Starts attachment of a texture target that renders on a graphics
+        device.
+
+        See `mln_map_attach_graphics_device_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+        """
+        raw = self._native.attach_graphics_device_texture(
+            device._native, descriptor, options
+        )
+        return MapAttachGraphicsDeviceTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            ready=raw["ready"],
+        )
 
     def attach_metal_borrowed_texture(
         self,

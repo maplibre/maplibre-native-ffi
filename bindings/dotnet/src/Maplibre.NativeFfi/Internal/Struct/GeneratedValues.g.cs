@@ -607,6 +607,31 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_graphics_device_options NativeGraphicsDeviceOptions(
+        GraphicsDeviceOptions value
+    )
+    {
+        var native = new mln_graphics_device_options();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_graphics_device_options);
+        native.fields |= Put(
+            value.AdapterIndex,
+            ref native.adapter_index,
+            MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
+        );
+        return native;
+    }
+
+    internal static mln_graphics_device_texture_descriptor NativeGraphicsDeviceTextureDescriptor(
+        GraphicsDeviceTextureDescriptor value
+    )
+    {
+        var native = new mln_graphics_device_texture_descriptor();
+        native.size = (uint)sizeof(mln_graphics_device_texture_descriptor);
+        native.extent = NativeLogicalExtent(value.Extent);
+        return native;
+    }
+
     internal static mln_http_header NativeHttpHeader(HttpHeader value, NativeCallScope scope)
     {
         Required(value.Name, "HttpHeader.Name must not be null.");

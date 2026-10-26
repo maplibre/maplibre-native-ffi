@@ -1,5 +1,6 @@
 // Renders one map image offscreen and copies it to host memory. The map uses
-// static mode and the session owns its texture.
+// static mode, and the session owns its texture on a graphics device that
+// native code creates.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -11,8 +12,6 @@ typedef struct still_image_job {
   mln_map map;
   mln_render_session session;
   const char* style_url;
-  void* egl_display;
-  void* egl_config;
   uint32_t width;
   uint32_t height;
   atomic_bool attach_ready;
@@ -58,32 +57,34 @@ static void ignore_completion(
   (void)result;
 }
 
-static mln_status attach_owned_texture(still_image_job* job) {
+static mln_status attach_device_texture(still_image_job* job) {
+  // #region device
+  mln_graphics_device device = MLN_HANDLE_NULL;
+  mln_status status = mln_graphics_device_create(NULL, &device, NULL);
+  if (status != MLN_STATUS_OK) return status;
+  // #endregion device
   // #region attach
-  mln_open_gl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_owned_texture_descriptor)
+  mln_graphics_device_texture_descriptor descriptor = {
+    .size = sizeof(mln_graphics_device_texture_descriptor)
   };
   descriptor.extent.width = job->width;
   descriptor.extent.height = job->height;
   descriptor.extent.scale_factor = 1.0;
-  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
-  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
-  descriptor.context.data.egl.display = job->egl_display;
-  descriptor.context.data.egl.config = job->egl_config;
-  descriptor.context.data.egl.client_api = MLN_OPEN_GL_CLIENT_API_GLES;
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
-  options.requested_texture_ring_depth = 1;
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = attach_finished,
     .user_data = job,
   };
-  return mln_map_attach_open_gl_owned_texture(
-    job->map, &descriptor, &options, &job->session, &completion, NULL
+  status = mln_map_attach_graphics_device_texture(
+    job->map, device, &descriptor, &options, &job->session, &completion, NULL
   );
+  // The session keeps its own reference to the device.
+  mln_graphics_device_release(device);
+  return status;
   // #endregion attach
 }
 
@@ -94,7 +95,7 @@ static void map_ready(void* user_data, const mln_completion_result* result) {
     job->finished(job->user_data, job);
     return;
   }
-  job->status = attach_owned_texture(job);
+  job->status = attach_device_texture(job);
   if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
 }
 

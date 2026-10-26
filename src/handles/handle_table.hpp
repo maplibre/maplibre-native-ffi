@@ -34,6 +34,7 @@ enum class HandleKind : std::uint8_t {
   DeliveryQueue = 23,
   DeliveryBatch = 24,
   StyleExpression = 25,
+  GraphicsDevice = 26,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

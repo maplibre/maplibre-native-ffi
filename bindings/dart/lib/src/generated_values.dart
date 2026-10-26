@@ -1973,6 +1973,29 @@ final class GeoJsonSourceOptions extends _Value {
   ]);
 }
 
+/// Options for creating a graphics device.
+///
+/// See `mln_graphics_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+final class GraphicsDeviceOptions extends _Value {
+  const GraphicsDeviceOptions({this.adapterIndex});
+
+  /// The adapter to create the device on, as a position in the graphics API's
+  /// own list of adapters, from zero. Without it, the backend picks its default
+  /// adapter.
+  final int? adapterIndex;
+
+  /// A copy of this value with the given members replaced.
+  GraphicsDeviceOptions copyWith({int? adapterIndex}) =>
+      GraphicsDeviceOptions(adapterIndex: adapterIndex ?? this.adapterIndex);
+
+  @override
+  List<Object?> get _members => [adapterIndex];
+  @override
+  String toString() =>
+      _describe('GraphicsDeviceOptions', const ['adapterIndex']);
+}
+
 /// Lower-level Spherical Mercator projected-meter coordinate.
 ///
 /// See `mln_projected_meters` in the
@@ -2381,79 +2404,26 @@ final class CameraDelta extends _Value {
   ]);
 }
 
-/// One caller-owned Metal texture of a borrowed texture ring.
+/// Attachment options for a graphics device texture target.
 ///
-/// See `mln_metal_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTexture extends _Value {
-  const MetalBorrowedTexture({required this.texture});
+/// See `mln_graphics_device_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+final class GraphicsDeviceTextureDescriptor extends _Value {
+  const GraphicsDeviceTextureDescriptor({required this.extent});
 
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-  final NativePointer texture;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
-      MetalBorrowedTexture(texture: texture ?? this.texture);
-
-  @override
-  List<Object?> get _members => [texture];
-  @override
-  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
-}
-
-/// Metal attachment options for a borrowed texture target.
-///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTextureDescriptor extends _Value {
-  MetalBorrowedTextureDescriptor({
-    required this.extent,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<MetalBorrowedTexture> textures,
-  }) : textures = List.unmodifiable(textures);
-
-  /// Logical texture extent. Required. physical_width and physical_height give
-  /// the texture's size. A scale_factor that differs from the map's is accepted
-  /// and logged as a warning.
+  /// Logical texture extent. Required. A scale_factor that differs from the
+  /// map's is accepted and logged as a warning.
   final LogicalExtent extent;
 
-  /// Physical texture width in device pixels. Required.
-  final int physicalWidth;
-
-  /// Physical texture height in device pixels. Required.
-  final int physicalHeight;
-
-  /// The ring's textures, one per slot, in slot order. Required.
-  final List<MetalBorrowedTexture> textures;
-
   /// A copy of this value with the given members replaced.
-  MetalBorrowedTextureDescriptor copyWith({
-    LogicalExtent? extent,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-  }) => MetalBorrowedTextureDescriptor(
-    extent: extent ?? this.extent,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-  );
+  GraphicsDeviceTextureDescriptor copyWith({LogicalExtent? extent}) =>
+      GraphicsDeviceTextureDescriptor(extent: extent ?? this.extent);
 
   @override
-  List<Object?> get _members => [
-    extent,
-    physicalWidth,
-    physicalHeight,
-    textures,
-  ];
+  List<Object?> get _members => [extent];
   @override
-  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
-    'extent',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-  ]);
+  String toString() =>
+      _describe('GraphicsDeviceTextureDescriptor', const ['extent']);
 }
 
 /// Schedules service by the receiver that owns a queue or driver. The callback
@@ -2607,6 +2577,81 @@ final class RenderSessionAttachOptions extends _Value {
     'frameWake',
     'driverWorkWake',
     'queueLock',
+  ]);
+}
+
+/// One caller-owned Metal texture of a borrowed texture ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({required this.texture});
+
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+  final NativePointer texture;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
+      MetalBorrowedTexture(texture: texture ?? this.texture);
+
+  @override
+  List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
+}
+
+/// Metal attachment options for a borrowed texture target.
+///
+/// See `mln_metal_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTextureDescriptor extends _Value {
+  MetalBorrowedTextureDescriptor({
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
+
+  /// Logical texture extent. Required. physical_width and physical_height give
+  /// the texture's size. A scale_factor that differs from the map's is accepted
+  /// and logged as a warning.
+  final LogicalExtent extent;
+
+  /// Physical texture width in device pixels. Required.
+  final int physicalWidth;
+
+  /// Physical texture height in device pixels. Required.
+  final int physicalHeight;
+
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<MetalBorrowedTexture> textures;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+  }) => MetalBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    textures,
+  ];
+  @override
+  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
   ]);
 }
 

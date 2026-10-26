@@ -17,6 +17,8 @@ import type {
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
+  GraphicsDeviceOptions,
+  GraphicsDeviceTextureDescriptor,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -477,6 +479,61 @@ export class GeoJsonSourceDataHandle extends Owner {
 defineDisposers(GeoJsonSourceDataHandle, undefined, "close");
 
 /**
+ * A GPU device that native code creates for texture render targets.
+ *
+ * See `mln_graphics_device` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class GraphicsDeviceHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "GraphicsDeviceHandle", { registrations });
+  }
+  /**
+   * Calls `close()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `close()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Releases a graphics device.
+   *
+   * See `mln_graphics_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   */
+  close(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_graphics_device_release(handle, token),
+    );
+  }
+
+  /**
+   * Creates a graphics device for this build's render backend.
+   *
+   * See `mln_graphics_device_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   */
+  static create(options?: GraphicsDeviceOptions): GraphicsDeviceHandle {
+    const handle = native.mln_graphics_device_create(options);
+    return adopt(
+      handle,
+      () => new GraphicsDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_graphics_device_release(disposed, undefined),
+    );
+  }
+}
+defineDisposers(GraphicsDeviceHandle, undefined, "close");
+
+/**
  * A map, which holds map state independent of any render target.
  *
  * See `mln_map` in the
@@ -706,6 +763,39 @@ export class MapHandle extends Owner {
         registrations.commit(rootsOf(this));
       }),
     );
+  }
+
+  /**
+   * Starts attachment of a texture target that renders on a graphics device.
+   *
+   * See `mln_map_attach_graphics_device_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   */
+  attachGraphicsDeviceTexture(
+    device: GraphicsDeviceHandle,
+    descriptor: GraphicsDeviceTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): NewRenderSession {
+    return withRegistrations((registrations) => {
+      const [session, ready] = attach(
+        (completion) =>
+          native.mln_map_attach_graphics_device_texture(
+            this.id,
+            device.id,
+            descriptor,
+            options,
+            completion,
+          ),
+        (handle) =>
+          adopt(
+            handle,
+            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined, undefined),
+          ),
+      );
+      return { session, ready };
+    });
   }
 
   /**

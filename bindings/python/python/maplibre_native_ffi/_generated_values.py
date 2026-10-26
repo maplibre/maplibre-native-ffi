@@ -1457,6 +1457,43 @@ class GpuSync:
 
 
 @dataclass(frozen=True, slots=True)
+class GraphicsDeviceOptions:
+    """Options for creating a graphics device.
+
+    See `mln_graphics_device_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    """
+
+    adapter_index: int | None = None
+    """The adapter to create the device on, as a position in the graphics API's
+    own list of adapters, from zero. Without it, the backend picks its
+    default adapter.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(adapter_index=raw["adapter_index"])
+
+
+@dataclass(frozen=True, slots=True)
+class GraphicsDeviceTextureDescriptor:
+    """Attachment options for a graphics device texture target.
+
+    See `mln_graphics_device_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    """
+
+    extent: LogicalExtent
+    """Logical texture extent. Required. A scale_factor that differs from the
+    map's is accepted and logged as a warning.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(extent=LogicalExtent._from_native(raw["extent"]))
+
+
+@dataclass(frozen=True, slots=True)
 class HttpHeader:
     """One HTTP header that a header rule supplies.
 

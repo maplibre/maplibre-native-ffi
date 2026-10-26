@@ -306,6 +306,38 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Starts attachment of a texture target that renders on a graphics device.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_graphics_device_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachGraphicsDeviceTexture(
+        GraphicsDeviceHandle device,
+        GraphicsDeviceTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeGraphicsDeviceTextureDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_graphics_device_texture(
+            Handle,
+            scope.Use(device),
+            &nativeDescriptor,
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Starts attachment of a ring of caller-owned Metal textures.
     /// </summary>
     /// <remarks>

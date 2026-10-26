@@ -8,6 +8,9 @@
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/GraphicsDevice/GraphicsDeviceHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/GraphicsDevice/GraphicsDeviceOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/GraphicsDevice/GraphicsDeviceTextureDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs linguist-generated=true
@@ -217,6 +220,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeneratedOwnerDisposal.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeneratedValues.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeoJsonSourceDataHandle.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GraphicsDeviceHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/MapHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/MapProjectionHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/RenderSessionHandle.kt linguist-generated=true
@@ -260,6 +264,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/geo_json_source_data.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/global.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/graphics_device.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map_projection.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/mod.rs linguist-generated=true
@@ -274,6 +279,8 @@
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedGraphicsDeviceGraphicsDeviceOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedGraphicsDeviceMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedLoggingGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapRuntimeOperations.swift linguist-generated=true
@@ -297,6 +304,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedBaseValues.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedGraphicsDeviceValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLoggingValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedMapValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedQueryValues.swift linguist-generated=true

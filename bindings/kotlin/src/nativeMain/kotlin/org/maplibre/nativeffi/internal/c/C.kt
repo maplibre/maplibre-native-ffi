@@ -161,6 +161,17 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_release(data.toULong())
   }
 
+  actual fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_graphics_device_create(
+      options.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_graphics_device_release(device: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_graphics_device_release(device.toULong())
+  }
+
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -352,6 +363,25 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_map_apply_camera_delta(
       map.toULong(),
       delta.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_attach_graphics_device_texture(
+    map: Long,
+    device: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_graphics_device_texture(
+      map.toULong(),
+      device.toULong(),
+      descriptor.toCPointer(),
+      options.toCPointer(),
+      outSession.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

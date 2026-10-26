@@ -1212,6 +1212,57 @@ impl Default for GpuSyncKind {
     }
 }
 
+/// Options for creating a graphics device.
+///
+/// See `mln_graphics_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct GraphicsDeviceOptions {
+    /// The adapter to create the device on, as a position in the graphics API's
+    /// own list of adapters, from zero. Without it, the backend picks its
+    /// default adapter.
+    pub adapter_index: Option<u32>,
+}
+impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_graphics_device_options> {
+        let mut raw: sys::mln_graphics_device_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_graphics_device_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.adapter_index {
+            raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
+            raw.adapter_index = *item;
+        }
+        Ok(raw)
+    }
+}
+
+/// Attachment options for a graphics device texture target.
+///
+/// See `mln_graphics_device_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GraphicsDeviceTextureDescriptor {
+    /// Logical texture extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    pub extent: LogicalExtent,
+}
+impl GraphicsDeviceTextureDescriptor {
+    pub const fn new(extent: LogicalExtent) -> Self {
+        Self { extent }
+    }
+}
+impl ToNative<sys::mln_graphics_device_texture_descriptor> for GraphicsDeviceTextureDescriptor {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_graphics_device_texture_descriptor> {
+        let mut raw: sys::mln_graphics_device_texture_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_graphics_device_texture_descriptor>() as _;
+        raw.extent = to_native(&self.extent, arena)?;
+        Ok(raw)
+    }
+}
+
 /// One HTTP header that a header rule supplies.
 ///
 /// See `mln_http_header` in the

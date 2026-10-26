@@ -222,6 +222,39 @@ impl MapHandle {
         })
     }
 
+    /// Starts attachment of a texture target that renders on a graphics device.
+    ///
+    /// See `mln_map_attach_graphics_device_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    pub fn attach_graphics_device_texture(
+        &self,
+        device: &GraphicsDeviceHandle,
+        descriptor: &GraphicsDeviceTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let parent = self.inner.parent();
+        let device = device.inner.native();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_graphics_device_texture(
+                    map,
+                    device,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
     /// Starts attachment of a ring of caller-owned Metal textures.
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the

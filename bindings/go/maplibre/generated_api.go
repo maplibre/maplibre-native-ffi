@@ -2287,6 +2287,45 @@ func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	return raw
 }
 
+// GraphicsDeviceOptions corresponds to mln_graphics_device_options. Options for
+// creating a graphics device.
+//
+// See mln_graphics_device_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+type GraphicsDeviceOptions struct {
+	// The adapter to create the device on, as a position in the graphics API's own
+	// list of adapters, from zero. Without it, the backend picks its default
+	// adapter.
+	AdapterIndex *uint32
+}
+
+func nativeGraphicsDeviceOptions(input GraphicsDeviceOptions, arena *bindingArena) C.mln_graphics_device_options {
+	raw := C.mln_graphics_device_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
+	return raw
+}
+
+// GraphicsDeviceTextureDescriptor corresponds to
+// mln_graphics_device_texture_descriptor. Attachment options for a graphics
+// device texture target.
+//
+// See mln_graphics_device_texture_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+type GraphicsDeviceTextureDescriptor struct {
+	// Logical texture extent. Required. A scale_factor that differs from the map's
+	// is accepted and logged as a warning.
+	Extent LogicalExtent
+}
+
+func nativeGraphicsDeviceTextureDescriptor(input GraphicsDeviceTextureDescriptor, arena *bindingArena) C.mln_graphics_device_texture_descriptor {
+	raw := C.mln_graphics_device_texture_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
+	return raw
+}
+
 // HttpHeader corresponds to mln_http_header. One HTTP header that a header rule
 // supplies.
 //
@@ -5145,6 +5184,39 @@ func (handle *GeoJsonSourceDataHandle) String() string {
 	return bindingDescribe("GeoJsonSourceDataHandle", handle.owner())
 }
 
+// GraphicsDeviceHandle corresponds to mln_graphics_device. A GPU device that
+// native code creates for texture render targets.
+//
+// See mln_graphics_device in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type GraphicsDeviceHandle struct{ *bindingOwner }
+
+func adoptGraphicsDeviceHandle(raw uint64, parent any) *GraphicsDeviceHandle {
+	owner := &GraphicsDeviceHandle{bindingAdopt(raw, parent, "GraphicsDeviceHandle", func(raw uint64) { C.mln_graphics_device_release(C.mln_graphics_device(raw)) })}
+	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *GraphicsDeviceHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *GraphicsDeviceHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *GraphicsDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as GraphicsDeviceHandle(id=0x<hex>, closed=<true|false>).
+func (handle *GraphicsDeviceHandle) String() string {
+	return bindingDescribe("GraphicsDeviceHandle", handle.owner())
+}
+
 // MapHandle corresponds to mln_map. A map, which holds map state independent of
 // any render target.
 //
@@ -5507,6 +5579,32 @@ func (receiver *GeoJsonSourceDataHandle) Close() error {
 	return err
 }
 
+// NewGraphicsDevice creates a graphics device for this build's render backend.
+//
+// See mln_graphics_device_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+func NewGraphicsDevice(options *GraphicsDeviceOptions) (*GraphicsDeviceHandle, error) {
+	var outDevice C.mln_graphics_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_graphics_device_create(bindingStoreOptional(options, arena, nativeGraphicsDeviceOptions), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GraphicsDeviceHandle {
+		adopted := adoptGraphicsDeviceHandle(uint64(outDevice), nil)
+		return adopted
+	})
+}
+
+// Close releases a graphics device.
+//
+// See mln_graphics_device_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+func (receiver *GraphicsDeviceHandle) Close() error {
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_graphics_device_release(C.mln_graphics_device(raw))
+		return struct{}{}
+	})
+	return err
+}
+
 // SetHeader sets one outgoing HTTP request header for the current transform
 // invocation.
 //
@@ -5680,6 +5778,29 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), bindingStore(nativeCameraDelta(delta, arena), arena), completion, diagnostic))
 	}, completionCommand)
+}
+
+// AttachGraphicsDeviceTexture starts attachment of a texture target that
+// renders on a graphics device.
+//
+// See mln_map_attach_graphics_device_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+func (receiver *MapHandle) AttachGraphicsDeviceTexture(device *GraphicsDeviceHandle, descriptor GraphicsDeviceTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_graphics_device_texture(C.mln_map(raw), C.mln_graphics_device(arena.lease(device.owner())), bindingStore(nativeGraphicsDeviceTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
 }
 
 // AttachOpenGlBorrowedTexture starts attachment of a ring of caller-owned

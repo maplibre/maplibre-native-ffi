@@ -3,6 +3,7 @@
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
     _GeoJsonSourceDataHandleOperations,
+    _GraphicsDeviceHandleOperations,
     _HttpHeaderTransformResponseScopeOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
@@ -63,6 +64,32 @@ class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMi
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "GeoJsonSourceDataHandle"
+
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+
+    @classmethod
+    def _from_native(cls, native, parent=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
+
+
+class GraphicsDeviceHandle(_GraphicsDeviceHandleOperations, ScopedHandleMixin):
+    """A GPU device that native code creates for texture render targets.
+
+    See `mln_graphics_device` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    __module__ = "maplibre_native_ffi"
+    _handle_name = "GraphicsDeviceHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

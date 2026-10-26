@@ -13,6 +13,8 @@
 #include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLTexture.hpp>
 
+#include "render/metal/metal_texture_session.hpp"
+
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "render/metal/metal_texture_backend.inc"
@@ -209,6 +211,14 @@ namespace mln::core {
 
 auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_METAL;
+}
+
+auto create_metal_owned_texture_backend(
+  MTL::Device* device, mln::Size size, std::size_t ring_depth
+) -> std::unique_ptr<TextureSessionBackend> {
+  return std::make_unique<MetalTextureSessionBackend>(
+    device, size, ring_depth, MTL::PixelFormatRGBA8Unorm
+  );
 }
 
 auto metal_owned_texture_attach_start(

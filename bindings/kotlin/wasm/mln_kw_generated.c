@@ -152,6 +152,19 @@ void mln_kw_mln_geo_json_source_data_release(int64_t data) {
   mln_geo_json_source_data_release((mln_geo_json_source_data)data);
 }
 
+int32_t mln_kw_mln_graphics_device_create(
+  uintptr_t options, uintptr_t out_device, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_graphics_device_create(
+    (const mln_graphics_device_options*)options,
+    (mln_graphics_device*)out_device, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+void mln_kw_mln_graphics_device_release(int64_t device) {
+  mln_graphics_device_release((mln_graphics_device)device);
+}
+
 int32_t mln_kw_mln_http_header_transform_response_set_header(
   uintptr_t response, uintptr_t name, uintptr_t value, uintptr_t out_diagnostic
 ) {
@@ -300,6 +313,19 @@ int32_t mln_kw_mln_map_apply_camera_delta(
   return (int32_t)mln_map_apply_camera_delta(
     (mln_map)map, (const mln_camera_delta*)delta,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_attach_graphics_device_texture(
+  int64_t map, int64_t device, uintptr_t descriptor, uintptr_t options,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_graphics_device_texture(
+    (mln_map)map, (mln_graphics_device)device,
+    (const mln_graphics_device_texture_descriptor*)descriptor,
+    (const mln_render_session_attach_options*)options,
+    (mln_render_session*)out_session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

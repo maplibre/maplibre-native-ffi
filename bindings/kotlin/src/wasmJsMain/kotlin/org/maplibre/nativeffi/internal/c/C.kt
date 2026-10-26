@@ -100,6 +100,13 @@ internal actual object C {
     mln_kw_mln_geo_json_source_data_release(data)
   }
 
+  actual fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_graphics_device_create(word(options), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_graphics_device_release(device: Long) {
+    mln_kw_mln_graphics_device_release(device)
+  }
+
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -279,6 +286,25 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_map_apply_camera_delta(map, word(delta), word(completion), word(outDiagnostic))
+
+  actual fun mln_map_attach_graphics_device_texture(
+    map: Long,
+    device: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_attach_graphics_device_texture(
+      map,
+      device,
+      word(descriptor),
+      word(options),
+      word(outSession),
+      word(completion),
+      word(outDiagnostic),
+    )
 
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,
@@ -1979,6 +2005,14 @@ private fun mln_kw_mln_geo_json_source_data_release(p0: Long): Unit =
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geo_json_source_data_release(p0)",
   )
 
+private fun mln_kw_mln_graphics_device_create(p0: Int, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_graphics_device_create(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_graphics_device_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_graphics_device_release(p0)")
+
 private fun mln_kw_mln_http_header_transform_response_set_header(
   p0: Int,
   p1: Int,
@@ -2100,6 +2134,19 @@ private fun mln_kw_mln_map_add_style_source_json(
 private fun mln_kw_mln_map_apply_camera_delta(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_apply_camera_delta(p0, p1, p2, p3)",
+  )
+
+private fun mln_kw_mln_map_attach_graphics_device_texture(
+  p0: Long,
+  p1: Long,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+  p6: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_graphics_device_texture(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_attach_metal_borrowed_texture(

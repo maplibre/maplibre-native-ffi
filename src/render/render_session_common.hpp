@@ -350,6 +350,17 @@ class TextureSessionBackend {
   virtual auto select_render_slot(std::size_t) -> mln_status {
     return MLN_STATUS_OK;
   }
+
+  // Keeps the graphics device that this backend's objects belong to. The base
+  // is destroyed after every member of the derived backend, so the device
+  // outlives the objects made on it, and a backend that detach or abandon
+  // keeps forever keeps its device too.
+  void retain_device(std::shared_ptr<const void> device) noexcept {
+    device_ = std::move(device);
+  }
+
+ private:
+  std::shared_ptr<const void> device_;
 };
 
 // The scheduler mbgl sees as current while a render session renders. Work

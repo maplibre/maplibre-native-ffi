@@ -62,6 +62,10 @@ internal actual object C {
     )
   private val mln_geo_json_source_data_release =
     Ffm.downcall("mln_geo_json_source_data_release", null, JAVA_LONG)
+  private val mln_graphics_device_create =
+    Ffm.downcall("mln_graphics_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_graphics_device_release =
+    Ffm.downcall("mln_graphics_device_release", null, JAVA_LONG)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -180,6 +184,18 @@ internal actual object C {
     )
   private val mln_map_apply_camera_delta =
     Ffm.downcall("mln_map_apply_camera_delta", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_attach_graphics_device_texture =
+    Ffm.downcall(
+      "mln_map_attach_graphics_device_texture",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_attach_metal_borrowed_texture =
     Ffm.downcall(
       "mln_map_attach_metal_borrowed_texture",
@@ -1352,6 +1368,13 @@ internal actual object C {
     mln_geo_json_source_data_release.invoke(data)
   }
 
+  actual fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_graphics_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
+
+  actual fun mln_graphics_device_release(device: Long) {
+    mln_graphics_device_release.invoke(device)
+  }
+
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -1534,6 +1557,25 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int = mln_map_apply_camera_delta.invokeExact(map, delta, completion, outDiagnostic) as Int
+
+  actual fun mln_map_attach_graphics_device_texture(
+    map: Long,
+    device: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_graphics_device_texture.invokeExact(
+      map,
+      device,
+      descriptor,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,

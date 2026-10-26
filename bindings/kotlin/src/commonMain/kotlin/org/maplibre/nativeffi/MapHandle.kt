@@ -235,6 +235,38 @@ internal constructor(
     }
 
   /**
+   * Starts attachment of a texture target that renders on a graphics device.
+   *
+   * See `mln_map_attach_graphics_device_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   */
+  public fun attachGraphicsDeviceTexture(
+    device: GraphicsDeviceHandle,
+    descriptor: GraphicsDeviceTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): NewRenderSession =
+    nativeCall(this, binding) {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_graphics_device_texture(
+            handle,
+            argument(device, device.binding),
+            writeGraphicsDeviceTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::NewRenderSession,
+      )
+    }
+
+  /**
    * Starts attachment of a ring of caller-owned OpenGL textures.
    *
    * See `mln_map_attach_open_gl_borrowed_texture` in the

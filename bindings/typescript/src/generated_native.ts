@@ -15,6 +15,8 @@ import type {
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
+  GraphicsDeviceOptions,
+  GraphicsDeviceTextureDescriptor,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -97,6 +99,10 @@ export interface NativeOperations {
     data: bigint,
     token: object | undefined,
   ): void;
+  mln_graphics_device_create(
+    options: GraphicsDeviceOptions | undefined,
+  ): bigint;
+  mln_graphics_device_release(device: bigint, token: object | undefined): void;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters | undefined): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
@@ -161,6 +167,13 @@ export interface NativeOperations {
     delta: CameraDelta | undefined,
     completion: number | undefined,
   ): void;
+  mln_map_attach_graphics_device_texture(
+    map: bigint,
+    device: bigint,
+    descriptor: GraphicsDeviceTextureDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: number,
+  ): bigint;
   mln_map_attach_metal_borrowed_texture(
     map: bigint,
     descriptor: MetalBorrowedTextureDescriptor,

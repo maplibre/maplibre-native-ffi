@@ -107,6 +107,15 @@ internal actual object C {
   @JvmStatic actual external fun mln_geo_json_source_data_release(data: Long): Unit
 
   @JvmStatic
+  actual external fun mln_graphics_device_create(
+    options: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic actual external fun mln_graphics_device_release(device: Long): Unit
+
+  @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -217,6 +226,17 @@ internal actual object C {
   actual external fun mln_map_apply_camera_delta(
     map: Long,
     delta: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_attach_graphics_device_texture(
+    map: Long,
+    device: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

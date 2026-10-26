@@ -324,6 +324,24 @@ Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
   return result;
 }
 
+Pointer<raw.mln_graphics_device_options> _writeGraphicsDeviceOptions(
+  GraphicsDeviceOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_graphics_device_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_graphics_device_options>();
+  result.ref.size = sizeOf<raw.mln_graphics_device_options>();
+  if (value.adapterIndex != null) {
+    result.ref.fields |= raw.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
+    result.ref.adapter_index = _nativeInteger(
+      value.adapterIndex!,
+      0,
+      4294967295,
+    );
+  }
+  return result;
+}
+
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
   Allocator arena, {
@@ -684,46 +702,15 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
-Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
-  MetalBorrowedTexture value,
+Pointer<raw.mln_graphics_device_texture_descriptor>
+_writeGraphicsDeviceTextureDescriptor(
+  GraphicsDeviceTextureDescriptor value,
   Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture>? into,
+  Pointer<raw.mln_graphics_device_texture_descriptor>? into,
 }) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  return result;
-}
-
-Pointer<raw.mln_metal_borrowed_texture_descriptor>
-_writeMetalBorrowedTextureDescriptor(
-  MetalBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  final result = into ?? arena<raw.mln_graphics_device_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_graphics_device_texture_descriptor>();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeMetalBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
   return result;
 }
 
@@ -781,6 +768,49 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
     result.ref.queue_lock = registrations
         .add(_prepareQueueLock(value.queueLock!))
         .ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
+  MetalBorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture_descriptor>
+_writeMetalBorrowedTextureDescriptor(
+  MetalBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
   }
   return result;
 }
@@ -2974,6 +3004,69 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   });
 }
 
+/// Issued native handle id.
+extension type const _NativeGraphicsDevice(int raw) implements NativeHandle {}
+
+/// Owner of one native handle.
+///
+/// A GPU device that native code creates for texture render targets.
+///
+/// See `mln_graphics_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class GraphicsDeviceHandle implements Finalizable {
+  GraphicsDeviceHandle._(_NativeGraphicsDevice handle)
+    : _state = NativeHandleState(handle, 'GraphicsDeviceHandle');
+  final NativeHandleState<_NativeGraphicsDevice> _state;
+  // ignore: unused_element
+  _NativeGraphicsDevice get _handle => _state.handle;
+
+  /// The native handle id.
+  int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'GraphicsDeviceHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Creates a graphics device for this build's render backend.
+  ///
+  /// See `mln_graphics_device_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+  static GraphicsDeviceHandle create({GraphicsDeviceOptions? options}) =>
+      withNativeArena((arena) {
+        ensureAbiVersion();
+        final outDevice = arena<Uint64>();
+        _check(
+          raw.mln_graphics_device_create(
+            options == null
+                ? nullptr
+                : _writeGraphicsDeviceOptions(options, arena),
+            outDevice,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outDevice.value,
+          () => GraphicsDeviceHandle._(_NativeGraphicsDevice(outDevice.value)),
+          (handle) {
+            raw.mln_graphics_device_release(handle);
+          },
+        );
+      });
+
+  /// Releases a graphics device.
+  ///
+  /// See `mln_graphics_device_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+  void close() => _state.close((handle) {
+    raw.mln_graphics_device_release(handle.raw);
+    return nativeStatusOk;
+  });
+}
+
 extension type MapHandleDiscarding._(MapHandle _owner) {
   _NativeMap get _handle => _owner._handle;
   _CallbackRoots get _callbackRoots => _owner._callbackRoots;
@@ -3748,6 +3841,43 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           ),
         );
       });
+
+  /// Starts attachment of a texture target that renders on a graphics device.
+  ///
+  /// See `mln_map_attach_graphics_device_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+  NewRenderSession attachGraphicsDeviceTexture(
+    GraphicsDeviceHandle device,
+    GraphicsDeviceTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_graphics_device_texture(
+          _handle.raw,
+          device._handle.raw,
+          _writeGraphicsDeviceTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
+        },
+      ),
+      NewRenderSession.new,
+    );
+  }
 
   /// Starts attachment of a ring of caller-owned Metal textures.
   ///

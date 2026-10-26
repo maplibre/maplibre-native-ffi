@@ -631,6 +631,35 @@ export type GpuSyncKind =
   | (number & {});
 
 /**
+ * Options for creating a graphics device.
+ *
+ * See `mln_graphics_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+ */
+export interface GraphicsDeviceOptions {
+  /**
+   * The adapter to create the device on, as a position in the graphics API's
+   * own list of adapters, from zero. Without it, the backend picks its default
+   * adapter.
+   */
+  adapterIndex?: number;
+}
+
+/**
+ * Attachment options for a graphics device texture target.
+ *
+ * See `mln_graphics_device_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+ */
+export interface GraphicsDeviceTextureDescriptor {
+  /**
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
+   */
+  extent: LogicalExtent;
+}
+
+/**
  * One HTTP header that a header rule supplies.
  *
  * See `mln_http_header` in the

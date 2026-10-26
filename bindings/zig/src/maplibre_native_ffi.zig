@@ -148,6 +148,43 @@ pub const GeoJsonSourceData = struct {
     }
 };
 
+/// A GPU device that native code creates for texture render targets.
+///
+/// See `mln_graphics_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const GraphicsDevice = struct {
+    raw: u64,
+    closed: bool = false,
+    pub const native_name = "mln_graphics_device";
+    const methods = owner.Handle(@This(), "GraphicsDevice", struct {
+        fn dispose(raw: u64) status.Error!void {
+            c.mln_graphics_device_release(raw);
+        }
+    }.dispose);
+    pub const adopt = methods.adopt;
+    pub const id = methods.id;
+    pub const isClosed = methods.isClosed;
+    pub const format = methods.format;
+    pub const deinit = methods.deinit;
+    /// Creates a graphics device for this build's render backend.
+    ///
+    /// See `mln_graphics_device_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    pub fn create(options: ?GraphicsDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GraphicsDevice {
+        return call.invoke("mln_graphics_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(GraphicsDevice) });
+    }
+
+    /// Releases a graphics device.
+    ///
+    /// See `mln_graphics_device_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    pub fn release(self: *GraphicsDevice) void {
+        if (self.closed) return;
+        c.mln_graphics_device_release(self.raw);
+        self.closed = true;
+    }
+};
+
 /// A map, which holds map state independent of any render target.
 ///
 /// See `mln_map` in the
@@ -244,6 +281,15 @@ pub const Map = struct {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn applyCameraDelta(self: Map, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_apply_camera_delta", .handle, self, call.command, null, diagnostic, .{delta});
+    }
+
+    /// Starts attachment of a texture target that renders on a graphics device.
+    ///
+    /// See `mln_map_attach_graphics_device_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    pub fn attachGraphicsDeviceTexture(self: Map, device: GraphicsDevice, descriptor: GraphicsDeviceTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+        const started = try call.submit("mln_map_attach_graphics_device_texture", .handle, self, call.unit, null, diagnostic, .{ device, descriptor, options, call.adopt(RenderSession) });
+        return .{ .session = started.outputs, .ready = started.ready };
     }
 
     /// Starts attachment of a ring of caller-owned Metal textures.
@@ -2613,6 +2659,50 @@ pub const GpuSyncKind = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// Options for creating a graphics device.
+///
+/// See `mln_graphics_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+pub const GraphicsDeviceOptions = struct {
+    /// The adapter to create the device on, as a position in the graphics API's
+    /// own list of adapters, from zero. Without it, the backend picks its
+    /// default adapter.
+    adapter_index: ?u32 = null,
+    pub fn toNative(self: GraphicsDeviceOptions) c.mln_graphics_device_options {
+        var raw = std.mem.zeroes(c.mln_graphics_device_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_graphics_device_options);
+        marshal.present(&raw.fields, c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_graphics_device_options) GraphicsDeviceOptions {
+        return .{
+            .adapter_index = if (raw.fields & c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
+        };
+    }
+};
+
+/// Attachment options for a graphics device texture target.
+///
+/// See `mln_graphics_device_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+pub const GraphicsDeviceTextureDescriptor = struct {
+    /// Logical texture extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    extent: LogicalExtent,
+    pub fn toNative(self: GraphicsDeviceTextureDescriptor) c.mln_graphics_device_texture_descriptor {
+        var raw = std.mem.zeroes(c.mln_graphics_device_texture_descriptor);
+        raw.size = @sizeOf(c.mln_graphics_device_texture_descriptor);
+        raw.extent = self.extent.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_graphics_device_texture_descriptor) GraphicsDeviceTextureDescriptor {
+        return .{
+            .extent = LogicalExtent.fromNative(raw.extent),
+        };
+    }
 };
 
 /// One HTTP header that a header rule supplies.

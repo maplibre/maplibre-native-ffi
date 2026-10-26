@@ -13,6 +13,7 @@ typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_batch = Uint64;
 typedef mln_delivery_queue = Uint64;
 typedef mln_geo_json_source_data = Uint64;
+typedef mln_graphics_device = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
 typedef mln_render_frame_batch = Uint64;
@@ -472,6 +473,21 @@ final class mln_gpu_sync extends Struct {
   external int kind;
   @Uint64()
   external int handle;
+}
+
+final class mln_graphics_device_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int adapter_index;
+}
+
+final class mln_graphics_device_texture_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
 }
 
 final class mln_http_header extends Struct {
@@ -1776,6 +1792,9 @@ const MLN_GESTURE_PHASE_CANCEL = 4;
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
 const MLN_GPU_SYNC_OPEN_GL_FENCE = 1;
 
+// mln_graphics_device_option_field
+const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1;
+
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;
 const MLN_LOG_EVENT_SETUP = 1;
@@ -2380,6 +2399,22 @@ external void mln_geo_json_source_data_release(int data);
 
 @Native<
   Int32 Function(
+    Pointer<mln_graphics_device_options>,
+    Pointer<mln_graphics_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_graphics_device_create(
+  Pointer<mln_graphics_device_options> options,
+  Pointer<mln_graphics_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_graphics_device)>()
+external void mln_graphics_device_release(int device);
+
+@Native<
+  Int32 Function(
     Pointer<mln_http_header_transform_response>,
     mln_buffer_view,
     mln_buffer_view,
@@ -2593,6 +2628,27 @@ external int mln_map_add_style_source_json(
 external int mln_map_apply_camera_delta(
   int map,
   Pointer<mln_camera_delta> delta,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_graphics_device,
+    Pointer<mln_graphics_device_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_graphics_device_texture(
+  int map,
+  int device,
+  Pointer<mln_graphics_device_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

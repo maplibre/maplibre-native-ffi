@@ -10,6 +10,7 @@ function(mln_ffi_configure_renderer target)
   set(MLN_FFI_VENDOR_METAL_SOURCES
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/mtl/headless_backend.cpp)
   set(MLN_FFI_METAL_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/metal/metal_graphics_device.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_session.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_backend.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_surface_session.mm)

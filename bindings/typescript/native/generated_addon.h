@@ -4,6 +4,7 @@
 
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
+#include "maplibre_native_c/graphics_device.h"
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
 #include "maplibre_native_c/plugin.h"
@@ -397,6 +398,14 @@ bool mln_ts_write_geo_json_source_options(
 );
 bool mln_ts_write_gpu_sync(
   mln_ts_call* call, napi_value value, mln_gpu_sync* out, const char* path
+);
+bool mln_ts_write_graphics_device_options(
+  mln_ts_call* call, napi_value value, mln_graphics_device_options* out,
+  const char* path
+);
+bool mln_ts_write_graphics_device_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_graphics_device_texture_descriptor* out, const char* path
 );
 bool mln_ts_write_http_header(
   mln_ts_call* call, napi_value value, mln_http_header* out, const char* path

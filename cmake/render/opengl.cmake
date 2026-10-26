@@ -187,8 +187,10 @@ function(mln_ffi_configure_renderer target)
       ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
-    list(APPEND MLN_FFI_OPENGL_SOURCES
-         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
+    list(
+      APPEND MLN_FFI_OPENGL_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_graphics_device.cpp)
     if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|Darwin)$")
       # Supplies the EGL entry points, so nothing links an EGL loader.
       list(APPEND MLN_FFI_OPENGL_SOURCES

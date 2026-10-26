@@ -312,6 +312,56 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_graphics_device_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_graphics_device_options arg_options;
+  const void* present_options = NULL;
+  mln_graphics_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_graphics_device_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_graphics_device_create(present_options, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_graphics_device_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_graphics_device arg_device = 0;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_graphics_device)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  mln_graphics_device_release(arg_device);
+  mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_lat_lng_for_projected_meters(
   napi_env env, napi_callback_info info
 ) {
@@ -840,6 +890,59 @@ static napi_value mln_ts_export_mln_map_apply_camera_delta(
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_attach_graphics_device_texture(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  uint64_t arg_device = 0;
+  mln_graphics_device_texture_descriptor arg_descriptor;
+  mln_render_session_attach_options arg_options;
+  mln_render_session arg_out_session = MLN_HANDLE_NULL;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_u64(call, call->argv[1], &arg_device, "device")) goto done;
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[2], "descriptor")) goto done;
+  if (!mln_ts_write_graphics_device_texture_descriptor(
+        call, call->argv[2], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
+  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
+  if (!mln_ts_write_render_session_attach_options(
+        call, call->argv[3], &arg_options, "options"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[4], false, MLN_TS_NO_DECODER, &arg_completion,
+        &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_attach_graphics_device_texture(
+    arg_map, arg_device, &arg_descriptor, &arg_options, &arg_out_session,
+    present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
 done:
   return mln_ts_end(call);
 }
@@ -6749,6 +6852,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_geo_json_source_data_create},
   {"mln_geo_json_source_data_release",
    mln_ts_export_mln_geo_json_source_data_release},
+  {"mln_graphics_device_create", mln_ts_export_mln_graphics_device_create},
+  {"mln_graphics_device_release", mln_ts_export_mln_graphics_device_release},
   {"mln_lat_lng_for_projected_meters",
    mln_ts_export_mln_lat_lng_for_projected_meters},
   {"mln_log_clear_callback", mln_ts_export_mln_log_clear_callback},
@@ -6772,6 +6877,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_add_style_source_json",
    mln_ts_export_mln_map_add_style_source_json},
   {"mln_map_apply_camera_delta", mln_ts_export_mln_map_apply_camera_delta},
+  {"mln_map_attach_graphics_device_texture",
+   mln_ts_export_mln_map_attach_graphics_device_texture},
   {"mln_map_attach_metal_borrowed_texture",
    mln_ts_export_mln_map_attach_metal_borrowed_texture},
   {"mln_map_attach_metal_owned_texture",

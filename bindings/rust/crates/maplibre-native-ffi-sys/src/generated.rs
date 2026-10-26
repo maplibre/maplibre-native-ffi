@@ -102,6 +102,8 @@ pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
 pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
 pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
+pub type mln_graphics_device_option_field = u32;
+pub const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX: mln_graphics_device_option_field = 1;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;
@@ -692,6 +694,19 @@ pub struct mln_gpu_sync {
     pub size: u32,
     pub kind: mln_gpu_sync_kind,
     pub handle: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_graphics_device_options {
+    pub size: u32,
+    pub fields: mln_graphics_device_option_fields,
+    pub adapter_index: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_graphics_device_texture_descriptor {
+    pub size: u32,
+    pub extent: mln_logical_extent,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1638,6 +1653,10 @@ pub type mln_free_camera_option_fields = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_geo_json_source_data(pub u64);
 pub type mln_geo_json_source_option_fields = u32;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_graphics_device(pub u64);
+pub type mln_graphics_device_option_fields = u32;
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
@@ -1730,6 +1749,7 @@ native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
     mln_geo_json_source_data,
+    mln_graphics_device,
     mln_map,
     mln_map_projection,
     mln_render_frame_batch,
@@ -1799,6 +1819,12 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_geo_json_source_data_release(data: mln_geo_json_source_data);
+    pub fn mln_graphics_device_create(
+        options: *const mln_graphics_device_options,
+        out_device: *mut mln_graphics_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_graphics_device_release(device: mln_graphics_device);
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -1889,6 +1915,15 @@ unsafe extern "C" {
     pub fn mln_map_apply_camera_delta(
         map: mln_map,
         delta: *const mln_camera_delta,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_graphics_device_texture(
+        map: mln_map,
+        device: mln_graphics_device,
+        descriptor: *const mln_graphics_device_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

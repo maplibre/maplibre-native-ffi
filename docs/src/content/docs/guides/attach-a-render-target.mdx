@@ -53,6 +53,11 @@ capabilities to choose acquisition or CPU readback.
 
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
+A host without graphics code of its own can attach an owned texture target on a
+graphics device that native code creates, and read its pixels back.
+[Render a static image](/maplibre-native-ffi/guides/render-a-static-image/)
+shows that path.
+
 A borrowed texture target names the host's textures and their physical size.
 A ring of two textures lets the session render while the host reads the previous
 frame.

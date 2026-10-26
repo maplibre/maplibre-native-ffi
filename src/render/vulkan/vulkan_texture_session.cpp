@@ -8,6 +8,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "render/vulkan/vulkan_texture_session.hpp"
+
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
@@ -211,6 +213,15 @@ namespace mln::core {
 
 auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_VULKAN;
+}
+
+auto create_vulkan_owned_texture_backend(
+  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
+  std::size_t ring_depth
+) -> std::unique_ptr<TextureSessionBackend> {
+  return std::make_unique<VulkanTextureSessionBackend>(
+    descriptor, size, ring_depth, nullptr
+  );
 }
 
 auto vulkan_owned_texture_attach_start(

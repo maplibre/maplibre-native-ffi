@@ -11,6 +11,8 @@ internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGeoJsonSourceData(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnGraphicsDevice(ulong Value) : IMlnHandle;
+
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMapProjection(ulong Value) : IMlnHandle;
@@ -280,6 +282,19 @@ internal unsafe struct mln_gpu_sync
     public uint size;
     public mln_gpu_sync_kind kind;
     public ulong handle;
+}
+
+internal unsafe struct mln_graphics_device_options
+{
+    public uint size;
+    public mln_graphics_device_option_field fields;
+    public uint adapter_index;
+}
+
+internal unsafe struct mln_graphics_device_texture_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
 }
 
 internal unsafe struct mln_http_header
@@ -1398,6 +1413,11 @@ internal enum mln_gpu_sync_kind : uint
 {
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
     MLN_GPU_SYNC_OPEN_GL_FENCE = 1,
+}
+
+internal enum mln_graphics_device_option_field : uint
+{
+    MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1,
 }
 
 internal enum mln_log_event : uint
