@@ -318,13 +318,6 @@ status = "path-known"
 reason = "Add an app host with a Node-API runtime, package the addon, and run simulator tests."
 
 [[gap]]
-language = "typescript"
-platform = "emscripten"
-status = "path-known"
-reason = "Link the Node-API addon with emnapi 2 into an Emscripten module, add a browser entry that loads it, and run WebGL and WebGPU tests in headless Chromium."
-link = "https://github.com/toyobayashi/emnapi"
-
-[[gap]]
 language = "zig"
 platform = "freebsd"
 status = "path-known"

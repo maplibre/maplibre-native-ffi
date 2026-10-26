@@ -77,42 +77,48 @@ else()
       "and a browser module renders with webgpu or opengl")
 endif()
 
+# Links [target] from the addon's sources, the archives, and emnapi into an ES
+# module factory and its .wasm.
+function(mln_ffi_browser_module target)
+  set_target_properties(${target} PROPERTIES SUFFIX ".mjs")
+  target_include_directories(
+    ${target}
+    PRIVATE
+      "${MLN_FFI_ROOT}/include" "${MLN_FFI_NATIVE_PREFIX}/include"
+      "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(${target} PRIVATE MLN_STATIC)
+  target_compile_options(
+    ${target}
+    PRIVATE -pthread -fwasm-exceptions -Wall -Wextra -Wno-unused-parameter)
+  target_link_libraries(
+    ${target}
+    PRIVATE "${MLN_FFI_NATIVE_ARCHIVE}" ${MLN_FFI_COMPANION_ARCHIVES} emnapi-mt)
+  target_link_options(
+    ${target}
+    PRIVATE
+      ${MLN_FFI_LINK_FLAGS}
+      -sMODULARIZE
+      -sEXPORT_ES6
+      -sENVIRONMENT=web,worker
+      # A failed allocation returns null to the caller, which reports it.
+      -sABORTING_MALLOC=0
+      # A transferred-canvas WebGL session hands its canvas to the core worker
+      # that pthread_create starts. No thread takes the default list, which
+      # would name a #canvas that the page need not have.
+      -sOFFSCREENCANVAS_SUPPORT=1
+      "-sOFFSCREENCANVASES_TO_PTHREAD=''"
+      "-sEXPORTED_FUNCTIONS=${MLN_FFI_EMNAPI_EXPORTS}"
+      -sEXPORTED_RUNTIME_METHODS=${MLN_FFI_GRAPHICS_OBJECT}
+      "--js-library=${MLN_FFI_GRAPHICS_LIBRARY}")
+  set_property(
+    TARGET ${target}
+    APPEND
+    PROPERTY
+      LINK_DEPENDS "${MLN_FFI_LINK_FLAGS_FILE}" "${MLN_FFI_GRAPHICS_LIBRARY}")
+endfunction()
+
 add_executable(maplibre_native_ffi ${MLN_FFI_SOURCES})
-set_target_properties(maplibre_native_ffi PROPERTIES SUFFIX ".mjs")
-target_include_directories(
-  maplibre_native_ffi
-  PRIVATE
-    "${MLN_FFI_ROOT}/include" "${MLN_FFI_NATIVE_PREFIX}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}")
-target_compile_definitions(maplibre_native_ffi PRIVATE MLN_STATIC)
-target_compile_options(
-  maplibre_native_ffi
-  PRIVATE -pthread -fwasm-exceptions -Wall -Wextra -Wno-unused-parameter)
-target_link_libraries(
-  maplibre_native_ffi
-  PRIVATE "${MLN_FFI_NATIVE_ARCHIVE}" ${MLN_FFI_COMPANION_ARCHIVES} emnapi-mt)
-target_link_options(
-  maplibre_native_ffi
-  PRIVATE
-    ${MLN_FFI_LINK_FLAGS}
-    -sMODULARIZE
-    -sEXPORT_ES6
-    -sENVIRONMENT=web,worker
-    # A failed allocation returns null to the caller, which reports it.
-    -sABORTING_MALLOC=0
-    # A transferred-canvas WebGL session hands its canvas to the core worker
-    # that pthread_create starts. No thread takes the default list, which
-    # would name a #canvas that the page need not have.
-    -sOFFSCREENCANVAS_SUPPORT=1
-    "-sOFFSCREENCANVASES_TO_PTHREAD=''"
-    "-sEXPORTED_FUNCTIONS=${MLN_FFI_EMNAPI_EXPORTS}"
-    -sEXPORTED_RUNTIME_METHODS=${MLN_FFI_GRAPHICS_OBJECT}
-    "--js-library=${MLN_FFI_GRAPHICS_LIBRARY}")
-set_property(
-  TARGET maplibre_native_ffi
-  APPEND
-  PROPERTY
-    LINK_DEPENDS "${MLN_FFI_LINK_FLAGS_FILE}" "${MLN_FFI_GRAPHICS_LIBRARY}")
+mln_ffi_browser_module(maplibre_native_ffi)
 install(
   FILES "$<TARGET_FILE:maplibre_native_ffi>"
   "$<TARGET_FILE_DIR:maplibre_native_ffi>/maplibre_native_ffi.wasm"
@@ -122,3 +128,15 @@ install(
 install(
   DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
   DESTINATION licenses)
+
+# The module that the browser suite loads, whose entry adds the test exports
+# beside the addon's.
+add_executable(
+  maplibre_native_ffi_test
+  EXCLUDE_FROM_ALL
+    ${MLN_FFI_SOURCES} ../test/browser/test_addon.c
+    ../test/support/native_probe.c)
+mln_ffi_browser_module(maplibre_native_ffi_test)
+target_include_directories(
+  maplibre_native_ffi_test
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../test/support")

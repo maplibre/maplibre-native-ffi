@@ -90,7 +90,7 @@ scripts/pack-ohpm.sh --version "$usage_version" build/ohpm "$usage_preset"
 '''
 
 [tasks.test]
-description = "Run the TypeScript binding suite under Node, Bun, and Deno, or on ArkTS for an OpenHarmony preset."
+description = "Run the TypeScript binding suite under Node, Bun, and Deno, on ArkTS for an OpenHarmony preset, or in headless Chromium for an Emscripten preset."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}"
 arg "[runtime]" help="One runtime instead of all three, for a desktop preset" {
@@ -99,8 +99,9 @@ arg "[runtime]" help="One runtime instead of all three, for a desktop preset" {
 '''
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 # The preset selects the host: OpenHarmony presets run the suite on ArkTS from
-# a signed HAP on the emulator, and desktop presets run it in one process per
-# runtime, after packing the preset's packages as the pack task does.
+# a signed HAP on the emulator, Emscripten presets run it as a page in headless
+# Chromium, and desktop presets run it in one process per runtime, after
+# packing the preset's packages as the pack task does.
 run = '''
 case "$usage_preset" in
   ohos-*)
@@ -109,6 +110,13 @@ case "$usage_preset" in
       exit 2
     fi
     exec mise run :_test-arkts "$usage_preset"
+    ;;
+  emscripten-*)
+    if [[ -n ${usage_runtime:-} ]]; then
+      echo "error: an Emscripten preset runs the suite in a browser, not $usage_runtime" >&2
+      exit 2
+    fi
+    exec scripts/test-browser.sh "$usage_preset"
     ;;
 esac
 exec scripts/test-desktop.sh "$usage_preset" ${usage_runtime:-}

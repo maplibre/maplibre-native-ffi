@@ -3,7 +3,8 @@
 // A case declares the capabilities it needs. The harness leaves a case out
 // only for a capability that `unavailable` names, and fails the run when a
 // case would be left out for any other reason. This module serves Node, Bun,
-// and Deno; the ArkTS bundle replaces it with test/arkts/host-capabilities.ts.
+// and Deno; the ArkTS bundle replaces it with test/arkts/host-capabilities.ts,
+// and the browser bundle with test/browser/host-capabilities.ts.
 
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -12,7 +13,7 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-export type Host = "node" | "bun" | "deno" | "arkts";
+export type Host = "node" | "bun" | "deno" | "arkts" | "browser";
 
 export type Capability =
   | "httpOrigin"
@@ -21,7 +22,8 @@ export type Capability =
   | "childProcess"
   | "processExit"
   | "bufferTransfer"
-  | "disposers";
+  | "disposers"
+  | "beforeLoad";
 
 export interface ChildResult {
   readonly code: number | null;
@@ -88,6 +90,15 @@ export interface Capabilities {
   readonly bufferTransfer?: (buffer: ArrayBuffer, length: number) => void;
   /** The host defines `Symbol.dispose` and `Symbol.asyncDispose`. */
   readonly disposers?: true;
+  /**
+   * What a call made before the browser module loaded threw, and how many
+   * entries it left pending. Other hosts load the addon as they import the
+   * binding, so no call precedes the load.
+   */
+  readonly beforeLoad?: () => {
+    readonly error: unknown;
+    readonly pending: number;
+  };
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
   /** Keeps a timer from holding the event loop open. */
@@ -296,7 +307,7 @@ function forcedGc(): (() => void) | undefined {
 
 export const capabilities: Capabilities = {
   host,
-  unavailable: [],
+  unavailable: ["beforeLoad"],
   httpOrigin,
   realmSpawn: host === "deno" ? denoWorker : await nodeWorkerThreads(),
   forcedGc: forcedGc(),

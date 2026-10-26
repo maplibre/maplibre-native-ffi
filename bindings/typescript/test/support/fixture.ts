@@ -33,11 +33,12 @@ export function utf8(text: string): Uint8Array {
 
 /**
  * Whether the C API accepts HTTP header transforms on this platform. The
- * HTTP client of OpenHarmony, the only platform of ArkTS, cannot keep a
- * transformed header from following a cross-origin redirect, so runtime.h
- * documents that the C API refuses header transforms there.
+ * HTTP clients of OpenHarmony, the only platform of ArkTS, and of the browser
+ * cannot keep a transformed header from following a cross-origin redirect, so
+ * runtime.h documents that the C API refuses header transforms there.
  */
-export const headerTransforms = capabilities.host !== "arkts";
+export const headerTransforms =
+  capabilities.host !== "arkts" && capabilities.host !== "browser";
 
 /**
  * Sets a header transform, or checks the documented refusal where the

@@ -5,6 +5,7 @@
 import {
   AwaitableWake,
   FrameDemandFlag,
+  MaplibreError,
   type LogicalExtent,
   type MapHandle,
   OpenGlClientApi,
@@ -19,6 +20,7 @@ import {
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
   supportedRenderBackendMask,
+  WebGlContextKind,
 } from "../../src/index.ts";
 import {
   bounded,
@@ -43,6 +45,8 @@ interface GraphicsContext {
   readonly vulkanQueueFamilyIndex: number;
   readonly vulkanGetInstanceProcAddr: bigint;
   readonly vulkanGetDeviceProcAddr: bigint;
+  readonly webGlContext: number;
+  readonly webGpuDevice: bigint;
 }
 
 interface ProbeAddresses {
@@ -62,8 +66,12 @@ interface GraphicsAddon {
 
 const addon = capabilities.testGraphics() as GraphicsAddon;
 
-/** The backend that this build renders through, by its test graphics number. */
-const backends = { metal: 1, vulkan: 2, egl: 3 } as const;
+/**
+ * The backend that this build renders through, by its test graphics number.
+ * The browser's test graphics create a WebGL context or import a WebGPU
+ * device from the page for the browser's two.
+ */
+const backends = { metal: 1, vulkan: 2, egl: 3, webgl: 5, webgpu: 6 } as const;
 export type Backend = keyof typeof backends;
 
 function buildBackend(): Backend {
@@ -74,7 +82,16 @@ function buildBackend(): Backend {
   if ((mask & RenderBackendFlag.vulkan) !== 0) {
     return "vulkan";
   }
+  if ((mask & RenderBackendFlag.webGpu) !== 0) {
+    return "webgpu";
+  }
   const providers = openGlSupportedContextProviderMask();
+  if (
+    (mask & RenderBackendFlag.openGl) !== 0 &&
+    (providers & OpenGlContextProviderFlag.webGl) !== 0
+  ) {
+    return "webgl";
+  }
   if (
     (mask & RenderBackendFlag.openGl) !== 0 &&
     (providers & OpenGlContextProviderFlag.egl) !== 0
@@ -87,6 +104,16 @@ function buildBackend(): Backend {
 }
 
 export const backend = buildBackend();
+
+/**
+ * Browser texture targets take only the caller-graphics-thread driver, so a
+ * session that a core worker drives elsewhere is one that this thread
+ * services there.
+ */
+const browser = backend === "webgl" || backend === "webgpu";
+const workerDriver = browser
+  ? RenderDriverKind.callerGraphicsThread
+  : RenderDriverKind.coreWorker;
 
 export const renderSize = 32;
 export const renderExtent: LogicalExtent = {
@@ -114,6 +141,29 @@ function attachOwnedTexture(
   options: RenderSessionAttachOptions,
 ): NewRenderSession {
   const extent = renderExtent;
+  if (backend === "webgpu") {
+    return map.attachWebGpuOwnedTexture(
+      { extent, context: { device: context.webGpuDevice } },
+      options,
+    );
+  }
+  if (backend === "webgl") {
+    return map.attachOpenGlOwnedTexture(
+      {
+        extent,
+        context: {
+          data: {
+            kind: "webGl",
+            value: {
+              kind: WebGlContextKind.existing,
+              context: context.webGlContext,
+            },
+          },
+        },
+      },
+      options,
+    );
+  }
   if (backend === "metal") {
     return map.attachMetalOwnedTexture(
       {
@@ -174,11 +224,44 @@ export function attachSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
 ): NewRenderSession {
-  const attachment = attachOwnedTexture(openGraphics(), map, {
-    driver: RenderDriverKind.coreWorker,
+  return attachWorkerSession(openGraphics(), map, options);
+}
+
+/**
+ * Attaches an owned texture that a core worker drives, or in the browser one
+ * that this thread services on its driver-work wake as a core worker would, so
+ * the case sees the same progress. A case that passes its own driver-work wake
+ * services nothing.
+ */
+function attachWorkerSession(
+  context: GraphicsContext,
+  map: MapHandle,
+  options: Partial<RenderSessionAttachOptions>,
+): NewRenderSession {
+  let serviced: RenderSessionHandle | undefined;
+  const service = () => {
+    if (serviced === undefined || serviced.isClosed) {
+      return;
+    }
+    if (backend === "webgl") {
+      addon.makeCurrent(context.graphics);
+    }
+    try {
+      serviced.serviceDriverWork();
+    } catch (error) {
+      // A session that the case abandoned or detached has no work left.
+      if (!(error instanceof MaplibreError)) {
+        throw error;
+      }
+    }
+  };
+  const attachment = attachOwnedTexture(context, map, {
+    driver: workerDriver,
     requestedTextureRingDepth: 1,
+    ...(browser && { driverWorkWake: service }),
     ...options,
   });
+  serviced = attachment.session;
   teardown(() => releaseSession(attachment.session));
   return attachment;
 }
@@ -201,12 +284,7 @@ export function attachSessionOverOwnGraphics(
     }
   };
   teardown(destroyGraphics);
-  const attachment = attachOwnedTexture(context, map, {
-    driver: RenderDriverKind.coreWorker,
-    requestedTextureRingDepth: 1,
-    ...options,
-  });
-  teardown(() => releaseSession(attachment.session));
+  const attachment = attachWorkerSession(context, map, options);
   return { ...attachment, destroyGraphics };
 }
 
@@ -330,8 +408,12 @@ export class TestSession {
     driver: "worker" | "caller" = "worker",
   ): Promise<TestSession> {
     const context = openGraphics();
-    const serviced = driver === "caller";
-    if (serviced && backend === "egl" && !addon.makeCurrent(context.graphics)) {
+    const serviced = driver === "caller" || browser;
+    if (
+      serviced &&
+      (backend === "egl" || backend === "webgl") &&
+      !addon.makeCurrent(context.graphics)
+    ) {
       throw new Error("the test graphics context could not be made current");
     }
     const wake = new AwaitableWake();

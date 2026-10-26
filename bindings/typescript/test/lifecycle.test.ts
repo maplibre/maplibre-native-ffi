@@ -17,12 +17,24 @@ import {
   test,
   watchCollection,
 } from "./support/harness.ts";
+import { capabilities } from "./support/host-capabilities.ts";
 import { captureLeaks, runtimeIsLive } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
 
 function isInvalidState(error: unknown): boolean {
   return error instanceof MaplibreError && error.status === Status.invalidState;
 }
+
+test(
+  "a call before the browser module loads throws and leaves nothing pending",
+  () => {
+    const { error, pending } = capabilities.beforeLoad!();
+    assert.ok(error instanceof Error, "the call did not throw");
+    assert.match(error.message, /call loadModule\(\) first/);
+    assert.equal(pending, 0);
+  },
+  { needs: ["beforeLoad"] },
+);
 
 test("repeated asynchronous release reaches native", async () => {
   const fixture = await openRuntime();

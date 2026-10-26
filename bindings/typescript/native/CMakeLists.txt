@@ -200,7 +200,8 @@ if(MLN_FFI_TEST_GRAPHICS_LIBRARY)
   add_library(
     maplibre_native_ffi_test_graphics
     MODULE
-    EXCLUDE_FROM_ALL ../test/support/graphics_addon.c)
+    EXCLUDE_FROM_ALL
+      ../test/support/graphics_addon.c ../test/support/native_probe.c)
   mln_ffi_node_module(maplibre_native_ffi_test_graphics)
   target_include_directories(
     maplibre_native_ffi_test_graphics

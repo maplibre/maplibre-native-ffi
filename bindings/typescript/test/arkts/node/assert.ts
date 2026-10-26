@@ -1,5 +1,6 @@
-// The part of node:assert/strict that the suite calls, for the ArkTS bundle.
-// ArkTS has no node: modules; the bundle resolves node:assert/strict here.
+// The part of node:assert/strict that the suite calls, for the ArkTS and
+// browser bundles, whose hosts have no node: modules. Each bundle resolves
+// node:assert/strict here.
 
 export class AssertionError extends Error {
   override name = "AssertionError";

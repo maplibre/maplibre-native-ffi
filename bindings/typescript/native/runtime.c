@@ -5,6 +5,10 @@
 
 #include "runtime.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emnapi.h>
+#endif
+
 struct mln_ts_allocation {
   mln_ts_allocation* next;
   max_align_t data[];
@@ -498,6 +502,13 @@ napi_value mln_ts_bytes(napi_env env, const void* data, size_t size) {
   }
   if (size > 0) {
     memcpy(target, data, size);
+#ifdef __EMSCRIPTEN__
+    // emnapi's data pointer is a copy of the buffer in the module's memory,
+    // which the sync writes into the buffer.
+    if (emnapi_sync_memory(env, false, &buffer, 0, size) != napi_ok) {
+      return NULL;
+    }
+#endif
   }
   napi_create_typedarray(env, napi_uint8_array, size, buffer, 0, &result);
   return result;
@@ -540,10 +551,11 @@ napi_value mln_ts_missing_value(napi_env env) {
 
 #ifdef __EMSCRIPTEN__
 // emnapi enters a WebAssembly module through napi_register_wasm_v1, and asks it
-// for the Node-API version that it targets.
+// for the Node-API version that it targets. The entry is weak, so the browser
+// suite's test module can register the addon with test exports beside it.
 NAPI_MODULE_EXPORT napi_value
 napi_register_module_v1(napi_env env, napi_value exports);
-NAPI_MODULE_EXPORT napi_value
+NAPI_MODULE_EXPORT __attribute__((weak)) napi_value
 napi_register_wasm_v1(napi_env env, napi_value exports) {
   return napi_register_module_v1(env, exports);
 }

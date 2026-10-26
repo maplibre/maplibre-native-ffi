@@ -52,10 +52,10 @@ export function captureConsole(method: "warn" | "error"): string[] {
 /**
  * Collects the leak reports that the binding makes during the running case
  * instead of printing them. Node, Bun, and Deno report a leak as a process
- * warning, and ArkTS through `console.warn`.
+ * warning, and ArkTS and the browser through `console.warn`.
  */
 export function captureLeaks(): string[] {
-  if (capabilities.host === "arkts") {
+  if (capabilities.host === "arkts" || capabilities.host === "browser") {
     return captureConsole("warn");
   }
   const leaks: string[] = [];

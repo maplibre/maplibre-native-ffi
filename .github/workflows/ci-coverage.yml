@@ -1011,7 +1011,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/typescript:build emscripten-wasm32-webgl
+        run: mise run //bindings/typescript:test emscripten-wasm32-webgl
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -1075,7 +1075,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/typescript:build emscripten-wasm32-webgpu
+        run: mise run //bindings/typescript:test emscripten-wasm32-webgpu
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:

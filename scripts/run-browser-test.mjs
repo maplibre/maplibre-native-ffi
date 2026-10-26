@@ -190,6 +190,65 @@ const finished = new Promise((resolve) => {
   settle = resolve;
 });
 
+// The HTTP origins that a page's suite opens and closes, each under
+// /__origins/<id>/ on the page's own origin, so the module's fetches need no
+// cross-origin access. An origin serves fixed bodies by path and records each
+// request's path and headers. POST /__origins takes { routes } and answers
+// { id }; GET /__origins/<id>/requests answers the records; DELETE closes it.
+const origins = new Map();
+let nextOrigin = 1;
+
+function readJson(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function serveOrigin(url, request, response) {
+  const json = (status, value) =>
+    response
+      .writeHead(status, { "Content-Type": "application/json" })
+      .end(value === undefined ? "" : JSON.stringify(value));
+  if (url.pathname === "/__origins" && request.method === "POST") {
+    readJson(request).then(
+      ({ routes }) => {
+        const id = nextOrigin++;
+        origins.set(id, { routes, requests: [] });
+        json(200, { id });
+      },
+      () => json(400),
+    );
+    return;
+  }
+  const match = /^\/__origins\/(\d+)(\/.*)?$/.exec(url.pathname);
+  const origin = match && origins.get(Number(match[1]));
+  if (!origin) {
+    json(404);
+    return;
+  }
+  const rest = match[2] ?? "/";
+  if (rest === "/requests" && request.method === "GET") {
+    json(200, origin.requests);
+  } else if (rest === "/" && request.method === "DELETE") {
+    origins.delete(Number(match[1]));
+    json(204);
+  } else {
+    origin.requests.push({ path: rest + url.search, headers: request.headers });
+    const body = origin.routes[rest + url.search];
+    if (body === undefined) json(404);
+    else
+      response.writeHead(200, { "Content-Type": "application/json" }).end(body);
+  }
+}
+
 const server = createServer((request, response) => {
   // Cross-origin isolation, so the page may use SharedArrayBuffer.
   response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
@@ -208,6 +267,11 @@ const server = createServer((request, response) => {
         settle({ status: 2, output: `malformed result: ${String(error)}` });
       }
     });
+    return;
+  }
+
+  if (url.pathname.startsWith("/__origins")) {
+    serveOrigin(url, request, response);
     return;
   }
 

@@ -128,7 +128,13 @@ if ("asyncDispose" in Symbol) {
 
 export const capabilities: Capabilities = {
   host: "arkts",
-  unavailable: ["childProcess", "processExit", "bufferTransfer", "disposers"],
+  unavailable: [
+    "childProcess",
+    "processExit",
+    "bufferTransfer",
+    "disposers",
+    "beforeLoad",
+  ],
   httpOrigin,
   realmSpawn,
   forcedGc: () => ArkTools.forceFullGC(),
