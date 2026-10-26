@@ -155,6 +155,24 @@ link = "https://codeberg.org/ziglang/zig/pulls/37063"
 # Languages with a known path to a platform that no one has started.
 
 [[gap]]
+language = "c"
+platform = "windows-mingw"
+status = "path-known"
+reason = "Build with llvm-mingw and a static libc++, link the Rust platform crate for `*-pc-windows-gnullvm`, and run the suite on the Windows runners. MapLibre Native needs no change."
+
+[[gap]]
+language = "c"
+platform = "freebsd"
+status = "path-known"
+reason = "Cross-compile with Zig against a FreeBSD 14 sysroot, and run the suite in a FreeBSD VM on the Linux x64 runner. MapLibre Native needs no change."
+
+[[gap]]
+language = "c"
+platform = "visionos"
+status = "path-known"
+reason = "Add presets and XCFramework slices like tvOS's, and run the suite on the Apple Vision Pro simulator. MapLibre Native needs no change."
+
+[[gap]]
 language = "dotnet"
 platform = "android"
 status = "path-known"
@@ -174,6 +192,18 @@ reason = "Add a browser WebAssembly host that links the native archives through 
 
 [[gap]]
 language = "go"
+platform = "windows-mingw"
+status = "path-known"
+reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
+
+[[gap]]
+language = "go"
+platform = "freebsd"
+status = "path-known"
+reason = "Run the cgo suite in the FreeBSD VM. Go supports cgo on `freebsd/amd64` and `freebsd/arm64`."
+
+[[gap]]
+language = "go"
 platform = "ios"
 status = "path-known"
 reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
@@ -186,16 +216,67 @@ reason = "Kotlin/JVM needs musl natives that the loader selects on musl hosts. K
 link = "https://youtrack.jetbrains.com/issue/KT-38876"
 
 [[gap]]
+language = "kotlin"
+platform = "freebsd"
+status = "path-known"
+reason = "Kotlin/JVM runs on the OpenJDK ports and needs FreeBSD natives that the loader selects. Kotlin/Native has no FreeBSD target."
+link = "https://kotlinlang.org/docs/native-target-support.html"
+
+[[gap]]
+language = "python"
+platform = "freebsd"
+status = "path-known"
+reason = "Build and test the extension in the FreeBSD VM. PyPI rejects FreeBSD wheel tags, so the package cannot publish one."
+link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
+
+[[gap]]
 language = "python"
 platform = "ios"
 status = "path-known"
 reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
 
 [[gap]]
+language = "rust"
+platform = "windows-mingw"
+status = "path-known"
+reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
+
+[[gap]]
+language = "rust"
+platform = "freebsd"
+status = "path-known"
+reason = "Add the FreeBSD targets to the build and test tasks, and run the suite in the FreeBSD VM."
+
+[[gap]]
+language = "rust"
+platform = "visionos"
+status = "path-known"
+reason = "Add visionOS to the build script's target and backend selection and to the generated `cfg`s, and a simulator runner."
+
+[[gap]]
+language = "swift"
+platform = "freebsd"
+status = "path-known"
+reason = "Swift.org ships a preview toolchain for FreeBSD 14 on x64 only. Run the suite with it in the FreeBSD VM."
+link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
+
+[[gap]]
 language = "swift"
 platform = "android"
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
+
+[[gap]]
+language = "swift"
+platform = "visionos"
+status = "path-known"
+reason = "Add visionOS build and simulator test cases, and `os(visionOS)` to the generated platform conditions."
+
+[[gap]]
+language = "typescript"
+platform = "freebsd"
+status = "path-known"
+reason = "Build the addon and run the Node suite in the FreeBSD VM. Node supports FreeBSD x64 as experimental and ships no official binaries."
 
 [[gap]]
 language = "typescript"
@@ -215,6 +296,12 @@ platform = "emscripten"
 status = "path-known"
 reason = "Link the Node-API addon with emnapi 2 into an Emscripten module, add a browser entry that loads it, and run WebGL and WebGPU tests in headless Chromium."
 link = "https://github.com/toyobayashi/emnapi"
+
+[[gap]]
+language = "zig"
+platform = "freebsd"
+status = "path-known"
+reason = "Zig 0.17 targets FreeBSD 14. Add the target to `build.zig` and run the suite in the FreeBSD VM."
 
 [[gap]]
 language = "zig"

@@ -232,9 +232,7 @@ def support_matrix() -> dict[str, Any]:
                 row["detail"] = ", ".join(labels)
             return row
         gap = gaps.get((name, target.platform))
-        # A known path still waits on the C library when it does not build
-        # the target.
-        if gap and (gap["status"] == "blocked" or target in built):
+        if gap:
             # Tooltips show plain text, so code spans drop their backticks.
             return {"status": gap["status"], "detail": gap["reason"].replace("`", "")}
         return {"status": "unknown"}
