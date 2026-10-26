@@ -7,11 +7,6 @@ point the plugin header documents, and nothing else. No exported name may
 belong to the test seams: a name containing `mln_test`, `testing`, or
 `sync_point` fails the check even if a header declared it.
 
-A coverage build, one configured with MLN_FFI_ENABLE_COVERAGE, also exports
-`mln_ffi_coverage_write_profile`, which src/coverage/profile.c defines for
-hosts that exit without running the profile runtime's exit hook. The check
-reads that setting from the preset's CMake cache.
-
 A preset without shared libraries installs only the static archive, where
 hidden symbols stay visible to a static link. There the check covers the
 archive's C symbols with the `mln_` prefix, which are the ones a host links
@@ -39,11 +34,6 @@ LIBRARY_STEM = "maplibre-native-c"
 # Upstream defines the plugin registration function, and the library exports
 # it for include/maplibre_native_c/plugin.h; see cmake/mln_ffi_c_api.cmake.
 EXTRA_EXPORTS = frozenset({"mln_plugin_register_v1"})
-# A coverage build adds this one; see cmake/mln_ffi_coverage.cmake.
-COVERAGE_EXPORTS = frozenset({"mln_ffi_coverage_write_profile"})
-COVERAGE_OPTION = re.compile(
-    r"^MLN_FFI_ENABLE_COVERAGE:BOOL=(?:ON|TRUE|YES|Y|1)$", re.IGNORECASE | re.MULTILINE
-)
 FORBIDDEN = re.compile(r"mln_test|testing|sync_point", re.IGNORECASE)
 # Symbols a linker can define in a shared library's dynamic table on its own.
 # The version script keeps them local with GNU ld, and the check ignores them in
@@ -62,14 +52,6 @@ def declared_functions() -> set[str]:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return set(module.exported_functions())
-
-
-def coverage_enabled(build: pathlib.Path) -> bool:
-    """Whether the preset's build tree instruments the library for coverage."""
-    cache = build / "CMakeCache.txt"
-    if not cache.exists():
-        return False
-    return COVERAGE_OPTION.search(cache.read_text(encoding="utf-8")) is not None
 
 
 def run(command: list[str]) -> str:
@@ -194,9 +176,6 @@ def main() -> int:
         # capital, or with `?` on Windows.
         exported = {name for name in exported if name.startswith("mln_")}
     expected = declared_functions() | EXTRA_EXPORTS
-    coverage = coverage_enabled(build)
-    if coverage:
-        expected |= COVERAGE_EXPORTS
 
     errors = []
     for name in sorted(exported - expected):
@@ -212,9 +191,7 @@ def main() -> int:
     if errors:
         return 1
     kind = "exports" if shared else "defines"
-    public = len(exported - COVERAGE_EXPORTS)
-    extra = " and the coverage profile writer" if coverage else ""
-    print(f"{relative} {kind} the {public} public C API symbols{extra}.")
+    print(f"{relative} {kind} the {len(exported)} public C API symbols.")
     return 0
 
 

@@ -10,28 +10,13 @@ import unittest
 
 from ci.generate_workflow import ROOT, ci_workflow
 from ci.retry import retryable
-from ci.workflow import load_configuration, preset_sets
+from ci.workflow import load_configuration
 
 
 class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source, cls.presets = load_configuration(ROOT)
-
-    def test_presets_that_opt_out_of_ci_name_no_target(self):
-        local = {"vendor": {"maplibre-native-ffi": {"ci": False}}}
-        presets = {
-            "configurePresets": [{"name": "host"}, {"name": "host-local", **local}],
-            "buildPresets": [
-                {"name": "host", "configurePreset": "host"},
-                {"name": "host-local", "configurePreset": "host-local"},
-            ],
-            "testPresets": [
-                {"name": "host", "configurePreset": "host"},
-                {"name": "host-local", "configurePreset": "host-local"},
-            ],
-        }
-        self.assertEqual(preset_sets(presets), (["host"], {"host"}, {"host"}, set()))
 
     def test_android_emulator_diagnostics_are_uploaded_even_after_recovery(self):
         jobs = ci_workflow(self.source, self.presets)["jobs"]

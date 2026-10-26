@@ -79,8 +79,6 @@ interface Addon {
   readonly files: readonly string[];
 }
 
-// A coverage preset builds the addon of its base preset with instrumentation,
-// so it packs under the same name for the suite to install.
 function addonOf(preset: string): Addon {
   const browser = /^emscripten-wasm32-(webgl|webgpu)$/.exec(preset);
   if (browser !== null) {
@@ -93,10 +91,9 @@ function addonOf(preset: string): Addon {
       files: ["maplibre_native_ffi.mjs", "maplibre_native_ffi.wasm"],
     };
   }
-  const match =
-    /^(linux-gnu|macos)-(x64|arm64)-(egl|metal|vulkan)(?:-coverage)?$/.exec(
-      preset,
-    );
+  const match = /^(linux-gnu|macos)-(x64|arm64)-(egl|metal|vulkan)$/.exec(
+    preset,
+  );
   if (match === null) {
     throw new Error(
       `${preset} has no addon package; only the Linux glibc, macOS, and Emscripten presets do`,

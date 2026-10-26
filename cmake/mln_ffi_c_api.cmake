@@ -1,7 +1,6 @@
 include(mln_ffi_lint)
 include(mln_ffi_apple_framework)
 include(mln_ffi_archive)
-include(mln_ffi_coverage)
 include(mln_ffi_platform)
 include(mln_ffi_render_backend)
 
@@ -258,9 +257,7 @@ function(mln_ffi_add_c_api_library target)
   set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
   add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
   mln_ffi_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
-  mln_ffi_configure_coverage_objects(${MLN_FFI_C_API_OBJECT_TARGET})
   mln_ffi_complete_static_dependencies_for_target(MLN_FFI_STATIC_DEPS)
-  mln_ffi_append_coverage_static_dependencies(MLN_FFI_STATIC_DEPS)
 
   get_target_property(MLN_FFI_SHARED_SUPPORTED mln_ffi_platform_dependencies
                       MLN_FFI_SHARED_SUPPORTED)
@@ -268,7 +265,6 @@ function(mln_ffi_add_c_api_library target)
     add_library(${target} STATIC)
     mln_ffi_configure_static_c_api_wrapper(${target}
                                            ${MLN_FFI_C_API_OBJECT_TARGET})
-    mln_ffi_configure_coverage_library(${target})
     mln_ffi_configure_complete_static_archive(${target} ${MLN_FFI_STATIC_DEPS})
     return()
   endif()
@@ -276,19 +272,16 @@ function(mln_ffi_add_c_api_library target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target}
                                          ${MLN_FFI_C_API_OBJECT_TARGET})
-  mln_ffi_configure_coverage_library(${target})
 
   if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     mln_ffi_add_c_api_framework(${target}_framework
                                 ${MLN_FFI_C_API_OBJECT_TARGET})
-    mln_ffi_configure_coverage_library(${target}_framework)
   endif()
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
   mln_ffi_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
                                          ${MLN_FFI_C_API_OBJECT_TARGET})
-  mln_ffi_configure_coverage_library(${MLN_FFI_STATIC_TARGET})
   get_target_property(
     MLN_FFI_STATIC_BASE_OUTPUT_NAME mln_ffi_platform_dependencies
     MLN_FFI_STATIC_BASE_OUTPUT_NAME)

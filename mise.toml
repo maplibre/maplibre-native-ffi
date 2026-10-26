@@ -386,18 +386,6 @@ cargo test --locked -p maplibre-native-ffi-platform --lib
 ctest --preset "$usage_preset" --parallel
 '''
 
-[tasks.coverage]
-description = "Measure the src/ line coverage of the C tests or one binding's tests."
-usage = '''
-arg "[suite]" default="native" help="native for the C tests, or a binding name"
-flag "--preset <preset>" default="macos-arm64-metal-coverage"
-'''
-run = 'python3 scripts/coverage.py "$usage_suite" --preset "$usage_preset"'
-
-[tasks.coverage-diff]
-description = "List src/ lines that one coverage report hits and another misses."
-run = 'python3 scripts/coverage-diff.py "$@"'
-
 [tasks.check-exports]
 description = "Check that an installed native library exports exactly the public C API."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

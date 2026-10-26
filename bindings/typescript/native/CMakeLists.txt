@@ -171,11 +171,6 @@ if(NOT MLN_FFI_NO_ZIG_TARGET AND MLN_FFI_ZIG_TARGET MATCHES "-linux-(gnu|musl)")
   # libraries provide them.
   target_link_libraries(maplibre_native_ffi PRIVATE unwind)
 endif()
-if(MLN_FFI_ENABLE_COVERAGE)
-  # The coverage presets instrument the archive, whose objects call into the
-  # profile runtime that only an instrumented link brings.
-  target_link_options(maplibre_native_ffi PRIVATE -fprofile-instr-generate)
-endif()
 install(TARGETS maplibre_native_ffi LIBRARY DESTINATION .)
 # The addon package ships the licenses of the native library it embeds, so the
 # install prefix alone is enough to pack it.

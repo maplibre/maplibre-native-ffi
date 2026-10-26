@@ -1,8 +1,7 @@
 ---
 title: Overview
 description:
-  Set up a development machine, build for other targets, debug on CI, and use
-  code coverage.
+  Set up a development machine, build for other targets, and debug on CI.
 sidebar:
   order: 1
 ---
@@ -102,22 +101,3 @@ The testbox shell has the workflow's sccache settings but not its S3
 credentials, so builds fail until you prefix the command with
 `env -u SCCACHE_BUCKET -u SCCACHE_ENDPOINT -u SCCACHE_REGION -u SCCACHE_S3_USE_SSL`,
 which makes sccache use the testbox's local disk.
-
-## Code coverage
-
-`mise run coverage [suite]` builds the `macos-arm64-metal-coverage` preset, runs
-one suite, and writes an lcov and HTML report under `build/coverage/<suite>/`.
-The suite is `native`, the default, or a binding name. CI runs no coverage.
-
-Before you delete a binding test, compare that binding's report with the C
-suite's:
-
-```bash
-mise run coverage native
-mise run coverage rust
-mise run coverage-diff --only-in rust --not-in native
-```
-
-Each line that `coverage-diff` lists needs a C test, or a reason that the C
-suite cannot reach it. Coverage records which lines ran, not what a test
-asserted, so check that the C test asserts what the binding test checked.

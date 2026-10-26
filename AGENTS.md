@@ -23,10 +23,8 @@ patches if it is empty.
 
 Native behavior is tested once, in C, under `tests/native`. A binding suite
 tests only what its binding adds: its runtime, its generated shapes, and its
-platform integration. Before you delete a binding test, check that the C suite
-covers its lines, as
-[Code coverage](docs/src/content/docs/development/overview.md#code-coverage)
-describes.
+platform integration. Before you delete a binding test, check that a C test
+asserts what it checked.
 
 A Linux host can run the Windows and FreeBSD suites locally, under Wine and in a
 virtual machine, as the
@@ -46,7 +44,7 @@ where it is made. The site's Development section holds only what maintainers
 need and the code cannot say:
 
 - [Overview](docs/src/content/docs/development/overview.md): machine setup,
-  cross-compilation, debugging on a CI runner, and code coverage.
+  cross-compilation, and debugging on a CI runner.
 - [C API guidelines](docs/src/content/docs/development/c-api-guidelines.md):
   read before you change a C declaration.
 - [Releases and snapshots](docs/src/content/docs/development/versioning.md):
