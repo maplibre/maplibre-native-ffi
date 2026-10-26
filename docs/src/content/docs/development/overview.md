@@ -50,9 +50,9 @@ another session may be using it, no task stops it; run
 `mise run //:android-emulator:stop <abi> --api <level>` when none is.
 
 Every checkout also shares the one OpenHarmony emulator that runs the Oniro
-image mise installed. A task reuses it, whoever started it, and a new one
-forwards hdc from the first free port from 55555 on. Run
-`mise run //:ohos-emulator:stop` when no session is using it.
+image mise installed. It forwards hdc from `127.0.0.1:55555`, and a task reuses
+it, whoever started it. Run `mise run //:ohos-emulator:stop` when no session is
+using it.
 
 ## FreeBSD
 

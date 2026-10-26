@@ -444,11 +444,11 @@ run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh" "$usage_api" "$usa
 
 [tasks."ohos-emulator:boot"]
 description = "Boot the shared OpenHarmony emulator, or reuse it, and wait until it is ready."
-run = '"$MISE_MONOREPO_ROOT/scripts/boot-ohos-emulator.sh"'
+run = '"$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator" boot'
 
 [tasks."ohos-emulator:stop"]
 description = "Stop the shared OpenHarmony emulator, which any session on the machine may be using."
-run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
+run = '"$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator" stop'
 
 [tasks."freebsd-vm:boot"]
 description = "Boot this checkout's FreeBSD virtual machine, or reuse it, and wait until it is ready."

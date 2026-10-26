@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs native test executables on the shared OpenHarmony emulator, which
-# boot-ohos-emulator.sh boots when it is not running yet. Every executable runs
-# and reports its own exit status; the first failure stops the batch.
+# tools/devices/ohos-emulator boots when it is not running yet. Every executable
+# runs and reports its own exit status; the first failure stops the batch.
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
@@ -54,10 +54,10 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-key_script="$MISE_MONOREPO_ROOT/scripts/ohos-emulator-connect-key.sh"
-if ! connect_key=$("$key_script"); then
-  mise run //:ohos-emulator:boot
-  connect_key=$("$key_script")
+emulator="$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator"
+if ! connect_key=$("$emulator" key); then
+  "$emulator" boot
+  connect_key=$("$emulator" key)
 fi
 
 remove_remote_dir() {

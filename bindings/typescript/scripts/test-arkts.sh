@@ -59,10 +59,10 @@ cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi"
 
-key_script="$binding/../../scripts/ohos-emulator-connect-key.sh"
-if ! connect_key=$("$key_script"); then
-  mise run //:ohos-emulator:boot
-  connect_key=$("$key_script")
+emulator="$binding/../../tools/devices/ohos-emulator"
+if ! connect_key=$("$emulator" key); then
+  "$emulator" boot
+  connect_key=$("$emulator" key)
 fi
 hdc=(hdc -t "$connect_key")
 
