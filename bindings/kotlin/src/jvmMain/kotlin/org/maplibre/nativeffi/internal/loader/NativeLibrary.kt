@@ -33,8 +33,8 @@ internal object NativeLibrary {
   @Volatile private var loadedLibrary: LoadedLibrary? = null
 
   /**
-   * Loads the native library once, in the order that
-   * [org.maplibre.nativeffi.loadNativeLibrary] states.
+   * Loads the native library once, in the order that [org.maplibre.nativeffi.loadNativeLibrary]
+   * states.
    */
   fun load() {
     if (isLoaded()) {
