@@ -214,7 +214,8 @@ class AndroidHttpTransportTest {
       // The configuration permits plain HTTP to 127.0.0.1 alone.
       loadStyleUrl(server.url("/ok.json"))
       val refused = server.url("/ok.json").replace(HOST, "localhost")
-      assertContains(loadingFailure(refused), "CLEARTEXT")
+      // Android words the refusal differently across versions.
+      assertContains(loadingFailure(refused), "cleartext", ignoreCase = true)
       assertEquals(1, server.requests("/ok.json").size)
     }
   }
