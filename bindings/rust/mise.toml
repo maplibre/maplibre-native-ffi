@@ -142,9 +142,10 @@ mkdir -p "$workspace"
 git ls-files -z --cached --others --exclude-standard -- \
   Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust examples/rust-map src/platform/rust |
   tar -c --null -T - | tar -x -C "$workspace"
-printf '%s  %s\n' "$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" "$(basename "$archive")" \
-  >"$scratch/SHA256SUMS"
-python3 ci/rust_release.py "$workspace" "$tag" --checksums "$scratch/SHA256SUMS"
+PYTHONPATH=ci python3 -c 'import pathlib, sys
+from native_package_release import write_artifacts
+write_artifacts(pathlib.Path(sys.argv[1]), [pathlib.Path(sys.argv[2])])' "$scratch/artifacts.json" "$archive"
+python3 ci/rust_release.py "$workspace" "$tag" --artifacts "$scratch/artifacts.json"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \
   -p maplibre-native-ffi-platform \

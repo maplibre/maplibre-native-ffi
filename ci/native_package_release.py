@@ -23,6 +23,7 @@ from zig_package import write_package as write_zig_package
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"
+ARTIFACTS_NAME = "maplibre-native-c-artifacts.json"
 RELEASE_NOTES_NAME = "RELEASE_NOTES.md"
 XCFRAMEWORK_NAME = "MaplibreNativeC.xcframework.zip"
 RELEASE_DOWNLOAD_URL = (
@@ -80,27 +81,32 @@ def native_archives(
     return [release_dir / name for name in sorted(expected)]
 
 
-def write_pin(
-    path: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
-) -> None:
-    """Writes the pin by which a published package downloads its native library.
+def pin(tag: str, artifacts: list[dict]) -> str:
+    """The pin by which a published package downloads its native library.
 
-    The pin holds the release tag and the SHA-256 digest of each asset that the
-    release's SHA256SUMS lists. It reads SHA256SUMS from `checksums` if given,
-    and otherwise downloads it from the release.
+    The pin holds the release tag and the release's artifact index, and maps
+    each archive to its SHA-256 digest for the readers that look one up by name.
     """
-    if checksums is None:
-        url = f"{RELEASE_DOWNLOAD_URL}/{tag}/SHA256SUMS"
+    digests = {entry["archive"]: entry["sha256"] for entry in artifacts}
+    content = {"tag": tag, "sha256": digests, "artifacts": artifacts}
+    return json.dumps(content, indent=2) + "\n"
+
+
+def write_pin(
+    path: pathlib.Path, tag: str, artifacts: pathlib.Path | None = None
+) -> None:
+    """Writes the pin of release `tag` to `path`.
+
+    It reads the release's artifact index from `artifacts` if given, and
+    otherwise downloads it from the release.
+    """
+    if artifacts is None:
+        url = f"{RELEASE_DOWNLOAD_URL}/{tag}/{ARTIFACTS_NAME}"
         with urllib.request.urlopen(url) as response:
-            text = response.read().decode()
+            index = json.loads(response.read())
     else:
-        text = checksums.read_text(encoding="utf-8")
-    digests = {}
-    for line in text.splitlines():
-        digest, _, name = line.partition("  ")
-        digests[name] = digest
-    pin = {"tag": tag, "sha256": dict(sorted(digests.items()))}
-    path.write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+        index = json.loads(artifacts.read_text(encoding="utf-8"))
+    path.write_text(pin(tag, index), encoding="utf-8")
 
 
 def pkg_config_bytes(content: bytes, archive: pathlib.Path, version: str) -> bytes:
@@ -234,6 +240,29 @@ def rewrite_xcframework(archive: pathlib.Path, version: str) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+def archive_descriptor(archive: pathlib.Path) -> dict:
+    root = archive.name.removesuffix(ARCHIVE_SUFFIX)
+    with tarfile.open(archive, "r:gz") as source:
+        return json.load(
+            source.extractfile(f"{root}/share/maplibre-native-c/artifact.json")
+        )
+
+
+def write_artifacts(path: pathlib.Path, archives: list[pathlib.Path]) -> list[dict]:
+    """Writes the artifact index: each archive's name and digest, with its descriptor.
+
+    A published package reads the index from its pin to choose an archive by
+    the descriptor's fields, before it has downloaded any.
+    """
+    artifacts = [
+        {"archive": archive.name, "sha256": sha256(archive)}
+        | archive_descriptor(archive)
+        for archive in archives
+    ]
+    path.write_text(json.dumps(artifacts, indent=2) + "\n", encoding="utf-8")
+    return artifacts
+
+
 def write_checksums(release_dir: pathlib.Path, files: list[pathlib.Path]) -> None:
     lines = [f"{sha256(path)}  {path.name}" for path in files]
     (release_dir / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -299,11 +328,14 @@ def prepare_assets(
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")
     rewrite_xcframework(xcframework, version)
     tag = required_env("PUBLISH_TAG")
+    artifacts_path = release_dir / ARTIFACTS_NAME
+    artifacts = write_artifacts(artifacts_path, archives)
     zig_package = release_dir / ZIG_PACKAGE_NAME
     write_zig_package(
         zig_package,
         root,
         version,
+        pin(tag, artifacts),
         {
             archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(ARCHIVE_SUFFIX): (
                 f"{RELEASE_DOWNLOAD_URL}/{tag}/{archive.name}",
@@ -313,7 +345,7 @@ def prepare_assets(
         },
     )
     write_notes(release_dir, channel, sha, version)
-    write_checksums(release_dir, [*archives, xcframework, zig_package])
+    write_checksums(release_dir, [*archives, xcframework, zig_package, artifacts_path])
 
 
 def main(arguments: list[str] | None = None) -> int:

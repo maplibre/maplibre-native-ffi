@@ -1,9 +1,9 @@
 """Builds the Zig package that a release publishes beside its native archives.
 
 The package holds the files that the repository's build.zig.zon lists in
-`.paths`, at the same paths. Its manifest carries the release version and
-declares each native archive as a lazy dependency, which build.zig selects by
-target and backend.
+`.paths`, at the same paths, and the release pin. Its manifest carries the
+release version and declares each native archive as a lazy dependency, which
+build.zig selects by target and backend.
 """
 
 from __future__ import annotations
@@ -19,6 +19,9 @@ from collections.abc import Mapping
 PACKAGE_NAME = "maplibre-native-ffi-zig.tar.gz"
 PACKAGE_ROOT = "maplibre-native-ffi-zig"
 MANIFEST = "build.zig.zon"
+# Only the published package holds the pin, which the manifest still lists in
+# `.paths` because Zig drops a package's files outside them.
+PIN_PATH = "bindings/zig/native_release.json"
 
 
 def zig_hash(archive: pathlib.Path) -> str:
@@ -79,16 +82,21 @@ def write_package(
     destination: pathlib.Path,
     repository: pathlib.Path,
     version: str,
+    pin: str,
     archives: Mapping[str, tuple[str, pathlib.Path]],
 ) -> None:
     """Writes the Zig package to `destination`.
 
-    `archives` maps each native preset to its archive's release URL and local
-    copy, which yields the hash that the dependency on it declares.
+    `pin` is the content of the release pin. `archives` maps each native preset
+    to its archive's release URL and local copy, which yields the hash that the
+    dependency on it declares.
     """
     manifest = (repository / MANIFEST).read_text(encoding="utf-8")
-    files = {}
-    for path in package_paths(manifest):
+    paths = package_paths(manifest)
+    if PIN_PATH not in paths:
+        raise SystemExit(f"{MANIFEST} does not list {PIN_PATH} in its package paths")
+    files = {PIN_PATH: pin.encode()}
+    for path in paths:
         source = repository / path
         sources = sorted(source.rglob("*")) if source.is_dir() else [source]
         for file in sources:

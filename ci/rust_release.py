@@ -22,11 +22,11 @@ def substitute(path: pathlib.Path, pattern: str, replacement: str, count: int) -
 
 
 def prepare(
-    workspace: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
+    workspace: pathlib.Path, tag: str, artifacts: pathlib.Path | None = None
 ) -> None:
     _, version = parse_tag(tag)
 
-    write_pin(workspace / PIN_PATH, tag, checksums)
+    write_pin(workspace / PIN_PATH, tag, artifacts)
 
     # The workspace version, then each published crate's requirement on the
     # others, which ship in lockstep.
@@ -45,12 +45,12 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("workspace", type=pathlib.Path)
     parser.add_argument("tag")
     parser.add_argument(
-        "--checksums",
+        "--artifacts",
         type=pathlib.Path,
-        help="A SHA256SUMS to pin, rather than the release's",
+        help="An artifact index to pin, rather than the release's",
     )
     args = parser.parse_args(arguments)
-    prepare(args.workspace, args.tag, args.checksums)
+    prepare(args.workspace, args.tag, args.artifacts)
     return 0
 
 

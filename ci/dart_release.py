@@ -15,11 +15,11 @@ RELEASES_URL = "https://github.com/maplibre/maplibre-native-ffi/releases/tag"
 
 
 def prepare(
-    package: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
+    package: pathlib.Path, tag: str, artifacts: pathlib.Path | None = None
 ) -> None:
     _, version = parse_tag(tag)
 
-    write_pin(package / PIN_PATH, tag, checksums)
+    write_pin(package / PIN_PATH, tag, artifacts)
 
     pubspec = package / "pubspec.yaml"
     text, count = re.subn(
@@ -45,12 +45,12 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("package", type=pathlib.Path)
     parser.add_argument("tag")
     parser.add_argument(
-        "--checksums",
+        "--artifacts",
         type=pathlib.Path,
-        help="A SHA256SUMS to pin, rather than the release's",
+        help="An artifact index to pin, rather than the release's",
     )
     args = parser.parse_args(arguments)
-    prepare(args.package, args.tag, args.checksums)
+    prepare(args.package, args.tag, args.artifacts)
     return 0
 
 

@@ -15,7 +15,7 @@ import unittest
 import zipfile
 from unittest import mock
 
-from native_package_release import XCFRAMEWORK_NAME, prepare_assets
+from native_package_release import ARTIFACTS_NAME, XCFRAMEWORK_NAME, prepare_assets
 from release_version import next_release, require_current_month, validate_tag
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
@@ -265,8 +265,19 @@ class NativePackageReleaseTest(unittest.TestCase):
                     archive,
                     self.xcframework,
                     self.release_dir / ZIG_PACKAGE_NAME,
+                    self.release_dir / ARTIFACTS_NAME,
                 )
             },
+        )
+        self.assertEqual(
+            json.loads((self.release_dir / ARTIFACTS_NAME).read_text()),
+            [
+                {
+                    "archive": archive.name,
+                    "sha256": checksums[archive.name],
+                    **descriptor,
+                }
+            ],
         )
         self.assertIn(title, notes)
         self.assertIn(f"/commit/{self.sha}", notes)
@@ -351,15 +362,30 @@ class NativePackageReleaseTest(unittest.TestCase):
                 .read()
                 .decode()
             )
+            pin = json.load(
+                package.extractfile(
+                    "maplibre-native-ffi-zig/bindings/zig/native_release.json"
+                )
+            )
 
         self.assertEqual(
             names,
             [
                 "maplibre-native-ffi-zig/LICENSE",
+                "maplibre-native-ffi-zig/bindings/zig/native_release.json",
                 "maplibre-native-ffi-zig/bindings/zig/src/maplibre_native_ffi.zig",
                 "maplibre-native-ffi-zig/build.zig",
                 "maplibre-native-ffi-zig/build.zig.zon",
             ],
+        )
+        artifacts = json.loads((self.release_dir / ARTIFACTS_NAME).read_text())
+        self.assertEqual(
+            pin,
+            {
+                "tag": f"v{self.version}",
+                "sha256": {archive.name: artifacts[0]["sha256"]},
+                "artifacts": artifacts,
+            },
         )
         self.assertIn(f'.version = "{self.version}",', manifest)
         self.assertIn(
