@@ -23,6 +23,12 @@ function(mln_ffi_configure_options)
     CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER
     PROPERTY STRINGS egl wgl webgl)
   set(MLN_FFI_EGL_ROOT "" CACHE PATH "Path to a local EGL/GLES package")
+  set(MLN_FFI_DEFAULT_RENDER_BACKEND ""
+      CACHE STRING "Render backend that bindings take for this target")
+  set_property(
+    CACHE MLN_FFI_DEFAULT_RENDER_BACKEND
+    PROPERTY STRINGS metal opengl vulkan webgpu)
+  set(MLN_FFI_RUST_TARGET "" CACHE STRING "Rust target triple for this build")
 
   string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
   string(TOLOWER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"

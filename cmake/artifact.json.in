@@ -1,7 +1,10 @@
 {
+  "artifact": "@MLN_FFI_ARTIFACT_NAME@",
   "renderBackend": "@MLN_FFI_RENDER_BACKEND@",
+  "defaultBackend": "@MLN_FFI_DEFAULT_RENDER_BACKEND@",
   "targetPlatform": "@MLN_FFI_TARGET_PLATFORM@",
-  "zigTarget": "@MLN_FFI_ZIG_TARGET@",
+  "rustTarget": "@MLN_FFI_RUST_TARGET@",
+  "zigTarget": "@MLN_FFI_ZIG_TARGET@",@MLN_FFI_ANDROID_ABI_ENTRY@
   "staticLinkLibraries": [@MLN_FFI_STATIC_LINK_LIBRARIES_JSON@],
   "staticLinkFrameworks": [@MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON@]
 }

@@ -262,6 +262,10 @@ function(mln_ffi_install_c_api_library target)
                       MLN_FFI_ZIG_TARGET)
   get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
                       MLN_FFI_TARGET_PLATFORM)
+  set(MLN_FFI_ANDROID_ABI_ENTRY "")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(MLN_FFI_ANDROID_ABI_ENTRY "\n  \"androidAbi\": \"${ANDROID_ABI}\",")
+  endif()
   mln_ffi_install_emscripten_options()
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
                                MLN_FFI_STATIC_LINK_FRAMEWORKS)

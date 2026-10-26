@@ -47,8 +47,12 @@ list(
 
 if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
   set(MLN_FFI_ZIG_ARCH "aarch64")
-else()
+elseif(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "x64")
   set(MLN_FFI_ZIG_ARCH "x86_64")
+else()
+  message(
+    FATAL_ERROR
+      "Unsupported Zig target architecture: ${MLN_FFI_TARGET_ARCHITECTURE}")
 endif()
 
 if(MLN_FFI_ZIG_OS STREQUAL "freebsd")

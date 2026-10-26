@@ -17,6 +17,20 @@ function(mln_ffi_validate_platform)
       FATAL_ERROR
         "${CMAKE_SYSTEM_NAME} preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
   endif()
+  if(MLN_FFI_RUST_TARGET MATCHES "^x86_64-")
+    set(MLN_FFI_RUST_ARCHITECTURE x64)
+  elseif(MLN_FFI_RUST_TARGET MATCHES "^aarch64-")
+    set(MLN_FFI_RUST_ARCHITECTURE arm64)
+  else()
+    message(
+      FATAL_ERROR
+        "Unsupported ${CMAKE_SYSTEM_NAME} Rust target: ${MLN_FFI_RUST_TARGET}")
+  endif()
+  if(NOT MLN_FFI_RUST_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
+    message(
+      FATAL_ERROR
+        "${CMAKE_SYSTEM_NAME} preset targets Rust ${MLN_FFI_RUST_TARGET}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+  endif()
 endfunction()
 
 if(APPLE)
