@@ -1032,8 +1032,13 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
           RuntimeEventOfflineRegionTileCountLimit(raw: raw
             .payload
             .offline_region_tile_count_limit)
-        ) case MLN_RUNTIME_EVENT_PAYLOAD_NONE
-        .rawValue: return .none default: return .unknown(
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS
+        .rawValue: return try .glyphs(RuntimeEventGlyphs(raw: raw.payload
+            .glyphs)) case MLN_RUNTIME_EVENT_PAYLOAD_SPRITE
+                  .rawValue: return try .sprite(RuntimeEventSprite(raw: raw
+            .payload
+            .sprite)) case MLN_RUNTIME_EVENT_PAYLOAD_NONE
+                  .rawValue: return .none default: return .unknown(
           raw.payload_type.rawValue,
           recordBytes
             .map {
@@ -1098,13 +1103,67 @@ public struct RuntimeEventFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     .init(rawValue: 262_144)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventFlag =
     .init(rawValue: 524_288)
+  public static let mapGlyphsRequested: RuntimeEventFlag =
+    .init(rawValue: 1_048_576)
+  public static let mapGlyphsLoaded: RuntimeEventFlag =
+    .init(rawValue: 2_097_152)
+  public static let mapGlyphsError: RuntimeEventFlag =
+    .init(rawValue: 4_194_304)
+  public static let mapSpriteRequested: RuntimeEventFlag =
+    .init(rawValue: 8_388_608)
+  public static let mapSpriteLoaded: RuntimeEventFlag =
+    .init(rawValue: 16_777_216)
+  public static let mapSpriteError: RuntimeEventFlag =
+    .init(rawValue: 33_554_432)
   /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventFlag = .init(rawValue: 131_070)
+  public static let allMapEvents: RuntimeEventFlag = .init(rawValue: 66_191_358)
   /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventFlag =
     .init(rawValue: 917_504)
   /// Selects every event type this version defines.
-  public static let all: RuntimeEventFlag = .init(rawValue: 1_048_574)
+  public static let all: RuntimeEventFlag = .init(rawValue: 67_108_862)
+}
+
+/// Payload for `RuntimeEventType.mapGlyphsRequested`,
+/// `RuntimeEventType.mapGlyphsLoaded`, and `RuntimeEventType.mapGlyphsError`.
+///
+/// See `mln_runtime_event_glyphs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventGlyphs: Equatable, Hashable, Sendable {
+  /// Font names of the font stack, in the style's order.
+  public var fontStack: [String]
+  /// First glyph of the range.
+  public var first: UInt32
+  /// Last glyph of the range, inclusive.
+  public var last: UInt32
+  /// Whether the range stands for a whole font file that the style's font-faces
+  /// names. MapLibre then loads the whole file, and first and last do not
+  /// describe the glyphs it holds.
+  public var fontFace: Bool
+  public init(
+    fontStack: [String] = [],
+    first: UInt32 = 0,
+    last: UInt32 = 0,
+    fontFace: Bool = false
+  ) {
+    self.fontStack = fontStack
+    self.first = first
+    self.last = last
+    self.fontFace = fontFace
+  }
+
+  init(
+    raw: mln_runtime_event_glyphs,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    fontStack = try NativeInputArena.copyArray(
+      raw.font_stack,
+      count: Int(raw.font_count)
+    ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
+    first = raw.first
+    last = raw.last
+    fontFace = raw.font_face
+  }
 }
 
 /// Runtime and map event callback. Map events arrive on the runtime's native
@@ -1224,6 +1283,8 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case offlineRegionStatus(RuntimeEventOfflineRegionStatus)
   case offlineRegionResponseError(RuntimeEventOfflineRegionResponseError)
   case offlineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit)
+  case glyphs(RuntimeEventGlyphs)
+  case sprite(RuntimeEventSprite)
   case none
   case unknown(UInt32, Data)
 }
@@ -1297,6 +1358,32 @@ public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
   }
 }
 
+/// Payload for `RuntimeEventType.mapSpriteRequested`,
+/// `RuntimeEventType.mapSpriteLoaded`, and `RuntimeEventType.mapSpriteError`.
+///
+/// See `mln_runtime_event_sprite` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventSprite: Equatable, Hashable, Sendable {
+  /// Sprite ID: the id of an entry in the style's sprite array, or "default"
+  /// when the style names one sprite URL.
+  public var id: String
+  /// Sprite URL as the style names it, without the pixel-ratio suffix and file
+  /// extension that MapLibre appends to request the image and JSON.
+  public var url: String
+  public init(id: String = "", url: String = "") {
+    self.id = id
+    self.url = url
+  }
+
+  init(
+    raw: mln_runtime_event_sprite,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
+  }
+}
+
 /// Payload for `RuntimeEventType.mapTileAction`.
 ///
 /// See `mln_runtime_event_tile_action` in the
@@ -1354,6 +1441,12 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
     .init(rawValue: 18)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 19)
+  public static let mapGlyphsRequested: RuntimeEventType = .init(rawValue: 20)
+  public static let mapGlyphsLoaded: RuntimeEventType = .init(rawValue: 21)
+  public static let mapGlyphsError: RuntimeEventType = .init(rawValue: 22)
+  public static let mapSpriteRequested: RuntimeEventType = .init(rawValue: 23)
+  public static let mapSpriteLoaded: RuntimeEventType = .init(rawValue: 24)
+  public static let mapSpriteError: RuntimeEventType = .init(rawValue: 25)
   public var description: String {
     switch rawValue {
     case 1: return "mapCameraWillChange"
@@ -1375,6 +1468,12 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
     case 17: return "offlineRegionStatusChanged"
     case 18: return "offlineRegionResponseError"
     case 19: return "offlineRegionTileCountLimitExceeded"
+    case 20: return "mapGlyphsRequested"
+    case 21: return "mapGlyphsLoaded"
+    case 22: return "mapGlyphsError"
+    case 23: return "mapSpriteRequested"
+    case 24: return "mapSpriteLoaded"
+    case 25: return "mapSpriteError"
     default: return "RuntimeEventType(\(rawValue))"
     }
   }

@@ -43,8 +43,40 @@ void a_failed_event_append_keeps_the_published_events_readable() {
   TEST_ASSERT_EQUAL_INT(2, wakes.load());
 }
 
+// Later appends grow the item's storage, which must not move the text that an
+// earlier event's payload points at.
+void queued_payload_text_outlives_later_appends() {
+  auto queue = mln::delivery::DeliveryQueueState{nullptr};
+  auto sprite = mln_runtime_event{
+    .type = MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR,
+    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_SPRITE,
+  };
+  queue.push_event(sprite, "failed", nullptr, {"poi", "test://sprites/poi"});
+  auto glyphs = mln_runtime_event{
+    .type = MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED,
+    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS,
+  };
+  for (auto index = 0; index < 64; ++index) {
+    queue.push_event(glyphs, {}, nullptr, {"Noto Sans Regular", "Arial"});
+  }
+  auto view = mln_delivery_batch_view{};
+  const auto batch = queue.drain(view);
+  const auto& events = *view.deliveries[0].payload.runtime_events.events;
+  TEST_ASSERT_EQUAL_size_t(65, events.event_count);
+  const auto& first = events.events[0];
+  TEST_ASSERT_EQUAL_STRING("failed", first.message.data);
+  TEST_ASSERT_EQUAL_STRING("poi", first.payload.sprite.id.data);
+  TEST_ASSERT_EQUAL_STRING("test://sprites/poi", first.payload.sprite.url.data);
+  const auto& last = events.events[64].payload.glyphs;
+  TEST_ASSERT_EQUAL_size_t(2, last.font_count);
+  TEST_ASSERT_EQUAL_STRING("Noto Sans Regular", last.font_stack[0].data);
+  TEST_ASSERT_EQUAL_STRING("Arial", last.font_stack[1].data);
+  mln::delivery::release_delivery_batch(batch);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_event_append_keeps_the_published_events_readable);
+  RUN_TEST(queued_payload_text_outlives_later_appends);
 }

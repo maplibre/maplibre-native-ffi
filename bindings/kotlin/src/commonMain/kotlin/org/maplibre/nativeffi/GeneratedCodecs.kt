@@ -1809,6 +1809,8 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
             RuntimeEventPayload.OfflineRegionTileCountLimit(
               readRuntimeEventOfflineRegionTileCountLimit(source + w(40, 48)),
             )
+          7u -> RuntimeEventPayload.Glyphs(readRuntimeEventGlyphs(source + w(40, 48)))
+          8u -> RuntimeEventPayload.Sprite(readRuntimeEventSprite(source + w(40, 48)))
           0u -> RuntimeEventPayload.None
           else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + w(40, 48), 72))
         }
@@ -1911,6 +1913,24 @@ internal fun readRuntimeEventOfflineRegionTileCountLimit(
   source: Long,
 ): RuntimeEventOfflineRegionTileCountLimit =
   RuntimeEventOfflineRegionTileCountLimit(regionId = readI64(source), limit = readU64(source + 8))
+
+internal fun readRuntimeEventGlyphs(source: Long): RuntimeEventGlyphs =
+  RuntimeEventGlyphs(
+    fontStack =
+      readArray(
+        readAddress(source),
+        readSize(source + w(4, 8)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
+    first = readU32(source + w(8, 16)),
+    last = readU32(source + w(12, 20)),
+    fontFace = readBool(source + w(16, 24)),
+  )
+
+internal fun readRuntimeEventSprite(source: Long): RuntimeEventSprite =
+  RuntimeEventSprite(id = readViewString(source), url = readViewString(source + w(8, 16)))
 
 internal fun readRenderingStats(source: Long): RenderingStats =
   RenderingStats(

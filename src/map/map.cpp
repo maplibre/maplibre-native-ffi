@@ -66,15 +66,18 @@
 #include <mln/style/sources/raster_dem_source.hpp>
 #include <mln/style/sources/raster_source.hpp>
 #include <mln/style/sources/vector_source.hpp>
+#include <mln/style/sprite.hpp>
 #include <mln/style/style.hpp>
 #include <mln/style/style_property.hpp>
 #include <mln/style/transition_options.hpp>
 #include <mln/style/types.hpp>
+#include <mln/text/glyph_range.hpp>
 #include <mln/tile/tile_id.hpp>
 #include <mln/tile/tile_operation.hpp>
 #include <mln/util/chrono.hpp>
 #include <mln/util/constants.hpp>
 #include <mln/util/feature.hpp>
+#include <mln/util/font_stack.hpp>
 #include <mln/util/geo.hpp>
 #include <mln/util/image.hpp>
 #include <mln/util/immutable.hpp>
@@ -376,6 +379,31 @@ auto tile_action_payload(
   return payload;
 }
 
+auto glyphs_payload(const mln::GlyphRange& range) -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.glyphs = mln_runtime_event_glyphs{
+    .font_stack = nullptr,
+    .font_count = 0,
+    .first = range.first,
+    .last = range.second,
+    .font_face = range.type != mln::GlyphIDType::FontPBF
+  };
+  return payload;
+}
+
+auto exception_message(std::exception_ptr error) -> std::string {
+  if (!error) {
+    return {};
+  }
+  try {
+    std::rethrow_exception(error);
+  } catch (const std::exception& exception) {
+    return exception.what();
+  } catch (...) {
+    return "unknown native error";
+  }
+}
+
 }  // namespace
 
 namespace mln::core {
@@ -450,12 +478,14 @@ namespace {
 // event, and zero drops it, because zero means the map is gone or its publish
 // failed. Every map producer queues through here. Most run inside MapLibre
 // callbacks, so an event that cannot be queued is dropped rather than thrown.
-// The message is copied inside the guard for the same reason.
+// The message is copied inside the guard for the same reason. `strings` holds
+// the payload's text; see delivery::bind_event_strings().
 auto queue_map_event(
   MapEventState& events, uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
   const mln_runtime_event_payload& payload = zeroed_event_payload(),
-  uint32_t code = 0, std::string_view message = {}
+  uint32_t code = 0, std::string_view message = {},
+  std::vector<std::string> strings = {}
 ) noexcept -> void {
   try {
     if (events.in_transaction()) {
@@ -466,6 +496,7 @@ auto queue_map_event(
           .payload = payload,
           .code = code,
           .message = std::string{message},
+          .strings = std::move(strings),
         }
       );
       return;
@@ -473,7 +504,7 @@ auto queue_map_event(
     if (generation == 0) return;
     push_runtime_map_event_payload(
       events.runtime_events, events.map, generation, type, payload_type,
-      payload, code, std::string{message}
+      payload, code, std::string{message}, std::move(strings)
     );
   } catch (...) {
     // MapLibre callbacks drop events that cannot be delivered.
@@ -758,6 +789,45 @@ class HeadlessObserver final : public mln::MapObserver {
     );
   }
 
+  void onGlyphsRequested(
+    const mln::FontStack& font_stack, const mln::GlyphRange& range
+  ) override {
+    queue_glyphs(MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED, font_stack, range);
+  }
+
+  void onGlyphsLoaded(
+    const mln::FontStack& font_stack, const mln::GlyphRange& range
+  ) override {
+    queue_glyphs(MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED, font_stack, range);
+  }
+
+  void onGlyphsError(
+    const mln::FontStack& font_stack, const mln::GlyphRange& range,
+    std::exception_ptr error
+  ) override {
+    queue_glyphs(
+      MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR, font_stack, range, std::move(error)
+    );
+  }
+
+  void onSpriteRequested(
+    const std::optional<mln::style::Sprite>& sprite
+  ) override {
+    queue_sprite(MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED, sprite);
+  }
+
+  void onSpriteLoaded(
+    const std::optional<mln::style::Sprite>& sprite
+  ) override {
+    queue_sprite(MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED, sprite);
+  }
+
+  void onSpriteError(
+    const std::optional<mln::style::Sprite>& sprite, std::exception_ptr error
+  ) override {
+    queue_sprite(MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR, sprite, std::move(error));
+  }
+
   // The mask test precedes the try block, so a suppressed render error never
   // formats the exception text.
   void onRenderError(std::exception_ptr error) override {
@@ -784,6 +854,42 @@ class HeadlessObserver final : public mln::MapObserver {
     return mln::core::event_selected(event_state_->mask, type);
   }
 
+  // The mask test precedes the copies, so an unselected event copies no text.
+  // An event whose text cannot be copied is dropped, as queue_map_event()
+  // drops one it cannot queue.
+  auto queue_glyphs(
+    mln_runtime_event_type type, const mln::FontStack& font_stack,
+    const mln::GlyphRange& range, std::exception_ptr error = nullptr
+  ) noexcept -> void {
+    if (!selected(type)) return;
+    try {
+      queue_current(
+        type, 0, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS,
+        glyphs_payload(range), {font_stack.begin(), font_stack.end()}
+      );
+    } catch (...) {
+    }
+  }
+
+  // MapLibre reports a style without a sprite as one empty sprite.
+  auto queue_sprite(
+    mln_runtime_event_type type,
+    const std::optional<mln::style::Sprite>& sprite,
+    std::exception_ptr error = nullptr
+  ) noexcept -> void {
+    if (!selected(type)) return;
+    try {
+      auto strings = sprite.has_value()
+                       ? std::vector<std::string>{sprite->id, sprite->spriteURL}
+                       : std::vector<std::string>(2);
+      queue_current(
+        type, 0, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_SPRITE,
+        zeroed_event_payload(), std::move(strings)
+      );
+    } catch (...) {
+    }
+  }
+
   auto queue_fresh(
     mln_runtime_event_type type, uint32_t code = 0,
     std::string_view message = {}
@@ -800,12 +906,13 @@ class HeadlessObserver final : public mln::MapObserver {
     std::string_view message = {},
     mln_runtime_event_payload_type payload_type =
       MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-    const mln_runtime_event_payload& payload = zeroed_event_payload()
+    const mln_runtime_event_payload& payload = zeroed_event_payload(),
+    std::vector<std::string> strings = {}
   ) noexcept -> void {
     auto& events = *event_state_;
     queue_map_event(
       events, events.published_generation, type, payload_type, payload, code,
-      message
+      message, std::move(strings)
     );
   }
 
@@ -1317,19 +1424,6 @@ auto to_native_map_mode(mln_map_mode mode) -> mln::MapMode {
 
 auto is_still_map_mode(mln_map_mode mode) -> bool {
   return mode == MLN_MAP_MODE_STATIC || mode == MLN_MAP_MODE_TILE;
-}
-
-auto exception_message(std::exception_ptr error) -> std::string {
-  if (!error) {
-    return {};
-  }
-  try {
-    std::rethrow_exception(error);
-  } catch (const std::exception& exception) {
-    return exception.what();
-  } catch (...) {
-    return "unknown native error";
-  }
 }
 
 auto validate_lat_lng(mln_lat_lng coordinate) -> mln_status;

@@ -6,8 +6,10 @@
 #include <mutex>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "delivery/capture.hpp"
 #include "maplibre_native_c.h"
@@ -22,6 +24,16 @@ inline auto event_message(std::string_view message) -> std::string_view {
   }
   return message;
 }
+
+// Points the views of `event`'s payload at `strings`, which hold the payload's
+// text in the order that its type takes it: a font stack's names for GLYPHS,
+// and the ID then the URL for SPRITE. A font stack's array is `views`, which
+// this fills. The event borrows both until it is delivered. A payload type
+// without text leaves the event unchanged.
+auto bind_event_strings(
+  mln_runtime_event& event, const std::vector<std::string>& strings,
+  std::vector<mln_buffer_view>& views
+) -> void;
 
 // One queued delivery and the copy it owns, in a single allocation: this
 // header, then the arena storage that the view's pointers reach.
@@ -137,7 +149,8 @@ class DeliveryQueueState final {
   // Events share contiguous record and message storage, without a capture or
   // allocation for each event. A failed append leaves the queue unchanged.
   auto push_event(
-    mln_runtime_event event, std::string_view message, void* user_data
+    mln_runtime_event event, std::string_view message, void* user_data,
+    std::vector<std::string> strings = {}
   ) -> void;
 
   // Moves every queued item, in push order, into a new owned batch, writes

@@ -1,0 +1,17 @@
+Reports a glyph range that fails to load or parse to the renderer observer, as
+the renderer already reports one that it requests or loads, so a map observer
+learns which font stack and range failed
+(https://github.com/maplibre/maplibre-native-ffi/issues/787).
+Upstream: not proposed
+
+diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
+--- a/src/mln/renderer/render_orchestrator.cpp
++++ b/src/mln/renderer/render_orchestrator.cpp
+@@ -1139,6 +1139,7 @@ void RenderOrchestrator::onGlyphsError(const FontStack& fontStack,
+     ss << " for font stack " << fontStackToString(fontStack) << ":( " << util::toString(error) << ")";
+     auto errorDetail = ss.str();
+     Log::Error(Event::Style, errorDetail);
++    observer->onGlyphsError(fontStack, glyphRange, error);
+     observer->onResourceError(error);
+ }
+ 

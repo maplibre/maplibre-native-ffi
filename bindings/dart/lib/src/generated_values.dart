@@ -822,15 +822,21 @@ final class RuntimeEventFlag extends _Flags<RuntimeEventFlag> {
   );
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventFlag.fromRawValue(524288);
+  static const mapGlyphsRequested = RuntimeEventFlag.fromRawValue(1048576);
+  static const mapGlyphsLoaded = RuntimeEventFlag.fromRawValue(2097152);
+  static const mapGlyphsError = RuntimeEventFlag.fromRawValue(4194304);
+  static const mapSpriteRequested = RuntimeEventFlag.fromRawValue(8388608);
+  static const mapSpriteLoaded = RuntimeEventFlag.fromRawValue(16777216);
+  static const mapSpriteError = RuntimeEventFlag.fromRawValue(33554432);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventFlag.fromRawValue(131070);
+  static const allMapEvents = RuntimeEventFlag.fromRawValue(66191358);
 
   /// Selects every runtime-originated event type this version defines.
   static const allRuntimeEvents = RuntimeEventFlag.fromRawValue(917504);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventFlag.fromRawValue(1048574);
+  static const all = RuntimeEventFlag.fromRawValue(67108862);
   @override
   RuntimeEventFlag _of(int rawValue) => RuntimeEventFlag.fromRawValue(rawValue);
   @override
@@ -855,9 +861,15 @@ final class RuntimeEventFlag extends _Flags<RuntimeEventFlag> {
     131072: 'offlineRegionStatusChanged',
     262144: 'offlineRegionResponseError',
     524288: 'offlineRegionTileCountLimitExceeded',
-    131070: 'allMapEvents',
+    1048576: 'mapGlyphsRequested',
+    2097152: 'mapGlyphsLoaded',
+    4194304: 'mapGlyphsError',
+    8388608: 'mapSpriteRequested',
+    16777216: 'mapSpriteLoaded',
+    33554432: 'mapSpriteError',
+    66191358: 'allMapEvents',
     917504: 'allRuntimeEvents',
-    1048574: 'all',
+    67108862: 'all',
   });
 }
 
@@ -903,6 +915,12 @@ final class RuntimeEventType extends _Enum {
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(18);
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(19);
+  static const mapGlyphsRequested = RuntimeEventType.fromRawValue(20);
+  static const mapGlyphsLoaded = RuntimeEventType.fromRawValue(21);
+  static const mapGlyphsError = RuntimeEventType.fromRawValue(22);
+  static const mapSpriteRequested = RuntimeEventType.fromRawValue(23);
+  static const mapSpriteLoaded = RuntimeEventType.fromRawValue(24);
+  static const mapSpriteError = RuntimeEventType.fromRawValue(25);
   @override
   String toString() => switch (rawValue) {
     1 => 'RuntimeEventType.mapCameraWillChange',
@@ -924,6 +942,12 @@ final class RuntimeEventType extends _Enum {
     17 => 'RuntimeEventType.offlineRegionStatusChanged',
     18 => 'RuntimeEventType.offlineRegionResponseError',
     19 => 'RuntimeEventType.offlineRegionTileCountLimitExceeded',
+    20 => 'RuntimeEventType.mapGlyphsRequested',
+    21 => 'RuntimeEventType.mapGlyphsLoaded',
+    22 => 'RuntimeEventType.mapGlyphsError',
+    23 => 'RuntimeEventType.mapSpriteRequested',
+    24 => 'RuntimeEventType.mapSpriteLoaded',
+    25 => 'RuntimeEventType.mapSpriteError',
     _ => 'RuntimeEventType($rawValue)',
   };
 }
@@ -5347,6 +5371,66 @@ final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
   );
 }
 
+/// Payload for `RuntimeEventType.mapGlyphsRequested`,
+/// `RuntimeEventType.mapGlyphsLoaded`, and `RuntimeEventType.mapGlyphsError`.
+///
+/// See `mln_runtime_event_glyphs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventGlyphs extends _Value {
+  RuntimeEventGlyphs({
+    List<String> fontStack = const [],
+    this.first = 0,
+    this.last = 0,
+    this.fontFace = false,
+  }) : fontStack = List.unmodifiable(fontStack);
+
+  /// Font names of the font stack, in the style's order.
+  final List<String> fontStack;
+
+  /// First glyph of the range.
+  final int first;
+
+  /// Last glyph of the range, inclusive.
+  final int last;
+
+  /// Whether the range stands for a whole font file that the style's font-faces
+  /// names. MapLibre then loads the whole file, and first and last do not
+  /// describe the glyphs it holds.
+  final bool fontFace;
+
+  @override
+  List<Object?> get _members => [fontStack, first, last, fontFace];
+  @override
+  String toString() => _describe('RuntimeEventGlyphs', const [
+    'fontStack',
+    'first',
+    'last',
+    'fontFace',
+  ]);
+}
+
+/// Payload for `RuntimeEventType.mapSpriteRequested`,
+/// `RuntimeEventType.mapSpriteLoaded`, and `RuntimeEventType.mapSpriteError`.
+///
+/// See `mln_runtime_event_sprite` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventSprite extends _Value {
+  const RuntimeEventSprite({this.id = '', this.url = ''});
+
+  /// Sprite ID: the id of an entry in the style's sprite array, or "default"
+  /// when the style names one sprite URL.
+  final String id;
+
+  /// Sprite URL as the style names it, without the pixel-ratio suffix and file
+  /// extension that MapLibre appends to request the image and JSON.
+  final String url;
+
+  @override
+  List<Object?> get _members => [id, url];
+  @override
+  String toString() => _describe('RuntimeEventSprite', const ['id', 'url']);
+}
+
 /// One delivered runtime event.
 ///
 /// See `mln_runtime_event` in the
@@ -5414,6 +5498,16 @@ final class RuntimeEventPayloadOfflineRegionTileCountLimit
     extends RuntimeEventPayload {
   const RuntimeEventPayloadOfflineRegionTileCountLimit(this.value) : super._();
   final RuntimeEventOfflineRegionTileCountLimit value;
+}
+
+final class RuntimeEventPayloadGlyphs extends RuntimeEventPayload {
+  const RuntimeEventPayloadGlyphs(this.value) : super._();
+  final RuntimeEventGlyphs value;
+}
+
+final class RuntimeEventPayloadSprite extends RuntimeEventPayload {
+  const RuntimeEventPayloadSprite(this.value) : super._();
+  final RuntimeEventSprite value;
 }
 
 final class RuntimeEventPayloadNone extends RuntimeEventPayload {

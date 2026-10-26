@@ -88,6 +88,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0050-evaluate-feature-with-context.patch"
   "$repo_root/patches/maplibre-native/0051-custom-source-tile-errors.patch"
   "$repo_root/patches/maplibre-native/0052-custom-vector-source-mlt.patch"
+  "$repo_root/patches/maplibre-native/0053-glyph-error-observer.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

@@ -1194,6 +1194,18 @@ final class mln_runtime_event_delivery extends Struct {
   external Pointer<mln_event_batch_view> events;
 }
 
+final class mln_runtime_event_glyphs extends Struct {
+  external Pointer<mln_buffer_view> font_stack;
+  @Size()
+  external int font_count;
+  @Uint32()
+  external int first;
+  @Uint32()
+  external int last;
+  @Bool()
+  external bool font_face;
+}
+
 final class mln_runtime_event_handler extends Struct {
   @Uint32()
   external int size;
@@ -1233,6 +1245,8 @@ final class mln_runtime_event_payload extends Union {
   offline_region_response_error;
   external mln_runtime_event_offline_region_tile_count_limit
   offline_region_tile_count_limit;
+  external mln_runtime_event_glyphs glyphs;
+  external mln_runtime_event_sprite sprite;
 }
 
 final class mln_runtime_event_render_frame extends Struct {
@@ -1248,6 +1262,11 @@ final class mln_runtime_event_render_frame extends Struct {
 final class mln_runtime_event_render_map extends Struct {
   @Uint32()
   external int mode;
+}
+
+final class mln_runtime_event_sprite extends Struct {
+  external mln_buffer_view id;
+  external mln_buffer_view url;
 }
 
 final class mln_runtime_event_tile_action extends Struct {
@@ -2029,9 +2048,15 @@ const MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 65536;
 const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072;
 const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144;
 const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288;
-const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 131070;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1048576;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 2097152;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 4194304;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 8388608;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 16777216;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 33554432;
+const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 66191358;
 const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504;
-const MLN_RUNTIME_EVENT_FLAG_ALL = 1048574;
+const MLN_RUNTIME_EVENT_FLAG_ALL = 67108862;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
@@ -2041,6 +2066,8 @@ const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6;
+const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7;
+const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8;
 
 // mln_runtime_event_source_type
 const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
@@ -2066,6 +2093,12 @@ const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25;
 
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;

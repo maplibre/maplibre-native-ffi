@@ -1147,9 +1147,38 @@ fn generated_copy_mln_runtime_event(
                     &(unsafe { value.payload.offline_region_tile_count_limit }),
                 )?,
             )?,
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS => generated_variant(
+                py,
+                "glyphs",
+                generated_copy_mln_runtime_event_glyphs(py, &(unsafe { value.payload.glyphs }))?,
+            )?,
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_SPRITE => generated_variant(
+                py,
+                "sprite",
+                generated_copy_mln_runtime_event_sprite(py, &(unsafe { value.payload.sprite }))?,
+            )?,
             tag => generated_unknown_variant(py, tag)?,
         },
     )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_runtime_event_glyphs(
+    py: Python<'_>,
+    value: &sys::mln_runtime_event_glyphs,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "font_stack",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.font_stack, value.font_count)? },
+            |element| generated_text(py, *element),
+        )?,
+    )?;
+    dict.set_item("first", generated_value(py, value.first)?)?;
+    dict.set_item("last", generated_value(py, value.last)?)?;
+    dict.set_item("font_face", generated_value(py, value.font_face)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1245,6 +1274,16 @@ fn generated_copy_mln_runtime_event_render_map(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("mode", generated_value(py, value.mode)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_runtime_event_sprite(
+    py: Python<'_>,
+    value: &sys::mln_runtime_event_sprite,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", generated_text(py, value.id)?)?;
+    dict.set_item("url", generated_text(py, value.url)?)?;
     Ok(dict.into_any().unbind())
 }
 

@@ -266,6 +266,12 @@ napi_value mln_ts_read_runtime_event(
 napi_value mln_ts_read_runtime_event_delivery(
   napi_env env, const mln_runtime_event_delivery* source, size_t size
 );
+napi_value mln_ts_read_runtime_event_glyphs(
+  napi_env env, const mln_runtime_event_glyphs* source, size_t size
+);
+napi_value mln_ts_read_runtime_event_glyphs_font_stack(
+  napi_env env, const mln_runtime_event_glyphs* source
+);
 napi_value mln_ts_read_runtime_event_offline_region_response_error(
   napi_env env, const mln_runtime_event_offline_region_response_error* source,
   size_t size
@@ -286,6 +292,9 @@ napi_value mln_ts_read_runtime_event_render_frame(
 );
 napi_value mln_ts_read_runtime_event_render_map(
   napi_env env, const mln_runtime_event_render_map* source, size_t size
+);
+napi_value mln_ts_read_runtime_event_sprite(
+  napi_env env, const mln_runtime_event_sprite* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_tile_action(
   napi_env env, const mln_runtime_event_tile_action* source, size_t size

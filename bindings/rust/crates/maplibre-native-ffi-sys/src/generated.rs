@@ -301,9 +301,15 @@ pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_even
 pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_flag = 262144;
 pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_flag =
     524288;
-pub const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS: mln_runtime_event_flag = 131070;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED: mln_runtime_event_flag = 1048576;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED: mln_runtime_event_flag = 2097152;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR: mln_runtime_event_flag = 4194304;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED: mln_runtime_event_flag = 8388608;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED: mln_runtime_event_flag = 16777216;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR: mln_runtime_event_flag = 33554432;
+pub const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS: mln_runtime_event_flag = 66191358;
 pub const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS: mln_runtime_event_flag = 917504;
-pub const MLN_RUNTIME_EVENT_FLAG_ALL: mln_runtime_event_flag = 1048574;
+pub const MLN_RUNTIME_EVENT_FLAG_ALL: mln_runtime_event_flag = 67108862;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
@@ -314,6 +320,8 @@ pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_e
     5;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
     mln_runtime_event_payload_type = 6;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS: mln_runtime_event_payload_type = 7;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE: mln_runtime_event_payload_type = 8;
 pub type mln_runtime_event_source_type = u32;
 pub const MLN_RUNTIME_EVENT_SOURCE_RUNTIME: mln_runtime_event_source_type = 0;
 pub const MLN_RUNTIME_EVENT_SOURCE_MAP: mln_runtime_event_source_type = 1;
@@ -337,6 +345,12 @@ pub const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED: mln_runtime_event_type = 16;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_type = 17;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 18;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 19;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED: mln_runtime_event_type = 20;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED: mln_runtime_event_type = 21;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR: mln_runtime_event_type = 22;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED: mln_runtime_event_type = 23;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED: mln_runtime_event_type = 24;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR: mln_runtime_event_type = 25;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
@@ -1238,6 +1252,15 @@ pub struct mln_runtime_event {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_glyphs {
+    pub font_stack: *const mln_buffer_view,
+    pub font_count: usize,
+    pub first: u32,
+    pub last: u32,
+    pub font_face: bool,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_event_handler {
     pub size: u32,
     pub callback: mln_runtime_event_callback,
@@ -1272,6 +1295,8 @@ pub union mln_runtime_event_payload {
     pub offline_region_status: mln_runtime_event_offline_region_status,
     pub offline_region_response_error: mln_runtime_event_offline_region_response_error,
     pub offline_region_tile_count_limit: mln_runtime_event_offline_region_tile_count_limit,
+    pub glyphs: mln_runtime_event_glyphs,
+    pub sprite: mln_runtime_event_sprite,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1285,6 +1310,12 @@ pub struct mln_runtime_event_render_frame {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_event_render_map {
     pub mode: mln_render_mode,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_sprite {
+    pub id: mln_buffer_view,
+    pub url: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

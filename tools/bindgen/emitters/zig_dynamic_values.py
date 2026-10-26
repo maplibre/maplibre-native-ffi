@@ -140,11 +140,14 @@ def lends(values, value):
     """Whether a record's `fromNative` borrows native's text, which a callback
     argument alone reaches and native lends until the callback returns."""
     return (
-        value.kind == "record"
-        and dynamic(value)
-        and value.native in values.bound.lent
-        and borrows(values, value)
+        value.kind == "record" and dynamic(value) and value.native in values.bound.lent
     )
+
+
+def copies_with_allocator(values, value):
+    """Whether a record's `fromNative` takes an allocator: a copy owns its
+    text, or a borrowed copy still allocates an array whose length varies."""
+    return not lends(values, value) or not borrows(values, value)
 
 
 def decode(values, value, source, context="raw", borrowed=False):
@@ -216,13 +219,11 @@ def decode(values, value, source, context="raw", borrowed=False):
         return variant(values, value, value, source, context, borrowed)
     if value.kind in {"scalar", "native_pointer"}:
         return source
-    return (
-        f"try {values.public(value)}.fromNative({source})"
-        if lends(values, value)
-        else f"try {values.public(value)}.fromNative(allocator, {source})"
-        if dynamic(value)
-        else f"{values.public(value)}.fromNative({source})"
-    )
+    if not dynamic(value):
+        return f"{values.public(value)}.fromNative({source})"
+    if copies_with_allocator(values, value):
+        return f"try {values.public(value)}.fromNative(allocator, {source})"
+    return f"try {values.public(value)}.fromNative({source})"
 
 
 def variant(values, union, owner, source, context, borrowed=False):
@@ -358,9 +359,10 @@ def declaration(values, value):
         }[name]
         for name in encoder_parameters
     )
+    allocates = copies_with_allocator(values, value)
     capture_use = (
         ""
-        if borrowed or any("allocator" in line for line in captures)
+        if not allocates or any("allocator" in line for line in captures)
         else "        _ = allocator;\n"
     )
     if not any("raw." in line for line in captures):
@@ -373,7 +375,7 @@ def declaration(values, value):
     )
     # A registration that native returns copies with its callbacks unset.
     copy = (
-        f"""{lent_doc}    pub fn fromNative({"" if borrowed else "allocator: std.mem.Allocator, "}raw: c.{value.native}) status.Error!{typ} {{
+        f"""{lent_doc}    pub fn fromNative({"allocator: std.mem.Allocator, " if allocates else ""}raw: c.{value.native}) status.Error!{typ} {{
 {capture_use}        return .{{
 {chr(10).join(captures)}
         }};

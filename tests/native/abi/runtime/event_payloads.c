@@ -54,9 +54,66 @@ static const char tilejson[] =
   "{\"tilejson\":\"2.2.0\",\"tiles\":[\"test://tiles/{z}/{x}/{y}.pbf\"],"
   "\"attribution\":\"Served tiles\"}";
 
+// The test provider's answer to a URL it has no route for.
+static const char unrouted_message[] =
+  "the test provider has no route for this URL";
+
+// Two sprites and two font stacks: the provider serves one of each and has no
+// route for the other. Each symbol layer requests its font stack's first glyph
+// range.
+static const char resource_style_json[] =
+  "{\"version\":8,"
+  "\"sprite\":[{\"id\":\"good\",\"url\":\"test://sprites/good\"},"
+  "{\"id\":\"bad\",\"url\":\"test://sprites/bad\"}],"
+  "\"glyphs\":\"test://fonts/{fontstack}/{range}.pbf\","
+  "\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0,0]},\"properties\":{}}}},"
+  "\"layers\":[{\"id\":\"good\",\"type\":\"symbol\",\"source\":\"points\","
+  "\"layout\":{\"text-field\":\"A\",\"text-font\":[\"GoodFont\"]}},"
+  "{\"id\":\"bad\",\"type\":\"symbol\",\"source\":\"points\","
+  "\"layout\":{\"text-field\":\"A\","
+  "\"text-font\":[\"BadFont\",\"Fallback\"]}}]}";
+
+static const char good_sprite_json[] = "{}";
+
+// A transparent 1x1 RGBA PNG.
+static const uint8_t good_sprite_png[] = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+  0x0b, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x60, 0x00, 0x02, 0x00,
+  0x00, 0x05, 0x00, 0x01, 0x7a, 0x5e, 0xab, 0x3f, 0x00, 0x00, 0x00, 0x00,
+  0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+};
+
+static const mln_test_provided_resource sprite_and_glyph_resources[] = {
+  {.url = "test://sprites/good.json",
+   .response =
+     {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)good_sprite_json,
+       .byte_count = sizeof(good_sprite_json) - 1,
+     }},
+  {.url = "test://sprites/good.png",
+   .response =
+     {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = good_sprite_png,
+       .byte_count = sizeof(good_sprite_png),
+     }},
+  {.url = "test://fonts/GoodFont/0-255.pbf",
+   .response = {.status = MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT}},
+};
+
 typedef struct recorded_event {
   mln_runtime_event event;
   char message[128];
+  // Copies of the payload's text, which the event borrows only until the
+  // drain releases its batch: a font stack's first names, or a sprite's ID and
+  // URL. The payload's own views are not read after the drain.
+  char strings[2][64];
+  size_t string_count;
 } recorded_event;
 
 // The first events of each type a scenario drained, in queue order. Rendering
@@ -73,6 +130,37 @@ typedef struct event_log {
 } event_log;
 
 static event_log scenario_log;
+
+static void copy_view(char* out, size_t capacity, mln_buffer_view view) {
+  const size_t length = view.size < capacity - 1 ? view.size : capacity - 1;
+  if (length != 0) memcpy(out, view.data, length);
+  out[length] = '\0';
+}
+
+static void record_payload_text(
+  recorded_event* record, const mln_runtime_event* event
+) {
+  record->string_count = 0;
+  if (event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS) {
+    const mln_runtime_event_glyphs* glyphs = &event->payload.glyphs;
+    record->string_count = glyphs->font_count;
+    for (size_t index = 0; index < glyphs->font_count && index < 2;
+         index += 1) {
+      copy_view(
+        record->strings[index], sizeof(record->strings[index]),
+        glyphs->font_stack[index]
+      );
+    }
+  } else if (event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_SPRITE) {
+    record->string_count = 2;
+    copy_view(
+      record->strings[0], sizeof(record->strings[0]), event->payload.sprite.id
+    );
+    copy_view(
+      record->strings[1], sizeof(record->strings[1]), event->payload.sprite.url
+    );
+  }
+}
 
 static void log_reset(event_log* log) {
   log->count = 0;
@@ -109,11 +197,8 @@ static void log_drain_quietly(mln_runtime runtime, event_log* log) {
       recorded_event* record = &log->events[log->count];
       log->count += 1;
       record->event = *event;
-      const size_t length = event->message.size < sizeof(record->message) - 1
-                              ? event->message.size
-                              : sizeof(record->message) - 1;
-      if (length != 0) memcpy(record->message, event->message.data, length);
-      record->message[length] = '\0';
+      copy_view(record->message, sizeof(record->message), event->message);
+      record_payload_text(record, event);
     }
   }
 }
@@ -148,6 +233,7 @@ typedef enum scenario {
   SCENARIO_STILL_IMAGE_FAILURE,
   SCENARIO_OFFLINE,
   SCENARIO_SOURCE_DESCRIPTION,
+  SCENARIO_SPRITES_AND_GLYPHS,
   // No local input reaches the event; the row's reason says why.
   SCENARIO_UNREACHABLE,
 } scenario;
@@ -246,6 +332,50 @@ static void check_offline_response_error(
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_ERROR_REASON_NOT_FOUND, error->reason);
 }
 
+// GoodFont's range loads and the stack of BadFont and Fallback fails; both
+// request the range that holds "A".
+static void check_glyphs(
+  const recorded_event* record, const scenario_context* context
+) {
+  (void)context;
+  const mln_runtime_event_glyphs* glyphs = &record->event.payload.glyphs;
+  TEST_ASSERT_EQUAL_UINT32(0, glyphs->first);
+  TEST_ASSERT_EQUAL_UINT32(255, glyphs->last);
+  TEST_ASSERT_FALSE(glyphs->font_face);
+  const bool good = strcmp(record->strings[0], "GoodFont") == 0;
+  if (record->event.type == MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED) {
+    TEST_ASSERT_TRUE(good);
+  } else if (record->event.type == MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR) {
+    TEST_ASSERT_FALSE(good);
+  }
+  if (good) {
+    TEST_ASSERT_EQUAL_size_t(1, record->string_count);
+  } else {
+    TEST_ASSERT_EQUAL_size_t(2, record->string_count);
+    TEST_ASSERT_EQUAL_STRING("BadFont", record->strings[0]);
+    TEST_ASSERT_EQUAL_STRING("Fallback", record->strings[1]);
+  }
+}
+
+// The good sprite loads and the bad one fails, and each carries its own URL.
+static void check_sprite(
+  const recorded_event* record, const scenario_context* context
+) {
+  (void)context;
+  const bool good = strcmp(record->strings[0], "good") == 0;
+  if (record->event.type == MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED) {
+    TEST_ASSERT_TRUE(good);
+  } else if (record->event.type == MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR) {
+    TEST_ASSERT_FALSE(good);
+  }
+  if (!good) {
+    TEST_ASSERT_EQUAL_STRING("bad", record->strings[0]);
+  }
+  TEST_ASSERT_EQUAL_STRING(
+    good ? "test://sprites/good" : "test://sprites/bad", record->strings[1]
+  );
+}
+
 enum { MAP = MLN_RUNTIME_EVENT_SOURCE_MAP };
 
 // A row that names only its type, scenario, and source has no payload, code,
@@ -303,6 +433,26 @@ static const payload_row payload_rows[] = {
    .unreachable_reason =
      "MapLibre limits only mapbox:// tile downloads, and no call sets the "
      "limit"},
+  {MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS, sizeof(mln_runtime_event_glyphs),
+   .check = check_glyphs},
+  {MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS, sizeof(mln_runtime_event_glyphs),
+   .check = check_glyphs},
+  {MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS, sizeof(mln_runtime_event_glyphs),
+   .message = MESSAGE_TEXT, .expected_message = unrouted_message,
+   .check = check_glyphs},
+  {MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_SPRITE, sizeof(mln_runtime_event_sprite),
+   .check = check_sprite},
+  {MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_SPRITE, sizeof(mln_runtime_event_sprite),
+   .check = check_sprite},
+  {MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR, SCENARIO_SPRITES_AND_GLYPHS, MAP,
+   MLN_RUNTIME_EVENT_PAYLOAD_SPRITE, sizeof(mln_runtime_event_sprite),
+   .message = MESSAGE_TEXT, .expected_message = unrouted_message,
+   .check = check_sprite},
 };
 
 static const size_t payload_row_count =
@@ -556,6 +706,13 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   TEST_ASSERT_GREATER_THAN_INT64(0, frame_count);
   check_scenario_rows(SCENARIO_RENDER, log, &context);
 
+  // The style names no sprite, which MapLibre reports as one empty sprite.
+  const recorded_event* sprite =
+    log_find(log, MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED, map);
+  TEST_ASSERT_NOT_NULL(sprite);
+  TEST_ASSERT_EQUAL_STRING("", sprite->strings[0]);
+  TEST_ASSERT_EQUAL_STRING("", sprite->strings[1]);
+
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -801,6 +958,102 @@ static void a_source_reports_the_description_its_tilejson_brings(void) {
   mln_test_provider_destroy(provider);
 }
 
+// A style's sprites and glyph ranges report each request, load, and failure
+// with the resource that they name.
+static void sprites_and_glyphs_name_the_resource_they_report(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider* provider = mln_test_provider_create(
+    sprite_and_glyph_resources,
+    sizeof(sprite_and_glyph_resources) / sizeof(*sprite_and_glyph_resources)
+  );
+  mln_test_provider_install(runtime, provider);
+  mln_map map = mln_test_create_map(runtime);
+  const scenario_context context = {.runtime = runtime, .map = map};
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  mln_test_drain_all(runtime);
+  event_log* log = &scenario_log;
+  log_reset(log);
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(resource_style_json), &completion.descriptor, NULL
+  ));
+  static const uint32_t awaited[] = {
+    MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR,
+  };
+  for (size_t index = 0; index < sizeof(awaited) / sizeof(*awaited);
+       index += 1) {
+    render_until_logged(&fixture, runtime, log, awaited[index], map);
+  }
+  check_scenario_rows(SCENARIO_SPRITES_AND_GLYPHS, log, &context);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+static bool sprite_error_logged(void* context) {
+  scenario_context* scenario = context;
+  log_drain_quietly(scenario->runtime, &scenario_log);
+  return scenario_log.drain_failed || scenario_log.overflowed ||
+         log_contains(
+           &scenario_log, MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR, scenario->map
+         );
+}
+
+// A sprite that fails to load fails a pending still image with the text of its
+// error event, which names the sprite that failed.
+static void a_failed_sprite_names_itself_to_a_failed_still_image(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider* provider = mln_test_provider_create(NULL, 0);
+  mln_test_provider_install(runtime, provider);
+  mln_map map =
+    create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR);
+  scenario_context context = {.runtime = runtime, .map = map};
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  log_reset(&scenario_log);
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"version\":8,\"sprite\":\"test://sprites/bad\",\"sources\":{},"
+      "\"layers\":[{\"id\":\"bg\",\"type\":\"background\"}]}"
+    ),
+    &completion.descriptor, NULL
+  ));
+  char still_diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY] = "";
+  MLN_TEST_STATUS(
+    MLN_STATUS_NATIVE_ERROR,
+    render_still_image(
+      &fixture, map, still_diagnostic, sizeof(still_diagnostic)
+    )
+  );
+  TEST_ASSERT_EQUAL_STRING(unrouted_message, still_diagnostic);
+  // MapLibre fails the image before it reports the sprite's error.
+  TEST_ASSERT_TRUE(mln_test_await(
+    sprite_error_logged, &context, mln_test_deadline_default(), "a sprite error"
+  ));
+  log_drain(runtime, &scenario_log);
+  const recorded_event* error =
+    log_find(&scenario_log, MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR, map);
+  TEST_ASSERT_NOT_NULL(error);
+  TEST_ASSERT_EQUAL_STRING(still_diagnostic, error->message);
+  TEST_ASSERT_EQUAL_STRING("default", error->strings[0]);
+  TEST_ASSERT_EQUAL_STRING("test://sprites/bad", error->strings[1]);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 // A map created with an empty mask queues nothing, through a camera change and
 // a rendered still image, whose completion fences the check.
 static void a_map_created_with_an_empty_mask_queues_nothing(void) {
@@ -831,5 +1084,7 @@ MLN_TEST_GROUP {
   RUN_TEST(failed_loads_report_their_text);
   RUN_TEST(an_observed_offline_download_reports_status_and_errors);
   RUN_TEST(a_source_reports_the_description_its_tilejson_brings);
+  RUN_TEST(sprites_and_glyphs_name_the_resource_they_report);
+  RUN_TEST(a_failed_sprite_names_itself_to_a_failed_still_image);
   RUN_TEST(a_map_created_with_an_empty_mask_queues_nothing);
 }

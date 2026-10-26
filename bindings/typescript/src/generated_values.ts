@@ -2329,10 +2329,16 @@ export const RuntimeEventFlag = {
   offlineRegionStatusChanged: 131072n,
   offlineRegionResponseError: 262144n,
   offlineRegionTileCountLimitExceeded: 524288n,
+  mapGlyphsRequested: 1048576n,
+  mapGlyphsLoaded: 2097152n,
+  mapGlyphsError: 4194304n,
+  mapSpriteRequested: 8388608n,
+  mapSpriteLoaded: 16777216n,
+  mapSpriteError: 33554432n,
   /**
    * Selects every map-originated event type this version defines.
    */
-  allMapEvents: 131070n,
+  allMapEvents: 66191358n,
   /**
    * Selects every runtime-originated event type this version defines.
    */
@@ -2340,10 +2346,38 @@ export const RuntimeEventFlag = {
   /**
    * Selects every event type this version defines.
    */
-  all: 1048574n,
+  all: 67108862n,
 } as const;
 /** A bitwise OR of RuntimeEventFlag flags. */
 export type RuntimeEventFlag = bigint;
+
+/**
+ * Payload for `RuntimeEventType.mapGlyphsRequested`,
+ * `RuntimeEventType.mapGlyphsLoaded`, and `RuntimeEventType.mapGlyphsError`.
+ *
+ * See `mln_runtime_event_glyphs` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface RuntimeEventGlyphs {
+  /**
+   * Font names of the font stack, in the style's order.
+   */
+  readonly fontStack: readonly string[];
+  /**
+   * First glyph of the range.
+   */
+  readonly first: number;
+  /**
+   * Last glyph of the range, inclusive.
+   */
+  readonly last: number;
+  /**
+   * Whether the range stands for a whole font file that the style's font-faces
+   * names. MapLibre then loads the whole file, and first and last do not
+   * describe the glyphs it holds.
+   */
+  readonly fontFace: boolean;
+}
 
 /**
  * Runtime and map event callback. The callback runs asynchronously on the
@@ -2409,6 +2443,8 @@ export type RuntimeEventPayload =
       readonly kind: "offlineRegionTileCountLimit";
       readonly value: RuntimeEventOfflineRegionTileCountLimit;
     }
+  | { readonly kind: "glyphs"; readonly value: RuntimeEventGlyphs }
+  | { readonly kind: "sprite"; readonly value: RuntimeEventSprite }
   | { readonly kind: "none" }
   | {
       readonly kind: "unknown";
@@ -2461,6 +2497,26 @@ export type RuntimeEventSourceType =
   | (number & {});
 
 /**
+ * Payload for `RuntimeEventType.mapSpriteRequested`,
+ * `RuntimeEventType.mapSpriteLoaded`, and `RuntimeEventType.mapSpriteError`.
+ *
+ * See `mln_runtime_event_sprite` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface RuntimeEventSprite {
+  /**
+   * Sprite ID: the id of an entry in the style's sprite array, or "default"
+   * when the style names one sprite URL.
+   */
+  readonly id: string;
+  /**
+   * Sprite URL as the style names it, without the pixel-ratio suffix and file
+   * extension that MapLibre appends to request the image and JSON.
+   */
+  readonly url: string;
+}
+
+/**
  * Payload for `RuntimeEventType.mapTileAction`.
  *
  * See `mln_runtime_event_tile_action` in the
@@ -2497,6 +2553,12 @@ export const RuntimeEventType = {
   offlineRegionStatusChanged: 17,
   offlineRegionResponseError: 18,
   offlineRegionTileCountLimitExceeded: 19,
+  mapGlyphsRequested: 20,
+  mapGlyphsLoaded: 21,
+  mapGlyphsError: 22,
+  mapSpriteRequested: 23,
+  mapSpriteLoaded: 24,
+  mapSpriteError: 25,
 } as const;
 /** One of the RuntimeEventType values, or a value this binding does not know. */
 export type RuntimeEventType =

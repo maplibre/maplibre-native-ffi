@@ -34,11 +34,17 @@ public enum RuntimeEventFlag : ulong
     OfflineRegionStatusChanged = 131072,
     OfflineRegionResponseError = 262144,
     OfflineRegionTileCountLimitExceeded = 524288,
+    MapGlyphsRequested = 1048576,
+    MapGlyphsLoaded = 2097152,
+    MapGlyphsError = 4194304,
+    MapSpriteRequested = 8388608,
+    MapSpriteLoaded = 16777216,
+    MapSpriteError = 33554432,
 
     /// <summary>
     /// Selects every map-originated event type this version defines.
     /// </summary>
-    AllMapEvents = 131070,
+    AllMapEvents = 66191358,
 
     /// <summary>
     /// Selects every runtime-originated event type this version defines.
@@ -48,5 +54,5 @@ public enum RuntimeEventFlag : ulong
     /// <summary>
     /// Selects every event type this version defines.
     /// </summary>
-    All = 1048574,
+    All = 67108862,
 }

@@ -957,6 +957,12 @@ const (
 	RuntimeEventFlagOfflineRegionStatusChanged          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventFlagOfflineRegionResponseError          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventFlagOfflineRegionTileCountLimitExceeded RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventFlagMapGlyphsRequested                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED)
+	RuntimeEventFlagMapGlyphsLoaded                     RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED)
+	RuntimeEventFlagMapGlyphsError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR)
+	RuntimeEventFlagMapSpriteRequested                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED)
+	RuntimeEventFlagMapSpriteLoaded                     RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED)
+	RuntimeEventFlagMapSpriteError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR)
 	// Selects every map-originated event type this version defines.
 	RuntimeEventFlagAllMapEvents RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS)
 	// Selects every runtime-originated event type this version defines.
@@ -968,7 +974,7 @@ const (
 func (value RuntimeEventFlag) Has(flags RuntimeEventFlag) bool { return value&flags == flags }
 
 func (value RuntimeEventFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventFlagMapCameraWillChange"}, {4, "RuntimeEventFlagMapCameraIsChanging"}, {8, "RuntimeEventFlagMapCameraDidChange"}, {16, "RuntimeEventFlagMapStyleLoaded"}, {32, "RuntimeEventFlagMapLoadingStarted"}, {64, "RuntimeEventFlagMapLoadingFinished"}, {128, "RuntimeEventFlagMapLoadingFailed"}, {256, "RuntimeEventFlagMapIdle"}, {512, "RuntimeEventFlagMapRenderError"}, {1024, "RuntimeEventFlagMapRenderFrameStarted"}, {2048, "RuntimeEventFlagMapRenderFrameFinished"}, {4096, "RuntimeEventFlagMapRenderMapStarted"}, {8192, "RuntimeEventFlagMapRenderMapFinished"}, {16384, "RuntimeEventFlagMapStyleImageMissing"}, {32768, "RuntimeEventFlagMapTileAction"}, {65536, "RuntimeEventFlagMapSourceChanged"}, {131072, "RuntimeEventFlagOfflineRegionStatusChanged"}, {262144, "RuntimeEventFlagOfflineRegionResponseError"}, {524288, "RuntimeEventFlagOfflineRegionTileCountLimitExceeded"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventFlagMapCameraWillChange"}, {4, "RuntimeEventFlagMapCameraIsChanging"}, {8, "RuntimeEventFlagMapCameraDidChange"}, {16, "RuntimeEventFlagMapStyleLoaded"}, {32, "RuntimeEventFlagMapLoadingStarted"}, {64, "RuntimeEventFlagMapLoadingFinished"}, {128, "RuntimeEventFlagMapLoadingFailed"}, {256, "RuntimeEventFlagMapIdle"}, {512, "RuntimeEventFlagMapRenderError"}, {1024, "RuntimeEventFlagMapRenderFrameStarted"}, {2048, "RuntimeEventFlagMapRenderFrameFinished"}, {4096, "RuntimeEventFlagMapRenderMapStarted"}, {8192, "RuntimeEventFlagMapRenderMapFinished"}, {16384, "RuntimeEventFlagMapStyleImageMissing"}, {32768, "RuntimeEventFlagMapTileAction"}, {65536, "RuntimeEventFlagMapSourceChanged"}, {131072, "RuntimeEventFlagOfflineRegionStatusChanged"}, {262144, "RuntimeEventFlagOfflineRegionResponseError"}, {524288, "RuntimeEventFlagOfflineRegionTileCountLimitExceeded"}, {1048576, "RuntimeEventFlagMapGlyphsRequested"}, {2097152, "RuntimeEventFlagMapGlyphsLoaded"}, {4194304, "RuntimeEventFlagMapGlyphsError"}, {8388608, "RuntimeEventFlagMapSpriteRequested"}, {16777216, "RuntimeEventFlagMapSpriteLoaded"}, {33554432, "RuntimeEventFlagMapSpriteError"}})
 }
 
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
@@ -1020,6 +1026,12 @@ const (
 	RuntimeEventTypeOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventTypeOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventTypeMapGlyphsRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
+	RuntimeEventTypeMapGlyphsLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
+	RuntimeEventTypeMapGlyphsError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
+	RuntimeEventTypeMapSpriteRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
+	RuntimeEventTypeMapSpriteLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
+	RuntimeEventTypeMapSpriteError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
 )
 
 func (value RuntimeEventType) String() string {
@@ -1062,6 +1074,18 @@ func (value RuntimeEventType) String() string {
 		return "RuntimeEventTypeOfflineRegionResponseError"
 	case 19:
 		return "RuntimeEventTypeOfflineRegionTileCountLimitExceeded"
+	case 20:
+		return "RuntimeEventTypeMapGlyphsRequested"
+	case 21:
+		return "RuntimeEventTypeMapGlyphsLoaded"
+	case 22:
+		return "RuntimeEventTypeMapGlyphsError"
+	case 23:
+		return "RuntimeEventTypeMapSpriteRequested"
+	case 24:
+		return "RuntimeEventTypeMapSpriteLoaded"
+	case 25:
+		return "RuntimeEventTypeMapSpriteError"
 	}
 	return fmt.Sprintf("RuntimeEventType(%d)", value)
 }
@@ -1646,6 +1670,20 @@ func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) bindingTag() uint32
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 }
 func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) isRuntimeEventPayload() {}
+
+type RuntimeEventPayloadGlyphsVariant struct{ Value RuntimeEventGlyphs }
+
+func (RuntimeEventPayloadGlyphsVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS)
+}
+func (RuntimeEventPayloadGlyphsVariant) isRuntimeEventPayload() {}
+
+type RuntimeEventPayloadSpriteVariant struct{ Value RuntimeEventSprite }
+
+func (RuntimeEventPayloadSpriteVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE)
+}
+func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
 
 // AnimationOptions corresponds to mln_animation_options. Optional animation
 // controls for camera transitions.
@@ -3937,11 +3975,51 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 			return RuntimeEventPayloadOfflineRegionResponseErrorVariant{Value: copyRuntimeEventOfflineRegionResponseError((*(*C.mln_runtime_event_offline_region_response_error)(unsafe.Pointer(&raw.payload))))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
 			return RuntimeEventPayloadOfflineRegionTileCountLimitVariant{Value: copyRuntimeEventOfflineRegionTileCountLimit((*(*C.mln_runtime_event_offline_region_tile_count_limit)(unsafe.Pointer(&raw.payload))))}
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
+			return RuntimeEventPayloadGlyphsVariant{Value: copyRuntimeEventGlyphs((*(*C.mln_runtime_event_glyphs)(unsafe.Pointer(&raw.payload))))}
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
+			return RuntimeEventPayloadSpriteVariant{Value: copyRuntimeEventSprite((*(*C.mln_runtime_event_sprite)(unsafe.Pointer(&raw.payload))))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_NONE:
 			return nil
 		}
 		return UnknownVariant{Tag: uint32(raw.payload_type)}
 	}()
+	return result
+}
+
+// RuntimeEventGlyphs corresponds to mln_runtime_event_glyphs. Payload for
+// RuntimeEventTypeMapGlyphsRequested, RuntimeEventTypeMapGlyphsLoaded, and
+// RuntimeEventTypeMapGlyphsError.
+//
+// See mln_runtime_event_glyphs in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventGlyphs struct {
+	// Font names of the font stack, in the style's order.
+	FontStack []string
+	// First glyph of the range.
+	First uint32
+	// Last glyph of the range, inclusive.
+	Last uint32
+	// Whether the range stands for a whole font file that the style's font-faces
+	// names. MapLibre then loads the whole file, and first and last do not describe
+	// the glyphs it holds.
+	FontFace bool
+}
+
+func copyRuntimeEventGlyphs(raw C.mln_runtime_event_glyphs) RuntimeEventGlyphs {
+	var result RuntimeEventGlyphs
+	result.FontStack = func() []string {
+		length := bindingLength(uint64(raw.font_count))
+		result := make([]string, length)
+		for i := range result {
+			item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.font_stack), i, uint64(unsafe.Sizeof(*raw.font_stack)), unsafe.Sizeof(*raw.font_stack), unsafe.Alignof(*raw.font_stack)))
+			result[i] = bindingString(item.data, uint64(item.size))
+		}
+		return result
+	}()
+	result.First = uint32(raw.first)
+	result.Last = uint32(raw.last)
+	result.FontFace = bool(raw.font_face)
 	return result
 }
 
@@ -4056,6 +4134,28 @@ type RuntimeEventRenderMap struct{ Mode RenderMode }
 func copyRuntimeEventRenderMap(raw C.mln_runtime_event_render_map) RuntimeEventRenderMap {
 	var result RuntimeEventRenderMap
 	result.Mode = RenderMode(raw.mode)
+	return result
+}
+
+// RuntimeEventSprite corresponds to mln_runtime_event_sprite. Payload for
+// RuntimeEventTypeMapSpriteRequested, RuntimeEventTypeMapSpriteLoaded, and
+// RuntimeEventTypeMapSpriteError.
+//
+// See mln_runtime_event_sprite in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventSprite struct {
+	// Sprite ID: the id of an entry in the style's sprite array, or "default" when
+	// the style names one sprite URL.
+	Id string
+	// Sprite URL as the style names it, without the pixel-ratio suffix and file
+	// extension that MapLibre appends to request the image and JSON.
+	Url string
+}
+
+func copyRuntimeEventSprite(raw C.mln_runtime_event_sprite) RuntimeEventSprite {
+	var result RuntimeEventSprite
+	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
+	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
 	return result
 }
 

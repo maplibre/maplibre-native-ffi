@@ -4992,7 +4992,7 @@ pub const RuntimeEvent = struct {
     payload: RuntimeEventPayload = .{ .unknown = 0 },
 
     /// Borrows the record's text, which native lends until the callback returns.
-    pub fn fromNative(raw: c.mln_runtime_event) status.Error!RuntimeEvent {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event) status.Error!RuntimeEvent {
         return .{
             .type = RuntimeEventType.fromNative(raw.type),
             .source_type = RuntimeEventSourceType.fromNative(raw.source_type),
@@ -5007,6 +5007,8 @@ pub const RuntimeEvent = struct {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => .{ .offline_region_status = RuntimeEventOfflineRegionStatus.fromNative(raw.payload.offline_region_status) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .{ .offline_region_response_error = RuntimeEventOfflineRegionResponseError.fromNative(raw.payload.offline_region_response_error) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .{ .offline_region_tile_count_limit = RuntimeEventOfflineRegionTileCountLimit.fromNative(raw.payload.offline_region_tile_count_limit) },
+                c.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS => .{ .glyphs = try RuntimeEventGlyphs.fromNative(allocator, raw.payload.glyphs) },
+                c.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE => .{ .sprite = try RuntimeEventSprite.fromNative(raw.payload.sprite) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .empty,
                 else => |tag| .{ .unknown = @intCast(tag) },
             },
@@ -5038,15 +5040,54 @@ pub const RuntimeEventFlag = struct {
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
     offline_region_tile_count_limit_exceeded: bool = false,
+    map_glyphs_requested: bool = false,
+    map_glyphs_loaded: bool = false,
+    map_glyphs_error: bool = false,
+    map_sprite_requested: bool = false,
+    map_sprite_loaded: bool = false,
+    map_sprite_error: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
     pub const none: RuntimeEventFlag = .{};
-    pub const all_map_events: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true };
+    pub const all_map_events: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .map_glyphs_requested = true, .map_glyphs_loaded = true, .map_glyphs_error = true, .map_sprite_requested = true, .map_sprite_loaded = true, .map_sprite_error = true };
     pub const all_runtime_events: RuntimeEventFlag = .{ .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
-    pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
+    pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true, .map_glyphs_requested = true, .map_glyphs_loaded = true, .map_glyphs_error = true, .map_sprite_requested = true, .map_sprite_loaded = true, .map_sprite_error = true };
+};
+
+/// Payload for `RuntimeEventType.map_glyphs_requested`,
+/// `RuntimeEventType.map_glyphs_loaded`, and
+/// `RuntimeEventType.map_glyphs_error`.
+///
+/// See `mln_runtime_event_glyphs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const RuntimeEventGlyphs = struct {
+    /// Font names of the font stack, in the style's order.
+    font_stack: []const []const u8 = &.{},
+    /// First glyph of the range.
+    first: u32 = 0,
+    /// Last glyph of the range, inclusive.
+    last: u32 = 0,
+    /// Whether the range stands for a whole font file that the style's
+    /// font-faces names. MapLibre then loads the whole file, and first and last
+    /// do not describe the glyphs it holds.
+    font_face: bool = false,
+
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event_glyphs) status.Error!RuntimeEventGlyphs {
+        return .{
+            .font_stack = blk: {
+                const copied = try allocator.alloc([]const u8, raw.font_count);
+                for (try marshal.nativeSlice(c.mln_buffer_view, raw.font_stack, raw.font_count), 0..) |item, index| copied[index] = try marshal.borrowView(item);
+                break :blk copied;
+            },
+            .first = raw.first,
+            .last = raw.last,
+            .font_face = raw.font_face,
+        };
+    }
 };
 
 /// Runtime and map event callback. Map events arrive on the runtime's native
@@ -5081,7 +5122,7 @@ pub const RuntimeEventHandler = struct {
                         const copied = try allocator.alloc(RuntimeEvent, slice_view.event_count);
                         for (0..slice_view.event_count) |index| {
                             const item = try marshal.stridedAt(c.mln_runtime_event, slice_view.events, slice_view.event_count, slice_view.event_size, index);
-                            copied[index] = try RuntimeEvent.fromNative(item);
+                            copied[index] = try RuntimeEvent.fromNative(allocator, item);
                         }
                         break :blk copied;
                     };
@@ -5172,6 +5213,8 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_status: RuntimeEventOfflineRegionStatus,
     offline_region_response_error: RuntimeEventOfflineRegionResponseError,
     offline_region_tile_count_limit: RuntimeEventOfflineRegionTileCountLimit,
+    glyphs: RuntimeEventGlyphs,
+    sprite: RuntimeEventSprite,
     empty,
     unknown: u32,
 };
@@ -5222,6 +5265,29 @@ pub const RuntimeEventSourceType = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// Payload for `RuntimeEventType.map_sprite_requested`,
+/// `RuntimeEventType.map_sprite_loaded`, and
+/// `RuntimeEventType.map_sprite_error`.
+///
+/// See `mln_runtime_event_sprite` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const RuntimeEventSprite = struct {
+    /// Sprite ID: the id of an entry in the style's sprite array, or "default"
+    /// when the style names one sprite URL.
+    id: []const u8 = &.{},
+    /// Sprite URL as the style names it, without the pixel-ratio suffix and
+    /// file extension that MapLibre appends to request the image and JSON.
+    url: []const u8 = &.{},
+
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_runtime_event_sprite) status.Error!RuntimeEventSprite {
+        return .{
+            .id = try marshal.borrowView(raw.id),
+            .url = try marshal.borrowView(raw.url),
+        };
+    }
+};
+
 /// Payload for `RuntimeEventType.map_tile_action`.
 ///
 /// See `mln_runtime_event_tile_action` in the
@@ -5261,6 +5327,12 @@ pub const RuntimeEventType = enum(u32) {
     offline_region_status_changed = 17,
     offline_region_response_error = 18,
     offline_region_tile_count_limit_exceeded = 19,
+    map_glyphs_requested = 20,
+    map_glyphs_loaded = 21,
+    map_glyphs_error = 22,
+    map_sprite_requested = 23,
+    map_sprite_loaded = 24,
+    map_sprite_error = 25,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;

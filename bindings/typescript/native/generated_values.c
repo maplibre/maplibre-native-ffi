@@ -1940,6 +1940,52 @@ napi_value mln_ts_read_runtime_event_delivery(
   return result;
 }
 
+napi_value mln_ts_read_runtime_event_glyphs(
+  napi_env env, const mln_runtime_event_glyphs* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "fontStack",
+        mln_ts_read_runtime_event_glyphs_font_stack(env, source)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "first", mln_ts_number(env, (double)(source->first))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "last", mln_ts_number(env, (double)(source->last))
+      ))
+    return NULL;
+  if (!mln_ts_set(env, result, "fontFace", mln_ts_bool(env, source->font_face)))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_runtime_event_glyphs_font_stack(
+  napi_env env, const mln_runtime_event_glyphs* source
+) {
+  size_t count = (size_t)source->font_count;
+  size_t stride = sizeof(mln_buffer_view);
+  if (count > 0 && stride < sizeof(mln_buffer_view)) {
+    napi_throw_range_error(env, NULL, "native record stride is too small");
+    return NULL;
+  }
+  napi_value result = mln_ts_array(env, count);
+  if (result == NULL) return NULL;
+  for (size_t index = 0; index < count; index++) {
+    const mln_buffer_view* item =
+      (const mln_buffer_view*)((const char*)source->font_stack +
+                               index * stride);
+    napi_value element = mln_ts_text(env, ((*item)).data, ((*item)).size);
+    if (element == NULL) return NULL;
+    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
+  }
+  return result;
+}
+
 napi_value mln_ts_read_runtime_event_offline_region_response_error(
   napi_env env, const mln_runtime_event_offline_region_response_error* source,
   size_t size
@@ -2083,6 +2129,28 @@ napi_value mln_ts_read_runtime_event_payload(
           ))
         return NULL;
       return result;
+    case MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
+      if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "glyphs", 6)))
+        return NULL;
+      if (!mln_ts_set(
+            env, result, "value",
+            mln_ts_read_runtime_event_glyphs(
+              env, &(source->payload.glyphs), sizeof(source->payload.glyphs)
+            )
+          ))
+        return NULL;
+      return result;
+    case MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
+      if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "sprite", 6)))
+        return NULL;
+      if (!mln_ts_set(
+            env, result, "value",
+            mln_ts_read_runtime_event_sprite(
+              env, &(source->payload.sprite), sizeof(source->payload.sprite)
+            )
+          ))
+        return NULL;
+      return result;
     case MLN_RUNTIME_EVENT_PAYLOAD_NONE:
       if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "none", 4)))
         return NULL;
@@ -2138,6 +2206,25 @@ napi_value mln_ts_read_runtime_event_render_map(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "mode", mln_ts_number(env, (double)(source->mode))
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_runtime_event_sprite(
+  napi_env env, const mln_runtime_event_sprite* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "id",
+        mln_ts_text(env, (source->id).data, (source->id).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "url",
+        mln_ts_text(env, (source->url).data, (source->url).size)
       ))
     return NULL;
   return result;

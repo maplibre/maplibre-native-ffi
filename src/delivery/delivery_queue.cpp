@@ -18,6 +18,38 @@
 namespace mln::delivery {
 namespace {
 
+auto string_view_of(const std::string& text) noexcept -> mln_buffer_view {
+  return mln_buffer_view{.data = text.c_str(), .size = text.size()};
+}
+
+}  // namespace
+
+auto bind_event_strings(
+  mln_runtime_event& event, const std::vector<std::string>& strings,
+  std::vector<mln_buffer_view>& views
+) -> void {
+  switch (event.payload_type) {
+    case MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
+      views.clear();
+      views.reserve(strings.size());
+      for (const auto& name : strings) views.push_back(string_view_of(name));
+      event.payload.glyphs.font_stack = views.empty() ? nullptr : views.data();
+      event.payload.glyphs.font_count = views.size();
+      return;
+    case MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
+      if (strings.size() != 2) {
+        throw std::logic_error{"a sprite payload takes an ID and a URL"};
+      }
+      event.payload.sprite.id = string_view_of(strings[0]);
+      event.payload.sprite.url = string_view_of(strings[1]);
+      return;
+    default:
+      return;
+  }
+}
+
+namespace {
+
 struct DeliveryQueueObject {
   std::shared_ptr<DeliveryQueueState> state;
 };
@@ -29,9 +61,19 @@ struct DeliveryBatchObject {
   std::vector<mln_delivery> views;
 };
 
+// The payload text of one event, and the font stack array that points at it.
+// The event's views point into the vectors' heap storage, which stays put when
+// the vectors move.
+struct EventStrings {
+  std::vector<std::string> strings;
+  std::vector<mln_buffer_view> views;
+};
+
 struct EventDeliveryItem final : DeliveryItem {
   std::vector<mln_runtime_event> events;
   std::string messages;
+  // Only the events whose payload carries text have an entry.
+  std::vector<EventStrings> strings;
 
   mln_event_batch_view batch_view{};
 
@@ -44,20 +86,28 @@ struct EventDeliveryItem final : DeliveryItem {
     };
   }
 
-  auto append(mln_runtime_event event, std::string_view message) -> void {
+  auto append(
+    mln_runtime_event event, std::string_view message,
+    std::vector<std::string> payload_strings
+  ) -> void {
     message = event_message(message);
     event.message = mln_buffer_view{.data = nullptr, .size = message.size()};
-    // Reserve both before changing their sizes. A failed reserve can move
+    auto text =
+      EventStrings{.strings = std::move(payload_strings), .views = {}};
+    bind_event_strings(event, text.strings, text.views);
+    // Reserve every vector before changing any size. A failed reserve can move
     // storage, so refresh the event span on either exit.
     try {
       if (events.size() == events.capacity()) {
         events.reserve(std::max(std::size_t{16}, events.size() * 2));
       }
+      if (!text.strings.empty()) strings.reserve(strings.size() + 1);
       if (!message.empty()) {
         messages.reserve(messages.size() + message.size() + 1);
         messages.append(message);
         messages.push_back('\0');
       }
+      if (!text.strings.empty()) strings.push_back(std::move(text));
       events.push_back(event);
     } catch (...) {
       refresh();
@@ -184,7 +234,8 @@ auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
 }
 
 auto DeliveryQueueState::push_event(
-  mln_runtime_event event, std::string_view message, void* user_data
+  mln_runtime_event event, std::string_view message, void* user_data,
+  std::vector<std::string> strings
 ) -> void {
   if (core::process_exiting()) return;
   auto wake = std::shared_ptr<core::Wake>{};
@@ -196,10 +247,12 @@ auto DeliveryQueueState::push_event(
       tail_->view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS &&
       tail_->view.user_data == user_data
     ) {
-      static_cast<EventDeliveryItem*>(tail_)->append(event, message);
+      static_cast<EventDeliveryItem*>(tail_)->append(
+        event, message, std::move(strings)
+      );
     } else {
       auto item = std::make_unique<EventDeliveryItem>(user_data);
-      item->append(event, message);
+      item->append(event, message, std::move(strings));
       auto* raw = item.release();
       if (tail_ == nullptr) {
         head_ = raw;

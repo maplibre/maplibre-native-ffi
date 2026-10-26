@@ -1792,6 +1792,14 @@ internal static unsafe class GeneratedValues
                             value.payload.offline_region_tile_count_limit
                         )
                     ),
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS =>
+                    new RuntimeEvent.PayloadValue.Glyphs(
+                        CopyRuntimeEventGlyphs(value.payload.glyphs)
+                    ),
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE =>
+                    new RuntimeEvent.PayloadValue.Sprite(
+                        CopyRuntimeEventSprite(value.payload.sprite)
+                    ),
                 mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE =>
                     new RuntimeEvent.PayloadValue.None(),
                 _ => new RuntimeEvent.PayloadValue.Unknown(
@@ -1813,6 +1821,21 @@ internal static unsafe class GeneratedValues
                 ),
             }
         );
+
+    internal static RuntimeEventGlyphs CopyRuntimeEventGlyphs(mln_runtime_event_glyphs value) =>
+        default(RuntimeEventGlyphs) with
+        {
+            FontStackStorage = new(
+                NativeCallScope.CopyArray<mln_buffer_view, string>(
+                    value.font_stack,
+                    (nuint)(value.font_count),
+                    static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
+                )
+            ),
+            First = value.first,
+            Last = value.last,
+            FontFace = value.font_face != 0,
+        };
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeRuntimeEventHandlerCallback(
@@ -1873,6 +1896,12 @@ internal static unsafe class GeneratedValues
     internal static RuntimeEventRenderMap CopyRuntimeEventRenderMap(
         mln_runtime_event_render_map value
     ) => new((RenderMode)value.mode);
+
+    internal static RuntimeEventSprite CopyRuntimeEventSprite(mln_runtime_event_sprite value) =>
+        new(
+            RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
+        );
 
     internal static RuntimeEventTileAction CopyRuntimeEventTileAction(
         mln_runtime_event_tile_action value

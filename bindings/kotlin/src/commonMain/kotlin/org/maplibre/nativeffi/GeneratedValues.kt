@@ -1057,6 +1057,12 @@ public value class RuntimeEventFlag(public val rawValue: ULong) {
         131072uL to "OFFLINE_REGION_STATUS_CHANGED",
         262144uL to "OFFLINE_REGION_RESPONSE_ERROR",
         524288uL to "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED",
+        1048576uL to "MAP_GLYPHS_REQUESTED",
+        2097152uL to "MAP_GLYPHS_LOADED",
+        4194304uL to "MAP_GLYPHS_ERROR",
+        8388608uL to "MAP_SPRITE_REQUESTED",
+        16777216uL to "MAP_SPRITE_LOADED",
+        33554432uL to "MAP_SPRITE_ERROR",
       ),
     )
 
@@ -1083,12 +1089,18 @@ public value class RuntimeEventFlag(public val rawValue: ULong) {
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventFlag = RuntimeEventFlag(262144uL)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventFlag =
       RuntimeEventFlag(524288uL)
+    public val MAP_GLYPHS_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(1048576uL)
+    public val MAP_GLYPHS_LOADED: RuntimeEventFlag = RuntimeEventFlag(2097152uL)
+    public val MAP_GLYPHS_ERROR: RuntimeEventFlag = RuntimeEventFlag(4194304uL)
+    public val MAP_SPRITE_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(8388608uL)
+    public val MAP_SPRITE_LOADED: RuntimeEventFlag = RuntimeEventFlag(16777216uL)
+    public val MAP_SPRITE_ERROR: RuntimeEventFlag = RuntimeEventFlag(33554432uL)
     /** Selects every map-originated event type this version defines. */
-    public val ALL_MAP_EVENTS: RuntimeEventFlag = RuntimeEventFlag(131070uL)
+    public val ALL_MAP_EVENTS: RuntimeEventFlag = RuntimeEventFlag(66191358uL)
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventFlag = RuntimeEventFlag(917504uL)
     /** Selects every event type this version defines. */
-    public val ALL: RuntimeEventFlag = RuntimeEventFlag(1048574uL)
+    public val ALL: RuntimeEventFlag = RuntimeEventFlag(67108862uL)
   }
 }
 
@@ -1146,6 +1158,12 @@ public value class RuntimeEventType(public val rawValue: UInt) {
       17u -> "OFFLINE_REGION_STATUS_CHANGED"
       18u -> "OFFLINE_REGION_RESPONSE_ERROR"
       19u -> "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
+      20u -> "MAP_GLYPHS_REQUESTED"
+      21u -> "MAP_GLYPHS_LOADED"
+      22u -> "MAP_GLYPHS_ERROR"
+      23u -> "MAP_SPRITE_REQUESTED"
+      24u -> "MAP_SPRITE_LOADED"
+      25u -> "MAP_SPRITE_ERROR"
       else -> "RuntimeEventType($rawValue)"
     }
 
@@ -1169,6 +1187,12 @@ public value class RuntimeEventType(public val rawValue: UInt) {
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(17u)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(18u)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(19u)
+    public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(20u)
+    public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(21u)
+    public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(22u)
+    public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(23u)
+    public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(24u)
+    public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(25u)
   }
 }
 
@@ -3528,6 +3552,47 @@ public data class RuntimeEventOfflineRegionTileCountLimit(
 )
 
 /**
+ * Payload for `RuntimeEventType.MAP_GLYPHS_REQUESTED`, `RuntimeEventType.MAP_GLYPHS_LOADED`, and
+ * `RuntimeEventType.MAP_GLYPHS_ERROR`.
+ *
+ * See `mln_runtime_event_glyphs` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventGlyphs(
+  /** Font names of the font stack, in the style's order. */
+  public val fontStack: List<String>,
+  /** First glyph of the range. */
+  public val first: UInt,
+  /** Last glyph of the range, inclusive. */
+  public val last: UInt,
+  /**
+   * Whether the range stands for a whole font file that the style's font-faces names. MapLibre then
+   * loads the whole file, and first and last do not describe the glyphs it holds.
+   */
+  public val fontFace: Boolean,
+)
+
+/**
+ * Payload for `RuntimeEventType.MAP_SPRITE_REQUESTED`, `RuntimeEventType.MAP_SPRITE_LOADED`, and
+ * `RuntimeEventType.MAP_SPRITE_ERROR`.
+ *
+ * See `mln_runtime_event_sprite` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventSprite(
+  /**
+   * Sprite ID: the id of an entry in the style's sprite array, or "default" when the style names
+   * one sprite URL.
+   */
+  public val id: String,
+  /**
+   * Sprite URL as the style names it, without the pixel-ratio suffix and file extension that
+   * MapLibre appends to request the image and JSON.
+   */
+  public val url: String,
+)
+
+/**
  * Typed event payload carried inline by every event.
  *
  * See `mln_runtime_event_payload` in the
@@ -3550,6 +3615,10 @@ public sealed interface RuntimeEventPayload {
   public data class OfflineRegionTileCountLimit(
     public val value: RuntimeEventOfflineRegionTileCountLimit,
   ) : RuntimeEventPayload
+
+  public data class Glyphs(public val value: RuntimeEventGlyphs) : RuntimeEventPayload
+
+  public data class Sprite(public val value: RuntimeEventSprite) : RuntimeEventPayload
 
   public data object None : RuntimeEventPayload
 

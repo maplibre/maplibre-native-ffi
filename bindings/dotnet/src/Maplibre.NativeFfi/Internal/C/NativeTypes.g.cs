@@ -863,6 +863,15 @@ internal unsafe struct mln_runtime_event
     public mln_runtime_event_payload payload;
 }
 
+internal unsafe struct mln_runtime_event_glyphs
+{
+    public mln_buffer_view* font_stack;
+    public nuint font_count;
+    public uint first;
+    public uint last;
+    public byte font_face;
+}
+
 internal unsafe struct mln_runtime_event_handler
 {
     public uint size;
@@ -910,6 +919,12 @@ internal unsafe struct mln_runtime_event_payload
 
     [FieldOffset(0)]
     public mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
+
+    [FieldOffset(0)]
+    public mln_runtime_event_glyphs glyphs;
+
+    [FieldOffset(0)]
+    public mln_runtime_event_sprite sprite;
 }
 
 internal unsafe struct mln_runtime_event_render_frame
@@ -923,6 +938,12 @@ internal unsafe struct mln_runtime_event_render_frame
 internal unsafe struct mln_runtime_event_render_map
 {
     public mln_render_mode mode;
+}
+
+internal unsafe struct mln_runtime_event_sprite
+{
+    public mln_buffer_view id;
+    public mln_buffer_view url;
 }
 
 internal unsafe struct mln_runtime_event_tile_action
@@ -1727,9 +1748,15 @@ internal enum mln_runtime_event_flag : ulong
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072,
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144,
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288,
-    MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 131070,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1048576,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 2097152,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 4194304,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 8388608,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 16777216,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 33554432,
+    MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 66191358,
     MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504,
-    MLN_RUNTIME_EVENT_FLAG_ALL = 1048574,
+    MLN_RUNTIME_EVENT_FLAG_ALL = 67108862,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -1741,6 +1768,8 @@ internal enum mln_runtime_event_payload_type : uint
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
+    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7,
+    MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8,
 }
 
 internal enum mln_runtime_event_source_type : uint
@@ -1770,6 +1799,12 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
 }
 
 internal enum mln_source_feature_query_option_field : uint

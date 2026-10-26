@@ -103,6 +103,23 @@ typedef struct mln_offline_region_status {
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
+ * - MAP_GLYPHS_REQUESTED: MapLibre requested a glyph range of a font stack;
+ *   code is 0; payload GLYPHS.
+ * - MAP_GLYPHS_LOADED: a requested glyph range arrived and parsed; code is 0;
+ *   payload GLYPHS.
+ * - MAP_GLYPHS_ERROR: a glyph range failed to load or parse; code is 0;
+ *   message carries the error text; payload GLYPHS.
+ * - MAP_SPRITE_REQUESTED: MapLibre requested a sprite of the style; code is 0;
+ *   payload SPRITE.
+ * - MAP_SPRITE_LOADED: a sprite's image and JSON arrived and parsed; code is
+ *   0; payload SPRITE. A style without a sprite reports one with an empty ID
+ *   and URL.
+ * - MAP_SPRITE_ERROR: a sprite's image or JSON failed to load, or the sprite
+ *   failed to parse; code is 0; message carries the error text; payload
+ *   SPRITE. A sprite whose image and JSON both fail reports each.
+ *
+ * A glyph or sprite error fails a pending mln_map_request_still_image() with
+ * the same error text.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -124,6 +141,12 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
 } mln_runtime_event_type;
 
 /**
@@ -179,6 +202,18 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1ULL
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+  MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
+  MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED,
+  MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR,
+  MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED,
+  MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED,
+  MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 1ULL
+    << MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR,
   /** Selects every map-originated event type this version defines. */
   MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE |
@@ -195,7 +230,13 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED |
     MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING |
     MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION |
-    MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR |
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR,
   /** Selects every runtime-originated event type this version defines. */
   MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
@@ -224,6 +265,8 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
+  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7,
+  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8,
 } mln_runtime_event_payload_type;
 
 /** Camera change kinds reported by camera will-change and did-change events. */
@@ -420,6 +463,47 @@ typedef struct mln_runtime_event_tile_action {
   mln_tile_id tile_id;
 } mln_runtime_event_tile_action;
 
+/**
+ * Payload for MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
+ * MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED, and MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR.
+ *
+ * The font stack array and its names are borrowed with the event.
+ */
+typedef struct mln_runtime_event_glyphs {
+  /** Font names of the font stack, in the style's order. */
+  const mln_buffer_view* font_stack MLN_BINDING("length=font_count");
+  size_t font_count;
+  /** First glyph of the range. */
+  uint32_t first;
+  /** Last glyph of the range, inclusive. */
+  uint32_t last;
+  /**
+   * Whether the range stands for a whole font file that the style's
+   * font-faces names. MapLibre then loads the whole file, and first and last
+   * do not describe the glyphs it holds.
+   */
+  bool font_face;
+} mln_runtime_event_glyphs;
+
+/**
+ * Payload for MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED,
+ * MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED, and MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR.
+ *
+ * The ID and URL are borrowed with the event.
+ */
+typedef struct mln_runtime_event_sprite {
+  /**
+   * Sprite ID: the id of an entry in the style's sprite array, or "default"
+   * when the style names one sprite URL.
+   */
+  mln_buffer_view id;
+  /**
+   * Sprite URL as the style names it, without the pixel-ratio suffix and file
+   * extension that MapLibre appends to request the image and JSON.
+   */
+  mln_buffer_view url;
+} mln_runtime_event_sprite;
+
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
@@ -453,7 +537,8 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
  * A host that decodes a payload type this version does not define treats the
  * payload as opaque bytes and forwards them unchanged. Those bytes run from the
  * payload's offset within mln_runtime_event to
- * mln_event_batch_view.event_size.
+ * mln_event_batch_view.event_size, and any pointers among them are borrowed
+ * with the event.
  */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame
@@ -472,12 +557,17 @@ typedef union mln_runtime_event_payload {
     offline_region_tile_count_limit MLN_BINDING(
       "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT"
     );
+  mln_runtime_event_glyphs glyphs
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS");
+  mln_runtime_event_sprite sprite
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_SPRITE");
 } mln_runtime_event_payload;
 
 /**
  * One delivered runtime event.
  *
- * Message bytes are borrowed for the callback or delivery batch lifetime.
+ * Message bytes, and the views and arrays that the payload holds, are borrowed
+ * for the callback or delivery batch lifetime.
  *
  * Step through an array of these by mln_event_batch_view.event_size rather
  * than by the size of this struct: a later version may add a member to

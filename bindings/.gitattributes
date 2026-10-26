@@ -139,6 +139,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventFlag.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventGlyphs.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionStatus.g.cs linguist-generated=true
@@ -146,6 +147,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventRenderFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventRenderMap.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventSourceType.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventSprite.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventTileAction.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventType.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeHandle.Operations.g.cs linguist-generated=true

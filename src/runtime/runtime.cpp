@@ -2424,10 +2424,11 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
 }
 
 auto RuntimeEventRegistration::push(
-  mln_runtime_event event, const std::string& message
+  mln_runtime_event event, const std::string& message,
+  std::vector<std::string> strings
 ) const -> void {
   if (queued != nullptr) {
-    queued->push_event(event, message);
+    queued->push_event(event, message, std::move(strings));
   } else {
     if (process_exiting()) return;
     const auto text = delivery::event_message(message);
@@ -2435,6 +2436,8 @@ auto RuntimeEventRegistration::push(
     event.message = mln_buffer_view{
       .data = text.empty() ? "" : text.data(), .size = text.size()
     };
+    auto views = std::vector<mln_buffer_view>{};
+    delivery::bind_event_strings(event, strings, views);
     // The callback borrows this span; bindings copy it before returning.
     const mln_event_batch_view events = {
       .size = sizeof(events),
@@ -2698,11 +2701,13 @@ auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type,
-  const mln_runtime_event_payload& payload, uint32_t code, std::string message
+  const mln_runtime_event_payload& payload, uint32_t code, std::string message,
+  std::vector<std::string> strings
 ) -> void {
   if (state->registration == nullptr) return;
   state->registration->push(
-    map_event(map, generation, type, payload_type, payload, code), message
+    map_event(map, generation, type, payload_type, payload, code), message,
+    std::move(strings)
   );
 }
 
@@ -2716,7 +2721,7 @@ auto push_runtime_map_events(
       map_event(
         map, generation, held.type, held.payload_type, held.payload, held.code
       ),
-      held.message
+      held.message, std::move(held.strings)
     );
   }
 }

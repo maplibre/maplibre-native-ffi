@@ -2139,6 +2139,27 @@ _readRuntimeEventOfflineRegionTileCountLimit(
   limit: source.limit,
 );
 
+RuntimeEventGlyphs _readRuntimeEventGlyphs(
+  raw.mln_runtime_event_glyphs source,
+) => RuntimeEventGlyphs(
+  fontStack: List<String>.unmodifiable(
+    List.generate(
+      source.font_count,
+      (index) => utf8.decode(_copyBufferView(source.font_stack[index])),
+    ),
+  ),
+  first: source.first,
+  last: source.last,
+  fontFace: source.font_face,
+);
+
+RuntimeEventSprite _readRuntimeEventSprite(
+  raw.mln_runtime_event_sprite source,
+) => RuntimeEventSprite(
+  id: utf8.decode(_copyBufferView(source.id)),
+  url: utf8.decode(_copyBufferView(source.url)),
+);
+
 RuntimeEvent _readRuntimeEvent(
   raw.mln_runtime_event source, {
   Uint8List Function()? rawRecord,
@@ -2173,6 +2194,12 @@ RuntimeEvent _readRuntimeEvent(
       _readRuntimeEventOfflineRegionTileCountLimit(
         source.payload.offline_region_tile_count_limit,
       ),
+    ),
+    7 => RuntimeEventPayloadGlyphs(
+      _readRuntimeEventGlyphs(source.payload.glyphs),
+    ),
+    8 => RuntimeEventPayloadSprite(
+      _readRuntimeEventSprite(source.payload.sprite),
     ),
     0 => const RuntimeEventPayloadNone(),
     final tag => RuntimeEventPayloadUnknown(

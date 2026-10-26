@@ -54,6 +54,9 @@ struct HeldMapEvent {
   mln_runtime_event_payload payload{};
   uint32_t code = 0;
   std::string message;
+  // The text that the payload's views point at; see
+  // delivery::bind_event_strings().
+  std::vector<std::string> strings;
 };
 
 // A camera command whose transitions ended with `outcome`, waiting for the
@@ -144,7 +147,7 @@ static_assert(
   "every event type needs a mask bit in one of the two groups"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED < 64,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR < 64,
   "an event type value past 63 needs a wider subscription mask"
 );
 // runtime.h promises that a later payload member widens the event stride
@@ -219,7 +222,10 @@ struct RuntimeEventRegistration {
   std::shared_ptr<RuntimeCallbackContext> context;
   delivery::QueuedRegistration* queued = nullptr;
 
-  auto push(mln_runtime_event event, const std::string& message) const -> void;
+  auto push(
+    mln_runtime_event event, const std::string& message,
+    std::vector<std::string> strings = {}
+  ) const -> void;
 };
 
 struct ResourceProvider {
@@ -524,7 +530,7 @@ auto push_runtime_map_event_payload(
   uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type,
   const mln_runtime_event_payload& payload, uint32_t code = 0,
-  std::string message = {}
+  std::string message = {}, std::vector<std::string> strings = {}
 ) -> void;
 auto push_runtime_map_events(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,

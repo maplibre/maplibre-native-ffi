@@ -29,4 +29,10 @@ public enum RuntimeEventType : uint
     OfflineRegionStatusChanged = 17,
     OfflineRegionResponseError = 18,
     OfflineRegionTileCountLimitExceeded = 19,
+    MapGlyphsRequested = 20,
+    MapGlyphsLoaded = 21,
+    MapGlyphsError = 22,
+    MapSpriteRequested = 23,
+    MapSpriteLoaded = 24,
+    MapSpriteError = 25,
 }

@@ -3927,6 +3927,12 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
                         from_native(raw.payload.offline_region_tile_count_limit)
                     }?)
                 }
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS => {
+                    RuntimeEventPayload::Glyphs(unsafe { from_native(raw.payload.glyphs) }?)
+                }
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_SPRITE => {
+                    RuntimeEventPayload::Sprite(unsafe { from_native(raw.payload.sprite) }?)
+                }
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload::Empty,
                 tag => RuntimeEventPayload::Unknown(tag as u32),
             },
@@ -3959,13 +3965,48 @@ pub struct RuntimeEventFlag: u64 {
     const OFFLINE_REGION_STATUS_CHANGED = 131072;
     const OFFLINE_REGION_RESPONSE_ERROR = 262144;
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288;
+    const MAP_GLYPHS_REQUESTED = 1048576;
+    const MAP_GLYPHS_LOADED = 2097152;
+    const MAP_GLYPHS_ERROR = 4194304;
+    const MAP_SPRITE_REQUESTED = 8388608;
+    const MAP_SPRITE_LOADED = 16777216;
+    const MAP_SPRITE_ERROR = 33554432;
     /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 131070;
+    const ALL_MAP_EVENTS = 66191358;
     /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 917504;
     /// Selects every event type this version defines.
-    const ALL = 1048574;
+    const ALL = 67108862;
 }
+}
+
+/// Payload for `RuntimeEventType::MapGlyphsRequested`,
+/// `RuntimeEventType::MapGlyphsLoaded`, and `RuntimeEventType::MapGlyphsError`.
+///
+/// See `mln_runtime_event_glyphs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RuntimeEventGlyphs {
+    /// Font names of the font stack, in the style's order.
+    pub font_stack: Vec<String>,
+    /// First glyph of the range.
+    pub first: u32,
+    /// Last glyph of the range, inclusive.
+    pub last: u32,
+    /// Whether the range stands for a whole font file that the style's
+    /// font-faces names. MapLibre then loads the whole file, and first and last
+    /// do not describe the glyphs it holds.
+    pub font_face: bool,
+}
+impl FromNative<sys::mln_runtime_event_glyphs> for RuntimeEventGlyphs {
+    unsafe fn from_native(raw: sys::mln_runtime_event_glyphs) -> Result<Self> {
+        Ok(Self {
+            font_stack: unsafe { convert::copy_array(raw.font_stack, raw.font_count) }?,
+            first: raw.first,
+            last: raw.last,
+            font_face: raw.font_face,
+        })
+    }
 }
 
 /// Runtime and map event callback. Map events arrive on the runtime's native
@@ -4100,6 +4141,8 @@ pub enum RuntimeEventPayload {
     OfflineRegionStatus(RuntimeEventOfflineRegionStatus),
     OfflineRegionResponseError(RuntimeEventOfflineRegionResponseError),
     OfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit),
+    Glyphs(RuntimeEventGlyphs),
+    Sprite(RuntimeEventSprite),
     Empty,
     Unknown(u32),
 }
@@ -4165,6 +4208,29 @@ impl Default for RuntimeEventSourceType {
     }
 }
 
+/// Payload for `RuntimeEventType::MapSpriteRequested`,
+/// `RuntimeEventType::MapSpriteLoaded`, and `RuntimeEventType::MapSpriteError`.
+///
+/// See `mln_runtime_event_sprite` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RuntimeEventSprite {
+    /// Sprite ID: the id of an entry in the style's sprite array, or "default"
+    /// when the style names one sprite URL.
+    pub id: String,
+    /// Sprite URL as the style names it, without the pixel-ratio suffix and
+    /// file extension that MapLibre appends to request the image and JSON.
+    pub url: String,
+}
+impl FromNative<sys::mln_runtime_event_sprite> for RuntimeEventSprite {
+    unsafe fn from_native(raw: sys::mln_runtime_event_sprite) -> Result<Self> {
+        Ok(Self {
+            id: unsafe { from_native(raw.id) }?,
+            url: unsafe { from_native(raw.url) }?,
+        })
+    }
+}
+
 /// Payload for `RuntimeEventType::MapTileAction`.
 ///
 /// See `mln_runtime_event_tile_action` in the
@@ -4208,6 +4274,12 @@ pub enum RuntimeEventType: u32 {
     OfflineRegionStatusChanged = 17,
     OfflineRegionResponseError = 18,
     OfflineRegionTileCountLimitExceeded = 19,
+    MapGlyphsRequested = 20,
+    MapGlyphsLoaded = 21,
+    MapGlyphsError = 22,
+    MapSpriteRequested = 23,
+    MapSpriteLoaded = 24,
+    MapSpriteError = 25,
 } Unknown
 }
 

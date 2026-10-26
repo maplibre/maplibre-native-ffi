@@ -1,7 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "delivery/delivery_queue.hpp"
 #include "maplibre_native_c.h"
@@ -57,9 +59,11 @@ class QueuedRegistration final {
   }
 
   // Events share the queue tail's record and message storage.
-  auto push_event(mln_runtime_event event, std::string_view message) const
-    -> void {
-    queue_->push_event(event, message, user_data_);
+  auto push_event(
+    mln_runtime_event event, std::string_view message,
+    std::vector<std::string> strings = {}
+  ) const -> void {
+    queue_->push_event(event, message, user_data_, std::move(strings));
   }
 
   // Reserves a one-shot delivery without owned handles before accepting its

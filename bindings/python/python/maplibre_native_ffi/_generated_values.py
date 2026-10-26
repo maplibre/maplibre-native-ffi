@@ -191,6 +191,26 @@ class RuntimeEventOfflineRegionTileCountLimitVariant:
         return cls(RuntimeEventOfflineRegionTileCountLimit._from_native(raw))
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeEventGlyphsVariant:
+    value: RuntimeEventGlyphs
+    _tag = 7
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventGlyphs._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventSpriteVariant:
+    value: RuntimeEventSprite
+    _tag = 8
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventSprite._from_native(raw))
+
+
 class AmbientCacheOperation(UnknownIntEnum):
     RESET_DATABASE = 1
     PACK_DATABASE = 2
@@ -610,9 +630,15 @@ class RuntimeEventFlag(IntFlag):
     OFFLINE_REGION_STATUS_CHANGED = 131072
     OFFLINE_REGION_RESPONSE_ERROR = 262144
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288
-    ALL_MAP_EVENTS = 131070
+    MAP_GLYPHS_REQUESTED = 1048576
+    MAP_GLYPHS_LOADED = 2097152
+    MAP_GLYPHS_ERROR = 4194304
+    MAP_SPRITE_REQUESTED = 8388608
+    MAP_SPRITE_LOADED = 16777216
+    MAP_SPRITE_ERROR = 33554432
+    ALL_MAP_EVENTS = 66191358
     ALL_RUNTIME_EVENTS = 917504
-    ALL = 1048574
+    ALL = 67108862
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -652,6 +678,12 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_STATUS_CHANGED = 17
     OFFLINE_REGION_RESPONSE_ERROR = 18
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19
+    MAP_GLYPHS_REQUESTED = 20
+    MAP_GLYPHS_LOADED = 21
+    MAP_GLYPHS_ERROR = 22
+    MAP_SPRITE_REQUESTED = 23
+    MAP_SPRITE_LOADED = 24
+    MAP_SPRITE_ERROR = 25
 
 
 class Status(UnknownIntEnum):
@@ -3155,6 +3187,8 @@ class RuntimeEvent:
         | RuntimeEventOfflineRegionStatusVariant
         | RuntimeEventOfflineRegionResponseErrorVariant
         | RuntimeEventOfflineRegionTileCountLimitVariant
+        | RuntimeEventGlyphsVariant
+        | RuntimeEventSpriteVariant
         | UnknownVariant
         | None
     )
@@ -3178,9 +3212,46 @@ class RuntimeEvent:
                     "offline_region_status": RuntimeEventOfflineRegionStatusVariant,
                     "offline_region_response_error": RuntimeEventOfflineRegionResponseErrorVariant,
                     "offline_region_tile_count_limit": RuntimeEventOfflineRegionTileCountLimitVariant,
+                    "glyphs": RuntimeEventGlyphsVariant,
+                    "sprite": RuntimeEventSpriteVariant,
                 },
                 0,
             ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventGlyphs:
+    """Payload for `RuntimeEventType.MAP_GLYPHS_REQUESTED`,
+    `RuntimeEventType.MAP_GLYPHS_LOADED`, and
+    `RuntimeEventType.MAP_GLYPHS_ERROR`.
+
+    See `mln_runtime_event_glyphs` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    font_stack: tuple[str, ...]
+    """Font names of the font stack, in the style's order."""
+
+    first: int
+    """First glyph of the range."""
+
+    last: int
+    """Last glyph of the range, inclusive."""
+
+    font_face: bool
+    """Whether the range stands for a whole font file that the style's
+    font-faces names. MapLibre then loads the whole file, and first and last
+    do not describe the glyphs it holds.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            font_stack=tuple(item for item in raw["font_stack"]),
+            first=raw["first"],
+            last=raw["last"],
+            font_face=raw["font_face"],
         )
 
 
@@ -3298,6 +3369,31 @@ class RuntimeEventRenderMap:
     @classmethod
     def _from_native(cls, raw):
         return cls(mode=RenderMode(raw["mode"]))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventSprite:
+    """Payload for `RuntimeEventType.MAP_SPRITE_REQUESTED`,
+    `RuntimeEventType.MAP_SPRITE_LOADED`, and
+    `RuntimeEventType.MAP_SPRITE_ERROR`.
+
+    See `mln_runtime_event_sprite` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    id: str
+    """Sprite ID: the id of an entry in the style's sprite array, or "default"
+    when the style names one sprite URL.
+    """
+
+    url: str
+    """Sprite URL as the style names it, without the pixel-ratio suffix and file
+    extension that MapLibre appends to request the image and JSON.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(id=raw["id"], url=raw["url"])
 
 
 @dataclass(frozen=True, slots=True)
