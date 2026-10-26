@@ -42,17 +42,17 @@ struct OwnedView {
 };
 
 struct OwnedGeoJSONOptions {
-  mln_geojson_source_options value{};
+  mln_geo_json_source_options value{};
   OwnedView cluster_properties;
 
-  explicit OwnedGeoJSONOptions(const mln_geojson_source_options* source)
+  explicit OwnedGeoJSONOptions(const mln_geo_json_source_options* source)
       : value(
           source == nullptr ? mln::core::geojson_source_options_default()
                             : *source
         ),
         cluster_properties(value.cluster_properties) {}
 
-  [[nodiscard]] auto options() const -> mln_geojson_source_options {
+  [[nodiscard]] auto options() const -> mln_geo_json_source_options {
     auto copied = value;
     copied.cluster_properties = cluster_properties.view();
     return copied;
@@ -344,9 +344,9 @@ auto mln_map_list_style_sources(
   });
 }
 
-auto mln_map_add_geojson_source_url(
+auto mln_map_add_geo_json_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options, const mln_completion* completion,
+  const mln_geo_json_source_options* options, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -376,22 +376,22 @@ auto mln_map_add_geojson_source_url(
   });
 }
 
-auto mln_geojson_source_data_create(
-  mln_buffer_view data, const mln_geojson_source_options* options,
-  mln_geojson_source_data* out_data, mln_diagnostic* out_diagnostic
+auto mln_geo_json_source_data_create(
+  mln_buffer_view data, const mln_geo_json_source_options* options,
+  mln_geo_json_source_data* out_data, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::geojson_source_data_create(data, options, out_data);
   });
 }
 
-auto mln_geojson_source_data_release(mln_geojson_source_data data) noexcept
+auto mln_geo_json_source_data_release(mln_geo_json_source_data data) noexcept
   -> void {
   mln::core::geojson_source_data_release(data);
 }
 
-auto mln_map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+auto mln_map_add_geo_json_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -419,7 +419,7 @@ auto mln_map_add_geojson_source_data(
   });
 }
 
-auto mln_map_set_geojson_source_url(
+auto mln_map_set_geo_json_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -446,8 +446,8 @@ auto mln_map_set_geojson_source_url(
   });
 }
 
-auto mln_map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+auto mln_map_set_geo_json_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -475,7 +475,7 @@ auto mln_map_set_geojson_source_data(
   });
 }
 
-auto mln_map_set_geojson_source_synchronous_tiling(
+auto mln_map_set_geo_json_source_synchronous_tiling(
   mln_map map, mln_buffer_view source_id, bool enabled,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

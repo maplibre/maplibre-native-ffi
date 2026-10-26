@@ -12,7 +12,7 @@ const int MLN_C_VERSION = 0;
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_batch = Uint64;
 typedef mln_delivery_queue = Uint64;
-typedef mln_geojson_source_data = Uint64;
+typedef mln_geo_json_source_data = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
 typedef mln_render_frame_batch = Uint64;
@@ -437,7 +437,7 @@ final class mln_free_camera_options extends Struct {
   external mln_quaternion orientation;
 }
 
-final class mln_geojson_source_options extends Struct {
+final class mln_geo_json_source_options extends Struct {
   @Uint32()
   external int size;
   @Uint32()
@@ -777,12 +777,12 @@ final class mln_offline_tile_pyramid_region_definition extends Struct {
   external bool include_ideographs;
 }
 
-final class mln_opengl_borrowed_texture extends Struct {
+final class mln_open_gl_borrowed_texture extends Struct {
   @Uint32()
   external int texture;
 }
 
-final class mln_opengl_borrowed_texture_descriptor extends Struct {
+final class mln_open_gl_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
@@ -790,44 +790,44 @@ final class mln_opengl_borrowed_texture_descriptor extends Struct {
   external int physical_width;
   @Uint32()
   external int physical_height;
-  external mln_opengl_context_descriptor context;
-  external Pointer<mln_opengl_borrowed_texture> textures;
+  external mln_open_gl_context_descriptor context;
+  external Pointer<mln_open_gl_borrowed_texture> textures;
   @Size()
   external int texture_count;
   @Uint32()
   external int target;
 }
 
-final class mln_opengl_context_descriptor extends Struct {
+final class mln_open_gl_context_descriptor extends Struct {
   @Uint32()
   external int platform;
   @Uint32()
   external int ownership;
-  external mln_opengl_context_descriptor_data data;
+  external mln_open_gl_context_descriptor_data data;
 }
 
-final class mln_opengl_context_descriptor_data extends Union {
+final class mln_open_gl_context_descriptor_data extends Union {
   external mln_wgl_context_descriptor wgl;
   external mln_egl_context_descriptor egl;
-  external mln_webgl_context_descriptor webgl;
+  external mln_web_gl_context_descriptor web_gl;
 }
 
-final class mln_opengl_owned_texture_descriptor extends Struct {
+final class mln_open_gl_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
-  external mln_opengl_context_descriptor context;
+  external mln_open_gl_context_descriptor context;
 }
 
-final class mln_opengl_surface_descriptor extends Struct {
+final class mln_open_gl_surface_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
-  external mln_opengl_context_descriptor context;
+  external mln_open_gl_context_descriptor context;
   external Pointer<Void> surface;
 }
 
-final class mln_opengl_texture_frame extends Struct {
+final class mln_open_gl_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -1397,7 +1397,7 @@ final class mln_style_source_info extends Struct {
   external bool is_volatile;
   external mln_buffer_view attribution;
   external mln_buffer_view url;
-  external mln_style_source_tile_info tilejson;
+  external mln_style_source_tile_info tile_json;
   external mln_lat_lng_bounds bounds;
   @Uint32()
   external int tile_size;
@@ -1567,7 +1567,7 @@ final class mln_wake extends Struct {
   external mln_user_data_release release_user_data;
 }
 
-final class mln_webgl_context_descriptor extends Struct {
+final class mln_web_gl_context_descriptor extends Struct {
   @Uint32()
   external int kind;
   @Int32()
@@ -1575,12 +1575,12 @@ final class mln_webgl_context_descriptor extends Struct {
   external mln_buffer_view canvas_selector;
 }
 
-final class mln_webgpu_borrowed_texture extends Struct {
+final class mln_web_gpu_borrowed_texture extends Struct {
   external Pointer<Void> texture;
   external Pointer<Void> texture_view;
 }
 
-final class mln_webgpu_borrowed_texture_descriptor extends Struct {
+final class mln_web_gpu_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
@@ -1588,38 +1588,38 @@ final class mln_webgpu_borrowed_texture_descriptor extends Struct {
   external int physical_width;
   @Uint32()
   external int physical_height;
-  external mln_webgpu_context_descriptor context;
-  external Pointer<mln_webgpu_borrowed_texture> textures;
+  external mln_web_gpu_context_descriptor context;
+  external Pointer<mln_web_gpu_borrowed_texture> textures;
   @Size()
   external int texture_count;
   @Uint32()
   external int format;
 }
 
-final class mln_webgpu_context_descriptor extends Struct {
+final class mln_web_gpu_context_descriptor extends Struct {
   external Pointer<Void> instance;
   external Pointer<Void> device;
   external Pointer<Void> queue;
 }
 
-final class mln_webgpu_owned_texture_descriptor extends Struct {
+final class mln_web_gpu_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
-  external mln_webgpu_context_descriptor context;
+  external mln_web_gpu_context_descriptor context;
 }
 
-final class mln_webgpu_surface_descriptor extends Struct {
+final class mln_web_gpu_surface_descriptor extends Struct {
   @Uint32()
   external int size;
   external mln_logical_extent extent;
-  external mln_webgpu_context_descriptor context;
+  external mln_web_gpu_context_descriptor context;
   external Pointer<Void> surface;
   @Uint32()
   external int format;
 }
 
-final class mln_webgpu_texture_frame extends Struct {
+final class mln_web_gpu_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -1753,17 +1753,17 @@ const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;
 const MLN_FREE_CAMERA_OPTION_ORIENTATION = 2;
 
-// mln_geojson_source_option_field
-const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1;
-const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2;
-const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
-const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 16;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 32;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
-const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 128;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 256;
-const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512;
+// mln_geo_json_source_option_field
+const MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM = 1;
+const MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM = 2;
+const MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE = 4;
+const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
+const MLN_GEO_JSON_SOURCE_OPTION_BUFFER = 16;
+const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS = 32;
+const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
+const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128;
+const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256;
+const MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512;
 
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;
@@ -1774,7 +1774,7 @@ const MLN_GESTURE_PHASE_CANCEL = 4;
 
 // mln_gpu_sync_kind
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
-const MLN_GPU_SYNC_OPENGL_FENCE = 1;
+const MLN_GPU_SYNC_OPEN_GL_FENCE = 1;
 
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;
@@ -1856,25 +1856,25 @@ const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
 const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
 const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
 
-// mln_opengl_client_api
-const MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0;
-const MLN_OPENGL_CLIENT_API_GL = 1;
-const MLN_OPENGL_CLIENT_API_GLES = 2;
+// mln_open_gl_client_api
+const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0;
+const MLN_OPEN_GL_CLIENT_API_GL = 1;
+const MLN_OPEN_GL_CLIENT_API_GLES = 2;
 
-// mln_opengl_context_ownership
-const MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0;
-const MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1;
+// mln_open_gl_context_ownership
+const MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0;
+const MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1;
 
-// mln_opengl_context_platform
-const MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
-const MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1;
-const MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2;
-const MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3;
+// mln_open_gl_context_platform
+const MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
+const MLN_OPEN_GL_CONTEXT_PLATFORM_WGL = 1;
+const MLN_OPEN_GL_CONTEXT_PLATFORM_EGL = 2;
+const MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3;
 
-// mln_opengl_context_provider_flag
-const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1;
-const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 2;
-const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4;
+// mln_open_gl_context_provider_flag
+const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1;
+const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2;
+const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4;
 
 // mln_projection_mode_field
 const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
@@ -1888,8 +1888,8 @@ const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
 // mln_render_backend_flag
 const MLN_RENDER_BACKEND_FLAG_METAL = 1;
 const MLN_RENDER_BACKEND_FLAG_VULKAN = 2;
-const MLN_RENDER_BACKEND_FLAG_OPENGL = 4;
-const MLN_RENDER_BACKEND_FLAG_WEBGPU = 8;
+const MLN_RENDER_BACKEND_FLAG_OPEN_GL = 4;
+const MLN_RENDER_BACKEND_FLAG_WEB_GPU = 8;
 
 // mln_render_driver_kind
 const MLN_RENDER_DRIVER_CORE_WORKER = 1;
@@ -2114,7 +2114,7 @@ const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0;
 const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1;
 
 // mln_style_source_info_field
-const MLN_STYLE_SOURCE_INFO_TILEJSON = 1;
+const MLN_STYLE_SOURCE_INFO_TILE_JSON = 1;
 const MLN_STYLE_SOURCE_INFO_BOUNDS = 2;
 const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4;
 const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8;
@@ -2125,7 +2125,7 @@ const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
 const MLN_STYLE_SOURCE_TYPE_VECTOR = 1;
 const MLN_STYLE_SOURCE_TYPE_RASTER = 2;
 const MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3;
-const MLN_STYLE_SOURCE_TYPE_GEOJSON = 4;
+const MLN_STYLE_SOURCE_TYPE_GEO_JSON = 4;
 const MLN_STYLE_SOURCE_TYPE_IMAGE = 5;
 const MLN_STYLE_SOURCE_TYPE_VIDEO = 6;
 const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7;
@@ -2168,9 +2168,9 @@ const MLN_URL_MATCH_GLOB = 1;
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
 const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
 
-// mln_webgl_context_kind
-const MLN_WEBGL_CONTEXT_EXISTING = 0;
-const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1;
+// mln_web_gl_context_kind
+const MLN_WEB_GL_CONTEXT_EXISTING = 0;
+const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1;
 
 @Native<Int32 Function(mln_acquired_frame, Pointer<mln_diagnostic>)>()
 external int mln_acquired_frame_discard(
@@ -2194,13 +2194,13 @@ external int mln_acquired_frame_get_metal_texture(
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_opengl_texture_frame>,
+    Pointer<mln_open_gl_texture_frame>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_acquired_frame_get_opengl_texture(
+external int mln_acquired_frame_get_open_gl_texture(
   int frame,
-  Pointer<mln_opengl_texture_frame> out_frame,
+  Pointer<mln_open_gl_texture_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -2363,20 +2363,20 @@ external void mln_delivery_queue_release(int queue);
 @Native<
   Int32 Function(
     mln_buffer_view,
-    Pointer<mln_geojson_source_options>,
-    Pointer<mln_geojson_source_data>,
+    Pointer<mln_geo_json_source_options>,
+    Pointer<mln_geo_json_source_data>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_geojson_source_data_create(
+external int mln_geo_json_source_data_create(
   mln_buffer_view data,
-  Pointer<mln_geojson_source_options> options,
-  Pointer<mln_geojson_source_data> out_data,
+  Pointer<mln_geo_json_source_options> options,
+  Pointer<mln_geo_json_source_data> out_data,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Void Function(mln_geojson_source_data)>()
-external void mln_geojson_source_data_release(int data);
+@Native<Void Function(mln_geo_json_source_data)>()
+external void mln_geo_json_source_data_release(int data);
 
 @Native<
   Int32 Function(
@@ -2474,12 +2474,12 @@ external int mln_map_add_custom_mvt_vector_source(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_geojson_source_data,
+    mln_geo_json_source_data,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_add_geojson_source_data(
+external int mln_map_add_geo_json_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
@@ -2492,16 +2492,16 @@ external int mln_map_add_geojson_source_data(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    Pointer<mln_geojson_source_options>,
+    Pointer<mln_geo_json_source_options>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_add_geojson_source_url(
+external int mln_map_add_geo_json_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
-  Pointer<mln_geojson_source_options> options,
+  Pointer<mln_geo_json_source_options> options,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -2657,16 +2657,16 @@ external int mln_map_attach_metal_surface(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_opengl_borrowed_texture_descriptor>,
+    Pointer<mln_open_gl_borrowed_texture_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_attach_opengl_borrowed_texture(
+external int mln_map_attach_open_gl_borrowed_texture(
   int map,
-  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_open_gl_borrowed_texture_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
@@ -2676,16 +2676,16 @@ external int mln_map_attach_opengl_borrowed_texture(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_opengl_owned_texture_descriptor>,
+    Pointer<mln_open_gl_owned_texture_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_attach_opengl_owned_texture(
+external int mln_map_attach_open_gl_owned_texture(
   int map,
-  Pointer<mln_opengl_owned_texture_descriptor> descriptor,
+  Pointer<mln_open_gl_owned_texture_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
@@ -2695,16 +2695,16 @@ external int mln_map_attach_opengl_owned_texture(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_opengl_surface_descriptor>,
+    Pointer<mln_open_gl_surface_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_attach_opengl_surface(
+external int mln_map_attach_open_gl_surface(
   int map,
-  Pointer<mln_opengl_surface_descriptor> descriptor,
+  Pointer<mln_open_gl_surface_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
@@ -3579,12 +3579,12 @@ external int mln_map_set_free_camera_options(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_geojson_source_data,
+    mln_geo_json_source_data,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_geojson_source_data(
+external int mln_map_set_geo_json_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
@@ -3601,7 +3601,7 @@ external int mln_map_set_geojson_source_data(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_geojson_source_synchronous_tiling(
+external int mln_map_set_geo_json_source_synchronous_tiling(
   int map,
   mln_buffer_view source_id,
   bool enabled,
@@ -3618,7 +3618,7 @@ external int mln_map_set_geojson_source_synchronous_tiling(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_geojson_source_url(
+external int mln_map_set_geo_json_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
@@ -3916,7 +3916,7 @@ external int mln_network_set_status(
 );
 
 @Native<Uint32 Function()>()
-external int mln_opengl_supported_context_provider_mask();
+external int mln_open_gl_supported_context_provider_mask();
 
 @Native<Pointer<Void> Function()>()
 external Pointer<Void> mln_plugin_get_register_function_v1();
@@ -4219,14 +4219,14 @@ external int mln_render_session_set_metal_surface_target(
 @Native<
   Int32 Function(
     mln_render_session,
-    Pointer<mln_opengl_borrowed_texture_descriptor>,
+    Pointer<mln_open_gl_borrowed_texture_descriptor>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_render_session_set_opengl_borrowed_texture_target(
+external int mln_render_session_set_open_gl_borrowed_texture_target(
   int session,
-  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_open_gl_borrowed_texture_descriptor> descriptor,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -4234,14 +4234,14 @@ external int mln_render_session_set_opengl_borrowed_texture_target(
 @Native<
   Int32 Function(
     mln_render_session,
-    Pointer<mln_opengl_surface_descriptor>,
+    Pointer<mln_open_gl_surface_descriptor>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_render_session_set_opengl_surface_target(
+external int mln_render_session_set_open_gl_surface_target(
   int session,
-  Pointer<mln_opengl_surface_descriptor> descriptor,
+  Pointer<mln_open_gl_surface_descriptor> descriptor,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

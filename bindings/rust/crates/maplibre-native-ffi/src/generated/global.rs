@@ -134,12 +134,12 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 
 /// Returns OpenGL context providers supported by this build.
 ///
-/// See `mln_opengl_supported_context_provider_mask` in the
+/// See `mln_open_gl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
+pub fn open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
     let mut call = Call::global();
     maplibre_core::require_abi_version();
-    let value = call.run(|_| unsafe { sys::mln_opengl_supported_context_provider_mask() });
+    let value = call.run(|_| unsafe { sys::mln_open_gl_supported_context_provider_mask() });
     OpenGlContextProviderFlag::from_bits_retain(value)
 }
 

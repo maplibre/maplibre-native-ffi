@@ -53,7 +53,7 @@ fn owned_texture_session(map: &MapHandle) -> (webgl::WebGlTestContext, Session) 
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the context outlives the session, on this thread.
     let attachment = unsafe {
-        map.attach_opengl_owned_texture(
+        map.attach_open_gl_owned_texture(
             &OpenGlOwnedTextureDescriptor {
                 extent: EXTENT,
                 context: context.descriptor(),
@@ -71,7 +71,7 @@ fn owned_texture_session(map: &MapHandle) -> (webgpu::WebGpuTestContext, Session
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the device outlives the session, on this thread.
     let attachment = unsafe {
-        map.attach_webgpu_owned_texture(
+        map.attach_web_gpu_owned_texture(
             &WebGpuOwnedTextureDescriptor {
                 extent: EXTENT,
                 context: context.descriptor(),
@@ -93,7 +93,7 @@ fn a_webgl_session_renders_into_a_host_texture() {
     let attachment = unsafe {
         fixture
             .map()
-            .attach_opengl_borrowed_texture(&texture.descriptor(EXTENT), &options)
+            .attach_open_gl_borrowed_texture(&texture.descriptor(EXTENT), &options)
     }
     .unwrap();
     let session = Session::finish_attach(attachment, wakes);
@@ -114,7 +114,7 @@ fn a_webgpu_session_renders_into_a_host_texture() {
     let attachment = unsafe {
         fixture
             .map()
-            .attach_webgpu_borrowed_texture(&texture.descriptor(EXTENT, &context), &options)
+            .attach_web_gpu_borrowed_texture(&texture.descriptor(EXTENT, &context), &options)
     }
     .unwrap();
     let session = Session::finish_attach(attachment, wakes);

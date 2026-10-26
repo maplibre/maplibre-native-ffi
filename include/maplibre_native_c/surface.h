@@ -49,7 +49,7 @@ typedef struct mln_vulkan_surface_descriptor {
 } mln_vulkan_surface_descriptor;
 
 /** WebGPU attachment options for a native surface. */
-typedef struct mln_webgpu_surface_descriptor {
+typedef struct mln_web_gpu_surface_descriptor {
   uint32_t size;
   /**
    * Logical surface extent. Required. A scale_factor that differs from the
@@ -57,7 +57,7 @@ typedef struct mln_webgpu_surface_descriptor {
    */
   mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed WebGPU context. device is required. */
-  mln_webgpu_context_descriptor context;
+  mln_web_gpu_context_descriptor context;
   /**
    * Borrowed WGPUSurface. Required, and must stay alive for the session. The
    * session configures it for this device and extent, and unconfigures it when
@@ -69,10 +69,10 @@ typedef struct mln_webgpu_surface_descriptor {
    * takes it from navigator.gpu.getPreferredCanvasFormat().
    */
   uint32_t format MLN_BINDING("required=true");
-} mln_webgpu_surface_descriptor;
+} mln_web_gpu_surface_descriptor;
 
 /** OpenGL attachment options for a native surface. */
-typedef struct mln_opengl_surface_descriptor {
+typedef struct mln_open_gl_surface_descriptor {
   uint32_t size;
   /**
    * Logical surface extent. Required. A scale_factor that differs from the
@@ -80,13 +80,13 @@ typedef struct mln_opengl_surface_descriptor {
    */
   mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed OpenGL context provider data. */
-  mln_opengl_context_descriptor context;
+  mln_open_gl_context_descriptor context;
   /**
    * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
    * both required. Null for WebGL, whose context carries its canvas binding.
    */
   void* surface;
-} mln_opengl_surface_descriptor;
+} mln_open_gl_surface_descriptor;
 
 /**
  * Starts attachment of a Metal surface target.
@@ -189,8 +189,8 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_map_attach_opengl_surface(
-  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_open_gl_surface(
+  mln_map map, const mln_open_gl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -224,8 +224,8 @@ MLN_API mln_status mln_map_attach_opengl_surface(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle;platforms=web")
-MLN_API mln_status mln_map_attach_webgpu_surface(
-  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_web_gpu_surface(
+  mln_map map, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -317,8 +317,8 @@ MLN_API mln_status mln_render_session_set_vulkan_surface_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_render_session_set_opengl_surface_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+MLN_API mln_status mln_render_session_set_open_gl_surface_target(
+  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -349,8 +349,8 @@ MLN_API mln_status mln_render_session_set_opengl_surface_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;platforms=web")
-MLN_API mln_status mln_render_session_set_webgpu_surface_target(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+MLN_API mln_status mln_render_session_set_web_gpu_surface_target(
+  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

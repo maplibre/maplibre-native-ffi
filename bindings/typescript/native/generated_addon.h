@@ -203,8 +203,8 @@ napi_value mln_ts_read_offline_tile_pyramid_region_definition(
   napi_env env, const mln_offline_tile_pyramid_region_definition* source,
   size_t size
 );
-napi_value mln_ts_read_opengl_texture_frame(
-  napi_env env, const mln_opengl_texture_frame* source, size_t size
+napi_value mln_ts_read_open_gl_texture_frame(
+  napi_env env, const mln_open_gl_texture_frame* source, size_t size
 );
 napi_value mln_ts_read_projected_meters(
   napi_env env, const mln_projected_meters* source, size_t size
@@ -383,8 +383,8 @@ bool mln_ts_write_free_camera_options(
   mln_ts_call* call, napi_value value, mln_free_camera_options* out,
   const char* path
 );
-bool mln_ts_write_geojson_source_options(
-  mln_ts_call* call, napi_value value, mln_geojson_source_options* out,
+bool mln_ts_write_geo_json_source_options(
+  mln_ts_call* call, napi_value value, mln_geo_json_source_options* out,
   const char* path
 );
 bool mln_ts_write_gpu_sync(
@@ -437,9 +437,9 @@ bool mln_ts_write_list_metal_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
   mln_metal_borrowed_texture** out, size_t* out_count, const char* path
 );
-bool mln_ts_write_list_opengl_borrowed_texture(
+bool mln_ts_write_list_open_gl_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
-  mln_opengl_borrowed_texture** out, size_t* out_count, const char* path
+  mln_open_gl_borrowed_texture** out, size_t* out_count, const char* path
 );
 bool mln_ts_write_list_resource_route(
   mln_ts_call* call, napi_value value, size_t maximum, mln_resource_route** out,
@@ -502,24 +502,24 @@ bool mln_ts_write_offline_tile_pyramid_region_definition(
   mln_ts_call* call, napi_value value,
   mln_offline_tile_pyramid_region_definition* out, const char* path
 );
-bool mln_ts_write_opengl_borrowed_texture(
-  mln_ts_call* call, napi_value value, mln_opengl_borrowed_texture* out,
+bool mln_ts_write_open_gl_borrowed_texture(
+  mln_ts_call* call, napi_value value, mln_open_gl_borrowed_texture* out,
   const char* path
 );
-bool mln_ts_write_opengl_borrowed_texture_descriptor(
+bool mln_ts_write_open_gl_borrowed_texture_descriptor(
   mln_ts_call* call, napi_value value,
-  mln_opengl_borrowed_texture_descriptor* out, const char* path
+  mln_open_gl_borrowed_texture_descriptor* out, const char* path
 );
-bool mln_ts_write_opengl_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_context_descriptor* out,
+bool mln_ts_write_open_gl_context_descriptor(
+  mln_ts_call* call, napi_value value, mln_open_gl_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_opengl_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_owned_texture_descriptor* out,
-  const char* path
+bool mln_ts_write_open_gl_owned_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_open_gl_owned_texture_descriptor* out, const char* path
 );
-bool mln_ts_write_opengl_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_surface_descriptor* out,
+bool mln_ts_write_open_gl_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
   const char* path
 );
 bool mln_ts_write_premultiplied_rgba8_image(
@@ -624,8 +624,8 @@ bool mln_ts_write_vulkan_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_surface_descriptor* out,
   const char* path
 );
-bool mln_ts_write_webgl_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_webgl_context_descriptor* out,
+bool mln_ts_write_web_gl_context_descriptor(
+  mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,
   const char* path
 );
 bool mln_ts_write_wgl_context_descriptor(

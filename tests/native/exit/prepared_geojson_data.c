@@ -16,16 +16,16 @@ int main(void) {
   // Preparation spreads datasets over ten sequenced workers, so ten
   // preparations start every one of them.
   for (int index = 0; index < 10; index += 1) {
-    mln_geojson_source_data data = MLN_HANDLE_NULL;
+    mln_geo_json_source_data data = MLN_HANDLE_NULL;
     mln_diagnostic diagnostic = {.size = sizeof(mln_diagnostic)};
-    const mln_status status = mln_geojson_source_data_create(
+    const mln_status status = mln_geo_json_source_data_create(
       mln_buffer_view_from_cstr(json), NULL, &data, &diagnostic
     );
     if (status != MLN_STATUS_OK) {
       (void)fprintf(stderr, "preparation failed: %s\n", diagnostic.message);
       return 1;
     }
-    mln_geojson_source_data_release(data);
+    mln_geo_json_source_data_release(data);
   }
   return 0;
 }

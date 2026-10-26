@@ -175,11 +175,11 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent = {}): {
 /**
  * Returns OpenGL context providers supported by this build.
  *
- * See `mln_opengl_supported_context_provider_mask` in the
+ * See `mln_open_gl_supported_context_provider_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export function openGlSupportedContextProviderMask(): OpenGlContextProviderFlag {
-  return native.mln_opengl_supported_context_provider_mask();
+  return native.mln_open_gl_supported_context_provider_mask();
 }
 
 /**
@@ -319,7 +319,7 @@ export class AcquiredFrameHandle extends Owner {
   /**
    * Copies OpenGL-native metadata from an acquired frame.
    *
-   * See `mln_acquired_frame_get_opengl_texture` in the
+   * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   withOpenGlTexture<T>(use: (view: ScopedOpenGlTextureFrame) => T): T {
@@ -333,7 +333,7 @@ export class AcquiredFrameHandle extends Owner {
         new ScopedOpenGlTextureFrame(
           ADOPT,
           scope,
-          native.mln_acquired_frame_get_opengl_texture(this.id),
+          native.mln_acquired_frame_get_open_gl_texture(this.id),
         ),
       ),
     );
@@ -390,7 +390,7 @@ defineDisposers(AcquiredFrameHandle, undefined, undefined);
 /**
  * Prepared GeoJSON data that sources retain independently of its handle.
  *
- * See `mln_geojson_source_data` in the
+ * See `mln_geo_json_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 export class GeoJsonSourceDataHandle extends Owner {
@@ -416,30 +416,31 @@ export class GeoJsonSourceDataHandle extends Owner {
   /**
    * Releases prepared GeoJSON source data.
    *
-   * See `mln_geojson_source_data_release` in the
+   * See `mln_geo_json_source_data_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   close(): void {
     closeSync(this, (handle, token) =>
-      native.mln_geojson_source_data_release(handle, token),
+      native.mln_geo_json_source_data_release(handle, token),
     );
   }
 
   /**
    * Prepares GeoJSON source data for installation on a map.
    *
-   * See `mln_geojson_source_data_create` in the
+   * See `mln_geo_json_source_data_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   static create(
     data: unknown,
     options?: GeoJsonSourceOptions,
   ): GeoJsonSourceDataHandle {
-    const handle = native.mln_geojson_source_data_create(data, options);
+    const handle = native.mln_geo_json_source_data_create(data, options);
     return adopt(
       handle,
       () => new GeoJsonSourceDataHandle(ADOPT, handle),
-      (disposed) => native.mln_geojson_source_data_release(disposed, undefined),
+      (disposed) =>
+        native.mln_geo_json_source_data_release(disposed, undefined),
     );
   }
 }
@@ -537,7 +538,7 @@ export class MapHandle extends Owner {
   /**
    * Adds a GeoJSON source with prepared inline data.
    *
-   * See `mln_map_add_geojson_source_data` in the
+   * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   addGeoJsonSourceData(
@@ -545,7 +546,7 @@ export class MapHandle extends Owner {
     data: GeoJsonSourceDataHandle,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_add_geojson_source_data(
+      native.mln_map_add_geo_json_source_data(
         this.id,
         sourceId,
         data.id,
@@ -557,7 +558,7 @@ export class MapHandle extends Owner {
   /**
    * Adds a GeoJSON source with URL data.
    *
-   * See `mln_map_add_geojson_source_url` in the
+   * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   addGeoJsonSourceUrl(
@@ -566,7 +567,7 @@ export class MapHandle extends Owner {
     options?: GeoJsonSourceOptions,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_add_geojson_source_url(
+      native.mln_map_add_geo_json_source_url(
         this.id,
         sourceId,
         url,
@@ -771,7 +772,7 @@ export class MapHandle extends Owner {
   /**
    * Starts attachment of a ring of caller-owned OpenGL textures.
    *
-   * See `mln_map_attach_opengl_borrowed_texture` in the
+   * See `mln_map_attach_open_gl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachOpenGlBorrowedTexture(
@@ -781,7 +782,7 @@ export class MapHandle extends Owner {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
         (completion) =>
-          native.mln_map_attach_opengl_borrowed_texture(
+          native.mln_map_attach_open_gl_borrowed_texture(
             this.id,
             descriptor,
             options,
@@ -802,7 +803,7 @@ export class MapHandle extends Owner {
   /**
    * Starts attachment of a session-owned OpenGL texture ring.
    *
-   * See `mln_map_attach_opengl_owned_texture` in the
+   * See `mln_map_attach_open_gl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachOpenGlOwnedTexture(
@@ -812,7 +813,7 @@ export class MapHandle extends Owner {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
         (completion) =>
-          native.mln_map_attach_opengl_owned_texture(
+          native.mln_map_attach_open_gl_owned_texture(
             this.id,
             descriptor,
             options,
@@ -833,7 +834,7 @@ export class MapHandle extends Owner {
   /**
    * Starts attachment of an OpenGL surface target.
    *
-   * See `mln_map_attach_opengl_surface` in the
+   * See `mln_map_attach_open_gl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   attachOpenGlSurface(
@@ -843,7 +844,7 @@ export class MapHandle extends Owner {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
         (completion) =>
-          native.mln_map_attach_opengl_surface(
+          native.mln_map_attach_open_gl_surface(
             this.id,
             descriptor,
             options,
@@ -1664,7 +1665,7 @@ export class MapHandle extends Owner {
   /**
    * Updates one GeoJSON source with prepared inline data.
    *
-   * See `mln_map_set_geojson_source_data` in the
+   * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceData(
@@ -1672,7 +1673,7 @@ export class MapHandle extends Owner {
     data: GeoJsonSourceDataHandle,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_set_geojson_source_data(
+      native.mln_map_set_geo_json_source_data(
         this.id,
         sourceId,
         data.id,
@@ -1684,7 +1685,7 @@ export class MapHandle extends Owner {
   /**
    * Overrides one GeoJSON source's synchronous tiling at runtime.
    *
-   * See `mln_map_set_geojson_source_synchronous_tiling` in the
+   * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceSynchronousTiling(
@@ -1692,7 +1693,7 @@ export class MapHandle extends Owner {
     enabled: boolean,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_set_geojson_source_synchronous_tiling(
+      native.mln_map_set_geo_json_source_synchronous_tiling(
         this.id,
         sourceId,
         enabled,
@@ -1704,7 +1705,7 @@ export class MapHandle extends Owner {
   /**
    * Updates one GeoJSON source to load data from a URL.
    *
-   * See `mln_map_set_geojson_source_url` in the
+   * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceUrl(
@@ -1712,7 +1713,12 @@ export class MapHandle extends Owner {
     url: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_set_geojson_source_url(this.id, sourceId, url, completion),
+      native.mln_map_set_geo_json_source_url(
+        this.id,
+        sourceId,
+        url,
+        completion,
+      ),
     );
   }
 
@@ -2060,11 +2066,11 @@ export class MapHandleDiscarding {
   /**
    * Adds a GeoJSON source with prepared inline data.
    *
-   * See `mln_map_add_geojson_source_data` in the
+   * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   addGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
-    native.mln_map_add_geojson_source_data(
+    native.mln_map_add_geo_json_source_data(
       this.#owner.id,
       sourceId,
       data.id,
@@ -2075,7 +2081,7 @@ export class MapHandleDiscarding {
   /**
    * Adds a GeoJSON source with URL data.
    *
-   * See `mln_map_add_geojson_source_url` in the
+   * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   addGeoJsonSourceUrl(
@@ -2083,7 +2089,7 @@ export class MapHandleDiscarding {
     url: string,
     options?: GeoJsonSourceOptions,
   ): void {
-    native.mln_map_add_geojson_source_url(
+    native.mln_map_add_geo_json_source_url(
       this.#owner.id,
       sourceId,
       url,
@@ -2499,11 +2505,11 @@ export class MapHandleDiscarding {
   /**
    * Updates one GeoJSON source with prepared inline data.
    *
-   * See `mln_map_set_geojson_source_data` in the
+   * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
-    native.mln_map_set_geojson_source_data(
+    native.mln_map_set_geo_json_source_data(
       this.#owner.id,
       sourceId,
       data.id,
@@ -2514,11 +2520,11 @@ export class MapHandleDiscarding {
   /**
    * Overrides one GeoJSON source's synchronous tiling at runtime.
    *
-   * See `mln_map_set_geojson_source_synchronous_tiling` in the
+   * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceSynchronousTiling(sourceId: string, enabled: boolean): void {
-    native.mln_map_set_geojson_source_synchronous_tiling(
+    native.mln_map_set_geo_json_source_synchronous_tiling(
       this.#owner.id,
       sourceId,
       enabled,
@@ -2529,11 +2535,11 @@ export class MapHandleDiscarding {
   /**
    * Updates one GeoJSON source to load data from a URL.
    *
-   * See `mln_map_set_geojson_source_url` in the
+   * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   setGeoJsonSourceUrl(sourceId: string, url: string): void {
-    native.mln_map_set_geojson_source_url(
+    native.mln_map_set_geo_json_source_url(
       this.#owner.id,
       sourceId,
       url,
@@ -3296,14 +3302,14 @@ export class RenderSessionHandle extends Owner {
    * Starts an ordered replacement of every texture of a caller-owned OpenGL
    * ring.
    *
-   * See `mln_render_session_set_opengl_borrowed_texture_target` in the
+   * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   setOpenGlBorrowedTextureTarget(
     descriptor: OpenGlBorrowedTextureDescriptor,
   ): Promise<void> {
     return run((completion) =>
-      native.mln_render_session_set_opengl_borrowed_texture_target(
+      native.mln_render_session_set_open_gl_borrowed_texture_target(
         this.id,
         descriptor,
         completion,
@@ -3314,12 +3320,12 @@ export class RenderSessionHandle extends Owner {
   /**
    * Starts an ordered OpenGL surface replacement.
    *
-   * See `mln_render_session_set_opengl_surface_target` in the
+   * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Promise<void> {
     return run((completion) =>
-      native.mln_render_session_set_opengl_surface_target(
+      native.mln_render_session_set_open_gl_surface_target(
         this.id,
         descriptor,
         completion,

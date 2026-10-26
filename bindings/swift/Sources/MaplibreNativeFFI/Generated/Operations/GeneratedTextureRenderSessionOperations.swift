@@ -41,13 +41,13 @@ public extension RenderSessionHandle {
   /// Starts an ordered replacement of every texture of a caller-owned OpenGL
   /// ring.
   ///
-  /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+  /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func setOpenGlBorrowedTextureTarget(
     descriptor bindingArg0: OpenGlBorrowedTextureDescriptor
   ) async throws {
     try await nativeUnit { raw, arena, completion, diagnostic in
-      try mln_render_session_set_opengl_borrowed_texture_target(
+      try mln_render_session_set_open_gl_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,

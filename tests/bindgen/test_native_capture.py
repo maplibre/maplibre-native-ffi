@@ -216,15 +216,15 @@ int main() {
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
   mln_style_source_info source{};
   source.id = {url, 8};
-  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  source.tilejson.tile_urls = views;
-  source.tilejson.tile_url_count = 2;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILE_JSON;
+  source.tile_json.tile_urls = views;
+  source.tile_json.tile_url_count = 2;
   source.attribution = {url, 5};
   const auto* copied = copy(&source, 1);
   assert(reinterpret_cast<std::uintptr_t>(copied) % alignof(mln_style_source_info) == 0);
-  assert(copied->tilejson.tile_urls != views && copied->tilejson.tile_urls[0].data != url);
+  assert(copied->tile_json.tile_urls != views && copied->tile_json.tile_urls[0].data != url);
   std::memset(url, 'X', sizeof(url));
-  assert(std::memcmp(copied->tilejson.tile_urls[0].data, "retained URL", 12) == 0);
+  assert(std::memcmp(copied->tile_json.tile_urls[0].data, "retained URL", 12) == 0);
   assert(std::memcmp(copied->attribution.data, "retai", 5) == 0);
   assert(std::memcmp(copied->id.data, "retained", 8) == 0);
 
@@ -281,16 +281,16 @@ int main() {
   char bytes[] = "nested";
   mln_buffer_view view{bytes, 6};
   mln_capture_fixture input{};
-  input.nested.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  input.nested.tilejson.tile_urls = &view;
-  input.nested.tilejson.tile_url_count = 1;
+  input.nested.fields = MLN_STYLE_SOURCE_INFO_TILE_JSON;
+  input.nested.tile_json.tile_urls = &view;
+  input.nested.tile_json.tile_url_count = 1;
   input.extra = &view;
   input.count = 1;
   input.fields = 0;
   input.name = {reinterpret_cast<const char*>(1), 5};
   auto* copied = copy(input);
   std::memset(bytes, 0, sizeof(bytes));
-  assert(std::memcmp(copied->nested.tilejson.tile_urls[0].data, "nested", 6) == 0);
+  assert(std::memcmp(copied->nested.tile_json.tile_urls[0].data, "nested", 6) == 0);
   assert(std::memcmp(copied->extra[0].data, "nested", 6) == 0);
   assert(copied->name.data == nullptr && copied->name.size == 0);
 
@@ -300,15 +300,15 @@ int main() {
   copied = copy(input);
   assert(copied->extra != nullptr);
   assert(reinterpret_cast<std::uintptr_t>(copied->extra) % alignof(mln_buffer_view) == 0);
-  assert(copied->nested.tilejson.tile_urls[0].data != nullptr);
-  assert(copied->nested.tilejson.tile_urls[0].size == 0);
+  assert(copied->nested.tile_json.tile_urls[0].data != nullptr);
+  assert(copied->nested.tile_json.tile_urls[0].size == 0);
 
   // A copied view is NUL-terminated, even an empty one whose source has no data.
   input.extra = nullptr;
   view.data = nullptr;
   copied = copy(input);
   assert(copied->extra == nullptr);
-  assert(copied->nested.tilejson.tile_urls[0].size == 0);
-  assert(*static_cast<const char*>(copied->nested.tilejson.tile_urls[0].data) == '\0');
+  assert(copied->nested.tile_json.tile_urls[0].size == 0);
+  assert(*static_cast<const char*>(copied->nested.tile_json.tile_urls[0].data) == '\0');
 }
 """

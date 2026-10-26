@@ -218,7 +218,7 @@ public typealias CustomSourceFetchTileCallback =
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
 ///
-/// See `mln_geojson_source_options` in the
+/// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   /// Minimum tiling zoom. Absent selects 0.
@@ -273,81 +273,82 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   }
 
   init(
-    raw: mln_geojson_source_options,
+    raw: mln_geo_json_source_options,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    minZoom = raw.fields & MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+    minZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM
       .rawValue != 0 ? raw.min_zoom : nil
-    maxZoom = raw.fields & MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+    maxZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM
       .rawValue != 0 ? raw.max_zoom : nil
-    tolerance = raw.fields & MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+    tolerance = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE
       .rawValue != 0 ? raw.tolerance : nil
-    clusterMaxZoom = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+    clusterMaxZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
       .rawValue != 0 ? raw.cluster_max_zoom : nil
     clusterProperties = try NativeString.copyUTF8(
       data: raw.cluster_properties.data,
       size: raw.cluster_properties.size
     )
-    buffer = raw.fields & MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw
+    buffer = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw
       .buffer : nil
-    clusterRadius = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+    clusterRadius = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS
       .rawValue != 0 ? raw.cluster_radius : nil
-    clusterMinPoints = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+    clusterMinPoints = raw
+      .fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
       .rawValue != 0 ? raw.cluster_min_points : nil
-    lineMetrics = raw.fields & MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+    lineMetrics = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS
       .rawValue != 0 ? raw.line_metrics : nil
-    cluster = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue != 0 ? raw
-      .cluster : nil
+    cluster = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER
+      .rawValue != 0 ? raw.cluster : nil
     synchronousTiling = raw
-      .fields & MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue != 0 ? raw
-      .synchronous_tiling : nil
+      .fields & MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+      .rawValue != 0 ? raw.synchronous_tiling : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws
-    -> mln_geojson_source_options
+    -> mln_geo_json_source_options
   {
-    var raw = mln_geojson_source_options()
+    var raw = mln_geo_json_source_options()
     raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_geojson_source_options>.size)
+    raw.size = UInt32(MemoryLayout<mln_geo_json_source_options>.size)
     if let item = minZoom {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
         .min_zoom = item
     }
     if let item = maxZoom {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
         .max_zoom = item
     }
     if let item = tolerance {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_TOLERANCE.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE.rawValue; raw
         .tolerance = item
     }
     if let item = clusterMaxZoom {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue; raw
         .cluster_max_zoom = item
     }
     raw.cluster_properties = arena.view(clusterProperties)
     if let item = buffer {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue; raw
         .buffer = item
     }
     if let item = clusterRadius {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue; raw
         .cluster_radius = item
     }
     if let item = clusterMinPoints {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue; raw
         .cluster_min_points = item
     }
     if let item = lineMetrics {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS.rawValue; raw
         .line_metrics = item
     }
     if let item = cluster {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER.rawValue; raw
         .cluster = item
     }
     if let item = synchronousTiling {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue; raw
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue; raw
         .synchronous_tiling = item
     }
     return raw
@@ -839,8 +840,8 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
       size: raw.attribution.size
     )
     url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
-    tileJson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
-      .rawValue != 0 ? try StyleSourceTileInfo(raw: raw.tilejson) : nil
+    tileJson = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
+      .rawValue != 0 ? try StyleSourceTileInfo(raw: raw.tile_json) : nil
     bounds = raw.fields & MLN_STYLE_SOURCE_INFO_BOUNDS
       .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
     tileSize = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue != 0 ? raw

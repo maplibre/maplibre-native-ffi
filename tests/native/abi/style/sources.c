@@ -52,12 +52,12 @@ static void copy_sources(void* user_data, const mln_completion_result* result) {
     copy_text(info->id, copy->id, sizeof(copy->id));
     copy_text(info->attribution, copy->attribution, sizeof(copy->attribution));
     copy_text(info->url, copy->url, sizeof(copy->url));
-    for (size_t url = 0; url < info->tilejson.tile_url_count && url < 2;
+    for (size_t url = 0; url < info->tile_json.tile_url_count && url < 2;
          url += 1) {
       copy->terminated &=
-        mln_test_lent_text_is_terminated(info->tilejson.tile_urls[url]);
+        mln_test_lent_text_is_terminated(info->tile_json.tile_urls[url]);
       copy_text(
-        info->tilejson.tile_urls[url], copy->tile_urls[url],
+        info->tile_json.tile_urls[url], copy->tile_urls[url],
         sizeof(copy->tile_urls[url])
       );
     }
@@ -137,12 +137,12 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
     map, "unattributed",
     "{\"type\":\"vector\",\"tiles\":[\"fixture://a/{z}/{x}/{y}.mvt\"]}"
   );
-  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_url(
     map, MLN_BUFFER_LITERAL("geojson"),
     MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
     NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_url(
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_url(
     map, MLN_BUFFER_LITERAL("geojson"),
     MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
   ));
@@ -150,7 +150,7 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   source_copy probe = read_source(map, "remote");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_HEX32(
-    0, probe.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+    0, probe.info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
   );
   TEST_ASSERT_EQUAL_STRING("fixture://tiles.json", probe.url);
   TEST_ASSERT_EQUAL_size_t(0, probe.info.attribution.size);
@@ -162,12 +162,12 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   probe = read_source(map, "inline");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_STYLE_SOURCE_INFO_TILEJSON,
-    probe.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+    MLN_STYLE_SOURCE_INFO_TILE_JSON,
+    probe.info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
   );
   TEST_ASSERT_EQUAL_size_t(0, probe.info.url.size);
   TEST_ASSERT_EQUAL_STRING("Fixture tiles", probe.attribution);
-  TEST_ASSERT_EQUAL_size_t(2, probe.info.tilejson.tile_url_count);
+  TEST_ASSERT_EQUAL_size_t(2, probe.info.tile_json.tile_url_count);
   TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.tile_urls[0]);
   TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.tile_urls[1]);
 
@@ -193,12 +193,12 @@ static void assert_same_source(
   TEST_ASSERT_EQUAL_STRING(expected->attribution, actual->attribution);
   TEST_ASSERT_EQUAL_STRING(expected->url, actual->url);
   TEST_ASSERT_EQUAL_size_t(
-    want->tilejson.tile_url_count, got->tilejson.tile_url_count
+    want->tile_json.tile_url_count, got->tile_json.tile_url_count
   );
   TEST_ASSERT_EQUAL_STRING(expected->tile_urls[0], actual->tile_urls[0]);
-  TEST_ASSERT_EQUAL_DOUBLE(want->tilejson.min_zoom, got->tilejson.min_zoom);
-  TEST_ASSERT_EQUAL_DOUBLE(want->tilejson.max_zoom, got->tilejson.max_zoom);
-  TEST_ASSERT_EQUAL_UINT32(want->tilejson.scheme, got->tilejson.scheme);
+  TEST_ASSERT_EQUAL_DOUBLE(want->tile_json.min_zoom, got->tile_json.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(want->tile_json.max_zoom, got->tile_json.max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(want->tile_json.scheme, got->tile_json.scheme);
   TEST_ASSERT_EQUAL_UINT32(want->tile_size, got->tile_size);
   TEST_ASSERT_EQUAL_UINT32(want->vector_encoding, got->vector_encoding);
 }
@@ -232,19 +232,19 @@ static void sources_list_in_style_order_with_their_info(void) {
   const source_copy* second = &list.sources[0];
   const source_copy* third = &list.sources[1];
   TEST_ASSERT_EQUAL_STRING("second", second->id);
-  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_GEOJSON, second->info.type);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_GEO_JSON, second->info.type);
   TEST_ASSERT_EQUAL_HEX32(
-    0, second->info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+    0, second->info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
   );
   TEST_ASSERT_EQUAL_STRING("", second->attribution);
   TEST_ASSERT_EQUAL_STRING("third", third->id);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_VECTOR, third->info.type);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_STYLE_SOURCE_INFO_TILEJSON,
-    third->info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+    MLN_STYLE_SOURCE_INFO_TILE_JSON,
+    third->info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
   );
   TEST_ASSERT_EQUAL_STRING("Third tiles", third->attribution);
-  TEST_ASSERT_EQUAL_size_t(1, third->info.tilejson.tile_url_count);
+  TEST_ASSERT_EQUAL_size_t(1, third->info.tile_json.tile_url_count);
   TEST_ASSERT_EQUAL_STRING("fixture://tiles/{z}/{x}/{y}", third->tile_urls[0]);
 
   const source_copy got = read_source(map, "third");

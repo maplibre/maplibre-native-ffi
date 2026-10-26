@@ -6,8 +6,6 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import ModelError
 
-from ..names import words
-
 # The build constraint that selects each platform the module builds for. An
 # OpenHarmony build is a GOOS=linux build, and GOOS=android satisfies linux.
 PLATFORMS = {
@@ -66,7 +64,7 @@ def native_identifier(value: str) -> str:
 
 
 def name(value: str) -> str:
-    return "".join(word[:1].upper() + word[1:] for word in words(value))
+    return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
 
 
 def doc(bound, native: str, declared: str | None, *, operation: bool = False) -> str:

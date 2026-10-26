@@ -186,7 +186,7 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
 
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
-/// See `mln_opengl_borrowed_texture` in the
+/// See `mln_open_gl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
   /// Borrowed OpenGL texture object name. Required.
@@ -195,12 +195,12 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
     self.texture = texture
   }
 
-  init(raw: mln_opengl_borrowed_texture) {
+  init(raw: mln_open_gl_borrowed_texture) {
     texture = raw.texture
   }
 
-  func nativeValue() -> mln_opengl_borrowed_texture {
-    var raw = mln_opengl_borrowed_texture()
+  func nativeValue() -> mln_open_gl_borrowed_texture {
+    var raw = mln_open_gl_borrowed_texture()
     raw.texture = texture
     return raw
   }
@@ -208,7 +208,7 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
 
 /// OpenGL attachment options for a borrowed texture target.
 ///
-/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. Required. physical_width and physical_height give
@@ -243,7 +243,7 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(
-    raw: mln_opengl_borrowed_texture_descriptor,
+    raw: mln_open_gl_borrowed_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     extent = LogicalExtent(raw: raw.extent)
@@ -258,10 +258,11 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws
-    -> mln_opengl_borrowed_texture_descriptor
+    -> mln_open_gl_borrowed_texture_descriptor
   {
-    var raw = mln_opengl_borrowed_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_opengl_borrowed_texture_descriptor>.size)
+    var raw = mln_open_gl_borrowed_texture_descriptor()
+    raw
+      .size = UInt32(MemoryLayout<mln_open_gl_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
@@ -275,7 +276,7 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 
 /// OpenGL attachment options for an owned texture target.
 ///
-/// See `mln_opengl_owned_texture_descriptor` in the
+/// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. Required. A scale_factor that differs from the
@@ -292,7 +293,7 @@ public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(
-    raw: mln_opengl_owned_texture_descriptor,
+    raw: mln_open_gl_owned_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     extent = LogicalExtent(raw: raw.extent)
@@ -300,10 +301,10 @@ public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws
-    -> mln_opengl_owned_texture_descriptor
+    -> mln_open_gl_owned_texture_descriptor
   {
-    var raw = mln_opengl_owned_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_descriptor>.size)
+    var raw = mln_open_gl_owned_texture_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_open_gl_owned_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = try context.nativeValue(arena: arena)
     return raw
@@ -312,7 +313,7 @@ public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
 
 /// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_texture_frame` in the
+/// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
@@ -365,7 +366,7 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     self.type = type
   }
 
-  init(raw: mln_opengl_texture_frame) {
+  init(raw: mln_open_gl_texture_frame) {
     generation = raw.generation
     width = raw.width
     height = raw.height

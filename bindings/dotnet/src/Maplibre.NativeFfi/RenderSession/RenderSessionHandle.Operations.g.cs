@@ -593,7 +593,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// ring.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_opengl_borrowed_texture_target</c> in the
+    /// See <c>mln_render_session_set_open_gl_borrowed_texture_target</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
@@ -602,7 +602,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeOpenGlBorrowedTextureDescriptor(descriptor, scope);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
+        var nativeStatus = NativeMethods.mln_render_session_set_open_gl_borrowed_texture_target(
             Handle,
             &nativeDescriptor,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
@@ -615,7 +615,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// Starts an ordered OpenGL surface replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_opengl_surface_target</c> in the <see
+    /// See <c>mln_render_session_set_open_gl_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
     public Task SetOpenGlSurfaceTargetAsync(OpenGlSurfaceDescriptor descriptor)
@@ -623,7 +623,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor, scope);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_opengl_surface_target(
+        var nativeStatus = NativeMethods.mln_render_session_set_open_gl_surface_target(
             Handle,
             &nativeDescriptor,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),

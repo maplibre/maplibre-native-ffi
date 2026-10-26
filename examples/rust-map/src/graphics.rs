@@ -26,7 +26,7 @@ pub fn required_backend() -> RenderBackendFlag {
     }
     #[cfg(maplibre_render_backend = "opengl")]
     {
-        RenderBackendFlag::OPENGL
+        RenderBackendFlag::OPEN_GL
     }
     #[cfg(maplibre_render_backend = "vulkan")]
     {

@@ -1054,7 +1054,7 @@ impl FromNative<sys::mln_free_camera_options> for FreeCameraOptions {
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
 ///
-/// See `mln_geojson_source_options` in the
+/// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct GeoJsonSourceOptions {
@@ -1084,50 +1084,50 @@ pub struct GeoJsonSourceOptions {
     /// Absent selects false.
     pub synchronous_tiling: Option<bool>,
 }
-impl ToNative<sys::mln_geojson_source_options> for GeoJsonSourceOptions {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_geojson_source_options> {
-        let mut raw: sys::mln_geojson_source_options = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_geojson_source_options>() as _;
+impl ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_geo_json_source_options> {
+        let mut raw: sys::mln_geo_json_source_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_geo_json_source_options>() as _;
         raw.fields = 0;
         if let Some(item) = &self.min_zoom {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
             raw.min_zoom = *item;
         }
         if let Some(item) = &self.max_zoom {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM;
             raw.max_zoom = *item;
         }
         if let Some(item) = &self.tolerance {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE;
             raw.tolerance = *item;
         }
         if let Some(item) = &self.cluster_max_zoom {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
             raw.cluster_max_zoom = *item;
         }
         raw.cluster_properties = to_native(&self.cluster_properties, arena)?;
         if let Some(item) = &self.buffer {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_BUFFER;
             raw.buffer = *item;
         }
         if let Some(item) = &self.cluster_radius {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
             raw.cluster_radius = *item;
         }
         if let Some(item) = &self.cluster_min_points {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
             raw.cluster_min_points = *item;
         }
         if let Some(item) = &self.line_metrics {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
             raw.line_metrics = *item;
         }
         if let Some(item) = &self.cluster {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
             raw.cluster = *item;
         }
         if let Some(item) = &self.synchronous_tiling {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
             raw.synchronous_tiling = *item;
         }
         Ok(raw)
@@ -2441,7 +2441,7 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
 
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
-/// See `mln_opengl_borrowed_texture` in the
+/// See `mln_open_gl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpenGlBorrowedTexture {
@@ -2453,9 +2453,9 @@ impl OpenGlBorrowedTexture {
         Self { texture }
     }
 }
-impl ToNative<sys::mln_opengl_borrowed_texture> for OpenGlBorrowedTexture {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_opengl_borrowed_texture> {
-        let mut raw: sys::mln_opengl_borrowed_texture = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_open_gl_borrowed_texture> {
+        let mut raw: sys::mln_open_gl_borrowed_texture = unsafe { std::mem::zeroed() };
         raw.texture = self.texture;
         Ok(raw)
     }
@@ -2463,7 +2463,7 @@ impl ToNative<sys::mln_opengl_borrowed_texture> for OpenGlBorrowedTexture {
 
 /// OpenGL attachment options for a borrowed texture target.
 ///
-/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlBorrowedTextureDescriptor {
@@ -2502,13 +2502,13 @@ impl OpenGlBorrowedTextureDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_opengl_borrowed_texture_descriptor> for OpenGlBorrowedTextureDescriptor {
+impl ToNative<sys::mln_open_gl_borrowed_texture_descriptor> for OpenGlBorrowedTextureDescriptor {
     fn to_native(
         &self,
         arena: &mut InputArena,
-    ) -> Result<sys::mln_opengl_borrowed_texture_descriptor> {
-        let mut raw: sys::mln_opengl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_opengl_borrowed_texture_descriptor>() as _;
+    ) -> Result<sys::mln_open_gl_borrowed_texture_descriptor> {
+        let mut raw: sys::mln_open_gl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
@@ -2523,7 +2523,7 @@ impl ToNative<sys::mln_opengl_borrowed_texture_descriptor> for OpenGlBorrowedTex
 native_enum! {
 /// OpenGL client API a dedicated EGL session creates its context for.
 ///
-/// See `mln_opengl_client_api` in the
+/// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum OpenGlClientApi: u32 {
     /// No client API is named.
@@ -2542,7 +2542,7 @@ impl Default for OpenGlClientApi {
 
 /// OpenGL backend context fields shared by OpenGL render targets.
 ///
-/// See `mln_opengl_context_descriptor` in the
+/// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlContextDescriptor {
@@ -2560,22 +2560,22 @@ impl OpenGlContextDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_opengl_context_descriptor> for OpenGlContextDescriptor {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_opengl_context_descriptor> {
-        let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_open_gl_context_descriptor> for OpenGlContextDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_context_descriptor> {
+        let mut raw: sys::mln_open_gl_context_descriptor = unsafe { std::mem::zeroed() };
         raw.ownership = to_native(&self.ownership, arena)?;
         match &self.data {
             OpenGlContextDescriptorData::Wgl(item) => {
-                raw.platform = sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                raw.platform = sys::MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
                 raw.data.wgl = to_native(&(*item), arena)?;
             }
             OpenGlContextDescriptorData::Egl(item) => {
-                raw.platform = sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                raw.platform = sys::MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
                 raw.data.egl = to_native(&(*item), arena)?;
             }
             OpenGlContextDescriptorData::WebGl(item) => {
-                raw.platform = sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
-                raw.data.webgl = to_native(&(*item), arena)?;
+                raw.platform = sys::MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+                raw.data.web_gl = to_native(&(*item), arena)?;
             }
         }
         Ok(raw)
@@ -2584,7 +2584,7 @@ impl ToNative<sys::mln_opengl_context_descriptor> for OpenGlContextDescriptor {
 
 /// Backend-specific OpenGL context data.
 ///
-/// See `mln_opengl_context_descriptor_data` in the
+/// See `mln_open_gl_context_descriptor_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum OpenGlContextDescriptorData {
@@ -2597,7 +2597,7 @@ native_enum! {
 /// How a session's OpenGL context relates to its driver thread and host
 /// graphics state.
 ///
-/// See `mln_opengl_context_ownership` in the
+/// See `mln_open_gl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum OpenGlContextOwnership: u32 {
     /// The session shares its thread with host graphics work.
@@ -2615,19 +2615,19 @@ impl Default for OpenGlContextOwnership {
 native_flags! {
 /// OpenGL context providers supported by this build.
 ///
-/// See `mln_opengl_context_provider_flag` in the
+/// See `mln_open_gl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub struct OpenGlContextProviderFlag: u32 {
     const WGL = 1;
     const EGL = 2;
     /// Browser WebGL context imported into an Emscripten module.
-    const WEBGL = 4;
+    const WEB_GL = 4;
 }
 }
 
 /// OpenGL attachment options for an owned texture target.
 ///
-/// See `mln_opengl_owned_texture_descriptor` in the
+/// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlOwnedTextureDescriptor {
@@ -2645,13 +2645,13 @@ impl OpenGlOwnedTextureDescriptor {
         Self { extent, context }
     }
 }
-impl ToNative<sys::mln_opengl_owned_texture_descriptor> for OpenGlOwnedTextureDescriptor {
+impl ToNative<sys::mln_open_gl_owned_texture_descriptor> for OpenGlOwnedTextureDescriptor {
     fn to_native(
         &self,
         arena: &mut InputArena,
-    ) -> Result<sys::mln_opengl_owned_texture_descriptor> {
-        let mut raw: sys::mln_opengl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_opengl_owned_texture_descriptor>() as _;
+    ) -> Result<sys::mln_open_gl_owned_texture_descriptor> {
+        let mut raw: sys::mln_open_gl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_open_gl_owned_texture_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
         Ok(raw)
@@ -2660,7 +2660,7 @@ impl ToNative<sys::mln_opengl_owned_texture_descriptor> for OpenGlOwnedTextureDe
 
 /// OpenGL attachment options for a native surface.
 ///
-/// See `mln_opengl_surface_descriptor` in the
+/// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlSurfaceDescriptor {
@@ -2683,10 +2683,10 @@ impl OpenGlSurfaceDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_opengl_surface_descriptor> for OpenGlSurfaceDescriptor {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_opengl_surface_descriptor> {
-        let mut raw: sys::mln_opengl_surface_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_opengl_surface_descriptor>() as _;
+impl ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_surface_descriptor> {
+        let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
         raw.surface = self.surface;
@@ -2696,7 +2696,7 @@ impl ToNative<sys::mln_opengl_surface_descriptor> for OpenGlSurfaceDescriptor {
 
 /// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_texture_frame` in the
+/// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OpenGlTextureFrame {
@@ -2726,8 +2726,8 @@ pub struct OpenGlTextureFrame {
     /// texture.
     pub r#type: u32,
 }
-impl FromNative<sys::mln_opengl_texture_frame> for OpenGlTextureFrame {
-    unsafe fn from_native(raw: sys::mln_opengl_texture_frame) -> Result<Self> {
+impl FromNative<sys::mln_open_gl_texture_frame> for OpenGlTextureFrame {
+    unsafe fn from_native(raw: sys::mln_open_gl_texture_frame) -> Result<Self> {
         Ok(Self {
             generation: raw.generation,
             width: raw.width,
@@ -3006,8 +3006,8 @@ native_flags! {
 pub struct RenderBackendFlag: u32 {
     const METAL = 1;
     const VULKAN = 2;
-    const OPENGL = 4;
-    const WEBGPU = 8;
+    const OPEN_GL = 4;
+    const WEB_GPU = 8;
 }
 }
 
@@ -3138,7 +3138,7 @@ pub struct RenderSessionAttachOptions {
     /// its texture count, so borrowed and other targets ignore this value.
     pub requested_texture_ring_depth: u32,
     /// Producer synchronization for acquired texture frames.
-    /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+    /// `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
     /// and a caller-graphics-thread driver. Other targets support only CPU
     /// completion and fail an unsupported request.
     pub producer_sync_kind: GpuSyncKind,
@@ -4673,7 +4673,7 @@ pub struct StyleSourceInfo {
     /// URL that the source loads from, or empty when it has none.
     pub url: String,
     /// Inline TileJSON metadata, when the source was defined with it.
-    pub tilejson: Option<StyleSourceTileInfo>,
+    pub tile_json: Option<StyleSourceTileInfo>,
     /// Geographic bounds, when inline TileJSON sets them.
     pub bounds: Option<LatLngBounds>,
     /// Tile size in pixels, for a tile source.
@@ -4691,11 +4691,11 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             is_volatile: raw.is_volatile,
             attribution: unsafe { from_native(raw.attribution) }?,
             url: unsafe { from_native(raw.url) }?,
-            tilejson: unsafe {
+            tile_json: unsafe {
                 convert::present(
                     raw.fields,
-                    sys::MLN_STYLE_SOURCE_INFO_TILEJSON,
-                    raw.tilejson,
+                    sys::MLN_STYLE_SOURCE_INFO_TILE_JSON,
+                    raw.tile_json,
                 )
             }?,
             bounds: unsafe {
@@ -5368,7 +5368,7 @@ impl ToNative<sys::mln_wake> for Wake {
 
 /// WebGL context fields shared by OpenGL render targets in the browser.
 ///
-/// See `mln_webgl_context_descriptor` in the
+/// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WebGlContextDescriptor {
@@ -5379,9 +5379,9 @@ pub struct WebGlContextDescriptor {
     /// canvas must still be transferable when attachment starts.
     pub canvas_selector: String,
 }
-impl ToNative<sys::mln_webgl_context_descriptor> for WebGlContextDescriptor {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_webgl_context_descriptor> {
-        let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_web_gl_context_descriptor> for WebGlContextDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_web_gl_context_descriptor> {
+        let mut raw: sys::mln_web_gl_context_descriptor = unsafe { std::mem::zeroed() };
         raw.kind = to_native(&self.kind, arena)?;
         raw.context = self.context;
         raw.canvas_selector = to_native(&self.canvas_selector, arena)?;
@@ -5392,7 +5392,7 @@ impl ToNative<sys::mln_webgl_context_descriptor> for WebGlContextDescriptor {
 native_enum! {
 /// WebGL context placement.
 ///
-/// See `mln_webgl_context_kind` in the
+/// See `mln_web_gl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum WebGlContextKind: u32 {
     /// Use a host-created context on its current browser agent.
@@ -5410,7 +5410,7 @@ impl Default for WebGlContextKind {
 
 /// One caller-owned WebGPU texture of a borrowed texture ring.
 ///
-/// See `mln_webgpu_borrowed_texture` in the
+/// See `mln_web_gpu_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGpuBorrowedTexture {
@@ -5428,9 +5428,9 @@ impl WebGpuBorrowedTexture {
         }
     }
 }
-impl ToNative<sys::mln_webgpu_borrowed_texture> for WebGpuBorrowedTexture {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_borrowed_texture> {
-        let mut raw: sys::mln_webgpu_borrowed_texture = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_web_gpu_borrowed_texture> for WebGpuBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_web_gpu_borrowed_texture> {
+        let mut raw: sys::mln_web_gpu_borrowed_texture = unsafe { std::mem::zeroed() };
         raw.texture = self.texture;
         raw.texture_view = self.texture_view;
         Ok(raw)
@@ -5439,7 +5439,7 @@ impl ToNative<sys::mln_webgpu_borrowed_texture> for WebGpuBorrowedTexture {
 
 /// WebGPU attachment options for a borrowed texture target.
 ///
-/// See `mln_webgpu_borrowed_texture_descriptor` in the
+/// See `mln_web_gpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct WebGpuBorrowedTextureDescriptor {
@@ -5479,13 +5479,13 @@ impl WebGpuBorrowedTextureDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebGpuBorrowedTextureDescriptor {
+impl ToNative<sys::mln_web_gpu_borrowed_texture_descriptor> for WebGpuBorrowedTextureDescriptor {
     fn to_native(
         &self,
         arena: &mut InputArena,
-    ) -> Result<sys::mln_webgpu_borrowed_texture_descriptor> {
-        let mut raw: sys::mln_webgpu_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgpu_borrowed_texture_descriptor>() as _;
+    ) -> Result<sys::mln_web_gpu_borrowed_texture_descriptor> {
+        let mut raw: sys::mln_web_gpu_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_web_gpu_borrowed_texture_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
@@ -5499,7 +5499,7 @@ impl ToNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebGpuBorrowedTex
 
 /// WebGPU backend context fields shared by WebGPU render targets.
 ///
-/// See `mln_webgpu_context_descriptor` in the
+/// See `mln_web_gpu_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGpuContextDescriptor {
@@ -5520,9 +5520,9 @@ impl WebGpuContextDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_webgpu_context_descriptor> for WebGpuContextDescriptor {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_context_descriptor> {
-        let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
+impl ToNative<sys::mln_web_gpu_context_descriptor> for WebGpuContextDescriptor {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_web_gpu_context_descriptor> {
+        let mut raw: sys::mln_web_gpu_context_descriptor = unsafe { std::mem::zeroed() };
         raw.instance = self.instance;
         raw.device = self.device;
         raw.queue = self.queue;
@@ -5532,7 +5532,7 @@ impl ToNative<sys::mln_webgpu_context_descriptor> for WebGpuContextDescriptor {
 
 /// WebGPU attachment options for an owned texture target.
 ///
-/// See `mln_webgpu_owned_texture_descriptor` in the
+/// See `mln_web_gpu_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGpuOwnedTextureDescriptor {
@@ -5547,13 +5547,13 @@ impl WebGpuOwnedTextureDescriptor {
         Self { extent, context }
     }
 }
-impl ToNative<sys::mln_webgpu_owned_texture_descriptor> for WebGpuOwnedTextureDescriptor {
+impl ToNative<sys::mln_web_gpu_owned_texture_descriptor> for WebGpuOwnedTextureDescriptor {
     fn to_native(
         &self,
         arena: &mut InputArena,
-    ) -> Result<sys::mln_webgpu_owned_texture_descriptor> {
-        let mut raw: sys::mln_webgpu_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_descriptor>() as _;
+    ) -> Result<sys::mln_web_gpu_owned_texture_descriptor> {
+        let mut raw: sys::mln_web_gpu_owned_texture_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_web_gpu_owned_texture_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
         Ok(raw)
@@ -5562,7 +5562,7 @@ impl ToNative<sys::mln_webgpu_owned_texture_descriptor> for WebGpuOwnedTextureDe
 
 /// WebGPU attachment options for a native surface.
 ///
-/// See `mln_webgpu_surface_descriptor` in the
+/// See `mln_web_gpu_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGpuSurfaceDescriptor {
@@ -5594,10 +5594,10 @@ impl WebGpuSurfaceDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_webgpu_surface_descriptor> for WebGpuSurfaceDescriptor {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_webgpu_surface_descriptor> {
-        let mut raw: sys::mln_webgpu_surface_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgpu_surface_descriptor>() as _;
+impl ToNative<sys::mln_web_gpu_surface_descriptor> for WebGpuSurfaceDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_web_gpu_surface_descriptor> {
+        let mut raw: sys::mln_web_gpu_surface_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_web_gpu_surface_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
         raw.surface = self.surface;
@@ -5608,7 +5608,7 @@ impl ToNative<sys::mln_webgpu_surface_descriptor> for WebGpuSurfaceDescriptor {
 
 /// WebGPU frame acquired from a texture ring.
 ///
-/// See `mln_webgpu_texture_frame` in the
+/// See `mln_web_gpu_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WebGpuTextureFrame {
@@ -5634,8 +5634,8 @@ pub struct WebGpuTextureFrame {
     /// Backend-native WGPUTextureFormat value.
     pub format: u32,
 }
-impl FromNative<sys::mln_webgpu_texture_frame> for WebGpuTextureFrame {
-    unsafe fn from_native(raw: sys::mln_webgpu_texture_frame) -> Result<Self> {
+impl FromNative<sys::mln_web_gpu_texture_frame> for WebGpuTextureFrame {
+    unsafe fn from_native(raw: sys::mln_web_gpu_texture_frame) -> Result<Self> {
         Ok(Self {
             generation: raw.generation,
             width: raw.width,

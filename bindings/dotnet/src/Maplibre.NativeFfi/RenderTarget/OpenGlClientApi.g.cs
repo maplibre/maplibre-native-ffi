@@ -5,7 +5,7 @@ namespace Maplibre.NativeFfi;
 /// OpenGL client API a dedicated EGL session creates its context for.
 /// </summary>
 /// <remarks>
-/// See <c>mln_opengl_client_api</c> in the <see
+/// See <c>mln_open_gl_client_api</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 public enum OpenGlClientApi : uint

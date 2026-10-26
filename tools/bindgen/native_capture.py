@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from .compiler import compile_api
 from .model import Api, ModelError
-from .names import words
 from .semantic import BoundApi, ValuePlan
 
 # The copies that the native core makes for queue deliveries.
@@ -63,7 +62,9 @@ def delivery_records(bound: BoundApi):
 def _release_call(handle, value: str) -> str:
     kind = "".join(
         word.title()
-        for word in words(handle.native.removeprefix("mln_").removesuffix("_handle"))
+        for word in handle.native.removeprefix("mln_")
+        .removesuffix("_handle")
+        .split("_")
     )
     return f"static_cast<void>(dispose_owner(mln::core::HandleKind::{kind}, {value}));"
 

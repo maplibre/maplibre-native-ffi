@@ -95,9 +95,9 @@ static void the_library_reports_its_abi_version_and_built_backend(void) {
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   const uint32_t expected = MLN_RENDER_BACKEND_FLAG_VULKAN;
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const uint32_t expected = MLN_RENDER_BACKEND_FLAG_OPENGL;
+  const uint32_t expected = MLN_RENDER_BACKEND_FLAG_OPEN_GL;
 #elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const uint32_t expected = MLN_RENDER_BACKEND_FLAG_WEBGPU;
+  const uint32_t expected = MLN_RENDER_BACKEND_FLAG_WEB_GPU;
 #else
 #error "the native suite builds for exactly one render backend"
 #endif

@@ -1383,8 +1383,8 @@ napi_value mln_ts_read_offline_tile_pyramid_region_definition(
   return result;
 }
 
-napi_value mln_ts_read_opengl_texture_frame(
-  napi_env env, const mln_opengl_texture_frame* source, size_t size
+napi_value mln_ts_read_open_gl_texture_frame(
+  napi_env env, const mln_open_gl_texture_frame* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
@@ -2394,11 +2394,11 @@ napi_value mln_ts_read_style_source_info(
         mln_ts_text(env, (source->url).data, (source->url).size)
       ))
     return NULL;
-  if ((source->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+  if ((source->fields & MLN_STYLE_SOURCE_INFO_TILE_JSON) != 0) {
     if (!mln_ts_set(
           env, result, "tileJson",
           mln_ts_read_style_source_tile_info(
-            env, &(source->tilejson), sizeof(source->tilejson)
+            env, &(source->tile_json), sizeof(source->tile_json)
           )
         ))
       return NULL;
@@ -3392,7 +3392,7 @@ bool mln_ts_write_egl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->client_api = (mln_opengl_client_api)number;
+      out->client_api = (mln_open_gl_client_api)number;
     }
   }
   if (!mln_ts_member(call, value, "getProcAddress", &member)) return false;
@@ -3495,8 +3495,8 @@ bool mln_ts_write_free_camera_options(
   return true;
 }
 
-bool mln_ts_write_geojson_source_options(
-  mln_ts_call* call, napi_value value, mln_geojson_source_options* out,
+bool mln_ts_write_geo_json_source_options(
+  mln_ts_call* call, napi_value value, mln_geo_json_source_options* out,
   const char* path
 ) {
   napi_value member;
@@ -3510,7 +3510,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->min_zoom = (double)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
   }
   if (!mln_ts_member(call, value, "maxZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "maxZoom");
@@ -3520,7 +3520,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->max_zoom = (double)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM;
   }
   if (!mln_ts_member(call, value, "tolerance", &member)) return false;
   mln_ts_path(child, sizeof child, path, "tolerance");
@@ -3530,7 +3530,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->tolerance = (double)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE;
   }
   if (!mln_ts_member(call, value, "clusterMaxZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "clusterMaxZoom");
@@ -3540,7 +3540,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->cluster_max_zoom = (double)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
   }
   if (!mln_ts_member(call, value, "clusterProperties", &member)) return false;
   mln_ts_path(child, sizeof child, path, "clusterProperties");
@@ -3555,7 +3555,7 @@ bool mln_ts_write_geojson_source_options(
         return false;
       out->buffer = (uint32_t)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_BUFFER;
   }
   if (!mln_ts_member(call, value, "clusterRadius", &member)) return false;
   mln_ts_path(child, sizeof child, path, "clusterRadius");
@@ -3566,7 +3566,7 @@ bool mln_ts_write_geojson_source_options(
         return false;
       out->cluster_radius = (uint32_t)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
   }
   if (!mln_ts_member(call, value, "clusterMinPoints", &member)) return false;
   mln_ts_path(child, sizeof child, path, "clusterMinPoints");
@@ -3577,7 +3577,7 @@ bool mln_ts_write_geojson_source_options(
         return false;
       out->cluster_min_points = (uint32_t)number;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
   }
   if (!mln_ts_member(call, value, "lineMetrics", &member)) return false;
   mln_ts_path(child, sizeof child, path, "lineMetrics");
@@ -3587,7 +3587,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_bool(call, member, &flag, child)) return false;
       out->line_metrics = flag;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
   }
   if (!mln_ts_member(call, value, "cluster", &member)) return false;
   mln_ts_path(child, sizeof child, path, "cluster");
@@ -3597,7 +3597,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_bool(call, member, &flag, child)) return false;
       out->cluster = flag;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
   }
   if (!mln_ts_member(call, value, "synchronousTiling", &member)) return false;
   mln_ts_path(child, sizeof child, path, "synchronousTiling");
@@ -3607,7 +3607,7 @@ bool mln_ts_write_geojson_source_options(
       if (!mln_ts_read_bool(call, member, &flag, child)) return false;
       out->synchronous_tiling = flag;
     }
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
   }
   return true;
 }
@@ -3994,11 +3994,11 @@ bool mln_ts_write_list_metal_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_list_opengl_borrowed_texture(
+bool mln_ts_write_list_open_gl_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
-  mln_opengl_borrowed_texture** out, size_t* out_count, const char* path
+  mln_open_gl_borrowed_texture** out, size_t* out_count, const char* path
 ) {
-  mln_opengl_borrowed_texture* items = NULL;
+  mln_open_gl_borrowed_texture* items = NULL;
   if (!mln_ts_read_list(
         call, value, sizeof *items, maximum, (void**)&items, out_count, path
       ))
@@ -4010,7 +4010,7 @@ bool mln_ts_write_list_opengl_borrowed_texture(
     mln_ts_index_path(item_path, sizeof item_path, path, index);
     memset(&items[index], 0, sizeof items[index]);
     if (!mln_ts_read_record(call, element, item_path)) return false;
-    if (!mln_ts_write_opengl_borrowed_texture(
+    if (!mln_ts_write_open_gl_borrowed_texture(
           call, element, &items[index], item_path
         ))
       return false;
@@ -4643,8 +4643,8 @@ bool mln_ts_write_offline_tile_pyramid_region_definition(
   return true;
 }
 
-bool mln_ts_write_opengl_borrowed_texture(
-  mln_ts_call* call, napi_value value, mln_opengl_borrowed_texture* out,
+bool mln_ts_write_open_gl_borrowed_texture(
+  mln_ts_call* call, napi_value value, mln_open_gl_borrowed_texture* out,
   const char* path
 ) {
   napi_value member;
@@ -4661,9 +4661,9 @@ bool mln_ts_write_opengl_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_opengl_borrowed_texture_descriptor(
+bool mln_ts_write_open_gl_borrowed_texture_descriptor(
   mln_ts_call* call, napi_value value,
-  mln_opengl_borrowed_texture_descriptor* out, const char* path
+  mln_open_gl_borrowed_texture_descriptor* out, const char* path
 ) {
   napi_value member;
   char child[256];
@@ -4694,16 +4694,16 @@ bool mln_ts_write_opengl_borrowed_texture_descriptor(
   mln_ts_path(child, sizeof child, path, "context");
   memset(&out->context, 0, sizeof out->context);
   if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_opengl_context_descriptor(
+  if (!mln_ts_write_open_gl_context_descriptor(
         call, member, &out->context, child
       ))
     return false;
   if (!mln_ts_member(call, value, "textures", &member)) return false;
   mln_ts_path(child, sizeof child, path, "textures");
   {
-    mln_opengl_borrowed_texture* items = NULL;
+    mln_open_gl_borrowed_texture* items = NULL;
     size_t count = 0;
-    if (!mln_ts_write_list_opengl_borrowed_texture(
+    if (!mln_ts_write_list_open_gl_borrowed_texture(
           call, member, UINT32_MAX, &items, &count, child
         ))
       return false;
@@ -4721,8 +4721,8 @@ bool mln_ts_write_opengl_borrowed_texture_descriptor(
   return true;
 }
 
-bool mln_ts_write_opengl_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_context_descriptor* out,
+bool mln_ts_write_open_gl_context_descriptor(
+  mln_ts_call* call, napi_value value, mln_open_gl_context_descriptor* out,
   const char* path
 ) {
   napi_value member;
@@ -4735,7 +4735,7 @@ bool mln_ts_write_opengl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->ownership = (mln_opengl_context_ownership)number;
+      out->ownership = (mln_open_gl_context_ownership)number;
     }
   }
   if (!mln_ts_member(call, value, "data", &member)) return false;
@@ -4749,7 +4749,7 @@ bool mln_ts_write_opengl_context_descriptor(
     (void)arm_path;
     switch (mln_ts_read_kind(call, member, kinds, 3, child)) {
       case 0:
-        out->platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+        out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
         if (!mln_ts_member(call, member, "value", &arm)) return false;
         mln_ts_path(arm_path, sizeof arm_path, child, "value");
         memset(&out->data.wgl, 0, sizeof out->data.wgl);
@@ -4760,7 +4760,7 @@ bool mln_ts_write_opengl_context_descriptor(
           return false;
         break;
       case 1:
-        out->platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+        out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
         if (!mln_ts_member(call, member, "value", &arm)) return false;
         mln_ts_path(arm_path, sizeof arm_path, child, "value");
         memset(&out->data.egl, 0, sizeof out->data.egl);
@@ -4771,13 +4771,13 @@ bool mln_ts_write_opengl_context_descriptor(
           return false;
         break;
       case 2:
-        out->platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+        out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
         if (!mln_ts_member(call, member, "value", &arm)) return false;
         mln_ts_path(arm_path, sizeof arm_path, child, "value");
-        memset(&out->data.webgl, 0, sizeof out->data.webgl);
+        memset(&out->data.web_gl, 0, sizeof out->data.web_gl);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
-        if (!mln_ts_write_webgl_context_descriptor(
-              call, arm, &out->data.webgl, arm_path
+        if (!mln_ts_write_web_gl_context_descriptor(
+              call, arm, &out->data.web_gl, arm_path
             ))
           return false;
         break;
@@ -4788,9 +4788,9 @@ bool mln_ts_write_opengl_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_opengl_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_owned_texture_descriptor* out,
-  const char* path
+bool mln_ts_write_open_gl_owned_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_open_gl_owned_texture_descriptor* out, const char* path
 ) {
   napi_value member;
   char child[256];
@@ -4805,15 +4805,15 @@ bool mln_ts_write_opengl_owned_texture_descriptor(
   mln_ts_path(child, sizeof child, path, "context");
   memset(&out->context, 0, sizeof out->context);
   if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_opengl_context_descriptor(
+  if (!mln_ts_write_open_gl_context_descriptor(
         call, member, &out->context, child
       ))
     return false;
   return true;
 }
 
-bool mln_ts_write_opengl_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_opengl_surface_descriptor* out,
+bool mln_ts_write_open_gl_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
   const char* path
 ) {
   napi_value member;
@@ -4829,7 +4829,7 @@ bool mln_ts_write_opengl_surface_descriptor(
   mln_ts_path(child, sizeof child, path, "context");
   memset(&out->context, 0, sizeof out->context);
   if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_opengl_context_descriptor(
+  if (!mln_ts_write_open_gl_context_descriptor(
         call, member, &out->context, child
       ))
     return false;
@@ -6045,8 +6045,8 @@ bool mln_ts_write_vulkan_surface_descriptor(
   return true;
 }
 
-bool mln_ts_write_webgl_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_webgl_context_descriptor* out,
+bool mln_ts_write_web_gl_context_descriptor(
+  mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,
   const char* path
 ) {
   napi_value member;
@@ -6059,7 +6059,7 @@ bool mln_ts_write_webgl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kind = (mln_webgl_context_kind)number;
+      out->kind = (mln_web_gl_context_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "context", &member)) return false;

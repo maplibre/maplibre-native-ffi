@@ -12,9 +12,9 @@ public abstract class GeneratedGeoJsonSourceDataOperations internal constructor(
   /**
    * Releases prepared GeoJSON source data.
    *
-   * See `mln_geojson_source_data_release` in the
+   * See `mln_geo_json_source_data_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun release(): Unit =
-    nativeClose(this, binding) { C.mln_geojson_source_data_release(handle) }
+    nativeClose(this, binding) { C.mln_geo_json_source_data_release(handle) }
 }

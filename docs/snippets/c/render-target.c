@@ -12,13 +12,13 @@ static mln_render_session_attach_options caller_driver(void) {
 }
 
 mln_status attach_to_window(
-  mln_map map, const mln_opengl_context_descriptor* context, void* egl_surface,
+  mln_map map, const mln_open_gl_context_descriptor* context, void* egl_surface,
   uint32_t width, uint32_t height, double scale_factor,
   mln_render_session* out_session, const mln_completion* completion
 ) {
   // #region surface
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
@@ -26,34 +26,34 @@ mln_status attach_to_window(
   descriptor.context = *context;
   descriptor.surface = egl_surface;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_map_attach_opengl_surface(
+  return mln_map_attach_open_gl_surface(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion surface
 }
 
 mln_status attach_to_own_texture(
-  mln_map map, const mln_opengl_context_descriptor* context, uint32_t width,
+  mln_map map, const mln_open_gl_context_descriptor* context, uint32_t width,
   uint32_t height, double scale_factor, mln_render_session* out_session,
   const mln_completion* completion
 ) {
   // #region owned
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_map_attach_opengl_owned_texture(
+  return mln_map_attach_open_gl_owned_texture(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion owned
 }
 
 mln_status attach_to_host_textures(
-  mln_map map, const mln_opengl_context_descriptor* context,
+  mln_map map, const mln_open_gl_context_descriptor* context,
   const uint32_t textures[2], uint32_t texture_target, uint32_t logical_width,
   uint32_t logical_height, double scale_factor, mln_render_session* out_session,
   const mln_completion* completion
@@ -61,12 +61,12 @@ mln_status attach_to_host_textures(
   // #region borrowed
   // Two textures let the host hold the newest frame while the session renders
   // the next one into the other.
-  const mln_opengl_borrowed_texture ring[2] = {
+  const mln_open_gl_borrowed_texture ring[2] = {
     {.texture = textures[0]},
     {.texture = textures[1]},
   };
-  mln_opengl_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  mln_open_gl_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
   descriptor.extent.width = logical_width;
   descriptor.extent.height = logical_height;
@@ -78,7 +78,7 @@ mln_status attach_to_host_textures(
   descriptor.texture_count = 2;
   descriptor.target = texture_target;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_map_attach_opengl_borrowed_texture(
+  return mln_map_attach_open_gl_borrowed_texture(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion borrowed
@@ -97,20 +97,20 @@ mln_status resize_session(
 }
 
 mln_status resize_window_target(
-  mln_render_session session, const mln_opengl_context_descriptor* context,
+  mln_render_session session, const mln_open_gl_context_descriptor* context,
   void* egl_surface, uint32_t width, uint32_t height, double scale_factor,
   const mln_completion* completion
 ) {
   // #region set-target
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   descriptor.surface = egl_surface;
-  return mln_render_session_set_opengl_surface_target(
+  return mln_render_session_set_open_gl_surface_target(
     session, &descriptor, completion, NULL
   );
   // #endregion set-target

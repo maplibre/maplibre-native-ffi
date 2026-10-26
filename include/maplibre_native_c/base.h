@@ -106,8 +106,8 @@ typedef struct mln_diagnostic {
 typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
   MLN_RENDER_BACKEND_FLAG_METAL = 1u << 0u,
   MLN_RENDER_BACKEND_FLAG_VULKAN = 1u << 1u,
-  MLN_RENDER_BACKEND_FLAG_OPENGL = 1u << 2u,
-  MLN_RENDER_BACKEND_FLAG_WEBGPU = 1u << 3u,
+  MLN_RENDER_BACKEND_FLAG_OPEN_GL = 1u << 2u,
+  MLN_RENDER_BACKEND_FLAG_WEB_GPU = 1u << 3u,
 } mln_render_backend_flag;
 
 /** A set of mln_render_backend_flag bits. */
@@ -133,9 +133,9 @@ typedef uint64_t mln_map MLN_BINDING(
   "dispose=mln_map_dispose"
 );
 /** Prepared GeoJSON data that sources retain independently of its handle. */
-typedef uint64_t mln_geojson_source_data MLN_BINDING(
-  "kind=handle;release=mln_geojson_source_data_release;"
-  "dispose=mln_geojson_source_data_release"
+typedef uint64_t mln_geo_json_source_data MLN_BINDING(
+  "kind=handle;release=mln_geo_json_source_data_release;"
+  "dispose=mln_geo_json_source_data_release"
 );
 /** A parsed style expression, immutable and independent of any map. */
 typedef uint64_t mln_style_expression MLN_BINDING(

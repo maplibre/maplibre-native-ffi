@@ -30,7 +30,7 @@ test "host strings use views and native-lent strings decode" {
     try support.expectCommitted(try fixture.map.addStyleSourceJson(source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
     var info = (try support.resolve(try fixture.map.getStyleSource(testing.allocator, source_id, null))).?;
     defer info.deinit();
-    try testing.expectEqual(maplibre.StyleSourceType.geojson, info.value.type);
+    try testing.expectEqual(maplibre.StyleSourceType.geo_json, info.value.type);
     try testing.expect(try support.resolve(try fixture.map.getStyleSource(testing.allocator, "nul", null)) == null);
 }
 

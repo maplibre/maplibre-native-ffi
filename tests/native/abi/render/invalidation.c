@@ -121,18 +121,18 @@ static void add_the_late_source(
 ) {
   (void)runtime;
   (void)fixture;
-  mln_geojson_source_data data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geojson_source_data_create(
+  mln_geo_json_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_geo_json_source_data_create(
     MLN_BUFFER_LITERAL(
       "{\"type\":\"Feature\",\"properties\":{},\"geometry\":"
       "{\"type\":\"Point\",\"coordinates\":[0,0]}}"
     ),
     NULL, &data, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
     map, MLN_BUFFER_LITERAL("late"), data, &completion.descriptor, NULL
   ));
-  mln_geojson_source_data_release(data);
+  mln_geo_json_source_data_release(data);
 }
 
 static void remove_the_swatch(
@@ -326,12 +326,12 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
 }
 
 typedef struct update_state {
-  mln_geojson_source_data data;
+  mln_geo_json_source_data data;
   mln_map_tile_options initial_tile;
 } update_state;
 
 static void add_empty_geojson(mln_map map, update_state* state) {
-  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
     map, MLN_BUFFER_LITERAL("geo"), state->data, &completion.descriptor, NULL
   ));
 }
@@ -477,7 +477,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   update_state state = {0};
-  MLN_TEST_OK(mln_geojson_source_data_create(
+  MLN_TEST_OK(mln_geo_json_source_data_create(
     MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
     NULL, &state.data, NULL
   ));
@@ -503,7 +503,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
     }
   }
 
-  mln_geojson_source_data_release(state.data);
+  mln_geo_json_source_data_release(state.data);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

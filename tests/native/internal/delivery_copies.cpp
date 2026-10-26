@@ -47,9 +47,9 @@ void a_copy_owns_arrays_and_their_nested_buffers() {
   const auto url = mln_buffer_view{text, sizeof(text) - 1};
   auto source = mln_style_source_info{};
   source.id = url;
-  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  source.tilejson.tile_urls = &url;
-  source.tilejson.tile_url_count = 1;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILE_JSON;
+  source.tile_json.tile_urls = &url;
+  source.tile_json.tile_url_count = 1;
   const mln_style_source_info sources[] = {source, source};
   auto copy = Copy{};
   copy_values(
@@ -59,10 +59,10 @@ void a_copy_owns_arrays_and_their_nested_buffers() {
   text[0] = 'X';
   for (std::size_t index = 0; index < 2; ++index) {
     TEST_ASSERT_EQUAL_MEMORY("tile", copied[index].id.data, 4);
-    TEST_ASSERT_EQUAL_size_t(1, copied[index].tilejson.tile_url_count);
-    TEST_ASSERT_TRUE(copied[index].tilejson.tile_urls != &url);
+    TEST_ASSERT_EQUAL_size_t(1, copied[index].tile_json.tile_url_count);
+    TEST_ASSERT_TRUE(copied[index].tile_json.tile_urls != &url);
     TEST_ASSERT_EQUAL_MEMORY(
-      "tile", copied[index].tilejson.tile_urls[0].data, 4
+      "tile", copied[index].tile_json.tile_urls[0].data, 4
     );
   }
 }
@@ -115,18 +115,18 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
     sizeof(mln_camera_options) - offsetof(mln_camera_options, center)
   ));
 
-  // A clear TILEJSON bit leaves the embedded record unread, so its tile URL
+  // A clear TILE_JSON bit leaves the embedded record unread, so its tile URL
   // pointer and count are never followed.
   auto source = mln_style_source_info{};
-  source.tilejson.tile_urls = &stale;
-  source.tilejson.tile_url_count = SIZE_MAX;
-  source.tilejson.min_zoom = 1.0;
+  source.tile_json.tile_urls = &stale;
+  source.tile_json.tile_url_count = SIZE_MAX;
+  source.tile_json.min_zoom = 1.0;
   source.tile_size = 512;
   auto source_copy = Copy{};
   copy_one(source, source_copy);
   const auto* copied_source =
     static_cast<const mln_style_source_info*>(source_copy.value);
-  TEST_ASSERT_TRUE(mln_test_tile_info_is_zero(&copied_source->tilejson));
+  TEST_ASSERT_TRUE(mln_test_tile_info_is_zero(&copied_source->tile_json));
   TEST_ASSERT_EQUAL_UINT32(0, copied_source->tile_size);
 }
 
@@ -183,16 +183,16 @@ void a_copy_terminates_every_view() {
   source.id = lent;
   source.attribution = empty;
   source.url = lent;
-  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  source.tilejson.tile_urls = &lent;
-  source.tilejson.tile_url_count = 1;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILE_JSON;
+  source.tile_json.tile_urls = &lent;
+  source.tile_json.tile_url_count = 1;
   auto source_copy = Copy{};
   copy_one(source, source_copy);
   const auto* copied_source =
     static_cast<const mln_style_source_info*>(source_copy.value);
   for (const auto& view :
        {copied_source->id, copied_source->attribution, copied_source->url,
-        copied_source->tilejson.tile_urls[0]}) {
+        copied_source->tile_json.tile_urls[0]}) {
     TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(view));
   }
 

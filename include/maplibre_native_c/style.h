@@ -82,7 +82,7 @@ typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_VECTOR = 1,
   MLN_STYLE_SOURCE_TYPE_RASTER = 2,
   MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3,
-  MLN_STYLE_SOURCE_TYPE_GEOJSON = 4,
+  MLN_STYLE_SOURCE_TYPE_GEO_JSON = 4,
   MLN_STYLE_SOURCE_TYPE_IMAGE = 5,
   MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
   MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
@@ -95,7 +95,7 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_style_source_info_field : uint32_t {
   /** The tile source was defined with an inline TileJSON description. */
-  MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 0U,
+  MLN_STYLE_SOURCE_INFO_TILE_JSON = 1U << 0U,
   /** The inline TileJSON description contains geographic bounds. */
   MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 1U,
   /** The source exposes a tile size. */
@@ -166,24 +166,24 @@ typedef enum mln_style_layer_visibility : uint32_t {
   MLN_STYLE_LAYER_VISIBILITY_NONE = 1,
 } mln_style_layer_visibility;
 
-/** Field mask values for mln_geojson_source_options. */
+/** Field mask values for mln_geo_json_source_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
-) mln_geojson_source_option_field : uint32_t {
-  MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
-  MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
-  MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 1U << 2U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3U,
-  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 4U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 5U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 6U,
-  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 7U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 8U,
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 9U,
-} mln_geojson_source_option_field;
+) mln_geo_json_source_option_field : uint32_t {
+  MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
+  MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
+  MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE = 1U << 2U,
+  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3U,
+  MLN_GEO_JSON_SOURCE_OPTION_BUFFER = 1U << 4U,
+  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 5U,
+  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 6U,
+  MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 1U << 7U,
+  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 1U << 8U,
+  MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 9U,
+} mln_geo_json_source_option_field;
 
-/** A set of mln_geojson_source_option_field bits. */
-typedef uint32_t mln_geojson_source_option_fields;
+/** A set of mln_geo_json_source_option_field bits. */
+typedef uint32_t mln_geo_json_source_option_fields;
 
 /** Field mask values for mln_custom_geometry_source_options. */
 typedef enum MLN_BINDING(
@@ -256,7 +256,7 @@ typedef uint32_t mln_style_transition_option_fields;
 /**
  * Inline TileJSON metadata of a tile source.
  *
- * mln_style_source_info carries it when fields contains TILEJSON.
+ * mln_style_source_info carries it when fields contains TILE_JSON.
  */
 typedef struct mln_style_source_tile_info {
   /** Tile URL templates in TileJSON order. */
@@ -288,8 +288,8 @@ typedef struct mln_style_source_info {
   /** URL that the source loads from, or empty when it has none. */
   mln_buffer_view url;
   /** Inline TileJSON metadata, when the source was defined with it. */
-  mln_style_source_tile_info tilejson
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON");
+  mln_style_source_tile_info tile_json
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_JSON");
   /** Geographic bounds, when inline TileJSON sets them. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_BOUNDS");
@@ -332,21 +332,21 @@ typedef struct mln_style_layer_info {
  * These options are fixed for the source's lifetime. URL updates preserve
  * them, and prepared data updates require matching options.
  */
-typedef struct mln_geojson_source_options {
+typedef struct mln_geo_json_source_options {
   uint32_t size;
-  mln_geojson_source_option_fields fields;
+  mln_geo_json_source_option_fields fields;
   /** Minimum tiling zoom. Absent selects 0. */
   double min_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM");
   /** Maximum tiling zoom, an integer within [0, 24]. Absent selects 18. */
   double max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM");
   /** Douglas-Peucker simplification tolerance. Absent selects 0.375. */
   double tolerance
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_TOLERANCE");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE");
   /** Highest zoom that clusters points. Absent selects 17. */
   double cluster_max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
    * whose members follow the MapLibre Style Spec clusterProperties form, or
@@ -355,35 +355,38 @@ typedef struct mln_geojson_source_options {
   mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
   /** Tile buffer in pixels within [0, 512]. Absent selects 128. */
   uint32_t buffer
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_BUFFER");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_BUFFER");
   /** Cluster radius in pixels within [0, 4095]. Absent selects 50. */
   uint32_t cluster_radius
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS");
   /** Points required to form a cluster. Absent selects 2. */
-  uint32_t cluster_min_points
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS");
+  uint32_t cluster_min_points MLN_BINDING(
+    "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS"
+  );
   /** Adds line distance metrics to line features. Absent selects false. */
   bool line_metrics
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS");
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS");
   /**
    * Clusters point features. Absent selects false.
    *
    * Clustering applies to feature collections whose every feature carries point
-   * geometry. mln_geojson_source_data_create() rejects a bare geometry, a
+   * geometry. mln_geo_json_source_data_create() rejects a bare geometry, a
    * single feature, or a feature collection that mixes in other geometry. An
    * empty feature collection stays accepted and carries nothing to cluster.
    */
-  bool cluster MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER");
+  bool cluster
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER");
   /**
    * Tiles the data for the next render update instead of in the background.
    * Absent selects false.
    *
    * A rendered frame may still wait for tile layout.
-   * mln_map_set_geojson_source_synchronous_tiling() overrides this at runtime.
+   * mln_map_set_geo_json_source_synchronous_tiling() overrides this at runtime.
    */
-  bool synchronous_tiling
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING");
-} mln_geojson_source_options;
+  bool synchronous_tiling MLN_BINDING(
+    "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING"
+  );
+} mln_geo_json_source_options;
 
 /** Canonical tile identity used by custom geometry and custom MVT vector source
  * callbacks. */
@@ -813,9 +816,9 @@ MLN_API mln_status mln_map_list_style_sources(
  *   options cannot be converted.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_geojson_source_url(
+MLN_API mln_status mln_map_add_geo_json_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options MLN_BINDING("nullable=true"),
+  const mln_geo_json_source_options* options MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -834,7 +837,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * Preparation, installation, and release may happen on different threads.
  *
  * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
- * handle the host releases with mln_geojson_source_data_release(). Installing
+ * handle the host releases with mln_geo_json_source_data_release(). Installing
  * the data borrows the handle, so one prepared handle may be installed on any
  * number of sources and released at any time afterward.
  *
@@ -846,10 +849,10 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  *   or a feature carries geometry other than a point.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_API mln_status mln_geojson_source_data_create(
+MLN_API mln_status mln_geo_json_source_data_create(
   mln_buffer_view data MLN_BINDING("encoding=json"),
-  const mln_geojson_source_options* options MLN_BINDING("nullable=true"),
-  mln_geojson_source_data* out_data MLN_BINDING("direction=out"),
+  const mln_geo_json_source_options* options MLN_BINDING("nullable=true"),
+  mln_geo_json_source_data* out_data MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -860,15 +863,15 @@ MLN_API mln_status mln_geojson_source_data_create(
  * Sources the data was installed on keep their own reference, so releasing
  * the handle preserves each source.
  */
-MLN_API void mln_geojson_source_data_release(
-  mln_geojson_source_data data
+MLN_API void mln_geo_json_source_data_release(
+  mln_geo_json_source_data data
 ) MLN_NOEXCEPT;
 
 /**
  * Adds a GeoJSON source with prepared inline data.
  *
  * source_id is borrowed for the call. data names a live handle from
- * mln_geojson_source_data_create(); the call borrows the handle, and the
+ * mln_geo_json_source_data_create(); the call borrows the handle, and the
  * source adopts the options the data was prepared with, fixed for the lifetime
  * of the source.
  *
@@ -884,8 +887,8 @@ MLN_API void mln_geojson_source_data_release(
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+MLN_API mln_status mln_map_add_geo_json_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -893,7 +896,7 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  * Updates one GeoJSON source to load data from a URL.
  *
  * source_id and url are borrowed for the call. The source keeps the
- * mln_geojson_source_options it was added with.
+ * mln_geo_json_source_options it was added with.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -907,7 +910,7 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_geojson_source_url(
+MLN_API mln_status mln_map_set_geo_json_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -916,7 +919,7 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * Updates one GeoJSON source with prepared inline data.
  *
  * source_id is borrowed for the call. data names a live handle from
- * mln_geojson_source_data_create(); the call borrows the handle and retains
+ * mln_geo_json_source_data_create(); the call borrows the handle and retains
  * prepared data before returning.
  *
  * The data must have been prepared with options equal to the options the
@@ -938,8 +941,8 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  *   the data was prepared with options that do not match the source's options.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+MLN_API mln_status mln_map_set_geo_json_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -963,7 +966,7 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
+MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
   mln_map map, mln_buffer_view source_id, bool enabled,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

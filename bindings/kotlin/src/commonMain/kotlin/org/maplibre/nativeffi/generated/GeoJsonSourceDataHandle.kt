@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.internal.memory.*
 /**
  * Prepared GeoJSON data that sources retain independently of its handle.
  *
- * See `mln_geojson_source_data` in the
+ * See `mln_geo_json_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class GeoJsonSourceDataHandle
@@ -38,7 +38,7 @@ internal constructor(
     /**
      * Prepares GeoJSON source data for installation on a map.
      *
-     * See `mln_geojson_source_data_create` in the
+     * See `mln_geo_json_source_data_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
      */
     public fun create(
@@ -48,7 +48,7 @@ internal constructor(
       nativeCall(null, null) {
         val out = allocate(8, 8)
         check(
-          C.mln_geojson_source_data_create(
+          C.mln_geo_json_source_data_create(
             view(data),
             options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
             out,

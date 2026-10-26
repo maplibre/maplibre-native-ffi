@@ -190,7 +190,7 @@ impl OpenGlTextureCompositor {
         context: &OpenGlContext,
         frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
-        frame.get_opengl_texture(|metadata| {
+        frame.get_open_gl_texture(|metadata| {
             if metadata.width == 0 || metadata.height == 0 {
                 return Err(compositor_error("OpenGL frame has an empty extent"));
             }

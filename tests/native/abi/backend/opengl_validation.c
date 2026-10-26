@@ -9,32 +9,32 @@
 #include "support/test_support.h"
 
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
-#define PRESET_PLATFORM MLN_OPENGL_CONTEXT_PLATFORM_WGL
-#define PRESET_PROVIDERS MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL
+#define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_WGL
+#define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL
 #elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
-#define PRESET_PLATFORM MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
-#define PRESET_PROVIDERS MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL
+#define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL
+#define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-#define PRESET_PLATFORM MLN_OPENGL_CONTEXT_PLATFORM_EGL
-#define PRESET_PROVIDERS MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
+#define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
+#define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL
 #else
-#define PRESET_PLATFORM MLN_OPENGL_CONTEXT_PLATFORM_EGL
+#define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
 #define PRESET_PROVIDERS 0U
 #endif
 
 // A shared context of `platform` whose handles only validation reads.
-static mln_opengl_context_descriptor fake_context(uint32_t platform) {
-  mln_opengl_context_descriptor context = {
+static mln_open_gl_context_descriptor fake_context(uint32_t platform) {
+  mln_open_gl_context_descriptor context = {
     .platform = platform,
-    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED,
   };
-  if (platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL) {
+  if (platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WGL) {
     context.data.wgl = (mln_wgl_context_descriptor){
       .device_context = MLN_TEST_FAKE_HANDLE,
       .share_context = MLN_TEST_FAKE_HANDLE,
     };
-  } else if (platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL) {
-    context.data.webgl = (mln_webgl_context_descriptor){
+  } else if (platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL) {
+    context.data.web_gl = (mln_web_gl_context_descriptor){
       .context = 1,
     };
   } else {
@@ -48,32 +48,32 @@ static mln_opengl_context_descriptor fake_context(uint32_t platform) {
 }
 
 // The one handle a shared context needs beyond the display or device.
-static void clear_shared_context(mln_opengl_context_descriptor* context) {
+static void clear_shared_context(mln_open_gl_context_descriptor* context) {
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
   context->data.wgl.share_context = NULL;
 #elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
-  context->data.webgl.context = 0;
+  context->data.web_gl.context = 0;
 #else
   context->data.egl.share_context = NULL;
 #endif
 }
 
-MLN_TEST_DESCRIPTOR_EDITS(opengl_surface, mln_opengl_surface_descriptor)
+MLN_TEST_DESCRIPTOR_EDITS(opengl_surface, mln_open_gl_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(opengl_surface)
-MLN_TEST_DESCRIPTOR_EDITS(opengl_owned, mln_opengl_owned_texture_descriptor)
+MLN_TEST_DESCRIPTOR_EDITS(opengl_owned, mln_open_gl_owned_texture_descriptor)
 MLN_TEST_OVERFLOW_EDIT(opengl_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
-  opengl_borrowed, mln_opengl_borrowed_texture_descriptor
+  opengl_borrowed, mln_open_gl_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(opengl_borrowed, opengl)
 
-static mln_opengl_surface_descriptor* surface_of(void* call) {
+static mln_open_gl_surface_descriptor* surface_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_surface;
 }
-static mln_opengl_owned_texture_descriptor* owned_of(void* call) {
+static mln_open_gl_owned_texture_descriptor* owned_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_owned;
 }
-static mln_opengl_borrowed_texture_descriptor* borrowed_of(void* call) {
+static mln_open_gl_borrowed_texture_descriptor* borrowed_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_borrowed;
 }
 
@@ -94,15 +94,15 @@ static void surface_with_unknown_platform(void* call) {
   surface_of(call)->context.platform = 7;
 }
 static void surface_with_unspecified_platform(void* call) {
-  surface_of(call)->context.platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED;
+  surface_of(call)->context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED;
 }
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 // A dedicated context joins no share group, so naming one contradicts it.
 static void dedicated_surface_with_share_context(void* call) {
-  mln_opengl_context_descriptor* context = &surface_of(call)->context;
-  context->ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  mln_open_gl_context_descriptor* context = &surface_of(call)->context;
+  context->ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
 #if !defined(MLN_FFI_TEST_OPENGL_WGL)
-  context->data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
+  context->data.egl.client_api = MLN_OPEN_GL_CLIENT_API_GLES;
 #endif
 }
 #else
@@ -140,26 +140,26 @@ static void borrowed_without_physical_width(void* call) {
   borrowed_of(call)->physical_width = 0;
 }
 
-MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_opengl_surface)
+MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_open_gl_surface)
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_opengl_owned_texture
+  submit_owned_attach, mln_map_attach_open_gl_owned_texture
 )
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_borrowed_attach, mln_map_attach_opengl_borrowed_texture
+  submit_borrowed_attach, mln_map_attach_open_gl_borrowed_texture
 )
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_surface_set_target, mln_render_session_set_opengl_surface_target
+  submit_surface_set_target, mln_render_session_set_open_gl_surface_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
-  mln_render_session_set_opengl_borrowed_texture_target
+  mln_render_session_set_open_gl_borrowed_texture_target
 )
 #endif
 
-static mln_opengl_surface_descriptor surface_descriptor(void) {
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+static mln_open_gl_surface_descriptor surface_descriptor(void) {
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent = mln_test_target_extent();
   descriptor.context = fake_context(PRESET_PLATFORM);
@@ -169,9 +169,11 @@ static mln_opengl_surface_descriptor surface_descriptor(void) {
   return descriptor;
 }
 
-static mln_opengl_owned_texture_descriptor owned_descriptor(uint32_t platform) {
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+static mln_open_gl_owned_texture_descriptor owned_descriptor(
+  uint32_t platform
+) {
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent = mln_test_target_extent();
   descriptor.context = fake_context(platform);
@@ -180,11 +182,11 @@ static mln_opengl_owned_texture_descriptor owned_descriptor(uint32_t platform) {
 
 // A ring of one texture, whose entry is in the call's storage.
 static void describe_borrowed(mln_test_target_call* call) {
-  call->textures.opengl[0] = (mln_opengl_borrowed_texture){.texture = 1};
-  mln_opengl_borrowed_texture_descriptor* descriptor =
+  call->textures.opengl[0] = (mln_open_gl_borrowed_texture){.texture = 1};
+  mln_open_gl_borrowed_texture_descriptor* descriptor =
     &call->descriptor.opengl_borrowed;
-  *descriptor = (mln_opengl_borrowed_texture_descriptor){
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  *descriptor = (mln_open_gl_borrowed_texture_descriptor){
+    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
   descriptor->extent = mln_test_target_extent();
   descriptor->context = fake_context(PRESET_PLATFORM);
@@ -279,7 +281,7 @@ static void opengl_attach_rejects_malformed_calls(void) {
 // context of any other.
 static void only_the_builds_providers_attach(void) {
   TEST_ASSERT_EQUAL_HEX32(
-    PRESET_PROVIDERS, mln_opengl_supported_context_provider_mask()
+    PRESET_PROVIDERS, mln_open_gl_supported_context_provider_mask()
   );
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -287,9 +289,10 @@ static void only_the_builds_providers_attach(void) {
     uint32_t platform;
     uint32_t provider;
   } providers[] = {
-    {MLN_OPENGL_CONTEXT_PLATFORM_EGL, MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL},
-    {MLN_OPENGL_CONTEXT_PLATFORM_WGL, MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL},
-    {MLN_OPENGL_CONTEXT_PLATFORM_WEBGL, MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL},
+    {MLN_OPEN_GL_CONTEXT_PLATFORM_EGL, MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL},
+    {MLN_OPEN_GL_CONTEXT_PLATFORM_WGL, MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL},
+    {MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
+     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL},
   };
   for (size_t index = 0; index < sizeof(providers) / sizeof(providers[0]);
        index += 1) {

@@ -157,11 +157,11 @@ static mln_vulkan_context_descriptor host_context(
   };
 }
 #elif defined(MLN_FFI_TEST_OPENGL_WGL)
-static mln_opengl_context_descriptor host_context(
+static mln_open_gl_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
-  return (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL,
     .data = {
       .wgl = {
         .device_context = context->wgl_device_context,
@@ -172,11 +172,11 @@ static mln_opengl_context_descriptor host_context(
   };
 }
 #else
-static mln_opengl_context_descriptor host_context(
+static mln_open_gl_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
-  return (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
     .data = {
       .egl = {
         .display = context->egl_display,
@@ -223,14 +223,14 @@ bool mln_test_backend_attach(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
-  *out_status = mln_map_attach_opengl_owned_texture(
+  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
+  *out_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -246,9 +246,9 @@ typedef mln_vulkan_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_vulkan_borrowed_texture borrowed_entry;
 typedef mln_vulkan_surface_descriptor surface_descriptor;
 #else
-typedef mln_opengl_borrowed_texture_descriptor borrowed_descriptor;
-typedef mln_opengl_borrowed_texture borrowed_entry;
-typedef mln_opengl_surface_descriptor surface_descriptor;
+typedef mln_open_gl_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_open_gl_borrowed_texture borrowed_entry;
+typedef mln_open_gl_surface_descriptor surface_descriptor;
 #endif
 
 // Describes `textures`, which the graphics object with `context` created, as a
@@ -291,8 +291,8 @@ static bool describe_ring(
   out->initial_layout = info.vulkan_initial_layout;
   out->final_layout = info.vulkan_final_layout;
 #else
-  *out = (mln_opengl_borrowed_texture_descriptor){
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  *out = (mln_open_gl_borrowed_texture_descriptor){
+    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
   out->context = host_context(context);
   out->target = info.opengl_target;
@@ -327,8 +327,8 @@ static bool describe_surface(
   };
   out->surface = info.vulkan_surface;
 #else
-  *out = (mln_opengl_surface_descriptor){
-    .size = sizeof(mln_opengl_surface_descriptor)
+  *out = (mln_open_gl_surface_descriptor){
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   out->surface = info.opengl_surface;
 #endif
@@ -384,8 +384,8 @@ static bool attach_borrowed_texture(
   );
 #else
   mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
-  *out_status = mln_map_attach_opengl_borrowed_texture(
+  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
+  *out_status = mln_map_attach_open_gl_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -423,7 +423,7 @@ static bool attach_surface(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  *out_status = mln_map_attach_opengl_surface(
+  *out_status = mln_map_attach_open_gl_surface(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -590,9 +590,10 @@ uint64_t mln_test_frame_texture_handle(
   *out_slot = record.slot;
   return record.image;
 #else
-  mln_opengl_texture_frame record = {.size = sizeof(record)};
+  mln_open_gl_texture_frame record = {.size = sizeof(record)};
   if (
-    mln_acquired_frame_get_opengl_texture(frame, &record, NULL) != MLN_STATUS_OK
+    mln_acquired_frame_get_open_gl_texture(frame, &record, NULL) !=
+    MLN_STATUS_OK
   ) {
     return 0;
   }
@@ -691,7 +692,7 @@ mln_status mln_test_render_fixture_set_textures(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  return mln_render_session_set_opengl_borrowed_texture_target(
+  return mln_render_session_set_open_gl_borrowed_texture_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -718,7 +719,7 @@ mln_status mln_test_render_fixture_set_surface(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  return mln_render_session_set_opengl_surface_target(
+  return mln_render_session_set_open_gl_surface_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif

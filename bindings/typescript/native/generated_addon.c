@@ -57,13 +57,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_acquired_frame_get_opengl_texture(
+static napi_value mln_ts_export_mln_acquired_frame_get_open_gl_texture(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_acquired_frame arg_frame = 0;
-  mln_opengl_texture_frame arg_out_frame;
+  mln_open_gl_texture_frame arg_out_frame;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -76,11 +76,11 @@ static napi_value mln_ts_export_mln_acquired_frame_get_opengl_texture(
   arg_out_frame.size = sizeof arg_out_frame;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_acquired_frame_get_opengl_texture(
+  status = mln_acquired_frame_get_open_gl_texture(
     arg_frame, &arg_out_frame, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_read_opengl_texture_frame(
+  call->result = mln_ts_read_open_gl_texture_frame(
     env, &(arg_out_frame), sizeof(arg_out_frame)
   );
 done:
@@ -229,15 +229,15 @@ static napi_value mln_ts_export_mln_c_version(
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_geojson_source_data_create(
+static napi_value mln_ts_export_mln_geo_json_source_data_create(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_buffer_view arg_data = {0};
-  mln_geojson_source_options arg_options;
+  mln_geo_json_source_options arg_options;
   const void* present_options = NULL;
-  mln_geojson_source_data arg_out_data = MLN_HANDLE_NULL;
+  mln_geo_json_source_data arg_out_data = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
@@ -246,7 +246,7 @@ static napi_value mln_ts_export_mln_geojson_source_data_create(
     memset(&arg_options, 0, sizeof arg_options);
     arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
-    if (!mln_ts_write_geojson_source_options(
+    if (!mln_ts_write_geo_json_source_options(
           call, call->argv[1], &arg_options, "options"
         ))
       goto done;
@@ -254,7 +254,7 @@ static napi_value mln_ts_export_mln_geojson_source_data_create(
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_geojson_source_data_create(
+  status = mln_geo_json_source_data_create(
     arg_data, present_options, &arg_out_data, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -263,20 +263,20 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_geojson_source_data_release(
+static napi_value mln_ts_export_mln_geo_json_source_data_release(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  mln_geojson_source_data arg_data = 0;
+  mln_geo_json_source_data arg_data = 0;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "data")) goto done;
-    arg_data = (mln_geojson_source_data)number;
+    arg_data = (mln_geo_json_source_data)number;
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_geojson_source_data_release(arg_data);
+  mln_geo_json_source_data_release(arg_data);
   mln_ts_consume(call);
 done:
   return mln_ts_end(call);
@@ -508,7 +508,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_add_geojson_source_data(
+static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -536,7 +536,7 @@ static napi_value mln_ts_export_mln_map_add_geojson_source_data(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_add_geojson_source_data(
+  status = mln_map_add_geo_json_source_data(
     arg_map, arg_source_id, arg_data, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -544,7 +544,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_add_geojson_source_url(
+static napi_value mln_ts_export_mln_map_add_geo_json_source_url(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -552,7 +552,7 @@ static napi_value mln_ts_export_mln_map_add_geojson_source_url(
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
   mln_buffer_view arg_url = {0};
-  mln_geojson_source_options arg_options;
+  mln_geo_json_source_options arg_options;
   const void* present_options = NULL;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
@@ -571,7 +571,7 @@ static napi_value mln_ts_export_mln_map_add_geojson_source_url(
     memset(&arg_options, 0, sizeof arg_options);
     arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-    if (!mln_ts_write_geojson_source_options(
+    if (!mln_ts_write_geo_json_source_options(
           call, call->argv[3], &arg_options, "options"
         ))
       goto done;
@@ -584,7 +584,7 @@ static napi_value mln_ts_export_mln_map_add_geojson_source_url(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_add_geojson_source_url(
+  status = mln_map_add_geo_json_source_url(
     arg_map, arg_source_id, arg_url, present_options, present_completion,
     &diagnostic
   );
@@ -967,13 +967,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_attach_opengl_borrowed_texture(
+static napi_value mln_ts_export_mln_map_attach_open_gl_borrowed_texture(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_opengl_borrowed_texture_descriptor arg_descriptor;
+  mln_open_gl_borrowed_texture_descriptor arg_descriptor;
   mln_render_session_attach_options arg_options;
   mln_render_session arg_out_session = MLN_HANDLE_NULL;
   mln_completion arg_completion;
@@ -989,7 +989,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_borrowed_texture(
   memset(&arg_descriptor, 0, sizeof arg_descriptor);
   arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_opengl_borrowed_texture_descriptor(
+  if (!mln_ts_write_open_gl_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
@@ -1007,7 +1007,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_borrowed_texture(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_attach_opengl_borrowed_texture(
+  status = mln_map_attach_open_gl_borrowed_texture(
     arg_map, &arg_descriptor, &arg_options, &arg_out_session,
     present_completion, &diagnostic
   );
@@ -1018,13 +1018,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_attach_opengl_owned_texture(
+static napi_value mln_ts_export_mln_map_attach_open_gl_owned_texture(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_opengl_owned_texture_descriptor arg_descriptor;
+  mln_open_gl_owned_texture_descriptor arg_descriptor;
   mln_render_session_attach_options arg_options;
   mln_render_session arg_out_session = MLN_HANDLE_NULL;
   mln_completion arg_completion;
@@ -1040,7 +1040,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_owned_texture(
   memset(&arg_descriptor, 0, sizeof arg_descriptor);
   arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_opengl_owned_texture_descriptor(
+  if (!mln_ts_write_open_gl_owned_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
@@ -1058,7 +1058,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_owned_texture(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_attach_opengl_owned_texture(
+  status = mln_map_attach_open_gl_owned_texture(
     arg_map, &arg_descriptor, &arg_options, &arg_out_session,
     present_completion, &diagnostic
   );
@@ -1069,13 +1069,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_attach_opengl_surface(
+static napi_value mln_ts_export_mln_map_attach_open_gl_surface(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_opengl_surface_descriptor arg_descriptor;
+  mln_open_gl_surface_descriptor arg_descriptor;
   mln_render_session_attach_options arg_options;
   mln_render_session arg_out_session = MLN_HANDLE_NULL;
   mln_completion arg_completion;
@@ -1091,7 +1091,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_surface(
   memset(&arg_descriptor, 0, sizeof arg_descriptor);
   arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_opengl_surface_descriptor(
+  if (!mln_ts_write_open_gl_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
@@ -1109,7 +1109,7 @@ static napi_value mln_ts_export_mln_map_attach_opengl_surface(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_attach_opengl_surface(
+  status = mln_map_attach_open_gl_surface(
     arg_map, &arg_descriptor, &arg_options, &arg_out_session,
     present_completion, &diagnostic
   );
@@ -3401,7 +3401,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_geojson_source_data(
+static napi_value mln_ts_export_mln_map_set_geo_json_source_data(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -3429,7 +3429,7 @@ static napi_value mln_ts_export_mln_map_set_geojson_source_data(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_set_geojson_source_data(
+  status = mln_map_set_geo_json_source_data(
     arg_map, arg_source_id, arg_data, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -3437,7 +3437,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_geojson_source_synchronous_tiling(
+static napi_value mln_ts_export_mln_map_set_geo_json_source_synchronous_tiling(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -3470,7 +3470,7 @@ static napi_value mln_ts_export_mln_map_set_geojson_source_synchronous_tiling(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_set_geojson_source_synchronous_tiling(
+  status = mln_map_set_geo_json_source_synchronous_tiling(
     arg_map, arg_source_id, arg_enabled, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -3478,7 +3478,7 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_geojson_source_url(
+static napi_value mln_ts_export_mln_map_set_geo_json_source_url(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -3506,7 +3506,7 @@ static napi_value mln_ts_export_mln_map_set_geojson_source_url(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_set_geojson_source_url(
+  status = mln_map_set_geo_json_source_url(
     arg_map, arg_source_id, arg_url, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -4230,14 +4230,14 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_opengl_supported_context_provider_mask(
+static napi_value mln_ts_export_mln_open_gl_supported_context_provider_mask(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  mln_opengl_context_provider_flags result;
+  mln_open_gl_context_provider_flags result;
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_opengl_supported_context_provider_mask();
+  result = mln_open_gl_supported_context_provider_mask();
   call->result = mln_ts_number(env, (double)(result));
   return mln_ts_end(call);
 }
@@ -4968,13 +4968,13 @@ done:
 }
 
 static napi_value
-mln_ts_export_mln_render_session_set_opengl_borrowed_texture_target(
+mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  mln_opengl_borrowed_texture_descriptor arg_descriptor;
+  mln_open_gl_borrowed_texture_descriptor arg_descriptor;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -4988,7 +4988,7 @@ mln_ts_export_mln_render_session_set_opengl_borrowed_texture_target(
   memset(&arg_descriptor, 0, sizeof arg_descriptor);
   arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_opengl_borrowed_texture_descriptor(
+  if (!mln_ts_write_open_gl_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
@@ -4999,7 +4999,7 @@ mln_ts_export_mln_render_session_set_opengl_borrowed_texture_target(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_render_session_set_opengl_borrowed_texture_target(
+  status = mln_render_session_set_open_gl_borrowed_texture_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -5007,13 +5007,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_render_session_set_opengl_surface_target(
+static napi_value mln_ts_export_mln_render_session_set_open_gl_surface_target(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  mln_opengl_surface_descriptor arg_descriptor;
+  mln_open_gl_surface_descriptor arg_descriptor;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -5027,7 +5027,7 @@ static napi_value mln_ts_export_mln_render_session_set_opengl_surface_target(
   memset(&arg_descriptor, 0, sizeof arg_descriptor);
   arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_opengl_surface_descriptor(
+  if (!mln_ts_write_open_gl_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
@@ -5038,7 +5038,7 @@ static napi_value mln_ts_export_mln_render_session_set_opengl_surface_target(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_render_session_set_opengl_surface_target(
+  status = mln_render_session_set_open_gl_surface_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -6451,8 +6451,8 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_discard", mln_ts_export_mln_acquired_frame_discard},
   {"mln_acquired_frame_get_metal_texture",
    mln_ts_export_mln_acquired_frame_get_metal_texture},
-  {"mln_acquired_frame_get_opengl_texture",
-   mln_ts_export_mln_acquired_frame_get_opengl_texture},
+  {"mln_acquired_frame_get_open_gl_texture",
+   mln_ts_export_mln_acquired_frame_get_open_gl_texture},
   {"mln_acquired_frame_get_producer_sync",
    mln_ts_export_mln_acquired_frame_get_producer_sync},
   {"mln_acquired_frame_get_result",
@@ -6464,10 +6464,10 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_acquired_frame_view_begin},
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
   {"mln_c_version", mln_ts_export_mln_c_version},
-  {"mln_geojson_source_data_create",
-   mln_ts_export_mln_geojson_source_data_create},
-  {"mln_geojson_source_data_release",
-   mln_ts_export_mln_geojson_source_data_release},
+  {"mln_geo_json_source_data_create",
+   mln_ts_export_mln_geo_json_source_data_create},
+  {"mln_geo_json_source_data_release",
+   mln_ts_export_mln_geo_json_source_data_release},
   {"mln_lat_lng_for_projected_meters",
    mln_ts_export_mln_lat_lng_for_projected_meters},
   {"mln_log_clear_callback", mln_ts_export_mln_log_clear_callback},
@@ -6480,10 +6480,10 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_add_custom_geometry_source},
   {"mln_map_add_custom_mvt_vector_source",
    mln_ts_export_mln_map_add_custom_mvt_vector_source},
-  {"mln_map_add_geojson_source_data",
-   mln_ts_export_mln_map_add_geojson_source_data},
-  {"mln_map_add_geojson_source_url",
-   mln_ts_export_mln_map_add_geojson_source_url},
+  {"mln_map_add_geo_json_source_data",
+   mln_ts_export_mln_map_add_geo_json_source_data},
+  {"mln_map_add_geo_json_source_url",
+   mln_ts_export_mln_map_add_geo_json_source_url},
   {"mln_map_add_image_source_image",
    mln_ts_export_mln_map_add_image_source_image},
   {"mln_map_add_image_source_url", mln_ts_export_mln_map_add_image_source_url},
@@ -6496,12 +6496,12 @@ static const mln_ts_export exports[] = {
   {"mln_map_attach_metal_owned_texture",
    mln_ts_export_mln_map_attach_metal_owned_texture},
   {"mln_map_attach_metal_surface", mln_ts_export_mln_map_attach_metal_surface},
-  {"mln_map_attach_opengl_borrowed_texture",
-   mln_ts_export_mln_map_attach_opengl_borrowed_texture},
-  {"mln_map_attach_opengl_owned_texture",
-   mln_ts_export_mln_map_attach_opengl_owned_texture},
-  {"mln_map_attach_opengl_surface",
-   mln_ts_export_mln_map_attach_opengl_surface},
+  {"mln_map_attach_open_gl_borrowed_texture",
+   mln_ts_export_mln_map_attach_open_gl_borrowed_texture},
+  {"mln_map_attach_open_gl_owned_texture",
+   mln_ts_export_mln_map_attach_open_gl_owned_texture},
+  {"mln_map_attach_open_gl_surface",
+   mln_ts_export_mln_map_attach_open_gl_surface},
   {"mln_map_attach_vulkan_borrowed_texture",
    mln_ts_export_mln_map_attach_vulkan_borrowed_texture},
   {"mln_map_attach_vulkan_owned_texture",
@@ -6593,12 +6593,12 @@ static const mln_ts_export exports[] = {
   {"mln_map_set_feature_state", mln_ts_export_mln_map_set_feature_state},
   {"mln_map_set_free_camera_options",
    mln_ts_export_mln_map_set_free_camera_options},
-  {"mln_map_set_geojson_source_data",
-   mln_ts_export_mln_map_set_geojson_source_data},
-  {"mln_map_set_geojson_source_synchronous_tiling",
-   mln_ts_export_mln_map_set_geojson_source_synchronous_tiling},
-  {"mln_map_set_geojson_source_url",
-   mln_ts_export_mln_map_set_geojson_source_url},
+  {"mln_map_set_geo_json_source_data",
+   mln_ts_export_mln_map_set_geo_json_source_data},
+  {"mln_map_set_geo_json_source_synchronous_tiling",
+   mln_ts_export_mln_map_set_geo_json_source_synchronous_tiling},
+  {"mln_map_set_geo_json_source_url",
+   mln_ts_export_mln_map_set_geo_json_source_url},
   {"mln_map_set_global_state_property",
    mln_ts_export_mln_map_set_global_state_property},
   {"mln_map_set_image_source_coordinates",
@@ -6626,8 +6626,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_update_camera", mln_ts_export_mln_map_update_camera},
   {"mln_network_get_status", mln_ts_export_mln_network_get_status},
   {"mln_network_set_status", mln_ts_export_mln_network_set_status},
-  {"mln_opengl_supported_context_provider_mask",
-   mln_ts_export_mln_opengl_supported_context_provider_mask},
+  {"mln_open_gl_supported_context_provider_mask",
+   mln_ts_export_mln_open_gl_supported_context_provider_mask},
   {"mln_plugin_get_register_function_v1",
    mln_ts_export_mln_plugin_get_register_function_v1},
   {"mln_projected_meters_for_lat_lng",
@@ -6667,10 +6667,10 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_set_metal_borrowed_texture_target},
   {"mln_render_session_set_metal_surface_target",
    mln_ts_export_mln_render_session_set_metal_surface_target},
-  {"mln_render_session_set_opengl_borrowed_texture_target",
-   mln_ts_export_mln_render_session_set_opengl_borrowed_texture_target},
-  {"mln_render_session_set_opengl_surface_target",
-   mln_ts_export_mln_render_session_set_opengl_surface_target},
+  {"mln_render_session_set_open_gl_borrowed_texture_target",
+   mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target},
+  {"mln_render_session_set_open_gl_surface_target",
+   mln_ts_export_mln_render_session_set_open_gl_surface_target},
   {"mln_render_session_set_vulkan_borrowed_texture_target",
    mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target},
   {"mln_render_session_set_vulkan_surface_target",

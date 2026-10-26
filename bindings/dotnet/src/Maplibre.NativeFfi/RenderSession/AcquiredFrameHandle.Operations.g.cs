@@ -99,15 +99,15 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// Copies OpenGL-native metadata from an acquired frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_opengl_texture</c> in the <see
+    /// See <c>mln_acquired_frame_get_open_gl_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
     public void WithOpenGlTexture(Action<OpenGlTextureFrameView> callback)
     {
         using var call = Enter(this);
-        var outFrame = new mln_opengl_texture_frame
+        var outFrame = new mln_open_gl_texture_frame
         {
-            size = (uint)sizeof(mln_opengl_texture_frame),
+            size = (uint)sizeof(mln_open_gl_texture_frame),
         };
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
@@ -116,7 +116,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         try
         {
             Check(
-                NativeMethods.mln_acquired_frame_get_opengl_texture(Handle, &outFrame, Diagnostic)
+                NativeMethods.mln_acquired_frame_get_open_gl_texture(Handle, &outFrame, Diagnostic)
             );
             callback(new OpenGlTextureFrameView(CopyOpenGlTextureFrame(outFrame), viewScope));
         }

@@ -81,12 +81,12 @@ auto logical_extent_physical_size(
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
-  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
+  return MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL;
 #elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
+  return MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL;
 #elif defined(MLN_RENDER_BACKEND_OPENGL) && \
   defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL;
+  return MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL;
 #else
   return 0;
 #endif
@@ -94,7 +94,7 @@ auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 
 // The instance and queue are optional: no session kind needs the instance, and
 // a null queue means the device's default queue.
-auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
+auto validate_webgpu_context(const mln_web_gpu_context_descriptor& context)
   -> mln_status {
   if (context.device == nullptr) {
     set_thread_error("WebGPU device must not be null");
@@ -104,22 +104,22 @@ auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
 }
 
 auto validate_opengl_context(
-  const mln_opengl_context_descriptor& context, bool require_supported_provider
+  const mln_open_gl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status {
   if (
-    context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED &&
-    context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
+    context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED &&
+    context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED
   ) {
-    set_thread_error("mln_opengl_context_descriptor.ownership is unknown");
+    set_thread_error("mln_open_gl_context_descriptor.ownership is unknown");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto dedicated =
-    context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+    context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
 
-  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL) {
+  if (context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WGL) {
     if (
       require_supported_provider && (opengl_supported_context_provider_mask() &
-                                     MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL) == 0
+                                     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL) == 0
     ) {
       set_thread_error("OpenGL WGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
@@ -146,10 +146,10 @@ auto validate_opengl_context(
     return MLN_STATUS_OK;
   }
 
-  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL) {
+  if (context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_EGL) {
     if (
       require_supported_provider && (opengl_supported_context_provider_mask() &
-                                     MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL) == 0
+                                     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL) == 0
     ) {
       set_thread_error("OpenGL EGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
@@ -170,8 +170,8 @@ auto validate_opengl_context(
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       if (
-        context.data.egl.client_api != MLN_OPENGL_CLIENT_API_GL &&
-        context.data.egl.client_api != MLN_OPENGL_CLIENT_API_GLES
+        context.data.egl.client_api != MLN_OPEN_GL_CLIENT_API_GL &&
+        context.data.egl.client_api != MLN_OPEN_GL_CLIENT_API_GLES
       ) {
         set_thread_error(
           "a dedicated EGL context has no share context to take "
@@ -189,27 +189,27 @@ auto validate_opengl_context(
     return MLN_STATUS_OK;
   }
 
-  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL) {
+  if (context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL) {
     if (
       require_supported_provider &&
       (opengl_supported_context_provider_mask() &
-       MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL) == 0
+       MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL) == 0
     ) {
       set_thread_error("OpenGL WebGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
     }
-    if (context.data.webgl.kind == MLN_WEBGL_CONTEXT_EXISTING) {
+    if (context.data.web_gl.kind == MLN_WEB_GL_CONTEXT_EXISTING) {
       if (dedicated) {
         set_thread_error("an existing WebGL context must use shared ownership");
         return MLN_STATUS_INVALID_ARGUMENT;
       }
-      if (context.data.webgl.context <= 0) {
+      if (context.data.web_gl.context <= 0) {
         set_thread_error("WebGL context handle must be positive");
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       return MLN_STATUS_OK;
     }
-    if (context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS) {
+    if (context.data.web_gl.kind == MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS) {
       if (!dedicated) {
         set_thread_error(
           "a transferred WebGL canvas must use dedicated ownership"
@@ -217,9 +217,9 @@ auto validate_opengl_context(
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       if (
-        context.data.webgl.context != 0 ||
-        context.data.webgl.canvas_selector.data == nullptr ||
-        context.data.webgl.canvas_selector.size == 0
+        context.data.web_gl.context != 0 ||
+        context.data.web_gl.canvas_selector.data == nullptr ||
+        context.data.web_gl.canvas_selector.size == 0
       ) {
         set_thread_error(
           "a transferred WebGL canvas requires a selector and "
@@ -248,14 +248,14 @@ auto vulkan_context_matches(
 }
 
 auto opengl_context_matches(
-  const mln_opengl_context_descriptor& lhs,
-  const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
+  const mln_open_gl_context_descriptor& lhs,
+  const mln_open_gl_context_descriptor& rhs, OpenGLContextMatch strictness
 ) -> bool {
   if (lhs.platform != rhs.platform) {
     return false;
   }
   switch (lhs.platform) {
-    case MLN_OPENGL_CONTEXT_PLATFORM_WGL:
+    case MLN_OPEN_GL_CONTEXT_PLATFORM_WGL:
       if (lhs.ownership != rhs.ownership) {
         return false;
       }
@@ -263,13 +263,13 @@ auto opengl_context_matches(
       // was created from is what identifies it under either strictness.
       if (
         (strictness == OpenGLContextMatch::Exact ||
-         lhs.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED) &&
+         lhs.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED) &&
         lhs.data.wgl.device_context != rhs.data.wgl.device_context
       ) {
         return false;
       }
       return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
-    case MLN_OPENGL_CONTEXT_PLATFORM_EGL:
+    case MLN_OPEN_GL_CONTEXT_PLATFORM_EGL:
       // EGL names its drawable in the target rather than in the context, so
       // both strictnesses ask for the same three handles.
       // A dedicated context names no share context, so its identity rests on
@@ -280,7 +280,7 @@ auto opengl_context_matches(
         return false;
       }
       if (
-        lhs.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED &&
+        lhs.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED &&
         lhs.data.egl.client_api != rhs.data.egl.client_api
       ) {
         return false;
@@ -288,28 +288,28 @@ auto opengl_context_matches(
       return lhs.data.egl.display == rhs.data.egl.display &&
              lhs.data.egl.config == rhs.data.egl.config &&
              lhs.data.egl.share_context == rhs.data.egl.share_context;
-    case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
-      if (lhs.data.webgl.kind != rhs.data.webgl.kind) {
+    case MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL:
+      if (lhs.data.web_gl.kind != rhs.data.web_gl.kind) {
         return false;
       }
-      if (lhs.data.webgl.kind == MLN_WEBGL_CONTEXT_EXISTING) {
-        return lhs.data.webgl.context == rhs.data.webgl.context;
+      if (lhs.data.web_gl.kind == MLN_WEB_GL_CONTEXT_EXISTING) {
+        return lhs.data.web_gl.context == rhs.data.web_gl.context;
       }
-      return lhs.data.webgl.canvas_selector.size ==
-               rhs.data.webgl.canvas_selector.size &&
+      return lhs.data.web_gl.canvas_selector.size ==
+               rhs.data.web_gl.canvas_selector.size &&
              std::equal(
                static_cast<const std::byte*>(
-                 lhs.data.webgl.canvas_selector.data
+                 lhs.data.web_gl.canvas_selector.data
                ),
                static_cast<const std::byte*>(
-                 lhs.data.webgl.canvas_selector.data
+                 lhs.data.web_gl.canvas_selector.data
                ) +
-                 lhs.data.webgl.canvas_selector.size,
+                 lhs.data.web_gl.canvas_selector.size,
                static_cast<const std::byte*>(
-                 rhs.data.webgl.canvas_selector.data
+                 rhs.data.web_gl.canvas_selector.data
                )
              );
-    case MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED:
+    case MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED:
       break;
   }
   return false;
@@ -1513,7 +1513,7 @@ auto validate_render_session_attach_request(
   }
   if (
     options->producer_sync_kind != MLN_GPU_SYNC_CPU_COMPLETE &&
-    options->producer_sync_kind != MLN_GPU_SYNC_OPENGL_FENCE
+    options->producer_sync_kind != MLN_GPU_SYNC_OPEN_GL_FENCE
   ) {
     set_thread_error("producer synchronization kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3598,7 +3598,7 @@ auto acquired_frame_release(
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (copied.kind == MLN_GPU_SYNC_OPENGL_FENCE && copied.handle == 0) {
+  if (copied.kind == MLN_GPU_SYNC_OPEN_GL_FENCE && copied.handle == 0) {
     set_thread_error("OpenGL fence must have a nonzero handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

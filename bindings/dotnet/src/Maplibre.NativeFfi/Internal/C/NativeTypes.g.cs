@@ -221,7 +221,7 @@ internal unsafe struct mln_egl_context_descriptor
     public void* display;
     public void* config;
     public void* share_context;
-    public mln_opengl_client_api client_api;
+    public mln_open_gl_client_api client_api;
     public void* get_proc_address;
 }
 
@@ -258,10 +258,10 @@ internal unsafe struct mln_free_camera_options
     public mln_quaternion orientation;
 }
 
-internal unsafe struct mln_geojson_source_options
+internal unsafe struct mln_geo_json_source_options
 {
     public uint size;
-    public mln_geojson_source_option_field fields;
+    public mln_geo_json_source_option_field fields;
     public double min_zoom;
     public double max_zoom;
     public double tolerance;
@@ -533,32 +533,32 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
     public byte include_ideographs;
 }
 
-internal unsafe struct mln_opengl_borrowed_texture
+internal unsafe struct mln_open_gl_borrowed_texture
 {
     public uint texture;
 }
 
-internal unsafe struct mln_opengl_borrowed_texture_descriptor
+internal unsafe struct mln_open_gl_borrowed_texture_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
-    public mln_opengl_context_descriptor context;
-    public mln_opengl_borrowed_texture* textures;
+    public mln_open_gl_context_descriptor context;
+    public mln_open_gl_borrowed_texture* textures;
     public nuint texture_count;
     public uint target;
 }
 
-internal unsafe struct mln_opengl_context_descriptor
+internal unsafe struct mln_open_gl_context_descriptor
 {
-    public mln_opengl_context_platform platform;
-    public mln_opengl_context_ownership ownership;
-    public mln_opengl_context_descriptor_data data;
+    public mln_open_gl_context_platform platform;
+    public mln_open_gl_context_ownership ownership;
+    public mln_open_gl_context_descriptor_data data;
 }
 
 [StructLayout(LayoutKind.Explicit)]
-internal unsafe struct mln_opengl_context_descriptor_data
+internal unsafe struct mln_open_gl_context_descriptor_data
 {
     [FieldOffset(0)]
     public mln_wgl_context_descriptor wgl;
@@ -567,25 +567,25 @@ internal unsafe struct mln_opengl_context_descriptor_data
     public mln_egl_context_descriptor egl;
 
     [FieldOffset(0)]
-    public mln_webgl_context_descriptor webgl;
+    public mln_web_gl_context_descriptor web_gl;
 }
 
-internal unsafe struct mln_opengl_owned_texture_descriptor
+internal unsafe struct mln_open_gl_owned_texture_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
-    public mln_opengl_context_descriptor context;
+    public mln_open_gl_context_descriptor context;
 }
 
-internal unsafe struct mln_opengl_surface_descriptor
+internal unsafe struct mln_open_gl_surface_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
-    public mln_opengl_context_descriptor context;
+    public mln_open_gl_context_descriptor context;
     public void* surface;
 }
 
-internal unsafe struct mln_opengl_texture_frame
+internal unsafe struct mln_open_gl_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -1043,7 +1043,7 @@ internal unsafe struct mln_style_source_info
     public byte is_volatile;
     public mln_buffer_view attribution;
     public mln_buffer_view url;
-    public mln_style_source_tile_info tilejson;
+    public mln_style_source_tile_info tile_json;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
     public mln_style_vector_tile_encoding vector_encoding;
@@ -1175,55 +1175,55 @@ internal unsafe struct mln_wake
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
-internal unsafe struct mln_webgl_context_descriptor
+internal unsafe struct mln_web_gl_context_descriptor
 {
-    public mln_webgl_context_kind kind;
+    public mln_web_gl_context_kind kind;
     public int context;
     public mln_buffer_view canvas_selector;
 }
 
-internal unsafe struct mln_webgpu_borrowed_texture
+internal unsafe struct mln_web_gpu_borrowed_texture
 {
     public void* texture;
     public void* texture_view;
 }
 
-internal unsafe struct mln_webgpu_borrowed_texture_descriptor
+internal unsafe struct mln_web_gpu_borrowed_texture_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
-    public mln_webgpu_context_descriptor context;
-    public mln_webgpu_borrowed_texture* textures;
+    public mln_web_gpu_context_descriptor context;
+    public mln_web_gpu_borrowed_texture* textures;
     public nuint texture_count;
     public uint format;
 }
 
-internal unsafe struct mln_webgpu_context_descriptor
+internal unsafe struct mln_web_gpu_context_descriptor
 {
     public void* instance;
     public void* device;
     public void* queue;
 }
 
-internal unsafe struct mln_webgpu_owned_texture_descriptor
+internal unsafe struct mln_web_gpu_owned_texture_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
-    public mln_webgpu_context_descriptor context;
+    public mln_web_gpu_context_descriptor context;
 }
 
-internal unsafe struct mln_webgpu_surface_descriptor
+internal unsafe struct mln_web_gpu_surface_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
-    public mln_webgpu_context_descriptor context;
+    public mln_web_gpu_context_descriptor context;
     public void* surface;
     public uint format;
 }
 
-internal unsafe struct mln_webgpu_texture_frame
+internal unsafe struct mln_web_gpu_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -1371,18 +1371,18 @@ internal enum mln_free_camera_option_field : uint
     MLN_FREE_CAMERA_OPTION_ORIENTATION = 2,
 }
 
-internal enum mln_geojson_source_option_field : uint
+internal enum mln_geo_json_source_option_field : uint
 {
-    MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1,
-    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2,
-    MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8,
-    MLN_GEOJSON_SOURCE_OPTION_BUFFER = 16,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 32,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64,
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 128,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 256,
-    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512,
+    MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM = 1,
+    MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM = 2,
+    MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE = 4,
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8,
+    MLN_GEO_JSON_SOURCE_OPTION_BUFFER = 16,
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS = 32,
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64,
+    MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128,
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256,
+    MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512,
 }
 
 internal enum mln_gesture_phase : uint
@@ -1397,7 +1397,7 @@ internal enum mln_gesture_phase : uint
 internal enum mln_gpu_sync_kind : uint
 {
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
-    MLN_GPU_SYNC_OPENGL_FENCE = 1,
+    MLN_GPU_SYNC_OPEN_GL_FENCE = 1,
 }
 
 internal enum mln_log_event : uint
@@ -1504,32 +1504,32 @@ internal enum mln_offline_region_download_state : uint
     MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 }
 
-internal enum mln_opengl_client_api : uint
+internal enum mln_open_gl_client_api : uint
 {
-    MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0,
-    MLN_OPENGL_CLIENT_API_GL = 1,
-    MLN_OPENGL_CLIENT_API_GLES = 2,
+    MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0,
+    MLN_OPEN_GL_CLIENT_API_GL = 1,
+    MLN_OPEN_GL_CLIENT_API_GLES = 2,
 }
 
-internal enum mln_opengl_context_ownership : uint
+internal enum mln_open_gl_context_ownership : uint
 {
-    MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0,
-    MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1,
+    MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0,
+    MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1,
 }
 
-internal enum mln_opengl_context_platform : uint
+internal enum mln_open_gl_context_platform : uint
 {
-    MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0,
-    MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1,
-    MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2,
-    MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3,
+    MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED = 0,
+    MLN_OPEN_GL_CONTEXT_PLATFORM_WGL = 1,
+    MLN_OPEN_GL_CONTEXT_PLATFORM_EGL = 2,
+    MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3,
 }
 
-internal enum mln_opengl_context_provider_flag : uint
+internal enum mln_open_gl_context_provider_flag : uint
 {
-    MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1,
-    MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 2,
-    MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4,
+    MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1,
+    MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2,
+    MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4,
 }
 
 internal enum mln_projection_mode_field : uint
@@ -1549,8 +1549,8 @@ internal enum mln_render_backend_flag : uint
 {
     MLN_RENDER_BACKEND_FLAG_METAL = 1,
     MLN_RENDER_BACKEND_FLAG_VULKAN = 2,
-    MLN_RENDER_BACKEND_FLAG_OPENGL = 4,
-    MLN_RENDER_BACKEND_FLAG_WEBGPU = 8,
+    MLN_RENDER_BACKEND_FLAG_OPEN_GL = 4,
+    MLN_RENDER_BACKEND_FLAG_WEB_GPU = 8,
 }
 
 internal enum mln_render_driver_kind : uint
@@ -1839,7 +1839,7 @@ internal enum mln_style_raster_dem_encoding : uint
 
 internal enum mln_style_source_info_field : uint
 {
-    MLN_STYLE_SOURCE_INFO_TILEJSON = 1,
+    MLN_STYLE_SOURCE_INFO_TILE_JSON = 1,
     MLN_STYLE_SOURCE_INFO_BOUNDS = 2,
     MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4,
     MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8,
@@ -1852,7 +1852,7 @@ internal enum mln_style_source_type : uint
     MLN_STYLE_SOURCE_TYPE_VECTOR = 1,
     MLN_STYLE_SOURCE_TYPE_RASTER = 2,
     MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3,
-    MLN_STYLE_SOURCE_TYPE_GEOJSON = 4,
+    MLN_STYLE_SOURCE_TYPE_GEO_JSON = 4,
     MLN_STYLE_SOURCE_TYPE_IMAGE = 5,
     MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
     MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
@@ -1910,8 +1910,8 @@ internal enum mln_viewport_mode : uint
     MLN_VIEWPORT_MODE_FLIPPED_Y = 1,
 }
 
-internal enum mln_webgl_context_kind : uint
+internal enum mln_web_gl_context_kind : uint
 {
-    MLN_WEBGL_CONTEXT_EXISTING = 0,
-    MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1,
+    MLN_WEB_GL_CONTEXT_EXISTING = 0,
+    MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1,
 }

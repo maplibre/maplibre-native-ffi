@@ -122,7 +122,7 @@ auto to_c_source_type(mln::style::SourceType type) -> mln_style_source_type {
     case mln::style::SourceType::RasterDEM:
       return MLN_STYLE_SOURCE_TYPE_RASTER_DEM;
     case mln::style::SourceType::GeoJSON:
-      return MLN_STYLE_SOURCE_TYPE_GEOJSON;
+      return MLN_STYLE_SOURCE_TYPE_GEO_JSON;
     case mln::style::SourceType::Video:
       return MLN_STYLE_SOURCE_TYPE_VIDEO;
     case mln::style::SourceType::Annotations:
@@ -784,10 +784,10 @@ auto is_native_duration_ms(double milliseconds) -> bool {
          milliseconds < max_native_duration_ms();
 }
 
-auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
+auto geojson_source_options_default() noexcept -> mln_geo_json_source_options {
   const auto defaults = mln::style::GeoJSONOptions{};
-  return mln_geojson_source_options{
-    .size = sizeof(mln_geojson_source_options),
+  return mln_geo_json_source_options{
+    .size = sizeof(mln_geo_json_source_options),
     .fields = 0,
     .min_zoom = static_cast<double>(defaults.minzoom),
     .max_zoom = static_cast<double>(defaults.maxzoom),
@@ -1132,10 +1132,10 @@ auto style_source_record(const mln::style::Source& source)
     return record;
   }
 
-  info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  info.tilejson.min_zoom = tileset->zoomRange.min;
-  info.tilejson.max_zoom = tileset->zoomRange.max;
-  info.tilejson.scheme = to_c_tile_scheme(tileset->scheme);
+  info.fields |= MLN_STYLE_SOURCE_INFO_TILE_JSON;
+  info.tile_json.min_zoom = tileset->zoomRange.min;
+  info.tile_json.max_zoom = tileset->zoomRange.max;
+  info.tile_json.scheme = to_c_tile_scheme(tileset->scheme);
   record.tile_urls = tileset->tiles;
   if (tileset->bounds) {
     info.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
@@ -1179,7 +1179,7 @@ auto map_list_style_sources(
 
 auto map_add_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options
+  const mln_geo_json_source_options* options
 ) -> mln_status {
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);

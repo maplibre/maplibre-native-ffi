@@ -99,7 +99,7 @@ fn render_backend_label(backends: maplibre_native_ffi::RenderBackendFlag) -> Str
     if backends.contains(maplibre_native_ffi::RenderBackendFlag::METAL) {
         labels.push("metal");
     }
-    if backends.contains(maplibre_native_ffi::RenderBackendFlag::OPENGL) {
+    if backends.contains(maplibre_native_ffi::RenderBackendFlag::OPEN_GL) {
         labels.push("opengl");
     }
     if backends.contains(maplibre_native_ffi::RenderBackendFlag::VULKAN) {

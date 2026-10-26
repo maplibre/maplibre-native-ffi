@@ -67,8 +67,8 @@ import Testing
 
   var source = mln_style_source_info()
   source.type = mln_style_source_type(rawValue: 700)
-  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue
-  source.tilejson.scheme = mln_style_tile_scheme(rawValue: 701)
+  source.fields = MLN_STYLE_SOURCE_INFO_TILE_JSON.rawValue
+  source.tile_json.scheme = mln_style_tile_scheme(rawValue: 701)
   let copied = try StyleSourceInfo(raw: source)
   #expect(copied.type.rawValue == 700)
   #expect(copied.tileJson?.scheme.rawValue == 701)

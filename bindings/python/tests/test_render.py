@@ -44,8 +44,8 @@ def _backends() -> list[str]:
         backends.append("metal")
     if mask & mln.RenderBackendFlag.VULKAN:
         backends.append("vulkan")
-    if mask & mln.RenderBackendFlag.OPENGL:
-        providers = mln.opengl_supported_context_provider_mask()
+    if mask & mln.RenderBackendFlag.OPEN_GL:
+        providers = mln.open_gl_supported_context_provider_mask()
         if providers & mln.OpenGlContextProviderFlag.EGL:
             backends.append("egl")
         if providers & mln.OpenGlContextProviderFlag.WGL:
@@ -200,7 +200,7 @@ class OwnedTexture:
                 ),
                 options,
             )
-        return self.map.attach_opengl_owned_texture(
+        return self.map.attach_open_gl_owned_texture(
             mln.OpenGlOwnedTextureDescriptor(
                 extent=extent, context=_opengl_context(self.backend, context)
             ),
@@ -246,7 +246,7 @@ class OwnedTexture:
         elif self.backend == "vulkan":
             view = frame.vulkan_texture()
         else:
-            view = frame.opengl_texture()
+            view = frame.open_gl_texture()
         with view as texture:
             return callback(texture)
 

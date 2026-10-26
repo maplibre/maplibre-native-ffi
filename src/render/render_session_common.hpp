@@ -90,9 +90,9 @@ using MetalBorrowedTarget = BorrowedTarget<
 using VulkanBorrowedTarget = BorrowedTarget<
   mln_vulkan_borrowed_texture_descriptor, mln_vulkan_borrowed_texture>;
 using OpenGLBorrowedTarget = BorrowedTarget<
-  mln_opengl_borrowed_texture_descriptor, mln_opengl_borrowed_texture>;
+  mln_open_gl_borrowed_texture_descriptor, mln_open_gl_borrowed_texture>;
 using WebGPUBorrowedTarget = BorrowedTarget<
-  mln_webgpu_borrowed_texture_descriptor, mln_webgpu_borrowed_texture>;
+  mln_web_gpu_borrowed_texture_descriptor, mln_web_gpu_borrowed_texture>;
 
 class RenderTargetNotReady : public std::runtime_error {
  public:
@@ -162,7 +162,7 @@ class SurfaceSessionBackend {
     );
   }
   virtual auto set_opengl_target(
-    const mln_opengl_surface_descriptor& descriptor
+    const mln_open_gl_surface_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
     return unsupported_retarget(
@@ -170,7 +170,7 @@ class SurfaceSessionBackend {
     );
   }
   virtual auto set_webgpu_target(
-    const mln_webgpu_surface_descriptor& descriptor
+    const mln_web_gpu_surface_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
     return unsupported_retarget(
@@ -985,9 +985,9 @@ auto logical_extent_physical_size(
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
 auto validate_opengl_context(
-  const mln_opengl_context_descriptor& context, bool require_supported_provider
+  const mln_open_gl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status;
-auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
+auto validate_webgpu_context(const mln_web_gpu_context_descriptor& context)
   -> mln_status;
 
 auto vulkan_context_matches(
@@ -1005,8 +1005,8 @@ enum class OpenGLContextMatch : uint8_t { ShareGroup, Exact };
 // proc-address loader is excluded: it is a way to reach a context, not part of
 // its identity.
 auto opengl_context_matches(
-  const mln_opengl_context_descriptor& lhs,
-  const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
+  const mln_open_gl_context_descriptor& lhs,
+  const mln_open_gl_context_descriptor& rhs, OpenGLContextMatch strictness
 ) -> bool;
 
 inline auto set_session_extent(

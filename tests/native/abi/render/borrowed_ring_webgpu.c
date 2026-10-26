@@ -25,8 +25,8 @@ static void a_borrowed_ring_frame_is_ordered_before_the_hosts_reads(void) {
   mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
-  mln_webgpu_texture_frame record = {.size = sizeof(record)};
-  MLN_TEST_OK(mln_acquired_frame_get_webgpu_texture(frame, &record, NULL));
+  mln_web_gpu_texture_frame record = {.size = sizeof(record)};
+  MLN_TEST_OK(mln_acquired_frame_get_web_gpu_texture(frame, &record, NULL));
   TEST_ASSERT_EQUAL_PTR(
     mln_test_webgpu_ring_texture(&fixture, record.slot), record.texture
   );

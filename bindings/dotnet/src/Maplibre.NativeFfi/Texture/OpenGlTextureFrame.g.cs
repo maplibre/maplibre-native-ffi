@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi;
 /// OpenGL frame acquired from a texture ring.
 /// </summary>
 /// <remarks>
-/// See <c>mln_opengl_texture_frame</c> in the <see
+/// See <c>mln_open_gl_texture_frame</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Generation">

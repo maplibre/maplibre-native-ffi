@@ -60,17 +60,17 @@ static void ignore_completion(
 
 static mln_status attach_owned_texture(still_image_job* job) {
   // #region attach
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent.width = job->width;
   descriptor.extent.height = job->height;
   descriptor.extent.scale_factor = 1.0;
-  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
-  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
+  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.egl.display = job->egl_display;
   descriptor.context.data.egl.config = job->egl_config;
-  descriptor.context.data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
+  descriptor.context.data.egl.client_api = MLN_OPEN_GL_CLIENT_API_GLES;
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
@@ -81,7 +81,7 @@ static mln_status attach_owned_texture(still_image_job* job) {
     .callback = attach_finished,
     .user_data = job,
   };
-  return mln_map_attach_opengl_owned_texture(
+  return mln_map_attach_open_gl_owned_texture(
     job->map, &descriptor, &options, &job->session, &completion, NULL
   );
   // #endregion attach

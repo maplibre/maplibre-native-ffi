@@ -46,7 +46,7 @@ public readonly partial record struct RenderSessionAttachOptions
 
     /// <summary>
     /// Producer synchronization for acquired texture frames.
-    /// <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires a shared EGL or WGL texture
+    /// <c>MLN_GPU_SYNC_OPEN_GL_FENCE</c> requires a shared EGL or WGL texture
     /// target and a caller-graphics-thread driver. Other targets support only
     /// CPU completion and fail an unsupported request.
     /// </summary>

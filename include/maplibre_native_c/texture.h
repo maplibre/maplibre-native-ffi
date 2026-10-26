@@ -227,7 +227,7 @@ typedef struct mln_vulkan_texture_frame {
 } mln_vulkan_texture_frame;
 
 /** OpenGL attachment options for an owned texture target. */
-typedef struct mln_opengl_owned_texture_descriptor {
+typedef struct mln_open_gl_owned_texture_descriptor {
   uint32_t size;
   /**
    * Logical texture extent. Required. A scale_factor that differs from the
@@ -240,17 +240,17 @@ typedef struct mln_opengl_owned_texture_descriptor {
    * transferred WebGL ownership creates a private core-worker context for CPU
    * readback.
    */
-  mln_opengl_context_descriptor context;
-} mln_opengl_owned_texture_descriptor;
+  mln_open_gl_context_descriptor context;
+} mln_open_gl_owned_texture_descriptor;
 
 /** One caller-owned OpenGL texture of a borrowed texture ring. */
-typedef struct mln_opengl_borrowed_texture {
+typedef struct mln_open_gl_borrowed_texture {
   /** Borrowed OpenGL texture object name. Required. */
   uint32_t texture MLN_BINDING("required=true");
-} mln_opengl_borrowed_texture;
+} mln_open_gl_borrowed_texture;
 
 /** OpenGL attachment options for a borrowed texture target. */
-typedef struct mln_opengl_borrowed_texture_descriptor {
+typedef struct mln_open_gl_borrowed_texture_descriptor {
   uint32_t size;
   /**
    * Logical texture extent. Required. physical_width and physical_height give
@@ -266,7 +266,7 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
    */
-  mln_opengl_context_descriptor context;
+  mln_open_gl_context_descriptor context;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    *
@@ -278,7 +278,7 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * physical_width and physical_height. The session does not validate those
    * dimensions.
    */
-  const mln_opengl_borrowed_texture* textures
+  const mln_open_gl_borrowed_texture* textures
     MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of textures, which is the ring depth, from one to
@@ -288,10 +288,10 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   size_t texture_count;
   /** OpenGL texture target of every texture. Required: GL_TEXTURE_2D. */
   uint32_t target MLN_BINDING("required=true");
-} mln_opengl_borrowed_texture_descriptor;
+} mln_open_gl_borrowed_texture_descriptor;
 
 /** WebGPU attachment options for an owned texture target. */
-typedef struct mln_webgpu_owned_texture_descriptor {
+typedef struct mln_web_gpu_owned_texture_descriptor {
   uint32_t size;
   /**
    * Logical texture extent. Required. A scale_factor that differs from the
@@ -299,11 +299,11 @@ typedef struct mln_webgpu_owned_texture_descriptor {
    */
   mln_logical_extent extent MLN_BINDING("required=true");
   /** Borrowed WebGPU context. device is required. */
-  mln_webgpu_context_descriptor context;
-} mln_webgpu_owned_texture_descriptor;
+  mln_web_gpu_context_descriptor context;
+} mln_web_gpu_owned_texture_descriptor;
 
 /** One caller-owned WebGPU texture of a borrowed texture ring. */
-typedef struct mln_webgpu_borrowed_texture {
+typedef struct mln_web_gpu_borrowed_texture {
   /**
    * Borrowed WGPUTexture. Required.
    *
@@ -318,10 +318,10 @@ typedef struct mln_webgpu_borrowed_texture {
    * color view compatible with texture and the descriptor's format.
    */
   void* texture_view MLN_BINDING("required=true");
-} mln_webgpu_borrowed_texture;
+} mln_web_gpu_borrowed_texture;
 
 /** WebGPU attachment options for a borrowed texture target. */
-typedef struct mln_webgpu_borrowed_texture_descriptor {
+typedef struct mln_web_gpu_borrowed_texture_descriptor {
   uint32_t size;
   /**
    * Logical texture extent. Required. physical_width and physical_height give
@@ -337,7 +337,7 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    * Borrowed WebGPU context. device is required. Rendering is submitted
    * through context.queue or that device's default queue.
    */
-  mln_webgpu_context_descriptor context;
+  mln_web_gpu_context_descriptor context;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    *
@@ -345,7 +345,7 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    * must stay valid: until set_target replaces them, until detach completes,
    * or until abandon returns. The textures are distinct.
    */
-  const mln_webgpu_borrowed_texture* textures
+  const mln_web_gpu_borrowed_texture* textures
     MLN_BINDING("length=texture_count;required=true");
   /**
    * Number of textures, which is the ring depth, from one to
@@ -358,10 +358,10 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    * Undefined is invalid.
    */
   uint32_t format MLN_BINDING("required=true");
-} mln_webgpu_borrowed_texture_descriptor;
+} mln_web_gpu_borrowed_texture_descriptor;
 
 /** WebGPU frame acquired from a texture ring. */
-typedef struct mln_webgpu_texture_frame {
+typedef struct mln_web_gpu_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -386,10 +386,10 @@ typedef struct mln_webgpu_texture_frame {
   void* device MLN_BINDING("lifetime=owner");
   /** Backend-native WGPUTextureFormat value. */
   uint32_t format;
-} mln_webgpu_texture_frame;
+} mln_web_gpu_texture_frame;
 
 /** OpenGL frame acquired from a texture ring. */
-typedef struct mln_opengl_texture_frame {
+typedef struct mln_open_gl_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -428,7 +428,7 @@ typedef struct mln_opengl_texture_frame {
    * OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
    */
   uint32_t type;
-} mln_opengl_texture_frame;
+} mln_open_gl_texture_frame;
 
 /** CPU image readback metadata for a texture target frame. */
 typedef struct mln_texture_image_info {
@@ -632,8 +632,8 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_map_attach_opengl_owned_texture(
-  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_open_gl_owned_texture(
+  mln_map map, const mln_open_gl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -669,8 +669,8 @@ MLN_API mln_status mln_map_attach_opengl_owned_texture(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
-  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_open_gl_borrowed_texture(
+  mln_map map, const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -703,8 +703,8 @@ MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle;platforms=web")
-MLN_API mln_status mln_map_attach_webgpu_owned_texture(
-  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_web_gpu_owned_texture(
+  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -739,8 +739,8 @@ MLN_API mln_status mln_map_attach_webgpu_owned_texture(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle;platforms=web")
-MLN_API mln_status mln_map_attach_webgpu_borrowed_texture(
-  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+MLN_API mln_status mln_map_attach_web_gpu_borrowed_texture(
+  mln_map map, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -857,9 +857,9 @@ MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_render_session_set_opengl_borrowed_texture_target(
+MLN_API mln_status mln_render_session_set_open_gl_borrowed_texture_target(
   mln_render_session session,
-  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -897,9 +897,9 @@ MLN_API mln_status mln_render_session_set_opengl_borrowed_texture_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;platforms=web")
-MLN_API mln_status mln_render_session_set_webgpu_borrowed_texture_target(
+MLN_API mln_status mln_render_session_set_web_gpu_borrowed_texture_target(
   mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1007,9 +1007,9 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("view_owner=frame")
-MLN_API mln_status mln_acquired_frame_get_opengl_texture(
+MLN_API mln_status mln_acquired_frame_get_open_gl_texture(
   mln_acquired_frame frame,
-  mln_opengl_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_open_gl_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1032,9 +1032,9 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("view_owner=frame;platforms=web")
-MLN_API mln_status mln_acquired_frame_get_webgpu_texture(
+MLN_API mln_status mln_acquired_frame_get_web_gpu_texture(
   mln_acquired_frame frame,
-  mln_webgpu_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_web_gpu_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

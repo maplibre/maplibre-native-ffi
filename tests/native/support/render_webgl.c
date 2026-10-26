@@ -79,11 +79,11 @@ static bool create_backend_state(void** out_state, void* out_context) {
     ) {
       return false;
     }
-    *(mln_opengl_context_descriptor*)out_context =
-      (mln_opengl_context_descriptor){
-        .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+    *(mln_open_gl_context_descriptor*)out_context =
+      (mln_open_gl_context_descriptor){
+        .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
         .data = {
-          .webgl = {
+          .web_gl = {
             .context = state->context,
           }
         },
@@ -134,11 +134,11 @@ static bool create_backend_state(void** out_state, void* out_context) {
     return false;
   }
 
-  *(mln_opengl_context_descriptor*)out_context =
-    (mln_opengl_context_descriptor){
-      .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+  *(mln_open_gl_context_descriptor*)out_context =
+    (mln_open_gl_context_descriptor){
+      .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
       .data = {
-        .webgl = {
+        .web_gl = {
           .context = state->context,
         }
       },
@@ -169,18 +169,18 @@ bool mln_test_backend_attach(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  mln_opengl_context_descriptor context = {0};
+  mln_open_gl_context_descriptor context = {0};
   if (!create_backend_state(out_state, &context)) {
     return false;
   }
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
   descriptor.context = context;
-  *out_status = mln_map_attach_opengl_owned_texture(
+  *out_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
@@ -217,16 +217,16 @@ bool mln_test_transferred_webgl_surface_create(
 
   char target[sizeof(state->id) + 1];
   (void)snprintf(target, sizeof(target), "#%s", state->id);
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
-  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
-  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
-  descriptor.context.data.webgl = (mln_webgl_context_descriptor){
-    .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.web_gl = (mln_web_gl_context_descriptor){
+    .kind = MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS,
     .canvas_selector = mln_buffer_view_from_cstr(target),
   };
   mln_render_session_attach_options options = {
@@ -240,7 +240,7 @@ bool mln_test_transferred_webgl_surface_create(
     .callback = mln_test_render_count_wake, .user_data = &fixture->driver_wakes
   };
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_map_attach_opengl_surface(
+  const mln_status status = mln_map_attach_open_gl_surface(
     map, &descriptor, &options, &fixture->session, &completion.descriptor,
     MLN_TEST_DIAGNOSTIC
   );

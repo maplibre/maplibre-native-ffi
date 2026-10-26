@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi;
 /// WebGL context fields shared by OpenGL render targets in the browser.
 /// </summary>
 /// <remarks>
-/// See <c>mln_webgl_context_descriptor</c> in the <see
+/// See <c>mln_web_gl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Context">

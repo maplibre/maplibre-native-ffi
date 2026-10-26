@@ -12,15 +12,15 @@ struct CompletionResult<&mln_map_attach_metal_surface> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_opengl_borrowed_texture> {
+struct CompletionResult<&mln_map_attach_open_gl_borrowed_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_opengl_owned_texture> {
+struct CompletionResult<&mln_map_attach_open_gl_owned_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_opengl_surface> {
+struct CompletionResult<&mln_map_attach_open_gl_surface> {
   static constexpr bool has_value = false;
 };
 template <>
@@ -36,15 +36,15 @@ struct CompletionResult<&mln_map_attach_vulkan_surface> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_webgpu_borrowed_texture> {
+struct CompletionResult<&mln_map_attach_web_gpu_borrowed_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_webgpu_owned_texture> {
+struct CompletionResult<&mln_map_attach_web_gpu_owned_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_webgpu_surface> {
+struct CompletionResult<&mln_map_attach_web_gpu_surface> {
   static constexpr bool has_value = false;
 };
 template <>
@@ -257,11 +257,11 @@ struct CompletionResult<&mln_render_session_set_metal_surface_target> {
 };
 template <>
 struct CompletionResult<
-  &mln_render_session_set_opengl_borrowed_texture_target> {
+  &mln_render_session_set_open_gl_borrowed_texture_target> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_render_session_set_opengl_surface_target> {
+struct CompletionResult<&mln_render_session_set_open_gl_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>
@@ -275,11 +275,11 @@ struct CompletionResult<&mln_render_session_set_vulkan_surface_target> {
 };
 template <>
 struct CompletionResult<
-  &mln_render_session_set_webgpu_borrowed_texture_target> {
+  &mln_render_session_set_web_gpu_borrowed_texture_target> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_render_session_set_webgpu_surface_target> {
+struct CompletionResult<&mln_render_session_set_web_gpu_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>

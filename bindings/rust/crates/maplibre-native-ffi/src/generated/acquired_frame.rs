@@ -58,9 +58,9 @@ impl AcquiredFrameHandle {
 
     /// Copies OpenGL-native metadata from an acquired frame.
     ///
-    /// See `mln_acquired_frame_get_opengl_texture` in the
+    /// See `mln_acquired_frame_get_open_gl_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn get_opengl_texture<R>(
+    pub fn get_open_gl_texture<R>(
         &self,
         callback: impl FnOnce(&OpenGlTextureFrame) -> R,
     ) -> Result<R> {
@@ -71,10 +71,10 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_opengl_texture_frame>() as _;
+        let mut out_frame: sys::mln_open_gl_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_open_gl_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
-            sys::mln_acquired_frame_get_opengl_texture(frame, &mut out_frame, out_diagnostic)
+            sys::mln_acquired_frame_get_open_gl_texture(frame, &mut out_frame, out_diagnostic)
         })?;
         let value = unsafe { from_native(out_frame) }?;
         Ok(callback(&value))
@@ -147,10 +147,10 @@ impl AcquiredFrameHandle {
 
     /// Copies WebGPU-native metadata from an acquired frame.
     ///
-    /// See `mln_acquired_frame_get_webgpu_texture` in the
+    /// See `mln_acquired_frame_get_web_gpu_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     #[cfg(target_os = "emscripten")]
-    pub fn get_webgpu_texture<R>(
+    pub fn get_web_gpu_texture<R>(
         &self,
         callback: impl FnOnce(&WebGpuTextureFrame) -> R,
     ) -> Result<R> {
@@ -161,10 +161,10 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_webgpu_texture_frame>() as _;
+        let mut out_frame: sys::mln_web_gpu_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_web_gpu_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
-            sys::mln_acquired_frame_get_webgpu_texture(frame, &mut out_frame, out_diagnostic)
+            sys::mln_acquired_frame_get_web_gpu_texture(frame, &mut out_frame, out_diagnostic)
         })?;
         let value = unsafe { from_native(out_frame) }?;
         Ok(callback(&value))

@@ -54,14 +54,14 @@ auto validate_borrowed_textures(
 }  // namespace
 
 auto validate_webgpu_owned_texture_descriptor(
-  const mln_webgpu_owned_texture_descriptor* descriptor
+  const mln_web_gpu_owned_texture_descriptor* descriptor
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("texture descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_webgpu_owned_texture_descriptor)) {
-    set_thread_error("mln_webgpu_owned_texture_descriptor.size is too small");
+  if (descriptor->size < sizeof(mln_web_gpu_owned_texture_descriptor)) {
+    set_thread_error("mln_web_gpu_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto extent_status = validate_logical_extent(
@@ -74,15 +74,15 @@ auto validate_webgpu_owned_texture_descriptor(
 }
 
 auto validate_webgpu_borrowed_texture_descriptor(
-  const mln_webgpu_borrowed_texture_descriptor* descriptor
+  const mln_web_gpu_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("texture descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_webgpu_borrowed_texture_descriptor)) {
+  if (descriptor->size < sizeof(mln_web_gpu_borrowed_texture_descriptor)) {
     set_thread_error(
-      "mln_webgpu_borrowed_texture_descriptor.size is too small"
+      "mln_web_gpu_borrowed_texture_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -98,7 +98,7 @@ auto validate_webgpu_borrowed_texture_descriptor(
   }
   const auto textures_status = validate_borrowed_textures(
     descriptor->textures, descriptor->texture_count,
-    [](const mln_webgpu_borrowed_texture& entry) { return entry.texture; },
+    [](const mln_web_gpu_borrowed_texture& entry) { return entry.texture; },
     "WebGPU texture and texture_view must not be null"
   );
   if (textures_status != MLN_STATUS_OK) {
@@ -247,9 +247,9 @@ auto validate_vulkan_borrowed_texture_descriptor(
 // A borrowed target must share objects with the host context that owns its
 // texture. Dedicated ownership names no share group.
 auto validate_borrowed_texture_ownership(
-  const mln_opengl_context_descriptor& context
+  const mln_open_gl_context_descriptor& context
 ) -> mln_status {
-  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED) {
+  if (context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED) {
     return MLN_STATUS_OK;
   }
   set_thread_error(
@@ -259,15 +259,15 @@ auto validate_borrowed_texture_ownership(
 }
 
 auto validate_opengl_owned_texture_descriptor(
-  const mln_opengl_owned_texture_descriptor* descriptor,
+  const mln_open_gl_owned_texture_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("texture descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_opengl_owned_texture_descriptor)) {
-    set_thread_error("mln_opengl_owned_texture_descriptor.size is too small");
+  if (descriptor->size < sizeof(mln_open_gl_owned_texture_descriptor)) {
+    set_thread_error("mln_open_gl_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto extent_status = validate_logical_extent(
@@ -282,16 +282,16 @@ auto validate_opengl_owned_texture_descriptor(
 }
 
 auto validate_opengl_borrowed_texture_descriptor(
-  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_open_gl_borrowed_texture_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("texture descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_opengl_borrowed_texture_descriptor)) {
+  if (descriptor->size < sizeof(mln_open_gl_borrowed_texture_descriptor)) {
     set_thread_error(
-      "mln_opengl_borrowed_texture_descriptor.size is too small"
+      "mln_open_gl_borrowed_texture_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -317,7 +317,7 @@ auto validate_opengl_borrowed_texture_descriptor(
   }
   return validate_borrowed_textures(
     descriptor->textures, descriptor->texture_count,
-    [](const mln_opengl_borrowed_texture& entry) { return entry.texture; },
+    [](const mln_open_gl_borrowed_texture& entry) { return entry.texture; },
     "OpenGL texture and target must be specified"
   );
 }
@@ -567,13 +567,13 @@ auto acquired_frame_get_vulkan_texture(
 }
 
 auto acquired_frame_get_opengl_texture(
-  mln_acquired_frame frame, mln_opengl_texture_frame* out_frame
+  mln_acquired_frame frame, mln_open_gl_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }
 
 auto acquired_frame_get_webgpu_texture(
-  mln_acquired_frame frame, mln_webgpu_texture_frame* out_frame
+  mln_acquired_frame frame, mln_web_gpu_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }

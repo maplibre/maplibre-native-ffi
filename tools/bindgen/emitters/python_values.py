@@ -9,7 +9,6 @@ from typing import NoReturn
 
 from .. import async_hosts, docs
 from ..model import ModelError
-from ..names import words
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_member
 
 SCALARS = {
@@ -69,7 +68,7 @@ def field_name(name: str) -> str:
 
 
 def public_name(native: str) -> str:
-    return "".join(x.capitalize() for x in words(native.removeprefix("mln_")))
+    return "".join(x.capitalize() for x in native.removeprefix("mln_").split("_"))
 
 
 def native_name(plan: ValuePlan) -> str:

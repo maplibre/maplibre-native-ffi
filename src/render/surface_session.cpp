@@ -66,14 +66,14 @@ auto validate_vulkan_surface_descriptor(
 }
 
 auto validate_webgpu_surface_descriptor(
-  const mln_webgpu_surface_descriptor* descriptor
+  const mln_web_gpu_surface_descriptor* descriptor
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_webgpu_surface_descriptor)) {
-    set_thread_error("mln_webgpu_surface_descriptor.size is too small");
+  if (descriptor->size < sizeof(mln_web_gpu_surface_descriptor)) {
+    set_thread_error("mln_web_gpu_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto extent_status = validate_logical_extent(
@@ -99,15 +99,15 @@ auto validate_webgpu_surface_descriptor(
 }
 
 auto validate_opengl_surface_descriptor(
-  const mln_opengl_surface_descriptor* descriptor,
+  const mln_open_gl_surface_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status {
   if (descriptor == nullptr) {
     set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->size < sizeof(mln_opengl_surface_descriptor)) {
-    set_thread_error("mln_opengl_surface_descriptor.size is too small");
+  if (descriptor->size < sizeof(mln_open_gl_surface_descriptor)) {
+    set_thread_error("mln_open_gl_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto extent_status = validate_logical_extent(
@@ -124,7 +124,7 @@ auto validate_opengl_surface_descriptor(
   // WGL and EGL need a surface to make a context current, so they carry one
   // alongside the context. A WebGL context already names its canvas, so the
   // field is rejected rather than ignored.
-  if (descriptor->context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL) {
+  if (descriptor->context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL) {
     if (descriptor->surface != nullptr) {
       set_thread_error(
         "WebGL surface must be null; the context names its canvas"

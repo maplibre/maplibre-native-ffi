@@ -10,16 +10,28 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_discard", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_metal_texture =
     Ffm.downcall("mln_acquired_frame_get_metal_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_acquired_frame_get_opengl_texture =
-    Ffm.downcall("mln_acquired_frame_get_opengl_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_get_open_gl_texture =
+    Ffm.downcall(
+      "mln_acquired_frame_get_open_gl_texture",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_acquired_frame_get_producer_sync =
     Ffm.downcall("mln_acquired_frame_get_producer_sync", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_result =
     Ffm.downcall("mln_acquired_frame_get_result", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_vulkan_texture =
     Ffm.downcall("mln_acquired_frame_get_vulkan_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_acquired_frame_get_webgpu_texture =
-    Ffm.downcall("mln_acquired_frame_get_webgpu_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_get_web_gpu_texture =
+    Ffm.downcall(
+      "mln_acquired_frame_get_web_gpu_texture",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_acquired_frame_release =
     Ffm.downcall("mln_acquired_frame_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_view_begin =
@@ -39,17 +51,17 @@ internal actual object C {
     Ffm.downcall("mln_delivery_queue_drain", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
-  private val mln_geojson_source_data_create =
+  private val mln_geo_json_source_data_create =
     Ffm.downcall(
-      "mln_geojson_source_data_create",
+      "mln_geo_json_source_data_create",
       JAVA_INT,
       mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_geojson_source_data_release =
-    Ffm.downcall("mln_geojson_source_data_release", null, JAVA_LONG)
+  private val mln_geo_json_source_data_release =
+    Ffm.downcall("mln_geo_json_source_data_release", null, JAVA_LONG)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -101,9 +113,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_geojson_source_data =
+  private val mln_map_add_geo_json_source_data =
     Ffm.downcall(
-      "mln_map_add_geojson_source_data",
+      "mln_map_add_geo_json_source_data",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -111,9 +123,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_geojson_source_url =
+  private val mln_map_add_geo_json_source_url =
     Ffm.downcall(
-      "mln_map_add_geojson_source_url",
+      "mln_map_add_geo_json_source_url",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -201,9 +213,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_opengl_borrowed_texture =
+  private val mln_map_attach_open_gl_borrowed_texture =
     Ffm.downcall(
-      "mln_map_attach_opengl_borrowed_texture",
+      "mln_map_attach_open_gl_borrowed_texture",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -212,9 +224,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_opengl_owned_texture =
+  private val mln_map_attach_open_gl_owned_texture =
     Ffm.downcall(
-      "mln_map_attach_opengl_owned_texture",
+      "mln_map_attach_open_gl_owned_texture",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -223,9 +235,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_opengl_surface =
+  private val mln_map_attach_open_gl_surface =
     Ffm.downcall(
-      "mln_map_attach_opengl_surface",
+      "mln_map_attach_open_gl_surface",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -267,9 +279,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_webgpu_borrowed_texture =
+  private val mln_map_attach_web_gpu_borrowed_texture =
     Ffm.downcall(
-      "mln_map_attach_webgpu_borrowed_texture",
+      "mln_map_attach_web_gpu_borrowed_texture",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -278,9 +290,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_webgpu_owned_texture =
+  private val mln_map_attach_web_gpu_owned_texture =
     Ffm.downcall(
-      "mln_map_attach_webgpu_owned_texture",
+      "mln_map_attach_web_gpu_owned_texture",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -289,9 +301,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_webgpu_surface =
+  private val mln_map_attach_web_gpu_surface =
     Ffm.downcall(
-      "mln_map_attach_webgpu_surface",
+      "mln_map_attach_web_gpu_surface",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -676,9 +688,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_geojson_source_data =
+  private val mln_map_set_geo_json_source_data =
     Ffm.downcall(
-      "mln_map_set_geojson_source_data",
+      "mln_map_set_geo_json_source_data",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -686,9 +698,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_geojson_source_synchronous_tiling =
+  private val mln_map_set_geo_json_source_synchronous_tiling =
     Ffm.downcall(
-      "mln_map_set_geojson_source_synchronous_tiling",
+      "mln_map_set_geo_json_source_synchronous_tiling",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -696,9 +708,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_geojson_source_url =
+  private val mln_map_set_geo_json_source_url =
     Ffm.downcall(
-      "mln_map_set_geojson_source_url",
+      "mln_map_set_geo_json_source_url",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -860,8 +872,8 @@ internal actual object C {
     Ffm.downcall("mln_network_get_status", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_network_set_status =
     Ffm.downcall("mln_network_set_status", JAVA_INT, JAVA_INT, JAVA_LONG)
-  private val mln_opengl_supported_context_provider_mask =
-    Ffm.downcall("mln_opengl_supported_context_provider_mask", JAVA_INT)
+  private val mln_open_gl_supported_context_provider_mask =
+    Ffm.downcall("mln_open_gl_supported_context_provider_mask", JAVA_INT)
   private val mln_plugin_get_register_function_v1 =
     Ffm.downcall("mln_plugin_get_register_function_v1", JAVA_LONG)
   private val mln_projected_meters_for_lat_lng =
@@ -963,18 +975,18 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_render_session_set_opengl_borrowed_texture_target =
+  private val mln_render_session_set_open_gl_borrowed_texture_target =
     Ffm.downcall(
-      "mln_render_session_set_opengl_borrowed_texture_target",
+      "mln_render_session_set_open_gl_borrowed_texture_target",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_render_session_set_opengl_surface_target =
+  private val mln_render_session_set_open_gl_surface_target =
     Ffm.downcall(
-      "mln_render_session_set_opengl_surface_target",
+      "mln_render_session_set_open_gl_surface_target",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -999,18 +1011,18 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_render_session_set_webgpu_borrowed_texture_target =
+  private val mln_render_session_set_web_gpu_borrowed_texture_target =
     Ffm.downcall(
-      "mln_render_session_set_webgpu_borrowed_texture_target",
+      "mln_render_session_set_web_gpu_borrowed_texture_target",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_render_session_set_webgpu_surface_target =
+  private val mln_render_session_set_web_gpu_surface_target =
     Ffm.downcall(
-      "mln_render_session_set_webgpu_surface_target",
+      "mln_render_session_set_web_gpu_surface_target",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1257,11 +1269,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_acquired_frame_get_metal_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
 
-  actual fun mln_acquired_frame_get_opengl_texture(
+  actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
-  ): Int = mln_acquired_frame_get_opengl_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
+  ): Int = mln_acquired_frame_get_open_gl_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
 
   actual fun mln_acquired_frame_get_producer_sync(
     frame: Long,
@@ -1278,11 +1290,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_acquired_frame_get_vulkan_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
 
-  actual fun mln_acquired_frame_get_webgpu_texture(
+  actual fun mln_acquired_frame_get_web_gpu_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
-  ): Int = mln_acquired_frame_get_webgpu_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
+  ): Int = mln_acquired_frame_get_web_gpu_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
 
   actual fun mln_acquired_frame_release(
     frame: Long,
@@ -1323,21 +1335,21 @@ internal actual object C {
     mln_delivery_queue_release.invoke(queue)
   }
 
-  actual fun mln_geojson_source_data_create(
+  actual fun mln_geo_json_source_data_create(
     data: Long,
     options: Long,
     outData: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_geojson_source_data_create.invokeExact(
+    mln_geo_json_source_data_create.invokeExact(
       Ffm.value(data, mln_buffer_view),
       options,
       outData,
       outDiagnostic,
     ) as Int
 
-  actual fun mln_geojson_source_data_release(data: Long) {
-    mln_geojson_source_data_release.invoke(data)
+  actual fun mln_geo_json_source_data_release(data: Long) {
+    mln_geo_json_source_data_release.invoke(data)
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -1416,14 +1428,14 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_geojson_source_data(
+  actual fun mln_map_add_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_add_geojson_source_data.invokeExact(
+    mln_map_add_geo_json_source_data.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       data,
@@ -1431,7 +1443,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_geojson_source_url(
+  actual fun mln_map_add_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
@@ -1439,7 +1451,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_add_geojson_source_url.invokeExact(
+    mln_map_add_geo_json_source_url.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       Ffm.value(url, mln_buffer_view),
@@ -1574,7 +1586,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_opengl_borrowed_texture(
+  actual fun mln_map_attach_open_gl_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1582,7 +1594,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_opengl_borrowed_texture.invokeExact(
+    mln_map_attach_open_gl_borrowed_texture.invokeExact(
       map,
       descriptor,
       options,
@@ -1591,7 +1603,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_opengl_owned_texture(
+  actual fun mln_map_attach_open_gl_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1599,7 +1611,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_opengl_owned_texture.invokeExact(
+    mln_map_attach_open_gl_owned_texture.invokeExact(
       map,
       descriptor,
       options,
@@ -1608,7 +1620,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_opengl_surface(
+  actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1616,7 +1628,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_opengl_surface.invokeExact(
+    mln_map_attach_open_gl_surface.invokeExact(
       map,
       descriptor,
       options,
@@ -1676,7 +1688,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_webgpu_borrowed_texture(
+  actual fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1684,7 +1696,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_webgpu_borrowed_texture.invokeExact(
+    mln_map_attach_web_gpu_borrowed_texture.invokeExact(
       map,
       descriptor,
       options,
@@ -1693,7 +1705,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_webgpu_owned_texture(
+  actual fun mln_map_attach_web_gpu_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1701,7 +1713,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_webgpu_owned_texture.invokeExact(
+    mln_map_attach_web_gpu_owned_texture.invokeExact(
       map,
       descriptor,
       options,
@@ -1710,7 +1722,7 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_webgpu_surface(
+  actual fun mln_map_attach_web_gpu_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -1718,7 +1730,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_webgpu_surface.invokeExact(
+    mln_map_attach_web_gpu_surface.invokeExact(
       map,
       descriptor,
       options,
@@ -2293,14 +2305,14 @@ internal actual object C {
   ): Int =
     mln_map_set_free_camera_options.invokeExact(map, options, completion, outDiagnostic) as Int
 
-  actual fun mln_map_set_geojson_source_data(
+  actual fun mln_map_set_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_set_geojson_source_data.invokeExact(
+    mln_map_set_geo_json_source_data.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       data,
@@ -2308,14 +2320,14 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_geojson_source_synchronous_tiling(
+  actual fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,
     enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_set_geojson_source_synchronous_tiling.invokeExact(
+    mln_map_set_geo_json_source_synchronous_tiling.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       enabled,
@@ -2323,14 +2335,14 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_geojson_source_url(
+  actual fun mln_map_set_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_set_geojson_source_url.invokeExact(
+    mln_map_set_geo_json_source_url.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       Ffm.value(url, mln_buffer_view),
@@ -2554,8 +2566,8 @@ internal actual object C {
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_network_set_status.invokeExact(status, outDiagnostic) as Int
 
-  actual fun mln_opengl_supported_context_provider_mask(): Int =
-    mln_opengl_supported_context_provider_mask.invokeExact() as Int
+  actual fun mln_open_gl_supported_context_provider_mask(): Int =
+    mln_open_gl_supported_context_provider_mask.invokeExact() as Int
 
   actual fun mln_plugin_get_register_function_v1(): Long =
     mln_plugin_get_register_function_v1.invokeExact() as Long
@@ -2739,26 +2751,26 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_render_session_set_opengl_borrowed_texture_target(
+  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_render_session_set_opengl_borrowed_texture_target.invokeExact(
+    mln_render_session_set_open_gl_borrowed_texture_target.invokeExact(
       session,
       descriptor,
       completion,
       outDiagnostic,
     ) as Int
 
-  actual fun mln_render_session_set_opengl_surface_target(
+  actual fun mln_render_session_set_open_gl_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_render_session_set_opengl_surface_target.invokeExact(
+    mln_render_session_set_open_gl_surface_target.invokeExact(
       session,
       descriptor,
       completion,
@@ -2791,26 +2803,26 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_render_session_set_webgpu_borrowed_texture_target(
+  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_render_session_set_webgpu_borrowed_texture_target.invokeExact(
+    mln_render_session_set_web_gpu_borrowed_texture_target.invokeExact(
       session,
       descriptor,
       completion,
       outDiagnostic,
     ) as Int
 
-  actual fun mln_render_session_set_webgpu_surface_target(
+  actual fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_render_session_set_webgpu_surface_target.invokeExact(
+    mln_render_session_set_web_gpu_surface_target.invokeExact(
       session,
       descriptor,
       completion,

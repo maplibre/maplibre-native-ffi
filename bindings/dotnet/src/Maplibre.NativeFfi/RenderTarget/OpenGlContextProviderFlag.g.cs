@@ -5,7 +5,7 @@ namespace Maplibre.NativeFfi;
 /// OpenGL context providers supported by this build.
 /// </summary>
 /// <remarks>
-/// See <c>mln_opengl_context_provider_flag</c> in the <see
+/// See <c>mln_open_gl_context_provider_flag</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 [Flags]

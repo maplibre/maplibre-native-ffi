@@ -11,7 +11,7 @@ global using static Maplibre.NativeFfi.Internal.C.mln_custom_geometry_source_opt
 global using static Maplibre.NativeFfi.Internal.C.mln_custom_mvt_vector_source_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_feature_state_selector_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_free_camera_option_field;
-global using static Maplibre.NativeFfi.Internal.C.mln_geojson_source_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_geo_json_source_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_map_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_map_tile_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_map_viewport_option_field;

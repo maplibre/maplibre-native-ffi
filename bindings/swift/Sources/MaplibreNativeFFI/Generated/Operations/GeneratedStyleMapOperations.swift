@@ -46,7 +46,7 @@ public extension MapHandle {
 
   /// Adds a GeoJSON source with prepared inline data.
   ///
-  /// See `mln_map_add_geojson_source_data` in the
+  /// See `mln_map_add_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeoJsonSourceData(
@@ -54,7 +54,7 @@ public extension MapHandle {
     data bindingArg1: GeoJsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_add_geojson_source_data(
+      mln_map_add_geo_json_source_data(
         raw,
         arena.view(bindingArg0),
         arena.use(bindingArg1.handle),
@@ -66,7 +66,7 @@ public extension MapHandle {
 
   /// Adds a GeoJSON source with URL data.
   ///
-  /// See `mln_map_add_geojson_source_url` in the
+  /// See `mln_map_add_geo_json_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeoJsonSourceUrl(
@@ -75,7 +75,7 @@ public extension MapHandle {
     options bindingArg2: GeoJsonSourceOptions? = nil
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_add_geojson_source_url(
+      try mln_map_add_geo_json_source_url(
         raw,
         arena.view(bindingArg0),
         arena.view(bindingArg1),
@@ -617,7 +617,7 @@ public extension MapHandle {
 
   /// Updates one GeoJSON source with prepared inline data.
   ///
-  /// See `mln_map_set_geojson_source_data` in the
+  /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeoJsonSourceData(
@@ -625,7 +625,7 @@ public extension MapHandle {
     data bindingArg1: GeoJsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_geojson_source_data(
+      mln_map_set_geo_json_source_data(
         raw,
         arena.view(bindingArg0),
         arena.use(bindingArg1.handle),
@@ -637,7 +637,7 @@ public extension MapHandle {
 
   /// Overrides one GeoJSON source's synchronous tiling at runtime.
   ///
-  /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+  /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeoJsonSourceSynchronousTiling(
@@ -645,7 +645,7 @@ public extension MapHandle {
     enabled bindingArg1: Bool
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_geojson_source_synchronous_tiling(
+      mln_map_set_geo_json_source_synchronous_tiling(
         raw,
         arena.view(bindingArg0),
         bindingArg1,
@@ -657,7 +657,7 @@ public extension MapHandle {
 
   /// Updates one GeoJSON source to load data from a URL.
   ///
-  /// See `mln_map_set_geojson_source_url` in the
+  /// See `mln_map_set_geo_json_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeoJsonSourceUrl(
@@ -665,7 +665,7 @@ public extension MapHandle {
     url bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_geojson_source_url(
+      mln_map_set_geo_json_source_url(
         raw,
         arena.view(bindingArg0),
         arena.view(bindingArg1),
@@ -918,13 +918,15 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeoJsonSourceDataHandle
   ) throws {
     try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_add_geojson_source_data(
-        raw,
-        arena.view(bindingArg0),
-        arena.use(bindingArg1.handle),
-        nil,
-        diagnostic
-      ) }
+      .nativeInvoke { raw, arena, diagnostic in
+        mln_map_add_geo_json_source_data(
+          raw,
+          arena.view(bindingArg0),
+          arena.use(bindingArg1.handle),
+          nil,
+          diagnostic
+        )
+      }
   }
 
   func addGeoJsonSourceUrl(
@@ -934,7 +936,7 @@ public extension MapHandleDiscarding {
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_add_geojson_source_url(
+        try mln_map_add_geo_json_source_url(
           raw,
           arena.view(bindingArg0),
           arena.view(bindingArg1),
@@ -1179,13 +1181,15 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeoJsonSourceDataHandle
   ) throws {
     try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_geojson_source_data(
-        raw,
-        arena.view(bindingArg0),
-        arena.use(bindingArg1.handle),
-        nil,
-        diagnostic
-      ) }
+      .nativeInvoke { raw, arena, diagnostic in
+        mln_map_set_geo_json_source_data(
+          raw,
+          arena.view(bindingArg0),
+          arena.use(bindingArg1.handle),
+          nil,
+          diagnostic
+        )
+      }
   }
 
   func setGeoJsonSourceSynchronousTiling(
@@ -1194,7 +1198,7 @@ public extension MapHandleDiscarding {
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
-        mln_map_set_geojson_source_synchronous_tiling(
+        mln_map_set_geo_json_source_synchronous_tiling(
           raw,
           arena.view(bindingArg0),
           bindingArg1,
@@ -1209,7 +1213,7 @@ public extension MapHandleDiscarding {
     url bindingArg1: String
   ) throws {
     try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_geojson_source_url(
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_geo_json_source_url(
         raw,
         arena.view(bindingArg0),
         arena.view(bindingArg1),

@@ -143,7 +143,7 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * and consumer fences until process exit.
    * The host finishes its GPU reads before destroying borrowed textures.
    */
-  MLN_GPU_SYNC_OPENGL_FENCE = 1U,
+  MLN_GPU_SYNC_OPEN_GL_FENCE = 1U,
 } mln_gpu_sync_kind;
 
 /**
@@ -170,8 +170,8 @@ typedef struct mln_render_session_attach_options {
   uint32_t requested_texture_ring_depth;
   /**
    * Producer synchronization for acquired texture frames.
-   * MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or WGL texture target and a
-   * caller-graphics-thread driver. Other targets support only CPU completion
+   * MLN_GPU_SYNC_OPEN_GL_FENCE requires a shared EGL or WGL texture target and
+   * a caller-graphics-thread driver. Other targets support only CPU completion
    * and fail an unsupported request.
    */
   mln_gpu_sync_kind producer_sync_kind;
@@ -209,7 +209,7 @@ typedef struct mln_render_session_capabilities {
 /**
  * Backend synchronization copied by frame access and release calls.
  *
- * OpenGL ownership and lifetimes follow MLN_GPU_SYNC_OPENGL_FENCE.
+ * OpenGL ownership and lifetimes follow MLN_GPU_SYNC_OPEN_GL_FENCE.
  */
 typedef struct mln_gpu_sync {
   uint32_t size;
@@ -252,7 +252,7 @@ typedef struct mln_vulkan_context_descriptor {
 } mln_vulkan_context_descriptor;
 
 /** WebGPU backend context fields shared by WebGPU render targets. */
-typedef struct mln_webgpu_context_descriptor {
+typedef struct mln_web_gpu_context_descriptor {
   /** Borrowed WGPUInstance. Optional for texture targets. */
   void* instance;
   /** Borrowed WGPUDevice. Required. */
@@ -262,30 +262,30 @@ typedef struct mln_webgpu_context_descriptor {
    * non-null queue must belong to device.
    */
   void* queue;
-} mln_webgpu_context_descriptor;
+} mln_web_gpu_context_descriptor;
 
 /** OpenGL context providers supported by this build. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
-) mln_opengl_context_provider_flag : uint32_t {
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 1u << 1u,
+) mln_open_gl_context_provider_flag : uint32_t {
+  MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,
+  MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 1u << 1u,
   /** Browser WebGL context imported into an Emscripten module. */
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 1u << 2u,
-} mln_opengl_context_provider_flag;
+  MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 1u << 2u,
+} mln_open_gl_context_provider_flag;
 
-/** A set of mln_opengl_context_provider_flag bits. */
-typedef uint32_t mln_opengl_context_provider_flags;
+/** A set of mln_open_gl_context_provider_flag bits. */
+typedef uint32_t mln_open_gl_context_provider_flags;
 
 /** OpenGL platform context provider used by a context descriptor. */
-typedef enum mln_opengl_context_platform : uint32_t {
+typedef enum mln_open_gl_context_platform : uint32_t {
   /** No OpenGL context provider is selected. */
-  MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0u,
-  MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1u,
-  MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2u,
+  MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED = 0u,
+  MLN_OPEN_GL_CONTEXT_PLATFORM_WGL = 1u,
+  MLN_OPEN_GL_CONTEXT_PLATFORM_EGL = 2u,
   /** Emscripten WebGL context handle. */
-  MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3u,
-} mln_opengl_context_platform;
+  MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3u,
+} mln_open_gl_context_platform;
 
 /**
  * How a session's OpenGL context relates to its driver thread and host graphics
@@ -303,22 +303,22 @@ typedef enum mln_opengl_context_platform : uint32_t {
  * context between renders. Teardown releases the session context from the
  * thread and restores nothing.
  */
-typedef enum mln_opengl_context_ownership : uint32_t {
+typedef enum mln_open_gl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
-  MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0u,
+  MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0u,
   /** The session keeps its own OpenGL context current on its thread. */
-  MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
-} mln_opengl_context_ownership;
+  MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
+} mln_open_gl_context_ownership;
 
 /** OpenGL client API a dedicated EGL session creates its context for. */
-typedef enum mln_opengl_client_api : uint32_t {
+typedef enum mln_open_gl_client_api : uint32_t {
   /** No client API is named. */
-  MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0u,
+  MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0u,
   /** Desktop OpenGL, as EGL_OPENGL_API names it. */
-  MLN_OPENGL_CLIENT_API_GL = 1u,
+  MLN_OPEN_GL_CLIENT_API_GL = 1u,
   /** OpenGL ES, as EGL_OPENGL_ES_API names it. */
-  MLN_OPENGL_CLIENT_API_GLES = 2u,
-} mln_opengl_client_api;
+  MLN_OPEN_GL_CLIENT_API_GLES = 2u,
+} mln_open_gl_client_api;
 
 /** WGL context fields shared by OpenGL render targets on Windows. */
 typedef struct mln_wgl_context_descriptor {
@@ -365,25 +365,25 @@ typedef struct mln_egl_context_descriptor {
    * ownership. A shared session queries share_context for it, so this is
    * ignored there.
    */
-  mln_opengl_client_api client_api;
+  mln_open_gl_client_api client_api;
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
 /** WebGL context placement. */
-typedef enum mln_webgl_context_kind : uint32_t {
+typedef enum mln_web_gl_context_kind : uint32_t {
   /** Use a host-created context on its current browser agent. */
-  MLN_WEBGL_CONTEXT_EXISTING = 0U,
+  MLN_WEB_GL_CONTEXT_EXISTING = 0U,
   /**
    * Transfer the canvas named by canvas_selector to a native worker and create
    * a WebGL 2 context there.
    */
-  MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1U,
-} mln_webgl_context_kind;
+  MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1U,
+} mln_web_gl_context_kind;
 
 /** WebGL context fields shared by OpenGL render targets in the browser. */
-typedef struct mln_webgl_context_descriptor {
-  mln_webgl_context_kind kind;
+typedef struct mln_web_gl_context_descriptor {
+  mln_web_gl_context_kind kind;
   /**
    * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
    */
@@ -393,30 +393,30 @@ typedef struct mln_webgl_context_descriptor {
    * canvas must still be transferable when attachment starts.
    */
   mln_buffer_view canvas_selector;
-} mln_webgl_context_descriptor;
+} mln_web_gl_context_descriptor;
 
 /** Backend-specific OpenGL context data. */
-typedef union mln_opengl_context_descriptor_data {
+typedef union mln_open_gl_context_descriptor_data {
   mln_wgl_context_descriptor wgl
-    MLN_BINDING("variant=MLN_OPENGL_CONTEXT_PLATFORM_WGL");
+    MLN_BINDING("variant=MLN_OPEN_GL_CONTEXT_PLATFORM_WGL");
   mln_egl_context_descriptor egl
-    MLN_BINDING("variant=MLN_OPENGL_CONTEXT_PLATFORM_EGL");
-  mln_webgl_context_descriptor webgl
-    MLN_BINDING("variant=MLN_OPENGL_CONTEXT_PLATFORM_WEBGL");
-} mln_opengl_context_descriptor_data;
+    MLN_BINDING("variant=MLN_OPEN_GL_CONTEXT_PLATFORM_EGL");
+  mln_web_gl_context_descriptor web_gl
+    MLN_BINDING("variant=MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL");
+} mln_open_gl_context_descriptor_data;
 
 /** OpenGL backend context fields shared by OpenGL render targets. */
-typedef struct mln_opengl_context_descriptor {
+typedef struct mln_open_gl_context_descriptor {
   /** WGL, EGL, or WebGL context provider. Required. */
-  mln_opengl_context_platform platform;
+  mln_open_gl_context_platform platform;
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
-  mln_opengl_context_ownership ownership;
-  mln_opengl_context_descriptor_data data MLN_BINDING("tag=platform");
-} mln_opengl_context_descriptor;
+  mln_open_gl_context_ownership ownership;
+  mln_open_gl_context_descriptor_data data MLN_BINDING("tag=platform");
+} mln_open_gl_context_descriptor;
 
 /**
  * Computes the physical device-pixel size of a logical extent.
@@ -440,8 +440,8 @@ MLN_API mln_status mln_logical_extent_physical_size(
 /**
  * Returns OpenGL context providers supported by this build.
  */
-MLN_API mln_opengl_context_provider_flags
-mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;
+MLN_API mln_open_gl_context_provider_flags
+mln_open_gl_supported_context_provider_mask(void) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

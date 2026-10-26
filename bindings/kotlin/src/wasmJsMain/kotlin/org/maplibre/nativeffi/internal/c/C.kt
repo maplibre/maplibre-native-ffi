@@ -16,11 +16,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_acquired_frame_get_metal_texture(frame, word(outFrame), word(outDiagnostic))
 
-  actual fun mln_acquired_frame_get_opengl_texture(
+  actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
-  ): Int = mln_kw_mln_acquired_frame_get_opengl_texture(frame, word(outFrame), word(outDiagnostic))
+  ): Int = mln_kw_mln_acquired_frame_get_open_gl_texture(frame, word(outFrame), word(outDiagnostic))
 
   actual fun mln_acquired_frame_get_producer_sync(
     frame: Long,
@@ -37,11 +37,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_acquired_frame_get_vulkan_texture(frame, word(outFrame), word(outDiagnostic))
 
-  actual fun mln_acquired_frame_get_webgpu_texture(
+  actual fun mln_acquired_frame_get_web_gpu_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
-  ): Int = mln_kw_mln_acquired_frame_get_webgpu_texture(frame, word(outFrame), word(outDiagnostic))
+  ): Int = mln_kw_mln_acquired_frame_get_web_gpu_texture(frame, word(outFrame), word(outDiagnostic))
 
   actual fun mln_acquired_frame_release(
     frame: Long,
@@ -83,21 +83,21 @@ internal actual object C {
     mln_kw_mln_delivery_queue_release(queue)
   }
 
-  actual fun mln_geojson_source_data_create(
+  actual fun mln_geo_json_source_data_create(
     data: Long,
     options: Long,
     outData: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_geojson_source_data_create(
+    mln_kw_mln_geo_json_source_data_create(
       word(data),
       word(options),
       word(outData),
       word(outDiagnostic),
     )
 
-  actual fun mln_geojson_source_data_release(data: Long) {
-    mln_kw_mln_geojson_source_data_release(data)
+  actual fun mln_geo_json_source_data_release(data: Long) {
+    mln_kw_mln_geo_json_source_data_release(data)
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -172,14 +172,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_add_geojson_source_data(
+  actual fun mln_map_add_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_add_geojson_source_data(
+    mln_kw_mln_map_add_geo_json_source_data(
       map,
       word(sourceId),
       data,
@@ -187,7 +187,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_add_geojson_source_url(
+  actual fun mln_map_add_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
@@ -195,7 +195,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_add_geojson_source_url(
+    mln_kw_mln_map_add_geo_json_source_url(
       map,
       word(sourceId),
       word(url),
@@ -331,7 +331,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_opengl_borrowed_texture(
+  actual fun mln_map_attach_open_gl_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -339,7 +339,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_opengl_borrowed_texture(
+    mln_kw_mln_map_attach_open_gl_borrowed_texture(
       map,
       word(descriptor),
       word(options),
@@ -348,7 +348,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_opengl_owned_texture(
+  actual fun mln_map_attach_open_gl_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -356,7 +356,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_opengl_owned_texture(
+    mln_kw_mln_map_attach_open_gl_owned_texture(
       map,
       word(descriptor),
       word(options),
@@ -365,7 +365,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_opengl_surface(
+  actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -373,7 +373,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_opengl_surface(
+    mln_kw_mln_map_attach_open_gl_surface(
       map,
       word(descriptor),
       word(options),
@@ -433,7 +433,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_webgpu_borrowed_texture(
+  actual fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -441,7 +441,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_webgpu_borrowed_texture(
+    mln_kw_mln_map_attach_web_gpu_borrowed_texture(
       map,
       word(descriptor),
       word(options),
@@ -450,7 +450,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_webgpu_owned_texture(
+  actual fun mln_map_attach_web_gpu_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -458,7 +458,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_webgpu_owned_texture(
+    mln_kw_mln_map_attach_web_gpu_owned_texture(
       map,
       word(descriptor),
       word(options),
@@ -467,7 +467,7 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_webgpu_surface(
+  actual fun mln_map_attach_web_gpu_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -475,7 +475,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_webgpu_surface(
+    mln_kw_mln_map_attach_web_gpu_surface(
       map,
       word(descriptor),
       word(options),
@@ -1028,14 +1028,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_geojson_source_data(
+  actual fun mln_map_set_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_geojson_source_data(
+    mln_kw_mln_map_set_geo_json_source_data(
       map,
       word(sourceId),
       data,
@@ -1043,14 +1043,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_geojson_source_synchronous_tiling(
+  actual fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,
     enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_geojson_source_synchronous_tiling(
+    mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
       map,
       word(sourceId),
       if (enabled) 1 else 0,
@@ -1058,14 +1058,14 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_geojson_source_url(
+  actual fun mln_map_set_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_geojson_source_url(
+    mln_kw_mln_map_set_geo_json_source_url(
       map,
       word(sourceId),
       word(url),
@@ -1284,8 +1284,8 @@ internal actual object C {
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_kw_mln_network_set_status(status, word(outDiagnostic))
 
-  actual fun mln_opengl_supported_context_provider_mask(): Int =
-    mln_kw_mln_opengl_supported_context_provider_mask()
+  actual fun mln_open_gl_supported_context_provider_mask(): Int =
+    mln_kw_mln_open_gl_supported_context_provider_mask()
 
   actual fun mln_plugin_get_register_function_v1(): Long =
     unsignedWord(mln_kw_mln_plugin_get_register_function_v1())
@@ -1464,26 +1464,26 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_render_session_set_opengl_borrowed_texture_target(
+  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_set_opengl_borrowed_texture_target(
+    mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
       session,
       word(descriptor),
       word(completion),
       word(outDiagnostic),
     )
 
-  actual fun mln_render_session_set_opengl_surface_target(
+  actual fun mln_render_session_set_open_gl_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_set_opengl_surface_target(
+    mln_kw_mln_render_session_set_open_gl_surface_target(
       session,
       word(descriptor),
       word(completion),
@@ -1516,26 +1516,26 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_render_session_set_webgpu_borrowed_texture_target(
+  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_set_webgpu_borrowed_texture_target(
+    mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
       session,
       word(descriptor),
       word(completion),
       word(outDiagnostic),
     )
 
-  actual fun mln_render_session_set_webgpu_surface_target(
+  actual fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_set_webgpu_surface_target(
+    mln_kw_mln_render_session_set_web_gpu_surface_target(
       session,
       word(descriptor),
       word(completion),
@@ -1904,9 +1904,9 @@ private fun mln_kw_mln_acquired_frame_get_metal_texture(p0: Long, p1: Int, p2: I
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_metal_texture(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_acquired_frame_get_opengl_texture(p0: Long, p1: Int, p2: Int): Int =
+private fun mln_kw_mln_acquired_frame_get_open_gl_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_opengl_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_open_gl_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_producer_sync(p0: Long, p1: Int, p2: Int): Int =
@@ -1924,9 +1924,9 @@ private fun mln_kw_mln_acquired_frame_get_vulkan_texture(p0: Long, p1: Int, p2: 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_vulkan_texture(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_acquired_frame_get_webgpu_texture(p0: Long, p1: Int, p2: Int): Int =
+private fun mln_kw_mln_acquired_frame_get_web_gpu_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_webgpu_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_web_gpu_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_release(p0: Long, p1: Int, p2: Int): Int =
@@ -1969,14 +1969,14 @@ private fun mln_kw_mln_delivery_queue_drain(p0: Long, p1: Int, p2: Int, p3: Int)
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_release(p0)")
 
-private fun mln_kw_mln_geojson_source_data_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
+private fun mln_kw_mln_geo_json_source_data_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geojson_source_data_create(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geo_json_source_data_create(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_geojson_source_data_release(p0: Long): Unit =
+private fun mln_kw_mln_geo_json_source_data_release(p0: Long): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geojson_source_data_release(p0)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geo_json_source_data_release(p0)",
   )
 
 private fun mln_kw_mln_http_header_transform_response_set_header(
@@ -2032,7 +2032,7 @@ private fun mln_kw_mln_map_add_custom_mvt_vector_source(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_mvt_vector_source(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_add_geojson_source_data(
+private fun mln_kw_mln_map_add_geo_json_source_data(
   p0: Long,
   p1: Int,
   p2: Long,
@@ -2040,10 +2040,10 @@ private fun mln_kw_mln_map_add_geojson_source_data(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geojson_source_data(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_data(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_add_geojson_source_url(
+private fun mln_kw_mln_map_add_geo_json_source_url(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2052,7 +2052,7 @@ private fun mln_kw_mln_map_add_geojson_source_url(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geojson_source_url(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_url(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_add_image_source_image(
@@ -2138,7 +2138,7 @@ private fun mln_kw_mln_map_attach_metal_surface(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_metal_surface(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_opengl_borrowed_texture(
+private fun mln_kw_mln_map_attach_open_gl_borrowed_texture(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2147,10 +2147,10 @@ private fun mln_kw_mln_map_attach_opengl_borrowed_texture(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_opengl_borrowed_texture(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_borrowed_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_opengl_owned_texture(
+private fun mln_kw_mln_map_attach_open_gl_owned_texture(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2159,10 +2159,10 @@ private fun mln_kw_mln_map_attach_opengl_owned_texture(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_opengl_owned_texture(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_owned_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_opengl_surface(
+private fun mln_kw_mln_map_attach_open_gl_surface(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2171,7 +2171,7 @@ private fun mln_kw_mln_map_attach_opengl_surface(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_opengl_surface(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_surface(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_attach_vulkan_borrowed_texture(
@@ -2210,7 +2210,7 @@ private fun mln_kw_mln_map_attach_vulkan_surface(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_vulkan_surface(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_webgpu_borrowed_texture(
+private fun mln_kw_mln_map_attach_web_gpu_borrowed_texture(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2219,10 +2219,10 @@ private fun mln_kw_mln_map_attach_webgpu_borrowed_texture(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_webgpu_borrowed_texture(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_borrowed_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_webgpu_owned_texture(
+private fun mln_kw_mln_map_attach_web_gpu_owned_texture(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2231,10 +2231,10 @@ private fun mln_kw_mln_map_attach_webgpu_owned_texture(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_webgpu_owned_texture(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_owned_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_webgpu_surface(
+private fun mln_kw_mln_map_attach_web_gpu_surface(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2243,7 +2243,7 @@ private fun mln_kw_mln_map_attach_webgpu_surface(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_webgpu_surface(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_surface(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_begin_command_group(p0: Long, p1: Int, p2: Int): Int =
@@ -2625,7 +2625,7 @@ private fun mln_kw_mln_map_set_free_camera_options(p0: Long, p1: Int, p2: Int, p
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_free_camera_options(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_map_set_geojson_source_data(
+private fun mln_kw_mln_map_set_geo_json_source_data(
   p0: Long,
   p1: Int,
   p2: Long,
@@ -2633,10 +2633,10 @@ private fun mln_kw_mln_map_set_geojson_source_data(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geojson_source_data(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_data(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_set_geojson_source_synchronous_tiling(
+private fun mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2644,10 +2644,10 @@ private fun mln_kw_mln_map_set_geojson_source_synchronous_tiling(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geojson_source_synchronous_tiling(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_synchronous_tiling(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_set_geojson_source_url(
+private fun mln_kw_mln_map_set_geo_json_source_url(
   p0: Long,
   p1: Int,
   p2: Int,
@@ -2655,7 +2655,7 @@ private fun mln_kw_mln_map_set_geojson_source_url(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geojson_source_url(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_url(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_global_state_property(
@@ -2799,9 +2799,9 @@ private fun mln_kw_mln_network_get_status(p0: Int, p1: Int): Int =
 private fun mln_kw_mln_network_set_status(p0: Int, p1: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_network_set_status(p0, p1)")
 
-private fun mln_kw_mln_opengl_supported_context_provider_mask(): Int =
+private fun mln_kw_mln_open_gl_supported_context_provider_mask(): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_opengl_supported_context_provider_mask()",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_open_gl_supported_context_provider_mask()",
   )
 
 private fun mln_kw_mln_plugin_get_register_function_v1(): Int =
@@ -2955,24 +2955,24 @@ private fun mln_kw_mln_render_session_set_metal_surface_target(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_metal_surface_target(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_render_session_set_opengl_borrowed_texture_target(
+private fun mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_opengl_borrowed_texture_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_render_session_set_opengl_surface_target(
+private fun mln_kw_mln_render_session_set_open_gl_surface_target(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_opengl_surface_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_open_gl_surface_target(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_render_session_set_vulkan_borrowed_texture_target(
@@ -2995,24 +2995,24 @@ private fun mln_kw_mln_render_session_set_vulkan_surface_target(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_vulkan_surface_target(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_render_session_set_webgpu_borrowed_texture_target(
+private fun mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_webgpu_borrowed_texture_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_render_session_set_webgpu_surface_target(
+private fun mln_kw_mln_render_session_set_web_gpu_surface_target(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_webgpu_surface_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_web_gpu_surface_target(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_resource_request_complete(p0: Long, p1: Int, p2: Int): Int =

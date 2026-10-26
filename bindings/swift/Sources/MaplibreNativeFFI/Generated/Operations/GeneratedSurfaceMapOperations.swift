@@ -31,7 +31,7 @@ public extension MapHandle {
 
   /// Starts attachment of an OpenGL surface target.
   ///
-  /// See `mln_map_attach_opengl_surface` in the
+  /// See `mln_map_attach_open_gl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func attachOpenGlSurface(
     descriptor bindingArg0: OpenGlSurfaceDescriptor,
@@ -41,7 +41,7 @@ public extension MapHandle {
     return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
-      try mln_map_attach_opengl_surface(
+      try mln_map_attach_open_gl_surface(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),

@@ -43,7 +43,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 
 /// OpenGL attachment options for a native surface.
 ///
-/// See `mln_opengl_surface_descriptor` in the
+/// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// Logical surface extent. Required. A scale_factor that differs from the
@@ -66,7 +66,7 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(
-    raw: mln_opengl_surface_descriptor,
+    raw: mln_open_gl_surface_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     extent = LogicalExtent(raw: raw.extent)
@@ -78,10 +78,10 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws
-    -> mln_opengl_surface_descriptor
+    -> mln_open_gl_surface_descriptor
   {
-    var raw = mln_opengl_surface_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_opengl_surface_descriptor>.size)
+    var raw = mln_open_gl_surface_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_open_gl_surface_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = try context.nativeValue(arena: arena)
     raw.surface = surface.unsafeMutableRawPointer

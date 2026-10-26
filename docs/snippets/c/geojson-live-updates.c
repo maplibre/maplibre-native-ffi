@@ -8,8 +8,8 @@
 
 mln_status add_vehicle_source(mln_map map, const mln_completion* completion) {
   // #region add
-  mln_geojson_source_data empty = MLN_HANDLE_NULL;
-  mln_status status = mln_geojson_source_data_create(
+  mln_geo_json_source_data empty = MLN_HANDLE_NULL;
+  mln_status status = mln_geo_json_source_data_create(
     mln_buffer_view_from_cstr(
       "{\"type\":\"FeatureCollection\",\"features\":[]}"
     ),
@@ -17,10 +17,10 @@ mln_status add_vehicle_source(mln_map map, const mln_completion* completion) {
   );
   if (status != MLN_STATUS_OK) return status;
 
-  status = mln_map_add_geojson_source_data(
+  status = mln_map_add_geo_json_source_data(
     map, mln_buffer_view_from_cstr("vehicles"), empty, completion, NULL
   );
-  mln_geojson_source_data_release(empty);
+  mln_geo_json_source_data_release(empty);
   return status;
   // #endregion add
 }
@@ -59,8 +59,8 @@ mln_status publish_vehicles(
   // #region prepare
   // Preparation parses and tiles the collection, and runs on any thread. The
   // data carries the same default options the source was added with.
-  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
-  mln_status status = mln_geojson_source_data_create(
+  mln_geo_json_source_data prepared = MLN_HANDLE_NULL;
+  mln_status status = mln_geo_json_source_data_create(
     mln_buffer_view_from_cstr(json), NULL, &prepared, NULL
   );
   if (status != MLN_STATUS_OK) return status;
@@ -68,10 +68,10 @@ mln_status publish_vehicles(
 
   // #region publish
   // The install is a cheap command submitted to the map owner.
-  status = mln_map_set_geojson_source_data(
+  status = mln_map_set_geo_json_source_data(
     map, mln_buffer_view_from_cstr("vehicles"), prepared, completion, NULL
   );
-  mln_geojson_source_data_release(prepared);
+  mln_geo_json_source_data_release(prepared);
   return status;
   // #endregion publish
 }
@@ -80,7 +80,7 @@ mln_status track_position_closely(
   mln_map map, bool tracking, const mln_completion* completion
 ) {
   // #region synchronous-tiling
-  return mln_map_set_geojson_source_synchronous_tiling(
+  return mln_map_set_geo_json_source_synchronous_tiling(
     map, mln_buffer_view_from_cstr("vehicles"), tracking, completion, NULL
   );
   // #endregion synchronous-tiling

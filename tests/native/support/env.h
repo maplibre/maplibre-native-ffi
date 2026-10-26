@@ -56,7 +56,7 @@ static inline bool mln_test_all_zero(const void* bytes, size_t size) {
   return true;
 }
 
-// Whether every member of `info` is zero, as an absent TILEJSON member reads.
+// Whether every member of `info` is zero, as an absent TILE_JSON member reads.
 // The struct has trailing padding, so this compares members rather than bytes.
 static inline bool mln_test_tile_info_is_zero(
   const mln_style_source_tile_info* info

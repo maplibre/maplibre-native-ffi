@@ -136,7 +136,7 @@ static bool create_webgpu_device(webgpu_state* state) {
   return true;
 }
 
-static bool thread_context(mln_webgpu_context_descriptor* out_context) {
+static bool thread_context(mln_web_gpu_context_descriptor* out_context) {
   if (!thread_webgpu_attempted) {
     thread_webgpu_attempted = true;
     if (!create_webgpu_device(&thread_webgpu_state)) {
@@ -147,7 +147,7 @@ static bool thread_context(mln_webgpu_context_descriptor* out_context) {
     return false;
   }
 
-  *out_context = (mln_webgpu_context_descriptor){
+  *out_context = (mln_web_gpu_context_descriptor){
     .instance = thread_webgpu_state.instance,
     .device = thread_webgpu_state.device,
     .queue = NULL,
@@ -185,19 +185,19 @@ bool mln_test_backend_attach(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  mln_webgpu_context_descriptor context = {0};
+  mln_web_gpu_context_descriptor context = {0};
   if (!thread_context(&context)) {
     return false;
   }
   *out_state = NULL;
-  mln_webgpu_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_webgpu_owned_texture_descriptor)
+  mln_web_gpu_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
   };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
   descriptor.context = context;
-  *out_status = mln_map_attach_webgpu_owned_texture(
+  *out_status = mln_map_attach_web_gpu_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
@@ -216,7 +216,7 @@ static bool attach_borrowed_ring(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  mln_webgpu_context_descriptor context = {0};
+  mln_web_gpu_context_descriptor context = {0};
   if (!thread_context(&context)) {
     return false;
   }
@@ -224,7 +224,7 @@ static bool attach_borrowed_ring(
   if (ring == NULL) {
     return false;
   }
-  mln_webgpu_borrowed_texture entries[MLN_TEXTURE_RING_MAX_DEPTH];
+  mln_web_gpu_borrowed_texture entries[MLN_TEXTURE_RING_MAX_DEPTH];
   for (size_t index = 0; index < attach_ring_depth; index += 1) {
     const WGPUTextureDescriptor texture_descriptor = {
       .usage = WGPUTextureUsage_RenderAttachment |
@@ -250,13 +250,13 @@ static bool attach_borrowed_ring(
     ring->textures[index] = texture;
     ring->views[index] = view;
     ring->texture_count += 1;
-    entries[index] = (mln_webgpu_borrowed_texture){
+    entries[index] = (mln_web_gpu_borrowed_texture){
       .texture = texture,
       .texture_view = view,
     };
   }
-  mln_webgpu_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_webgpu_borrowed_texture_descriptor)
+  mln_web_gpu_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_web_gpu_borrowed_texture_descriptor)
   };
   descriptor.extent.width = ring_texture_size;
   descriptor.extent.height = ring_texture_size;
@@ -268,7 +268,7 @@ static bool attach_borrowed_ring(
   descriptor.texture_count = ring->texture_count;
   descriptor.format = WGPUTextureFormat_RGBA8Unorm;
   *out_state = ring;
-  *out_status = mln_map_attach_webgpu_borrowed_texture(
+  *out_status = mln_map_attach_web_gpu_borrowed_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
@@ -418,7 +418,7 @@ void mln_test_webgpu_main_thread_device_destroy(
   *device = (mln_test_webgpu_main_thread_device){0};
 }
 
-static MLN_TEST_THREAD_LOCAL const mln_webgpu_context_descriptor*
+static MLN_TEST_THREAD_LOCAL const mln_web_gpu_context_descriptor*
   attach_context;
 
 // Attach validation makes no WebGPU call, so the attach can run here. The
@@ -429,14 +429,14 @@ static bool attach_main_thread_texture(
   const mln_completion* completion, mln_status* out_status
 ) {
   *out_state = NULL;
-  mln_webgpu_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_webgpu_owned_texture_descriptor)
+  mln_web_gpu_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
   };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
   descriptor.context = *attach_context;
-  *out_status = mln_map_attach_webgpu_owned_texture(
+  *out_status = mln_map_attach_web_gpu_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;

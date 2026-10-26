@@ -56,7 +56,7 @@ impl RenderTarget {
                     context,
                 };
                 let session = Session::new(
-                    unsafe { map.attach_opengl_owned_texture(&descriptor, &options) }?,
+                    unsafe { map.attach_open_gl_owned_texture(&descriptor, &options) }?,
                     &options,
                     mode,
                     wakes,
@@ -70,7 +70,7 @@ impl RenderTarget {
                 let ring = ring(gl, viewport)?;
                 let descriptor = borrowed_descriptor(context, &ring, viewport);
                 let session = Session::new(
-                    unsafe { map.attach_opengl_borrowed_texture(&descriptor, &options) }?,
+                    unsafe { map.attach_open_gl_borrowed_texture(&descriptor, &options) }?,
                     &options,
                     mode,
                     wakes,
@@ -93,7 +93,7 @@ impl RenderTarget {
                 };
                 Ok(Self::Surface {
                     session: Session::new(
-                        unsafe { map.attach_opengl_surface(&descriptor, &options) }?,
+                        unsafe { map.attach_open_gl_surface(&descriptor, &options) }?,
                         &options,
                         mode,
                         wakes,
@@ -146,7 +146,7 @@ impl RenderTarget {
                 let completion = match unsafe {
                     session
                         .handle()
-                        .set_opengl_borrowed_texture_target(&descriptor)
+                        .set_open_gl_borrowed_texture_target(&descriptor)
                 } {
                     Ok(completion) => completion,
                     Err(error) => {

@@ -282,11 +282,11 @@ static app_error opengl_context_swap_window(const opengl_context* context) {
   return APP_OK;
 }
 
-static mln_opengl_context_descriptor opengl_context_descriptor(
+static mln_open_gl_context_descriptor opengl_context_descriptor(
   const opengl_context* context
 ) {
-  return (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
     .data.egl = {
       .display = context->egl_display,
       .config = context->egl_config,
@@ -505,7 +505,7 @@ struct render_target {
 };
 
 uint32_t render_target_backend_flag(void) {
-  return MLN_RENDER_BACKEND_FLAG_OPENGL;
+  return MLN_RENDER_BACKEND_FLAG_OPEN_GL;
 }
 
 void render_target_apply_sdl_hints(void) {
@@ -579,16 +579,16 @@ app_error render_target_init(
 }
 
 /// Describes ring, whose entries the caller provides storage for.
-static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
+static mln_open_gl_borrowed_texture_descriptor borrowed_ring_descriptor(
   render_target* target, const opengl_ring* ring, viewport current_viewport,
-  mln_opengl_borrowed_texture entries[RING_DEPTH]
+  mln_open_gl_borrowed_texture entries[RING_DEPTH]
 ) {
   for (size_t index = 0; index < RING_DEPTH; ++index) {
     entries[index] =
-      (mln_opengl_borrowed_texture){.texture = ring->textures[index]};
+      (mln_open_gl_borrowed_texture){.texture = ring->textures[index]};
   }
-  mln_opengl_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  mln_open_gl_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
@@ -601,11 +601,11 @@ static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
   return descriptor;
 }
 
-static mln_opengl_surface_descriptor surface_descriptor(
+static mln_open_gl_surface_descriptor surface_descriptor(
   render_target* target, viewport current_viewport
 ) {
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.context = opengl_context_descriptor(&target->as.surface.context);
@@ -630,32 +630,32 @@ app_error render_target_attach(
   mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
-      mln_opengl_owned_texture_descriptor descriptor = {
-        .size = sizeof(mln_opengl_owned_texture_descriptor)
+      mln_open_gl_owned_texture_descriptor descriptor = {
+        .size = sizeof(mln_open_gl_owned_texture_descriptor)
       };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         opengl_context_descriptor(&target->as.owned.compositor.context);
-      status = mln_map_attach_opengl_owned_texture(
+      status = mln_map_attach_open_gl_owned_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_opengl_borrowed_texture entries[RING_DEPTH];
-      const mln_opengl_borrowed_texture_descriptor descriptor =
+      mln_open_gl_borrowed_texture entries[RING_DEPTH];
+      const mln_open_gl_borrowed_texture_descriptor descriptor =
         borrowed_ring_descriptor(
           target, &target->as.borrowed.ring, current_viewport, entries
         );
-      status = mln_map_attach_opengl_borrowed_texture(
+      status = mln_map_attach_open_gl_borrowed_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      const mln_opengl_surface_descriptor descriptor =
+      const mln_open_gl_surface_descriptor descriptor =
         surface_descriptor(target, current_viewport);
-      status = mln_map_attach_opengl_surface(
+      status = mln_map_attach_open_gl_surface(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -730,10 +730,10 @@ static app_error resize_borrowed(
   mln_status status = MLN_STATUS_INVALID_STATE;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   if (entry != nullptr) {
-    mln_opengl_borrowed_texture entries[RING_DEPTH];
-    const mln_opengl_borrowed_texture_descriptor descriptor =
+    mln_open_gl_borrowed_texture entries[RING_DEPTH];
+    const mln_open_gl_borrowed_texture_descriptor descriptor =
       borrowed_ring_descriptor(target, &replacement, current_viewport, entries);
-    status = mln_render_session_set_opengl_borrowed_texture_target(
+    status = mln_render_session_set_open_gl_borrowed_texture_target(
       target->session.handle, &descriptor, &completion, &diagnostic
     );
     texture_replacements_queue(
@@ -768,12 +768,12 @@ static app_error resize_surface(
   if (!replaced) {
     return render_session_resize(&target->session, current_viewport);
   }
-  const mln_opengl_surface_descriptor descriptor =
+  const mln_open_gl_surface_descriptor descriptor =
     surface_descriptor(target, current_viewport);
   const mln_completion completion =
     diagnostics_completion("OpenGL surface set target failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_render_session_set_opengl_surface_target(
+  const mln_status status = mln_render_session_set_open_gl_surface_target(
     target->session.handle, &descriptor, &completion, &diagnostic
   );
   if (status != MLN_STATUS_OK) {
@@ -828,10 +828,10 @@ static app_error present_acquired(
   MAP_TRY(render_session_require_cpu_complete_producer(
     *held, "OpenGL texture acquire failed"
   ));
-  mln_opengl_texture_frame frame = {.size = sizeof(frame)};
+  mln_open_gl_texture_frame frame = {.size = sizeof(frame)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
-    mln_acquired_frame_get_opengl_texture(*held, &frame, &diagnostic);
+    mln_acquired_frame_get_open_gl_texture(*held, &frame, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("OpenGL texture access failed", status, &diagnostic);
     return APP_ERROR_BACKEND_DRAW_FAILED;

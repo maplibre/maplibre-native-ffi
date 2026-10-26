@@ -25,20 +25,20 @@ namespace mln::core::opengl {
 
 // Whether this descriptor names a canvas the session transfers to its worker.
 inline auto is_transferred_webgl_canvas(
-  const mln_opengl_context_descriptor& context
+  const mln_open_gl_context_descriptor& context
 ) -> bool {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  return context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
-         context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS;
+  return context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL &&
+         context.data.web_gl.kind == MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS;
 #else
   static_cast<void>(context);
   return false;
 #endif
 }
 
-inline auto webgl_canvas_selector(const mln_opengl_context_descriptor& context)
+inline auto webgl_canvas_selector(const mln_open_gl_context_descriptor& context)
   -> std::string {
-  const auto view = context.data.webgl.canvas_selector;
+  const auto view = context.data.web_gl.canvas_selector;
   if (view.size == 0) return {};
   return std::string{static_cast<const char*>(view.data), view.size};
 }
@@ -110,7 +110,7 @@ inline auto configure_transferred_webgl_worker(
 // Creates the WebGL 2 context for a canvas this worker already owns, and
 // records its handle in the descriptor the backend is built from.
 inline auto create_transferred_webgl_context(
-  mln_opengl_context_descriptor& context, const std::string& selector
+  mln_open_gl_context_descriptor& context, const std::string& selector
 ) -> mln_status {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   auto attributes = EmscriptenWebGLContextAttributes{};
@@ -123,7 +123,7 @@ inline auto create_transferred_webgl_context(
     set_thread_error("creating the transferred WebGL 2 context failed");
     return MLN_STATUS_NATIVE_ERROR;
   }
-  context.data.webgl.context = created;
+  context.data.web_gl.context = created;
   return MLN_STATUS_OK;
 #else
   static_cast<void>(context);

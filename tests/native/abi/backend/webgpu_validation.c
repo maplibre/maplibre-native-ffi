@@ -11,13 +11,13 @@
 // takes the rest as given.
 enum { some_texture_format = 18 };
 
-MLN_TEST_DESCRIPTOR_EDITS(webgpu_surface, mln_webgpu_surface_descriptor)
+MLN_TEST_DESCRIPTOR_EDITS(webgpu_surface, mln_web_gpu_surface_descriptor)
 MLN_TEST_EXTENT_RULE_EDITS(webgpu_surface)
 MLN_TEST_OVERFLOW_EDIT(webgpu_surface)
-MLN_TEST_DESCRIPTOR_EDITS(webgpu_owned, mln_webgpu_owned_texture_descriptor)
+MLN_TEST_DESCRIPTOR_EDITS(webgpu_owned, mln_web_gpu_owned_texture_descriptor)
 MLN_TEST_OVERFLOW_EDIT(webgpu_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
-  webgpu_borrowed, mln_webgpu_borrowed_texture_descriptor
+  webgpu_borrowed, mln_web_gpu_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(webgpu_borrowed, webgpu)
 MLN_TEST_RING_RULE_EDITS(webgpu_borrowed, webgpu)
@@ -47,26 +47,26 @@ static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_borrowed.physical_width = 0;
 }
 
-MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_webgpu_surface)
+MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_web_gpu_surface)
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_webgpu_owned_texture
+  submit_owned_attach, mln_map_attach_web_gpu_owned_texture
 )
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_borrowed_attach, mln_map_attach_webgpu_borrowed_texture
+  submit_borrowed_attach, mln_map_attach_web_gpu_borrowed_texture
 )
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_surface_set_target, mln_render_session_set_webgpu_surface_target
+  submit_surface_set_target, mln_render_session_set_web_gpu_surface_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
-  mln_render_session_set_webgpu_borrowed_texture_target
+  mln_render_session_set_web_gpu_borrowed_texture_target
 )
 #endif
 
-static mln_webgpu_surface_descriptor surface_descriptor(void) {
-  mln_webgpu_surface_descriptor descriptor = {
-    .size = sizeof(mln_webgpu_surface_descriptor)
+static mln_web_gpu_surface_descriptor surface_descriptor(void) {
+  mln_web_gpu_surface_descriptor descriptor = {
+    .size = sizeof(mln_web_gpu_surface_descriptor)
   };
   descriptor.extent = mln_test_target_extent();
   descriptor.context.device = MLN_TEST_FAKE_HANDLE;
@@ -77,14 +77,14 @@ static mln_webgpu_surface_descriptor surface_descriptor(void) {
 
 // A ring of one texture, whose entry is in the call's storage.
 static void describe_borrowed(mln_test_target_call* call) {
-  call->textures.webgpu[0] = (mln_webgpu_borrowed_texture){
+  call->textures.webgpu[0] = (mln_web_gpu_borrowed_texture){
     .texture = MLN_TEST_FAKE_HANDLE,
     .texture_view = MLN_TEST_FAKE_HANDLE,
   };
-  mln_webgpu_borrowed_texture_descriptor* descriptor =
+  mln_web_gpu_borrowed_texture_descriptor* descriptor =
     &call->descriptor.webgpu_borrowed;
-  *descriptor = (mln_webgpu_borrowed_texture_descriptor){
-    .size = sizeof(mln_webgpu_borrowed_texture_descriptor)
+  *descriptor = (mln_web_gpu_borrowed_texture_descriptor){
+    .size = sizeof(mln_web_gpu_borrowed_texture_descriptor)
   };
   descriptor->extent = mln_test_target_extent();
   descriptor->context.device = MLN_TEST_FAKE_HANDLE;
@@ -122,8 +122,8 @@ static void webgpu_attach_rejects_malformed_calls(void) {
     sizeof(surface_rows) / sizeof(surface_rows[0])
   );
 
-  call.descriptor.webgpu_owned = (mln_webgpu_owned_texture_descriptor){
-    .size = sizeof(mln_webgpu_owned_texture_descriptor)
+  call.descriptor.webgpu_owned = (mln_web_gpu_owned_texture_descriptor){
+    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
   };
   call.descriptor.webgpu_owned.extent = mln_test_target_extent();
   call.descriptor.webgpu_owned.context.device = MLN_TEST_FAKE_HANDLE;

@@ -91,12 +91,12 @@ public object GeneratedApi {
   /**
    * Returns OpenGL context providers supported by this build.
    *
-   * See `mln_opengl_supported_context_provider_mask` in the
+   * See `mln_open_gl_supported_context_provider_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
   public fun openGlSupportedContextProviderMask(): OpenGlContextProviderFlag =
     nativeCall(null, null) {
-      val raw = C.mln_opengl_supported_context_provider_mask()
+      val raw = C.mln_open_gl_supported_context_provider_mask()
       OpenGlContextProviderFlag(raw.toUInt())
     }
 

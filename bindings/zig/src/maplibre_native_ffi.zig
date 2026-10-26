@@ -68,10 +68,10 @@ pub const AcquiredFrame = struct {
 
     /// Copies OpenGL-native metadata from an acquired frame.
     ///
-    /// See `mln_acquired_frame_get_opengl_texture` in the
+    /// See `mln_acquired_frame_get_open_gl_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn getOpenGlTexture(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
-        return call.scopedView("mln_acquired_frame_get_opengl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenGlTextureFrame, self, context, use, diagnostic);
+        return call.scopedView("mln_acquired_frame_get_open_gl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenGlTextureFrame, self, context, use, diagnostic);
     }
 
     /// Copies the producer synchronization for an acquired texture frame.
@@ -111,15 +111,15 @@ pub const AcquiredFrame = struct {
 
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
-/// See `mln_geojson_source_data` in the
+/// See `mln_geo_json_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const GeoJsonSourceData = struct {
     raw: u64,
     closed: bool = false,
-    pub const native_name = "mln_geojson_source_data";
+    pub const native_name = "mln_geo_json_source_data";
     const methods = owner.Handle(@This(), "GeoJsonSourceData", struct {
         fn dispose(raw: u64) status.Error!void {
-            c.mln_geojson_source_data_release(raw);
+            c.mln_geo_json_source_data_release(raw);
         }
     }.dispose);
     pub const adopt = methods.adopt;
@@ -129,19 +129,19 @@ pub const GeoJsonSourceData = struct {
     pub const deinit = methods.deinit;
     /// Prepares GeoJSON source data for installation on a map.
     ///
-    /// See `mln_geojson_source_data_create` in the
+    /// See `mln_geo_json_source_data_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn create(data: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeoJsonSourceData {
-        return call.invoke("mln_geojson_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeoJsonSourceData) });
+        return call.invoke("mln_geo_json_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeoJsonSourceData) });
     }
 
     /// Releases prepared GeoJSON source data.
     ///
-    /// See `mln_geojson_source_data_release` in the
+    /// See `mln_geo_json_source_data_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn release(self: *GeoJsonSourceData) void {
         if (self.closed) return;
-        c.mln_geojson_source_data_release(self.raw);
+        c.mln_geo_json_source_data_release(self.raw);
         self.closed = true;
     }
 };
@@ -188,18 +188,18 @@ pub const Map = struct {
 
     /// Adds a GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_add_geojson_source_data` in the
+    /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn addGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_geojson_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
+        return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
 
     /// Adds a GeoJSON source with URL data.
     ///
-    /// See `mln_map_add_geojson_source_url` in the
+    /// See `mln_map_add_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn addGeoJsonSourceUrl(self: Map, source_id: []const u8, url: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_geojson_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url, options });
+        return call.submit("mln_map_add_geo_json_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url, options });
     }
 
     /// Adds an image source with inline image pixels.
@@ -277,28 +277,28 @@ pub const Map = struct {
 
     /// Starts attachment of a ring of caller-owned OpenGL textures.
     ///
-    /// See `mln_map_attach_opengl_borrowed_texture` in the
+    /// See `mln_map_attach_open_gl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn attachOpenGlBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: OpenGlBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_opengl_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
+        const started = try call.submit("mln_map_attach_open_gl_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
 
     /// Starts attachment of a session-owned OpenGL texture ring.
     ///
-    /// See `mln_map_attach_opengl_owned_texture` in the
+    /// See `mln_map_attach_open_gl_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn attachOpenGlOwnedTexture(self: Map, descriptor: OpenGlOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_opengl_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
+        const started = try call.submit("mln_map_attach_open_gl_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
 
     /// Starts attachment of an OpenGL surface target.
     ///
-    /// See `mln_map_attach_opengl_surface` in the
+    /// See `mln_map_attach_open_gl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     pub fn attachOpenGlSurface(self: Map, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_opengl_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
+        const started = try call.submit("mln_map_attach_open_gl_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
 
@@ -722,26 +722,26 @@ pub const Map = struct {
 
     /// Updates one GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_set_geojson_source_data` in the
+    /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn setGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_geojson_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
+        return call.submit("mln_map_set_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
 
     /// Overrides one GeoJSON source's synchronous tiling at runtime.
     ///
-    /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+    /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn setGeoJsonSourceSynchronousTiling(self: Map, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_geojson_source_synchronous_tiling", .handle, self, call.command, null, diagnostic, .{ source_id, enabled });
+        return call.submit("mln_map_set_geo_json_source_synchronous_tiling", .handle, self, call.command, null, diagnostic, .{ source_id, enabled });
     }
 
     /// Updates one GeoJSON source to load data from a URL.
     ///
-    /// See `mln_map_set_geojson_source_url` in the
+    /// See `mln_map_set_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn setGeoJsonSourceUrl(self: Map, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_geojson_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url });
+        return call.submit("mln_map_set_geo_json_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url });
     }
 
     /// Submits a global-state JSON value. JSON null restores the style default.
@@ -1225,18 +1225,18 @@ pub const RenderSession = struct {
     /// Starts an ordered replacement of every texture of a caller-owned OpenGL
     /// ring.
     ///
-    /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+    /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn setOpenGlBorrowedTextureTarget(self: RenderSession, allocator: std.mem.Allocator, descriptor: OpenGlBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_opengl_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
+        return call.submit("mln_render_session_set_open_gl_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
     }
 
     /// Starts an ordered OpenGL surface replacement.
     ///
-    /// See `mln_render_session_set_opengl_surface_target` in the
+    /// See `mln_render_session_set_open_gl_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     pub fn setOpenGlSurfaceTarget(self: RenderSession, descriptor: OpenGlSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_opengl_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
+        return call.submit("mln_render_session_set_open_gl_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
     }
 
     /// Starts an ordered replacement of every image of a caller-owned Vulkan ring.
@@ -2474,7 +2474,7 @@ pub const FreeCameraOptions = struct {
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
 ///
-/// See `mln_geojson_source_options` in the
+/// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const GeoJsonSourceOptions = struct {
     /// Minimum tiling zoom. Absent selects 0.
@@ -2502,37 +2502,37 @@ pub const GeoJsonSourceOptions = struct {
     /// Tiles the data for the next render update instead of in the background.
     /// Absent selects false.
     synchronous_tiling: ?bool = null,
-    pub fn toNative(self: GeoJsonSourceOptions) status.Error!c.mln_geojson_source_options {
-        var raw = std.mem.zeroes(c.mln_geojson_source_options);
+    pub fn toNative(self: GeoJsonSourceOptions) status.Error!c.mln_geo_json_source_options {
+        var raw = std.mem.zeroes(c.mln_geo_json_source_options);
         raw.fields = 0;
-        raw.size = @sizeOf(c.mln_geojson_source_options);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, self.tolerance);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, self.cluster_max_zoom);
+        raw.size = @sizeOf(c.mln_geo_json_source_options);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, self.tolerance);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, self.cluster_max_zoom);
         raw.cluster_properties = marshal.view(self.cluster_properties);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, self.cluster_radius);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, self.line_metrics);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER, &raw.cluster, self.cluster);
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, self.synchronous_tiling);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, self.cluster_radius);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, self.line_metrics);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER, &raw.cluster, self.cluster);
+        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, self.synchronous_tiling);
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_geojson_source_options) status.Error!GeoJsonSourceOptions {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_geo_json_source_options) status.Error!GeoJsonSourceOptions {
         return .{
-            .min_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
-            .max_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
-            .tolerance = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0) raw.tolerance else null,
-            .cluster_max_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0) raw.cluster_max_zoom else null,
+            .min_zoom = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
+            .max_zoom = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
+            .tolerance = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE != 0) raw.tolerance else null,
+            .cluster_max_zoom = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0) raw.cluster_max_zoom else null,
             .cluster_properties = try marshal.copyView(allocator, raw.cluster_properties),
-            .buffer = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0) raw.buffer else null,
-            .cluster_radius = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0) raw.cluster_radius else null,
-            .cluster_min_points = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,
-            .line_metrics = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0) raw.line_metrics else null,
-            .cluster = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0) raw.cluster else null,
-            .synchronous_tiling = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0) raw.synchronous_tiling else null,
+            .buffer = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_BUFFER != 0) raw.buffer else null,
+            .cluster_radius = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS != 0) raw.cluster_radius else null,
+            .cluster_min_points = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,
+            .line_metrics = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0) raw.line_metrics else null,
+            .cluster = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0) raw.cluster else null,
+            .synchronous_tiling = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0) raw.synchronous_tiling else null,
         };
     }
 };
@@ -2593,7 +2593,7 @@ pub const GpuSyncKind = enum(u32) {
     cpu_complete = 0,
     /// GLsync in the shared EGL or WGL context's share group, used only by a
     /// caller-graphics-thread driver. handle is nonzero.
-    opengl_fence = 1,
+    open_gl_fence = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3572,17 +3572,17 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
-/// See `mln_opengl_borrowed_texture` in the
+/// See `mln_open_gl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlBorrowedTexture = struct {
     /// Borrowed OpenGL texture object name. Required.
     texture: u32,
-    pub fn toNative(self: OpenGlBorrowedTexture) c.mln_opengl_borrowed_texture {
-        var raw = std.mem.zeroes(c.mln_opengl_borrowed_texture);
+    pub fn toNative(self: OpenGlBorrowedTexture) c.mln_open_gl_borrowed_texture {
+        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture);
         raw.texture = self.texture;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_opengl_borrowed_texture) OpenGlBorrowedTexture {
+    pub fn fromNative(raw: c.mln_open_gl_borrowed_texture) OpenGlBorrowedTexture {
         return .{
             .texture = raw.texture,
         };
@@ -3591,7 +3591,7 @@ pub const OpenGlBorrowedTexture = struct {
 
 /// OpenGL attachment options for a borrowed texture target.
 ///
-/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlBorrowedTextureDescriptor = struct {
     /// Logical texture extent. Required. physical_width and physical_height
@@ -3609,15 +3609,15 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
     textures: []const OpenGlBorrowedTexture,
     /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
     target: u32,
-    pub fn toNative(self: OpenGlBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_opengl_borrowed_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_opengl_borrowed_texture_descriptor);
-        raw.size = @sizeOf(c.mln_opengl_borrowed_texture_descriptor);
+    pub fn toNative(self: OpenGlBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_texture_descriptor {
+        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture_descriptor);
+        raw.size = @sizeOf(c.mln_open_gl_borrowed_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = try self.context.toNative();
         raw.textures = blk: {
-            const items = try allocator.alloc(c.mln_opengl_borrowed_texture, self.textures.len);
+            const items = try allocator.alloc(c.mln_open_gl_borrowed_texture, self.textures.len);
             for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
             break :blk items.ptr;
         };
@@ -3626,7 +3626,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_borrowed_texture_descriptor) status.Error!OpenGlBorrowedTextureDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_texture_descriptor) status.Error!OpenGlBorrowedTextureDescriptor {
         return .{
             .extent = LogicalExtent.fromNative(raw.extent),
             .physical_width = raw.physical_width,
@@ -3634,7 +3634,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
             .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
             .textures = blk: {
                 const copied = try allocator.alloc(OpenGlBorrowedTexture, raw.texture_count);
-                for (try marshal.nativeSlice(c.mln_opengl_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
+                for (try marshal.nativeSlice(c.mln_open_gl_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
             .target = raw.target,
@@ -3644,7 +3644,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
 
 /// OpenGL client API a dedicated EGL session creates its context for.
 ///
-/// See `mln_opengl_client_api` in the
+/// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlClientApi = enum(u32) {
     /// No client API is named.
@@ -3660,7 +3660,7 @@ pub const OpenGlClientApi = enum(u32) {
 
 /// OpenGL backend context fields shared by OpenGL render targets.
 ///
-/// See `mln_opengl_context_descriptor` in the
+/// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlContextDescriptor = struct {
     /// Whether the session shares its driver thread and graphics objects with
@@ -3668,33 +3668,33 @@ pub const OpenGlContextDescriptor = struct {
     /// canvas are dedicated to their core worker.
     ownership: OpenGlContextOwnership = .shared,
     data: OpenGlContextDescriptorData,
-    pub fn toNative(self: OpenGlContextDescriptor) status.Error!c.mln_opengl_context_descriptor {
-        var raw = std.mem.zeroes(c.mln_opengl_context_descriptor);
+    pub fn toNative(self: OpenGlContextDescriptor) status.Error!c.mln_open_gl_context_descriptor {
+        var raw = std.mem.zeroes(c.mln_open_gl_context_descriptor);
         raw.ownership = self.ownership.toNative();
         switch (self.data) {
             .wgl => |item| {
-                raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                raw.platform = c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
                 raw.data.wgl = item.toNative();
             },
             .egl => |item| {
-                raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                raw.platform = c.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
                 raw.data.egl = item.toNative();
             },
-            .webgl => |item| {
-                raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
-                raw.data.webgl = try item.toNative();
+            .web_gl => |item| {
+                raw.platform = c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+                raw.data.web_gl = try item.toNative();
             },
         }
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_context_descriptor) status.Error!OpenGlContextDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_context_descriptor) status.Error!OpenGlContextDescriptor {
         return .{
             .ownership = OpenGlContextOwnership.fromNative(raw.ownership),
             .data = switch (raw.platform) {
-                c.MLN_OPENGL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
-                c.MLN_OPENGL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
-                c.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL => .{ .webgl = try WebGlContextDescriptor.fromNative(allocator, raw.data.webgl) },
+                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
+                c.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
+                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => .{ .web_gl = try WebGlContextDescriptor.fromNative(allocator, raw.data.web_gl) },
                 else => return error.NativeError,
             },
         };
@@ -3703,18 +3703,18 @@ pub const OpenGlContextDescriptor = struct {
 
 /// Backend-specific OpenGL context data.
 ///
-/// See `mln_opengl_context_descriptor_data` in the
+/// See `mln_open_gl_context_descriptor_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlContextDescriptorData = union(enum) {
     wgl: WglContextDescriptor,
     egl: EglContextDescriptor,
-    webgl: WebGlContextDescriptor,
+    web_gl: WebGlContextDescriptor,
 };
 
 /// How a session's OpenGL context relates to its driver thread and host
 /// graphics state.
 ///
-/// See `mln_opengl_context_ownership` in the
+/// See `mln_open_gl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlContextOwnership = enum(u32) {
     /// The session shares its thread with host graphics work.
@@ -3728,13 +3728,13 @@ pub const OpenGlContextOwnership = enum(u32) {
 
 /// OpenGL context providers supported by this build.
 ///
-/// See `mln_opengl_context_provider_flag` in the
+/// See `mln_open_gl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlContextProviderFlag = struct {
     wgl: bool = false,
     egl: bool = false,
     /// Browser WebGL context imported into an Emscripten module.
-    webgl: bool = false,
+    web_gl: bool = false,
     unknown_bits: u32 = 0,
     pub const native_bits = [_]u32{ 1, 2, 4 };
     const methods = marshal.FlagMethods(@This());
@@ -3744,7 +3744,7 @@ pub const OpenGlContextProviderFlag = struct {
 
 /// OpenGL attachment options for an owned texture target.
 ///
-/// See `mln_opengl_owned_texture_descriptor` in the
+/// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlOwnedTextureDescriptor = struct {
     /// Logical texture extent. Required. A scale_factor that differs from the
@@ -3755,15 +3755,15 @@ pub const OpenGlOwnedTextureDescriptor = struct {
     /// or transferred WebGL ownership creates a private core-worker context for
     /// CPU readback.
     context: OpenGlContextDescriptor,
-    pub fn toNative(self: OpenGlOwnedTextureDescriptor) status.Error!c.mln_opengl_owned_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_opengl_owned_texture_descriptor);
-        raw.size = @sizeOf(c.mln_opengl_owned_texture_descriptor);
+    pub fn toNative(self: OpenGlOwnedTextureDescriptor) status.Error!c.mln_open_gl_owned_texture_descriptor {
+        var raw = std.mem.zeroes(c.mln_open_gl_owned_texture_descriptor);
+        raw.size = @sizeOf(c.mln_open_gl_owned_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = try self.context.toNative();
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_owned_texture_descriptor) status.Error!OpenGlOwnedTextureDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_owned_texture_descriptor) status.Error!OpenGlOwnedTextureDescriptor {
         return .{
             .extent = LogicalExtent.fromNative(raw.extent),
             .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
@@ -3773,7 +3773,7 @@ pub const OpenGlOwnedTextureDescriptor = struct {
 
 /// OpenGL attachment options for a native surface.
 ///
-/// See `mln_opengl_surface_descriptor` in the
+/// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const OpenGlSurfaceDescriptor = struct {
     /// Logical surface extent. Required. A scale_factor that differs from the
@@ -3785,16 +3785,16 @@ pub const OpenGlSurfaceDescriptor = struct {
     /// EGL, both required. Null for WebGL, whose context carries its canvas
     /// binding.
     surface: ?*anyopaque = null,
-    pub fn toNative(self: OpenGlSurfaceDescriptor) status.Error!c.mln_opengl_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_opengl_surface_descriptor);
-        raw.size = @sizeOf(c.mln_opengl_surface_descriptor);
+    pub fn toNative(self: OpenGlSurfaceDescriptor) status.Error!c.mln_open_gl_surface_descriptor {
+        var raw = std.mem.zeroes(c.mln_open_gl_surface_descriptor);
+        raw.size = @sizeOf(c.mln_open_gl_surface_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = try self.context.toNative();
         raw.surface = self.surface;
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_surface_descriptor) status.Error!OpenGlSurfaceDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_surface_descriptor) status.Error!OpenGlSurfaceDescriptor {
         return .{
             .extent = LogicalExtent.fromNative(raw.extent),
             .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
@@ -3805,7 +3805,7 @@ pub const OpenGlSurfaceDescriptor = struct {
 
 /// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_texture_frame` in the
+/// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlTextureFrame = struct {
     /// Session generation that produced this frame.
@@ -3833,7 +3833,7 @@ pub const OpenGlTextureFrame = struct {
     /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed
     /// texture.
     type: u32 = 0,
-    pub fn fromNative(raw: c.mln_opengl_texture_frame) OpenGlTextureFrame {
+    pub fn fromNative(raw: c.mln_open_gl_texture_frame) OpenGlTextureFrame {
         return .{
             .generation = raw.generation,
             .width = raw.width,
@@ -4074,8 +4074,8 @@ pub const RenderAbandonResult = struct {
 pub const RenderBackendFlag = struct {
     metal: bool = false,
     vulkan: bool = false,
-    opengl: bool = false,
-    webgpu: bool = false,
+    open_gl: bool = false,
+    web_gpu: bool = false,
     unknown_bits: u32 = 0,
     pub const native_bits = [_]u32{ 1, 2, 4, 8 };
     const methods = marshal.FlagMethods(@This());
@@ -4199,7 +4199,7 @@ pub const RenderSessionAttachOptions = struct {
     /// its texture count, so borrowed and other targets ignore this value.
     requested_texture_ring_depth: u32 = 0,
     /// Producer synchronization for acquired texture frames.
-    /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+    /// `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
     /// and a caller-graphics-thread driver. Other targets support only CPU
     /// completion and fail an unsupported request.
     producer_sync_kind: GpuSyncKind = .cpu_complete,
@@ -5696,7 +5696,7 @@ pub const StyleSourceInfo = struct {
     /// URL that the source loads from, or empty when it has none.
     url: []const u8 = &.{},
     /// Inline TileJSON metadata, when the source was defined with it.
-    tilejson: ?StyleSourceTileInfo = null,
+    tile_json: ?StyleSourceTileInfo = null,
     /// Geographic bounds, when inline TileJSON sets them.
     bounds: ?LatLngBounds = null,
     /// Tile size in pixels, for a tile source.
@@ -5713,7 +5713,7 @@ pub const StyleSourceInfo = struct {
             .is_volatile = raw.is_volatile,
             .attribution = try marshal.copyView(allocator, raw.attribution),
             .url = try marshal.copyView(allocator, raw.url),
-            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) try StyleSourceTileInfo.fromNative(allocator, raw.tilejson) else null,
+            .tile_json = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_JSON != 0) try StyleSourceTileInfo.fromNative(allocator, raw.tile_json) else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
             .vector_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
@@ -5758,7 +5758,7 @@ pub const StyleSourceType = enum(u32) {
     vector = 1,
     raster = 2,
     raster_dem = 3,
-    geojson = 4,
+    geo_json = 4,
     image = 5,
     video = 6,
     annotations = 7,
@@ -6289,7 +6289,7 @@ pub const Wake = struct {
 
 /// WebGL context fields shared by OpenGL render targets in the browser.
 ///
-/// See `mln_webgl_context_descriptor` in the
+/// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebGlContextDescriptor = struct {
     kind: WebGlContextKind = .existing,
@@ -6298,15 +6298,15 @@ pub const WebGlContextDescriptor = struct {
     /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
     /// canvas must still be transferable when attachment starts.
     canvas_selector: []const u8 = &.{},
-    pub fn toNative(self: WebGlContextDescriptor) status.Error!c.mln_webgl_context_descriptor {
-        var raw = std.mem.zeroes(c.mln_webgl_context_descriptor);
+    pub fn toNative(self: WebGlContextDescriptor) status.Error!c.mln_web_gl_context_descriptor {
+        var raw = std.mem.zeroes(c.mln_web_gl_context_descriptor);
         raw.kind = self.kind.toNative();
         raw.context = self.context;
         raw.canvas_selector = marshal.view(self.canvas_selector);
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_webgl_context_descriptor) status.Error!WebGlContextDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_web_gl_context_descriptor) status.Error!WebGlContextDescriptor {
         return .{
             .kind = WebGlContextKind.fromNative(raw.kind),
             .context = raw.context,
@@ -6317,7 +6317,7 @@ pub const WebGlContextDescriptor = struct {
 
 /// WebGL context placement.
 ///
-/// See `mln_webgl_context_kind` in the
+/// See `mln_web_gl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebGlContextKind = enum(u32) {
     /// Use a host-created context on its current browser agent.
@@ -6457,11 +6457,11 @@ pub fn setNetworkStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.D
 
 /// Returns OpenGL context providers supported by this build.
 ///
-/// See `mln_opengl_supported_context_provider_mask` in the
+/// See `mln_open_gl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn openGlSupportedContextProviderMask() OpenGlContextProviderFlag {
     status.requireAbiVersion();
-    return OpenGlContextProviderFlag.fromNative(c.mln_opengl_supported_context_provider_mask());
+    return OpenGlContextProviderFlag.fromNative(c.mln_open_gl_supported_context_provider_mask());
 }
 
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
@@ -6504,12 +6504,12 @@ pub const MapDiscarding = struct {
 
     pub fn addGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_add_geojson_source_data", .handle, map, null, diagnostic, .{ source_id, data });
+        return call.discard("mln_map_add_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data });
     }
 
     pub fn addGeoJsonSourceUrl(self: MapDiscarding, source_id: []const u8, url: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_add_geojson_source_url", .handle, map, null, diagnostic, .{ source_id, url, options });
+        return call.discard("mln_map_add_geo_json_source_url", .handle, map, null, diagnostic, .{ source_id, url, options });
     }
 
     pub fn addImageSourceImage(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -6659,17 +6659,17 @@ pub const MapDiscarding = struct {
 
     pub fn setGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_geojson_source_data", .handle, map, null, diagnostic, .{ source_id, data });
+        return call.discard("mln_map_set_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data });
     }
 
     pub fn setGeoJsonSourceSynchronousTiling(self: MapDiscarding, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_geojson_source_synchronous_tiling", .handle, map, null, diagnostic, .{ source_id, enabled });
+        return call.discard("mln_map_set_geo_json_source_synchronous_tiling", .handle, map, null, diagnostic, .{ source_id, enabled });
     }
 
     pub fn setGeoJsonSourceUrl(self: MapDiscarding, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_geojson_source_url", .handle, map, null, diagnostic, .{ source_id, url });
+        return call.discard("mln_map_set_geo_json_source_url", .handle, map, null, diagnostic, .{ source_id, url });
     }
 
     pub fn setGlobalStateProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

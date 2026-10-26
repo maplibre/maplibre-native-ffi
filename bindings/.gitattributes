@@ -267,7 +267,7 @@
 /rust/crates/maplibre-native-ffi-core/src/status.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
-/rust/crates/maplibre-native-ffi/src/generated/geojson_source_data.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/geo_json_source_data.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/global.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map_projection.rs linguist-generated=true

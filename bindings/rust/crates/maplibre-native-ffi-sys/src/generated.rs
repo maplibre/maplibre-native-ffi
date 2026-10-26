@@ -82,17 +82,17 @@ pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
 pub type mln_free_camera_option_field = u32;
 pub const MLN_FREE_CAMERA_OPTION_POSITION: mln_free_camera_option_field = 1;
 pub const MLN_FREE_CAMERA_OPTION_ORIENTATION: mln_free_camera_option_field = 2;
-pub type mln_geojson_source_option_field = u32;
-pub const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM: mln_geojson_source_option_field = 1;
-pub const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM: mln_geojson_source_option_field = 2;
-pub const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE: mln_geojson_source_option_field = 4;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM: mln_geojson_source_option_field = 8;
-pub const MLN_GEOJSON_SOURCE_OPTION_BUFFER: mln_geojson_source_option_field = 16;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geojson_source_option_field = 32;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geojson_source_option_field = 64;
-pub const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS: mln_geojson_source_option_field = 128;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER: mln_geojson_source_option_field = 256;
-pub const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geojson_source_option_field = 512;
+pub type mln_geo_json_source_option_field = u32;
+pub const MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM: mln_geo_json_source_option_field = 1;
+pub const MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM: mln_geo_json_source_option_field = 2;
+pub const MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE: mln_geo_json_source_option_field = 4;
+pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM: mln_geo_json_source_option_field = 8;
+pub const MLN_GEO_JSON_SOURCE_OPTION_BUFFER: mln_geo_json_source_option_field = 16;
+pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geo_json_source_option_field = 32;
+pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geo_json_source_option_field = 64;
+pub const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS: mln_geo_json_source_option_field = 128;
+pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER: mln_geo_json_source_option_field = 256;
+pub const MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geo_json_source_option_field = 512;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -101,7 +101,7 @@ pub const MLN_GESTURE_PHASE_END: mln_gesture_phase = 3;
 pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
 pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
-pub const MLN_GPU_SYNC_OPENGL_FENCE: mln_gpu_sync_kind = 1;
+pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;
@@ -170,22 +170,22 @@ pub const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY: mln_offline_region_definition_
 pub type mln_offline_region_download_state = u32;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE: mln_offline_region_download_state = 0;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE: mln_offline_region_download_state = 1;
-pub type mln_opengl_client_api = u32;
-pub const MLN_OPENGL_CLIENT_API_UNSPECIFIED: mln_opengl_client_api = 0;
-pub const MLN_OPENGL_CLIENT_API_GL: mln_opengl_client_api = 1;
-pub const MLN_OPENGL_CLIENT_API_GLES: mln_opengl_client_api = 2;
-pub type mln_opengl_context_ownership = u32;
-pub const MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED: mln_opengl_context_ownership = 0;
-pub const MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED: mln_opengl_context_ownership = 1;
-pub type mln_opengl_context_platform = u32;
-pub const MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED: mln_opengl_context_platform = 0;
-pub const MLN_OPENGL_CONTEXT_PLATFORM_WGL: mln_opengl_context_platform = 1;
-pub const MLN_OPENGL_CONTEXT_PLATFORM_EGL: mln_opengl_context_platform = 2;
-pub const MLN_OPENGL_CONTEXT_PLATFORM_WEBGL: mln_opengl_context_platform = 3;
-pub type mln_opengl_context_provider_flag = u32;
-pub const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL: mln_opengl_context_provider_flag = 1;
-pub const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL: mln_opengl_context_provider_flag = 2;
-pub const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL: mln_opengl_context_provider_flag = 4;
+pub type mln_open_gl_client_api = u32;
+pub const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED: mln_open_gl_client_api = 0;
+pub const MLN_OPEN_GL_CLIENT_API_GL: mln_open_gl_client_api = 1;
+pub const MLN_OPEN_GL_CLIENT_API_GLES: mln_open_gl_client_api = 2;
+pub type mln_open_gl_context_ownership = u32;
+pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED: mln_open_gl_context_ownership = 0;
+pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED: mln_open_gl_context_ownership = 1;
+pub type mln_open_gl_context_platform = u32;
+pub const MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED: mln_open_gl_context_platform = 0;
+pub const MLN_OPEN_GL_CONTEXT_PLATFORM_WGL: mln_open_gl_context_platform = 1;
+pub const MLN_OPEN_GL_CONTEXT_PLATFORM_EGL: mln_open_gl_context_platform = 2;
+pub const MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL: mln_open_gl_context_platform = 3;
+pub type mln_open_gl_context_provider_flag = u32;
+pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL: mln_open_gl_context_provider_flag = 1;
+pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL: mln_open_gl_context_provider_flag = 2;
+pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL: mln_open_gl_context_provider_flag = 4;
 pub type mln_projection_mode_field = u32;
 pub const MLN_PROJECTION_MODE_AXONOMETRIC: mln_projection_mode_field = 1;
 pub const MLN_PROJECTION_MODE_X_SKEW: mln_projection_mode_field = 2;
@@ -196,8 +196,8 @@ pub const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED: mln_render_abandon_disposi
 pub type mln_render_backend_flag = u32;
 pub const MLN_RENDER_BACKEND_FLAG_METAL: mln_render_backend_flag = 1;
 pub const MLN_RENDER_BACKEND_FLAG_VULKAN: mln_render_backend_flag = 2;
-pub const MLN_RENDER_BACKEND_FLAG_OPENGL: mln_render_backend_flag = 4;
-pub const MLN_RENDER_BACKEND_FLAG_WEBGPU: mln_render_backend_flag = 8;
+pub const MLN_RENDER_BACKEND_FLAG_OPEN_GL: mln_render_backend_flag = 4;
+pub const MLN_RENDER_BACKEND_FLAG_WEB_GPU: mln_render_backend_flag = 8;
 pub type mln_render_driver_kind = u32;
 pub const MLN_RENDER_DRIVER_CORE_WORKER: mln_render_driver_kind = 1;
 pub const MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD: mln_render_driver_kind = 2;
@@ -395,7 +395,7 @@ pub type mln_style_raster_dem_encoding = u32;
 pub const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX: mln_style_raster_dem_encoding = 0;
 pub const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM: mln_style_raster_dem_encoding = 1;
 pub type mln_style_source_info_field = u32;
-pub const MLN_STYLE_SOURCE_INFO_TILEJSON: mln_style_source_info_field = 1;
+pub const MLN_STYLE_SOURCE_INFO_TILE_JSON: mln_style_source_info_field = 1;
 pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 2;
 pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 4;
 pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 8;
@@ -405,7 +405,7 @@ pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
 pub const MLN_STYLE_SOURCE_TYPE_RASTER: mln_style_source_type = 2;
 pub const MLN_STYLE_SOURCE_TYPE_RASTER_DEM: mln_style_source_type = 3;
-pub const MLN_STYLE_SOURCE_TYPE_GEOJSON: mln_style_source_type = 4;
+pub const MLN_STYLE_SOURCE_TYPE_GEO_JSON: mln_style_source_type = 4;
 pub const MLN_STYLE_SOURCE_TYPE_IMAGE: mln_style_source_type = 5;
 pub const MLN_STYLE_SOURCE_TYPE_VIDEO: mln_style_source_type = 6;
 pub const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS: mln_style_source_type = 7;
@@ -441,9 +441,9 @@ pub const MLN_URL_MATCH_GLOB: mln_url_match_flag = 1;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
-pub type mln_webgl_context_kind = u32;
-pub const MLN_WEBGL_CONTEXT_EXISTING: mln_webgl_context_kind = 0;
-pub const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS: mln_webgl_context_kind = 1;
+pub type mln_web_gl_context_kind = u32;
+pub const MLN_WEB_GL_CONTEXT_EXISTING: mln_web_gl_context_kind = 0;
+pub const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: mln_web_gl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_animation_options {
@@ -633,7 +633,7 @@ pub struct mln_egl_context_descriptor {
     pub display: *mut std::ffi::c_void,
     pub config: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
-    pub client_api: mln_opengl_client_api,
+    pub client_api: mln_open_gl_client_api,
     pub get_proc_address: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -671,9 +671,9 @@ pub struct mln_free_camera_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_geojson_source_options {
+pub struct mln_geo_json_source_options {
     pub size: u32,
-    pub fields: mln_geojson_source_option_fields,
+    pub fields: mln_geo_json_source_option_fields,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub tolerance: f64,
@@ -931,53 +931,53 @@ pub struct mln_offline_tile_pyramid_region_definition {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_opengl_borrowed_texture {
+pub struct mln_open_gl_borrowed_texture {
     pub texture: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mln_opengl_borrowed_texture_descriptor {
+pub struct mln_open_gl_borrowed_texture_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub context: mln_opengl_context_descriptor,
-    pub textures: *const mln_opengl_borrowed_texture,
+    pub context: mln_open_gl_context_descriptor,
+    pub textures: *const mln_open_gl_borrowed_texture,
     pub texture_count: usize,
     pub target: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mln_opengl_context_descriptor {
-    pub platform: mln_opengl_context_platform,
-    pub ownership: mln_opengl_context_ownership,
-    pub data: mln_opengl_context_descriptor_data,
+pub struct mln_open_gl_context_descriptor {
+    pub platform: mln_open_gl_context_platform,
+    pub ownership: mln_open_gl_context_ownership,
+    pub data: mln_open_gl_context_descriptor_data,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub union mln_opengl_context_descriptor_data {
+pub union mln_open_gl_context_descriptor_data {
     pub wgl: mln_wgl_context_descriptor,
     pub egl: mln_egl_context_descriptor,
-    pub webgl: mln_webgl_context_descriptor,
+    pub web_gl: mln_web_gl_context_descriptor,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mln_opengl_owned_texture_descriptor {
+pub struct mln_open_gl_owned_texture_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
-    pub context: mln_opengl_context_descriptor,
+    pub context: mln_open_gl_context_descriptor,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mln_opengl_surface_descriptor {
+pub struct mln_open_gl_surface_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
-    pub context: mln_opengl_context_descriptor,
+    pub context: mln_open_gl_context_descriptor,
     pub surface: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_opengl_texture_frame {
+pub struct mln_open_gl_texture_frame {
     pub size: u32,
     pub generation: u64,
     pub width: u32,
@@ -1407,7 +1407,7 @@ pub struct mln_style_source_info {
     pub is_volatile: bool,
     pub attribution: mln_buffer_view,
     pub url: mln_buffer_view,
-    pub tilejson: mln_style_source_tile_info,
+    pub tile_json: mln_style_source_tile_info,
     pub bounds: mln_lat_lng_bounds,
     pub tile_size: u32,
     pub vector_encoding: mln_style_vector_tile_encoding,
@@ -1540,55 +1540,55 @@ pub struct mln_wake {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgl_context_descriptor {
-    pub kind: mln_webgl_context_kind,
+pub struct mln_web_gl_context_descriptor {
+    pub kind: mln_web_gl_context_kind,
     pub context: i32,
     pub canvas_selector: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_borrowed_texture {
+pub struct mln_web_gpu_borrowed_texture {
     pub texture: *mut std::ffi::c_void,
     pub texture_view: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_borrowed_texture_descriptor {
+pub struct mln_web_gpu_borrowed_texture_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub context: mln_webgpu_context_descriptor,
-    pub textures: *const mln_webgpu_borrowed_texture,
+    pub context: mln_web_gpu_context_descriptor,
+    pub textures: *const mln_web_gpu_borrowed_texture,
     pub texture_count: usize,
     pub format: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_context_descriptor {
+pub struct mln_web_gpu_context_descriptor {
     pub instance: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub queue: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_owned_texture_descriptor {
+pub struct mln_web_gpu_owned_texture_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
-    pub context: mln_webgpu_context_descriptor,
+    pub context: mln_web_gpu_context_descriptor,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_surface_descriptor {
+pub struct mln_web_gpu_surface_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
-    pub context: mln_webgpu_context_descriptor,
+    pub context: mln_web_gpu_context_descriptor,
     pub surface: *mut std::ffi::c_void,
     pub format: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_texture_frame {
+pub struct mln_web_gpu_texture_frame {
     pub size: u32,
     pub generation: u64,
     pub width: u32,
@@ -1636,8 +1636,8 @@ pub type mln_frame_demand_flags = u32;
 pub type mln_free_camera_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_geojson_source_data(pub u64);
-pub type mln_geojson_source_option_fields = u32;
+pub struct mln_geo_json_source_data(pub u64);
+pub type mln_geo_json_source_option_fields = u32;
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
@@ -1667,7 +1667,7 @@ pub struct mln_map_projection(pub u64);
 pub type mln_map_tile_option_fields = u32;
 pub type mln_map_viewport_option_fields = u32;
 pub type mln_offline_region_id = i64;
-pub type mln_opengl_context_provider_flags = u32;
+pub type mln_open_gl_context_provider_flags = u32;
 pub type mln_projection_mode_fields = u32;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_render_backend_flags = u32;
@@ -1729,7 +1729,7 @@ pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ff
 native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
-    mln_geojson_source_data,
+    mln_geo_json_source_data,
     mln_map,
     mln_map_projection,
     mln_render_frame_batch,
@@ -1750,9 +1750,9 @@ unsafe extern "C" {
         out_frame: *mut mln_metal_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_acquired_frame_get_opengl_texture(
+    pub fn mln_acquired_frame_get_open_gl_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_opengl_texture_frame,
+        out_frame: *mut mln_open_gl_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_producer_sync(
@@ -1770,9 +1770,9 @@ unsafe extern "C" {
         out_frame: *mut mln_vulkan_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_acquired_frame_get_webgpu_texture(
+    pub fn mln_acquired_frame_get_web_gpu_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_webgpu_texture_frame,
+        out_frame: *mut mln_web_gpu_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_release(
@@ -1792,13 +1792,13 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_c_version() -> u32;
-    pub fn mln_geojson_source_data_create(
+    pub fn mln_geo_json_source_data_create(
         data: mln_buffer_view,
-        options: *const mln_geojson_source_options,
-        out_data: *mut mln_geojson_source_data,
+        options: *const mln_geo_json_source_options,
+        out_data: *mut mln_geo_json_source_data,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_geojson_source_data_release(data: mln_geojson_source_data);
+    pub fn mln_geo_json_source_data_release(data: mln_geo_json_source_data);
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -1839,18 +1839,18 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_geojson_source_data(
+    pub fn mln_map_add_geo_json_source_data(
         map: mln_map,
         source_id: mln_buffer_view,
-        data: mln_geojson_source_data,
+        data: mln_geo_json_source_data,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_geojson_source_url(
+    pub fn mln_map_add_geo_json_source_url(
         map: mln_map,
         source_id: mln_buffer_view,
         url: mln_buffer_view,
-        options: *const mln_geojson_source_options,
+        options: *const mln_geo_json_source_options,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -1916,25 +1916,25 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_opengl_borrowed_texture(
+    pub fn mln_map_attach_open_gl_borrowed_texture(
         map: mln_map,
-        descriptor: *const mln_opengl_borrowed_texture_descriptor,
+        descriptor: *const mln_open_gl_borrowed_texture_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_opengl_owned_texture(
+    pub fn mln_map_attach_open_gl_owned_texture(
         map: mln_map,
-        descriptor: *const mln_opengl_owned_texture_descriptor,
+        descriptor: *const mln_open_gl_owned_texture_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_opengl_surface(
+    pub fn mln_map_attach_open_gl_surface(
         map: mln_map,
-        descriptor: *const mln_opengl_surface_descriptor,
+        descriptor: *const mln_open_gl_surface_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
@@ -1964,25 +1964,25 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_webgpu_borrowed_texture(
+    pub fn mln_map_attach_web_gpu_borrowed_texture(
         map: mln_map,
-        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
+        descriptor: *const mln_web_gpu_borrowed_texture_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_webgpu_owned_texture(
+    pub fn mln_map_attach_web_gpu_owned_texture(
         map: mln_map,
-        descriptor: *const mln_webgpu_owned_texture_descriptor,
+        descriptor: *const mln_web_gpu_owned_texture_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_webgpu_surface(
+    pub fn mln_map_attach_web_gpu_surface(
         map: mln_map,
-        descriptor: *const mln_webgpu_surface_descriptor,
+        descriptor: *const mln_web_gpu_surface_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
@@ -2335,21 +2335,21 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_geojson_source_data(
+    pub fn mln_map_set_geo_json_source_data(
         map: mln_map,
         source_id: mln_buffer_view,
-        data: mln_geojson_source_data,
+        data: mln_geo_json_source_data,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_geojson_source_synchronous_tiling(
+    pub fn mln_map_set_geo_json_source_synchronous_tiling(
         map: mln_map,
         source_id: mln_buffer_view,
         enabled: bool,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_geojson_source_url(
+    pub fn mln_map_set_geo_json_source_url(
         map: mln_map,
         source_id: mln_buffer_view,
         url: mln_buffer_view,
@@ -2477,7 +2477,7 @@ unsafe extern "C" {
         status: mln_network_status,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_opengl_supported_context_provider_mask() -> mln_opengl_context_provider_flags;
+    pub fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags;
     pub fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1;
     pub fn mln_projected_meters_for_lat_lng(
         coordinate: mln_lat_lng,
@@ -2597,15 +2597,15 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_opengl_borrowed_texture_target(
+    pub fn mln_render_session_set_open_gl_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_opengl_borrowed_texture_descriptor,
+        descriptor: *const mln_open_gl_borrowed_texture_descriptor,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_opengl_surface_target(
+    pub fn mln_render_session_set_open_gl_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_opengl_surface_descriptor,
+        descriptor: *const mln_open_gl_surface_descriptor,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2621,15 +2621,15 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_webgpu_borrowed_texture_target(
+    pub fn mln_render_session_set_web_gpu_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
+        descriptor: *const mln_web_gpu_borrowed_texture_descriptor,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_webgpu_surface_target(
+    pub fn mln_render_session_set_web_gpu_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_webgpu_surface_descriptor,
+        descriptor: *const mln_web_gpu_surface_descriptor,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

@@ -121,7 +121,7 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "source already exists",
-    mln_map_add_geojson_source_url(
+    mln_map_add_geo_json_source_url(
       map, taken, geojson_url, NULL, &completion.descriptor, NULL
     )
   );
@@ -145,7 +145,7 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
-    mln_map_set_geojson_source_url(
+    mln_map_set_geo_json_source_url(
       map, image, geojson_url, &completion.descriptor, NULL
     )
   );
@@ -159,7 +159,7 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
-    mln_map_set_geojson_source_synchronous_tiling(
+    mln_map_set_geo_json_source_synchronous_tiling(
       map, vector, true, &completion.descriptor, NULL
     )
   );

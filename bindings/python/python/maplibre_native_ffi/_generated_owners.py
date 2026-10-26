@@ -57,7 +57,7 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
 class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMixin):
     """Prepared GeoJSON data that sources retain independently of its handle.
 
-    See `mln_geojson_source_data` in the
+    See `mln_geo_json_source_data` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 

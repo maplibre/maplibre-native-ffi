@@ -280,7 +280,7 @@ class GpuSyncKind(UnknownIntEnum):
     """
 
     CPU_COMPLETE = 0
-    OPENGL_FENCE = 1
+    OPEN_GL_FENCE = 1
 
 
 class LogEvent(UnknownIntEnum):
@@ -389,7 +389,7 @@ class OfflineRegionDownloadState(UnknownIntEnum):
 class OpenGlClientApi(UnknownIntEnum):
     """OpenGL client API a dedicated EGL session creates its context for.
 
-    See `mln_opengl_client_api` in the
+    See `mln_open_gl_client_api` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
@@ -402,7 +402,7 @@ class OpenGlContextOwnership(UnknownIntEnum):
     """How a session's OpenGL context relates to its driver thread and host
     graphics state.
 
-    See `mln_opengl_context_ownership` in the
+    See `mln_open_gl_context_ownership` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
@@ -413,13 +413,13 @@ class OpenGlContextOwnership(UnknownIntEnum):
 class OpenGlContextProviderFlag(IntFlag):
     """OpenGL context providers supported by this build.
 
-    See `mln_opengl_context_provider_flag` in the
+    See `mln_open_gl_context_provider_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     WGL = 1
     EGL = 2
-    WEBGL = 4
+    WEB_GL = 4
 
 
 class RenderAbandonDisposition(UnknownIntEnum):
@@ -442,8 +442,8 @@ class RenderBackendFlag(IntFlag):
 
     METAL = 1
     VULKAN = 2
-    OPENGL = 4
-    WEBGPU = 8
+    OPEN_GL = 4
+    WEB_GPU = 8
 
 
 class RenderDriverKind(UnknownIntEnum):
@@ -739,7 +739,7 @@ class StyleSourceType(UnknownIntEnum):
     VECTOR = 1
     RASTER = 2
     RASTER_DEM = 3
-    GEOJSON = 4
+    GEO_JSON = 4
     IMAGE = 5
     VIDEO = 6
     ANNOTATIONS = 7
@@ -823,7 +823,7 @@ class ViewportMode(UnknownIntEnum):
 class WebGlContextKind(UnknownIntEnum):
     """WebGL context placement.
 
-    See `mln_webgl_context_kind` in the
+    See `mln_web_gl_context_kind` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
@@ -1377,7 +1377,7 @@ class GeoJsonSourceOptions:
     """Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel
     tile size.
 
-    See `mln_geojson_source_options` in the
+    See `mln_geo_json_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
@@ -2191,7 +2191,7 @@ class OfflineTilePyramidRegionDefinition:
 class OpenGlBorrowedTexture:
     """One caller-owned OpenGL texture of a borrowed texture ring.
 
-    See `mln_opengl_borrowed_texture` in the
+    See `mln_open_gl_borrowed_texture` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
@@ -2207,7 +2207,7 @@ class OpenGlBorrowedTexture:
 class OpenGlBorrowedTextureDescriptor:
     """OpenGL attachment options for a borrowed texture target.
 
-    See `mln_opengl_borrowed_texture_descriptor` in the
+    See `mln_open_gl_borrowed_texture_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
@@ -2255,7 +2255,7 @@ class OpenGlBorrowedTextureDescriptor:
 class OpenGlContextDescriptor:
     """OpenGL backend context fields shared by OpenGL render targets.
 
-    See `mln_opengl_context_descriptor` in the
+    See `mln_open_gl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
@@ -2280,7 +2280,7 @@ class OpenGlContextDescriptor:
                 {
                     "wgl": OpenGlContextDescriptorWglVariant,
                     "egl": OpenGlContextDescriptorEglVariant,
-                    "webgl": OpenGlContextDescriptorWebGlVariant,
+                    "web_gl": OpenGlContextDescriptorWebGlVariant,
                 },
                 None,
             ),
@@ -2291,7 +2291,7 @@ class OpenGlContextDescriptor:
 class OpenGlOwnedTextureDescriptor:
     """OpenGL attachment options for an owned texture target.
 
-    See `mln_opengl_owned_texture_descriptor` in the
+    See `mln_open_gl_owned_texture_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
@@ -2319,7 +2319,7 @@ class OpenGlOwnedTextureDescriptor:
 class OpenGlSurfaceDescriptor:
     """OpenGL attachment options for a native surface.
 
-    See `mln_opengl_surface_descriptor` in the
+    See `mln_open_gl_surface_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
@@ -2350,7 +2350,7 @@ class OpenGlSurfaceDescriptor:
 class OpenGlTextureFrame:
     """OpenGL frame acquired from a texture ring.
 
-    See `mln_opengl_texture_frame` in the
+    See `mln_open_gl_texture_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
@@ -2665,7 +2665,7 @@ class RenderSessionAttachOptions:
 
     producer_sync_kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
     """Producer synchronization for acquired texture frames.
-    `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+    `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
     and a caller-graphics-thread driver. Other targets support only CPU
     completion and fail an unsupported request.
     """
@@ -3703,7 +3703,7 @@ class StyleSourceInfo:
     url: str
     """URL that the source loads from, or empty when it has none."""
 
-    tilejson: StyleSourceTileInfo | None
+    tile_json: StyleSourceTileInfo | None
     """Inline TileJSON metadata, when the source was defined with it."""
 
     bounds: LatLngBounds | None
@@ -3726,7 +3726,7 @@ class StyleSourceInfo:
             is_volatile=raw["is_volatile"],
             attribution=raw["attribution"],
             url=raw["url"],
-            tilejson=_maybe(StyleSourceTileInfo._from_native, raw["tilejson"]),
+            tile_json=_maybe(StyleSourceTileInfo._from_native, raw["tile_json"]),
             bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
             tile_size=raw["tile_size"],
             vector_encoding=_maybe(StyleVectorTileEncoding, raw["vector_encoding"]),
@@ -4213,7 +4213,7 @@ class NativeWake:
 class WebGlContextDescriptor:
     """WebGL context fields shared by OpenGL render targets in the browser.
 
-    See `mln_webgl_context_descriptor` in the
+    See `mln_web_gl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 

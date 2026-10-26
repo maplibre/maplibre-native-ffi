@@ -28,12 +28,14 @@ struct HandleTraits<GeoJsonSourceDataObject> {
 
 auto geojson_source_data_table() -> HandleTable<GeoJsonSourceDataObject>&;
 
-auto validate_geojson_source_options(const mln_geojson_source_options* options)
+auto validate_geojson_source_options(const mln_geo_json_source_options* options)
   -> mln_status;
-auto effective_geojson_source_options(const mln_geojson_source_options* options)
-  -> mln_geojson_source_options;
-auto to_native_geojson_source_options(const mln_geojson_source_options& options)
-  -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>>;
+auto effective_geojson_source_options(
+  const mln_geo_json_source_options* options
+) -> mln_geo_json_source_options;
+auto to_native_geojson_source_options(
+  const mln_geo_json_source_options& options
+) -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>>;
 
 // Compares every scalar option; cluster_properties expressions carry no
 // equality, so they stay outside the comparison.
@@ -43,9 +45,9 @@ auto geojson_source_options_equal(
 ) -> bool;
 
 auto geojson_source_data_create(
-  mln_buffer_view data, const mln_geojson_source_options* options,
-  mln_geojson_source_data* out_data
+  mln_buffer_view data, const mln_geo_json_source_options* options,
+  mln_geo_json_source_data* out_data
 ) -> mln_status;
-auto geojson_source_data_release(mln_geojson_source_data data) -> void;
+auto geojson_source_data_release(mln_geo_json_source_data data) -> void;
 
 }  // namespace mln::core

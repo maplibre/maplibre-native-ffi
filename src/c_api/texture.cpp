@@ -11,7 +11,7 @@ auto mln_supported_render_backend_mask(void) noexcept -> uint32_t {
   return mln::core::supported_render_backend_mask();
 }
 
-auto mln_opengl_supported_context_provider_mask(void) noexcept -> uint32_t {
+auto mln_open_gl_supported_context_provider_mask(void) noexcept -> uint32_t {
   return mln::core::opengl_supported_context_provider_mask();
 }
 
@@ -78,8 +78,8 @@ auto mln_map_attach_vulkan_borrowed_texture(
   });
 }
 
-auto mln_map_attach_opengl_owned_texture(
-  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+auto mln_map_attach_open_gl_owned_texture(
+  mln_map map, const mln_open_gl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -91,8 +91,8 @@ auto mln_map_attach_opengl_owned_texture(
   });
 }
 
-auto mln_map_attach_opengl_borrowed_texture(
-  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+auto mln_map_attach_open_gl_borrowed_texture(
+  mln_map map, const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -104,8 +104,8 @@ auto mln_map_attach_opengl_borrowed_texture(
   });
 }
 
-auto mln_map_attach_webgpu_owned_texture(
-  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+auto mln_map_attach_web_gpu_owned_texture(
+  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -117,8 +117,8 @@ auto mln_map_attach_webgpu_owned_texture(
   });
 }
 
-auto mln_map_attach_webgpu_borrowed_texture(
-  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+auto mln_map_attach_web_gpu_borrowed_texture(
+  mln_map map, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -154,9 +154,9 @@ auto mln_render_session_set_vulkan_borrowed_texture_target(
   });
 }
 
-auto mln_render_session_set_opengl_borrowed_texture_target(
+auto mln_render_session_set_open_gl_borrowed_texture_target(
   mln_render_session session,
-  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -166,9 +166,9 @@ auto mln_render_session_set_opengl_borrowed_texture_target(
   });
 }
 
-auto mln_render_session_set_webgpu_borrowed_texture_target(
+auto mln_render_session_set_web_gpu_borrowed_texture_target(
   mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -207,8 +207,8 @@ auto mln_acquired_frame_get_vulkan_texture(
   });
 }
 
-auto mln_acquired_frame_get_opengl_texture(
-  mln_acquired_frame frame, mln_opengl_texture_frame* out_frame,
+auto mln_acquired_frame_get_open_gl_texture(
+  mln_acquired_frame frame, mln_open_gl_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -216,8 +216,8 @@ auto mln_acquired_frame_get_opengl_texture(
   });
 }
 
-auto mln_acquired_frame_get_webgpu_texture(
-  mln_acquired_frame frame, mln_webgpu_texture_frame* out_frame,
+auto mln_acquired_frame_get_web_gpu_texture(
+  mln_acquired_frame frame, mln_web_gpu_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

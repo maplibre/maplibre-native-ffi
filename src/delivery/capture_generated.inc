@@ -249,9 +249,9 @@ auto capture_element(
   result.id = buffer(arena, source.id);
   result.attribution = buffer(arena, source.attribution);
   result.url = buffer(arena, source.url);
-  if ((source.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-    result.tilejson.tile_urls = span(
-      arena, source.tilejson.tile_urls, source.tilejson.tile_url_count,
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON) != 0) {
+    result.tile_json.tile_urls = span(
+      arena, source.tile_json.tile_urls, source.tile_json.tile_url_count,
       [&]([[maybe_unused]] auto& arena, auto element_2) {
         auto copied_2 = element_2;
         copied_2 = buffer(arena, element_2);
@@ -259,7 +259,7 @@ auto capture_element(
       }
     );
   } else {
-    result.tilejson = {};
+    result.tile_json = {};
   }
   if ((source.fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
   } else {

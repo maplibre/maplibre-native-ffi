@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.internal.memory.*
 /**
  * Copies WebGPU-native metadata from an acquired frame.
  *
- * See `mln_acquired_frame_get_webgpu_texture` in the
+ * See `mln_acquired_frame_get_web_gpu_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public fun <T> GeneratedAcquiredFrameOperations.withWebGpuTexture(
@@ -22,7 +22,7 @@ public fun <T> GeneratedAcquiredFrameOperations.withWebGpuTexture(
       { C.mln_acquired_frame_view_end(it) },
     ) { scope ->
       val out = sized(w(64, 80), 8)
-      check(C.mln_acquired_frame_get_webgpu_texture(handle, out, diagnostic))
+      check(C.mln_acquired_frame_get_web_gpu_texture(handle, out, diagnostic))
       block(readWebGpuTextureFrame(out, scope))
     }
   }
@@ -30,7 +30,7 @@ public fun <T> GeneratedAcquiredFrameOperations.withWebGpuTexture(
 /**
  * Starts attachment of a ring of caller-owned WebGPU textures.
  *
- * See `mln_map_attach_webgpu_borrowed_texture` in the
+ * See `mln_map_attach_web_gpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public fun GeneratedMapOperations.attachWebGpuBorrowedTexture(
@@ -40,7 +40,7 @@ public fun GeneratedMapOperations.attachWebGpuBorrowedTexture(
   nativeCall(this, binding) {
     attach(
       { out, completion ->
-        C.mln_map_attach_webgpu_borrowed_texture(
+        C.mln_map_attach_web_gpu_borrowed_texture(
           handle,
           writeWebGpuBorrowedTextureDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
@@ -60,7 +60,7 @@ public fun GeneratedMapOperations.attachWebGpuBorrowedTexture(
 /**
  * Starts attachment of a session-owned WebGPU texture ring.
  *
- * See `mln_map_attach_webgpu_owned_texture` in the
+ * See `mln_map_attach_web_gpu_owned_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public fun GeneratedMapOperations.attachWebGpuOwnedTexture(
@@ -70,7 +70,7 @@ public fun GeneratedMapOperations.attachWebGpuOwnedTexture(
   nativeCall(this, binding) {
     attach(
       { out, completion ->
-        C.mln_map_attach_webgpu_owned_texture(
+        C.mln_map_attach_web_gpu_owned_texture(
           handle,
           writeWebGpuOwnedTextureDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
@@ -90,7 +90,7 @@ public fun GeneratedMapOperations.attachWebGpuOwnedTexture(
 /**
  * Starts attachment of a WebGPU surface target.
  *
- * See `mln_map_attach_webgpu_surface` in the
+ * See `mln_map_attach_web_gpu_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public fun GeneratedMapOperations.attachWebGpuSurface(
@@ -100,7 +100,7 @@ public fun GeneratedMapOperations.attachWebGpuSurface(
   nativeCall(this, binding) {
     attach(
       { out, completion ->
-        C.mln_map_attach_webgpu_surface(
+        C.mln_map_attach_web_gpu_surface(
           handle,
           writeWebGpuSurfaceDescriptor(descriptor),
           writeRenderSessionAttachOptions(options),
@@ -120,7 +120,7 @@ public fun GeneratedMapOperations.attachWebGpuSurface(
 /**
  * Starts an ordered replacement of every texture of a caller-owned WebGPU ring.
  *
- * See `mln_render_session_set_webgpu_borrowed_texture_target` in the
+ * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public fun GeneratedRenderSessionOperations.setWebGpuBorrowedTextureTarget(
@@ -128,7 +128,7 @@ public fun GeneratedRenderSessionOperations.setWebGpuBorrowedTextureTarget(
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
-      C.mln_render_session_set_webgpu_borrowed_texture_target(
+      C.mln_render_session_set_web_gpu_borrowed_texture_target(
         handle,
         writeWebGpuBorrowedTextureDescriptor(descriptor),
         completion,
@@ -140,7 +140,7 @@ public fun GeneratedRenderSessionOperations.setWebGpuBorrowedTextureTarget(
 /**
  * Starts an ordered WebGPU surface replacement.
  *
- * See `mln_render_session_set_webgpu_surface_target` in the
+ * See `mln_render_session_set_web_gpu_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public fun GeneratedRenderSessionOperations.setWebGpuSurfaceTarget(
@@ -148,7 +148,7 @@ public fun GeneratedRenderSessionOperations.setWebGpuSurfaceTarget(
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
-      C.mln_render_session_set_webgpu_surface_target(
+      C.mln_render_session_set_web_gpu_surface_target(
         handle,
         writeWebGpuSurfaceDescriptor(descriptor),
         completion,

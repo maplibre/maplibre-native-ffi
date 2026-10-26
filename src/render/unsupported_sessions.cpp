@@ -273,7 +273,7 @@ auto vulkan_surface_set_target_start(
 
 #if !defined(MLN_RENDER_BACKEND_OPENGL)
 auto opengl_surface_attach_start(
-  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_map map, const mln_open_gl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -298,7 +298,7 @@ auto opengl_surface_attach_start(
   return unsupported("OpenGL surface sessions are not supported by this build");
 }
 auto opengl_owned_texture_attach_start(
-  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_map map, const mln_open_gl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -324,7 +324,7 @@ auto opengl_owned_texture_attach_start(
   return unsupported("OpenGL texture sessions are not supported by this build");
 }
 auto opengl_borrowed_texture_attach_start(
-  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_map map, const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -352,7 +352,7 @@ auto opengl_borrowed_texture_attach_start(
   return unsupported("OpenGL texture sessions are not supported by this build");
 }
 auto opengl_surface_set_target_start(
-  mln_render_session, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session, const mln_open_gl_surface_descriptor* descriptor,
   const mln_completion*
 ) -> mln_status {
   if (
@@ -368,7 +368,7 @@ auto opengl_surface_set_target_start(
   return unsupported("OpenGL surface sessions are not supported by this build");
 }
 auto opengl_borrowed_texture_set_target_start(
-  mln_render_session, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session, const mln_open_gl_borrowed_texture_descriptor* descriptor,
   const mln_completion*
 ) -> mln_status {
   if (
@@ -390,7 +390,7 @@ auto opengl_borrowed_texture_set_target_start(
 
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
 auto webgpu_owned_texture_attach_start(
-  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -415,7 +415,7 @@ auto webgpu_owned_texture_attach_start(
   return unsupported("WebGPU texture sessions are not supported by this build");
 }
 auto webgpu_borrowed_texture_attach_start(
-  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -442,7 +442,7 @@ auto webgpu_borrowed_texture_attach_start(
   return unsupported("WebGPU texture sessions are not supported by this build");
 }
 auto webgpu_borrowed_texture_set_target_start(
-  mln_render_session, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_completion*
 ) -> mln_status {
   if (
@@ -460,7 +460,7 @@ auto webgpu_borrowed_texture_set_target_start(
   return unsupported("WebGPU texture sessions are not supported by this build");
 }
 auto webgpu_surface_attach_start(
-  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -485,7 +485,7 @@ auto webgpu_surface_attach_start(
   return unsupported("WebGPU surface sessions are not supported by this build");
 }
 auto webgpu_surface_set_target_start(
-  mln_render_session, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_completion*
 ) -> mln_status {
   if (

@@ -10,16 +10,16 @@ mln_status show_earthquakes(
 ) {
   // #region options
   // Each value applies when its field bit is set.
-  mln_geojson_source_options options = {
-    .size = sizeof(mln_geojson_source_options)
+  mln_geo_json_source_options options = {
+    .size = sizeof(mln_geo_json_source_options)
   };
-  options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-                    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+  options.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER |
+                    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
   options.cluster = true;
   options.cluster_radius = 60;  // pixels
   // #endregion options
   // #region source
-  mln_status status = mln_map_add_geojson_source_url(
+  mln_status status = mln_map_add_geo_json_source_url(
     map, mln_buffer_view_from_cstr("earthquakes"),
     mln_buffer_view_from_cstr(geojson_url), &options, source_completion, NULL
   );
@@ -57,16 +57,16 @@ mln_status show_one_point(
   }
 
   // A null options pointer selects the defaults. Clustering is off by default.
-  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
-  mln_status status = mln_geojson_source_data_create(
+  mln_geo_json_source_data prepared = MLN_HANDLE_NULL;
+  mln_status status = mln_geo_json_source_data_create(
     mln_buffer_view_from_cstr(data), NULL, &prepared, NULL
   );
   if (status != MLN_STATUS_OK) return status;
 
-  status = mln_map_add_geojson_source_data(
+  status = mln_map_add_geo_json_source_data(
     map, mln_buffer_view_from_cstr("pins"), prepared, completion, NULL
   );
-  mln_geojson_source_data_release(prepared);
+  mln_geo_json_source_data_release(prepared);
   return status;
   // #endregion inline-data
 }

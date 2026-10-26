@@ -19,7 +19,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_acquired_frame_get_opengl_texture(
+  actual external fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
@@ -47,7 +47,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_acquired_frame_get_webgpu_texture(
+  actual external fun mln_acquired_frame_get_web_gpu_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
@@ -97,14 +97,14 @@ internal actual object C {
   @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
 
   @JvmStatic
-  actual external fun mln_geojson_source_data_create(
+  actual external fun mln_geo_json_source_data_create(
     data: Long,
     options: Long,
     outData: Long,
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic actual external fun mln_geojson_source_data_release(data: Long): Unit
+  @JvmStatic actual external fun mln_geo_json_source_data_release(data: Long): Unit
 
   @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
@@ -155,7 +155,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_add_geojson_source_data(
+  actual external fun mln_map_add_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
@@ -164,7 +164,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_add_geojson_source_url(
+  actual external fun mln_map_add_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
@@ -252,7 +252,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_opengl_borrowed_texture(
+  actual external fun mln_map_attach_open_gl_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -262,7 +262,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_opengl_owned_texture(
+  actual external fun mln_map_attach_open_gl_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -272,7 +272,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_opengl_surface(
+  actual external fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -312,7 +312,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_webgpu_borrowed_texture(
+  actual external fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -322,7 +322,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_webgpu_owned_texture(
+  actual external fun mln_map_attach_web_gpu_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -332,7 +332,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_webgpu_surface(
+  actual external fun mln_map_attach_web_gpu_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -782,7 +782,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_geojson_source_data(
+  actual external fun mln_map_set_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
@@ -791,7 +791,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_geojson_source_synchronous_tiling(
+  actual external fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,
     enabled: Boolean,
@@ -800,7 +800,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_geojson_source_url(
+  actual external fun mln_map_set_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
@@ -959,7 +959,7 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
 
-  @JvmStatic actual external fun mln_opengl_supported_context_provider_mask(): Int
+  @JvmStatic actual external fun mln_open_gl_supported_context_provider_mask(): Int
 
   @JvmStatic actual external fun mln_plugin_get_register_function_v1(): Long
 
@@ -1127,7 +1127,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_set_opengl_borrowed_texture_target(
+  actual external fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
@@ -1135,7 +1135,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_set_opengl_surface_target(
+  actual external fun mln_render_session_set_open_gl_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
@@ -1159,7 +1159,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_set_webgpu_borrowed_texture_target(
+  actual external fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
@@ -1167,7 +1167,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_set_webgpu_surface_target(
+  actual external fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,

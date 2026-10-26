@@ -132,7 +132,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   };
 
   WebGPUTextureBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size,
+    const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth
   )
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
@@ -328,7 +328,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   // Whether a replacement target names the context this session attached with.
   // A null queue names the device's default queue, as it does at attach. The
   // instance is excluded: a texture session never uses it.
-  auto matches_context(const mln_webgpu_context_descriptor& context) const
+  auto matches_context(const mln_web_gpu_context_descriptor& context) const
     -> bool {
     if (static_cast<WGPUDevice>(context.device) != device_) {
       return false;
@@ -347,7 +347,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   // but does not key its cache on it, so a texture in another format would be
   // drawn with pipelines built for this one.
   auto matches_borrowed_target(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor
+    const mln_web_gpu_borrowed_texture_descriptor& descriptor
   ) const -> bool {
     return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
   }
@@ -526,7 +526,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     std::string failure_;
   };
 
-  void initializeContext(const mln_webgpu_context_descriptor& context) {
+  void initializeContext(const mln_web_gpu_context_descriptor& context) {
     if (context.instance != nullptr) {
       instance_ = static_cast<WGPUInstance>(context.instance);
       wgpuInstanceAddRef(instance_);
@@ -791,7 +791,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
   };
 
   WebGPUSurfaceBackend(
-    const mln_webgpu_surface_descriptor& descriptor, mln::Size size
+    const mln_web_gpu_surface_descriptor& descriptor, mln::Size size
   )
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::gfx::Renderable(size, std::make_unique<RenderableResource>(*this)),
@@ -908,17 +908,17 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     configureSurface();
   }
 
-  auto matches_context(const mln_webgpu_context_descriptor& context) const
+  auto matches_context(const mln_web_gpu_context_descriptor& context) const
     -> bool {
     return static_cast<WGPUDevice>(context.device) == device_;
   }
 
-  auto matches_format(const mln_webgpu_surface_descriptor& descriptor) const
+  auto matches_format(const mln_web_gpu_surface_descriptor& descriptor) const
     -> bool {
     return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
   }
 
-  void set_surface(const mln_webgpu_surface_descriptor& descriptor) {
+  void set_surface(const mln_web_gpu_surface_descriptor& descriptor) {
     auto* const replacement = static_cast<WGPUSurface>(descriptor.surface);
     // Reference the replacement before releasing the outgoing one, so a
     // descriptor naming the surface this session already holds cannot drop its
@@ -949,7 +949,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
-  void initializeContext(const mln_webgpu_context_descriptor& context) {
+  void initializeContext(const mln_web_gpu_context_descriptor& context) {
     if (context.instance != nullptr) {
       instance_ = static_cast<WGPUInstance>(context.instance);
       wgpuInstanceAddRef(instance_);
@@ -1094,7 +1094,7 @@ class WebGPUSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   WebGPUSurfaceSessionBackend(
-    const mln_webgpu_surface_descriptor& descriptor, mln::Size size
+    const mln_web_gpu_surface_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
@@ -1114,7 +1114,7 @@ class WebGPUSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  auto set_webgpu_target(const mln_webgpu_surface_descriptor& descriptor)
+  auto set_webgpu_target(const mln_web_gpu_surface_descriptor& descriptor)
     -> mln_status override {
     if (!backend_.matches_context(descriptor.context)) {
       mln::core::set_thread_error(
@@ -1141,7 +1141,7 @@ class WebGPUTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   WebGPUTextureSessionBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size,
+    const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth
   )
       : backend_(descriptor, size, ring_depth) {}
@@ -1210,8 +1210,8 @@ class WebGPUTextureSessionBackend final
       mln::core::set_thread_error("rendered WebGPU texture is not available");
       return MLN_STATUS_NOT_READY;
     }
-    out_metadata = mln_webgpu_texture_frame{
-      .size = sizeof(mln_webgpu_texture_frame),
+    out_metadata = mln_web_gpu_texture_frame{
+      .size = sizeof(mln_web_gpu_texture_frame),
       .generation = frame.generation,
       .width = frame.physical_width,
       .height = frame.physical_height,
@@ -1236,14 +1236,14 @@ namespace mln::core {
 
 auto supported_render_backend_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_WEBGPU)
-  return MLN_RENDER_BACKEND_FLAG_WEBGPU;
+  return MLN_RENDER_BACKEND_FLAG_WEB_GPU;
 #else
   return 0;
 #endif
 }
 
 auto webgpu_owned_texture_attach_start(
-  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -1300,13 +1300,13 @@ auto webgpu_owned_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_map_attach_webgpu_owned_texture>()
+    valueless_completion<&mln_map_attach_web_gpu_owned_texture>()
   );
 #endif
 }
 
 auto webgpu_borrowed_texture_attach_start(
-  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -1369,14 +1369,14 @@ auto webgpu_borrowed_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_map_attach_webgpu_borrowed_texture>()
+    valueless_completion<&mln_map_attach_web_gpu_borrowed_texture>()
   );
 #endif
 }
 
 auto webgpu_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -1406,12 +1406,12 @@ auto webgpu_borrowed_texture_set_target_start(
     },
     std::move(checked_completion),
     valueless_completion<
-      &mln_render_session_set_webgpu_borrowed_texture_target>()
+      &mln_render_session_set_web_gpu_borrowed_texture_target>()
   );
 }
 
 auto webgpu_surface_attach_start(
-  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_map map, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -1461,13 +1461,13 @@ auto webgpu_surface_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_map_attach_webgpu_surface>()
+    valueless_completion<&mln_map_attach_web_gpu_surface>()
   );
 #endif
 }
 
 auto webgpu_surface_set_target_start(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -1495,7 +1495,7 @@ auto webgpu_surface_set_target_start(
       return live.surface.backend->set_webgpu_target(copied);
     },
     std::move(checked_completion),
-    valueless_completion<&mln_render_session_set_webgpu_surface_target>()
+    valueless_completion<&mln_render_session_set_web_gpu_surface_target>()
   );
 }
 

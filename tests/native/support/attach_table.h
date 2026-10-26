@@ -40,12 +40,12 @@ typedef struct mln_test_target_call {
     mln_vulkan_surface_descriptor vulkan_surface;
     mln_vulkan_owned_texture_descriptor vulkan_owned;
     mln_vulkan_borrowed_texture_descriptor vulkan_borrowed;
-    mln_opengl_surface_descriptor opengl_surface;
-    mln_opengl_owned_texture_descriptor opengl_owned;
-    mln_opengl_borrowed_texture_descriptor opengl_borrowed;
-    mln_webgpu_surface_descriptor webgpu_surface;
-    mln_webgpu_owned_texture_descriptor webgpu_owned;
-    mln_webgpu_borrowed_texture_descriptor webgpu_borrowed;
+    mln_open_gl_surface_descriptor opengl_surface;
+    mln_open_gl_owned_texture_descriptor opengl_owned;
+    mln_open_gl_borrowed_texture_descriptor opengl_borrowed;
+    mln_web_gpu_surface_descriptor webgpu_surface;
+    mln_web_gpu_owned_texture_descriptor webgpu_owned;
+    mln_web_gpu_borrowed_texture_descriptor webgpu_borrowed;
   } descriptor;
   // Storage for a borrowed descriptor's textures array. A row works on a copy
   // of the call whose array still points at the original's storage, so an edit
@@ -53,8 +53,8 @@ typedef struct mln_test_target_call {
   union {
     mln_metal_borrowed_texture metal[MLN_TEST_RING_TEXTURES];
     mln_vulkan_borrowed_texture vulkan[MLN_TEST_RING_TEXTURES];
-    mln_opengl_borrowed_texture opengl[MLN_TEST_RING_TEXTURES];
-    mln_webgpu_borrowed_texture webgpu[MLN_TEST_RING_TEXTURES];
+    mln_open_gl_borrowed_texture opengl[MLN_TEST_RING_TEXTURES];
+    mln_web_gpu_borrowed_texture webgpu[MLN_TEST_RING_TEXTURES];
   } textures;
 } mln_test_target_call;
 

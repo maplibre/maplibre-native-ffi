@@ -107,12 +107,12 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
       return when {
         RenderBackendFlag.METAL in backends -> METAL
         RenderBackendFlag.VULKAN in backends -> VULKAN
-        RenderBackendFlag.WEBGPU in backends -> WEBGPU
-        RenderBackendFlag.OPENGL in backends -> {
+        RenderBackendFlag.WEB_GPU in backends -> WEBGPU
+        RenderBackendFlag.OPEN_GL in backends -> {
           val providers = GeneratedApi.openGlSupportedContextProviderMask()
           when {
             OpenGlContextProviderFlag.WGL in providers -> WGL
-            OpenGlContextProviderFlag.WEBGL in providers -> WEBGL
+            OpenGlContextProviderFlag.WEB_GL in providers -> WEBGL
             else -> EGL
           }
         }

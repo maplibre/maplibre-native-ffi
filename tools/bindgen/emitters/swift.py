@@ -9,7 +9,7 @@ from pathlib import Path
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
-from tools.bindgen.names import camel, words
+from tools.bindgen.names import camel
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -54,7 +54,7 @@ def identifier(value: str) -> str:
 
 
 def name(value: str) -> str:
-    return "".join(part[:1].upper() + part[1:] for part in words(value))
+    return "".join(part[:1].upper() + part[1:] for part in value.split("_"))
 
 
 def label_words(text: str) -> list[str]:

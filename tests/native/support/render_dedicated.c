@@ -64,13 +64,13 @@ static dedicated_state* create_dedicated_state(bool with_surface) {
   return NULL;
 }
 
-static mln_opengl_context_descriptor dedicated_context(
+static mln_open_gl_context_descriptor dedicated_context(
   const dedicated_state* state
 ) {
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
-  return (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL,
-    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL,
+    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
     .data = {
       .wgl = {
         .device_context = state->context.wgl_device_context,
@@ -80,15 +80,15 @@ static mln_opengl_context_descriptor dedicated_context(
     },
   };
 #else
-  return (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
+    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
     .data = {
       .egl = {
         .display = state->context.egl_display,
         .config = state->context.egl_config,
         .share_context = NULL,
-        .client_api = MLN_OPENGL_CLIENT_API_GLES,
+        .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
         .get_proc_address = NULL,
       }
     },
@@ -166,8 +166,8 @@ bool mln_test_dedicated_egl_surface_create(
   }
   mln_test_graphics_surface_info surface = {0};
   (void)mln_test_graphics_surface_get_info(state->surface, &surface);
-  mln_opengl_surface_descriptor descriptor = {
-    .size = sizeof(mln_opengl_surface_descriptor)
+  mln_open_gl_surface_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_surface_descriptor)
   };
   descriptor.extent = (mln_logical_extent){
     .width = surface.width,
@@ -184,7 +184,7 @@ bool mln_test_dedicated_egl_surface_create(
   };
   options.driver = fixture->driver;
   mln_test_completion attach = mln_test_completion_default(0);
-  const mln_status attach_status = mln_map_attach_opengl_surface(
+  const mln_status attach_status = mln_map_attach_open_gl_surface(
     map, &descriptor, &options, &fixture->session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   );
@@ -225,8 +225,8 @@ bool mln_test_dedicated_texture_create(
   if (state == NULL) {
     return false;
   }
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
@@ -240,7 +240,7 @@ bool mln_test_dedicated_texture_create(
   options.driver = fixture->driver;
   options.requested_texture_ring_depth = 3;
   mln_test_completion attach = mln_test_completion_default(0);
-  const mln_status attach_status = mln_map_attach_opengl_owned_texture(
+  const mln_status attach_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, &options, &fixture->session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   );

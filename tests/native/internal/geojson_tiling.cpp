@@ -27,10 +27,10 @@ using mln::native_tests::SyncPointScope;
 
 constexpr char empty_style_json[] = R"({"version":8,"sources":{},"layers":[]})";
 
-auto prepare(const char* json, const mln_geojson_source_options* options)
-  -> mln_geojson_source_data {
-  auto data = mln_geojson_source_data{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_geojson_source_data_create(
+auto prepare(const char* json, const mln_geo_json_source_options* options)
+  -> mln_geo_json_source_data {
+  auto data = mln_geo_json_source_data{MLN_HANDLE_NULL};
+  MLN_TEST_OK(mln_geo_json_source_data_create(
     mln_buffer_view_from_cstr(json), options, &data, MLN_TEST_DIAGNOSTIC
   ));
   return data;
@@ -38,7 +38,7 @@ auto prepare(const char* json, const mln_geojson_source_options* options)
 
 // The index behind a prepared handle, which the handle, the sources it is
 // installed on, and their tiles share.
-auto index_of(mln_geojson_source_data data)
+auto index_of(mln_geo_json_source_data data)
   -> std::weak_ptr<mln::style::GeoJSONData> {
   const auto object = mln::core::geojson_source_data_table().lease(data);
   TEST_ASSERT_NOT_NULL(object.get());
@@ -48,10 +48,10 @@ auto index_of(mln_geojson_source_data data)
 // A map with a GeoJSON source named "points" holding `data`, drawn by a
 // circle layer so that rendering requests its tiles.
 void add_drawn_source(
-  mln_runtime runtime, mln_map map, mln_geojson_source_data data
+  mln_runtime runtime, mln_map map, mln_geo_json_source_data data
 ) {
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(empty_style_json));
-  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
   ));
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
@@ -61,8 +61,8 @@ void add_drawn_source(
   ));
 }
 
-void set_data(mln_map map, mln_geojson_source_data data) {
-  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_data(
+void set_data(mln_map map, mln_geo_json_source_data data) {
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
   ));
 }
@@ -115,7 +115,7 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
   // worker meanwhile, which a frame does not wait for.
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);
-  mln_geojson_source_data_release(first);
+  mln_geo_json_source_data_release(first);
   first = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return first_index.expired(); },
@@ -128,7 +128,7 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
     "the second data's tiles"
   ));
 
-  mln_geojson_source_data_release(second);
+  mln_geo_json_source_data_release(second);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -145,7 +145,7 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
   const auto map = mln_test_create_map(runtime);
   const auto first = prepare(POINT_COLLECTION("first"), nullptr);
   add_drawn_source(runtime, map, first);
-  mln_geojson_source_data_release(first);
+  mln_geo_json_source_data_release(first);
 
   auto fixture = mln_test_render_fixture{};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
@@ -154,13 +154,13 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
     "the first data's tiles"
   ));
 
-  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_synchronous_tiling(
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_synchronous_tiling(
     map, MLN_BUFFER_LITERAL("points"), true, &completion.descriptor, nullptr
   ));
   sync.hold(SyncPoint::GeoJsonTileSlice);
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);
-  mln_geojson_source_data_release(second);
+  mln_geo_json_source_data_release(second);
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return holds_the_name(fixture, "second"); },
     "the second data's tiles while its worker is parked"

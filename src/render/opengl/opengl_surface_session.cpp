@@ -66,7 +66,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 
  public:
   OpenGLSurfaceBackend(
-    const mln_opengl_surface_descriptor& descriptor, mln::Size size
+    const mln_open_gl_surface_descriptor& descriptor, mln::Size size
   )
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::Renderable(
@@ -149,7 +149,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
   // Presents through a different host surface from here on. The outgoing
   // surface is never touched, which a host may already have destroyed;
   // activate() makes the new one current on the next render.
-  void set_surface(const mln_opengl_surface_descriptor& descriptor) {
+  void set_surface(const mln_open_gl_surface_descriptor& descriptor) {
     // The surface alone. The context descriptor stays as it was at attach: this
     // session's GL context was created from it, and WGL context creation still
     // reads its device_context.
@@ -167,7 +167,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
   }
 
   [[nodiscard]] auto context_descriptor() const
-    -> const mln_opengl_context_descriptor& {
+    -> const mln_open_gl_context_descriptor& {
     return descriptor_.context;
   }
 
@@ -209,7 +209,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     return egl_context_.has_value();
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-    return descriptor_.context.data.webgl.context > 0;
+    return descriptor_.context.data.web_gl.context > 0;
 #else
     return false;
 #endif
@@ -302,7 +302,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     previous_webgl_context_ = emscripten_webgl_get_current_context();
     if (
       emscripten_webgl_make_context_current(
-        descriptor_.context.data.webgl.context
+        descriptor_.context.data.web_gl.context
       ) != EMSCRIPTEN_RESULT_SUCCESS
     ) {
       throw std::runtime_error("Switching WebGL context failed");
@@ -334,7 +334,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 
   [[nodiscard]] auto dedicated() const -> bool {
     return descriptor_.context.ownership ==
-           MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+           MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
   }
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -408,19 +408,19 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   void destroy_native_context() {
     if (
-      descriptor_.context.data.webgl.kind ==
-        MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS &&
-      descriptor_.context.data.webgl.context > 0
+      descriptor_.context.data.web_gl.kind ==
+        MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS &&
+      descriptor_.context.data.web_gl.context > 0
     ) {
-      emscripten_webgl_destroy_context(descriptor_.context.data.webgl.context);
-      descriptor_.context.data.webgl.context = 0;
+      emscripten_webgl_destroy_context(descriptor_.context.data.web_gl.context);
+      descriptor_.context.data.web_gl.context = 0;
     }
   }
 #else
   void destroy_native_context() {}
 #endif
 
-  mln_opengl_surface_descriptor descriptor_{};
+  mln_open_gl_surface_descriptor descriptor_{};
   // Set once teardown has found the session's surface unusable, so activate()
   // reaches for the drawable the context was created from instead.
   bool fallback_drawable_ = false;
@@ -440,7 +440,7 @@ class OpenGLSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   OpenGLSurfaceSessionBackend(
-    const mln_opengl_surface_descriptor& descriptor, mln::Size size
+    const mln_open_gl_surface_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
@@ -452,7 +452,7 @@ class OpenGLSurfaceSessionBackend final
     backend_.resize(mln::Size{physical_width, physical_height});
   }
 
-  auto set_opengl_target(const mln_opengl_surface_descriptor& descriptor)
+  auto set_opengl_target(const mln_open_gl_surface_descriptor& descriptor)
     -> mln_status override {
     if (!mln::core::opengl_context_matches(
           backend_.context_descriptor(), descriptor.context,
@@ -476,7 +476,7 @@ class OpenGLSurfaceSessionBackend final
 namespace mln::core {
 
 auto opengl_surface_attach_start(
-  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_map map, const mln_open_gl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
@@ -541,12 +541,12 @@ auto opengl_surface_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_map_attach_opengl_surface>()
+    valueless_completion<&mln_map_attach_open_gl_surface>()
   );
 }
 
 auto opengl_surface_set_target_start(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -575,7 +575,7 @@ auto opengl_surface_set_target_start(
       return live.surface.backend->set_opengl_target(copied);
     },
     std::move(checked_completion),
-    valueless_completion<&mln_render_session_set_opengl_surface_target>()
+    valueless_completion<&mln_render_session_set_open_gl_surface_target>()
   );
 }
 

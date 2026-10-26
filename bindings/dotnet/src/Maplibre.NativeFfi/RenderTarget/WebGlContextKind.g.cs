@@ -5,7 +5,7 @@ namespace Maplibre.NativeFfi;
 /// WebGL context placement.
 /// </summary>
 /// <remarks>
-/// See <c>mln_webgl_context_kind</c> in the <see
+/// See <c>mln_web_gl_context_kind</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 public enum WebGlContextKind : uint

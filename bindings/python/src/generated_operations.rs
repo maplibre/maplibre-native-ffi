@@ -725,9 +725,9 @@ fn generated_copy_mln_offline_tile_pyramid_region_definition(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_opengl_texture_frame(
+fn generated_copy_mln_open_gl_texture_frame(
     py: Python<'_>,
-    value: &sys::mln_opengl_texture_frame,
+    value: &sys::mln_open_gl_texture_frame,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("generation", generated_value(py, value.generation)?)?;
@@ -1376,11 +1376,11 @@ fn generated_copy_mln_style_source_info(
     dict.set_item("attribution", generated_text(py, value.attribution)?)?;
     dict.set_item("url", generated_text(py, value.url)?)?;
     dict.set_item(
-        "tilejson",
+        "tile_json",
         generated_optional(
             py,
-            value.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0,
-            || generated_copy_mln_style_source_tile_info(py, &value.tilejson),
+            value.fields & sys::MLN_STYLE_SOURCE_INFO_TILE_JSON != 0,
+            || generated_copy_mln_style_source_tile_info(py, &value.tile_json),
         )?,
     )?;
     dict.set_item(
@@ -1905,7 +1905,7 @@ fn generated_input_mln_egl_context_descriptor<'py>(
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
     raw.client_api = value
         .getattr("client_api")?
-        .extract::<sys::mln_opengl_client_api>()?;
+        .extract::<sys::mln_open_gl_client_api>()?;
     raw.get_proc_address = value.getattr("get_proc_address")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -1962,56 +1962,56 @@ fn generated_input_mln_free_camera_options<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_geojson_source_options<'py>(
+fn generated_input_mln_geo_json_source_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_geojson_source_options> {
-    let mut raw: sys::mln_geojson_source_options = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_geojson_source_options>() as _;
+) -> PyResult<sys::mln_geo_json_source_options> {
+    let mut raw: sys::mln_geo_json_source_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_geo_json_source_options>() as _;
     raw.fields = 0;
     if value.is_none() {
         return Ok(raw);
     }
     if let Some(field) = generated_present(value, "min_zoom")? {
         raw.min_zoom = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
     }
     if let Some(field) = generated_present(value, "max_zoom")? {
         raw.max_zoom = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM;
     }
     if let Some(field) = generated_present(value, "tolerance")? {
         raw.tolerance = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE;
     }
     if let Some(field) = generated_present(value, "cluster_max_zoom")? {
         raw.cluster_max_zoom = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     }
     raw.cluster_properties = storage.json(value.getattr("cluster_properties")?, true)?;
     if let Some(field) = generated_present(value, "buffer")? {
         raw.buffer = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_BUFFER;
     }
     if let Some(field) = generated_present(value, "cluster_radius")? {
         raw.cluster_radius = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
     }
     if let Some(field) = generated_present(value, "cluster_min_points")? {
         raw.cluster_min_points = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
     }
     if let Some(field) = generated_present(value, "line_metrics")? {
         raw.line_metrics = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
     }
     if let Some(field) = generated_present(value, "cluster")? {
         raw.cluster = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
     }
     if let Some(field) = generated_present(value, "synchronous_tiling")? {
         raw.synchronous_tiling = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
     }
     Ok(raw)
 }
@@ -2387,30 +2387,30 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_opengl_borrowed_texture<'py>(
+fn generated_input_mln_open_gl_borrowed_texture<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_opengl_borrowed_texture> {
+) -> PyResult<sys::mln_open_gl_borrowed_texture> {
     let _ = storage;
-    let mut raw: sys::mln_opengl_borrowed_texture = unsafe { std::mem::zeroed() };
+    let mut raw: sys::mln_open_gl_borrowed_texture = unsafe { std::mem::zeroed() };
     raw.texture = value.getattr("texture")?.extract::<u32>()?;
     Ok(raw)
 }
 
-fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
+fn generated_input_mln_open_gl_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_opengl_borrowed_texture_descriptor> {
-    let mut raw: sys::mln_opengl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_opengl_borrowed_texture_descriptor>() as _;
+) -> PyResult<sys::mln_open_gl_borrowed_texture_descriptor> {
+    let mut raw: sys::mln_open_gl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
-        generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
+        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
     raw.textures = {
         let items = generated_items(&value.getattr("textures")?, |item| {
-            generated_input_mln_opengl_borrowed_texture(&item, storage)
+            generated_input_mln_open_gl_borrowed_texture(&item, storage)
         })?;
         raw.texture_count = generated_length(items.len())?;
         storage.keep_array(items)
@@ -2419,28 +2419,28 @@ fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_opengl_context_descriptor<'py>(
+fn generated_input_mln_open_gl_context_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_opengl_context_descriptor> {
-    let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
+) -> PyResult<sys::mln_open_gl_context_descriptor> {
+    let mut raw: sys::mln_open_gl_context_descriptor = unsafe { std::mem::zeroed() };
     raw.ownership = value
         .getattr("ownership")?
-        .extract::<sys::mln_opengl_context_ownership>()?;
+        .extract::<sys::mln_open_gl_context_ownership>()?;
     let field = value.getattr("data")?;
     let tag = field.getattr("_tag")?.extract::<u32>()?;
     match tag {
-        sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL => {
+        sys::MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => {
             raw.data.wgl =
                 generated_input_mln_wgl_context_descriptor(&field.getattr("value")?, storage)?;
         }
-        sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL => {
+        sys::MLN_OPEN_GL_CONTEXT_PLATFORM_EGL => {
             raw.data.egl =
                 generated_input_mln_egl_context_descriptor(&field.getattr("value")?, storage)?;
         }
-        sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL => {
-            raw.data.webgl =
-                generated_input_mln_webgl_context_descriptor(&field.getattr("value")?, storage)?;
+        sys::MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => {
+            raw.data.web_gl =
+                generated_input_mln_web_gl_context_descriptor(&field.getattr("value")?, storage)?;
         }
         _ => {}
     }
@@ -2448,27 +2448,27 @@ fn generated_input_mln_opengl_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_opengl_owned_texture_descriptor<'py>(
+fn generated_input_mln_open_gl_owned_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_opengl_owned_texture_descriptor> {
-    let mut raw: sys::mln_opengl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_opengl_owned_texture_descriptor>() as _;
+) -> PyResult<sys::mln_open_gl_owned_texture_descriptor> {
+    let mut raw: sys::mln_open_gl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_open_gl_owned_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
-        generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
+        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
 }
 
-fn generated_input_mln_opengl_surface_descriptor<'py>(
+fn generated_input_mln_open_gl_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_opengl_surface_descriptor> {
-    let mut raw: sys::mln_opengl_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_opengl_surface_descriptor>() as _;
+) -> PyResult<sys::mln_open_gl_surface_descriptor> {
+    let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
-        generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
+        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -3128,14 +3128,14 @@ fn generated_input_mln_wake<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_webgl_context_descriptor<'py>(
+fn generated_input_mln_web_gl_context_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgl_context_descriptor> {
-    let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
+) -> PyResult<sys::mln_web_gl_context_descriptor> {
+    let mut raw: sys::mln_web_gl_context_descriptor = unsafe { std::mem::zeroed() };
     raw.kind = value
         .getattr("kind")?
-        .extract::<sys::mln_webgl_context_kind>()?;
+        .extract::<sys::mln_web_gl_context_kind>()?;
     raw.context = value.getattr("context")?.extract::<i32>()?;
     raw.canvas_selector = storage.buffer(value.getattr("canvas_selector")?, true)?;
     Ok(raw)
@@ -3159,10 +3159,10 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     unsafe { sys::mln_acquired_frame_discard(handle, std::ptr::null_mut()) }
 }
 
-unsafe extern "C" fn generated_dispose_mln_geojson_source_data(
-    handle: sys::mln_geojson_source_data,
+unsafe extern "C" fn generated_dispose_mln_geo_json_source_data(
+    handle: sys::mln_geo_json_source_data,
 ) -> sys::mln_status {
-    unsafe { sys::mln_geojson_source_data_release(handle) };
+    unsafe { sys::mln_geo_json_source_data_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -3242,17 +3242,17 @@ impl AcquiredFrameHandle {
         generated_copy_mln_metal_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
-    fn opengl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn open_gl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_opengl_texture_frame>() as _;
+        let mut out_frame: sys::mln_open_gl_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_open_gl_texture_frame>() as _;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_acquired_frame_get_opengl_texture(handle, &mut out_frame, diagnostic)
+                sys::mln_acquired_frame_get_open_gl_texture(handle, &mut out_frame, diagnostic)
             })
         }?;
-        generated_copy_mln_opengl_texture_frame(py, &out_frame)
+        generated_copy_mln_open_gl_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
     fn producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -3338,12 +3338,12 @@ impl GeoJsonSourceDataHandle {
         let data_value = storage.json(data.clone(), false)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geojson_source_options(&options, storage)
+            generated_input_mln_geo_json_source_options(&options, storage)
         })?;
-        let mut out_data: sys::mln_geojson_source_data = unsafe { std::mem::zeroed() };
+        let mut out_data: sys::mln_geo_json_source_data = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_geojson_source_data_create(
+                sys::mln_geo_json_source_data_create(
                     data_value,
                     generated_pointer(&options_value),
                     &mut out_data,
@@ -3360,7 +3360,7 @@ impl GeoJsonSourceDataHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_geojson_source_data_release(handle)) };
+        unsafe { call.run(|| sys::mln_geo_json_source_data_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -3371,7 +3371,7 @@ impl GeoJsonSourceDataHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_geojson_source_data_release(handle)) };
+        unsafe { call.run(|| sys::mln_geo_json_source_data_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -3521,7 +3521,7 @@ impl MapHandle {
         Ok(future)
     }
     #[pyo3(signature = (source_id, data))]
-    fn add_geojson_source_data(
+    fn add_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -3534,7 +3534,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_add_geojson_source_data(
+                sys::mln_map_add_geo_json_source_data(
                     handle,
                     source_id_value,
                     data_handle,
@@ -3545,7 +3545,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, data))]
-    fn _discard_add_geojson_source_data(
+    fn _discard_add_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -3558,7 +3558,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_add_geojson_source_data(
+                sys::mln_map_add_geo_json_source_data(
                     handle,
                     source_id_value,
                     data_handle,
@@ -3569,7 +3569,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, url, options=None))]
-    fn add_geojson_source_url(
+    fn add_geo_json_source_url(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -3582,12 +3582,12 @@ impl MapHandle {
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geojson_source_options(&options, storage)
+            generated_input_mln_geo_json_source_options(&options, storage)
         })?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_add_geojson_source_url(
+                sys::mln_map_add_geo_json_source_url(
                     handle,
                     source_id_value,
                     url_value,
@@ -3599,7 +3599,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, url, options=None))]
-    fn _discard_add_geojson_source_url(
+    fn _discard_add_geo_json_source_url(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -3612,12 +3612,12 @@ impl MapHandle {
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geojson_source_options(&options, storage)
+            generated_input_mln_geo_json_source_options(&options, storage)
         })?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_add_geojson_source_url(
+                sys::mln_map_add_geo_json_source_url(
                     handle,
                     source_id_value,
                     url_value,
@@ -4005,7 +4005,7 @@ impl MapHandle {
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options))]
-    fn attach_opengl_borrowed_texture(
+    fn attach_open_gl_borrowed_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
@@ -4014,7 +4014,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
-            generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
+            generated_input_mln_open_gl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4023,7 +4023,7 @@ impl MapHandle {
         let future = unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_attach_opengl_borrowed_texture(
+                    sys::mln_map_attach_open_gl_borrowed_texture(
                         handle,
                         &descriptor_value,
                         &options_value,
@@ -4047,7 +4047,7 @@ impl MapHandle {
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options))]
-    fn attach_opengl_owned_texture(
+    fn attach_open_gl_owned_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
@@ -4056,7 +4056,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
-            generated_input_mln_opengl_owned_texture_descriptor(&descriptor.clone(), storage)?;
+            generated_input_mln_open_gl_owned_texture_descriptor(&descriptor.clone(), storage)?;
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4065,7 +4065,7 @@ impl MapHandle {
         let future = unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_attach_opengl_owned_texture(
+                    sys::mln_map_attach_open_gl_owned_texture(
                         handle,
                         &descriptor_value,
                         &options_value,
@@ -4089,7 +4089,7 @@ impl MapHandle {
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options))]
-    fn attach_opengl_surface(
+    fn attach_open_gl_surface(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
@@ -4098,7 +4098,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
-            generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
+            generated_input_mln_open_gl_surface_descriptor(&descriptor.clone(), storage)?;
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4107,7 +4107,7 @@ impl MapHandle {
         let future = unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_attach_opengl_surface(
+                    sys::mln_map_attach_open_gl_surface(
                         handle,
                         &descriptor_value,
                         &options_value,
@@ -5673,7 +5673,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, data))]
-    fn set_geojson_source_data(
+    fn set_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5686,7 +5686,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_data(
+                sys::mln_map_set_geo_json_source_data(
                     handle,
                     source_id_value,
                     data_handle,
@@ -5697,7 +5697,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, data))]
-    fn _discard_set_geojson_source_data(
+    fn _discard_set_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5710,7 +5710,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_data(
+                sys::mln_map_set_geo_json_source_data(
                     handle,
                     source_id_value,
                     data_handle,
@@ -5721,7 +5721,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, enabled))]
-    fn set_geojson_source_synchronous_tiling(
+    fn set_geo_json_source_synchronous_tiling(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5733,7 +5733,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_synchronous_tiling(
+                sys::mln_map_set_geo_json_source_synchronous_tiling(
                     handle,
                     source_id_value,
                     enabled,
@@ -5744,7 +5744,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, enabled))]
-    fn _discard_set_geojson_source_synchronous_tiling(
+    fn _discard_set_geo_json_source_synchronous_tiling(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5756,7 +5756,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_synchronous_tiling(
+                sys::mln_map_set_geo_json_source_synchronous_tiling(
                     handle,
                     source_id_value,
                     enabled,
@@ -5767,7 +5767,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, url))]
-    fn set_geojson_source_url(
+    fn set_geo_json_source_url(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5780,7 +5780,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_url(
+                sys::mln_map_set_geo_json_source_url(
                     handle,
                     source_id_value,
                     url_value,
@@ -5791,7 +5791,7 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id, url))]
-    fn _discard_set_geojson_source_url(
+    fn _discard_set_geo_json_source_url(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
@@ -5804,7 +5804,7 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_set_geojson_source_url(
+                sys::mln_map_set_geo_json_source_url(
                     handle,
                     source_id_value,
                     url_value,
@@ -7188,7 +7188,7 @@ impl RenderSessionHandle {
         }
     }
     #[pyo3(signature = (descriptor))]
-    fn set_opengl_borrowed_texture_target(
+    fn set_open_gl_borrowed_texture_target(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
@@ -7196,13 +7196,13 @@ impl RenderSessionHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
-            generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
+            generated_input_mln_open_gl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_render_session_set_opengl_borrowed_texture_target(
+                    sys::mln_render_session_set_open_gl_borrowed_texture_target(
                         handle,
                         &descriptor_value,
                         completion,
@@ -7214,7 +7214,7 @@ impl RenderSessionHandle {
         }
     }
     #[pyo3(signature = (descriptor))]
-    fn set_opengl_surface_target(
+    fn set_open_gl_surface_target(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
@@ -7222,13 +7222,13 @@ impl RenderSessionHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
-            generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
+            generated_input_mln_open_gl_surface_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_render_session_set_opengl_surface_target(
+                    sys::mln_render_session_set_open_gl_surface_target(
                         handle,
                         &descriptor_value,
                         completion,
@@ -8180,8 +8180,8 @@ generated_owner!(
 generated_owner!(
     GeoJsonSourceDataHandle,
     "_GeoJsonSourceDataHandle",
-    mln_geojson_source_data,
-    Some(generated_dispose_mln_geojson_source_data),
+    mln_geo_json_source_data,
+    Some(generated_dispose_mln_geo_json_source_data),
     None,
     false
 );
@@ -8362,9 +8362,9 @@ fn set_network_status(
 
 #[pyfunction]
 #[pyo3(signature = ())]
-fn opengl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
+fn open_gl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
-    let result = unsafe { call.run(|| sys::mln_opengl_supported_context_provider_mask()) };
+    let result = unsafe { call.run(|| sys::mln_open_gl_supported_context_provider_mask()) };
     generated_value(py, result)
 }
 
@@ -8424,7 +8424,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(get_network_status, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status, module)?)?;
     module.add_function(wrap_pyfunction!(
-        opengl_supported_context_provider_mask,
+        open_gl_supported_context_provider_mask,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(get_plugin_register_function_v1, module)?)?;

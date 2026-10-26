@@ -10,27 +10,27 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_opengl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  mln_open_gl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
   descriptor.extent = probe_extent;
   // A core worker renders in a context of its own; a host graphics thread
   // renders in the host's context.
   const bool dedicated = options->driver == MLN_RENDER_DRIVER_CORE_WORKER;
-  descriptor.context = (mln_opengl_context_descriptor){
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-    .ownership = dedicated ? MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
-                           : MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+  descriptor.context = (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
+    .ownership = dedicated ? MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED
+                           : MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED,
     .data = {
       .egl = {
         .display = context->egl_display,
         .config = context->egl_config,
         .share_context = dedicated ? NULL : context->egl_context,
-        .client_api = MLN_OPENGL_CLIENT_API_GLES,
+        .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
       }
     },
   };
-  return mln_map_attach_opengl_owned_texture(
+  return mln_map_attach_open_gl_owned_texture(
     map, &descriptor, options, out_session, completion, NULL
   );
 }

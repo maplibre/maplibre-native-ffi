@@ -25,7 +25,6 @@ from tools.bindgen.semantic import (
     required_member,
 )
 
-from ..names import words
 from .python_values import Values, enum_type, ok, public_name, rust_field, scalar_type
 
 SCALARS = {
@@ -51,7 +50,7 @@ def ctype(type_: CType) -> str:
 
 
 def pascal(name: str) -> str:
-    return "".join(part.capitalize() for part in words(name))
+    return "".join(part.capitalize() for part in name.split("_"))
 
 
 def event_sources(api: Api) -> set[str]:

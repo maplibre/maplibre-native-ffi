@@ -10,7 +10,7 @@ internal object GeneratedOwnerDisposal {
   }
 
   fun geoJsonSourceData(handle: Long) {
-    C.mln_geojson_source_data_release(handle)
+    C.mln_geo_json_source_data_release(handle)
   }
 
   fun map(handle: Long) {

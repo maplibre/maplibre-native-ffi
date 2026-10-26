@@ -62,9 +62,9 @@ impl MapHandle {
 
     /// Adds a GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_add_geojson_source_data` in the
+    /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geojson_source_data(
+    pub fn add_geo_json_source_data(
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
@@ -73,15 +73,15 @@ impl MapHandle {
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geojson_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_add_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
     /// Adds a GeoJSON source with URL data.
     ///
-    /// See `mln_map_add_geojson_source_url` in the
+    /// See `mln_map_add_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geojson_source_url(
+    pub fn add_geo_json_source_url(
         &self,
         source_id: &str,
         url: &str,
@@ -92,7 +92,7 @@ impl MapHandle {
         let url = call.input(&url)?;
         let options = call.optional_reference(options.as_ref())?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geojson_source_url(
+            sys::mln_map_add_geo_json_source_url(
                 map,
                 source_id,
                 url,
@@ -324,12 +324,12 @@ impl MapHandle {
 
     /// Starts attachment of a ring of caller-owned OpenGL textures.
     ///
-    /// See `mln_map_attach_opengl_borrowed_texture` in the
+    /// See `mln_map_attach_open_gl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn attach_opengl_borrowed_texture(
+    pub unsafe fn attach_open_gl_borrowed_texture(
         &self,
         descriptor: &OpenGlBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
@@ -341,7 +341,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_opengl_borrowed_texture(
+                sys::mln_map_attach_open_gl_borrowed_texture(
                     map,
                     descriptor,
                     options,
@@ -357,12 +357,12 @@ impl MapHandle {
 
     /// Starts attachment of a session-owned OpenGL texture ring.
     ///
-    /// See `mln_map_attach_opengl_owned_texture` in the
+    /// See `mln_map_attach_open_gl_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn attach_opengl_owned_texture(
+    pub unsafe fn attach_open_gl_owned_texture(
         &self,
         descriptor: &OpenGlOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
@@ -374,7 +374,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_opengl_owned_texture(
+                sys::mln_map_attach_open_gl_owned_texture(
                     map,
                     descriptor,
                     options,
@@ -390,12 +390,12 @@ impl MapHandle {
 
     /// Starts attachment of an OpenGL surface target.
     ///
-    /// See `mln_map_attach_opengl_surface` in the
+    /// See `mln_map_attach_open_gl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn attach_opengl_surface(
+    pub unsafe fn attach_open_gl_surface(
         &self,
         descriptor: &OpenGlSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
@@ -407,7 +407,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_opengl_surface(
+                sys::mln_map_attach_open_gl_surface(
                     map,
                     descriptor,
                     options,
@@ -540,13 +540,13 @@ impl MapHandle {
 
     /// Starts attachment of a ring of caller-owned WebGPU textures.
     ///
-    /// See `mln_map_attach_webgpu_borrowed_texture` in the
+    /// See `mln_map_attach_web_gpu_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
-    pub unsafe fn attach_webgpu_borrowed_texture(
+    pub unsafe fn attach_web_gpu_borrowed_texture(
         &self,
         descriptor: &WebGpuBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
@@ -558,7 +558,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_webgpu_borrowed_texture(
+                sys::mln_map_attach_web_gpu_borrowed_texture(
                     map,
                     descriptor,
                     options,
@@ -574,13 +574,13 @@ impl MapHandle {
 
     /// Starts attachment of a session-owned WebGPU texture ring.
     ///
-    /// See `mln_map_attach_webgpu_owned_texture` in the
+    /// See `mln_map_attach_web_gpu_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
-    pub unsafe fn attach_webgpu_owned_texture(
+    pub unsafe fn attach_web_gpu_owned_texture(
         &self,
         descriptor: &WebGpuOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
@@ -592,7 +592,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_webgpu_owned_texture(
+                sys::mln_map_attach_web_gpu_owned_texture(
                     map,
                     descriptor,
                     options,
@@ -608,13 +608,13 @@ impl MapHandle {
 
     /// Starts attachment of a WebGPU surface target.
     ///
-    /// See `mln_map_attach_webgpu_surface` in the
+    /// See `mln_map_attach_web_gpu_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
-    pub unsafe fn attach_webgpu_surface(
+    pub unsafe fn attach_web_gpu_surface(
         &self,
         descriptor: &WebGpuSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
@@ -626,7 +626,7 @@ impl MapHandle {
         let options = call.reference(&options)?;
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_webgpu_surface(
+                sys::mln_map_attach_web_gpu_surface(
                     map,
                     descriptor,
                     options,
@@ -1480,9 +1480,9 @@ impl MapHandle {
 
     /// Updates one GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_set_geojson_source_data` in the
+    /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_data(
+    pub fn set_geo_json_source_data(
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
@@ -1491,15 +1491,15 @@ impl MapHandle {
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
     /// Overrides one GeoJSON source's synchronous tiling at runtime.
     ///
-    /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+    /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_synchronous_tiling(
+    pub fn set_geo_json_source_synchronous_tiling(
         &self,
         source_id: &str,
         enabled: bool,
@@ -1507,7 +1507,7 @@ impl MapHandle {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_synchronous_tiling(
+            sys::mln_map_set_geo_json_source_synchronous_tiling(
                 map,
                 source_id,
                 enabled,
@@ -1519,9 +1519,9 @@ impl MapHandle {
 
     /// Updates one GeoJSON source to load data from a URL.
     ///
-    /// See `mln_map_set_geojson_source_url` in the
+    /// See `mln_map_set_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_url(
+    pub fn set_geo_json_source_url(
         &self,
         source_id: &str,
         url: &str,
@@ -1530,7 +1530,7 @@ impl MapHandle {
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_url(map, source_id, url, completion, out_diagnostic)
+            sys::mln_map_set_geo_json_source_url(map, source_id, url, completion, out_diagnostic)
         })
     }
 
@@ -1896,9 +1896,9 @@ impl MapHandleDiscarding<'_> {
 
     /// Adds a GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_add_geojson_source_data` in the
+    /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geojson_source_data(
+    pub fn add_geo_json_source_data(
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
@@ -1907,15 +1907,15 @@ impl MapHandleDiscarding<'_> {
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geojson_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_add_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
     /// Adds a GeoJSON source with URL data.
     ///
-    /// See `mln_map_add_geojson_source_url` in the
+    /// See `mln_map_add_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geojson_source_url(
+    pub fn add_geo_json_source_url(
         &self,
         source_id: &str,
         url: &str,
@@ -1926,7 +1926,7 @@ impl MapHandleDiscarding<'_> {
         let url = call.input(&url)?;
         let options = call.optional_reference(options.as_ref())?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geojson_source_url(
+            sys::mln_map_add_geo_json_source_url(
                 map,
                 source_id,
                 url,
@@ -2425,9 +2425,9 @@ impl MapHandleDiscarding<'_> {
 
     /// Updates one GeoJSON source with prepared inline data.
     ///
-    /// See `mln_map_set_geojson_source_data` in the
+    /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_data(
+    pub fn set_geo_json_source_data(
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
@@ -2436,15 +2436,15 @@ impl MapHandleDiscarding<'_> {
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
     /// Overrides one GeoJSON source's synchronous tiling at runtime.
     ///
-    /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+    /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_synchronous_tiling(
+    pub fn set_geo_json_source_synchronous_tiling(
         &self,
         source_id: &str,
         enabled: bool,
@@ -2452,7 +2452,7 @@ impl MapHandleDiscarding<'_> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_synchronous_tiling(
+            sys::mln_map_set_geo_json_source_synchronous_tiling(
                 map,
                 source_id,
                 enabled,
@@ -2464,14 +2464,14 @@ impl MapHandleDiscarding<'_> {
 
     /// Updates one GeoJSON source to load data from a URL.
     ///
-    /// See `mln_map_set_geojson_source_url` in the
+    /// See `mln_map_set_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<()> {
+    pub fn set_geo_json_source_url(&self, source_id: &str, url: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_url(map, source_id, url, completion, out_diagnostic)
+            sys::mln_map_set_geo_json_source_url(map, source_id, url, completion, out_diagnostic)
         })
     }
 

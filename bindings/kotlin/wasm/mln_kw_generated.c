@@ -25,11 +25,11 @@ int32_t mln_kw_mln_acquired_frame_get_metal_texture(
   );
 }
 
-int32_t mln_kw_mln_acquired_frame_get_opengl_texture(
+int32_t mln_kw_mln_acquired_frame_get_open_gl_texture(
   int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_acquired_frame_get_opengl_texture(
-    (mln_acquired_frame)frame, (mln_opengl_texture_frame*)out_frame,
+  return (int32_t)mln_acquired_frame_get_open_gl_texture(
+    (mln_acquired_frame)frame, (mln_open_gl_texture_frame*)out_frame,
     (mln_diagnostic*)out_diagnostic
   );
 }
@@ -61,11 +61,11 @@ int32_t mln_kw_mln_acquired_frame_get_vulkan_texture(
   );
 }
 
-int32_t mln_kw_mln_acquired_frame_get_webgpu_texture(
+int32_t mln_kw_mln_acquired_frame_get_web_gpu_texture(
   int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_acquired_frame_get_webgpu_texture(
-    (mln_acquired_frame)frame, (mln_webgpu_texture_frame*)out_frame,
+  return (int32_t)mln_acquired_frame_get_web_gpu_texture(
+    (mln_acquired_frame)frame, (mln_web_gpu_texture_frame*)out_frame,
     (mln_diagnostic*)out_diagnostic
   );
 }
@@ -137,19 +137,19 @@ void mln_kw_mln_delivery_queue_release(int64_t queue) {
   mln_delivery_queue_release((mln_delivery_queue)queue);
 }
 
-int32_t mln_kw_mln_geojson_source_data_create(
+int32_t mln_kw_mln_geo_json_source_data_create(
   uintptr_t data, uintptr_t options, uintptr_t out_data,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_geojson_source_data_create(
+  return (int32_t)mln_geo_json_source_data_create(
     *(const mln_buffer_view*)(uintptr_t)data,
-    (const mln_geojson_source_options*)options,
-    (mln_geojson_source_data*)out_data, (mln_diagnostic*)out_diagnostic
+    (const mln_geo_json_source_options*)options,
+    (mln_geo_json_source_data*)out_data, (mln_diagnostic*)out_diagnostic
   );
 }
 
-void mln_kw_mln_geojson_source_data_release(int64_t data) {
-  mln_geojson_source_data_release((mln_geojson_source_data)data);
+void mln_kw_mln_geo_json_source_data_release(int64_t data) {
+  mln_geo_json_source_data_release((mln_geo_json_source_data)data);
 }
 
 int32_t mln_kw_mln_http_header_transform_response_set_header(
@@ -223,25 +223,25 @@ int32_t mln_kw_mln_map_add_custom_mvt_vector_source(
   );
 }
 
-int32_t mln_kw_mln_map_add_geojson_source_data(
+int32_t mln_kw_mln_map_add_geo_json_source_data(
   int64_t map, uintptr_t source_id, int64_t data, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_add_geojson_source_data(
+  return (int32_t)mln_map_add_geo_json_source_data(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (mln_geojson_source_data)data, (const mln_completion*)completion,
+    (mln_geo_json_source_data)data, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_add_geojson_source_url(
+int32_t mln_kw_mln_map_add_geo_json_source_url(
   int64_t map, uintptr_t source_id, uintptr_t url, uintptr_t options,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_add_geojson_source_url(
+  return (int32_t)mln_map_add_geo_json_source_url(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
     *(const mln_buffer_view*)(uintptr_t)url,
-    (const mln_geojson_source_options*)options,
+    (const mln_geo_json_source_options*)options,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -339,36 +339,36 @@ int32_t mln_kw_mln_map_attach_metal_surface(
   );
 }
 
-int32_t mln_kw_mln_map_attach_opengl_borrowed_texture(
+int32_t mln_kw_mln_map_attach_open_gl_borrowed_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_opengl_borrowed_texture(
-    (mln_map)map, (const mln_opengl_borrowed_texture_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_open_gl_borrowed_texture(
+    (mln_map)map, (const mln_open_gl_borrowed_texture_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_attach_opengl_owned_texture(
+int32_t mln_kw_mln_map_attach_open_gl_owned_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_opengl_owned_texture(
-    (mln_map)map, (const mln_opengl_owned_texture_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_open_gl_owned_texture(
+    (mln_map)map, (const mln_open_gl_owned_texture_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_attach_opengl_surface(
+int32_t mln_kw_mln_map_attach_open_gl_surface(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_opengl_surface(
-    (mln_map)map, (const mln_opengl_surface_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_open_gl_surface(
+    (mln_map)map, (const mln_open_gl_surface_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
@@ -411,36 +411,36 @@ int32_t mln_kw_mln_map_attach_vulkan_surface(
   );
 }
 
-int32_t mln_kw_mln_map_attach_webgpu_borrowed_texture(
+int32_t mln_kw_mln_map_attach_web_gpu_borrowed_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_webgpu_borrowed_texture(
-    (mln_map)map, (const mln_webgpu_borrowed_texture_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_web_gpu_borrowed_texture(
+    (mln_map)map, (const mln_web_gpu_borrowed_texture_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_attach_webgpu_owned_texture(
+int32_t mln_kw_mln_map_attach_web_gpu_owned_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_webgpu_owned_texture(
-    (mln_map)map, (const mln_webgpu_owned_texture_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_web_gpu_owned_texture(
+    (mln_map)map, (const mln_web_gpu_owned_texture_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_attach_webgpu_surface(
+int32_t mln_kw_mln_map_attach_web_gpu_surface(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_attach_webgpu_surface(
-    (mln_map)map, (const mln_webgpu_surface_descriptor*)descriptor,
+  return (int32_t)mln_map_attach_web_gpu_surface(
+    (mln_map)map, (const mln_web_gpu_surface_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
@@ -1022,32 +1022,32 @@ int32_t mln_kw_mln_map_set_free_camera_options(
   );
 }
 
-int32_t mln_kw_mln_map_set_geojson_source_data(
+int32_t mln_kw_mln_map_set_geo_json_source_data(
   int64_t map, uintptr_t source_id, int64_t data, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_geojson_source_data(
+  return (int32_t)mln_map_set_geo_json_source_data(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (mln_geojson_source_data)data, (const mln_completion*)completion,
+    (mln_geo_json_source_data)data, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_set_geojson_source_synchronous_tiling(
+int32_t mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
   int64_t map, uintptr_t source_id, int32_t enabled, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_geojson_source_synchronous_tiling(
+  return (int32_t)mln_map_set_geo_json_source_synchronous_tiling(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id, (bool)enabled,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_set_geojson_source_url(
+int32_t mln_kw_mln_map_set_geo_json_source_url(
   int64_t map, uintptr_t source_id, uintptr_t url, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_geojson_source_url(
+  return (int32_t)mln_map_set_geo_json_source_url(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
     *(const mln_buffer_view*)(uintptr_t)url, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
@@ -1242,8 +1242,8 @@ int32_t mln_kw_mln_network_set_status(
   );
 }
 
-int32_t mln_kw_mln_opengl_supported_context_provider_mask(void) {
-  return (int32_t)mln_opengl_supported_context_provider_mask();
+int32_t mln_kw_mln_open_gl_supported_context_provider_mask(void) {
+  return (int32_t)mln_open_gl_supported_context_provider_mask();
 }
 
 uintptr_t mln_kw_mln_plugin_get_register_function_v1(void) {
@@ -1459,24 +1459,24 @@ int32_t mln_kw_mln_render_session_set_metal_surface_target(
   );
 }
 
-int32_t mln_kw_mln_render_session_set_opengl_borrowed_texture_target(
+int32_t mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
   int64_t session, uintptr_t descriptor, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_render_session_set_opengl_borrowed_texture_target(
+  return (int32_t)mln_render_session_set_open_gl_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_opengl_borrowed_texture_descriptor*)descriptor,
+    (const mln_open_gl_borrowed_texture_descriptor*)descriptor,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_render_session_set_opengl_surface_target(
+int32_t mln_kw_mln_render_session_set_open_gl_surface_target(
   int64_t session, uintptr_t descriptor, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_render_session_set_opengl_surface_target(
+  return (int32_t)mln_render_session_set_open_gl_surface_target(
     (mln_render_session)session,
-    (const mln_opengl_surface_descriptor*)descriptor,
+    (const mln_open_gl_surface_descriptor*)descriptor,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -1503,24 +1503,24 @@ int32_t mln_kw_mln_render_session_set_vulkan_surface_target(
   );
 }
 
-int32_t mln_kw_mln_render_session_set_webgpu_borrowed_texture_target(
+int32_t mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
   int64_t session, uintptr_t descriptor, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_render_session_set_webgpu_borrowed_texture_target(
+  return (int32_t)mln_render_session_set_web_gpu_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_webgpu_borrowed_texture_descriptor*)descriptor,
+    (const mln_web_gpu_borrowed_texture_descriptor*)descriptor,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_render_session_set_webgpu_surface_target(
+int32_t mln_kw_mln_render_session_set_web_gpu_surface_target(
   int64_t session, uintptr_t descriptor, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_render_session_set_webgpu_surface_target(
+  return (int32_t)mln_render_session_set_web_gpu_surface_target(
     (mln_render_session)session,
-    (const mln_webgpu_surface_descriptor*)descriptor,
+    (const mln_web_gpu_surface_descriptor*)descriptor,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

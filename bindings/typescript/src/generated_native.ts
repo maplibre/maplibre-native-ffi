@@ -74,7 +74,7 @@ import type {
 export interface NativeOperations {
   mln_acquired_frame_discard(frame: bigint, token: object | undefined): void;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
-  mln_acquired_frame_get_opengl_texture(frame: bigint): OpenGlTextureFrame;
+  mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
   mln_acquired_frame_get_result(frame: bigint): RenderFrameResult;
   mln_acquired_frame_get_vulkan_texture(frame: bigint): VulkanTextureFrame;
@@ -84,11 +84,11 @@ export interface NativeOperations {
     consumerCompletion: GpuSync | undefined,
   ): void;
   mln_c_version(): number;
-  mln_geojson_source_data_create(
+  mln_geo_json_source_data_create(
     data: unknown,
     options: GeoJsonSourceOptions | undefined,
   ): bigint;
-  mln_geojson_source_data_release(
+  mln_geo_json_source_data_release(
     data: bigint,
     token: object | undefined,
   ): void;
@@ -112,13 +112,13 @@ export interface NativeOperations {
     options: CustomMvtVectorSourceOptions,
     completion: number | undefined,
   ): void;
-  mln_map_add_geojson_source_data(
+  mln_map_add_geo_json_source_data(
     map: bigint,
     sourceId: string,
     data: bigint,
     completion: number | undefined,
   ): void;
-  mln_map_add_geojson_source_url(
+  mln_map_add_geo_json_source_url(
     map: bigint,
     sourceId: string,
     url: string,
@@ -174,19 +174,19 @@ export interface NativeOperations {
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
-  mln_map_attach_opengl_borrowed_texture(
+  mln_map_attach_open_gl_borrowed_texture(
     map: bigint,
     descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
-  mln_map_attach_opengl_owned_texture(
+  mln_map_attach_open_gl_owned_texture(
     map: bigint,
     descriptor: OpenGlOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
-  mln_map_attach_opengl_surface(
+  mln_map_attach_open_gl_surface(
     map: bigint,
     descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
@@ -448,19 +448,19 @@ export interface NativeOperations {
     options: FreeCameraOptions | undefined,
     completion: number | undefined,
   ): void;
-  mln_map_set_geojson_source_data(
+  mln_map_set_geo_json_source_data(
     map: bigint,
     sourceId: string,
     data: bigint,
     completion: number | undefined,
   ): void;
-  mln_map_set_geojson_source_synchronous_tiling(
+  mln_map_set_geo_json_source_synchronous_tiling(
     map: bigint,
     sourceId: string,
     enabled: boolean,
     completion: number | undefined,
   ): void;
-  mln_map_set_geojson_source_url(
+  mln_map_set_geo_json_source_url(
     map: bigint,
     sourceId: string,
     url: string,
@@ -563,7 +563,7 @@ export interface NativeOperations {
   ): void;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
-  mln_opengl_supported_context_provider_mask(): OpenGlContextProviderFlag;
+  mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_plugin_get_register_function_v1(): bigint;
   mln_projected_meters_for_lat_lng(
     coordinate: LatLng | undefined,
@@ -632,12 +632,12 @@ export interface NativeOperations {
     descriptor: MetalSurfaceDescriptor,
     completion: number,
   ): void;
-  mln_render_session_set_opengl_borrowed_texture_target(
+  mln_render_session_set_open_gl_borrowed_texture_target(
     session: bigint,
     descriptor: OpenGlBorrowedTextureDescriptor,
     completion: number,
   ): void;
-  mln_render_session_set_opengl_surface_target(
+  mln_render_session_set_open_gl_surface_target(
     session: bigint,
     descriptor: OpenGlSurfaceDescriptor,
     completion: number,

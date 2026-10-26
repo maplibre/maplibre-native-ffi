@@ -26,7 +26,7 @@ static const mln_lat_lng dot = {.latitude = 10.0, .longitude = 20.0};
 
 static void prepare(mln_map map) {
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(circle_style));
-  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_synchronous_tiling(
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_synchronous_tiling(
     map, MLN_BUFFER_LITERAL("dot"), true, &completion.descriptor, NULL
   ));
 }

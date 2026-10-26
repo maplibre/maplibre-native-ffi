@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// Prepared GeoJSON data that sources retain independently of its handle.
 /// </summary>
 /// <remarks>
-/// See <c>mln_geojson_source_data</c> in the <see
+/// See <c>mln_geo_json_source_data</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
 /// </remarks>
 public sealed unsafe partial class GeoJsonSourceDataHandle
@@ -32,7 +32,7 @@ public sealed unsafe partial class GeoJsonSourceDataHandle
 
     private static mln_status Abandon(MlnGeoJsonSourceData live, mln_diagnostic* diagnostic)
     {
-        NativeMethods.mln_geojson_source_data_release(live);
+        NativeMethods.mln_geo_json_source_data_release(live);
         return mln_status.MLN_STATUS_OK;
     }
 
@@ -63,18 +63,18 @@ public sealed unsafe partial class GeoJsonSourceDataHandle
     /// Prepares GeoJSON source data for installation on a map.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_geojson_source_data_create</c> in the <see
+    /// See <c>mln_geo_json_source_data_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
     public static GeoJsonSourceDataHandle Create(string data, GeoJsonSourceOptions? options = null)
     {
         using var scope = new NativeCallScope(null);
         var nativeOptions = options is null
-            ? default(mln_geojson_source_options)
+            ? default(mln_geo_json_source_options)
             : NativeGeoJsonSourceOptions(options, scope);
         MlnGeoJsonSourceData outData = default;
         Check(
-            NativeMethods.mln_geojson_source_data_create(
+            NativeMethods.mln_geo_json_source_data_create(
                 scope.Utf8(data),
                 options is null ? null : &nativeOptions,
                 &outData,

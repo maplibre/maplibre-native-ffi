@@ -393,7 +393,7 @@ final class OfflineRegionDownloadState extends _Enum {
 
 /// OpenGL client API a dedicated EGL session creates its context for.
 ///
-/// See `mln_opengl_client_api` in the
+/// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class OpenGlClientApi extends _Enum {
   const OpenGlClientApi.fromRawValue(super.rawValue);
@@ -418,7 +418,7 @@ final class OpenGlClientApi extends _Enum {
 /// How a session's OpenGL context relates to its driver thread and host
 /// graphics state.
 ///
-/// See `mln_opengl_context_ownership` in the
+/// See `mln_open_gl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class OpenGlContextOwnership extends _Enum {
   const OpenGlContextOwnership.fromRawValue(super.rawValue);
@@ -438,7 +438,7 @@ final class OpenGlContextOwnership extends _Enum {
 
 /// OpenGL context providers supported by this build.
 ///
-/// See `mln_opengl_context_provider_flag` in the
+/// See `mln_open_gl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class OpenGlContextProviderFlag
     extends _Flags<OpenGlContextProviderFlag> {
@@ -1217,7 +1217,7 @@ final class ViewportMode extends _Enum {
 
 /// WebGL context placement.
 ///
-/// See `mln_webgl_context_kind` in the
+/// See `mln_web_gl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class WebGlContextKind extends _Enum {
   const WebGlContextKind.fromRawValue(super.rawValue);
@@ -1309,7 +1309,7 @@ final class MetalTextureFrame extends _Value {
 
 /// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_texture_frame` in the
+/// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlTextureFrame extends _Value {
   const OpenGlTextureFrame({
@@ -1862,7 +1862,7 @@ final class VulkanTextureFrame extends _Value {
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
 ///
-/// See `mln_geojson_source_options` in the
+/// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class GeoJsonSourceOptions extends _Value {
   const GeoJsonSourceOptions({
@@ -2544,7 +2544,7 @@ final class RenderSessionAttachOptions extends _Value {
   final int requestedTextureRingDepth;
 
   /// Producer synchronization for acquired texture frames.
-  /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
+  /// `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
   /// and a caller-graphics-thread driver. Other targets support only CPU
   /// completion and fail an unsupported request.
   final GpuSyncKind producerSyncKind;
@@ -2819,7 +2819,7 @@ final class EglContextDescriptor extends _Value {
 
 /// WebGL context fields shared by OpenGL render targets in the browser.
 ///
-/// See `mln_webgl_context_descriptor` in the
+/// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class WebGlContextDescriptor extends _Value {
   const WebGlContextDescriptor({
@@ -2859,7 +2859,7 @@ final class WebGlContextDescriptor extends _Value {
 
 /// OpenGL backend context fields shared by OpenGL render targets.
 ///
-/// See `mln_opengl_context_descriptor` in the
+/// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class OpenGlContextDescriptor {
   const OpenGlContextDescriptor({
@@ -2896,7 +2896,7 @@ final class OpenGlContextDescriptorDataWebGl
 
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
-/// See `mln_opengl_borrowed_texture` in the
+/// See `mln_open_gl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlBorrowedTexture extends _Value {
   const OpenGlBorrowedTexture({required this.texture});
@@ -2916,7 +2916,7 @@ final class OpenGlBorrowedTexture extends _Value {
 
 /// OpenGL attachment options for a borrowed texture target.
 ///
-/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlBorrowedTextureDescriptor extends _Value {
   OpenGlBorrowedTextureDescriptor({
@@ -2988,7 +2988,7 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
 
 /// OpenGL attachment options for an owned texture target.
 ///
-/// See `mln_opengl_owned_texture_descriptor` in the
+/// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlOwnedTextureDescriptor extends _Value {
   const OpenGlOwnedTextureDescriptor({
@@ -3024,7 +3024,7 @@ final class OpenGlOwnedTextureDescriptor extends _Value {
 
 /// OpenGL attachment options for a native surface.
 ///
-/// See `mln_opengl_surface_descriptor` in the
+/// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class OpenGlSurfaceDescriptor extends _Value {
   const OpenGlSurfaceDescriptor({

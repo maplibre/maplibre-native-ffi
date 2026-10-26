@@ -332,7 +332,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Starts an ordered replacement of every texture of a caller-owned OpenGL ring.
    *
-   * See `mln_render_session_set_opengl_borrowed_texture_target` in the
+   * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setOpenGlBorrowedTextureTarget(
@@ -340,7 +340,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   ): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
-        C.mln_render_session_set_opengl_borrowed_texture_target(
+        C.mln_render_session_set_open_gl_borrowed_texture_target(
           handle,
           writeOpenGlBorrowedTextureDescriptor(descriptor),
           completion,
@@ -352,13 +352,13 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Starts an ordered OpenGL surface replacement.
    *
-   * See `mln_render_session_set_opengl_surface_target` in the
+   * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
-        C.mln_render_session_set_opengl_surface_target(
+        C.mln_render_session_set_open_gl_surface_target(
           handle,
           writeOpenGlSurfaceDescriptor(descriptor),
           completion,

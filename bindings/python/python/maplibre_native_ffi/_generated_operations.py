@@ -184,17 +184,17 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             lambda raw: MetalTextureFrame._from_native(raw),
         )
 
-    def opengl_texture(self) -> AbstractContextManager[OpenGlTextureFrame]:
+    def open_gl_texture(self) -> AbstractContextManager[OpenGlTextureFrame]:
         """Copies OpenGL-native metadata from an acquired frame.
 
-        See `mln_acquired_frame_get_opengl_texture` in the
+        See `mln_acquired_frame_get_open_gl_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
         Native resources remain valid only inside the `with` block.
         """
         return _view(
             self,
-            lambda: self._native.opengl_texture(),
+            lambda: self._native.open_gl_texture(),
             lambda raw: OpenGlTextureFrame._from_native(raw),
         )
 
@@ -252,7 +252,7 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
     ) -> GeoJsonSourceDataHandle:
         """Prepares GeoJSON source data for installation on a map.
 
-        See `mln_geojson_source_data_create` in the
+        See `mln_geo_json_source_data_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return _adopt_value(
@@ -264,7 +264,7 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
     def close(self) -> None:
         """Releases prepared GeoJSON source data.
 
-        See `mln_geojson_source_data_release` in the
+        See `mln_geo_json_source_data_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.close()
@@ -306,25 +306,25 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_custom_mvt_vector_source(source_id, options)
 
-    def add_geojson_source_data(
+    def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Adds a GeoJSON source with prepared inline data.
 
-        See `mln_map_add_geojson_source_data` in the
+        See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.add_geojson_source_data(source_id, data._native)
+        return self._native.add_geo_json_source_data(source_id, data._native)
 
-    def add_geojson_source_url(
+    def add_geo_json_source_url(
         self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> Future[CommandCompletion]:
         """Adds a GeoJSON source with URL data.
 
-        See `mln_map_add_geojson_source_url` in the
+        See `mln_map_add_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.add_geojson_source_url(source_id, url, options)
+        return self._native.add_geo_json_source_url(source_id, url, options)
 
     def add_image_source_image(
         self,
@@ -423,47 +423,47 @@ class _MapHandleOperations(GeneratedOperations):
             ready=raw["ready"],
         )
 
-    def attach_opengl_borrowed_texture(
+    def attach_open_gl_borrowed_texture(
         self,
         descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachOpenGlBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned OpenGL textures.
 
-        See `mln_map_attach_opengl_borrowed_texture` in the
+        See `mln_map_attach_open_gl_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        raw = self._native.attach_opengl_borrowed_texture(descriptor, options)
+        raw = self._native.attach_open_gl_borrowed_texture(descriptor, options)
         return MapAttachOpenGlBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
 
-    def attach_opengl_owned_texture(
+    def attach_open_gl_owned_texture(
         self,
         descriptor: OpenGlOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachOpenGlOwnedTextureResult:
         """Starts attachment of a session-owned OpenGL texture ring.
 
-        See `mln_map_attach_opengl_owned_texture` in the
+        See `mln_map_attach_open_gl_owned_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        raw = self._native.attach_opengl_owned_texture(descriptor, options)
+        raw = self._native.attach_open_gl_owned_texture(descriptor, options)
         return MapAttachOpenGlOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
 
-    def attach_opengl_surface(
+    def attach_open_gl_surface(
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachOpenGlSurfaceResult:
         """Starts attachment of an OpenGL surface target.
 
-        See `mln_map_attach_opengl_surface` in the
+        See `mln_map_attach_open_gl_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        raw = self._native.attach_opengl_surface(descriptor, options)
+        raw = self._native.attach_open_gl_surface(descriptor, options)
         return MapAttachOpenGlSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
@@ -984,35 +984,35 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_free_camera_options(options)
 
-    def set_geojson_source_data(
+    def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Updates one GeoJSON source with prepared inline data.
 
-        See `mln_map_set_geojson_source_data` in the
+        See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.set_geojson_source_data(source_id, data._native)
+        return self._native.set_geo_json_source_data(source_id, data._native)
 
-    def set_geojson_source_synchronous_tiling(
+    def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
     ) -> Future[CommandCompletion]:
         """Overrides one GeoJSON source's synchronous tiling at runtime.
 
-        See `mln_map_set_geojson_source_synchronous_tiling` in the
+        See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.set_geojson_source_synchronous_tiling(source_id, enabled)
+        return self._native.set_geo_json_source_synchronous_tiling(source_id, enabled)
 
-    def set_geojson_source_url(
+    def set_geo_json_source_url(
         self, source_id: str, url: str
     ) -> Future[CommandCompletion]:
         """Updates one GeoJSON source to load data from a URL.
 
-        See `mln_map_set_geojson_source_url` in the
+        See `mln_map_set_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.set_geojson_source_url(source_id, url)
+        return self._native.set_geo_json_source_url(source_id, url)
 
     def set_global_state_property(
         self, property_name: str, value: Any
@@ -1525,26 +1525,26 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.set_metal_surface_target(descriptor)
 
-    def set_opengl_borrowed_texture_target(
+    def set_open_gl_borrowed_texture_target(
         self, descriptor: OpenGlBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every texture of a caller-owned
         OpenGL ring.
 
-        See `mln_render_session_set_opengl_borrowed_texture_target` in the
+        See `mln_render_session_set_open_gl_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        return self._native.set_opengl_borrowed_texture_target(descriptor)
+        return self._native.set_open_gl_borrowed_texture_target(descriptor)
 
-    def set_opengl_surface_target(
+    def set_open_gl_surface_target(
         self, descriptor: OpenGlSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered OpenGL surface replacement.
 
-        See `mln_render_session_set_opengl_surface_target` in the
+        See `mln_render_session_set_open_gl_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        return self._native.set_opengl_surface_target(descriptor)
+        return self._native.set_open_gl_surface_target(descriptor)
 
     def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor
@@ -2028,13 +2028,13 @@ def set_network_status(status: NetworkStatus) -> None:
     return _native.set_network_status(status)
 
 
-def opengl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
+def open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
     """Returns OpenGL context providers supported by this build.
 
-    See `mln_opengl_supported_context_provider_mask` in the
+    See `mln_open_gl_supported_context_provider_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
-    return OpenGlContextProviderFlag(_native.opengl_supported_context_provider_mask())
+    return OpenGlContextProviderFlag(_native.open_gl_supported_context_provider_mask())
 
 
 def get_plugin_register_function_v1() -> int:
@@ -2095,25 +2095,25 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_custom_mvt_vector_source(source_id, options)
 
-    def add_geojson_source_data(
+    def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
         """Adds a GeoJSON source with prepared inline data.
 
-        See `mln_map_add_geojson_source_data` in the
+        See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_add_geojson_source_data(source_id, data._native)
+        return self._native._discard_add_geo_json_source_data(source_id, data._native)
 
-    def add_geojson_source_url(
+    def add_geo_json_source_url(
         self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> None:
         """Adds a GeoJSON source with URL data.
 
-        See `mln_map_add_geojson_source_url` in the
+        See `mln_map_add_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_add_geojson_source_url(source_id, url, options)
+        return self._native._discard_add_geo_json_source_url(source_id, url, options)
 
     def add_image_source_image(
         self,
@@ -2387,35 +2387,35 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_free_camera_options(options)
 
-    def set_geojson_source_data(
+    def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
         """Updates one GeoJSON source with prepared inline data.
 
-        See `mln_map_set_geojson_source_data` in the
+        See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_set_geojson_source_data(source_id, data._native)
+        return self._native._discard_set_geo_json_source_data(source_id, data._native)
 
-    def set_geojson_source_synchronous_tiling(
+    def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
     ) -> None:
         """Overrides one GeoJSON source's synchronous tiling at runtime.
 
-        See `mln_map_set_geojson_source_synchronous_tiling` in the
+        See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_set_geojson_source_synchronous_tiling(
+        return self._native._discard_set_geo_json_source_synchronous_tiling(
             source_id, enabled
         )
 
-    def set_geojson_source_url(self, source_id: str, url: str) -> None:
+    def set_geo_json_source_url(self, source_id: str, url: str) -> None:
         """Updates one GeoJSON source to load data from a URL.
 
-        See `mln_map_set_geojson_source_url` in the
+        See `mln_map_set_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_set_geojson_source_url(source_id, url)
+        return self._native._discard_set_geo_json_source_url(source_id, url)
 
     def set_global_state_property(self, property_name: str, value: Any) -> None:
         """Submits a global-state JSON value. JSON null restores the style

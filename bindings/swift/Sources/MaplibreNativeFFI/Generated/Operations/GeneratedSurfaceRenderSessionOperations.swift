@@ -25,13 +25,13 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered OpenGL surface replacement.
   ///
-  /// See `mln_render_session_set_opengl_surface_target` in the
+  /// See `mln_render_session_set_open_gl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func setOpenGlSurfaceTarget(
     descriptor bindingArg0: OpenGlSurfaceDescriptor
   ) async throws {
     try await nativeUnit { raw, arena, completion, diagnostic in
-      try mln_render_session_set_opengl_surface_target(
+      try mln_render_session_set_open_gl_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,

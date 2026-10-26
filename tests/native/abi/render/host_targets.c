@@ -264,7 +264,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
   mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
-  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPEN_GL_FENCE, producer.kind);
   TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.handle));
   wait_sync((void*)(uintptr_t)producer.handle, 0, UINT64_MAX);
   uint32_t first_slot = UINT32_MAX;
@@ -282,7 +282,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
 
   // An invalid fence keeps the frame handle available for a valid release.
   mln_gpu_sync consumer = {
-    .size = sizeof(consumer), .kind = MLN_GPU_SYNC_OPENGL_FENCE
+    .size = sizeof(consumer), .kind = MLN_GPU_SYNC_OPEN_GL_FENCE
   };
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -306,7 +306,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
-  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPEN_GL_FENCE, producer.kind);
   TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.handle));
   wait_sync((void*)(uintptr_t)producer.handle, 0, UINT64_MAX);
   uint32_t second_slot = UINT32_MAX;

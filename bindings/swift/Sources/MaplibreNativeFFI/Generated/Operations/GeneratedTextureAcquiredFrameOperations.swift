@@ -36,13 +36,13 @@ public extension AcquiredFrameHandle {
 
   /// Copies OpenGL-native metadata from an acquired frame.
   ///
-  /// See `mln_acquired_frame_get_opengl_texture` in the
+  /// See `mln_acquired_frame_get_open_gl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws
     -> Result) throws -> Result
   {
-    var raw = mln_opengl_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_opengl_texture_frame>.size)
+    var raw = mln_open_gl_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_open_gl_texture_frame>.size)
     return try nativeView(
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
@@ -51,7 +51,7 @@ public extension AcquiredFrameHandle {
         diagnostic
       ) },
       end: { mln_acquired_frame_view_end($0) },
-      get: { raw, value, diagnostic in mln_acquired_frame_get_opengl_texture(
+      get: { raw, value, diagnostic in mln_acquired_frame_get_open_gl_texture(
         raw,
         value,
         diagnostic

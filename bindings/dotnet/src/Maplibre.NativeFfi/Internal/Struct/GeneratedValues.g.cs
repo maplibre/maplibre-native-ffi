@@ -446,7 +446,7 @@ internal static unsafe class GeneratedValues
         native.display = (void*)value.Display.Address;
         native.config = (void*)value.Config.Address;
         native.share_context = (void*)value.ShareContext.Address;
-        native.client_api = (mln_opengl_client_api)value.ClientApi;
+        native.client_api = (mln_open_gl_client_api)value.ClientApi;
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
     }
@@ -530,7 +530,7 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_geojson_source_options NativeGeoJsonSourceOptions(
+    internal static mln_geo_json_source_options NativeGeoJsonSourceOptions(
         GeoJsonSourceOptions value,
         NativeCallScope scope
     )
@@ -539,57 +539,57 @@ internal static unsafe class GeneratedValues
             value.ClusterProperties,
             "GeoJsonSourceOptions.ClusterProperties must not be null."
         );
-        var native = new mln_geojson_source_options();
+        var native = new mln_geo_json_source_options();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_geojson_source_options);
+        native.size = (uint)sizeof(mln_geo_json_source_options);
         native.fields |= Put(
             value.MinZoom,
             ref native.min_zoom,
-            MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+            MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM
         );
         native.fields |= Put(
             value.MaxZoom,
             ref native.max_zoom,
-            MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+            MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM
         );
         native.fields |= Put(
             value.Tolerance,
             ref native.tolerance,
-            MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+            MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE
         );
         native.fields |= Put(
             value.ClusterMaxZoom,
             ref native.cluster_max_zoom,
-            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+            MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
         );
         native.cluster_properties = scope.Utf8(value.ClusterProperties);
-        native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEOJSON_SOURCE_OPTION_BUFFER);
+        native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEO_JSON_SOURCE_OPTION_BUFFER);
         native.fields |= Put(
             value.ClusterRadius,
             ref native.cluster_radius,
-            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+            MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS
         );
         native.fields |= Put(
             value.ClusterMinPoints,
             ref native.cluster_min_points,
-            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+            MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
         );
         native.fields |= Put(
             value.LineMetrics,
             ref native.line_metrics,
-            MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
+            MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS,
             static present => (byte)(present ? 1 : 0)
         );
         native.fields |= Put(
             value.Cluster,
             ref native.cluster,
-            MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
+            MLN_GEO_JSON_SOURCE_OPTION_CLUSTER,
             static present => (byte)(present ? 1 : 0)
         );
         native.fields |= Put(
             value.SynchronousTiling,
             ref native.synchronous_tiling,
-            MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
+            MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
             static present => (byte)(present ? 1 : 0)
         );
         return native;
@@ -1155,27 +1155,27 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_opengl_borrowed_texture NativeOpenGlBorrowedTexture(
+    internal static mln_open_gl_borrowed_texture NativeOpenGlBorrowedTexture(
         OpenGlBorrowedTexture value
     )
     {
-        var native = new mln_opengl_borrowed_texture();
+        var native = new mln_open_gl_borrowed_texture();
         native.texture = value.Texture;
         return native;
     }
 
-    internal static mln_opengl_borrowed_texture_descriptor NativeOpenGlBorrowedTextureDescriptor(
+    internal static mln_open_gl_borrowed_texture_descriptor NativeOpenGlBorrowedTextureDescriptor(
         OpenGlBorrowedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = new mln_opengl_borrowed_texture_descriptor();
-        native.size = (uint)sizeof(mln_opengl_borrowed_texture_descriptor);
+        var native = new mln_open_gl_borrowed_texture_descriptor();
+        native.size = (uint)sizeof(mln_open_gl_borrowed_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeOpenGlContextDescriptor(value.Context, scope);
-        native.textures = scope.Array<mln_opengl_borrowed_texture, OpenGlBorrowedTexture>(
+        native.textures = scope.Array<mln_open_gl_borrowed_texture, OpenGlBorrowedTexture>(
             value.TexturesStorage.Items,
             static (item, scope) => NativeOpenGlBorrowedTexture(item)
         );
@@ -1184,26 +1184,26 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_opengl_context_descriptor NativeOpenGlContextDescriptor(
+    internal static mln_open_gl_context_descriptor NativeOpenGlContextDescriptor(
         OpenGlContextDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = new mln_opengl_context_descriptor();
-        native.ownership = (mln_opengl_context_ownership)value.Ownership;
+        var native = new mln_open_gl_context_descriptor();
+        native.ownership = (mln_open_gl_context_ownership)value.Ownership;
         switch (value.Data)
         {
             case OpenGlContextDescriptor.DataValue.Wgl selected:
-                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                native.platform = mln_open_gl_context_platform.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
                 native.data.wgl = NativeWglContextDescriptor(selected.Value);
                 break;
             case OpenGlContextDescriptor.DataValue.Egl selected:
-                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                native.platform = mln_open_gl_context_platform.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
                 native.data.egl = NativeEglContextDescriptor(selected.Value);
                 break;
             case OpenGlContextDescriptor.DataValue.WebGl selected:
-                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
-                native.data.webgl = NativeWebGlContextDescriptor(selected.Value, scope);
+                native.platform = mln_open_gl_context_platform.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+                native.data.web_gl = NativeWebGlContextDescriptor(selected.Value, scope);
                 break;
             default:
                 throw new ArgumentException("A union variant is required.", nameof(value));
@@ -1211,32 +1211,32 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_opengl_owned_texture_descriptor NativeOpenGlOwnedTextureDescriptor(
+    internal static mln_open_gl_owned_texture_descriptor NativeOpenGlOwnedTextureDescriptor(
         OpenGlOwnedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = new mln_opengl_owned_texture_descriptor();
-        native.size = (uint)sizeof(mln_opengl_owned_texture_descriptor);
+        var native = new mln_open_gl_owned_texture_descriptor();
+        native.size = (uint)sizeof(mln_open_gl_owned_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenGlContextDescriptor(value.Context, scope);
         return native;
     }
 
-    internal static mln_opengl_surface_descriptor NativeOpenGlSurfaceDescriptor(
+    internal static mln_open_gl_surface_descriptor NativeOpenGlSurfaceDescriptor(
         OpenGlSurfaceDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = new mln_opengl_surface_descriptor();
-        native.size = (uint)sizeof(mln_opengl_surface_descriptor);
+        var native = new mln_open_gl_surface_descriptor();
+        native.size = (uint)sizeof(mln_open_gl_surface_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenGlContextDescriptor(value.Context, scope);
         native.surface = (void*)value.Surface.Address;
         return native;
     }
 
-    internal static OpenGlTextureFrame CopyOpenGlTextureFrame(mln_opengl_texture_frame value) =>
+    internal static OpenGlTextureFrame CopyOpenGlTextureFrame(mln_open_gl_texture_frame value) =>
         new(
             value.generation,
             value.width,
@@ -2107,8 +2107,8 @@ internal static unsafe class GeneratedValues
                 value.attribution.size
             ),
             Url = RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size),
-            TileJson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILEJSON)
-                ? CopyStyleSourceTileInfo(value.tilejson)
+            TileJson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILE_JSON)
+                ? CopyStyleSourceTileInfo(value.tile_json)
                 : null,
             Bounds = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_BOUNDS)
                 ? CopyLatLngBounds(value.bounds)
@@ -2344,14 +2344,14 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_webgl_context_descriptor NativeWebGlContextDescriptor(
+    internal static mln_web_gl_context_descriptor NativeWebGlContextDescriptor(
         WebGlContextDescriptor value,
         NativeCallScope scope
     )
     {
         Required(value.CanvasSelector, "WebGlContextDescriptor.CanvasSelector must not be null.");
-        var native = new mln_webgl_context_descriptor();
-        native.kind = (mln_webgl_context_kind)value.Kind;
+        var native = new mln_web_gl_context_descriptor();
+        native.kind = (mln_web_gl_context_kind)value.Kind;
         native.context = value.Context;
         native.canvas_selector = scope.Utf8(value.CanvasSelector);
         return native;

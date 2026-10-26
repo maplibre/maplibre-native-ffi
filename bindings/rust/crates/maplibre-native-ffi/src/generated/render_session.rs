@@ -437,12 +437,12 @@ impl RenderSessionHandle {
     /// Starts an ordered replacement of every texture of a caller-owned OpenGL
     /// ring.
     ///
-    /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+    /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn set_opengl_borrowed_texture_target(
+    pub unsafe fn set_open_gl_borrowed_texture_target(
         &self,
         descriptor: &OpenGlBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
@@ -450,7 +450,7 @@ impl RenderSessionHandle {
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_set_opengl_borrowed_texture_target(
+                sys::mln_render_session_set_open_gl_borrowed_texture_target(
                     session,
                     descriptor,
                     completion,
@@ -463,12 +463,12 @@ impl RenderSessionHandle {
 
     /// Starts an ordered OpenGL surface replacement.
     ///
-    /// See `mln_render_session_set_opengl_surface_target` in the
+    /// See `mln_render_session_set_open_gl_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn set_opengl_surface_target(
+    pub unsafe fn set_open_gl_surface_target(
         &self,
         descriptor: &OpenGlSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
@@ -476,7 +476,7 @@ impl RenderSessionHandle {
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_set_opengl_surface_target(
+                sys::mln_render_session_set_open_gl_surface_target(
                     session,
                     descriptor,
                     completion,
@@ -555,13 +555,13 @@ impl RenderSessionHandle {
     /// Starts an ordered replacement of every texture of a caller-owned WebGPU
     /// ring.
     ///
-    /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
+    /// See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
-    pub unsafe fn set_webgpu_borrowed_texture_target(
+    pub unsafe fn set_web_gpu_borrowed_texture_target(
         &self,
         descriptor: &WebGpuBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
@@ -569,7 +569,7 @@ impl RenderSessionHandle {
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_set_webgpu_borrowed_texture_target(
+                sys::mln_render_session_set_web_gpu_borrowed_texture_target(
                     session,
                     descriptor,
                     completion,
@@ -582,13 +582,13 @@ impl RenderSessionHandle {
 
     /// Starts an ordered WebGPU surface replacement.
     ///
-    /// See `mln_render_session_set_webgpu_surface_target` in the
+    /// See `mln_render_session_set_web_gpu_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
-    pub unsafe fn set_webgpu_surface_target(
+    pub unsafe fn set_web_gpu_surface_target(
         &self,
         descriptor: &WebGpuSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
@@ -596,7 +596,7 @@ impl RenderSessionHandle {
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_set_webgpu_surface_target(
+                sys::mln_render_session_set_web_gpu_surface_target(
                     session,
                     descriptor,
                     completion,

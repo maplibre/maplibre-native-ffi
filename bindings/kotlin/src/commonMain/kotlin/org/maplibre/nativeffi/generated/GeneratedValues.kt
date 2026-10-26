@@ -239,7 +239,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "CPU_COMPLETE"
-      1u -> "OPENGL_FENCE"
+      1u -> "OPEN_GL_FENCE"
       else -> "GpuSyncKind($rawValue)"
     }
 
@@ -253,7 +253,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * GLsync in the shared EGL or WGL context's share group, used only by a caller-graphics-thread
      * driver. handle is nonzero.
      */
-    public val OPENGL_FENCE: GpuSyncKind = GpuSyncKind(1u)
+    public val OPEN_GL_FENCE: GpuSyncKind = GpuSyncKind(1u)
   }
 }
 
@@ -506,7 +506,7 @@ public value class OfflineRegionDownloadState(public val rawValue: UInt) {
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_opengl_client_api` in the
+ * See `mln_open_gl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
@@ -534,7 +534,7 @@ public value class OpenGlClientApi(public val rawValue: UInt) {
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_opengl_context_ownership` in the
+ * See `mln_open_gl_context_ownership` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
@@ -559,7 +559,7 @@ public value class OpenGlContextOwnership(public val rawValue: UInt) {
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
- * See `mln_opengl_context_provider_flag` in the
+ * See `mln_open_gl_context_provider_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
@@ -574,7 +574,7 @@ public value class OpenGlContextProviderFlag(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   override fun toString(): String =
-    flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "WGL", 2uL to "EGL", 4uL to "WEBGL"))
+    flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "WGL", 2uL to "EGL", 4uL to "WEB_GL"))
 
   public companion object {
     /** No flags. */
@@ -582,7 +582,7 @@ public value class OpenGlContextProviderFlag(public val rawValue: UInt) {
     public val WGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(1u)
     public val EGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(2u)
     /** Browser WebGL context imported into an Emscripten module. */
-    public val WEBGL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(4u)
+    public val WEB_GL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(4u)
   }
 }
 
@@ -634,7 +634,7 @@ public value class RenderBackendFlag(public val rawValue: UInt) {
     flagLabel(
       rawValue.toULong(),
       "NONE",
-      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPENGL", 8uL to "WEBGPU"),
+      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPEN_GL", 8uL to "WEB_GPU"),
     )
 
   public companion object {
@@ -642,8 +642,8 @@ public value class RenderBackendFlag(public val rawValue: UInt) {
     public val NONE: RenderBackendFlag = RenderBackendFlag(0u)
     public val METAL: RenderBackendFlag = RenderBackendFlag(1u)
     public val VULKAN: RenderBackendFlag = RenderBackendFlag(2u)
-    public val OPENGL: RenderBackendFlag = RenderBackendFlag(4u)
-    public val WEBGPU: RenderBackendFlag = RenderBackendFlag(8u)
+    public val OPEN_GL: RenderBackendFlag = RenderBackendFlag(4u)
+    public val WEB_GPU: RenderBackendFlag = RenderBackendFlag(8u)
   }
 }
 
@@ -1358,7 +1358,7 @@ public value class StyleSourceType(public val rawValue: UInt) {
       1u -> "VECTOR"
       2u -> "RASTER"
       3u -> "RASTER_DEM"
-      4u -> "GEOJSON"
+      4u -> "GEO_JSON"
       5u -> "IMAGE"
       6u -> "VIDEO"
       7u -> "ANNOTATIONS"
@@ -1372,7 +1372,7 @@ public value class StyleSourceType(public val rawValue: UInt) {
     public val VECTOR: StyleSourceType = StyleSourceType(1u)
     public val RASTER: StyleSourceType = StyleSourceType(2u)
     public val RASTER_DEM: StyleSourceType = StyleSourceType(3u)
-    public val GEOJSON: StyleSourceType = StyleSourceType(4u)
+    public val GEO_JSON: StyleSourceType = StyleSourceType(4u)
     public val IMAGE: StyleSourceType = StyleSourceType(5u)
     public val VIDEO: StyleSourceType = StyleSourceType(6u)
     public val ANNOTATIONS: StyleSourceType = StyleSourceType(7u)
@@ -1542,7 +1542,7 @@ public value class ViewportMode(public val rawValue: UInt) {
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_webgl_context_kind` in the
+ * See `mln_web_gl_context_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 @JvmInline
@@ -1613,7 +1613,7 @@ public class MetalTextureFrame(
 /**
  * OpenGL frame acquired from a texture ring.
  *
- * See `mln_opengl_texture_frame` in the
+ * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class OpenGlTextureFrame(
@@ -1893,7 +1893,7 @@ public class VulkanTextureFrame(
 /**
  * WebGPU frame acquired from a texture ring.
  *
- * See `mln_webgpu_texture_frame` in the
+ * See `mln_web_gpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class WebGpuTextureFrame(
@@ -1947,7 +1947,7 @@ public class WebGpuTextureFrame(
 /**
  * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile size.
  *
- * See `mln_geojson_source_options` in the
+ * See `mln_geo_json_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class GeoJsonSourceOptions(
@@ -2216,7 +2216,7 @@ public data class RenderSessionAttachOptions(
    */
   public val requestedTextureRingDepth: UInt = 0u,
   /**
-   * Producer synchronization for acquired texture frames. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
+   * Producer synchronization for acquired texture frames. `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a
    * shared EGL or WGL texture target and a caller-graphics-thread driver. Other targets support
    * only CPU completion and fail an unsupported request.
    */
@@ -2343,7 +2343,7 @@ public data class EglContextDescriptor(
 /**
  * WebGL context fields shared by OpenGL render targets in the browser.
  *
- * See `mln_webgl_context_descriptor` in the
+ * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WebGlContextDescriptor(
@@ -2360,7 +2360,7 @@ public data class WebGlContextDescriptor(
 /**
  * Backend-specific OpenGL context data.
  *
- * See `mln_opengl_context_descriptor_data` in the
+ * See `mln_open_gl_context_descriptor_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public sealed interface OpenGlContextDescriptorData {
@@ -2374,7 +2374,7 @@ public sealed interface OpenGlContextDescriptorData {
 /**
  * OpenGL backend context fields shared by OpenGL render targets.
  *
- * See `mln_opengl_context_descriptor` in the
+ * See `mln_open_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class OpenGlContextDescriptor(
@@ -2389,7 +2389,7 @@ public data class OpenGlContextDescriptor(
 /**
  * One caller-owned OpenGL texture of a borrowed texture ring.
  *
- * See `mln_opengl_borrowed_texture` in the
+ * See `mln_open_gl_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class OpenGlBorrowedTexture(
@@ -2400,7 +2400,7 @@ public data class OpenGlBorrowedTexture(
 /**
  * OpenGL attachment options for a borrowed texture target.
  *
- * See `mln_opengl_borrowed_texture_descriptor` in the
+ * See `mln_open_gl_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class OpenGlBorrowedTextureDescriptor(
@@ -2427,7 +2427,7 @@ public data class OpenGlBorrowedTextureDescriptor(
 /**
  * OpenGL attachment options for an owned texture target.
  *
- * See `mln_opengl_owned_texture_descriptor` in the
+ * See `mln_open_gl_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class OpenGlOwnedTextureDescriptor(
@@ -2447,7 +2447,7 @@ public data class OpenGlOwnedTextureDescriptor(
 /**
  * OpenGL attachment options for a native surface.
  *
- * See `mln_opengl_surface_descriptor` in the
+ * See `mln_open_gl_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class OpenGlSurfaceDescriptor(
@@ -2579,7 +2579,7 @@ public data class VulkanSurfaceDescriptor(
 /**
  * WebGPU backend context fields shared by WebGPU render targets.
  *
- * See `mln_webgpu_context_descriptor` in the
+ * See `mln_web_gpu_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WebGpuContextDescriptor(
@@ -2597,7 +2597,7 @@ public data class WebGpuContextDescriptor(
 /**
  * One caller-owned WebGPU texture of a borrowed texture ring.
  *
- * See `mln_webgpu_borrowed_texture` in the
+ * See `mln_web_gpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebGpuBorrowedTexture(
@@ -2613,7 +2613,7 @@ public data class WebGpuBorrowedTexture(
 /**
  * WebGPU attachment options for a borrowed texture target.
  *
- * See `mln_webgpu_borrowed_texture_descriptor` in the
+ * See `mln_web_gpu_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebGpuBorrowedTextureDescriptor(
@@ -2640,7 +2640,7 @@ public data class WebGpuBorrowedTextureDescriptor(
 /**
  * WebGPU attachment options for an owned texture target.
  *
- * See `mln_webgpu_owned_texture_descriptor` in the
+ * See `mln_web_gpu_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebGpuOwnedTextureDescriptor(
@@ -2656,7 +2656,7 @@ public data class WebGpuOwnedTextureDescriptor(
 /**
  * WebGPU attachment options for a native surface.
  *
- * See `mln_webgpu_surface_descriptor` in the
+ * See `mln_web_gpu_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class WebGpuSurfaceDescriptor(

@@ -9,7 +9,7 @@
 namespace mln::core::opengl {
 
 EglSharedContext::EglSharedContext(
-  mln_egl_context_descriptor descriptor, mln_opengl_context_ownership ownership
+  mln_egl_context_descriptor descriptor, mln_open_gl_context_ownership ownership
 )
     : descriptor_(descriptor), ownership_(ownership) {}
 
@@ -36,14 +36,14 @@ void EglSharedContext::deactivate() {
 }
 
 auto EglSharedContext::dedicated() const -> bool {
-  return ownership_ == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  return ownership_ == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
 }
 
 // The API to bind before creating a context and making it current. A dedicated
 // context has no share context to ask, so the descriptor names it.
 auto EglSharedContext::requested_api() const -> EGLenum {
   if (dedicated()) {
-    return descriptor_.client_api == MLN_OPENGL_CLIENT_API_GL
+    return descriptor_.client_api == MLN_OPEN_GL_CLIENT_API_GL
              ? static_cast<EGLenum>(EGL_OPENGL_API)
              : static_cast<EGLenum>(EGL_OPENGL_ES_API);
   }

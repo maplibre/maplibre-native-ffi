@@ -193,7 +193,7 @@ fn validateNativeRenderBackend() !void {
         renderBackendSupportLabel(&support_label_buffer, support),
     });
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
-    if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_opengl and !support.open_gl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
@@ -207,7 +207,7 @@ fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendFlag) 
     var len: usize = 0;
     var has_backend = false;
     if (support.metal) appendBackendLabel(buffer, &len, &has_backend, "metal");
-    if (support.opengl) appendBackendLabel(buffer, &len, &has_backend, "opengl");
+    if (support.open_gl) appendBackendLabel(buffer, &len, &has_backend, "opengl");
     if (support.vulkan) appendBackendLabel(buffer, &len, &has_backend, "vulkan");
     if (!has_backend) return "none";
     return buffer[0..len];

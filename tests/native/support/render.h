@@ -125,7 +125,7 @@ void* mln_test_webgpu_ring_texture(
 // A WebGPU device that the browser main thread creates and owns, for a
 // session that the main thread services while the suite's thread waits.
 typedef struct mln_test_webgpu_main_thread_device {
-  mln_webgpu_context_descriptor context;
+  mln_web_gpu_context_descriptor context;
   atomic_bool created;
   atomic_bool lost;
 } mln_test_webgpu_main_thread_device;

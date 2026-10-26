@@ -501,7 +501,7 @@ export interface FreeCameraOptions {
  * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
  * size.
  *
- * See `mln_geojson_source_options` in the
+ * See `mln_geo_json_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface GeoJsonSourceOptions {
@@ -1276,7 +1276,7 @@ export interface OfflineTilePyramidRegionDefinition {
 /**
  * One caller-owned OpenGL texture of a borrowed texture ring.
  *
- * See `mln_opengl_borrowed_texture` in the
+ * See `mln_open_gl_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlBorrowedTexture {
@@ -1289,7 +1289,7 @@ export interface OpenGlBorrowedTexture {
 /**
  * OpenGL attachment options for a borrowed texture target.
  *
- * See `mln_opengl_borrowed_texture_descriptor` in the
+ * See `mln_open_gl_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlBorrowedTextureDescriptor {
@@ -1325,7 +1325,7 @@ export interface OpenGlBorrowedTextureDescriptor {
 /**
  * OpenGL client API a dedicated EGL session creates its context for.
  *
- * See `mln_opengl_client_api` in the
+ * See `mln_open_gl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const OpenGlClientApi = {
@@ -1350,7 +1350,7 @@ export type OpenGlClientApi =
 /**
  * OpenGL backend context fields shared by OpenGL render targets.
  *
- * See `mln_opengl_context_descriptor` in the
+ * See `mln_open_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface OpenGlContextDescriptor {
@@ -1366,7 +1366,7 @@ export interface OpenGlContextDescriptor {
 /**
  * Backend-specific OpenGL context data.
  *
- * See `mln_opengl_context_descriptor_data` in the
+ * See `mln_open_gl_context_descriptor_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export type OpenGlContextDescriptorData =
@@ -1378,7 +1378,7 @@ export type OpenGlContextDescriptorData =
  * How a session's OpenGL context relates to its driver thread and host graphics
  * state.
  *
- * See `mln_opengl_context_ownership` in the
+ * See `mln_open_gl_context_ownership` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const OpenGlContextOwnership = {
@@ -1399,7 +1399,7 @@ export type OpenGlContextOwnership =
 /**
  * OpenGL context providers supported by this build.
  *
- * See `mln_opengl_context_provider_flag` in the
+ * See `mln_open_gl_context_provider_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const OpenGlContextProviderFlag = {
@@ -1416,7 +1416,7 @@ export type OpenGlContextProviderFlag = number;
 /**
  * OpenGL attachment options for an owned texture target.
  *
- * See `mln_opengl_owned_texture_descriptor` in the
+ * See `mln_open_gl_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlOwnedTextureDescriptor {
@@ -1437,7 +1437,7 @@ export interface OpenGlOwnedTextureDescriptor {
 /**
  * OpenGL attachment options for a native surface.
  *
- * See `mln_opengl_surface_descriptor` in the
+ * See `mln_open_gl_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 export interface OpenGlSurfaceDescriptor {
@@ -1460,7 +1460,7 @@ export interface OpenGlSurfaceDescriptor {
 /**
  * OpenGL frame acquired from a texture ring.
  *
- * See `mln_opengl_texture_frame` in the
+ * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlTextureFrame {
@@ -1815,9 +1815,9 @@ export interface RenderSessionAttachOptions {
   requestedTextureRingDepth?: number;
   /**
    * Producer synchronization for acquired texture frames.
-   * `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target and
-   * a caller-graphics-thread driver. Other targets support only CPU completion
-   * and fail an unsupported request.
+   * `MLN_GPU_SYNC_OPEN_GL_FENCE` requires a shared EGL or WGL texture target
+   * and a caller-graphics-thread driver. Other targets support only CPU
+   * completion and fail an unsupported request.
    */
   producerSyncKind?: GpuSyncKind;
   /**
@@ -3429,7 +3429,7 @@ export interface NativeWakeFields {
 /**
  * WebGL context fields shared by OpenGL render targets in the browser.
  *
- * See `mln_webgl_context_descriptor` in the
+ * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebGlContextDescriptor {
@@ -3448,7 +3448,7 @@ export interface WebGlContextDescriptor {
 /**
  * WebGL context placement.
  *
- * See `mln_webgl_context_kind` in the
+ * See `mln_web_gl_context_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const WebGlContextKind = {

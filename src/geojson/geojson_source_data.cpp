@@ -31,7 +31,7 @@
 namespace {
 
 auto has_geojson_source_option(
-  const mln_geojson_source_options& options, uint32_t field
+  const mln_geo_json_source_options& options, uint32_t field
 ) -> bool {
   return (options.fields & field) != 0U;
 }
@@ -212,61 +212,66 @@ auto geojson_source_data_table() -> HandleTable<GeoJsonSourceDataObject>& {
   return handle_table<GeoJsonSourceDataObject>();
 }
 
-auto effective_geojson_source_options(const mln_geojson_source_options* options)
-  -> mln_geojson_source_options {
+auto effective_geojson_source_options(
+  const mln_geo_json_source_options* options
+) -> mln_geo_json_source_options {
   auto result = geojson_source_options_default();
   if (options == nullptr) {
     return result;
   }
 
   result.fields = options->fields;
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)) {
+  if (
+    has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM)
+  ) {
     result.min_zoom = options->min_zoom;
   }
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)) {
+  if (
+    has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM)
+  ) {
     result.max_zoom = options->max_zoom;
   }
   if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
+    has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE)
   ) {
     result.tolerance = options->tolerance;
   }
   if (
     has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      *options, MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
     )
   ) {
     result.cluster_max_zoom = options->cluster_max_zoom;
   }
   result.cluster_properties = options->cluster_properties;
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
+  if (has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_BUFFER)) {
     result.buffer = options->buffer;
   }
   if (
     has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+      *options, MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS
     )
   ) {
     result.cluster_radius = options->cluster_radius;
   }
   if (
     has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      *options, MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
     )
   ) {
     result.cluster_min_points = options->cluster_min_points;
   }
   if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
+    has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS)
   ) {
     result.line_metrics = options->line_metrics;
   }
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
+  if (has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_CLUSTER)) {
     result.cluster = options->cluster;
   }
   if (
     has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+      *options, MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING
     )
   ) {
     result.synchronous_tiling = options->synchronous_tiling;
@@ -277,28 +282,31 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
 namespace {
 
 auto validate_and_resolve_geojson_source_options(
-  const mln_geojson_source_options* options,
-  mln_geojson_source_options& effective
+  const mln_geo_json_source_options* options,
+  mln_geo_json_source_options& effective
 ) -> mln_status {
   if (options == nullptr) {
     effective = geojson_source_options_default();
     return MLN_STATUS_OK;
   }
-  if (options->size < sizeof(mln_geojson_source_options)) {
-    set_thread_error("mln_geojson_source_options.size is too small");
+  if (options->size < sizeof(mln_geo_json_source_options)) {
+    set_thread_error("mln_geo_json_source_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
-    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+    static_cast<uint32_t>(MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEO_JSON_SOURCE_OPTION_BUFFER |
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS |
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER |
+    MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
   if ((options->fields & ~known_fields) != 0U) {
-    set_thread_error("mln_geojson_source_options.fields contains unknown bits");
+    set_thread_error(
+      "mln_geo_json_source_options.fields contains unknown bits"
+    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -346,16 +354,17 @@ auto validate_and_resolve_geojson_source_options(
 
 }  // namespace
 
-auto validate_geojson_source_options(const mln_geojson_source_options* options)
+auto validate_geojson_source_options(const mln_geo_json_source_options* options)
   -> mln_status {
-  auto effective = mln_geojson_source_options{};
+  auto effective = mln_geo_json_source_options{};
   return validate_and_resolve_geojson_source_options(options, effective);
 }
 
 // Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
 // which is what parses the aggregation expressions.
-auto to_native_geojson_source_options(const mln_geojson_source_options& options)
-  -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>> {
+auto to_native_geojson_source_options(
+  const mln_geo_json_source_options& options
+) -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>> {
   auto native = mln::style::GeoJSONOptions{};
   native.minzoom = static_cast<uint8_t>(options.min_zoom);
   native.maxzoom = static_cast<uint8_t>(options.max_zoom);
@@ -452,8 +461,8 @@ auto geojson_source_options_equal(
 }
 
 auto geojson_source_data_create(
-  mln_buffer_view data, const mln_geojson_source_options* options,
-  mln_geojson_source_data* out_data
+  mln_buffer_view data, const mln_geo_json_source_options* options,
+  mln_geo_json_source_data* out_data
 ) -> mln_status {
   if (out_data == nullptr) {
     set_thread_error("out_data must not be null");
@@ -463,7 +472,7 @@ auto geojson_source_data_create(
     set_thread_error("*out_data must be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto effective = mln_geojson_source_options{};
+  auto effective = mln_geo_json_source_options{};
   const auto options_status =
     validate_and_resolve_geojson_source_options(options, effective);
   if (options_status != MLN_STATUS_OK) {
@@ -508,7 +517,7 @@ auto geojson_source_data_create(
   return MLN_STATUS_OK;
 }
 
-auto geojson_source_data_release(mln_geojson_source_data data) -> void {
+auto geojson_source_data_release(mln_geo_json_source_data data) -> void {
   if (data == MLN_HANDLE_NULL) {
     return;
   }

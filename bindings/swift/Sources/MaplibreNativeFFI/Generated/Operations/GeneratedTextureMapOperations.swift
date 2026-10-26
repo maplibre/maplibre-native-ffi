@@ -56,7 +56,7 @@ public extension MapHandle {
 
   /// Starts attachment of a ring of caller-owned OpenGL textures.
   ///
-  /// See `mln_map_attach_opengl_borrowed_texture` in the
+  /// See `mln_map_attach_open_gl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func attachOpenGlBorrowedTexture(
     descriptor bindingArg0: OpenGlBorrowedTextureDescriptor,
@@ -66,7 +66,7 @@ public extension MapHandle {
     return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
-      try mln_map_attach_opengl_borrowed_texture(
+      try mln_map_attach_open_gl_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -79,7 +79,7 @@ public extension MapHandle {
 
   /// Starts attachment of a session-owned OpenGL texture ring.
   ///
-  /// See `mln_map_attach_opengl_owned_texture` in the
+  /// See `mln_map_attach_open_gl_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func attachOpenGlOwnedTexture(
     descriptor bindingArg0: OpenGlOwnedTextureDescriptor,
@@ -89,7 +89,7 @@ public extension MapHandle {
     return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
-      try mln_map_attach_opengl_owned_texture(
+      try mln_map_attach_open_gl_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),

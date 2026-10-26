@@ -1403,7 +1403,9 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
   MLN_TEST_OK(request_waiting(fixture, 173));
   fence_driver(fixture);
   const auto fenced = mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .handle = 1
+    .size = sizeof(mln_gpu_sync),
+    .kind = MLN_GPU_SYNC_OPEN_GL_FENCE,
+    .handle = 1
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
   MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
@@ -1454,7 +1456,9 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   const auto fenced = mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .handle = 1
+    .size = sizeof(mln_gpu_sync),
+    .kind = MLN_GPU_SYNC_OPEN_GL_FENCE,
+    .handle = 1
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
   MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));

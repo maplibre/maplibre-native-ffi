@@ -62,7 +62,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Adds a GeoJSON source with prepared inline data.
    *
-   * See `mln_map_add_geojson_source_data` in the
+   * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun addGeoJsonSourceData(
@@ -71,7 +71,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_add_geojson_source_data(
+        C.mln_map_add_geo_json_source_data(
           handle,
           view(sourceId),
           argument(data, data.binding),
@@ -84,7 +84,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Adds a GeoJSON source with URL data.
    *
-   * See `mln_map_add_geojson_source_url` in the
+   * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun addGeoJsonSourceUrl(
@@ -94,7 +94,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_add_geojson_source_url(
+        C.mln_map_add_geo_json_source_url(
           handle,
           view(sourceId),
           view(url),
@@ -210,7 +210,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Starts attachment of a ring of caller-owned OpenGL textures.
    *
-   * See `mln_map_attach_opengl_borrowed_texture` in the
+   * See `mln_map_attach_open_gl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun attachOpenGlBorrowedTexture(
@@ -220,7 +220,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeCall(this, binding) {
       attach(
         { out, completion ->
-          C.mln_map_attach_opengl_borrowed_texture(
+          C.mln_map_attach_open_gl_borrowed_texture(
             handle,
             writeOpenGlBorrowedTextureDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
@@ -240,7 +240,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Starts attachment of a session-owned OpenGL texture ring.
    *
-   * See `mln_map_attach_opengl_owned_texture` in the
+   * See `mln_map_attach_open_gl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun attachOpenGlOwnedTexture(
@@ -250,7 +250,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeCall(this, binding) {
       attach(
         { out, completion ->
-          C.mln_map_attach_opengl_owned_texture(
+          C.mln_map_attach_open_gl_owned_texture(
             handle,
             writeOpenGlOwnedTextureDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
@@ -270,7 +270,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Starts attachment of an OpenGL surface target.
    *
-   * See `mln_map_attach_opengl_surface` in the
+   * See `mln_map_attach_open_gl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun attachOpenGlSurface(
@@ -280,7 +280,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeCall(this, binding) {
       attach(
         { out, completion ->
-          C.mln_map_attach_opengl_surface(
+          C.mln_map_attach_open_gl_surface(
             handle,
             writeOpenGlSurfaceDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
@@ -1100,7 +1100,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Updates one GeoJSON source with prepared inline data.
    *
-   * See `mln_map_set_geojson_source_data` in the
+   * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setGeoJsonSourceData(
@@ -1109,7 +1109,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_geojson_source_data(
+        C.mln_map_set_geo_json_source_data(
           handle,
           view(sourceId),
           argument(data, data.binding),
@@ -1122,7 +1122,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Overrides one GeoJSON source's synchronous tiling at runtime.
    *
-   * See `mln_map_set_geojson_source_synchronous_tiling` in the
+   * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setGeoJsonSourceSynchronousTiling(
@@ -1131,7 +1131,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_geojson_source_synchronous_tiling(
+        C.mln_map_set_geo_json_source_synchronous_tiling(
           handle,
           view(sourceId),
           enabled,
@@ -1144,13 +1144,19 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Updates one GeoJSON source to load data from a URL.
    *
-   * See `mln_map_set_geojson_source_url` in the
+   * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
+        C.mln_map_set_geo_json_source_url(
+          handle,
+          view(sourceId),
+          view(url),
+          completion,
+          diagnostic,
+        ),
       )
     }
 
@@ -1499,7 +1505,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   public fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_add_geojson_source_data(
+        C.mln_map_add_geo_json_source_data(
           handle,
           view(sourceId),
           argument(data, data.binding),
@@ -1517,7 +1523,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_add_geojson_source_url(
+        C.mln_map_add_geo_json_source_url(
           handle,
           view(sourceId),
           view(url),
@@ -1854,7 +1860,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   public fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_geojson_source_data(
+        C.mln_map_set_geo_json_source_data(
           handle,
           view(sourceId),
           argument(data, data.binding),
@@ -1868,7 +1874,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_geojson_source_synchronous_tiling(
+        C.mln_map_set_geo_json_source_synchronous_tiling(
           handle,
           view(sourceId),
           enabled,
@@ -1882,7 +1888,13 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   public fun setGeoJsonSourceUrl(sourceId: String, url: String): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
+        C.mln_map_set_geo_json_source_url(
+          handle,
+          view(sourceId),
+          view(url),
+          completion,
+          diagnostic,
+        ),
       )
     }
 

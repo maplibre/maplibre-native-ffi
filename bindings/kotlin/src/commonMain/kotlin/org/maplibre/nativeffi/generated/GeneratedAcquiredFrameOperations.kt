@@ -22,7 +22,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   /**
    * Copies OpenGL-native metadata from an acquired frame.
    *
-   * See `mln_acquired_frame_get_opengl_texture` in the
+   * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun <T> withOpenGlTexture(block: (OpenGlTextureFrame) -> T): T =
@@ -32,7 +32,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(64, 8)
-        check(C.mln_acquired_frame_get_opengl_texture(handle, out, diagnostic))
+        check(C.mln_acquired_frame_get_open_gl_texture(handle, out, diagnostic))
         block(readOpenGlTextureFrame(out, scope))
       }
     }

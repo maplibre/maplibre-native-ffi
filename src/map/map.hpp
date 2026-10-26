@@ -35,7 +35,7 @@ auto camera_options_default() noexcept -> mln_camera_options;
 auto camera_fit_options_default() noexcept -> mln_camera_fit_options;
 auto bound_options_default() noexcept -> mln_bound_options;
 auto free_camera_options_default() noexcept -> mln_free_camera_options;
-auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
+auto geojson_source_options_default() noexcept -> mln_geo_json_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
 auto custom_mvt_vector_source_options_default() noexcept
@@ -133,9 +133,9 @@ auto deliver_style_result(
       info.id = view(source.id);
       info.attribution = view(source.attribution);
       info.url = view(source.url);
-      if ((info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-        info.tilejson.tile_urls = tile_urls.data();
-        info.tilejson.tile_url_count = tile_urls.size();
+      if ((info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON) != 0) {
+        info.tile_json.tile_urls = tile_urls.data();
+        info.tile_json.tile_url_count = tile_urls.size();
       }
       return info;
     };
@@ -321,7 +321,7 @@ auto map_list_style_sources(
 ) -> mln_status;
 auto map_add_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options
+  const mln_geo_json_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,

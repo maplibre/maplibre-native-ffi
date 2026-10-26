@@ -200,7 +200,7 @@ impl Graphics {
                     },
                     options,
                 ),
-                BACKEND_WGL => map.attach_opengl_owned_texture(
+                BACKEND_WGL => map.attach_open_gl_owned_texture(
                     &OpenGlOwnedTextureDescriptor {
                         extent,
                         context: OpenGlContextDescriptor {
@@ -214,7 +214,7 @@ impl Graphics {
                     },
                     options,
                 ),
-                _ => map.attach_opengl_owned_texture(
+                _ => map.attach_open_gl_owned_texture(
                     &OpenGlOwnedTextureDescriptor {
                         extent,
                         context: OpenGlContextDescriptor {
@@ -261,6 +261,6 @@ pub fn with_frame_view<R>(
         BACKEND_METAL => frame.get_metal_texture(|view| ((view.width, view.height), inside())),
         #[cfg(mln_render_backend = "vulkan")]
         BACKEND_VULKAN => frame.get_vulkan_texture(|view| ((view.width, view.height), inside())),
-        _ => frame.get_opengl_texture(|view| ((view.width, view.height), inside())),
+        _ => frame.get_open_gl_texture(|view| ((view.width, view.height), inside())),
     }
 }

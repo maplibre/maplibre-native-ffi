@@ -59,19 +59,19 @@ struct NativeGeoJsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool
   {
-    mln_geojson_source_data_release(raw); return true
+    mln_geo_json_source_data_release(raw); return true
   }
 }
 
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
-/// See `mln_geojson_source_data` in the
+/// See `mln_geo_json_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class GeoJsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
   Identifiable, Hashable, CustomStringConvertible
 {
   let handle: NativeHandleState<NativeGeoJsonSourceDataHandle>
-  init(adopting raw: mln_geojson_source_data) throws {
+  init(adopting raw: mln_geo_json_source_data) throws {
     handle = try NativeHandleState(
       typeName: "GeoJsonSourceDataHandle",
       handle: NativeGeoJsonSourceDataHandle(raw: raw)

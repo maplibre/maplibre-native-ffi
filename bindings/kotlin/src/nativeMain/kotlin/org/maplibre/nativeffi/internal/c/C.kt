@@ -25,12 +25,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_acquired_frame_get_opengl_texture(
+  actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_opengl_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_open_gl_texture(
       frame.toULong(),
       outFrame.toCPointer(),
       outDiagnostic.toCPointer(),
@@ -65,12 +65,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_acquired_frame_get_webgpu_texture(
+  actual fun mln_acquired_frame_get_web_gpu_texture(
     frame: Long,
     outFrame: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_webgpu_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_web_gpu_texture(
       frame.toULong(),
       outFrame.toCPointer(),
       outDiagnostic.toCPointer(),
@@ -144,21 +144,21 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
   }
 
-  actual fun mln_geojson_source_data_create(
+  actual fun mln_geo_json_source_data_create(
     data: Long,
     options: Long,
     outData: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_geojson_source_data_create(
+    org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_create(
       data.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       options.toCPointer(),
       outData.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_geojson_source_data_release(data: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_geojson_source_data_release(data.toULong())
+  actual fun mln_geo_json_source_data_release(data: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_release(data.toULong())
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -243,14 +243,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_geojson_source_data(
+  actual fun mln_map_add_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geojson_source_data(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geo_json_source_data(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       data.toULong(),
@@ -258,7 +258,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_geojson_source_url(
+  actual fun mln_map_add_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
@@ -266,7 +266,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geojson_source_url(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geo_json_source_url(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
@@ -407,7 +407,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_opengl_borrowed_texture(
+  actual fun mln_map_attach_open_gl_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -415,7 +415,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_opengl_borrowed_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_borrowed_texture(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -424,7 +424,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_opengl_owned_texture(
+  actual fun mln_map_attach_open_gl_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -432,7 +432,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_opengl_owned_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_owned_texture(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -441,7 +441,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_opengl_surface(
+  actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -449,7 +449,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_opengl_surface(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_surface(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -509,7 +509,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_webgpu_borrowed_texture(
+  actual fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -517,7 +517,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_webgpu_borrowed_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_borrowed_texture(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -526,7 +526,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_webgpu_owned_texture(
+  actual fun mln_map_attach_web_gpu_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -534,7 +534,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_webgpu_owned_texture(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_owned_texture(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -543,7 +543,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_webgpu_surface(
+  actual fun mln_map_attach_web_gpu_surface(
     map: Long,
     descriptor: Long,
     options: Long,
@@ -551,7 +551,7 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_webgpu_surface(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_surface(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
@@ -1252,14 +1252,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_geojson_source_data(
+  actual fun mln_map_set_geo_json_source_data(
     map: Long,
     sourceId: Long,
     data: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geojson_source_data(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geo_json_source_data(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       data.toULong(),
@@ -1267,14 +1267,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_geojson_source_synchronous_tiling(
+  actual fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,
     enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geojson_source_synchronous_tiling(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geo_json_source_synchronous_tiling(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       enabled,
@@ -1282,14 +1282,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_geojson_source_url(
+  actual fun mln_map_set_geo_json_source_url(
     map: Long,
     sourceId: Long,
     url: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geojson_source_url(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geo_json_source_url(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
@@ -1552,8 +1552,8 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_opengl_supported_context_provider_mask(): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_opengl_supported_context_provider_mask().toInt()
+  actual fun mln_open_gl_supported_context_provider_mask(): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_open_gl_supported_context_provider_mask().toInt()
 
   actual fun mln_plugin_get_register_function_v1(): Long =
     org.maplibre.nativeffi.internal.cinterop.mln_plugin_get_register_function_v1().toLong()
@@ -1798,26 +1798,26 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_opengl_borrowed_texture_target(
+  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_opengl_borrowed_texture_target(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_borrowed_texture_target(
       session.toULong(),
       descriptor.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_opengl_surface_target(
+  actual fun mln_render_session_set_open_gl_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_opengl_surface_target(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_surface_target(
       session.toULong(),
       descriptor.toCPointer(),
       completion.toCPointer(),
@@ -1850,26 +1850,26 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_webgpu_borrowed_texture_target(
+  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_webgpu_borrowed_texture_target(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_borrowed_texture_target(
       session.toULong(),
       descriptor.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_webgpu_surface_target(
+  actual fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
     descriptor: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_webgpu_surface_target(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_surface_target(
       session.toULong(),
       descriptor.toCPointer(),
       completion.toCPointer(),

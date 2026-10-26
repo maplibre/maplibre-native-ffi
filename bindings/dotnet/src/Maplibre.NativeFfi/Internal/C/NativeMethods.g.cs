@@ -21,9 +21,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_acquired_frame_get_opengl_texture(
+    internal static partial mln_status mln_acquired_frame_get_open_gl_texture(
         MlnAcquiredFrame frame,
-        mln_opengl_texture_frame* out_frame,
+        mln_open_gl_texture_frame* out_frame,
         mln_diagnostic* out_diagnostic
     );
 
@@ -76,15 +76,15 @@ internal static unsafe partial class NativeMethods
     internal static partial uint mln_c_version();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_geojson_source_data_create(
+    internal static partial mln_status mln_geo_json_source_data_create(
         mln_buffer_view data,
-        mln_geojson_source_options* options,
+        mln_geo_json_source_options* options,
         MlnGeoJsonSourceData* out_data,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_geojson_source_data_release(MlnGeoJsonSourceData data);
+    internal static partial void mln_geo_json_source_data_release(MlnGeoJsonSourceData data);
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
@@ -143,7 +143,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_geojson_source_data(
+    internal static partial mln_status mln_map_add_geo_json_source_data(
         MlnMap map,
         mln_buffer_view source_id,
         MlnGeoJsonSourceData data,
@@ -152,11 +152,11 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_geojson_source_url(
+    internal static partial mln_status mln_map_add_geo_json_source_url(
         MlnMap map,
         mln_buffer_view source_id,
         mln_buffer_view url,
-        mln_geojson_source_options* options,
+        mln_geo_json_source_options* options,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -240,9 +240,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_opengl_borrowed_texture(
+    internal static partial mln_status mln_map_attach_open_gl_borrowed_texture(
         MlnMap map,
-        mln_opengl_borrowed_texture_descriptor* descriptor,
+        mln_open_gl_borrowed_texture_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,
@@ -250,9 +250,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_opengl_owned_texture(
+    internal static partial mln_status mln_map_attach_open_gl_owned_texture(
         MlnMap map,
-        mln_opengl_owned_texture_descriptor* descriptor,
+        mln_open_gl_owned_texture_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,
@@ -260,9 +260,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_opengl_surface(
+    internal static partial mln_status mln_map_attach_open_gl_surface(
         MlnMap map,
-        mln_opengl_surface_descriptor* descriptor,
+        mln_open_gl_surface_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,
@@ -765,7 +765,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_geojson_source_data(
+    internal static partial mln_status mln_map_set_geo_json_source_data(
         MlnMap map,
         mln_buffer_view source_id,
         MlnGeoJsonSourceData data,
@@ -774,7 +774,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_geojson_source_synchronous_tiling(
+    internal static partial mln_status mln_map_set_geo_json_source_synchronous_tiling(
         MlnMap map,
         mln_buffer_view source_id,
         byte enabled,
@@ -783,7 +783,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_geojson_source_url(
+    internal static partial mln_status mln_map_set_geo_json_source_url(
         MlnMap map,
         mln_buffer_view source_id,
         mln_buffer_view url,
@@ -951,7 +951,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial uint mln_opengl_supported_context_provider_mask();
+    internal static partial uint mln_open_gl_supported_context_provider_mask();
 
     [LibraryImport(LibraryName)]
     internal static partial void* mln_plugin_get_register_function_v1();
@@ -1119,17 +1119,17 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_opengl_borrowed_texture_target(
+    internal static partial mln_status mln_render_session_set_open_gl_borrowed_texture_target(
         MlnRenderSession session,
-        mln_opengl_borrowed_texture_descriptor* descriptor,
+        mln_open_gl_borrowed_texture_descriptor* descriptor,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_opengl_surface_target(
+    internal static partial mln_status mln_render_session_set_open_gl_surface_target(
         MlnRenderSession session,
-        mln_opengl_surface_descriptor* descriptor,
+        mln_open_gl_surface_descriptor* descriptor,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

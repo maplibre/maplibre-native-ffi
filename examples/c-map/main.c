@@ -152,9 +152,9 @@ static app_error validate_native_render_backend(void) {
     const char* name;
   } backends[] = {
     {MLN_RENDER_BACKEND_FLAG_METAL, "metal"},
-    {MLN_RENDER_BACKEND_FLAG_OPENGL, "opengl"},
+    {MLN_RENDER_BACKEND_FLAG_OPEN_GL, "opengl"},
     {MLN_RENDER_BACKEND_FLAG_VULKAN, "vulkan"},
-    {MLN_RENDER_BACKEND_FLAG_WEBGPU, "webgpu"},
+    {MLN_RENDER_BACKEND_FLAG_WEB_GPU, "webgpu"},
   };
 
   const uint32_t support = mln_supported_render_backend_mask();

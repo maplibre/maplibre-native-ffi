@@ -25,14 +25,14 @@ public extension Maplibre {
 
   /// Returns OpenGL context providers supported by this build.
   ///
-  /// See `mln_opengl_supported_context_provider_mask` in the
+  /// See `mln_open_gl_supported_context_provider_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func openGlSupportedContextProviderMask()
     -> OpenGlContextProviderFlag
   {
     nativeDirect {
       OpenGlContextProviderFlag(
-        rawValue: mln_opengl_supported_context_provider_mask()
+        rawValue: mln_open_gl_supported_context_provider_mask()
       )
     }
   }
