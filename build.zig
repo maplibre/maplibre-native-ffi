@@ -104,6 +104,7 @@ fn targetPlatform(b: *std.Build, target: std.Target) []const u8 {
         else
             null,
         .macos => b.fmt("macos-{s}", .{arch}),
+        .maccatalyst => b.fmt("ios-maccatalyst-{s}", .{arch}),
         .windows => if (target.abi == .msvc) b.fmt("windows-{s}", .{arch}) else null,
         else => null,
     };

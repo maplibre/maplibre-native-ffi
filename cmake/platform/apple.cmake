@@ -88,12 +88,11 @@ function(mln_ffi_configure_platform_dependencies target)
         MLN_FFI_TEST_SUPPORTED TRUE)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     if(MLN_FFI_APPLE_MACCATALYST)
-      # Zig has no Catalyst ABI.
       set_target_properties(
         ${target}
         PROPERTIES
-          MLN_FFI_TARGET_PLATFORM ios-maccatalyst-arm64 MLN_FFI_ZIG_TARGET ""
-          MLN_FFI_TEST_SUPPORTED TRUE)
+          MLN_FFI_TARGET_PLATFORM ios-maccatalyst-arm64 MLN_FFI_ZIG_TARGET
+          aarch64-maccatalyst MLN_FFI_TEST_SUPPORTED TRUE)
     elseif(MLN_FFI_APPLE_SIMULATOR)
       set_target_properties(
         ${target}

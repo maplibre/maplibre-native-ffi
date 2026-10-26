@@ -31,9 +31,11 @@ SCALARS = {
 
 
 # The comptime condition that selects each platform the package builds for.
-# Android and OpenHarmony are Linux ABIs.
+# Android and OpenHarmony are Linux ABIs. Mac Catalyst is the one iOS target
+# the package builds for.
 PLATFORMS = {
     "android": "builtin.abi.isAndroid()",
+    "ios": "builtin.os.tag == .maccatalyst",
     "linux": "(builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())",
     "macos": "builtin.os.tag == .macos",
     "ohos": "builtin.abi.isOpenHarmony()",

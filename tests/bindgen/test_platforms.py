@@ -120,7 +120,8 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
     def test_zig_declares_a_function_void_off_the_platforms_it_serves(self):
         source = zig.generate(api())["maplibre_native_ffi.zig"]
         self.assertIn(
-            "pub const useMetal = if (builtin.os.tag == .macos) struct {\n"
+            "pub const useMetal = if (builtin.os.tag == .maccatalyst or "
+            "builtin.os.tag == .macos) struct {\n"
             "fn function(self: Map, ",
             source,
         )

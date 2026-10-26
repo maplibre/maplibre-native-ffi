@@ -429,8 +429,9 @@ On OpenHarmony, build the library with
 
 ### Zig
 
-Add the package from a release. The Zig binding does not support iOS, tvOS,
-OpenHarmony, or Emscripten.
+Add the package from a release. The Zig binding does not support the iOS device
+or simulator, tvOS, OpenHarmony, or Emscripten. Mac Catalyst builds target
+`aarch64-maccatalyst`.
 
 ```bash frame="terminal"
 zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/v{{version}}/maplibre-native-ffi-zig.tar.gz
@@ -446,12 +447,12 @@ exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_nativ
 
 The build downloads the C library for the target. Releases include macOS for
 arm64 alone, so an Intel Mac targets `aarch64-macos` or uses a local build. Each
-target uses Metal on macOS, OpenGL on Android, and Vulkan elsewhere. Pass
-`.backend` as `.opengl`, `.metal`, or `.vulkan` to choose another. Windows needs
-the `msvc` ABI, which Zig doesn't choose by default, so build with
-`-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`.
+target uses Metal on macOS and Mac Catalyst, OpenGL on Android, and Vulkan
+elsewhere. Pass `.backend` as `.opengl`, `.metal`, or `.vulkan` to choose
+another. Windows needs the `msvc` ABI, which Zig doesn't choose by default, so
+build with `-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`.
 
-On Linux, macOS, and Android, an executable that `zig build run`
+On Linux, macOS, Mac Catalyst, and Android, an executable that `zig build run`
 runs finds the library in Zig's package directory. An installed executable finds
 it beside itself on Windows and in `../lib` elsewhere, so install it from the
 package's `prefix`, and on Windows run the installed executable:
@@ -459,7 +460,7 @@ package's `prefix`, and on Windows run the installed executable:
 ```zig title="build.zig"
 const library = switch (target.result.os.tag) {
     .windows => "bin/maplibre-native-c.dll",
-    .macos => "lib/libmaplibre-native-c.dylib",
+    .macos, .maccatalyst => "lib/libmaplibre-native-c.dylib",
     else => "lib/libmaplibre-native-c.so",
 };
 const prefix = maplibre.namedLazyPath("prefix");

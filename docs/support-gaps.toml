@@ -221,9 +221,3 @@ language = "zig"
 platform = "emscripten"
 status = "path-known"
 reason = "Link the installed archives through an `emcc` final link, and add browser fixtures and tests."
-
-[[gap]]
-language = "zig"
-platform = "ios-maccatalyst"
-status = "path-known"
-reason = "Zig targets `aarch64-maccatalyst-none`, but `build.zig` rejects Catalyst artifacts. Add the SDK and link integration."
