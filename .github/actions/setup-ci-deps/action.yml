@@ -162,6 +162,14 @@ runs:
           echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
 
+    - name: Install the Android emulator debugger
+      if:
+        ${{ runner.os == 'Linux' && startsWith(inputs.target, 'android-x64-') }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes gdb
+
     # The hosted runner image has Android build tools and KVM, but no system
     # QEMU. Keep the emulator dependency out of every other job and the dev
     # container.

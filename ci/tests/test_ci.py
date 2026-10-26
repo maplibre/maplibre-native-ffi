@@ -33,6 +33,24 @@ class WorkflowTest(unittest.TestCase):
         }
         self.assertEqual(preset_sets(presets), (["host"], {"host"}, {"host"}, set()))
 
+    def test_android_emulator_diagnostics_are_uploaded_even_after_recovery(self):
+        jobs = ci_workflow(self.source, self.presets)["jobs"]
+        enabled = []
+        for name, job in jobs.items():
+            if "MLN_FFI_ANDROID_DIAGNOSTICS_DIR" not in job.get("env", {}):
+                continue
+            enabled.append(name)
+            upload = next(
+                step
+                for step in job["steps"]
+                if step.get("name") == "Upload Android emulator diagnostics"
+            )
+            self.assertEqual(upload["if"], "always()")
+            self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
+        self.assertEqual(
+            enabled, ["target-android-x64-egl", "target-android-x64-vulkan"]
+        )
+
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         source = copy.deepcopy(self.source)
         source["suites"].append(

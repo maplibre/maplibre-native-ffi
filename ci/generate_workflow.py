@@ -99,6 +99,7 @@ def setup(
 
 def target_job(row: dict) -> dict:
     preset = row["preset"]
+    android_emulator = bool(row["boot"]) and preset.startswith("android-")
     steps = setup(
         row["runner"],
         preset,
@@ -240,6 +241,20 @@ def target_job(row: dict) -> dict:
                 name="Upload ArkTS addon",
             )
         )
+    if android_emulator:
+        steps.append(
+            action(
+                "actions/upload-artifact",
+                {
+                    "name": f"android-emulator-diagnostics-{preset}-${{{{ github.run_attempt }}}}",
+                    "path": "${{ env.MLN_FFI_ANDROID_DIAGNOSTICS_DIR }}",
+                    "if-no-files-found": "ignore",
+                    "retention-days": 30,
+                },
+                name="Upload Android emulator diagnostics",
+                **{"if": "always()"},
+            )
+        )
     if suites:
         # A failed suite already fails the job. This step collects the verdict
         # at the end of the log, after the suites that kept running.
@@ -262,6 +277,15 @@ def target_job(row: dict) -> dict:
         "runs-on": row["runner"],
         "timeout-minutes": 120,
         "environment": SCCACHE_ENVIRONMENT,
+        **(
+            {
+                "env": {
+                    "MLN_FFI_ANDROID_DIAGNOSTICS_DIR": "${{ github.workspace }}/build/android-emulator-diagnostics"
+                }
+            }
+            if android_emulator
+            else {}
+        ),
         "steps": steps,
     }
 

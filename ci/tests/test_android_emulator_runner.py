@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -150,10 +151,12 @@ class AndroidDeviceSerialTest(unittest.TestCase):
             "ANDROID_SERIAL": "",
             "MLN_FFI_ANDROID_EMULATOR_API": "36",
         }
+        self.environment.pop("MLN_FFI_ANDROID_DIAGNOSTICS_DIR", None)
+        self.script = ROOT / "scripts/android-device-serial.sh"
 
     def serial(self, *arguments):
         return subprocess.run(
-            ["bash", str(ROOT / "scripts/android-device-serial.sh"), *arguments],
+            ["bash", str(self.script), *arguments],
             env=self.environment,
             check=False,
             capture_output=True,
@@ -175,6 +178,39 @@ class AndroidDeviceSerialTest(unittest.TestCase):
         result = self.serial("arm64-v8a", "26")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual(result.stdout, "")
+
+    def test_a_failed_collector_preserves_readiness_failure_and_stdout(self):
+        directory = Path(self.environment["ANDROID_HOME"]).parent
+        (directory / "scripts").mkdir()
+        (directory / "ci").mkdir()
+        self.script = directory / "scripts/android-device-serial.sh"
+        shutil.copyfile(ROOT / "scripts/android-device-serial.sh", self.script)
+        # Simulate SIGALRM without making the test wait thirty seconds.
+        commands = directory / "commands"
+        commands.mkdir()
+        perl = commands / "perl"
+        perl.write_text("#!/usr/bin/env bash\nexit 142\n")
+        perl.chmod(0o755)
+        self.environment["PATH"] = f"{commands}{os.pathsep}{os.environ['PATH']}"
+        collector = directory / "ci/android_emulator_diagnostics.py"
+        collector.write_text(
+            "import sys\n"
+            "print('collector called:', sys.argv[1:])\n"
+            "raise SystemExit(1)\n"
+        )
+        result = self.serial("x86_64", "26")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("collector called", result.stderr)
+        self.environment["MLN_FFI_ANDROID_DIAGNOSTICS_DIR"] = str(
+            directory / "diagnostics"
+        )
+        result = self.serial("x86_64", "26")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("adb devices missed its 30-second deadline", result.stderr)
+        self.assertIn("collector called: ['api-26-x86_64', 'devices']", result.stderr)
+        self.assertIn("emulator diagnostics failed", result.stderr)
 
 
 if __name__ == "__main__":

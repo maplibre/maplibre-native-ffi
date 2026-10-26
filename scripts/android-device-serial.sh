@@ -29,6 +29,13 @@ bounded_adb() {
     status=$?
   if ((status == 128 + 14)); then
     echo "android-device-serial.sh: adb $* missed its 30-second deadline." >&2
+    if [[ -n "${MLN_FFI_ANDROID_DIAGNOSTICS_DIR:-}" ]]; then
+      # Diagnostics must neither hold up the next readiness check indefinitely
+      # nor write into the serial that the caller captures from stdout.
+      timeout --kill-after=5s 40s python3 \
+        "$(dirname "$0")/../ci/android_emulator_diagnostics.py" "$avd_name" "$@" >&2 ||
+        echo "android-device-serial.sh: emulator diagnostics failed." >&2
+    fi
   fi
   return "$status"
 }
