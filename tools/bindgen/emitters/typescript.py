@@ -704,9 +704,10 @@ def scoped_name(native: str) -> str:
     return "Scoped" + public_name(native)
 
 
-# The platforms that the Node-API addon builds for. Both entry points share one
-# operations module, so it leaves out only what none of them can use.
-TARGETS = frozenset({"linux", "macos", "ohos"})
+# The platforms that the Node-API addon builds for, and the browser module's.
+# Every entry point shares one operations module, so it leaves out only what
+# none of them can use.
+TARGETS = frozenset({"linux", "macos", "ohos", "web"})
 
 
 def lower(api: Api | BoundApi):

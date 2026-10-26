@@ -58,6 +58,25 @@ set(MLN_FFI_EMNAPI_EXPORTS
     _uv_library_shutdown)
 list(JOIN MLN_FFI_EMNAPI_EXPORTS "," MLN_FFI_EMNAPI_EXPORTS)
 
+# The graphics imports of the browser entry reach the library of the build's
+# backend as a property of the module, which imports a page's objects into the
+# module's tables.
+file(READ "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/artifact.json"
+     MLN_FFI_ARTIFACT)
+string(JSON MLN_FFI_RENDER_BACKEND GET "${MLN_FFI_ARTIFACT}" renderBackend)
+if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+  set(MLN_FFI_GRAPHICS_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/mln_ts_webgpu.js")
+  set(MLN_FFI_GRAPHICS_OBJECT mlnTsWebGpu)
+elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+  set(MLN_FFI_GRAPHICS_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/mln_ts_webgl.js")
+  set(MLN_FFI_GRAPHICS_OBJECT mlnTsWebGl)
+else()
+  message(
+    FATAL_ERROR
+      "the native build renders with ${MLN_FFI_RENDER_BACKEND}, "
+      "and a browser module renders with webgpu or opengl")
+endif()
+
 add_executable(maplibre_native_ffi ${MLN_FFI_SOURCES})
 set_target_properties(maplibre_native_ffi PROPERTIES SUFFIX ".mjs")
 target_include_directories(
@@ -86,11 +105,14 @@ target_link_options(
     # would name a #canvas that the page need not have.
     -sOFFSCREENCANVAS_SUPPORT=1
     "-sOFFSCREENCANVASES_TO_PTHREAD=''"
-    "-sEXPORTED_FUNCTIONS=${MLN_FFI_EMNAPI_EXPORTS}")
+    "-sEXPORTED_FUNCTIONS=${MLN_FFI_EMNAPI_EXPORTS}"
+    -sEXPORTED_RUNTIME_METHODS=${MLN_FFI_GRAPHICS_OBJECT}
+    "--js-library=${MLN_FFI_GRAPHICS_LIBRARY}")
 set_property(
   TARGET maplibre_native_ffi
   APPEND
-  PROPERTY LINK_DEPENDS "${MLN_FFI_LINK_FLAGS_FILE}")
+  PROPERTY
+    LINK_DEPENDS "${MLN_FFI_LINK_FLAGS_FILE}" "${MLN_FFI_GRAPHICS_LIBRARY}")
 install(
   FILES "$<TARGET_FILE:maplibre_native_ffi>"
   "$<TARGET_FILE_DIR:maplibre_native_ffi>/maplibre_native_ffi.wasm"

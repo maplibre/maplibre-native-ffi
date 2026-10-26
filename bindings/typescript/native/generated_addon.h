@@ -335,6 +335,9 @@ napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size);
 napi_value mln_ts_read_vulkan_texture_frame(
   napi_env env, const mln_vulkan_texture_frame* source, size_t size
 );
+napi_value mln_ts_read_web_gpu_texture_frame(
+  napi_env env, const mln_web_gpu_texture_frame* source, size_t size
+);
 bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,
   const char* path
@@ -457,6 +460,10 @@ bool mln_ts_write_list_screen_point(
 bool mln_ts_write_list_vulkan_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
   mln_vulkan_borrowed_texture** out, size_t* out_count, const char* path
+);
+bool mln_ts_write_list_web_gpu_borrowed_texture(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_web_gpu_borrowed_texture** out, size_t* out_count, const char* path
 );
 bool mln_ts_write_logical_extent(
   mln_ts_call* call, napi_value value, mln_logical_extent* out, const char* path
@@ -631,6 +638,26 @@ bool mln_ts_write_vulkan_surface_descriptor(
 );
 bool mln_ts_write_web_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_web_gpu_borrowed_texture(
+  mln_ts_call* call, napi_value value, mln_web_gpu_borrowed_texture* out,
+  const char* path
+);
+bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_web_gpu_borrowed_texture_descriptor* out, const char* path
+);
+bool mln_ts_write_web_gpu_context_descriptor(
+  mln_ts_call* call, napi_value value, mln_web_gpu_context_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_web_gpu_owned_texture_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_web_gpu_owned_texture_descriptor* out, const char* path
+);
+bool mln_ts_write_web_gpu_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_web_gpu_surface_descriptor* out,
   const char* path
 );
 bool mln_ts_write_wgl_context_descriptor(

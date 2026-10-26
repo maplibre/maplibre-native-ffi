@@ -88,8 +88,10 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         typescript_operations = typescript.generate(api())[
             "bindings/typescript/src/generated_operations.ts"
         ]
+        # The browser module shares the operations, so a browser-only function
+        # stays.
         self.assertIn("useMetal(", typescript_operations)
-        self.assertNotIn("attachCanvas(", typescript_operations)
+        self.assertIn("attachCanvas(", typescript_operations)
         self.assertNotIn("androidStart(", typescript_operations)
         dart_operations = dart.generate(api())
         self.assertIn("useMetal(", dart_operations)

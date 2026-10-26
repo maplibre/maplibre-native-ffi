@@ -1,7 +1,7 @@
 {
   "name": "@maplibre/native-ffi",
   "version": "0.0.0",
-  "description": "Low-level TypeScript bindings for the MapLibre Native C API on Node.js, Bun, Deno, and OpenHarmony.",
+  "description": "Low-level TypeScript bindings for the MapLibre Native C API on Node.js, Bun, Deno, OpenHarmony, and the browser.",
   "license": "BSD-2-Clause",
   "repository": {
     "type": "git",
@@ -11,10 +11,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "browser": "./src/browser.ts",
+      "default": "./src/index.ts"
+    }
   },
   "engines": {
     "node": ">=24.11"
+  },
+  "dependencies": {
+    "@emnapi/runtime": "2.0.0-beta.2"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

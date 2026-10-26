@@ -3476,6 +3476,180 @@ export type WebGlContextKind =
   | (number & {});
 
 /**
+ * One caller-owned WebGPU texture of a borrowed texture ring.
+ *
+ * See `mln_web_gpu_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export interface WebGpuBorrowedTexture {
+  /**
+   * Borrowed WGPUTexture. Required.
+   */
+  texture: bigint;
+  /**
+   * Borrowed WGPUTextureView for texture. Required. The view must be a 2D color
+   * view compatible with texture and the descriptor's format.
+   */
+  textureView: bigint;
+}
+
+/**
+ * WebGPU attachment options for a borrowed texture target.
+ *
+ * See `mln_web_gpu_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export interface WebGpuBorrowedTextureDescriptor {
+  /**
+   * Logical texture extent. Required. physical_width and physical_height give
+   * the texture's size. A scale_factor that differs from the map's is accepted
+   * and logged as a warning.
+   */
+  extent: LogicalExtent;
+  /**
+   * Physical texture width in device pixels. Required.
+   */
+  physicalWidth: number;
+  /**
+   * Physical texture height in device pixels. Required.
+   */
+  physicalHeight: number;
+  /**
+   * Borrowed WebGPU context. device is required. Rendering is submitted through
+   * context.queue or that device's default queue.
+   */
+  context: WebGpuContextDescriptor;
+  /**
+   * The ring's textures, one per slot, in slot order. Required.
+   */
+  textures: readonly WebGpuBorrowedTexture[];
+  /**
+   * Backend-native WGPUTextureFormat value of every texture. Required, so
+   * Undefined is invalid.
+   */
+  format: number;
+}
+
+/**
+ * WebGPU backend context fields shared by WebGPU render targets.
+ *
+ * See `mln_web_gpu_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export interface WebGpuContextDescriptor {
+  /**
+   * Borrowed WGPUInstance. Optional for texture targets.
+   */
+  instance?: bigint;
+  /**
+   * Borrowed WGPUDevice. Required.
+   */
+  device: bigint;
+  /**
+   * Borrowed WGPUQueue. Optional; null uses the device default queue. A
+   * non-null queue must belong to device.
+   */
+  queue?: bigint;
+}
+
+/**
+ * WebGPU attachment options for an owned texture target.
+ *
+ * See `mln_web_gpu_owned_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export interface WebGpuOwnedTextureDescriptor {
+  /**
+   * Logical texture extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
+   */
+  extent: LogicalExtent;
+  /**
+   * Borrowed WebGPU context. device is required.
+   */
+  context: WebGpuContextDescriptor;
+}
+
+/**
+ * WebGPU attachment options for a native surface.
+ *
+ * See `mln_web_gpu_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
+export interface WebGpuSurfaceDescriptor {
+  /**
+   * Logical surface extent. Required. A scale_factor that differs from the
+   * map's is accepted and logged as a warning.
+   */
+  extent: LogicalExtent;
+  /**
+   * Borrowed WebGPU context. device is required.
+   */
+  context: WebGpuContextDescriptor;
+  /**
+   * Borrowed WGPUSurface. Required, and must stay alive for the session. The
+   * session configures it for this device and extent, and unconfigures it when
+   * the session ends.
+   */
+  surface: bigint;
+  /**
+   * WGPUTextureFormat to configure the surface with. Required. A browser host
+   * takes it from navigator.gpu.getPreferredCanvasFormat().
+   */
+  format: number;
+}
+
+/**
+ * WebGPU frame acquired from a texture ring.
+ *
+ * See `mln_web_gpu_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export interface WebGpuTextureFrame {
+  /**
+   * Session generation that produced this frame.
+   */
+  readonly generation: bigint;
+  /**
+   * Physical WebGPU texture width in device pixels.
+   */
+  readonly width: number;
+  /**
+   * Physical WebGPU texture height in device pixels.
+   */
+  readonly height: number;
+  /**
+   * UI-to-device pixel scale used for this frame.
+   */
+  readonly scaleFactor: number;
+  /**
+   * Opaque identity of this frame.
+   */
+  readonly frameId: bigint;
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its
+   * texture in the descriptor's textures array.
+   */
+  readonly slot: number;
+  /**
+   * Borrowed WGPUTexture. Valid until frame release.
+   */
+  readonly texture: bigint;
+  /**
+   * Borrowed WGPUTextureView. Valid until frame release.
+   */
+  readonly textureView: bigint;
+  /**
+   * Borrowed WGPUDevice. Valid until frame release.
+   */
+  readonly device: bigint;
+  /**
+   * Backend-native WGPUTextureFormat value.
+   */
+  readonly format: number;
+}
+
+/**
  * WGL context fields shared by OpenGL render targets on Windows.
  *
  * See `mln_wgl_context_descriptor` in the

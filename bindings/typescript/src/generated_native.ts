@@ -68,6 +68,10 @@ import type {
   VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
   VulkanTextureFrame,
+  WebGpuBorrowedTextureDescriptor,
+  WebGpuOwnedTextureDescriptor,
+  WebGpuSurfaceDescriptor,
+  WebGpuTextureFrame,
 } from "./generated_values.ts";
 
 /** The addon function of each generated operation, by C function name. */
@@ -78,6 +82,7 @@ export interface NativeOperations {
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
   mln_acquired_frame_get_result(frame: bigint): RenderFrameResult;
   mln_acquired_frame_get_vulkan_texture(frame: bigint): VulkanTextureFrame;
+  mln_acquired_frame_get_web_gpu_texture(frame: bigint): WebGpuTextureFrame;
   mln_acquired_frame_release(
     frame: bigint,
     token: object | undefined,
@@ -207,6 +212,24 @@ export interface NativeOperations {
   mln_map_attach_vulkan_surface(
     map: bigint,
     descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: number,
+  ): bigint;
+  mln_map_attach_web_gpu_borrowed_texture(
+    map: bigint,
+    descriptor: WebGpuBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: number,
+  ): bigint;
+  mln_map_attach_web_gpu_owned_texture(
+    map: bigint,
+    descriptor: WebGpuOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: number,
+  ): bigint;
+  mln_map_attach_web_gpu_surface(
+    map: bigint,
+    descriptor: WebGpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
@@ -650,6 +673,16 @@ export interface NativeOperations {
   mln_render_session_set_vulkan_surface_target(
     session: bigint,
     descriptor: VulkanSurfaceDescriptor,
+    completion: number,
+  ): void;
+  mln_render_session_set_web_gpu_borrowed_texture_target(
+    session: bigint,
+    descriptor: WebGpuBorrowedTextureDescriptor,
+    completion: number,
+  ): void;
+  mln_render_session_set_web_gpu_surface_target(
+    session: bigint,
+    descriptor: WebGpuSurfaceDescriptor,
     completion: number,
   ): void;
   mln_resource_request_complete(

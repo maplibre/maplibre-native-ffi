@@ -71,7 +71,15 @@ export interface HostHooks {
   reportError?: (error: unknown) => void;
 }
 
-export let native: Addon = undefined as never;
+// A browser page calls nothing native before loadModule() binds the addon,
+// which the other entry points bind as they load.
+export let native: Addon = new Proxy({} as Addon, {
+  get() {
+    throw new Error(
+      "the MapLibre Native browser module is not loaded; call loadModule() first",
+    );
+  },
+});
 export let hooks: HostHooks = {};
 
 /** The C ABI version that this binding was generated for. */
