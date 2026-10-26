@@ -2319,6 +2319,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload ArkTS addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arkts-addon-ohos-arm64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-arm64-egl/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
@@ -2374,6 +2381,13 @@ jobs:
         with:
           name: native-package-ohos-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload ArkTS addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arkts-addon-ohos-arm64-vulkan-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-arm64-vulkan/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
@@ -2439,6 +2453,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload ArkTS addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arkts-addon-ohos-x64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-x64-egl/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
@@ -2494,6 +2515,13 @@ jobs:
         with:
           name: native-package-ohos-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload ArkTS addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arkts-addon-ohos-x64-vulkan-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-x64-vulkan/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed

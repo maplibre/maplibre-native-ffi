@@ -175,6 +175,13 @@ install(TARGETS maplibre_native_ffi LIBRARY DESTINATION .)
 install(
   DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
   DESTINATION licenses)
+if(OHOS)
+  # The OHPM package ships the shared C++ runtime beside the addon, which the
+  # device does not carry.
+  install(
+    FILES "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
+    DESTINATION .)
+endif()
 
 # The suite's graphics objects come from the native build's test graphics
 # library, which the addon reaches through its install prefix.

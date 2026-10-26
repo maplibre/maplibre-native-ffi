@@ -422,10 +422,21 @@ mise run //bindings/typescript:pack linux-gnu-x64-vulkan
 npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
 ```
 
-On OpenHarmony, build the library with
-`mise -E ohos run //bindings/typescript:build <preset>`, ship it with the SDK's
-`libc++_shared.so` in the application's `libs/<abi>` directory, and bundle
-`bindings/typescript/src/arkts.ts`.
+On OpenHarmony, add `@maplibre/native-ffi-opengl` or
+`@maplibre/native-ffi-vulkan` from
+[OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl),
+and import the binding from that package. Both support `arm64-v8a` and `x86_64`.
+
+```bash frame="terminal"
+ohpm install @maplibre/native-ffi-opengl
+```
+
+To try `main`, pack the package for your preset, then install the HAR:
+
+```bash frame="terminal"
+mise -E ohos run //bindings/typescript:pack-ohpm ohos-arm64-egl
+ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/native-ffi-opengl-0.0.0.har
+```
 
 ### Zig
 

@@ -56,6 +56,12 @@ publish by hand. Add a trusted publishing policy for
 `nuget.org` environment, and set the repository variable `NUGET_USER` to the
 NuGet.org account that owns the policy.
 
+OHPM has no trusted publishing. Add the public half of a passphrase-protected
+RSA key in PEM format to an [OHPM](https://ohpm.openharmony.cn) account in the
+`maplibre` organization. Store that account's publish ID, the private key, and
+its passphrase in the `OHPM_PUBLISH_ID`, `OHPM_PRIVATE_KEY`, and
+`OHPM_KEY_PASSPHRASE` secrets of the `ohpm` environment.
+
 PyPI lets a pending trusted publisher create a project, so Python needs no first
 publish by hand. Add a trusted publisher for each distribution, for
 `maplibre/maplibre-native-ffi`, with the workflow `release.yml` and its own

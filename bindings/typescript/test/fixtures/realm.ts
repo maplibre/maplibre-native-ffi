@@ -3,7 +3,7 @@
 
 import process from "node:process";
 
-import { cVersion, RuntimeHandle } from "../../src/index.ts";
+import { RuntimeHandle } from "../../src/index.ts";
 import { mapOptions } from "../support/fixture.ts";
 import { execute } from "../support/harness.ts";
 import { postToParent, realmData } from "../support/realm-child.ts";
@@ -20,7 +20,6 @@ type Request =
   | { scenario: "routeRequests"; scheme: string }
   | { scenario: "burst" }
   | { scenario: "liveNativeWork" }
-  | { scenario: "load" }
   | { scenario: "exit" };
 
 /**
@@ -71,13 +70,6 @@ switch (request.scenario) {
       },
     });
     break;
-  case "load": {
-    // The realm loads the binding afresh, as an application that imports it.
-    const runtime = RuntimeHandle.create();
-    await runtime.close();
-    postToParent({ version: cVersion() });
-    break;
-  }
   case "exit":
     await exit();
     break;

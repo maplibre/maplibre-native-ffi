@@ -85,9 +85,15 @@ function inbox(): { push(message: unknown): void; next(): Promise<unknown> } {
   };
 }
 
-/** An @ohos.worker realm that runs the bundle's realm entry. */
+/**
+ * An @ohos.worker realm that runs the bundle's realm entry, or its consumer
+ * entry for the load scenario, which loads the packed package instead of the
+ * sources.
+ */
 function realmSpawn(data: unknown): Realm {
-  const realm = new worker.ThreadWorker("entry_test/ets/realm.js");
+  const entry =
+    (data as { scenario?: string }).scenario === "load" ? "consumer" : "realm";
+  const realm = new worker.ThreadWorker(`entry_test/ets/${entry}.js`);
   const messages = inbox();
   const exited = new Promise<void>((resolve) => {
     realm.onexit = () => resolve();

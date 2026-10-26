@@ -3,11 +3,13 @@
 //
 //   MAPLIBRE_NATIVE_FFI_ARKTS_BUNDLE=<dir> vp pack   (in test/arkts)
 //
-// The bundle has two entries, the hypium runner and the realm of a spawned
-// worker. ArkTS has no node: modules, so the bundle takes the ArkTS entry of
-// the binding, the ArkTS host capabilities and realm child, and small shims
-// for the node: imports of the cases. System modules, hypium, and the packed
-// native libraries stay imports, which test-arkts.sh rewrites to records.
+// The bundle has three entries: the hypium runner, the realm of a spawned
+// worker, and the realm that loads the packed OHPM package, whose directory
+// MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE names. ArkTS has no node: modules, so the
+// bundle takes the ArkTS entry of the binding, the ArkTS host capabilities and
+// realm child, and small shims for the node: imports of the cases. System
+// modules, hypium, and the packed native libraries stay imports, which
+// test-arkts.sh rewrites to records.
 
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -37,6 +39,7 @@ export default defineConfig({
     entry: {
       TestRunner: here("./TestRunner.ts"),
       realm: here("./realm.ts"),
+      consumer: here("./consumer.ts"),
     },
     // The output directory is the HAP's staging directory, which the caller
     // names; nothing outside it is cleaned.
@@ -57,6 +60,9 @@ export default defineConfig({
         async resolveId(source, importer, options) {
           if (source in nodeModules) {
             return nodeModules[source];
+          }
+          if (source === "@maplibre/native-ffi") {
+            return `${process.env.MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE!}/index.js`;
           }
           if (source.startsWith("node:")) {
             throw new Error(`no ArkTS shim for ${source}, from ${importer}`);

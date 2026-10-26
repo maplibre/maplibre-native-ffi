@@ -220,6 +220,26 @@ def target_job(row: dict) -> dict:
                 name="Upload TypeScript addon",
             )
         )
+    # The OHPM release packs the addon that each OpenHarmony job built against
+    # the packaged native artifact. The npm release downloads every
+    # typescript-addon artifact, so these take another prefix.
+    if preset.startswith("ohos-") and any(
+        f"mise run //bindings/typescript:{action_name} {preset}"
+        in row.get("consumer_commands", [])
+        for action_name in ("build", "test")
+    ):
+        steps.append(
+            action(
+                "actions/upload-artifact",
+                {
+                    "name": f"arkts-addon-{preset}-${{{{ github.sha }}}}",
+                    "path": f"bindings/typescript/native/build/{preset}/install",
+                    "if-no-files-found": "error",
+                    "retention-days": RETENTION,
+                },
+                name="Upload ArkTS addon",
+            )
+        )
     if suites:
         # A failed suite already fails the job. This step collects the verdict
         # at the end of the log, after the suites that kept running.

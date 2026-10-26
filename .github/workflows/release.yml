@@ -101,6 +101,21 @@ jobs:
       sha: ${{ needs.source.outputs.sha }}
       version: ${{ needs.source.outputs.version }}
 
+  arkts:
+    name: ArkTS
+    needs:
+      - source
+      - native
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/_arkts-ohpm.yml
+    with:
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      version: ${{ needs.source.outputs.version }}
+    secrets: inherit
+
   # Go resolves a module in a subdirectory from tags prefixed with its path.
   # The module path carries no major version suffix, so an epoch of 2 or more
   # needs the path to end in /vN first.
@@ -204,6 +219,7 @@ jobs:
           skip-existing: true
 
   # The docs quote the latest release, so republish them after it publishes.
+  # OHPM lists a version only after its review, so the docs do not wait for it.
   docs:
     name: Docs
     needs:

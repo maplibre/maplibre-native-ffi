@@ -14,8 +14,8 @@ set -euo pipefail
 preset=${1:?usage: test-arkts.sh <preset>}
 binding="$(cd "$(dirname "$0")/.." && pwd)"
 case "$preset" in
-  ohos-x64-*) abi=x86_64 triple=x86_64-linux-ohos ;;
-  ohos-arm64-*) abi=arm64-v8a triple=aarch64-linux-ohos ;;
+  ohos-x64-*) abi=x86_64 ;;
+  ohos-arm64-*) abi=arm64-v8a ;;
   *)
     echo "error: test-arkts.sh takes an OpenHarmony preset, not $preset" >&2
     exit 2
@@ -27,14 +27,21 @@ bundle=org.maplibre.nativeffi.suite
 native_install="$(cd "$binding/../.." && pwd)/build/$preset/install"
 
 rm -rf "$work"
-mkdir -p "$work/ets" "$work/libs/$abi"
+mkdir -p "$work/ets" "$work/libs/$abi" "$work/ohpm"
 cp "$binding/test/arkts/TestAbility.ts" "$work/ets/TestAbility.ts"
-# The addon links the shared C++ runtime, which the device does not carry.
-cp "$OHOS_SDK_NATIVE/llvm/lib/$triple/libc++_shared.so" "$work/libs/$abi/"
-# One bundle with two entries, the hypium runner and a spawned realm.
+# The application carries the OHPM package as an application that installs it
+# does: the addon and the C++ runtime from the package's libs, beside the
+# application's own libraries.
+"$binding/scripts/pack-ohpm.sh" "$work/ohpm" "$preset"
+tar -xzf "$work"/ohpm/*.har -C "$work/ohpm"
+cp -R "$work/ohpm/package/libs/." "$work/libs/"
+# One bundle with three entries: the hypium runner, a spawned realm, and a
+# spawned realm that loads the package's ArkTS entry.
 (
   cd "$binding/test/arkts"
-  MAPLIBRE_NATIVE_FFI_ARKTS_BUNDLE="$work/ets" pnpm exec vp pack >/dev/null
+  MAPLIBRE_NATIVE_FFI_ARKTS_BUNDLE="$work/ets" \
+    MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE="$work/ohpm/package" \
+    pnpm exec vp pack >/dev/null
 )
 # hypium, which mise.ohos.toml pins, is plain JavaScript with relative
 # imports, so its files become records beside the bundle's.
@@ -43,8 +50,7 @@ mkdir -p "$work/ets/hypium"
 cp -R "$hypium/package/." "$work/ets/hypium/"
 find "$work/ets/hypium" -type f ! -name '*.js' -delete
 perl -pi -e 's#from "\@ohos/hypium"#from "./hypium/index"#' "$work/ets/TestRunner.js"
-cp "$build/libmaplibre_native_ffi.so" \
-  "$build/libmaplibre_native_ffi_test_graphics.so" \
+cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi"
 

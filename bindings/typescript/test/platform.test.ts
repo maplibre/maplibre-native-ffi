@@ -31,9 +31,9 @@ import {
 
 // A host that starts processes loads the packages that the test task packed
 // and installed into a consumer project, with no addon override. ArkTS starts
-// no process, and its installed package is the application itself: a fresh
-// realm loads the binding through its ArkTS entry and the addon packed into
-// the application, by library name.
+// no process: a fresh realm loads the OHPM package that the test task packed,
+// through its bundled ArkTS entry and the addon in its libs, which the
+// application carries.
 const startsProcesses = !capabilities.unavailable.includes("childProcess");
 
 /** Runs the consumer scripts of the installed project under this runtime. */
@@ -57,7 +57,7 @@ async function loadFromInstalledPackages() {
   }
 }
 
-/** Loads the binding in a fresh realm of the installed application. */
+/** Loads the packed OHPM package in a fresh realm of the application. */
 async function loadFromApplication() {
   const realm = spawnRealm({ scenario: "load" });
   const { version } = await nextMessage<{ version: number }>(

@@ -1,0 +1,5 @@
+{
+  name: "libmaplibre_native_ffi.so",
+  version: "",
+  types: "./index.d.ts",
+}

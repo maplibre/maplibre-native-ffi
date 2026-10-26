@@ -71,6 +71,18 @@ rm -rf build/npm
 node scripts/pack.ts --version "$usage_version" build/npm "$usage_preset"
 '''
 
+[tasks.pack-ohpm]
+description = "Pack an OpenHarmony preset's OHPM package, with its ArkTS entry and addon, into a HAR."
+usage = '''
+arg "<preset>"
+flag "--version <version>" default="0.0.0" help="The version of the package"
+'''
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+rm -rf build/ohpm
+scripts/pack-ohpm.sh --version "$usage_version" build/ohpm "$usage_preset"
+'''
+
 [tasks.test]
 description = "Run the TypeScript binding suite under Node, Bun, and Deno, or on ArkTS for an OpenHarmony preset."
 usage = '''
