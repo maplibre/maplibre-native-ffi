@@ -70,6 +70,20 @@ reason = "dart2wasm forbids user imports of `dart:ffi`, so the browser needs a s
 link = "https://github.com/dart-lang/sdk/blob/3.13.5/CHANGELOG.md"
 
 [[gap]]
+language = "dart"
+platform = "freebsd"
+status = "blocked"
+reason = "The Dart SDK does not support FreeBSD, and only a community port exists."
+link = "https://github.com/dart-lang/sdk/issues/52374"
+
+[[gap]]
+language = "dotnet"
+platform = "freebsd"
+status = "blocked"
+reason = "Microsoft ships no .NET for FreeBSD, and the ports tree carries .NET 9, older than the binding's `net10.0`."
+link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/requirements/freebsd-requirements.md"
+
+[[gap]]
 language = "go"
 platform = "emscripten"
 status = "blocked"
@@ -91,6 +105,13 @@ reason = "Kotlin Multiplatform has no OpenHarmony target."
 link = "https://youtrack.jetbrains.com/issue/KT-63976"
 
 [[gap]]
+language = "kotlin"
+platform = "visionos"
+status = "blocked"
+reason = "Kotlin/Native has no visionOS target."
+link = "https://youtrack.jetbrains.com/issue/KT-59571"
+
+[[gap]]
 language = "python"
 platform = "emscripten"
 status = "blocked"
@@ -107,14 +128,28 @@ reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
 language = "zig"
 platform = "ios"
 status = "blocked"
-reason = "Zig 0.17.0 references process spawning, which these targets lack. The fix is expected in Zig 0.17.1."
+reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
+
+[[gap]]
+language = "zig"
+platform = "ohos"
+status = "blocked"
+reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
+link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[gap]]
 language = "zig"
 platform = "tvos"
 status = "blocked"
-reason = "Zig 0.17.0 references process spawning, which these targets lack. The fix is expected in Zig 0.17.1."
+reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
+link = "https://codeberg.org/ziglang/zig/pulls/37063"
+
+[[gap]]
+language = "zig"
+platform = "visionos"
+status = "blocked"
+reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
 
 # Languages with a known path to a platform that no one has started.
@@ -184,7 +219,7 @@ reason = "Add an app host with a Node-API runtime, package the addon, and run si
 language = "typescript"
 platform = "emscripten"
 status = "path-known"
-reason = "Load the addon through a browser Node-API bridge or a browser backend, and run WebGL and WebGPU tests."
+reason = "Link the Node-API addon with emnapi 2 into an Emscripten module, add a browser entry that loads it, and run WebGL and WebGPU tests in headless Chromium."
 link = "https://github.com/toyobayashi/emnapi"
 
 [[gap]]

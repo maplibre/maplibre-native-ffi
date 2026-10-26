@@ -429,8 +429,8 @@ On OpenHarmony, build the library with
 
 ### Zig
 
-Add the package from a release. The Zig binding does not support iOS, tvOS, or
-Emscripten.
+Add the package from a release. The Zig binding does not support iOS, tvOS,
+OpenHarmony, or Emscripten.
 
 ```bash frame="terminal"
 zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/v{{version}}/maplibre-native-ffi-zig.tar.gz
@@ -446,13 +446,12 @@ exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_nativ
 
 The build downloads the C library for the target. Releases include macOS for
 arm64 alone, so an Intel Mac targets `aarch64-macos` or uses a local build. Each
-target uses Metal on
-macOS, OpenGL on Android and OpenHarmony, and Vulkan elsewhere. Pass `.backend`
-as `.opengl`, `.metal`, or `.vulkan` to choose another. Windows needs the `msvc`
-ABI, which Zig doesn't choose by default, so build with
+target uses Metal on macOS, OpenGL on Android, and Vulkan elsewhere. Pass
+`.backend` as `.opengl`, `.metal`, or `.vulkan` to choose another. Windows needs
+the `msvc` ABI, which Zig doesn't choose by default, so build with
 `-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`.
 
-On Linux, macOS, Android, and OpenHarmony, an executable that `zig build run`
+On Linux, macOS, and Android, an executable that `zig build run`
 runs finds the library in Zig's package directory. An installed executable finds
 it beside itself on Windows and in `../lib` elsewhere, so install it from the
 package's `prefix`, and on Windows run the installed executable:
@@ -467,14 +466,13 @@ const prefix = maplibre.namedLazyPath("prefix");
 b.getInstallStep().dependOn(&b.addInstallFile(prefix.path(b, library), library).step);
 ```
 
-Zig has no libc for Android or OpenHarmony, so a build for either uses its SDK's.
-Pass the dependency `.@"system-root"` as the sysroot directory, the NDK's
-`sysroot` or the OpenHarmony SDK's `native/sysroot`, and `.@"target-libc"` as a
-libc file in the format that `zig libc` prints. The file names `usr/include` and
-its target subdirectory as the include directories, and the target's CRT
-directory as both `crt_dir` and `cc_dir`: `usr/lib/<target>/<API level>` in the
-NDK, `usr/lib/<target>` in the OpenHarmony SDK. Call `setLibCFile` with the same
-file on each artifact that imports the module. An app ships
+Zig has no libc for Android, so a build for it uses the NDK's. Pass the
+dependency `.@"system-root"` as the NDK's `sysroot` directory, and
+`.@"target-libc"` as a libc file in the format that `zig libc` prints. The file
+names `usr/include` and its target subdirectory as the include directories, and
+the target's CRT directory, `usr/lib/<target>/<API level>`, as both `crt_dir`
+and `cc_dir`. Call `setLibCFile` with the same file on each artifact that
+imports the module. An app ships
 `libmaplibre-native-c.so` in its `lib/<abi>` directory.
 
 The [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
