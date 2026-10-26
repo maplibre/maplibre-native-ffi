@@ -17,7 +17,10 @@ validation that native already does.
 MapLibre behavior is whatever the pinned `third_party/maplibre-native` submodule
 does with the patches in `patches/maplibre-native/`. Answer questions about
 engine behavior from that source; `mise deps` checks it out and applies the
-patches if it is empty.
+patches if it is empty. After a rebase, run `mise deps` before you stage
+anything, since plain `git submodule update` skips this submodule, and read
+`git diff origin/main...HEAD --stat` before you push: a stale checkout staged by
+`git add -A` reverts the engine pin.
 
 ## Tests
 
