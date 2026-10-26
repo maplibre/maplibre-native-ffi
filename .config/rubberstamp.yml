@@ -278,6 +278,7 @@ ci:
               - src/platform/windows/**
               - src/render/opengl/wgl_*
               - cmake/platform/windows.cmake
+              - cmake/toolchains/clang-cl.cmake
               - mise.windows.toml
               - .github/actions/setup-windows-*/**
               - .github/actions/setup-ci-deps/**
@@ -295,6 +296,7 @@ ci:
         - if:
             files:
               - cmake/platform/windows.cmake
+              - cmake/toolchains/clang-cl.cmake
               - mise.windows.toml
               - .github/actions/setup-windows-*/**
               - third_party/maplibre-native

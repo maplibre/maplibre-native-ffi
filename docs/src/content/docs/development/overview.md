@@ -65,6 +65,24 @@ needs QEMU, OVMF, and access to `/dev/kvm`; on Ubuntu, install
 which mounts the checkout at the same path and keeps its disk under
 `build/freebsd-vm`. Run `mise run //:freebsd-vm:stop` to shut it down.
 
+## Windows on Linux
+
+The Windows presets also cross-compile on a Linux host, with LLVM's `clang-cl`,
+`lld-link`, `llvm-lib`, `llvm-rc`, and `llvm-mt` from `PATH`. The `msvc` mise
+environment downloads the MSVC runtime and the Windows SDK from Microsoft with
+[xwin](https://github.com/Jake-Shadle/xwin). Installing it accepts
+[Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them:
+
+```bash
+mise -E msvc install
+```
+
+`mise run test` runs the suites under the Wine executable that `WINE` names,
+such as `files/bin/wine` in Steam's Proton, with a prefix under
+`build/wine-prefix`. An x64 host runs only the x64 presets. Wine implements WGL
+over the host's OpenGL and Vulkan over the host's Vulkan driver, so Windows CI
+remains the authority on Windows behavior.
+
 ## Debug on a CI runner
 
 [Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox) runs

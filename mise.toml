@@ -17,6 +17,7 @@ lockfile_mode = "merge"
 auto_install_disable_tools = [
   "android-sdk",
   "emsdk",
+  "github:Jake-Shadle/xwin",
   "ohos-sdk",
   "http:oniro-emulator",
 ]
@@ -331,6 +332,11 @@ case "$usage_preset" in
   android-*) variable=ANDROID_HOME environment=android ;;
   emscripten-*) variable=EMSDK environment=emscripten ;;
   ohos-*) variable=OHOS_SDK_NATIVE environment=ohos ;;
+  windows-*)
+    # A Windows host builds against Visual Studio instead.
+    case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) exit 0 ;; esac
+    variable=MLN_FFI_WINSYSROOT environment=msvc
+    ;;
   *) exit 0 ;;
 esac
 
@@ -385,27 +391,32 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # as pages in headless Chromium, four for the ABI suite and one for the internal
 # suite; see scripts/run-browser-test.mjs for how a browser is located. Every
 # target that runs through ctest first runs the Rust platform crate's host unit
-# tests with cargo. Emulator, musl, and FreeBSD targets run each executable once
-# instead: the suites, then the exit programs, then the ABI suite's plugin group
-# in an invocation of its own, since a plugin registration lasts for the rest of
-# the process.
+# tests with cargo. Emulator, musl, FreeBSD, and Wine targets run each executable
+# once instead: the suites, then the exit programs, then the ABI suite's plugin
+# group in an invocation of its own, since a plugin registration lasts for the
+# rest of the process. A Windows target built on Linux runs under Wine.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
-suite="$build_dir/mln_native_abi_tests"
-internal="$build_dir/mln_native_internal_tests"
-exit_programs=("$build_dir"/mln_native_exit_*)
-if [[ "$usage_preset" == linux-musl-* || "$usage_preset" == freebsd-* ]]; then
-  if [[ "$usage_preset" == freebsd-* ]]; then
-    runner="$MISE_MONOREPO_ROOT/scripts/run-freebsd-test.sh"
-  else
-    runner="$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh"
-  fi
-  "$runner" "$usage_preset" "$suite" -x /abi/plugin/
-  "$runner" "$usage_preset" "$internal"
+suffix=
+if [[ "$usage_preset" == windows-* ]]; then
+  suffix=.exe
+fi
+suite="$build_dir/mln_native_abi_tests$suffix"
+internal="$build_dir/mln_native_internal_tests$suffix"
+exit_programs=("$build_dir"/mln_native_exit_*$suffix)
+if [[ "$usage_preset" == linux-musl-* || "$usage_preset" == freebsd-* ||
+  ( "$usage_preset" == windows-* && "$(uname -s)" == Linux ) ]]; then
+  case "$usage_preset" in
+    freebsd-*) runner=("$MISE_MONOREPO_ROOT/scripts/run-freebsd-test.sh" "$usage_preset") ;;
+    windows-*) runner=("$MISE_MONOREPO_ROOT/scripts/run-wine-test.sh") ;;
+    *) runner=("$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset") ;;
+  esac
+  "${runner[@]}" "$suite" -x /abi/plugin/
+  "${runner[@]}" "$internal"
   for program in "${exit_programs[@]}"; do
-    "$runner" "$usage_preset" "$program"
+    "${runner[@]}" "$program"
   done
-  exec "$runner" "$usage_preset" "$suite" -f /abi/plugin/
+  exec "${runner[@]}" "$suite" -f /abi/plugin/
 elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
 elif [[ "$usage_preset" == visionos-simulator-* ]]; then

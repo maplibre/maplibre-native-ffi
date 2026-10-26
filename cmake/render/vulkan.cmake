@@ -35,6 +35,11 @@ function(mln_ffi_configure_render_dependencies target)
   if(NOT BUILD_TESTING)
     return()
   endif()
+  # A Windows build on another host has no SDK loader to find. Its tests run
+  # under Wine, whose own vulkan-1.dll the harness loads by name.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CROSSCOMPILING)
+    return()
+  endif()
 
   set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
   if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"

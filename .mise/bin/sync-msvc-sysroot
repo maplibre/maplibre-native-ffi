@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Lay out the MSVC runtime and the Windows SDK that the Windows presets
+# cross-compile against, as the `xwin` tool's post-install step under
+# `mise -E msvc install`. cmake/toolchains/clang-cl.cmake reads the result from
+# MLN_FFI_WINSYSROOT.
+#
+# Microsoft's license covers both downloads. Installing the environment
+# accepts it, which asking for a Windows cross build is taken as consent for,
+# as the Android SDK's packages are.
+
+# The versions arrive as arguments because a tool's post-install step gets neither
+# the repository's environment nor its tools, only the paths of the tool it follows.
+if [[ $# -ne 3 ]]; then
+  echo "usage: ${0##*/} <xwin-install-path> <crt-version> <sdk-version>" >&2
+  exit 2
+fi
+
+install_path="$1"
+crt_version="$2"
+sdk_version="$3"
+
+echo "Accepting Microsoft's license for the MSVC runtime and the Windows SDK:" >&2
+echo "  https://go.microsoft.com/fwlink/?LinkId=2086102" >&2
+
+# Download and splat into scratch directories beside the result, then rename it
+# into place, so an interrupted run leaves no partial tree for a build to find.
+# splat moves files out of the download cache, which is why that cache stays on
+# the same file system rather than in a temporary directory.
+sysroot="$install_path/winsysroot"
+staging="$install_path/winsysroot.partial"
+cache="$install_path/xwin-cache"
+rm -rf "$staging" "$cache"
+trap 'rm -rf "$staging" "$cache"' EXIT
+# --preserve-ms-arch-notation keeps the x64 and arm64 directory names that
+# /winsysroot expects. Symlinks stay on, because the headers include each other
+# with the wrong case for a case-sensitive file system.
+"$install_path/xwin" \
+  --accept-license \
+  --cache-dir "$cache" \
+  --arch x86_64,aarch64 \
+  --crt-version "$crt_version" \
+  --sdk-version "$sdk_version" \
+  splat \
+  --use-winsysroot-style \
+  --preserve-ms-arch-notation \
+  --output "$staging"
+rm -rf "$sysroot"
+mv "$staging" "$sysroot"
