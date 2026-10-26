@@ -27,8 +27,9 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         adb.write_text(
             "#!/usr/bin/env bash\n"
             'if [[ -n "$FAKE_STDIN_EOF_LOG" ]]; then\n'
-            "  read -r -t 0.1 _\n"
-            '  (($? != 1)) || echo "$*" >>"$FAKE_STDIN_EOF_LOG"\n'
+            # Bash 3.2 rejects a fractional `read -t`.
+            "  perl -MIO::Select -e 'exit !(IO::Select->new(\\*STDIN)->can_read(0.1) && !sysread STDIN, $_, 1)' &&\n"
+            '    echo "$*" >>"$FAKE_STDIN_EOF_LOG"\n'
             "fi\n"
             'case "$*" in\n'
             '  *"getprop ro.product.cpu.abi"*) echo x86_64; exit "$FAKE_ABI_ADB_STATUS" ;;\n'
@@ -204,11 +205,16 @@ class AndroidDeviceSerialTest(unittest.TestCase):
         (directory / "ci").mkdir()
         self.script = directory / "scripts/android-device-serial.sh"
         shutil.copyfile(ROOT / "scripts/android-device-serial.sh", self.script)
-        # Simulate SIGALRM without making the test wait thirty seconds.
+        # Simulate SIGALRM on each adb call without making the test wait thirty
+        # seconds.
         commands = directory / "commands"
         commands.mkdir()
         perl = commands / "perl"
-        perl.write_text("#!/usr/bin/env bash\nexit 142\n")
+        perl.write_text(
+            "#!/usr/bin/env bash\n"
+            '[[ "$4" != */adb ]] || exit 142\n'
+            f'exec "{shutil.which("perl")}" "$@"\n'
+        )
         perl.chmod(0o755)
         self.environment["PATH"] = f"{commands}{os.pathsep}{os.environ['PATH']}"
         collector = directory / "ci/android_emulator_diagnostics.py"
