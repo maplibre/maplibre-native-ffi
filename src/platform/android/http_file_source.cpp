@@ -39,9 +39,10 @@ namespace http = mln::platform::http;
 // Matches `mln::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
 // `OnlineFileSource`.
 constexpr auto worker_count = std::size_t{20};
-// Bounds connection establishment only, so a hung TCP/TLS handshake cannot
-// occupy a worker while a slow but progressing download still completes.
-constexpr auto connect_timeout_ms = jni::jint{30'000};
+// Bounds connecting and each wait for more of the reply. HttpURLConnection runs
+// the TLS handshake under the read timeout, so a stalled peer cannot occupy a
+// worker, while a slow but progressing download still completes.
+constexpr auto timeout_ms = jni::jint{30'000};
 // libcurl 8's default redirect limit.
 constexpr auto max_redirects = 30;
 constexpr auto read_chunk_size = jni::jsize{64 * 1024};
@@ -271,6 +272,11 @@ class Transfer {
     current.reset();
   }
 
+  [[nodiscard]] auto is_canceled() -> bool {
+    std::scoped_lock lock(mutex);
+    return canceled;
+  }
+
   void cancel() {
     std::scoped_lock lock(mutex);
     canceled = true;
@@ -320,8 +326,8 @@ auto open_connection(
   connection.Call(env, set_follow_redirects, jni::jni_false);
   // The file source caches, and revalidates through its own headers.
   connection.Call(env, set_use_caches, jni::jni_false);
-  connection.Call(env, set_connect_timeout, connect_timeout_ms);
-  connection.Call(env, set_read_timeout, jni::jint{0});
+  connection.Call(env, set_connect_timeout, timeout_ms);
+  connection.Call(env, set_read_timeout, timeout_ms);
   for (const auto& header : headers) {
     connection.Call(
       env, add_request_property, jni::Make<jni::String>(env, header.name),
@@ -365,6 +371,13 @@ auto fetch(
     }
 
     const auto status = connection.Call(env, get_response_code);
+    // disconnect() does nothing before the connection opens, so a request
+    // canceled while it opened ends here instead.
+    if (transfer.is_canceled()) {
+      connection.Call(env, disconnect);
+      transfer.untrack();
+      return std::nullopt;
+    }
     if (is_redirect_status(status)) {
       const auto location = header_field(env, connection, "Location");
       connection.Call(env, disconnect);
@@ -437,36 +450,38 @@ auto fetch(
 }
 
 // The threads that run requests, each attached to the Java VM for its whole
-// life. They start as requests need them and never end.
+// life. All of them start with the first request and never end, so a request
+// that stalls never keeps a queued one from a free thread.
 class Workers {
  public:
   using Job = std::function<void(JNIEnv&)>;
 
-  static auto instance() -> Workers& {
-    static Workers workers;
+  static auto instance(JavaVM& vm) -> Workers& {
+    static Workers workers{vm};
     return workers;
   }
 
-  void post(JavaVM& vm, Job job) {
-    std::scoped_lock lock(mutex);
-    jobs.push_back(std::move(job));
-    if (idle == 0 && threads < worker_count) {
-      ++threads;
-      std::thread([this, &vm] { run(vm); }).detach();
-    } else {
-      ready.notify_one();
+  void post(Job job) {
+    {
+      std::scoped_lock lock(mutex);
+      jobs.push_back(std::move(job));
     }
+    ready.notify_one();
   }
 
  private:
+  explicit Workers(JavaVM& vm) {
+    for (std::size_t index = 0; index < worker_count; ++index) {
+      std::thread([this, &vm] { run(vm); }).detach();
+    }
+  }
+
   void run(JavaVM& vm) {
     mln::platform::setCurrentThreadName("MLN HTTP");
     const auto environment = jni::GetAttachedEnv(vm);
     auto lock = std::unique_lock{mutex};
     for (;;) {
-      ++idle;
       ready.wait(lock, [this] { return !jobs.empty(); });
-      --idle;
       auto job = std::move(jobs.front());
       jobs.pop_front();
       lock.unlock();
@@ -478,8 +493,6 @@ class Workers {
   std::mutex mutex;
   std::condition_variable ready;
   std::deque<Job> jobs;
-  std::size_t threads = 0;
-  std::size_t idle = 0;
 };
 
 }  // namespace
@@ -542,9 +555,9 @@ class HTTPRequest : public AsyncRequest {
     auto url = platform::offline_url(resource);
     auto headers =
       platform::http::request_headers(resource, url, platformContext);
-    Workers::instance().post(
-      *jvm, [delivery = delivery, transfer = transfer, url = std::move(url),
-             headers = std::move(headers)](JNIEnv& env) mutable {
+    Workers::instance(*jvm).post(
+      [delivery = delivery, transfer = transfer, url = std::move(url),
+       headers = std::move(headers)](JNIEnv& env) mutable {
         if (delivery->is_canceled()) {
           return;
         }

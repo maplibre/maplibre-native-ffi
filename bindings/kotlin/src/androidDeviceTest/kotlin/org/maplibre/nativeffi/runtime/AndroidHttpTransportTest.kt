@@ -148,6 +148,34 @@ class AndroidHttpTransportTest {
   }
 
   @Test
+  fun aStalledRequestDoesNotHoldBackAnother(): Unit = runSuspendTest {
+    val geojson = """{"type":"FeatureCollection","features":[]}""".encodeToByteArray()
+    LoopbackServer(
+        mapOf(
+          "/held.json" to Route(body = geojson, held = true),
+          "/answered.json" to Route(body = geojson),
+        ),
+      )
+      .use { server ->
+        // The style's request leaves a thread idle, and the map then asks for both sources at
+        // once, the stalled one first.
+        val style =
+          """{"version":8,"sources":{""" +
+            """"held":{"type":"geojson","data":"${server.url("/held.json")}"},""" +
+            """"answered":{"type":"geojson","data":"${server.url("/answered.json")}"}""" +
+            """},"layers":[]}"""
+        LoopbackServer(mapOf("/style.json" to Route(body = style.encodeToByteArray()))).use {
+          styleServer ->
+          withMap(provider = nativeHttp()) {
+            map.setStyleUrl(styleServer.url("/style.json")).awaitWithin("the style command")
+            server.awaitRequest("/held.json")
+            server.awaitRequest("/answered.json")
+          }
+        }
+      }
+  }
+
+  @Test
   fun aRedirectKeepsTheTransformHeadersOnlyWithinItsOrigin(): Unit = runSuspendTest {
     LoopbackServer(mapOf("/style.json" to Route(body = EMPTY_STYLE_JSON.encodeToByteArray())))
       .use { other ->
