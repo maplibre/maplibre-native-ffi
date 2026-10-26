@@ -290,7 +290,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
             "    return threadStart((start) => native.mln_runtime_create(options, start), ",
             operations,
         )
-        self.assertIn("Runs on a thread of its own", operations)
+        self.assertIn("so a browser page, which cannot block,", operations)
         self.assertIn(
             "  mln_status status = mln_runtime_create("
             "&arguments->arg_options, &handle, diagnostic);\n",

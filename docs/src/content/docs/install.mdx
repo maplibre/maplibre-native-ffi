@@ -416,12 +416,10 @@ macOS. Releases include macOS for arm64 alone. Deno imports the package as
 `npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
 
 In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
-`@maplibre/native-ffi-webgpu` with WebGPU. Each also installs its browser
-module, in `@maplibre/native-ffi-opengl-wasm32` or
-`@maplibre/native-ffi-webgpu-wasm32`. A bundler that builds for the web takes
-the binding's browser entry. Serve the module's `maplibre_native_ffi.mjs` and
-`maplibre_native_ffi.wasm` side by side and unbundled, such as from Vite's
-`public` directory, and load the module before any other call:
+`@maplibre/native-ffi-webgpu` with WebGPU. Serve `maplibre_native_ffi.mjs` and
+`maplibre_native_ffi.wasm` from the backend's `-wasm32` package as static
+files, such as from Vite's `public` directory, and load them before any other
+call:
 
 ```ts
 import { loadModule, RuntimeHandle } from "@maplibre/native-ffi";
@@ -603,8 +601,8 @@ provider.
 ### Web
 
 Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
-provider. The WebGPU backend suspends threads through JSPI, which Chrome 137,
-Firefox 139, and later support, and Safari does not.
+provider. The WebGPU backend needs JSPI: Chrome 137 or Firefox 139 and later,
+not Safari.
 
 A page that loads a browser module must be cross-origin isolated: serve it with
 the `Cross-Origin-Opener-Policy: same-origin` and

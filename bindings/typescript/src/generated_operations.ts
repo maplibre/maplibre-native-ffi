@@ -3809,9 +3809,8 @@ export class RuntimeHandle extends Owner {
   /**
    * Creates a runtime.
    *
-   * Runs on a thread of its own, so a browser page can call it, and resolves
-   * once the call returns. A pending Promise keeps the event loop alive. When
-   * the realm ends first, the binding disposes the result.
+   * Resolves once the call completes, so a browser page, which cannot block,
+   * can call it.
    *
    * See `mln_runtime_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

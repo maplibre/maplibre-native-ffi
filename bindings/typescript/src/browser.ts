@@ -1,8 +1,7 @@
 /**
- * The entry that a bundler building for the web takes in place of the default
- * one. A page loads the browser module with {@link loadModule} before any other
- * call, and imports its own graphics objects into the module for the render
- * target descriptors that name them. Every other export is the default entry's.
+ * The browser API: {@link loadModule}, which a page calls first, and imports of
+ * the page's graphics objects for render target descriptors. Everything else
+ * matches the default entry.
  *
  * @module browser
  */

@@ -73,11 +73,10 @@ function importWebGpu(
 }
 
 /**
- * Imports a `GPUDevice` as the `WGPUDevice` of a `WebGpuContextDescriptor`.
- * Leave out its instance and queue: sessions use neither, and an absent queue
- * names the device's default queue.
+ * Imports a `GPUDevice` for a `WebGpuContextDescriptor`, whose instance and
+ * queue stay unset.
  *
- * Throws a `TypeError` when `device` is not a `GPUDevice` of this realm.
+ * Throws a `TypeError` when `device` is not a `GPUDevice`.
  */
 export function importWebGpuDevice(device: object): ImportedWebGpuObject {
   const library = webGpu();
@@ -90,11 +89,9 @@ export function importWebGpuDevice(device: object): ImportedWebGpuObject {
 }
 
 /**
- * Imports a `GPUCanvasContext`, the `getContext("webgpu")` of a canvas element
- * or an `OffscreenCanvas`, as the `WGPUSurface` of a `WebGpuSurfaceDescriptor`.
+ * Imports the `GPUCanvasContext` of a canvas for a `WebGpuSurfaceDescriptor`.
  *
- * Throws a `TypeError` when `canvasContext` is not a `GPUCanvasContext` of this
- * realm.
+ * Throws a `TypeError` when `canvasContext` is not a `GPUCanvasContext`.
  */
 export function importWebGpuSurface(
   canvasContext: object,
@@ -109,10 +106,9 @@ export function importWebGpuSurface(
 }
 
 /**
- * Imports a `GPUTexture` as a `WGPUTexture`, such as a texture of a borrowed
- * texture ring.
+ * Imports a `GPUTexture`, such as one of a borrowed texture ring.
  *
- * Throws a `TypeError` when `texture` is not a `GPUTexture` of this realm.
+ * Throws a `TypeError` when `texture` is not a `GPUTexture`.
  */
 export function importWebGpuTexture(texture: object): ImportedWebGpuObject {
   const library = webGpu();
@@ -125,10 +121,9 @@ export function importWebGpuTexture(texture: object): ImportedWebGpuObject {
 }
 
 /**
- * Imports a `GPUTextureView` as a `WGPUTextureView`, such as a view of a
- * borrowed texture ring.
+ * Imports a `GPUTextureView`, such as one of a borrowed texture ring.
  *
- * Throws a `TypeError` when `view` is not a `GPUTextureView` of this realm.
+ * Throws a `TypeError` when `view` is not a `GPUTextureView`.
  */
 export function importWebGpuTextureView(view: object): ImportedWebGpuObject {
   const library = webGpu();
@@ -142,10 +137,9 @@ export function importWebGpuTextureView(view: object): ImportedWebGpuObject {
 
 /**
  * Returns the `WGPUTextureFormat` value of a `GPUTextureFormat` name, such as
- * the `navigator.gpu.getPreferredCanvasFormat()` that a surface descriptor's
- * format takes.
+ * `navigator.gpu.getPreferredCanvasFormat()`.
  *
- * Throws a `RangeError` when the module knows no format of that name.
+ * Throws a `RangeError` for an unknown name.
  */
 export function webGpuTextureFormat(format: string): number {
   const value = webGpu().textureFormat(format);
@@ -156,13 +150,10 @@ export function webGpuTextureFormat(format: string): number {
 }
 
 /**
- * Returns the JavaScript object behind a WebGPU handle of the module, such as
- * the `GPUTexture` of an acquired frame's texture. The object is valid for as
- * long as the handle is, so a frame's texture is valid until the frame's
- * release.
+ * Returns the JavaScript object behind a WebGPU handle, such as an acquired
+ * frame's texture, valid for as long as the handle is.
  *
- * Throws a `RangeError` when `pointer` is zero or names no object of the
- * module.
+ * Throws a `RangeError` when `pointer` names no WebGPU object.
  */
 export function webGpuObject(pointer: bigint): object {
   const library = webGpu();
@@ -177,14 +168,10 @@ export function webGpuObject(pointer: bigint): object {
 }
 
 /**
- * Registers a `WebGL2RenderingContext` as the context handle of a
- * `WebGlContextDescriptor` of kind `existing`. The registration records the
- * attributes that the context was created with, and the C reference's rules
- * for an existing context apply: MapLibre draws with a depth and a stencil
- * buffer.
+ * Registers a `WebGL2RenderingContext` for a `WebGlContextDescriptor` of kind
+ * `existing`. Create the context with a depth and a stencil buffer.
  *
- * Throws a `TypeError` when `context` is not a `WebGL2RenderingContext` of this
- * realm.
+ * Throws a `TypeError` when `context` is not a `WebGL2RenderingContext`.
  */
 export function registerWebGlContext(context: object): RegisteredWebGlContext {
   const library = loaded().mlnTsWebGl;
@@ -208,15 +195,11 @@ function closedError(name: string): MaplibreError {
 }
 
 /**
- * A WebGPU object of the page, imported into the browser module. An import is
- * a copy, not a move: its handle holds one reference of the module's, and
- * {@link ImportedWebGpuObject.close} releases only that reference, so the
- * JavaScript object stays usable.
+ * A WebGPU object imported into the browser module. Closing it leaves the
+ * JavaScript object usable.
  *
- * Close it only after every session that names its pointer has completed its
- * detach or been destroyed, as the descriptors' borrowed handles require. An
- * import has no finalizer, so one that is never closed keeps its JavaScript
- * object alive.
+ * Close it only after every session that uses it has detached or been
+ * destroyed. An import that is never closed keeps its object alive.
  */
 export class ImportedWebGpuObject {
   readonly #handle: number;
@@ -239,8 +222,8 @@ export class ImportedWebGpuObject {
   }
 
   /**
-   * The module's handle to the object, for a render target descriptor. Throws
-   * a `MaplibreError` with the invalid-state status after close.
+   * The handle for a render target descriptor. Throws a `MaplibreError` with
+   * the invalid-state status after close.
    */
   get pointer(): bigint {
     if (this.#closed) {
@@ -249,7 +232,7 @@ export class ImportedWebGpuObject {
     return BigInt(this.#handle >>> 0);
   }
 
-  /** Releases the module's reference. A second call does nothing. */
+  /** Releases the import. A second call does nothing. */
   close(): void {
     if (this.#closed) {
       return;
@@ -266,13 +249,11 @@ export class ImportedWebGpuObject {
 }
 
 /**
- * A WebGL 2 context of the page, registered with the browser module.
- * {@link RegisteredWebGlContext.close} removes the registration, and the
- * JavaScript context stays usable.
+ * A WebGL 2 context registered with the browser module. Closing it leaves the
+ * context usable.
  *
- * Close it only after every session that names its context has completed its
- * detach or been destroyed. A registration has no finalizer, so one that is
- * never closed keeps its context alive.
+ * Close it only after every session that uses it has detached or been
+ * destroyed. A registration that is never closed keeps its context alive.
  */
 export class RegisteredWebGlContext {
   readonly #handle: number;
@@ -291,9 +272,8 @@ export class RegisteredWebGlContext {
   }
 
   /**
-   * The context's `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for a
-   * `WebGlContextDescriptor` of kind `existing`. Throws a `MaplibreError` with
-   * the invalid-state status after close.
+   * The handle for a `WebGlContextDescriptor` of kind `existing`. Throws a
+   * `MaplibreError` with the invalid-state status after close.
    */
   get context(): number {
     if (this.#closed) {
@@ -303,9 +283,8 @@ export class RegisteredWebGlContext {
   }
 
   /**
-   * Removes the registration. No later registration reuses the handle, so a
-   * descriptor that still names it fails to make a context current. A second
-   * call does nothing.
+   * Removes the registration. A descriptor that still names the handle fails
+   * to make a context current. A second call does nothing.
    */
   close(): void {
     if (this.#closed) {

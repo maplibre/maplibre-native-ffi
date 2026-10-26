@@ -16,11 +16,9 @@ import {
 /** Options for {@link loadModule}. */
 export interface LoadModuleOptions {
   /**
-   * The Web Workers that the module starts as it loads, for the threads that
-   * MapLibre starts. A thread that finds none waits until the page yields for
-   * the browser to start another, so a page that runs more maps, sources, or
-   * sessions than the default covers raises it. The default covers one
-   * runtime with one map, one GeoJSON source, and one render session.
+   * The Web Workers to start for native threads. The default covers one
+   * runtime with one map, one GeoJSON source, and one render session. Raise
+   * it for more, or new threads wait until the page yields.
    */
   readonly pthreadPoolSize?: number;
 }
@@ -40,13 +38,10 @@ let loading: Promise<void> | undefined;
 
 /**
  * Loads the browser module from the URL of its `maplibre_native_ffi.mjs`,
- * which the browser loads unbundled, with its `.wasm` beside it. The page must
- * be cross-origin isolated, since the module's threads share memory.
+ * with its `.wasm` beside it. The page must be cross-origin isolated.
  *
- * Every later call returns the first call's Promise and ignores its own
- * arguments. A load that fails leaves nothing loaded, so a later call loads
- * again; a module that instantiated keeps its memory and workers until the
- * page unloads.
+ * Later calls return the first call's Promise. After a failure, the next call
+ * loads again.
  */
 export function loadModule(
   url: string | URL,

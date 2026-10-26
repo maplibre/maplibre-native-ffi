@@ -33,9 +33,8 @@ HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
 # What a call that waits for a thread to start does in TypeScript, in place of
 # the C notes on blocking.
 THREAD_START_NOTE = (
-    "Runs on a thread of its own, so a browser page can call it, and resolves "
-    "once the call returns. A pending Promise keeps the event loop alive. When "
-    "the realm ends first, the binding disposes the result."
+    "Resolves once the call completes, so a browser page, which cannot block, "
+    "can call it."
 )
 # The handles that `mln_runtime_event_source_type` names as an event's source.
 EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
