@@ -291,7 +291,6 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'kotlin-maven')
     uses: ./.github/workflows/_kotlin-maven.yml
     with:
-      publish: false
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
       version: 0.1.0-SNAPSHOT
