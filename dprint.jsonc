@@ -86,11 +86,8 @@
   },
   "exec": {
     "commands": [
-      { "command": "bash .mise/bin/dprint-zig fmt --stdin", "exts": ["zig"] },
-      {
-        "command": "bash .mise/bin/dprint-zig fmt --stdin --zon",
-        "exts": ["zon"],
-      },
+      { "command": "zig fmt --stdin", "exts": ["zig"] },
+      { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
       {
         "command": "bash .mise/bin/dprint-dart format --output=show --stdin-name={{file_path}}",
         "exts": ["dart"],
@@ -101,7 +98,7 @@
         "exts": ["swift"],
       },
       {
-        "command": "bash .mise/bin/dprint-mdxlint {{file_path}}",
+        "command": "pnpm --dir docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
         "exts": ["mdx"],
         "cacheKeyFiles": ["pnpm-lock.yaml"],
       },
