@@ -366,7 +366,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/refs" \
             -f "ref=refs/tags/$TAG" -f "sha=$SHA"
 
-  # SwiftPM and vcpkg consume the distribution repository. Each release
+  # SwiftPM, vcpkg, and Conan consume the distribution repository. Each release
   # commits its packages and registry versions together, then tags the commit.
   distribution:
     name: Distribution repository

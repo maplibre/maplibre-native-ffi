@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import pathlib
 import shutil
 import tempfile
@@ -22,9 +23,9 @@ class DistributionTest(unittest.TestCase):
         self.assets.mkdir()
         archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
         archive.write_bytes(b"native archive")
-        archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        self.archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (self.assets / "SHA256SUMS").write_text(
-            f"{archive_digest}  maplibre-native-c-macos-arm64-metal.tar.gz\n"
+            f"{self.archive_digest}  maplibre-native-c-macos-arm64-metal.tar.gz\n"
             f"{DIGEST}  {XCFRAMEWORK_NAME}\n"
         )
         (self.assets / XCFRAMEWORK_NAME).write_bytes(b"xcframework")
@@ -117,6 +118,7 @@ class DistributionTest(unittest.TestCase):
                 "README.md",
                 "Sources",
                 "ports",
+                "recipes",
                 "versions",
             ],
         )
@@ -130,6 +132,50 @@ class DistributionTest(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "does not list"):
             write(self.tree, Release(self.assets, "v0.202611.0"), REPOSITORY)
+
+    def test_the_conan_index_keeps_earlier_versions_and_pins_each_archive(self) -> None:
+        write(self.tree, Release(self.assets, "v0.202611.0"), REPOSITORY)
+        write(self.tree, Release(self.assets, "v0.202611.1"), REPOSITORY)
+
+        recipe = self.tree / "recipes/maplibre-native-c"
+        versions = json.loads((recipe / "config.yml").read_text())["versions"]
+        self.assertEqual(
+            versions,
+            {
+                "0.202611.0": {"folder": "."},
+                "0.202611.1": {"folder": "."},
+            },
+        )
+        sources = json.loads((recipe / "conandata.yml").read_text())["sources"]
+        self.assertEqual(
+            sources["0.202611.0"]["macos-arm64-metal"],
+            {
+                "url": "https://github.com/maplibre/maplibre-native-ffi/releases/download/"
+                "v0.202611.0/maplibre-native-c-macos-arm64-metal.tar.gz",
+                "sha256": self.archive_digest,
+            },
+        )
+        self.assertIn("v0.202611.1/", sources["0.202611.1"]["macos-arm64-metal"]["url"])
+        self.assertEqual(
+            (recipe / "conanfile.py").read_bytes(),
+            (REPOSITORY / "tools/release/conan/conanfile.py").read_bytes(),
+        )
+
+    def test_a_local_conan_recipe_verifies_the_run_archive(self) -> None:
+        write(self.tree, Release(self.assets), REPOSITORY)
+
+        sources = json.loads(
+            (self.tree / "recipes/maplibre-native-c/conandata.yml").read_text()
+        )["sources"]
+        self.assertEqual(
+            sources["0.0.0"]["macos-arm64-metal"],
+            {
+                "url": (self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz")
+                .resolve()
+                .as_uri(),
+                "sha256": self.archive_digest,
+            },
+        )
 
     def test_the_tree_may_not_hold_the_repository(self) -> None:
         repository = self.tree / "checkout"

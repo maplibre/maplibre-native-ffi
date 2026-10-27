@@ -85,6 +85,7 @@ JOBS = {
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
     "swift-package": ("swiftpm", lambda target: target.backend == "metal"),
     "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64-egl"),
+    "conan-recipes": ("conan", lambda target: target.preset == "linux-gnu-x64-vulkan"),
 }
 # The jobs whose artifacts a job downloads, which run whenever it does. A job
 # that a skipped one needs would skip it too, and a skip passes the required

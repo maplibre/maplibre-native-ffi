@@ -1,0 +1,6 @@
+[requires]
+maplibre-native-c/0.0.0
+
+[generators]
+CMakeDeps
+CMakeToolchain

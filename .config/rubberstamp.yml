@@ -475,4 +475,18 @@ ci:
               - tests/package/**
               - cmake/mln_ffi_package_config.cmake
               - cmake/maplibre-native-c-config.cmake.in
+    conan:
+      covers: >-
+        Resolves the distribution repository's local Conan recipe index and
+        builds a CMakeDeps consumer of the Linux x64 Vulkan archive, so it runs
+        that target. Changes to the recipe, its release generator or consumer
+        check need it.
+      rules:
+        - if:
+            files:
+              - tools/release/distribution.py
+              - tools/release/conan_package.py
+              - tools/release/conan/**
+              - tools/release/check_conan.py
+              - tests/distribution/conan/**
           then: apply

@@ -298,6 +298,13 @@ class PresetTest(unittest.TestCase):
             ["apple-xcframework", "swift-package"],
         )
 
+    def test_conan_runs_the_linux_archive_it_consumes(self):
+        result = plan.plan(self.presets, False, ["conan"])
+        self.assertEqual(result["jobs"], ["conan-recipes"])
+        self.assertEqual(
+            [row["preset"] for row in result["matrix"]], ["linux-gnu-x64-vulkan"]
+        )
+
     def test_an_unknown_unit_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown coverage units: nope"):
             plan.plan(self.presets, False, ["nope"])

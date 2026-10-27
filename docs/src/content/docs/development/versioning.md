@@ -63,7 +63,8 @@ RSA key in PEM format to an [OHPM](https://ohpm.openharmony.cn) account in the
 its passphrase in the `OHPM_PUBLISH_ID`, `OHPM_PRIVATE_KEY`, and
 `OHPM_KEY_PASSPHRASE` secrets of the `ohpm` environment.
 
-Each release pushes the Swift package and vcpkg Git registry to
+Each release pushes the Swift package, vcpkg Git registry, and Conan recipe
+index to
 [maplibre-native-ffi-distribution](https://github.com/maplibre/maplibre-native-ffi-distribution)
 over SSH. Generate an Ed25519 key pair without a passphrase. Add its public half
 to that repository as a deploy key with write access, and store the private half
@@ -72,6 +73,9 @@ environment. Then add the distribution repository to the
 [Swift Package Index](https://swiftpackageindex.com/add-a-package). vcpkg needs
 no registry account or additional secret; consumers register that repository in
 `vcpkg-configuration.json`, using a release commit as its baseline.
+
+Conan needs no registry account or additional secret. The local recipe index
+retains earlier release versions and has no snapshot channel.
 
 PyPI lets a pending trusted publisher create a project, so Python needs no first
 publish by hand. Add a trusted publisher for each distribution, for

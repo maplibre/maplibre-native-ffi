@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import pathlib
 import subprocess
@@ -75,6 +76,17 @@ class PublishDistributionTest(unittest.TestCase):
             "/releases/download/v0.202611.1/",
             git(self.remote, "show", "v0.202611.1:Package.swift"),
         )
+
+    def test_each_release_retains_the_recipe_indexs_versions(self) -> None:
+        self.assertEqual(self.publish("v0.202611.0").returncode, 0)
+        self.assertEqual(self.publish("v0.202611.1").returncode, 0)
+
+        sources = json.loads(
+            git(self.remote, "show", "main:recipes/maplibre-native-c/conandata.yml")
+        )["sources"]
+        self.assertEqual(set(sources), {"0.202611.0", "0.202611.1"})
+        self.assertIn("v0.202611.0/", sources["0.202611.0"]["macos-arm64-metal"]["url"])
+        self.assertIn("v0.202611.1/", sources["0.202611.1"]["macos-arm64-metal"]["url"])
 
     def test_a_rerun_after_a_publish_changes_nothing(self) -> None:
         self.publish("v0.202611.0")

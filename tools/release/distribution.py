@@ -17,21 +17,23 @@ import dataclasses
 import pathlib
 import shutil
 
+import conan_package
 import swift_package
 import vcpkg_registry
 from native_package_release import RELEASE_DOWNLOAD_URL
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHECKSUMS_NAME = "SHA256SUMS"
-WRITERS = (swift_package.write, vcpkg_registry.write)
+WRITERS = (swift_package.write, vcpkg_registry.write, conan_package.write)
 README = """\
 # MapLibre Native FFI distribution
 
 This repository holds the packages of each
 [MapLibre Native FFI](https://github.com/maplibre/maplibre-native-ffi) release
 for package managers that read a Git repository. Each release updates its
-packages in one commit, tagged with the release's version. Report issues and
-send changes to MapLibre Native FFI, since the next release overwrites this
+packages in one commit, tagged with the release's version. The vcpkg registry
+and the Conan recipe index retain earlier versions. Report issues and send
+changes to MapLibre Native FFI, since the next release overwrites this
 repository.
 
 ## vcpkg
@@ -62,6 +64,24 @@ target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
 
 - [Install](https://maplibre.org/maplibre-native-ffi/install/)
 - [Guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
+
+## Conan 2
+
+Clone this repository and register its path as a local recipe index:
+
+```sh
+git clone https://github.com/maplibre/maplibre-native-ffi-distribution.git
+conan remote add maplibre-native-ffi ./maplibre-native-ffi-distribution --type=local-recipes-index
+conan install --requires="maplibre-native-c/<version>" --build=missing -g CMakeDeps -g CMakeToolchain
+```
+
+Link `maplibre-native-c::maplibre-native-c` after
+`find_package(maplibre-native-c CONFIG REQUIRED)`. The recipe packages the
+complete static C library. Select a renderer with
+`-o "maplibre-native-c/*:backend=metal"`, `opengl`, `vulkan`, or `webgpu`;
+`default` selects the platform's default renderer. Linux defaults to glibc;
+select musl with `-o "maplibre-native-c/*:libc=musl"`. Run `git pull` in the
+clone to make new release versions available.
 """
 
 
@@ -102,7 +122,7 @@ def write(
         raise SystemExit(f"{tree} holds {repository}; write the tree elsewhere")
     tree.mkdir(parents=True, exist_ok=True)
     for entry in tree.iterdir():
-        if entry.name in {".git", "versions"}:
+        if entry.name in {".git", "recipes", "versions"}:
             continue
         if entry.is_dir() and not entry.is_symlink():
             shutil.rmtree(entry)
@@ -125,7 +145,7 @@ def main(arguments: list[str] | None = None) -> int:
     source.add_argument(
         "--local",
         action="store_true",
-        help="Copy the native packages into the tree rather than download them",
+        help="Use the local native packages rather than release downloads",
     )
     args = parser.parse_args(arguments)
     write(args.tree, Release(args.assets, args.tag))
