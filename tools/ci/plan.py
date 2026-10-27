@@ -27,7 +27,9 @@ VENDOR = "maplibre-native-ffi"
 # These platforms supply native inputs to Kotlin Maven staging.
 KOTLIN_MAVEN_PLATFORMS = {
     "android",
+    "freebsd",
     "linux-gnu",
+    "linux-musl",
     "macos",
     "ios",
     "ios-simulator",

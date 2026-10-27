@@ -30,7 +30,8 @@ extract_preset() {
 }
 
 prepare_native_inputs() {
-  # The Linux and Windows installs also feed the JVM runtime classifiers.
+  # The Linux, FreeBSD, and Windows installs also feed the JVM runtime
+  # classifiers.
   local presets=(
     android-arm-egl
     android-arm-vulkan
@@ -42,6 +43,12 @@ prepare_native_inputs() {
     linux-gnu-arm64-vulkan
     linux-gnu-x64-egl
     linux-gnu-x64-vulkan
+    linux-musl-arm64-egl
+    linux-musl-arm64-vulkan
+    linux-musl-x64-egl
+    linux-musl-x64-vulkan
+    freebsd-x64-egl
+    freebsd-x64-vulkan
     macos-arm64-egl
     macos-arm64-vulkan
     macos-arm64-metal

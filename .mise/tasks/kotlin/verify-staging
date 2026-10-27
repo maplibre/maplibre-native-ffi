@@ -88,6 +88,9 @@ NATIVE_TARGETS = {
 JVM_CLASSIFIERS = {
     "natives-linux-x64",
     "natives-linux-arm64",
+    "natives-linux-musl-x64",
+    "natives-linux-musl-arm64",
+    "natives-freebsd-x64",
     "natives-macos-arm64",
     "natives-windows-x64",
     "natives-windows-arm64",
@@ -105,9 +108,9 @@ POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
 
 def native_licenses(backend: str, target: str) -> set[str]:
     licenses = set(COMMON_NATIVE_LICENSES)
-    if target.startswith(("android-", "linux-", "windows-")):
+    if target.startswith(("android-", "freebsd-", "linux-", "windows-")):
         licenses.add("rust.md")
-    if target.startswith(("linux-", "windows-")):
+    if target.startswith(("freebsd-", "linux-", "windows-")):
         licenses.update({"libuv-extra.txt", "libuv.txt", "zlib.txt"})
     if backend == "vulkan":
         licenses.update(
