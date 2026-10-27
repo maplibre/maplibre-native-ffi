@@ -42,20 +42,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-cfg=mln_platform_crate");
     }
 
-    let platform = target_platform(&target_os, &target_env)?;
+    let target = env::var("TARGET")?;
     // Checked ahead of the local build so two enabled backend features fail
     // however the library arrives.
     let backend = selected_backend()?;
-    let preset = format!(
-        "{platform}-{}",
-        backend_suffix(
-            backend.unwrap_or(default_backend(&target_os, &target_env)),
-            &target_os
-        )
-    );
     let install_dir = match env::var_os(LOCAL_BUILD_ENV) {
-        Some(local_build) => local_prefix(Path::new(&local_build), &platform, backend, &preset)?,
-        None => download::install_prefix(&preset)?,
+        Some(local_build) => local_prefix(Path::new(&local_build), &target, backend)?,
+        None => download::install_prefix(&target, backend)?,
     };
     let link_dir = native_library_dir(&install_dir);
     let descriptor = read_descriptor(&install_dir)?;
@@ -102,36 +95,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Names the platform half of the preset serving the target, as the artifact
-/// descriptor's `targetPlatform` spells it.
-fn target_platform(os: &str, target_env: &str) -> Result<String, Box<dyn Error>> {
-    let arch = match env::var("CARGO_CFG_TARGET_ARCH")?.as_str() {
-        "x86_64" => "x64".to_owned(),
-        "aarch64" => "arm64".to_owned(),
-        other => other.to_owned(),
-    };
-    // The environment separates targets that share an OS: OpenHarmony and musl
-    // both report `linux`, and the simulators and Mac Catalyst report their
-    // device OS.
-    Ok(match (os, target_env) {
-        ("linux", "gnu" | "musl") => format!("linux-{target_env}-{arch}"),
-        ("linux", "ohos") => format!("ohos-{arch}"),
-        ("ios" | "tvos" | "visionos", "sim") => format!("{os}-simulator-{arch}"),
-        ("ios", "macabi") => format!("ios-maccatalyst-{arch}"),
-        ("windows", "msvc")
-        | ("macos" | "ios" | "tvos" | "visionos" | "android" | "emscripten", _) => {
-            format!("{os}-{arch}")
-        }
-        _ => {
-            return Err(format!(
-                "MapLibre Native builds for no platform matching {}",
-                env::var("TARGET")?
-            )
-            .into());
-        }
-    })
-}
-
 /// The one enabled backend feature, or none when the consumer takes the
 /// platform default.
 fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
@@ -154,35 +117,12 @@ fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
     }
 }
 
-/// Metal on Apple platforms, OpenGL on Android and OpenHarmony, WebGPU in the
-/// browser, and Vulkan elsewhere.
-fn default_backend(os: &str, target_env: &str) -> &'static str {
-    match (os, target_env) {
-        ("macos" | "ios" | "tvos" | "visionos", _) => "metal",
-        ("android", _) | ("linux", "ohos") => "opengl",
-        ("emscripten", _) => "webgpu",
-        _ => "vulkan",
-    }
-}
-
-/// The backend half of a preset name, which spells OpenGL by its context
-/// provider.
-fn backend_suffix<'a>(backend: &'a str, os: &str) -> &'a str {
-    match (backend, os) {
-        ("opengl", "windows") => "wgl",
-        ("opengl", "emscripten") => "webgl",
-        ("opengl", _) => "egl",
-        _ => backend,
-    }
-}
-
-/// Resolves a local build, which is either an install prefix or a CMake build
-/// root holding an install for each preset.
+/// Resolves a local build, which is either an install prefix or a directory
+/// holding installs one level down, such as a CMake build root.
 fn local_prefix(
     directory: &Path,
-    platform: &str,
+    target: &str,
     backend: Option<&str>,
-    preset: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     // A relative path would resolve against this crate's own directory, which
     // the consumer neither chooses nor sees.
@@ -195,18 +135,23 @@ fn local_prefix(
         .into());
     }
     if directory.join(DESCRIPTOR_PATH).is_file() {
-        // A prefix serves one platform, so a build for several targets names a
-        // build root instead. Only a selected backend can conflict; without
-        // one, the prefix's own backend serves.
-        let descriptor = read_descriptor(directory)?;
-        if descriptor.target_platform != platform
-            || backend.is_some_and(|backend| backend != descriptor.render_backend)
+        // A prefix serves one target, so a build for several targets names a
+        // directory of installs instead. Only a selected backend can conflict;
+        // without one, the prefix's own backend serves.
+        let identity = read_identity(directory).ok_or_else(|| {
+            format!(
+                "{LOCAL_BUILD_ENV} names an install prefix built before artifact descriptors \
+                 recorded their Rust target and default backend; rebuild it"
+            )
+        })?;
+        if identity.rust_target != target
+            || backend.is_some_and(|backend| backend != identity.render_backend)
         {
             return Err(format!(
                 "{LOCAL_BUILD_ENV} names an install prefix built for {} {}, which cannot serve \
-                 {platform}{}",
-                descriptor.target_platform,
-                descriptor.render_backend,
+                 {target}{}",
+                identity.rust_target,
+                identity.render_backend,
                 backend
                     .map(|backend| format!(" {backend}"))
                     .unwrap_or_default()
@@ -215,29 +160,115 @@ fn local_prefix(
         }
         return Ok(directory.to_path_buf());
     }
-    let prefix = directory.join(preset).join("install");
-    // Registered before the existence check so that building the preset later
-    // reruns this script.
-    println!(
-        "cargo:rerun-if-changed={}",
-        prefix.join(DESCRIPTOR_PATH).display()
-    );
-    if !prefix.join(DESCRIPTOR_PATH).is_file() {
-        return Err(format!(
-            "{LOCAL_BUILD_ENV} names {}, which is neither an install prefix nor a build root \
-             holding {preset}",
+
+    let mut matches = Vec::new();
+    let mut other_backends = Vec::new();
+    let mut stale = Vec::new();
+    for prefix in installs(directory)? {
+        let Some(identity) = read_identity(&prefix) else {
+            stale.push(prefix);
+            continue;
+        };
+        if identity.rust_target != target {
+            continue;
+        }
+        // Without a selected backend only the target's default serves, so
+        // building another backend beside it never changes the answer.
+        if identity.render_backend == backend.unwrap_or(&identity.default_backend) {
+            matches.push(prefix);
+        } else {
+            other_backends.push(format!(
+                "\n  {} ({})",
+                prefix.display(),
+                identity.render_backend
+            ));
+        }
+    }
+    match matches.as_slice() {
+        [prefix] => Ok(prefix.clone()),
+        [] => {
+            let wanted = backend.map_or_else(
+                || "its default backend".to_owned(),
+                |backend| format!("the {backend} backend"),
+            );
+            let mut message = format!(
+                "{LOCAL_BUILD_ENV} names {}, which holds no install for {target} with {wanted}. \
+                 Build that install",
+                directory.display()
+            );
+            if !other_backends.is_empty() {
+                message += &format!(
+                    ", or enable the backend feature of one of these:{}",
+                    other_backends.concat()
+                );
+            }
+            if !stale.is_empty() {
+                message += &format!(
+                    "\nThese installs predate artifact descriptors that record their Rust target \
+                     and default backend; rebuild them:{}",
+                    stale
+                        .iter()
+                        .map(|prefix| format!("\n  {}", prefix.display()))
+                        .collect::<String>()
+                );
+            }
+            Err(message.into())
+        }
+        prefixes => Err(format!(
+            "{LOCAL_BUILD_ENV} names {}, which holds several installs for {target} with the same \
+             backend; name one of them instead:{}",
+            directory.display(),
+            prefixes
+                .iter()
+                .map(|prefix| format!("\n  {}", prefix.display()))
+                .collect::<String>()
+        )
+        .into()),
+    }
+}
+
+/// The install prefixes one level down: each `<name>/install` of a CMake build
+/// root, and each `<name>` that is itself a prefix, such as an unpacked
+/// release archive.
+fn installs(directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let entries = fs::read_dir(directory).map_err(|error| {
+        format!(
+            "{LOCAL_BUILD_ENV} names {}, which cannot be read: {error}",
             directory.display()
         )
-        .into());
+    })?;
+    let mut prefixes = Vec::new();
+    for entry in entries {
+        let path = entry?.path();
+        for prefix in [path.join("install"), path] {
+            if prefix.join(DESCRIPTOR_PATH).is_file() {
+                prefixes.push(prefix);
+            }
+        }
     }
-    Ok(prefix)
+    prefixes.sort();
+    Ok(prefixes)
+}
+
+/// The descriptor fields that choose an install. An install built before
+/// descriptors recorded all of them has none.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Identity {
+    rust_target: String,
+    render_backend: String,
+    default_backend: String,
+}
+
+fn read_identity(prefix: &Path) -> Option<Identity> {
+    let contents = fs::read_to_string(prefix.join(DESCRIPTOR_PATH)).ok()?;
+    serde_json::from_str(&contents).ok()
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArtifactDescriptor {
     render_backend: String,
-    target_platform: String,
     static_link_libraries: Vec<String>,
     static_link_frameworks: Vec<String>,
 }
@@ -324,21 +355,36 @@ fn print_rerun_if_changed(path: &Path) {
 mod download {
     use super::*;
 
-    use std::collections::BTreeMap;
-
+    /// The pinned release, with an entry in `artifacts` for each archive. Its
+    /// legacy `sha256` map goes unread.
     #[derive(Deserialize)]
     struct Pin {
         tag: String,
-        sha256: BTreeMap<String, String>,
+        artifacts: Vec<Artifact>,
     }
 
-    /// Downloads and unpacks `preset` from the pinned release, unless an
-    /// earlier build already did.
-    pub(super) fn install_prefix(preset: &str) -> Result<PathBuf, Box<dyn Error>> {
+    /// An archive of the release, with its digest and the fields of its
+    /// artifact descriptor that choose it.
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Artifact {
+        archive: String,
+        sha256: String,
+        rust_target: Option<String>,
+        render_backend: String,
+        default_backend: Option<String>,
+    }
+
+    /// Downloads and unpacks the pinned release's archive for `target` and
+    /// `backend`, or the target's default backend, unless an earlier build
+    /// already did.
+    pub(super) fn install_prefix(
+        target: &str,
+        backend: Option<&str>,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let pin_path =
             Path::new(&env::var_os("CARGO_MANIFEST_DIR").ok_or("CARGO_MANIFEST_DIR is unset")?)
                 .join(PIN_PATH);
-        println!("cargo:rerun-if-changed={}", pin_path.display());
         if !pin_path.is_file() {
             return Err(format!(
                 "Only a published maplibre-native-ffi-sys crate downloads the native library. \
@@ -346,13 +392,29 @@ mod download {
             )
             .into());
         }
+        println!("cargo:rerun-if-changed={}", pin_path.display());
         let pin: Pin = serde_json::from_str(&fs::read_to_string(&pin_path)?)
             .map_err(|error| format!("invalid {}: {error}", pin_path.display()))?;
-        let archive_name = format!("{LIBRARY_NAME}-{preset}.tar.gz");
-        let digest = pin
-            .sha256
-            .get(&archive_name)
-            .ok_or_else(|| format!("{} publishes no {archive_name}", pin.tag))?;
+        let artifact = pin
+            .artifacts
+            .iter()
+            .find(|artifact| {
+                artifact.rust_target.as_deref() == Some(target)
+                    && Some(artifact.render_backend.as_str())
+                        == backend.or(artifact.default_backend.as_deref())
+            })
+            .ok_or_else(|| {
+                format!(
+                    "{} publishes no archive for {target} with {}",
+                    pin.tag,
+                    backend.map_or_else(
+                        || "its default backend".to_owned(),
+                        |backend| format!("the {backend} backend")
+                    )
+                )
+            })?;
+        let archive_name = &artifact.archive;
+        let digest = &artifact.sha256;
 
         // The digest names the unpacked prefix, and an unpacked prefix is
         // complete because it is renamed into place.
@@ -393,10 +455,11 @@ mod download {
             .unpack(&scratch)
             .map_err(|error| format!("failed to unpack {archive_name}: {error}").into())
             .and_then(|()| {
-                // The archive holds a single `maplibre-native-c-<preset>/`
-                // root. Losing the rename means another build unpacked the same
+                // The archive holds a single root named after the archive.
+                // Losing the rename means another build unpacked the same
                 // digest first, which leaves the same tree in place.
-                match fs::rename(scratch.join(format!("{LIBRARY_NAME}-{preset}")), &prefix) {
+                let root = archive_name.strip_suffix(".tar.gz").unwrap_or(archive_name);
+                match fs::rename(scratch.join(root), &prefix) {
                     Err(error) if !prefix.is_dir() => {
                         Err(format!("failed to install {}: {error}", prefix.display()).into())
                     }

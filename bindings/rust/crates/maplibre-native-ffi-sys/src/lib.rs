@@ -6,18 +6,22 @@
 //! # Linking
 //!
 //! The build script links the native library statically. It takes the library
-//! from the local build that `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` names: the
-//! absolute path of an install prefix, or of a build directory holding
-//! `<preset>/install` for each target. Without one, a published crate
-//! downloads the release that it was published against, from the base URL in
-//! `MAPLIBRE_NATIVE_FFI_RELEASE_URL` when that is set.
+//! from the local build that `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` names, as an
+//! absolute path: an install prefix, or a directory holding installs one level
+//! down (`<name>/install` or `<name>`), such as a CMake build root. Without
+//! one, a published crate downloads the release that it was published against,
+//! from the base URL in `MAPLIBRE_NATIVE_FFI_RELEASE_URL` when that is set.
 //!
 //! The `metal`, `opengl`, `vulkan`, and `webgpu` features select the render
-//! backend, and at most one can be enabled. Without one, a target takes Metal
-//! on Apple platforms, OpenGL on Android and OpenHarmony, WebGPU in the
-//! browser, and Vulkan elsewhere. Dependents read the backend from
-//! `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix from
-//! `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
+//! backend, and at most one can be enabled. Without one, a target takes the
+//! default backend its artifact descriptor records: Metal on Apple platforms,
+//! OpenGL on Android and OpenHarmony, WebGPU in the browser, and Vulkan
+//! elsewhere. In a directory of installs, the one whose descriptor's
+//! `rustTarget` is the Cargo target and whose backend is the selected or
+//! default one serves; none or several is an error. An install prefix serves
+//! its own backend unless a feature selects another. Dependents read the
+//! backend from `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix
+//! from `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
 //!
 //! In the browser, the library uses shared memory, so the final module needs a
 //! standard library built with atomics: `-C target-feature=+atomics,+bulk-memory`

@@ -346,8 +346,8 @@ maplibre-native-ffi = { version = "{{version}}", features = ["vulkan"] }
 
 To build against your own copy of the [C library](#build-against-a-prefix), set
 `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` to an absolute path. Name an install prefix,
-or a build directory that holds `<preset>/install` for each target. A Git or
-path dependency on the crate needs a local build.
+or a directory holding installs one level down, such as a CMake build root. A
+Git or path dependency on the crate needs a local build.
 
 ```toml title=".cargo/config.toml"
 [env]
