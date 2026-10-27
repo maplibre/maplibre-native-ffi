@@ -111,7 +111,7 @@ impl WebGlTestContext {
         Ok(created)
     }
 
-    pub(super) fn descriptor(&self) -> OpenGlContextDescriptor {
+    pub(super) fn descriptor(&self) -> OpenGlContextDescriptor<'_> {
         OpenGlContextDescriptor {
             data: OpenGlContextDescriptorData::WebGl(WebGlContextDescriptor {
                 context: self.context,
@@ -203,7 +203,7 @@ impl WebGlHostTexture {
         })
     }
 
-    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenGlBorrowedTextureDescriptor {
+    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenGlBorrowedTextureDescriptor<'_> {
         OpenGlBorrowedTextureDescriptor {
             extent,
             physical_width: self.width,
