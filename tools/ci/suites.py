@@ -71,8 +71,10 @@ SUITES: list[dict] = [
             {"task": "//examples/zig-readback:smoke"},
         ],
     },
+    # A JDK in Alpine or the FreeBSD virtual machine runs the musl and FreeBSD
+    # suites, which Gradle compiles on the Linux runner.
     {
-        "platforms": ["linux-gnu", "macos", "windows"],
+        "platforms": ["linux-gnu", "linux-musl", "macos", "windows", "freebsd"],
         "commands": [{"task": "//bindings/kotlin:test"}],
     },
     {

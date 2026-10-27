@@ -7,7 +7,7 @@ set -euo pipefail
 
 case "$usage_preset" in
   linux-gnu-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
-  linux-gnu-arm64-* | windows-*) runtimes=(jvm) ;;
+  linux-gnu-arm64-* | linux-musl-* | freebsd-* | windows-*) runtimes=(jvm) ;;
   android-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"
     ;;

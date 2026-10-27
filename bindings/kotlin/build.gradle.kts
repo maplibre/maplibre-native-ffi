@@ -409,6 +409,16 @@ tasks.named<Test>("jvmTest") {
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }
 
+// Alpine and the FreeBSD virtual machine see only the repository, so the suite's classpath is
+// copied into it, and a JVM there runs the suite through DeviceSuite.
+tasks.register<Sync>("jvmDeviceTestClasspath") {
+  val test = kotlin.jvm().compilations.getByName("test")
+  val classpath = files(test.output.allOutputs, test.runtimeDependencyFiles)
+  into(layout.buildDirectory.dir("jvm-device-test"))
+  from(classpath.filter(File::isFile)) { into("lib") }
+  from(classpath.filter(File::isDirectory)) { into("classes") }
+}
+
 // The wasm suite runs in headless Chromium against the browser module that bindings/kotlin/wasm
 // links. The mise test:wasm task passes that module's directory, its render backend, and the
 // Chromium to run. The canary run selects only HarnessCanaryTest, which fails on purpose; every

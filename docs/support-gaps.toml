@@ -246,18 +246,6 @@ status = "path-known"
 reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
 
 [[gap]]
-binding = "kotlin-jvm"
-platform = "linux-musl"
-status = "path-known"
-reason = "Package musl natives that the loader selects on musl hosts, and run the JVM suite in Alpine."
-
-[[gap]]
-binding = "kotlin-jvm"
-platform = "freebsd"
-status = "path-known"
-reason = "The OpenJDK ports run the JVM suite. Package FreeBSD natives that the loader selects, and run the suite in the FreeBSD VM."
-
-[[gap]]
 binding = "kotlin-native"
 platform = "windows-mingw"
 status = "path-known"
