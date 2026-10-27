@@ -39,7 +39,9 @@ the install prefix. Its `share/maplibre-native-c/artifact.json` records the
 release `version` and the commit it was built from as `gitSha`, which matches a
 snapshot archive to its source after the snapshot moves on.
 
-With CMake, add the prefix to `CMAKE_PREFIX_PATH` and link the imported target:
+With CMake, set `maplibre-native-c_DIR` to the prefix's package config directory
+and link the imported target. This also works with cross-compilation toolchains
+that restrict package searches to a sysroot:
 
 ```cmake title="CMakeLists.txt"
 find_package(maplibre-native-c CONFIG REQUIRED)
@@ -47,7 +49,7 @@ target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
 ```
 
 ```bash frame="terminal"
-cmake -S . -B build -DCMAKE_PREFIX_PATH=<prefix>
+cmake -S . -B build -Dmaplibre-native-c_DIR=<prefix>/lib/cmake/maplibre-native-c
 cmake --build build
 ```
 
