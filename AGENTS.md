@@ -78,5 +78,5 @@ When you post AI-contributed GitHub content, including a new Discussion or
 Issue, a reply, or a PR description or comment, append this disclosure:
 `*AI-assisted — Tool: <tool>; model: <provider>/<model>*`
 
-If Rubberstamp's CI plan skips coverage that a change needs, run every unit with
-`gh workflow run CI --ref <branch>`.
+If Rubberstamp's CI plan skips a target unit that a change needs, ask before you
+run `gh workflow run CI --ref <branch>`: it runs every target.
