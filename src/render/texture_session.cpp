@@ -418,8 +418,8 @@ auto prepare_readback(
   return MLN_STATUS_OK;
 }
 
-// Shared because std::any holds only copyable values; the image itself moves
-// in from the readback and is never copied.
+// Shared because std::any holds only copyable values, and because a queued
+// delivery holds the image instead of copying it.
 struct TextureReadbackResult {
   std::shared_ptr<const mln::PremultipliedImage> image;
   mln_texture_image_info info{};
@@ -512,7 +512,7 @@ auto texture_read_premultiplied_rgba8_start(
             .info = info,
           };
           CompletionValue<&mln_render_session_read_texture>::deliver(
-            descriptor, value
+            descriptor, value, image
           );
         });
       } else {

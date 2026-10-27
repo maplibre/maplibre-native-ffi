@@ -39,12 +39,14 @@ class CompletionSink final {
   // Delivers one terminal result. A value that a queue cannot copy turns into
   // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed. A nonempty
   // diagnostic must be NUL-terminated after its bytes, as a std::string or a
-  // literal is, since the callback borrows it.
+  // literal is, since the callback borrows it. When `owner` keeps alive every
+  // byte view in the value, a queue holds it instead of copying those bytes.
   auto deliver(
     mln_status status, mln_command_disposition disposition,
     CommandGenerations generations, std::string_view diagnostic,
     const void* value, std::size_t value_count, std::uint32_t value_size,
-    const delivery::CompletionCapture* capture
+    const delivery::CompletionCapture* capture,
+    std::shared_ptr<const void> owner = nullptr
   ) const noexcept -> void;
 
  private:
@@ -64,7 +66,8 @@ class CompletionSink final {
 
   auto deliver_queued(
     const mln_completion_result& result,
-    const delivery::CompletionCapture* capture
+    const delivery::CompletionCapture* capture,
+    std::shared_ptr<const void> owner
   ) const noexcept -> void;
 
   // Callback mode.

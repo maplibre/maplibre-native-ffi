@@ -158,7 +158,8 @@ def _capture(
     if plan.kind == "buffer":
         match plan.buffer_form:
             case "view":
-                return [f"{indent}{target} = buffer(arena, {source});"]
+                copy = "byte_buffer" if plan.encoding == "bytes" else "buffer"
+                return [f"{indent}{target} = {copy}(arena, {source});"]
             case "pointer":
                 if plan.length == "nul":
                     raise ModelError(

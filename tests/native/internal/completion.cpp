@@ -6,6 +6,8 @@
 #include <memory>
 #include <stdexcept>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "completion/completion.hpp"
 
@@ -188,6 +190,33 @@ void queue_resolution_falls_back_without_allocation() {
   mln_delivery_queue_release(queue);
 }
 
+// A queued readback keeps its image until the batch is released, even when the
+// result is small enough for the reserved fallback item, which holds no image.
+void a_queued_readback_keeps_its_image_until_the_batch_is_released() {
+  const auto queue = create_queue();
+  auto completion = created(queued_descriptor(queue, nullptr));
+  completion->accept();
+  auto image = std::make_shared<std::vector<unsigned char>>(16);
+  const auto watched = std::weak_ptr<const void>{image};
+  completion->resolve([&image](const mln::core::CompletionSink& sink) {
+    const auto value = mln_texture_readback_result{
+      .data = {.data = image->data(), .size = image->size()},
+    };
+    mln::core::CompletionValue<&mln_render_session_read_texture>::deliver(
+      sink, value, std::exchange(image, nullptr)
+    );
+  });
+  completion.reset();
+  TEST_ASSERT_FALSE(watched.expired());
+
+  auto batch = mln_delivery_batch{MLN_HANDLE_NULL};
+  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+  MLN_TEST_OK(mln_delivery_queue_drain(queue, &batch, &view, nullptr));
+  mln_delivery_batch_release(batch);
+  TEST_ASSERT_TRUE(watched.expired());
+  mln_delivery_queue_release(queue);
+}
+
 void a_delivery_that_throws_after_the_sink_reports_once() {
   auto probe = CompletionProbe{};
   auto completion = created(descriptor_for(probe));
@@ -227,6 +256,7 @@ MLN_TEST_GROUP {
   RUN_TEST(racing_resolutions_deliver_once);
   RUN_TEST(a_throwing_delivery_reports_a_native_error);
   RUN_TEST(queue_resolution_falls_back_without_allocation);
+  RUN_TEST(a_queued_readback_keeps_its_image_until_the_batch_is_released);
   RUN_TEST(a_delivery_that_throws_after_the_sink_reports_once);
   RUN_TEST(abandoned_queue_completion_pushes_cancelled);
 }

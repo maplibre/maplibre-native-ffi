@@ -37,6 +37,9 @@ struct Arena {
   std::byte* storage = nullptr;
   std::size_t offset = 0;
   std::size_t capacity = std::numeric_limits<std::size_t>::max();
+  // Set when the delivery keeps alive the storage that the value's byte views
+  // point into, so they are borrowed instead of copied.
+  bool borrow_bytes = false;
 
   template <class T>
   auto allocate(std::size_t count) -> T* {
@@ -97,6 +100,16 @@ auto buffer(Arena<Writing>& arena, mln_buffer_view value) -> mln_buffer_view {
     destination[value.size] = '\0';
   }
   value.data = destination;
+  return value;
+}
+
+// A view the header marks as bytes. No host reads it as text, so a borrowed
+// view needs no terminator.
+template <bool Writing>
+auto byte_buffer(Arena<Writing>& arena, mln_buffer_view value)
+  -> mln_buffer_view {
+  if (!arena.borrow_bytes || value.size == 0) return buffer(arena, value);
+  if (value.data == nullptr) throw std::invalid_argument{"null bytes"};
   return value;
 }
 

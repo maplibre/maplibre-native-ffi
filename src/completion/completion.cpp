@@ -51,7 +51,7 @@ auto CompletionSink::deliver(
   mln_status status, mln_command_disposition disposition,
   CommandGenerations generations, std::string_view diagnostic,
   const void* value, std::size_t value_count, std::uint32_t value_size,
-  const delivery::CompletionCapture* capture
+  const delivery::CompletionCapture* capture, std::shared_ptr<const void> owner
 ) const noexcept -> void {
   const auto result = mln_completion_result{
     .size = sizeof(mln_completion_result),
@@ -72,7 +72,7 @@ auto CompletionSink::deliver(
   owner_->delivered_ = true;
   if (process_exiting()) return;
   if (queue_ != nullptr) {
-    deliver_queued(result, capture);
+    deliver_queued(result, capture, std::move(owner));
     return;
   }
   if (descriptor_.callback == nullptr) return;
@@ -85,24 +85,35 @@ auto CompletionSink::deliver(
 
 auto CompletionSink::deliver_queued(
   const mln_completion_result& result,
-  const delivery::CompletionCapture* capture
+  const delivery::CompletionCapture* capture, std::shared_ptr<const void> owner
 ) const noexcept -> void {
   auto item = delivery::ItemPtr{};
   try {
+    const auto borrow_bytes = owner != nullptr;
+    const auto header = borrow_bytes ? sizeof(delivery::OwningDeliveryItem)
+                                     : sizeof(delivery::DeliveryItem);
     auto measure =
-      delivery::Arena<false>{nullptr, sizeof(delivery::DeliveryItem)};
+      delivery::Arena<false>{.offset = header, .borrow_bytes = borrow_bytes};
     static_cast<void>(copy_result(measure, result, capture));
     const auto reserved_size =
       sizeof(delivery::DeliveryItem) + reserved_result_bytes;
-    item =
-      measure.offset <= reserved_size
-        ? std::move(owner_->fallback_)
-        : delivery::ItemPtr{delivery::detail::allocate_item(measure.offset)};
+    // The fallback item cannot hold an owner, however small the copy.
+    if (borrow_bytes) {
+      item = delivery::ItemPtr{
+        delivery::detail::allocate_owning_item(measure.offset, std::move(owner))
+      };
+    } else if (measure.offset <= reserved_size) {
+      item = std::move(owner_->fallback_);
+    } else {
+      item = delivery::ItemPtr{delivery::detail::allocate_item(measure.offset)};
+    }
     item->view.type = MLN_DELIVERY_TYPE_COMPLETION;
     item->view.user_data = user_data_;
     auto arena = delivery::Arena<true>{
-      reinterpret_cast<std::byte*>(item.get()), sizeof(delivery::DeliveryItem),
-      measure.offset
+      .storage = reinterpret_cast<std::byte*>(item.get()),
+      .offset = header,
+      .capacity = measure.offset,
+      .borrow_bytes = borrow_bytes,
     };
     item->view.payload.completion = copy_result(arena, result, capture);
   } catch (...) {
@@ -130,11 +141,12 @@ auto CompletionSink::deliver_queued(
 
 auto ErasedCompletionValue::deliver(
   const CompletionSink& sink, const void* value, std::size_t count,
-  std::uint32_t size, const delivery::CompletionCapture* capture
+  std::uint32_t size, const delivery::CompletionCapture* capture,
+  std::shared_ptr<const void> owner
 ) noexcept -> void {
   sink.deliver(
     MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, {}, {}, value, count,
-    size, capture
+    size, capture, std::move(owner)
   );
 }
 

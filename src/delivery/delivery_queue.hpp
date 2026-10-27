@@ -60,9 +60,17 @@ using ItemPtr = std::unique_ptr<DeliveryItem, ItemDeleter>;
 // Releases an item without disposing what it owns, as process exit requires.
 auto forget_item(ItemPtr item) noexcept -> void;
 
+// A delivery whose byte views borrow storage that `owner` keeps alive, such as
+// a readback's image, instead of copying it. Its arena starts after it.
+struct OwningDeliveryItem final : DeliveryItem {
+  std::shared_ptr<const void> owner;
+};
+
 namespace detail {
 
 auto allocate_item(std::size_t size) -> DeliveryItem*;
+auto allocate_owning_item(std::size_t size, std::shared_ptr<const void> owner)
+  -> DeliveryItem*;
 
 }  // namespace detail
 

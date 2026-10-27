@@ -187,7 +187,7 @@ auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_style_image_info& source
 ) -> mln_style_image_info {
   auto result = source;
-  result.pixels = buffer(arena, source.pixels);
+  result.pixels = byte_buffer(arena, source.pixels);
   result.stretch_x = span(
     arena, source.stretch_x, source.stretch_x_count,
     [&]([[maybe_unused]] auto& arena, auto element_1) {
@@ -323,7 +323,7 @@ auto capture_element(
   const mln_texture_readback_result& source
 ) -> mln_texture_readback_result {
   auto result = source;
-  result.data = buffer(arena, source.data);
+  result.data = byte_buffer(arena, source.data);
   return result;
 }
 inline auto discard_element(

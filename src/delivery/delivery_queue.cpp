@@ -190,6 +190,19 @@ auto allocate_item(std::size_t size) -> DeliveryItem* {
   return new (storage) DeliveryItem{};
 }
 
+auto allocate_owning_item(std::size_t size, std::shared_ptr<const void> owner)
+  -> DeliveryItem* {
+  auto* storage = ::operator new(size);
+  auto* item = new (storage) OwningDeliveryItem{};
+  item->owner = std::move(owner);
+  item->destroy = [](DeliveryItem* base) noexcept {
+    auto* owning = static_cast<OwningDeliveryItem*>(base);
+    owning->~OwningDeliveryItem();
+    ::operator delete(owning);
+  };
+  return item;
+}
+
 }  // namespace detail
 
 auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr {

@@ -5,6 +5,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <utility>
 
 #include "completion/completion.hpp"
 #include "maplibre_native_c.h"
@@ -28,7 +29,8 @@ class ErasedCompletionValue final {
 
   static auto deliver(
     const CompletionSink& sink, const void* value, std::size_t count,
-    std::uint32_t size, const delivery::CompletionCapture* capture
+    std::uint32_t size, const delivery::CompletionCapture* capture,
+    std::shared_ptr<const void> owner = nullptr
   ) noexcept -> void;
 };
 
@@ -58,6 +60,18 @@ class CompletionValue final {
     requires(!array)
   {
     ErasedCompletionValue::deliver(sink, &value, 1, size, capture);
+  }
+
+  // As deliver(), when `owner` keeps alive every byte view in `value`.
+  static auto deliver(
+    const CompletionSink& sink, const Type& value,
+    std::shared_ptr<const void> owner
+  ) noexcept -> void
+    requires(!array)
+  {
+    ErasedCompletionValue::deliver(
+      sink, &value, 1, size, capture, std::move(owner)
+    );
   }
 
   static auto deliver(
