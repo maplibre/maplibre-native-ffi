@@ -336,6 +336,20 @@ jobs:
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
       version: 0.202601.0-dev.0
+  arkts-ohpm:
+    name: ArkTS OHPM
+    permissions:
+      actions: read
+      contents: read
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'arkts-ohpm')
+    uses: ./.github/workflows/_arkts-ohpm.yml
+    with:
+      run_id: ${{ github.run_id }}
+      sha: ${{ github.sha }}
+      version: 0.202601.0-dev.0
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -353,6 +367,7 @@ jobs:
       - dotnet-nuget
       - python-wheels
       - typescript-npm
+      - arkts-ohpm
     steps:
       - name: Require every planned job
         env:

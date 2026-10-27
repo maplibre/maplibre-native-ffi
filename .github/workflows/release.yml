@@ -262,11 +262,10 @@ jobs:
             done
           done
 
-  arkts:
-    name: ArkTS
+  arkts-ohpm:
+    name: ArkTS OHPM
     needs:
       - source
-      - native
     permissions:
       actions: read
       contents: read
@@ -275,7 +274,55 @@ jobs:
       run_id: ${{ needs.source.outputs.run_id }}
       sha: ${{ needs.source.outputs.sha }}
       version: ${{ needs.source.outputs.version }}
-    secrets: inherit
+
+  arkts:
+    name: ArkTS
+    needs:
+      - source
+      - native
+      - arkts-ohpm
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    # OHPM has no trusted publishing. The environment holds the publish ID and
+    # the encrypted private key whose public half the publishing account lists,
+    # with its passphrase.
+    environment:
+      name: ohpm
+      url: https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl
+    permissions:
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+      PUBLISH_SHA: ${{ needs.source.outputs.sha }}
+      PUBLISH_VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ env.PUBLISH_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        with:
+          cache: false
+          install_args: core:node
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ohpm-packages-${{ env.PUBLISH_VERSION }}
+          path: build/ohpm
+      - uses: ./.github/actions/setup-ohpm
+      # A version that OHPM already lists is skipped, so a rerun after a
+      # partial publish resumes where it stopped.
+      - name: Publish
+        env:
+          OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
+          OHPM_PRIVATE_KEY: ${{ secrets.OHPM_PRIVATE_KEY }}
+          OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          mise exec --no-deps core:node -- python3 tools/release/ohpm_publish.py ohpm build/ohpm/*.har
+          for har in build/ohpm/*.har; do
+            echo "### $(basename "$har" .har) awaits OHPM's review" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   # Go resolves a module in a subdirectory from tags prefixed with its path.
   # The module path carries no major version suffix, so an epoch of 2 or more

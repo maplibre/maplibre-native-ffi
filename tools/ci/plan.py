@@ -82,6 +82,7 @@ JOBS = {
         lambda target: target.platform in PYTHON_WHEEL_PLATFORMS,
     ),
     "typescript-npm": ("npm", lambda target: addon(target) == "typescript"),
+    "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
 }
 
 

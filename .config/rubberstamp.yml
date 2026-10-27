@@ -426,3 +426,18 @@ ci:
             files:
               - bindings/typescript/scripts/pack.ts
           then: apply
+    ohpm:
+      covers: >-
+        Packs the ArkTS OHPM packages from the addons that the OpenHarmony
+        targets built, and checks them with ohpm as the registry will, so it
+        runs those targets. Only changes to what the packages contain or how
+        they are packed need it: the OHPM manifest and package files, and the
+        packing script. Ordinary TypeScript or ArkTS changes and one ABI's addon
+        don't.
+      rules:
+        - if:
+            files:
+              - .github/actions/setup-ohpm/**
+              - bindings/typescript/ohpm/**
+              - bindings/typescript/scripts/pack-ohpm.sh
+          then: apply
