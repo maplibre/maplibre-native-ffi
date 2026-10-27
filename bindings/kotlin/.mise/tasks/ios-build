@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Build the Kotlin binding and embedded Metal runtime for an iOS or tvOS target."
+#MISE depends=[{ task = "//:build", args = ["{{usage.preset}}"] }]
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "<preset>" {
+#USAGE   choices "ios-arm64-metal" "ios-simulator-arm64-metal" "tvos-arm64-metal" "tvos-simulator-arm64-metal"
+#USAGE }
+set -euo pipefail
+
+case "$usage_preset" in
+  ios-arm64-metal) kotlin_target=iosArm64 ;;
+  ios-simulator-arm64-metal) kotlin_target=iosSimulatorArm64 ;;
+  tvos-arm64-metal) kotlin_target=tvosArm64 ;;
+  tvos-simulator-arm64-metal) kotlin_target=tvosSimulatorArm64 ;;
+esac
+./gradlew \
+  -Pmaplibre.localBuild="build/$usage_preset/install" \
+  ":bindings:kotlin:${kotlin_target}Klib" \
+  ":bindings:kotlin:runtimes:metal:${kotlin_target}Klib"

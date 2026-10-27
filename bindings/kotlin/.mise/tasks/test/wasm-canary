@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#MISE description="Check that the Kotlin/Wasm runner fails a run whose test fails after asynchronous work."
+#MISE depends=[{ task = ":wasm-module", args = ["{{usage.preset}}"] }]
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "<preset>"
+set -euo pipefail
+
+# HarnessCanaryTest fails on purpose, so this passes only when the run fails
+# and its report names that one failure.
+results=bindings/kotlin/build/test-results/wasmJsBrowserTest
+rm -rf "$results"
+render_backend="${usage_preset#emscripten-wasm32-}"
+if ./gradlew \
+  -Pmaplibre.wasm.moduleDir="bindings/kotlin/wasm/build/$usage_preset/install" \
+  -Pmaplibre.wasm.renderBackend="$render_backend" \
+  -Pmaplibre.wasm.chromium="$(node scripts/find-chromium.mjs)" \
+  -Pmaplibre.wasm.canary=true \
+  :bindings:kotlin:wasmJsBrowserTest --rerun; then
+  echo "error: the canary run passed, so the wasm runner passes a failing test" >&2
+  exit 1
+fi
+python3 -I - "$results" <<'EOF'
+import pathlib
+import sys
+import xml.etree.ElementTree as ElementTree
+
+cases = [
+    case
+    for report in pathlib.Path(sys.argv[1]).glob("TEST-*.xml")
+    for case in ElementTree.parse(report).iter("testcase")
+]
+failed = [case for case in cases if case.find("failure") is not None]
+if len(cases) != 1 or len(failed) != 1:
+    sys.exit(
+        "error: the canary run failed without failing HarnessCanaryTest alone: "
+        f"{len(cases)} tests ran and {len(failed)} failed"
+    )
+if "fails on purpose" not in (failed[0].find("failure").get("message") or ""):
+    sys.exit("error: HarnessCanaryTest failed for another reason than its own")
+print("The wasm runner failed the run that HarnessCanaryTest failed.")
+EOF

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#MISE description="Run the Kotlin/Wasm suite in headless Chromium against an Emscripten preset's module."
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "<preset>"
+#USAGE flag "--filter <filter>" help="Run only the tests that match this Gradle test filter"
+set -euo pipefail
+
+# The preset is checked before the module links, so a refusal names its reason
+# even where that preset has no native build.
+case "$usage_preset" in
+  emscripten-wasm32-webgl) render_backend=webgl ;;
+  emscripten-wasm32-webgpu) render_backend=webgpu ;;
+  *)
+    echo "The Kotlin/Wasm suite tests the emscripten-wasm32 presets, got: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+mise run //bindings/kotlin:wasm-module "$usage_preset"
+gradle_args=(
+  -Pmaplibre.wasm.moduleDir="bindings/kotlin/wasm/build/$usage_preset/install"
+  -Pmaplibre.wasm.renderBackend="$render_backend"
+  -Pmaplibre.wasm.chromium="$(node scripts/find-chromium.mjs)"
+)
+test_args=()
+if [[ -n "${usage_filter:-}" ]]; then
+  test_args+=(--tests "$usage_filter")
+fi
+./gradlew "${gradle_args[@]}" :bindings:kotlin:wasmJsBrowserTest ${test_args[@]+"${test_args[@]}"}
+# A WebGPU canvas loses every WebGPU device of its page in headless Chromium,
+# so the WebGPU run gives the canvas surface test a page of its own.
+if [[ "$render_backend" == webgpu ]]; then
+  ./gradlew "${gradle_args[@]}" -Pmaplibre.wasm.canvasRun=true \
+    :bindings:kotlin:wasmJsBrowserTest ${test_args[@]+"${test_args[@]}"}
+fi

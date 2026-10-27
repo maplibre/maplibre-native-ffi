@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#MISE description="Run the Kotlin/JVM suite against a host preset's install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+case "$usage_preset" in
+  linux-* | macos-* | windows-*) ;;
+  *)
+    echo "The Kotlin/JVM suite tests host presets only, got: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+./gradlew -Pmaplibre.localBuild="build/$usage_preset/install" :bindings:kotlin:jvmTest

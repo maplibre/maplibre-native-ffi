@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#MISE description="Build the Kotlin Android binding from the presets built under build/."
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "[backend]" default="opengl" {
+#USAGE   choices "opengl" "vulkan"
+#USAGE }
+#USAGE arg "[abis]" default="auto" {
+#USAGE   choices "auto" "armeabi-v7a" "arm64-v8a" "x86_64" "arm64-v8a,x86_64" "armeabi-v7a,arm64-v8a,x86_64"
+#USAGE }
+set -euo pipefail
+
+abis="$usage_abis"
+if [[ "$abis" == auto ]]; then
+  abis=arm64-v8a,x86_64
+  if [[ "$usage_backend" == opengl ]]; then
+    abis=armeabi-v7a,arm64-v8a,x86_64
+  fi
+fi
+./gradlew \
+  -Pmaplibre.localBuild=build \
+  -Pmaplibre.android.backend="$usage_backend" \
+  -Pmaplibre.android.abis="$abis" \
+  :bindings:kotlin:androidBuild

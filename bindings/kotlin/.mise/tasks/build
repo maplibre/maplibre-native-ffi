@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#MISE description="Build the Kotlin binding for a native preset's target against its install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+runtime_backend=
+tasks=()
+case "$usage_preset" in
+  android-arm-egl) kotlin_target=androidNativeArm32; runtime_backend=opengl ;;
+  android-arm-vulkan) kotlin_target=androidNativeArm32; runtime_backend=vulkan ;;
+  android-arm64-egl) kotlin_target=androidNativeArm64; runtime_backend=opengl ;;
+  android-arm64-vulkan) kotlin_target=androidNativeArm64; runtime_backend=vulkan ;;
+  android-x64-egl) kotlin_target=androidNativeX64; runtime_backend=opengl ;;
+  android-x64-vulkan) kotlin_target=androidNativeX64; runtime_backend=vulkan ;;
+  linux-gnu-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64-egl) kotlin_target=linuxArm64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
+  macos-arm64-*) kotlin_target=macosArm64; tasks+=(:bindings:kotlin:jvmJar) ;;
+  windows-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
+  *)
+    echo "Unsupported Kotlin build preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+gradle_args=(-Pmaplibre.localBuild="build/$usage_preset/install")
+# Kotlin/Native has no Linux arm64 host toolchain, so this target only builds
+# through KLIB cross-compilation from a Linux x64 host.
+if [[ "$kotlin_target" == "linuxArm64" ]]; then
+  if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
+    echo "Linux ARM64 Kotlin/Native KLIBs cross-compile from a Linux x64 host only." >&2
+    exit 2
+  fi
+  gradle_args+=(-Pkotlin.native.enableKlibsCrossCompilation=true)
+fi
+if [[ -n "$kotlin_target" ]]; then
+  tasks+=(":bindings:kotlin:${kotlin_target}Klib")
+fi
+# The runtime KLIB embeds the backend-specific static archive, so it only
+# builds for a preset whose backend has a matching runtime publication.
+if [[ -n "$runtime_backend" ]]; then
+  tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
+fi
+./gradlew "${gradle_args[@]}" "${tasks[@]}"

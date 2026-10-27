@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Link the Kotlin/Wasm browser module against an Emscripten preset's archive."
+#MISE extends="ffi:preset"
+#MISE dir="wasm"
+#MISE shell="bash"
+set -euo pipefail
+
+cmake --preset "$usage_preset"
+cmake --build "build/$usage_preset" --target install --config Release --parallel

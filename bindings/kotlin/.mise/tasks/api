@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Generate Dokka HTML API reference for the Kotlin binding."
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+# Dokka configures every KMP target, including Android, so the SDK must exist.
+compile_sdk="$(
+  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' gradle/libs.versions.toml | head -n1
+)"
+if [[ -z "$compile_sdk" ]]; then
+  echo "Could not read android-compileSdk from gradle/libs.versions.toml" >&2
+  exit 1
+fi
+if [[ -z "${ANDROID_HOME:-}" ]]; then
+  echo "ANDROID_HOME is unset; point it at an Android SDK install." >&2
+  exit 1
+fi
+platform_dir="$ANDROID_HOME/platforms/android-$compile_sdk"
+if [[ ! -d "$platform_dir" ]]; then
+  echo "Android SDK platform android-$compile_sdk is missing under $ANDROID_HOME." >&2
+  echo "Install it (sdkmanager \"platforms;android-$compile_sdk\") and rerun." >&2
+  exit 1
+fi
+./gradlew :bindings:kotlin:dokkaGeneratePublicationHtml

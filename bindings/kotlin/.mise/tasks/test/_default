@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#MISE description="Run every Kotlin suite that a native preset's install supports."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+case "$usage_preset" in
+  linux-gnu-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
+  linux-gnu-arm64-* | windows-*) runtimes=(jvm) ;;
+  android-*)
+    exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"
+    ;;
+  ios-simulator-arm64-metal) runtimes=(native) ;;
+  tvos-simulator-arm64-metal) runtimes=(native) ;;
+  ios-arm64-metal)
+    echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2
+    exit 2
+    ;;
+  tvos-arm64-metal)
+    echo "The Kotlin tvOS tests need a runnable target; test tvos-simulator-arm64-metal instead of $usage_preset." >&2
+    exit 2
+    ;;
+  emscripten-wasm32-*) runtimes=(wasm) ;;
+  *)
+    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+for runtime in "${runtimes[@]}"; do
+  mise run "//bindings/kotlin:test:$runtime" "$usage_preset"
+done
