@@ -10,6 +10,7 @@ timeout = "10m"
 run = "zig build --build-file ../../build.zig --fetch=needed"
 
 [tasks.build]
+description = "Build the Zig binding against a native preset's install."
 extends = "ffi:preset"
 run = '''
 source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
@@ -17,57 +18,4 @@ zig build --build-file ../../build.zig \
   -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   ${zig_cross_args[@]+"${zig_cross_args[@]}"}
-'''
-
-[tasks.test]
-extends = "ffi:preset"
-# Android presets use their matching emulator, musl presets run in Alpine, and
-# other host presets run in process. Each test gets 30 seconds times
-# MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in Alpine's
-# software renderer, and to 1 on the host; the fixture scales its waits by the
-# same value.
-run = '''
-case "$usage_preset" in
-  android-* | linux-musl-*)
-    export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
-    ;;
-  *)
-    export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-1}"
-    ;;
-esac
-test_timeout="$((30 * MLN_TEST_TIMEOUT_SCALE))s"
-case "$usage_preset" in
-  android-arm64-* | android-x64-*)
-    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
-    exec zig build test --build-file ../../build.zig \
-      -Doptimize=ReleaseSafe \
-      -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout "$test_timeout" --summary all --verbose
-    ;;
-  android-*)
-    echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/zig:build and test an android-arm64 or android-x64 preset instead." >&2
-    exit 2
-    ;;
-esac
-zig build test --build-file ../../build.zig \
-  -Doptimize=ReleaseSafe \
-  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  --test-timeout "$test_timeout" \
-  --summary all \
-  --verbose
-'''
-run_windows = '''
-export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-1}"
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-zig build test --build-file ../../build.zig \
-  -Doptimize=ReleaseSafe \
-  -Dlocal-build="$native_install_dir" \
-  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  --test-timeout "$((30 * MLN_TEST_TIMEOUT_SCALE))s" \
-  --summary all \
-  --verbose
 '''
