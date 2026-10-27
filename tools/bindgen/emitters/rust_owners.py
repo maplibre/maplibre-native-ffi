@@ -140,7 +140,7 @@ def module_index(
         "use crate::callback;\n"
         "use crate::completion::{self, CommandCompletion, NativeFuture};\n"
         + (
-            "use crate::delivery::{self, CompletionHandler, DeliveryQueue, QueueKind};\n"
+            "use crate::delivery::{self, Callback, CompletionHandler, DeliveryQueue, Local, QueueKind, Shared};\n"
             if delivers
             else ""
         )

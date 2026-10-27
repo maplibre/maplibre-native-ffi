@@ -1,0 +1,31 @@
+error[E0308]: mismatched types
+  --> tests/compile_fail/local_registration_on_shared_queue.rs:13:32
+   |
+13 |         .set_resource_provider(provider.clone(), |_| {})
+   |          --------------------- ^^^^^^^^^^^^^^^^ expected `ResourceProvider`, found `ResourceProvider<Local>`
+   |          |
+   |          arguments to this method are incorrect
+   |
+   = note: expected struct `ResourceProvider<maplibre_native_ffi::Shared>`
+              found struct `ResourceProvider<Local>`
+note: method defined here
+  --> src/generated/runtime.rs
+   |
+   |     pub fn set_resource_provider(
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+  --> tests/compile_fail/local_registration_on_shared_queue.rs:15:35
+   |
+15 |     runtime.set_resource_provider(provider).unwrap();
+   |             --------------------- ^^^^^^^^ expected `ResourceProvider`, found `ResourceProvider<Local>`
+   |             |
+   |             arguments to this method are incorrect
+   |
+   = note: expected struct `ResourceProvider<maplibre_native_ffi::Shared>`
+              found struct `ResourceProvider<Local>`
+note: method defined here
+  --> src/generated/runtime.rs
+   |
+   |     pub fn set_resource_provider(
+   |            ^^^^^^^^^^^^^^^^^^^^^

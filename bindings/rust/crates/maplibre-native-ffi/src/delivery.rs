@@ -24,11 +24,14 @@
 //!   closes ends as if the queue had closed after it.
 //!
 //! [`Dispatcher`] drains a queue on a thread of its own and runs `Send`
-//! handlers there. [`LocalDispatcher`] runs completion handlers that need not
-//! be `Send` on the one thread that owns it. A registration's handler is its
-//! record's callbacks, which are `Send` and `Sync` in either mode. A synchronous
-//! round trip through a `Dispatcher` takes one thread hop more than callback
-//! mode or a `LocalDispatcher` drained by the waiting thread.
+//! handlers there. [`LocalDispatcher`] runs handlers that need not be `Send`
+//! on the one thread that owns it. A registration's handler is its record's
+//! [`Callback`]s: a record of kind [`Shared`], which callback mode and a
+//! shared queue take, holds `Send` and `Sync` callbacks, and one of kind
+//! [`Local`], built by its `local` constructor, holds callbacks that need not
+//! be either. A synchronous round trip through a `Dispatcher` takes one thread
+//! hop more than callback mode or a `LocalDispatcher` drained by the waiting
+//! thread.
 
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -43,22 +46,24 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::call::Call;
 use crate::completion::{self, CommandCompletion};
-use crate::convert::{InputArena, QueueSink, RegistrationHandler};
+use crate::convert::{
+    Handler, InputArena, LocalRegistrationHandler, QueueSink, RegistrationHandler,
+};
 use crate::handle::lock;
 use crate::{Error, Result, Status, TextureImageInfo};
 
-/// Whether a queue's completion handlers must be `Send`: [`Shared`] for a
-/// queue that any thread drains, and [`Local`] for one that only the thread
-/// that owns it drains.
-pub trait QueueKind: private::Sealed + 'static {}
+/// Whether a queue's handlers must be `Send`: [`Shared`] for a queue that
+/// any thread drains, and [`Local`] for one that only the thread that owns it
+/// drains.
+pub trait QueueKind: private::Sealed + Clone + Copy + Default + std::fmt::Debug + 'static {}
 
 /// A queue that any thread may drain.
-#[derive(Debug)]
-pub enum Shared {}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Shared;
 
 /// A queue that only the thread that owns it drains.
-#[derive(Debug)]
-pub enum Local {}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Local;
 
 impl QueueKind for Shared {}
 impl QueueKind for Local {}
@@ -77,16 +82,42 @@ mod private {
     pub trait Sealed {
         /// A completion handler, erased.
         type Completion: ?Sized;
+        /// A registration's handler.
+        type Registration: Clone;
 
         fn complete(
             handler: Box<Self::Completion>,
             result: Result<(&sys::mln_completion_result, &Arc<BatchOwner>)>,
+        );
+
+        /// Whether a registration of this kind needs a queue: its callbacks
+        /// can't run on native threads.
+        const LOCAL: bool;
+
+        /// The handler that a queue of this kind holds, or `None` for one
+        /// it can't run.
+        fn registration(handler: Handler) -> Option<Self::Registration>;
+
+        /// Erases a registration's handler.
+        ///
+        /// # Safety
+        ///
+        /// For [`Shared`], `deliver` must be `Send` and `Sync`.
+        unsafe fn handler(
+            deliver: impl Fn(*const c_void, &dyn Fn() -> Result<()>) + 'static,
+        ) -> Handler;
+
+        fn deliver(
+            handler: &Self::Registration,
+            delivery: *const c_void,
+            take: &dyn Fn() -> Result<()>,
         );
     }
 
     impl Sealed for Shared {
         type Completion =
             dyn FnOnce(Result<(&sys::mln_completion_result, &Arc<BatchOwner>)>) + Send;
+        type Registration = RegistrationHandler;
 
         fn complete(
             handler: Box<Self::Completion>,
@@ -94,16 +125,75 @@ mod private {
         ) {
             handler(result)
         }
+
+        const LOCAL: bool = false;
+
+        unsafe fn handler(
+            deliver: impl Fn(*const c_void, &dyn Fn() -> Result<()>) + 'static,
+        ) -> Handler {
+            /// A handler that the caller vouches is `Send` and `Sync`.
+            struct Vouched<F>(F);
+            // SAFETY: the caller guarantees it.
+            unsafe impl<F> Send for Vouched<F> {}
+            // SAFETY: as above.
+            unsafe impl<F> Sync for Vouched<F> {}
+            impl<F: Fn(*const c_void, &dyn Fn() -> Result<()>)> Vouched<F> {
+                fn run(&self, delivery: *const c_void, take: &dyn Fn() -> Result<()>) {
+                    (self.0)(delivery, take)
+                }
+            }
+            let deliver = Vouched(deliver);
+            Handler::Shared(Arc::new(move |delivery, take| deliver.run(delivery, take)))
+        }
+
+        fn registration(handler: Handler) -> Option<RegistrationHandler> {
+            match handler {
+                Handler::Shared(handler) => Some(handler),
+                Handler::Local(_) => None,
+            }
+        }
+
+        fn deliver(
+            handler: &RegistrationHandler,
+            delivery: *const c_void,
+            take: &dyn Fn() -> Result<()>,
+        ) {
+            handler(delivery, take)
+        }
     }
 
     impl Sealed for Local {
         type Completion = dyn FnOnce(Result<(&sys::mln_completion_result, &Arc<BatchOwner>)>);
+        type Registration = LocalRegistrationHandler;
 
         fn complete(
             handler: Box<Self::Completion>,
             result: Result<(&sys::mln_completion_result, &Arc<BatchOwner>)>,
         ) {
             handler(result)
+        }
+
+        const LOCAL: bool = true;
+
+        unsafe fn handler(
+            deliver: impl Fn(*const c_void, &dyn Fn() -> Result<()>) + 'static,
+        ) -> Handler {
+            Handler::Local(Arc::new(deliver))
+        }
+
+        fn registration(handler: Handler) -> Option<LocalRegistrationHandler> {
+            Some(match handler {
+                Handler::Shared(handler) => handler,
+                Handler::Local(handler) => handler,
+            })
+        }
+
+        fn deliver(
+            handler: &LocalRegistrationHandler,
+            delivery: *const c_void,
+            take: &dyn Fn() -> Result<()>,
+        ) {
+            handler(delivery, take)
         }
     }
 
@@ -128,6 +218,85 @@ mod private {
 }
 
 use private::BatchOwner;
+
+/// Whether a registration of kind `K` needs a queue.
+pub(crate) fn local<K: QueueKind>() -> bool {
+    K::LOCAL
+}
+
+/// Erases the handler of a registration of kind `K`, which runs its record's
+/// callbacks for a delivery.
+///
+/// # Safety
+///
+/// For [`Shared`], `deliver` must be `Send` and `Sync`.
+pub(crate) unsafe fn registration<K: QueueKind>(
+    deliver: impl Fn(*const c_void, &dyn Fn() -> Result<()>) + 'static,
+) -> Handler {
+    // SAFETY: the caller guarantees it.
+    unsafe { K::handler(deliver) }
+}
+
+/// A registration record's callback. A record of kind [`Shared`] holds one
+/// that is `Send` and `Sync`, which native threads or any thread that drains
+/// its queue may run. One of kind [`Local`] holds one that need not be either,
+/// which only a [`LocalDispatcher`]'s thread runs.
+pub struct Callback<K: QueueKind, F: ?Sized> {
+    callback: Arc<F>,
+    kind: PhantomData<K>,
+}
+
+// SAFETY: `shared` builds a shared callback only from a `Send` and `Sync`
+// closure.
+unsafe impl<F: ?Sized> Send for Callback<Shared, F> {}
+// SAFETY: as above.
+unsafe impl<F: ?Sized> Sync for Callback<Shared, F> {}
+
+impl<F: ?Sized> Callback<Shared, F> {
+    /// Erases a `Send` and `Sync` closure; `erase` only coerces it.
+    pub(crate) fn shared<C: Send + Sync + 'static>(
+        callback: C,
+        erase: fn(Arc<C>) -> Arc<F>,
+    ) -> Self {
+        Self {
+            callback: erase(Arc::new(callback)),
+            kind: PhantomData,
+        }
+    }
+}
+
+impl<F: ?Sized> Callback<Local, F> {
+    /// Erases a closure; `erase` only coerces it.
+    pub(crate) fn local<C: 'static>(callback: C, erase: fn(Arc<C>) -> Arc<F>) -> Self {
+        Self {
+            callback: erase(Arc::new(callback)),
+            kind: PhantomData,
+        }
+    }
+}
+
+impl<K: QueueKind, F: ?Sized> Clone for Callback<K, F> {
+    fn clone(&self) -> Self {
+        Self {
+            callback: Arc::clone(&self.callback),
+            kind: PhantomData,
+        }
+    }
+}
+
+impl<K: QueueKind, F: ?Sized> std::ops::Deref for Callback<K, F> {
+    type Target = F;
+
+    fn deref(&self) -> &F {
+        &self.callback
+    }
+}
+
+impl<K: QueueKind, F: ?Sized> std::fmt::Debug for Callback<K, F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Callback").finish_non_exhaustive()
+    }
+}
 
 /// What a queued completion lends its handler. Each operation's queued form
 /// names it; a handler only names the [`QueuedResult`] it receives.
@@ -362,7 +531,7 @@ static NATIVE: NativeQueue = NativeQueue {
 
 enum Entry<K: QueueKind> {
     Completion(Box<<K as private::Sealed>::Completion>),
-    Registration(RegistrationHandler),
+    Registration(<K as private::Sealed>::Registration),
 }
 
 struct Registry<K: QueueKind> {
@@ -597,7 +766,10 @@ fn end<K: QueueKind>(entries: impl IntoIterator<Item = (usize, Entry<K>)>) {
 }
 
 impl<K: QueueKind> QueueSink for DeliveryQueue<K> {
-    fn hold(&self, handler: RegistrationHandler) -> Result<(sys::mln_delivery_queue, *mut c_void)> {
+    fn hold(&self, handler: Handler) -> Result<(sys::mln_delivery_queue, *mut c_void)> {
+        let handler = K::registration(handler).ok_or_else(|| {
+            Error::invalid_argument("a local registration needs a local delivery queue")
+        })?;
         let id = DeliveryQueue::hold(self, Entry::Registration(handler))?;
         Ok((self.raw, id as *mut c_void))
     }
@@ -634,7 +806,7 @@ impl<K: QueueKind> Registry<K> {
                 None => None,
             },
             _ => match self.entries.get(&id) {
-                Some(Entry::Registration(handler)) => Some(Runs::Registration(Arc::clone(handler))),
+                Some(Entry::Registration(handler)) => Some(Runs::Registration(handler.clone())),
                 _ => None,
             },
         };
@@ -675,8 +847,8 @@ struct Slot<K: QueueKind>(Option<Runs<K>>);
 
 enum Runs<K: QueueKind> {
     Completion(Box<<K as private::Sealed>::Completion>),
-    Registration(RegistrationHandler),
-    Retired(RegistrationHandler),
+    Registration(<K as private::Sealed>::Registration),
+    Retired(<K as private::Sealed>::Registration),
 }
 
 impl<K: QueueKind> Slot<K> {
@@ -710,7 +882,7 @@ impl<K: QueueKind> Slot<K> {
             Runs::Registration(handler) => {
                 let take = || batch.take(index);
                 let delivery = std::ptr::from_ref(delivery).cast();
-                contain("mln_delivery", || handler(delivery, &take));
+                contain("mln_delivery", || K::deliver(&handler, delivery, &take));
             }
             Runs::Retired(handler) => contain("mln_user_data_release", || drop(handler)),
         }
@@ -1353,7 +1525,10 @@ mod tests {
         });
         let mut arena = InputArena::default();
         arena.set_queue(queue);
-        let (raw, token) = arena.queued_registration(|| handler).unwrap().unwrap();
+        let (raw, token) = arena
+            .queued_registration(false, || Handler::Shared(handler))
+            .unwrap()
+            .unwrap();
         assert_eq!(raw, queue.raw);
         arena.accept_registrations();
         (token, runs, dropped)
@@ -1513,7 +1688,9 @@ mod tests {
         let mut arena = InputArena::default();
         arena.set_queue(&queue);
         let error = arena
-            .queued_registration(|| Arc::new(|_, _: &dyn Fn() -> Result<()>| {}))
+            .queued_registration(false, || {
+                Handler::Shared(Arc::new(|_, _: &dyn Fn() -> Result<()>| {}))
+            })
             .unwrap_err();
         assert_eq!(error.status(), Status::InvalidState);
     }
@@ -1561,10 +1738,10 @@ mod tests {
         let mut arena = InputArena::default();
         arena.set_queue(&queue);
         arena
-            .queued_registration(|| {
-                Arc::new(move |_, _: &dyn Fn() -> Result<()>| {
+            .queued_registration(false, || {
+                Handler::Shared(Arc::new(move |_, _: &dyn Fn() -> Result<()>| {
                     let _ = &registered;
-                })
+                }))
             })
             .unwrap();
         queue.close();
@@ -1602,10 +1779,10 @@ mod tests {
             let mut arena = InputArena::default();
             arena.set_queue(&queue);
             arena
-                .queued_registration(|| {
-                    Arc::new(move |_, _: &dyn Fn() -> Result<()>| {
+                .queued_registration(false, || {
+                    Handler::Shared(Arc::new(move |_, _: &dyn Fn() -> Result<()>| {
                         let _ = &probe;
-                    })
+                    }))
                 })
                 .unwrap();
             // Native refused the call, so the arena drops without accepting.

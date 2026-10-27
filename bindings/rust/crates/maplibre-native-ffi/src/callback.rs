@@ -27,7 +27,7 @@ pub(crate) unsafe fn state<'a, S>(user_data: *mut c_void) -> &'a S {
 }
 
 /// The registration's callback, which a trampoline runs only when it is set.
-pub(crate) fn require<T: ?Sized>(callback: &Option<std::sync::Arc<T>>) -> Result<&T> {
+pub(crate) fn require<C: std::ops::Deref>(callback: &Option<C>) -> Result<&C::Target> {
     callback
         .as_deref()
         .ok_or_else(|| Error::invalid_argument("missing callback"))

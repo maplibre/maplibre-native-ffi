@@ -236,6 +236,7 @@ def declaration(values, value):
     """The struct, its conversions, and its constructors for one record."""
     name = pascal(value.native)
     generic = values.generic(value)
+    declared, bounds = values.generics(value)
     raw = f"sys::{value.native}"
     copyable = not dynamic(value)
     fields, writes, copies, args, names = [], [], [], [], []
@@ -338,12 +339,12 @@ def declaration(values, value):
         derives.append("Default")
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     impl = (
-        f"impl{generic} {name}{generic} {{ {' '.join(constructors)} }}\n"
+        f"impl{bounds} {name}{generic} {{ {' '.join(constructors)} }}\n"
         if constructors
         else ""
     )
     to_native = (
-        f"impl{generic} ToNative<{raw}> for {name}{generic} {{\n"
+        f"impl{bounds} ToNative<{raw}> for {name}{generic} {{\n"
         + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
@@ -352,7 +353,8 @@ def declaration(values, value):
         else ""
     )
     from_native = (
-        f"impl FromNative<{raw}> for {name} {{\n"
+        # A borrowed record is input only, so only a queued one is generic.
+        f"impl{bounds} FromNative<{raw}> for {name}{generic} {{\n"
         + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
         + "        Ok(Self {\n"
         + "".join(f"            {line}\n" for line in copies)
@@ -361,7 +363,7 @@ def declaration(values, value):
         else ""
     )
     return (
-        f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name}{generic} {{\n"
+        f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name}{declared} {{\n"
         + "\n".join(fields)
         + "\n}\n"
         + impl

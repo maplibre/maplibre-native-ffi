@@ -14,9 +14,14 @@ class Values:
         self.owners: dict[str, str] = {}
         self.handle_types: dict[str, str] = {}
         self.borrowed = borrowed_records(bound)
+        self.queue_generic = queue_generic_records(bound)
         # The lifetime that a borrowed record's type names: elided where a
         # signature uses it, and the record's own inside its declaration.
         self.lifetime = "'_"
+        # The queue kind that a queued registration's type names: the default,
+        # `Shared`, where unnamed, and `K` inside a queued view or a generic
+        # record's declaration.
+        self.queue_kind = ""
 
     def scalar(self, value: ValuePlan) -> str:
         canonical = value.ctype.canonical
@@ -151,6 +156,8 @@ class Values:
             return specialized
         if value.native in self.borrowed:
             return f"{self.name(value)}<{self.lifetime}>"
+        if value.native in self.queue_generic and self.queue_kind:
+            return f"{self.name(value)}<{self.queue_kind}>"
         return self.scalar(value) if value.kind == "scalar" else self.name(value)
 
     def declaration(self, value: ValuePlan) -> str:
@@ -168,6 +175,10 @@ class Values:
             return self.enum(value)
         if value.native in self.borrowed:
             self.lifetime = "'a"
+        if value.native in self.queue_generic:
+            if value.native in self.borrowed or value.kind == "union":
+                raise Unsupported(f"{value.native}: a borrowed or union queued record")
+            self.queue_kind = "K"
         try:
             if value.kind == "union":
                 return union_enum(self, value)
@@ -176,10 +187,20 @@ class Values:
             return declaration(self, value)
         finally:
             self.lifetime = "'_"
+            self.queue_kind = ""
 
     def generic(self, value: ValuePlan) -> str:
-        """The lifetime parameter of a borrowed record's declaration."""
+        """The parameter of a borrowed record's or queued record's type."""
+        if value.native in self.queue_generic:
+            return "<K>"
         return "<'a>" if value.native in self.borrowed else ""
+
+    def generics(self, value: ValuePlan) -> tuple[str, str]:
+        """The parameters that a record's declaration and its impls name."""
+        if value.native in self.queue_generic:
+            return "<K: QueueKind = Shared>", "<K: QueueKind>"
+        generic = self.generic(value)
+        return generic, generic
 
     def borrowing(self) -> bool:
         """Whether the declaration being rendered borrows its text and bytes."""
@@ -284,6 +305,32 @@ def borrowed_records(bound: BoundApi) -> frozenset[str]:
     ]:
         borrowed.update(added)
     return frozenset(borrowed)
+
+
+def queue_generic_records(bound: BoundApi) -> frozenset[str]:
+    """The registrations that a delivery queue can carry, and the records that
+    hold one, which are generic over the queue's kind."""
+    from .rust_callbacks import queued_registrations
+
+    found = set(queued_registrations(bound))
+
+    def holds(value: ValuePlan | None) -> bool:
+        while value is not None:
+            if value.native in found:
+                return True
+            value = value.element
+        return False
+
+    while added := [
+        native
+        for native, value in bound.values.items()
+        if native not in found
+        and value.kind == "record"
+        and not value.registration
+        and any(holds(field.value) for field in value.fields if field.role == "value")
+    ]:
+        found.update(added)
+    return frozenset(found)
 
 
 def _first_constant(value: ValuePlan, number: int) -> str:

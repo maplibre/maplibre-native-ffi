@@ -394,15 +394,25 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
 /// A registration's handler in queue mode, which runs its record's callback
 /// for the drained `mln_delivery` it receives a pointer to. `take` transfers
 /// the delivery's owned handles to the binding before a callback adopts them.
-pub(crate) type RegistrationHandler =
+pub type RegistrationHandler =
     std::sync::Arc<dyn Fn(*const c_void, &dyn Fn() -> Result<()>) + Send + Sync>;
+
+/// A local registration's handler, which only its queue's thread runs.
+pub type LocalRegistrationHandler = std::sync::Arc<dyn Fn(*const c_void, &dyn Fn() -> Result<()>)>;
+
+/// A registration's handler, of the kind of its record.
+pub enum Handler {
+    Shared(RegistrationHandler),
+    Local(LocalRegistrationHandler),
+}
 
 /// The delivery queue that a queue-mode call stores its registrations' handlers
 /// in.
 pub(crate) trait QueueSink {
     /// Stores a handler before its registration enters C, and returns the
     /// queue and the token that the registration names.
-    fn hold(&self, handler: RegistrationHandler) -> Result<(sys::mln_delivery_queue, *mut c_void)>;
+    /// A local handler fails on a shared queue.
+    fn hold(&self, handler: Handler) -> Result<(sys::mln_delivery_queue, *mut c_void)>;
     /// Native accepted the registration, so the queue keeps its handler, or
     /// drops it when the queue closed during the call.
     fn accept(&self, user_data: *mut c_void);
@@ -448,12 +458,18 @@ impl<'q> InputArena<'q> {
 
     /// Stores a registration's handler in this call's queue, and returns the
     /// queue and token that the registration names; or `None` in callback
-    /// mode.
+    /// mode, which a `local` registration can't use.
     pub(crate) fn queued_registration(
         &mut self,
-        handler: impl FnOnce() -> RegistrationHandler,
+        local: bool,
+        handler: impl FnOnce() -> Handler,
     ) -> Result<Option<(sys::mln_delivery_queue, *mut c_void)>> {
         let Some(queue) = self.queue else {
+            if local {
+                return Err(Error::invalid_argument(
+                    "a local registration needs a local delivery queue",
+                ));
+            }
             return Ok(None);
         };
         let (raw, user_data) = queue.hold(handler())?;

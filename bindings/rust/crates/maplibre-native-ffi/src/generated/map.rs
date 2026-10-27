@@ -1913,7 +1913,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
-        options: CustomGeometrySourceOptions,
+        options: CustomGeometrySourceOptions<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
@@ -1942,7 +1942,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     pub fn add_custom_vector_source(
         &self,
         source_id: &str,
-        options: CustomVectorSourceOptions,
+        options: CustomVectorSourceOptions<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
@@ -2150,7 +2150,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn apply_camera_delta(
         &self,
-        delta: &CameraDelta,
+        delta: &CameraDelta<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
@@ -4158,7 +4158,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn update_camera(
         &self,
-        update: &CameraUpdate,
+        update: &CameraUpdate<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);

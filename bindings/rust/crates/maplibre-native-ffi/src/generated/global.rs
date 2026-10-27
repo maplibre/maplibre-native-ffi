@@ -96,7 +96,7 @@ pub fn set_log_callback(handler: LogHandler) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn set_log_callback_queued<K: QueueKind>(
     queue: &DeliveryQueue<K>,
-    handler: LogHandler,
+    handler: LogHandler<K>,
 ) -> Result<()> {
     let mut call = Call::global().queue(queue);
     crate::abi::validate_abi_version()?;

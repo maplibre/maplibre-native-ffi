@@ -206,26 +206,50 @@ def trampoline(values, callback, name, host, state="Self"):
     ), public
 
 
-def required_parameters(values, value):
+def required_parameters(values, value, *, local=False):
     """The (name, function bound) of each callback that a registration
     requires, which its constructor takes."""
     return [
         (
             identifier(field.name),
-            callback_function(values, values.bound.callbacks[field.value.native]),
+            callback_function(
+                values, values.bound.callbacks[field.value.native], local=local
+            ),
         )
         for field in required_callbacks(value)
     ]
 
 
-def callback_function(values, callback):
-    """The closure bound of a host callback."""
+def callback_function(values, callback, *, local=False):
+    """The closure bound of a host callback, which a `local` one relaxes to
+    any thread's closure."""
     signature = ", ".join(
         callback_parameter_type(values, p) for p in callback.arguments
     )
     output, raw, _converted = callback_output(values, callback)
     returns = "" if raw == "()" else f" -> {output}"
-    return f"Fn({signature}){returns} + Send + Sync + 'static"
+    threads = "" if local else " + Send + Sync"
+    return f"Fn({signature}){returns}{threads} + 'static"
+
+
+def queued_registrations(bound) -> frozenset[str]:
+    """The registrations that a delivery queue can carry, whose callbacks
+    each have a delivery."""
+    from .rust import delivers_queues
+
+    if not delivers_queues(bound):
+        return frozenset()
+    return frozenset(
+        native
+        for native, value in bound.values.items()
+        if value.registration
+        and value.registration.queue
+        and all(
+            bound.callbacks[field.value.native].delivery is not None
+            for field in value.fields
+            if field.name in value.registration.callbacks
+        )
+    )
 
 
 def queued_dispatch(values, value):
@@ -237,19 +261,11 @@ def queued_dispatch(values, value):
     first, so the trampoline adopts what it now owns. Returns None when a
     callback has no queue delivery.
     """
-    from .rust import delivers_queues
-
-    if (
-        not value.registration
-        or not value.registration.queue
-        or not delivers_queues(values.bound)
-    ):
+    if value.native not in values.queue_generic:
         return None
     arms = []
     for field, callback in callbacks(values, value):
         plan = callback.delivery
-        if plan is None:
-            return None
         record = values.bound.values[plan.record]
         members = {f.name for f in record.fields}
         arguments = []
@@ -303,6 +319,10 @@ def declaration(values, value):
     name = values.name(value)
     raw = f"sys::{value.native}"
     fields, writes, copies, trampolines, constructors = [], [], [], [], []
+    # A queued registration is generic over its queue's kind: a shared one's
+    # callbacks are `Send` and `Sync`, and a local one's need not be.
+    queued = value.native in values.queue_generic
+    local_constructors = []
     required = {f.name for f in required_callbacks(value)}
     if any(field.required for field in value.fields):
         raise Unsupported(f"{value.native}: a registration's required member")
@@ -318,7 +338,10 @@ def declaration(values, value):
         )
         trampolines.append(code)
         function = callback_function(values, callback)
-        stored = f"std::sync::Arc<dyn {function}>"
+        local = callback_function(values, callback, local=True)
+        stored = (
+            f"Callback<K, dyn {local}>" if queued else f"std::sync::Arc<dyn {function}>"
+        )
         summary = callback_doc(
             values,
             doc(values.bound, f"{value.native}.{field.name}", "    "),
@@ -337,13 +360,22 @@ def declaration(values, value):
             f"raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"
         )
         copies.append(f"{public}: None,")
-        constructors.append(
-            f"pub fn with_{field.name}<F>(mut self, callback: F) -> Self where F: {function} {{ self.{public} = Some(std::sync::Arc::new(callback)); self }}"
-        )
-        if index == 0 and not required:
-            constructors.append(
-                f"pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{field.name}(callback) }}"
+        for kind, bound, made, built in (
+            (constructors, function, "shared", "new"),
+            *([(local_constructors, local, "local", "local")] if queued else []),
+        ):
+            wrapped = (
+                f"Callback::{made}(callback, |callback| callback)"
+                if queued
+                else "std::sync::Arc::new(callback)"
             )
+            kind.append(
+                f"pub fn with_{field.name}<F>(mut self, callback: F) -> Self where F: {bound} {{ self.{public} = Some({wrapped}); self }}"
+            )
+            if index == 0 and not required:
+                kind.append(
+                    f"pub fn {built}<F>(callback: F) -> Self where F: {bound} {{ Self::default().with_{field.name}(callback) }}"
+                )
     for field in value.fields:
         place = f"raw.{native_identifier(field.name)}"
         if field.role == "presence_mask":
@@ -390,7 +422,13 @@ def declaration(values, value):
         for field, _ in callbacks(values, value)
     )
     parameters = required_parameters(values, value)
-    if parameters:
+    for kind, local, made, built in (
+        (constructors, False, "shared", "new"),
+        *([(local_constructors, True, "local", "local")] if queued else []),
+    ):
+        parameters = required_parameters(values, value, local=local)
+        if not parameters:
+            break
         # A registration that requires a callback has no default value: its
         # constructor takes each required callback.
         types = (
@@ -411,7 +449,11 @@ def declaration(values, value):
         body = (
             "Self { "
             + " ".join(
-                f"{identifier(field.name)}: std::sync::Arc::new({identifier(field.name)}),"
+                (
+                    f"{identifier(field.name)}: Callback::{made}({identifier(field.name)}, |callback| callback),"
+                    if queued
+                    else f"{identifier(field.name)}: std::sync::Arc::new({identifier(field.name)}),"
+                )
                 if field.name in required
                 else f"{identifier(field.name)}: None,"
                 if field.name in value.registration.callbacks
@@ -421,8 +463,8 @@ def declaration(values, value):
             )
             + " }"
         )
-        constructors.append(
-            f"pub fn new<{generics}>({arguments}) -> Self where {bounds} {{ {body} }}"
+        kind.append(
+            f"pub fn {built}<{generics}>({arguments}) -> Self where {bounds} {{ {body} }}"
         )
     user_data = native_identifier(value.registration.user_data)
     release = native_identifier(value.registration.release)
@@ -442,7 +484,9 @@ def declaration(values, value):
             "            let state = self.clone();\n"
             "            // SAFETY: a queue runs the handler with a delivery of its\n"
             "            // batch, which stays valid until the handler returns.\n"
-            "            if let Some((queue, token)) = arena.queued_registration(|| std::sync::Arc::new(move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| state.deliver(unsafe { &*delivery.cast() }, take)))? {\n"
+            "            let deliver = move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| state.deliver(unsafe { &*delivery.cast() }, take);\n"
+            "            // SAFETY: a shared record is `Send` and `Sync`.\n"
+            "            if let Some((queue, token)) = arena.queued_registration(delivery::local::<K>(), || unsafe { delivery::registration::<K>(deliver) })? {\n"
             + "".join(
                 f"                raw.{name} = None;\n" for name in callback_fields
             )
@@ -457,19 +501,46 @@ def declaration(values, value):
     if parameters and returned:
         # A copy holds no callbacks, so it can't hold the required ones.
         raise Unsupported(f"{value.native}: a returned registration requires callbacks")
+    declared, generic, typed = (
+        ("<K: QueueKind = Shared>", "<K: QueueKind>", "<K>") if queued else ("", "", "")
+    )
     return (
         doc(values.bound, value.native)
+        + (
+            "///\n/// A record of kind [`Shared`], which `new` builds, holds `Send` and\n"
+            "/// `Sync` callbacks for callback mode or a shared queue. One of kind\n"
+            "/// [`Local`], which `local` builds, holds callbacks that only a local\n"
+            "/// queue's thread runs.\n"
+            if queued
+            else ""
+        )
         + f"#[derive(Clone{'' if parameters else ', Default'})]\n"
-        f"pub struct {name} {{\n"
+        f"pub struct {name}{declared} {{\n"
         + "\n".join(fields)
         + "\n}\n"
-        + f'impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
-        + f"impl {name} {{\n"
-        + "".join(f"    {line}\n" for line in constructors)
+        + f'impl{generic} std::fmt::Debug for {name}{typed} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
+        + (
+            f"impl {name} {{\n"
+            + "".join(f"    {line}\n" for line in constructors)
+            + "}\n"
+            + f"impl {name}<Local> {{\n"
+            + "".join(f"    {line}\n" for line in local_constructors)
+            + "}\n"
+            + f"impl<K: QueueKind> {name}<K> {{\n"
+            if queued
+            else f"impl {name} {{\n" + "".join(f"    {line}\n" for line in constructors)
+        )
         + "\n".join(trampolines)
         + (deliver or "")
         + "\n}\n"
-        + f"impl ToNative<{raw}> for {name} {{\n"
+        + (
+            # Queue mode vouches that a shared record crosses threads.
+            f"#[cfg(test)]\nstatic_assertions::assert_impl_all!({name}: Send, Sync);\n"
+            f"#[cfg(test)]\nstatic_assertions::assert_not_impl_any!({name}<Local>: Send, Sync);\n"
+            if queued
+            else ""
+        )
+        + f"impl{generic} ToNative<{raw}> for {name}{typed} {{\n"
         + f"    fn to_native(&self, arena: &mut InputArena) -> Result<{raw}> {{\n"
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
@@ -480,7 +551,7 @@ def declaration(values, value):
         + f"            raw.{release} = Some(callback::release::<Self>);\n"
         + "        }\n        Ok(raw)\n    }\n}\n"
         + (
-            f"impl FromNative<{raw}> for {name} {{\n"
+            f"impl{generic} FromNative<{raw}> for {name}{typed} {{\n"
             + "    /// Copies a registration, whose callbacks are unset.\n"
             + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
             + "        Ok(Self {\n"

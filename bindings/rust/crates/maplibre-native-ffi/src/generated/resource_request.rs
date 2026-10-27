@@ -124,7 +124,7 @@ impl<K: QueueKind> ResourceRequestHandleQueued<'_, K> {
     ///
     /// See `mln_resource_request_set_cancel_callback` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
+    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler<K>) -> Result<bool> {
         let mut call = self.0.inner.call().queue(self.1);
         let mut out_cancelled: bool = Default::default();
         let handler = call.reference(&handler)?;

@@ -168,7 +168,7 @@ fn a_queued_event_handler_receives_events_and_retires_when_cleared() {
         .runtime()
         .queued(dispatcher.queue())
         .set_event_handler(
-            RuntimeEventHandler::new(move |delivered| {
+            RuntimeEventHandler::local(move |delivered| {
                 let _ = &probe;
                 for event in delivered {
                     let _ = sender.send(event.r#type);
@@ -208,16 +208,18 @@ fn a_queued_provider_answers_requests_and_retires_when_replaced() {
     let dispatcher = LocalDispatcher::new().unwrap();
     let (probe, released) = release_probe();
     let serve = serving_provider(STYLE_URL, BACKGROUND_STYLE_JSON).callback;
-    let answered = Arc::new(Mutex::new(Vec::new()));
-    let seen = Arc::clone(&answered);
+    // A local provider runs only on the dispatcher's thread, so it may hold
+    // state that isn't Send.
+    let answered = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::clone(&answered);
     let accepted = Rc::new(Cell::new(false));
     fixture
         .runtime()
         .queued(dispatcher.queue())
         .set_resource_provider(
-            ResourceProvider::new(move |request, handle| {
+            ResourceProvider::local(move |request, handle| {
                 let _ = &probe;
-                seen.lock().unwrap().push(request.requested_url.clone());
+                seen.borrow_mut().push(request.requested_url.clone());
                 serve(request, handle);
             }),
             committed(&accepted),
@@ -230,10 +232,10 @@ fn a_queued_provider_answers_requests_and_retires_when_replaced() {
         &dispatcher,
         "the request",
         || {},
-        || !answered.lock().unwrap().is_empty(),
+        || !answered.borrow().is_empty(),
     );
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    assert_eq!(*answered.lock().unwrap(), [STYLE_URL]);
+    assert_eq!(*answered.borrow(), [STYLE_URL]);
 
     wait_for(fixture.runtime().set_resource_provider(denying_provider()));
     await_queued_release(&dispatcher, &released);
@@ -259,7 +261,7 @@ fn a_queued_transform_rewrites_urls_and_retires_when_cleared() {
         .runtime()
         .queued(dispatcher.queue())
         .set_resource_transform(
-            ResourceTransform::new(move |_, url, request| {
+            ResourceTransform::local(move |_, url, request| {
                 let _ = &probe;
                 let url = url.replace("/original.json", "/rewritten.json");
                 request.complete(&url).unwrap();
@@ -317,7 +319,7 @@ fn a_queued_cancel_handler_reports_a_cancelled_request_and_retires() {
     let reported = Arc::clone(&saw);
     let already = handle
         .queued(dispatcher.queue())
-        .set_cancel_callback(ResourceRequestCancelHandler::new(move || {
+        .set_cancel_callback(ResourceRequestCancelHandler::local(move || {
             let _ = &probe;
             *reported.lock().unwrap() = true;
         }))
@@ -350,7 +352,7 @@ fn a_queued_camera_end_handler_inside_a_command_runs_once_and_retires() {
         animation: AnimationOptions {
             duration_ms: Some(60_000.0),
             transition_id: Some(u64::MAX),
-            end_handler: CameraTransitionHandler::new(move |end| {
+            end_handler: CameraTransitionHandler::local(move |end| {
                 let _ = &probe;
                 sender.send(end.outcome).unwrap();
             }),
@@ -401,7 +403,7 @@ fn queued_custom_sources_fetch_tiles_and_retire_when_removed() {
     queued
         .add_custom_geometry_source(
             "geometry",
-            CustomGeometrySourceOptions::new(move |_| {
+            CustomGeometrySourceOptions::local(move |_| {
                 let _ = &geometry_probe;
                 geometry_fetched.lock().unwrap().push("geometry");
             }),
@@ -411,7 +413,7 @@ fn queued_custom_sources_fetch_tiles_and_retire_when_removed() {
     queued
         .add_custom_vector_source(
             "vector",
-            CustomVectorSourceOptions::new(move |_| {
+            CustomVectorSourceOptions::local(move |_| {
                 let _ = &vector_probe;
                 vector_fetched.lock().unwrap().push("vector");
             }),
@@ -461,7 +463,7 @@ fn a_queued_log_handler_receives_records_and_retires_when_cleared() {
     let (sender, records) = mpsc::channel();
     set_log_callback_queued(
         dispatcher.queue(),
-        LogHandler::new(move |severity, _, _, message| {
+        LogHandler::local(move |severity, _, _, message| {
             let _ = &probe;
             let _ = sender.send((severity, message.to_owned()));
             true

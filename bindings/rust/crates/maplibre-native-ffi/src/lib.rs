@@ -64,7 +64,7 @@ mod string;
 pub use call::Lent;
 pub use completion::{CommandCompletion, NativeFuture, Resolver, pending};
 pub use delivery::{
-    BatchBytes, Command, CompletionHandler, Copied, CopiedList, CopiedOptional, Delivery,
+    BatchBytes, Callback, Command, CompletionHandler, Copied, CopiedList, CopiedOptional, Delivery,
     DeliveryBatch, DeliveryKind, DeliveryQueue, Dispatcher, Local, LocalDispatcher, QueueKind,
     QueuedResult, QueuedValue, Readback, Shared, TakenDelivery, TextureReadbackView, Unit,
 };

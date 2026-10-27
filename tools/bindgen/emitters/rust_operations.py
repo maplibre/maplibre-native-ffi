@@ -116,6 +116,15 @@ def operation(
     passes no completion. With `queued`, it is a method of the owner's queued
     view, whose queue holds the completion's handler and the registrations'
     handlers."""
+    # A queued call takes the registrations of its queue's kind.
+    value_types.queue_kind = "K" if queued else ""
+    try:
+        return _operation(plan, value_types, discard=discard, queued=queued)
+    finally:
+        value_types.queue_kind = ""
+
+
+def _operation(plan: OperationPlan, value_types, *, discard, queued) -> tuple[str, str]:
     function = plan.function
     if plan.consumes == "always" and function.return_type.kind != "void":
         raise Unsupported(

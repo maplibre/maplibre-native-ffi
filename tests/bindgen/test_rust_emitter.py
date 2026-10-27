@@ -178,10 +178,17 @@ class RustEmitterTests(unittest.TestCase):
         # A closure bound cannot name its arguments, so the field's doc does.
         self.assertIn(
             "    /// The callback receives (`severity`, `event`, `code`, `message`).\n"
-            "    pub callback: std::sync::Arc<dyn ",
+            "    pub callback: Callback<K, dyn ",
             values,
         )
         self.assertIn("Fn(LogSeverity, LogEvent, i64, &str) -> bool", values)
+        # A queued registration's shared constructor takes a closure that
+        # crosses threads, and its local one any closure.
+        self.assertIn(
+            "F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static",
+            values,
+        )
+        self.assertIn("impl LogHandler<Local> {", values)
         self.assertIn('callback::invoke("mln_log_callback", false, ||', values)
 
     def test_docs_name_the_rust_symbols_of_c_declarations(self):

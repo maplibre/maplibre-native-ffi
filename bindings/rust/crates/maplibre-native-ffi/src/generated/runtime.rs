@@ -826,7 +826,7 @@ impl<K: QueueKind> RuntimeHandleQueued<'_, K> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_event_handler(
         &self,
-        handler: RuntimeEventHandler,
+        handler: RuntimeEventHandler<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
@@ -949,7 +949,7 @@ impl<K: QueueKind> RuntimeHandleQueued<'_, K> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_resource_provider(
         &self,
-        provider: ResourceProvider,
+        provider: ResourceProvider<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
@@ -975,7 +975,7 @@ impl<K: QueueKind> RuntimeHandleQueued<'_, K> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_resource_transform(
         &self,
-        transform: ResourceTransform,
+        transform: ResourceTransform<K>,
         on_complete: impl CompletionHandler<K, delivery::Command>,
     ) -> Result<()> {
         let mut call = self.0.inner.call().queue(self.1);
