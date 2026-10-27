@@ -5,9 +5,11 @@ block, usually inherited from a hidden platform preset, names the Rubberstamp
 coverage unit that runs it, the runner label it runs on, and the device its
 suites run on, if any. A device is the name of the CI step that boots it and
 the command that step runs. `ctest: false` marks a target whose native tests
-CI runs only on the device the target names, if any. This script uses only the
-standard library, so CI can run it with the runner's `python3` from a sparse
-checkout.
+CI runs only on the device the target names, if any. `miseEnv` names the mise
+configuration environment that supplies the target's SDK, and `softwareGpu`
+asks for a software driver for the target's backend on a runner without a
+GPU. This script uses only the standard library, so CI can run it with the
+runner's `python3` from a sparse checkout.
 """
 
 from __future__ import annotations
@@ -46,6 +48,8 @@ class Target:
     # False when CI runs the target's native tests only on its device.
     tested: bool
     device: dict[str, str] | None
+    mise_env: str
+    software_gpu: bool
 
 
 # The jobs other than target jobs: the unit that owns each, and which targets it
@@ -139,6 +143,8 @@ def targets(presets: dict) -> list[Target]:
                 runner=vendor["runner"],
                 tested=vendor.get("ctest", True),
                 device=device,
+                mise_env=vendor.get("miseEnv", ""),
+                software_gpu=vendor.get("softwareGpu", False),
             )
         )
     return result
@@ -177,16 +183,22 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         f"//bindings/typescript:{action}" in tasks for action in ("build", "test")
     ):
         addon = "arkts"
+    # The key hashes every `build.zig.zon` and is shared by all rows on the
+    # same runner. Cache keys are immutable, so a row that fetches only some
+    # projects would claim the key with an incomplete cache. A row that runs no
+    # Zig project skips the fetch; Windows ARM64 has no Zig toolchain to run it.
+    zig_projects = [
+        any(task.startswith(project) for task in tasks) for project in ZIG_PROJECTS
+    ]
+    zig = "cache" if all(zig_projects) else "fetch" if any(zig_projects) else "skip"
     return {
         "preset": target.preset,
         "runner": target.runner,
         "save_toolchains": save_toolchains,
-        # The key hashes every `build.zig.zon` and is shared by all rows on
-        # the same runner. Cache keys are immutable, so a row that fetches only
-        # some projects would claim the key with an incomplete cache.
-        "zig": all(
-            any(task.startswith(project) for task in tasks) for project in ZIG_PROJECTS
-        ),
+        "zig": zig,
+        "mise_env": target.mise_env,
+        # The backend that the software driver serves.
+        "software_gpu": target.backend if target.software_gpu else "",
         # `setup-gradle` restores a Gradle user home and stops the daemons in
         # its post-action, so Windows file locks do not outlive the job. A row
         # with no Gradle build pays that setup and teardown for an empty cache

@@ -151,7 +151,9 @@ jobs:
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-          target: ${{ matrix.preset }}
+          mise-env: ${{ matrix.mise_env }}
+          device: ${{ matrix.device }}
+          software-gpu: ${{ matrix.software_gpu }}
           zig: ${{ matrix.zig }}
           gradle: ${{ matrix.gradle }}
           save-toolchains: ${{ matrix.save_toolchains }}
@@ -175,7 +177,7 @@ jobs:
       # A failed job must not claim the immutable shared Zig cache with a
       # partial set of packages. Only rows covering every Zig project save it.
       - name: Save Zig packages
-        if: matrix.zig && steps.setup.outputs.zig-cache-hit != 'true'
+        if: matrix.zig == 'cache' && steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -235,7 +237,6 @@ jobs:
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-          target: android-multi
       - name: Download Android native artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -263,7 +264,6 @@ jobs:
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-          target: apple-xcframework
           gradle: false
       - name: Download Apple Metal native artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

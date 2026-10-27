@@ -184,6 +184,38 @@ class PresetTest(unittest.TestCase):
                 )
                 self.assertEqual(gnu.unit, f"linux-{architecture}")
 
+    def test_each_row_names_its_sdk_software_driver_and_zig_packages(self):
+        # The platforms whose suites run every Zig project cache the packages,
+        # those that run some fetch them, and the rest skip them.
+        zig = {
+            "linux-gnu": "cache",
+            "macos": "cache",
+            "linux-musl": "fetch",
+            "android": "fetch",
+            "ios-maccatalyst": "fetch",
+            "windows": "fetch",
+        }
+        expected = {}
+        for name, target in self.targets.items():
+            mise_env = (
+                target.platform if target.platform in ("emscripten", "ohos") else ""
+            )
+            # Only the Linux and Windows runners lack a GPU.
+            gpu = target.platform in ("linux-gnu", "linux-musl", "windows")
+            packages = zig.get(target.platform, "skip")
+            # Windows ARM64 has no Zig toolchain.
+            if name.startswith("windows-arm64-"):
+                packages = "skip"
+            expected[name] = (mise_env, target.backend if gpu else "", packages)
+        matrix = plan.plan(self.presets, True, [])["matrix"]
+        self.assertEqual(
+            {
+                row["preset"]: (row["mise_env"], row["software_gpu"], row["zig"])
+                for row in matrix
+            },
+            expected,
+        )
+
     def test_apple_simulators_and_catalyst_override_the_platform(self):
         self.assertEqual(
             {

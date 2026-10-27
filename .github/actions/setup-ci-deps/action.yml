@@ -1,11 +1,27 @@
 name: Setup CI deps
 description: Install the toolchain and target-specific CI prerequisites
 
+# A target job passes its matrix row's fields, which tools/ci/plan.py resolves
+# from the preset's vendor block. Every other job runs on the host toolchain.
 inputs:
-  target:
-    description: Native target name
+  mise-env:
+    description:
+      The mise configuration environment that supplies the target's SDK, such as
+      emscripten or ohos
     required: false
-    default: host
+    default: ""
+  device:
+    description:
+      The name of the device that the target's suites boot, such as Android
+      emulator
+    required: false
+    default: ""
+  software-gpu:
+    description:
+      The render backend, egl, vulkan, or wgl, whose software driver stands in
+      for the GPU that the runners lack
+    required: false
+    default: ""
   sccache-access-key-id:
     description: R2 S3 access key ID with Object Read & Write (push jobs only)
     required: false
@@ -16,10 +32,12 @@ inputs:
     required: false
     default: ""
   zig:
-    description:
-      Restore the Zig package cache and expose its key for a later save
+    description: >-
+      How the job gets its Zig packages: cache restores the Zig package cache
+      and exposes its key for a later save, fetch downloads them, and skip
+      leaves out the Zig projects
     required: false
-    default: "false"
+    default: fetch
   gradle:
     description:
       Set up Gradle and its user-home cache; jobs that run no Gradle build leave
@@ -87,16 +105,15 @@ runs:
       if: runner.os != 'Windows'
       shell: bash
       env:
-        TARGET: ${{ inputs.target }}
+        SDK: ${{ inputs.mise-env }}
+        DEVICE: ${{ inputs.device }}
       run: |
-        case "${TARGET}" in
-          emscripten-*) echo "MISE_ENV=emscripten" >> "$GITHUB_ENV" ;;
-          ohos-x64-egl) echo "MISE_ENV=ohos" >> "$GITHUB_ENV" ;;
-          ohos-*)
-            echo "MISE_ENV=ohos" >> "$GITHUB_ENV"
-            echo "MISE_DISABLE_TOOLS=http:oniro-emulator" >> "$GITHUB_ENV"
-            ;;
-        esac
+        if [[ -n "${SDK}" ]]; then
+          echo "MISE_ENV=${SDK}" >> "$GITHUB_ENV"
+        fi
+        if [[ "${SDK}" == ohos && "${DEVICE}" != "OpenHarmony emulator" ]]; then
+          echo "MISE_DISABLE_TOOLS=http:oniro-emulator" >> "$GITHUB_ENV"
+        fi
 
     # The gitlink SHA is what decides the checkout, so key on it directly. A
     # tag file can be left behind by a pin bump; the recorded commit cannot.
@@ -140,7 +157,7 @@ runs:
       run: bash "${GITHUB_ACTION_PATH}/bound-apt.sh"
 
     - name: Use Linux software graphics drivers
-      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
+      if: ${{ runner.os == 'Linux' && inputs.software-gpu != '' }}
       shell: bash
       run: |
         # xvfb-run needs xauth, which xvfb only recommends.
@@ -166,8 +183,7 @@ runs:
     # 16 GiB runner, whose kernel keeps some, room for one. The EGL job's
     # suites run on API 26 and API 36 at once.
     - name: Let the Android emulators run side by side
-      if:
-        ${{ runner.os == 'Linux' && startsWith(inputs.target, 'android-x64-') }}
+      if: ${{ runner.os == 'Linux' && inputs.device == 'Android emulator' }}
       shell: bash
       run: |
         mkdir -p ~/.config/devices-cli
@@ -177,7 +193,7 @@ runs:
     # QEMU. Keep the emulator dependency out of every other job and the dev
     # container.
     - name: Install the OpenHarmony emulator host
-      if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
+      if: ${{ runner.os == 'Linux' && inputs.device == 'OpenHarmony emulator' }}
       shell: bash
       run: |
         sudo apt-get update
@@ -186,7 +202,9 @@ runs:
     # The FreeBSD suites run in a virtual machine that anyvm boots from a UEFI
     # disk image.
     - name: Install the FreeBSD virtual machine host
-      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'freebsd-') }}
+      if:
+        ${{ runner.os == 'Linux' && inputs.device == 'FreeBSD virtual machine'
+        }}
       shell: bash
       run: |
         sudo apt-get update
@@ -197,13 +215,10 @@ runs:
 
     # The hosted runner exposes /dev/kvm, and this rule grants the runner
     # process access to hardware acceleration. Without it the emulators and the
-    # FreeBSD virtual machine fall back to software emulation, which no job here
-    # has the time budget for.
+    # FreeBSD virtual machine, every device a Linux job boots, fall back to
+    # software emulation, which no job here has the time budget for.
     - name: Enable KVM for the emulator
-      if:
-        ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' ||
-        startsWith(inputs.target, 'android-x64-') || startsWith(inputs.target,
-        'freebsd-')) }}
+      if: ${{ runner.os == 'Linux' && inputs.device != '' }}
       shell: bash
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -215,11 +230,11 @@ runs:
         test -w /dev/kvm
 
     - name: Use Windows Vulkan software driver
-      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
+      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
       uses: ./.github/actions/setup-windows-vulkan-software
 
     - name: Use Windows OpenGL software driver
-      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
+      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'wgl' }}
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
@@ -279,7 +294,7 @@ runs:
     # populate it pass. A key is never overwritten, so a partial fetch that won
     # the key would make one transient network error permanent.
     - name: Compute Zig package cache key
-      if: ${{ inputs.zig == 'true' }}
+      if: ${{ inputs.zig == 'cache' }}
       id: zig-cache-key
       shell: bash
       run: >-
@@ -290,7 +305,7 @@ runs:
     # holds compilation artifacts keyed by this key's `build.zig.zon` hash, so
     # they go stale the moment a source file changes and never get replaced.
     - name: Restore Zig packages
-      if: ${{ inputs.zig == 'true' }}
+      if: ${{ inputs.zig == 'cache' }}
       id: zig-packages
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -325,9 +340,7 @@ runs:
     # in the version catalog fixes all three, so the key is that file's hash,
     # and an exact hit skips the save.
     - name: Cache Kotlin/Wasm tooling
-      if:
-        ${{ inputs.gradle == 'true' && startsWith(inputs.target, 'emscripten-')
-        }}
+      if: ${{ inputs.gradle == 'true' && inputs.mise-env == 'emscripten' }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -373,9 +386,7 @@ runs:
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
     - name: Install Windows Vulkan SDK
-      if:
-        ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target,
-        '-vulkan') }}
+      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
       uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
@@ -395,9 +406,7 @@ runs:
     # directory to both ordinary processes and runtimes with isolated DLL
     # search paths, such as Python 3.8+.
     - name: Expose the Vulkan loader
-      if:
-        ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target,
-        '-vulkan') }}
+      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
       shell: pwsh
       run: |
         # Where the loader sits differs by runner: the x64 SDK groups it under
@@ -424,15 +433,16 @@ runs:
     # rustup tree, which lives outside the mise data directory either way.
     # Restore before it runs and save once every install has succeeded.
     #
-    # The hashed set mirrors `[monorepo].config_roots`. Naming the roots keeps a
-    # `**` glob out of the submodule an earlier step restores from a cache.
+    # The key covers every mise configuration and lock file in the repository.
+    # The globs leave out the submodule, which an earlier step restores from a
+    # cache.
     - name: Compute toolchain cache key
       id: toolchain-key
       shell: bash
       run: |
         prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
-        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}-${{ hashFiles('**/mise*.toml', '**/mise*.lock', '!third_party/**') }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore toolchains
       id: toolchains
@@ -483,9 +493,18 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        ZIG: ${{ inputs.zig }}
       run: |
+        deps_args=(--monorepo --jobs 1)
+        if [[ "$ZIG" == skip ]]; then
+          deps_args+=(
+            --skip //bindings/zig:zig
+            --skip //examples/zig-map:zig
+            --skip //examples/zig-readback:zig
+          )
+        fi
         for attempt in 1 2 3; do
-          if MISE_NO_HOOKS=1 mise deps --monorepo --jobs 1; then
+          if MISE_NO_HOOKS=1 mise deps "${deps_args[@]}"; then
             exit 0
           fi
           echo "::warning::mise deps --monorepo failed (attempt $attempt/3)"
@@ -505,11 +524,11 @@ runs:
       shell: pwsh
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        ZIG: ${{ inputs.zig }}
       run: |
         $env:MISE_NO_HOOKS = "1"
         $depsArgs = @("--monorepo", "--jobs", "1")
-        # Windows ARM64 has no Zig toolchain; its target suites omit Zig too.
-        if ($env:RUNNER_ARCH -eq "ARM64") {
+        if ($env:ZIG -eq "skip") {
           $depsArgs += @(
             "--skip", "//bindings/zig:zig",
             "--skip", "//examples/zig-map:zig",

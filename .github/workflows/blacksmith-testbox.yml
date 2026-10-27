@@ -23,16 +23,17 @@ jobs:
       - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
         with:
           testbox_id: ${{ inputs.testbox_id }}
-      # Matches the broad Linux target job, including source/submodule sync.
-      # Covers x64 GNU and musl presets with EGL or Vulkan; ARM64 needs CI's
-      # blacksmith-4vcpu-ubuntu-2404-arm runner. Android/OHOS emulators and
-      # Emscripten need their target-specific setup-ci-deps inputs and SDKs.
-      # FreeBSD presets build here too, and their suites need QEMU and KVM
-      # access; see the FreeBSD steps in setup-ci-deps.
+      # Matches the linux-gnu-x64-egl target job, including source/submodule
+      # sync. Covers x64 GNU and musl presets with EGL or Vulkan; ARM64 needs
+      # CI's blacksmith-4vcpu-ubuntu-2404-arm runner. Android/OHOS emulators
+      # and Emscripten need the setup-ci-deps inputs of their matrix rows,
+      # which name their SDKs and devices. FreeBSD presets build here too, and
+      # their suites need QEMU and KVM access; see the FreeBSD steps in
+      # setup-ci-deps.
       - uses: ./.github/actions/setup-ci-deps
         with:
-          target: linux-gnu-x64-egl
-          zig: true
+          software-gpu: egl
+          zig: cache
           save-toolchains: true
       - name: Preserve the environment for Testbox SSH commands
         shell: bash
