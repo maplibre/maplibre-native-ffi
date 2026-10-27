@@ -124,9 +124,8 @@ gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  android-*)
-    exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-native-android.sh" "$usage_preset"
-    ;;
+  android-arm64-*) kotlin_target=androidNativeArm64 ;;
+  android-x64-*) kotlin_target=androidNativeX64 ;;
   ios-simulator-arm64-metal)
     kotlin_target=iosSimulatorArm64
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
@@ -152,8 +151,22 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-gradle_tasks+=(":bindings:kotlin:${kotlin_target}Test")
-./gradlew -Pmaplibre.localBuild="build/$usage_preset/install" "${gradle_tasks[@]}"
+install="build/$usage_preset/install"
+if [[ "$kotlin_target" != androidNative* ]]; then
+  exec ./gradlew -Pmaplibre.localBuild="$install" "${gradle_tasks[@]}" ":bindings:kotlin:${kotlin_target}Test"
+fi
+# Gradle only links the Android suite; tools/devices/run runs it on an emulator
+# for the install's ABI.
+mise run //:android-sdk-packages --native-only
+# Use the project's NDK linker, which also runs natively on Apple Silicon.
+# Kotlin's bundled Android toolchain contains an Intel-only macOS linker.
+./gradlew \
+  -Pmaplibre.localBuild="$install" \
+  -Pmaplibre.android.nativeTestToolchain="$("$MISE_MONOREPO_ROOT/scripts/android-ndk-prebuilt.sh")" \
+  ":bindings:kotlin:linkDebugTest${kotlin_target/androidNative/AndroidNative}"
+export MLN_FFI_DEVICE_INSTALL="$install" MLN_FFI_DEVICE_TIMEOUT=300
+export MLN_FFI_DEVICE_LIBRARIES="$install/lib/libmln_test_graphics.so"
+exec "$MISE_MONOREPO_ROOT/tools/devices/run" "bindings/kotlin/build/bin/$kotlin_target/debugTest/test.kexe"
 '''
 
 [tasks.wasm-module]
