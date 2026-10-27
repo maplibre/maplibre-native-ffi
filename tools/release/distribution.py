@@ -20,11 +20,17 @@ import shutil
 import conan_package
 import swift_package
 import vcpkg_registry
+import xmake_package
 from native_package_release import RELEASE_DOWNLOAD_URL
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHECKSUMS_NAME = "SHA256SUMS"
-WRITERS = (swift_package.write, vcpkg_registry.write, conan_package.write)
+WRITERS = (
+    swift_package.write,
+    vcpkg_registry.write,
+    conan_package.write,
+    xmake_package.write,
+)
 README = """\
 # MapLibre Native FFI distribution
 

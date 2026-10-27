@@ -63,6 +63,23 @@ Linux and FreeBSD prefixes also carry a complete static archive. A static musl
 executable can link it for the non-rendering APIs, but rendering loads EGL or
 Vulkan drivers at run time and needs a dynamic loader.
 
+### xmake
+
+With xmake 3.1.2 or later, select a release by its distribution repository tag:
+
+```lua title="xmake.lua"
+add_repositories("maplibre https://github.com/maplibre/maplibre-native-ffi-distribution.git v{{version}}")
+add_requires("maplibre-native-c {{version}}", {configs = {backend = "vulkan"}})
+
+target("app")
+    set_kind("binary")
+    add_files("main.c")
+    add_packages("maplibre-native-c")
+```
+
+Omit `backend` to take the platform's default. On Linux, set `libc = "musl"`
+in `configs` when building for musl.
+
 ### Add the XCFramework to an Apple app
 
 `MaplibreNativeC.xcframework.zip` holds the framework `MaplibreNativeC` for

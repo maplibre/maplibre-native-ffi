@@ -40,9 +40,9 @@ class PublishDistributionTest(unittest.TestCase):
         self.assets.mkdir()
         archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
         archive.write_bytes(b"native archive")
-        archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        self.archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (self.assets / "SHA256SUMS").write_text(
-            f"{archive_digest}  {archive.name}\n{DIGEST}  {XCFRAMEWORK_NAME}\n"
+            f"{self.archive_digest}  {archive.name}\n{DIGEST}  {XCFRAMEWORK_NAME}\n"
         )
         self.remote = root / "distribution.git"
         subprocess.run(
@@ -87,6 +87,18 @@ class PublishDistributionTest(unittest.TestCase):
         self.assertEqual(set(sources), {"0.202611.0", "0.202611.1"})
         self.assertIn("v0.202611.0/", sources["0.202611.0"]["macos-arm64-metal"]["url"])
         self.assertIn("v0.202611.1/", sources["0.202611.1"]["macos-arm64-metal"]["url"])
+
+    def test_a_release_publishes_the_xmake_repository_with_its_version(self) -> None:
+        published = self.publish("v0.202611.0")
+        self.assertEqual(published.returncode, 0, published.stderr)
+
+        recipe = git(
+            self.remote, "show", "v0.202611.0:packages/m/maplibre-native-c/xmake.lua"
+        )
+        self.assertIn(
+            f'add_versions("macos-arm64-metal:0.202611.0", "{self.archive_digest}")',
+            recipe,
+        )
 
     def test_a_rerun_after_a_publish_changes_nothing(self) -> None:
         self.publish("v0.202611.0")

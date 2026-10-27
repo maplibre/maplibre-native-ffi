@@ -490,4 +490,17 @@ ci:
               - tools/release/conan/**
               - tools/release/check_conan.py
               - tests/distribution/conan/**
+    xmake:
+      covers: >-
+        Writes the xmake repository that a release pushes to the distribution
+        repository, then installs the Linux x64 OpenGL archive through it and
+        builds and runs a C consumer. Only changes to the repository generator
+        or consumer check need it.
+      rules:
+        - if:
+            files:
+              - tools/release/distribution.py
+              - tools/release/xmake_package.*
+              - tools/release/test_xmake_package.py
+              - tests/package/main.c
           then: apply

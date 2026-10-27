@@ -9,6 +9,7 @@ import unittest
 
 from distribution import Release, write
 from native_package_release import XCFRAMEWORK_NAME
+from xmake_package import PACKAGE
 
 REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 DIGEST = "539f11cb25fe35a1e8b8e8b6f1c095cde9f93f0f8efddb4115469335d6d37b8a"
@@ -134,6 +135,7 @@ class DistributionTest(unittest.TestCase):
                 "Package.swift",
                 "README.md",
                 "Sources",
+                "packages",
                 "ports",
                 "recipes",
                 "versions",
@@ -193,6 +195,29 @@ class DistributionTest(unittest.TestCase):
                 "sha256": self.archive_digest,
             },
         )
+
+    def test_the_xmake_package_pins_each_archives_version_and_checksum(self) -> None:
+        write(self.tree, Release(self.assets, "v0.202611.0"), REPOSITORY)
+
+        recipe = (self.tree / PACKAGE).read_text()
+        self.assertIn(
+            'add_urls("https://github.com/maplibre/maplibre-native-ffi/releases/'
+            'download/v0.202611.0/maplibre-native-c-macos-arm64-metal.tar.gz", '
+            '{alias = "macos-arm64-metal"})',
+            recipe,
+        )
+        self.assertIn(
+            f'add_versions("macos-arm64-metal:0.202611.0", "{self.archive_digest}")',
+            recipe,
+        )
+        self.assertNotIn("RELEASE_ARCHIVES", recipe)
+
+    def test_a_local_xmake_repository_installs_a_copy_of_the_archive(self) -> None:
+        write(self.tree, Release(self.assets), REPOSITORY)
+
+        archive = self.tree / "archives/maplibre-native-c-macos-arm64-metal.tar.gz"
+        self.assertEqual(archive.read_bytes(), b"native archive")
+        self.assertIn(str(archive.resolve()), (self.tree / PACKAGE).read_text())
 
     def test_the_tree_may_not_hold_the_repository(self) -> None:
         repository = self.tree / "checkout"
