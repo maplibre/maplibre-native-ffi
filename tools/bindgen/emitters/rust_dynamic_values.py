@@ -32,7 +32,17 @@ def public(values, value):
     if array := slice_of(values, value):
         return values.public(array.value)
     if value.kind == "buffer":
-        result = "String" if is_text(value) else "Vec<u8>"
+        if values.borrowing():
+            result = f"&{values.lifetime} {'str' if is_text(value) else '[u8]'}"
+        else:
+            result = "String" if is_text(value) else "Vec<u8>"
+    elif (
+        value.kind == "array"
+        and values.borrowing()
+        and value.ctype.kind != "array"
+        and value.element.kind == "buffer"
+    ):
+        result = f"&{values.lifetime} [{values.public(value.element)}]"
     elif value.kind == "array":
         result = f"Vec<{values.public(value.element)}>"
     elif value.kind == "reference":
@@ -225,6 +235,7 @@ def presence(mask, bit):
 def declaration(values, value):
     """The struct, its conversions, and its constructors for one record."""
     name = pascal(value.native)
+    generic = values.generic(value)
     raw = f"sys::{value.native}"
     copyable = not dynamic(value)
     fields, writes, copies, args, names = [], [], [], [], []
@@ -326,9 +337,13 @@ def declaration(values, value):
     if defaultable(values, value):
         derives.append("Default")
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
-    impl = f"impl {name} {{ {' '.join(constructors)} }}\n" if constructors else ""
+    impl = (
+        f"impl{generic} {name}{generic} {{ {' '.join(constructors)} }}\n"
+        if constructors
+        else ""
+    )
     to_native = (
-        f"impl ToNative<{raw}> for {name} {{\n"
+        f"impl{generic} ToNative<{raw}> for {name}{generic} {{\n"
         + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
@@ -346,7 +361,7 @@ def declaration(values, value):
         else ""
     )
     return (
-        f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name} {{\n"
+        f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name}{generic} {{\n"
         + "\n".join(fields)
         + "\n}\n"
         + impl
@@ -388,6 +403,7 @@ def union_declaration(values, value):
     from .rust_values import union_enum
 
     name = values.name(value)
+    generic = values.generic(value)
     raw = f"sys::{value.native}"
     member = value.union_member
     place = f"raw.{native_identifier(member.name)}"
@@ -400,7 +416,7 @@ def union_declaration(values, value):
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     directions = values.directions.get(value.native, {"in", "out"})
     to_native = (
-        f"impl ToNative<{raw}> for {name} {{\n"
+        f"impl{generic} ToNative<{raw}> for {name}{generic} {{\n"
         + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)

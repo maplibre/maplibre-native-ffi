@@ -3,7 +3,6 @@ resolver = "3"
 members = [
   "bindings/python",
   "bindings/rust/crates/maplibre-native-ffi",
-  "bindings/rust/crates/maplibre-native-ffi-core",
   "bindings/rust/crates/maplibre-native-ffi-sys",
   "examples/rust-map",
   "src/platform/rust",
@@ -19,6 +18,5 @@ license = "BSD-2-Clause"
 repository = "https://github.com/maplibre/maplibre-native-ffi"
 
 [workspace.dependencies]
-maplibre-native-ffi-core = { path = "bindings/rust/crates/maplibre-native-ffi-core", version = "=0.0.0" }
 maplibre-native-ffi-platform = { path = "src/platform/rust", version = "=0.0.0" }
 maplibre-native-ffi-sys = { path = "bindings/rust/crates/maplibre-native-ffi-sys", version = "=0.0.0" }

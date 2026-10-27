@@ -34,9 +34,9 @@ def prepare(
     substitute(manifest, r'^version = "0\.0\.0"$', f'version = "{version}"', 1)
     substitute(
         manifest,
-        r'^(maplibre-native-ffi-(?:core|platform|sys) = \{.*version = )"=0\.0\.0"',
+        r'^(maplibre-native-ffi-(?:platform|sys) = \{.*version = )"=0\.0\.0"',
         rf'\1"={version}"',
-        3,
+        2,
     )
 
 

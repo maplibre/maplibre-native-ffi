@@ -1,13 +1,19 @@
 use std::env;
 use std::path::PathBuf;
 
-/// Tells the tests which render backend the native library compiled in, and
-/// builds the browser fixture support.
+/// Tells the tests which render backend the native library compiled in and
+/// whether the build is for the host, and builds the browser fixture support.
 fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     println!(
         "cargo:rustc-check-cfg=cfg(mln_render_backend, values(\"metal\", \"opengl\", \"vulkan\", \"webgpu\"))"
     );
+    // The compile-fail tests run the compiler, which only a build for the host
+    // has beside it.
+    println!("cargo:rustc-check-cfg=cfg(mln_host_build)");
+    if env::var("TARGET") == env::var("HOST") {
+        println!("cargo:rustc-cfg=mln_host_build");
+    }
     // The sys crate reads the backend from the native install's descriptor.
     let backend = env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND").ok();
     if let Some(backend) = &backend {

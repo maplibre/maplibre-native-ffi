@@ -13,7 +13,6 @@ repository.workspace = true
 
 [dependencies]
 bitflags = "2.10.0"
-maplibre-native-ffi-core.workspace = true
 maplibre-native-ffi-sys.workspace = true
 
 # Re-exported so the render backend is selectable by crates that depend on this
@@ -36,3 +35,5 @@ static_assertions = "1.1.0"
 # Loads the GPU fixtures from tests/graphics.
 [target.'cfg(not(target_os = "emscripten"))'.dev-dependencies]
 libloading = "0.8.9"
+# Compiles the compile-fail fixtures, on a build for the host.
+trybuild = "1.0.122"

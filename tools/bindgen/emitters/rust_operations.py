@@ -24,9 +24,8 @@ from .rust import (
 )
 from .rust_dynamic_values import decode, dynamic, encode
 
-# Emitted bodies use these as crate paths and a view's callback parameter, so
-# no parameter can take them.
-RESERVED_LOCALS = {"callback", "sys", "convert"}
+# Emitted bodies use these as crate paths, so no parameter can take them.
+RESERVED_LOCALS = {"sys", "convert"}
 
 
 def local_name(name: str) -> str:
@@ -37,12 +36,11 @@ def local_name(name: str) -> str:
     return name
 
 
-def adopt_owned(owned, raw, value_types, parent="parent"):
+def adopt_owned(owned, raw, value_types):
     public = value_types.handle_types.get(owned.handle.native)
     if not public:
         raise Unsupported(f"{owned.handle.native}: owner runtime unavailable")
-    source = parent if owned.parent_parameter else "None"
-    return public, f"{public}::adopt({raw}, {source})"
+    return public, f"{public}::adopt({raw})"
 
 
 def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
@@ -99,7 +97,6 @@ class Body:
     call: str
     value: str
     future: str
-    parent: str
     # The receiver's local and how the native call's closure binds it.
     target: str | None
     binding: str
@@ -109,7 +106,6 @@ class Body:
     setup: list[str] = field(default_factory=list)
     outputs: list[tuple[str, str]] = field(default_factory=list)
     uses_call: bool = False
-    parent_line: str | None = None
 
 
 def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, str]:
@@ -152,7 +148,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         raise Unsupported("method name is reserved by the handle runtime")
     method = method_name(plan) if method == plan.member else identifier(method)
     closure, native = native_closure(plan, body)
-    generic = ""
     match plan.shape:
         case "discard" | "release" | "answer" | "thread_start" | "owned" | "call":
             public, lines, returned = immediate(
@@ -162,8 +157,10 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         case "drain":
             public, ending = drained(plan, value_types, body, closure, native)
         case "view":
+            # A view's getter is a method of the view guard, which `lower`
+            # declares around it.
+            module = "view"
             public, ending = viewed(plan, value_types, body, closure, native)
-            generic = "<R>"
         case "command":
             public, ending = pending(
                 body,
@@ -185,7 +182,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         case _:
             assert_never(plan.shape)
     return module, method_code(
-        plan, value_types, body, method, generic, public, ending, discard=discard
+        plan, value_types, body, method, public, ending, discard=discard
     )
 
 
@@ -214,15 +211,11 @@ def begin(plan: OperationPlan, receiver: str | None) -> Body:
         body_local("call"),
         body_local("value"),
         body_local("future"),
-        body_local("parent"),
         target,
         binding,
         args,
         ["&self"] if receiver else [],
     )
-    if any(owner.parent_parameter for owner in plan.owned_outputs):
-        body.parent_line = f"let {body.parent} = self.inner.parent();"
-        body.prelude.append(body.parent_line)
     return body
 
 
@@ -456,9 +449,7 @@ def convert(plan: OperationPlan, value_types, body: Body, receiver: str | None):
                 )
                 if not owned:
                     raise Unsupported("handle output lacks ownership transfer")
-                public, converted = adopt_owned(
-                    owned, local, value_types, f"{body.parent}.clone()"
-                )
+                public, converted = adopt_owned(owned, local, value_types)
                 body.prelude.append(f"let mut {local} = sys::{value.native}(0);")
                 body.args.append(f"&mut {local}")
                 body.outputs.append((public, converted + "?"))
@@ -543,17 +534,12 @@ def immediate(
     if not function.diagnostic:
         raise Unsupported(f"{function.name}: status return has no diagnostic")
     if plan.absence:
-        # Nothing is adopted when the output is absent, so the parent that
-        # adopts it is read after the status.
-        if body.parent_line:
-            body.prelude.remove(body.parent_line)
         return (
             f"Option<{public}>",
             [
                 f"if !{body.call}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
                 "    return Ok(None);",
                 "}",
-                *([body.parent_line] if body.parent_line else []),
             ],
             f"Some({output})",
         )
@@ -599,22 +585,11 @@ def drained(
 def viewed(
     plan: OperationPlan, value_types, body: Body, closure: str, native: str
 ) -> tuple[str, list[str]]:
-    """A call inside its owner's view scope, which lends its output to a
-    callback for the scope's duration."""
+    """A getter of its owner's view guard, whose output borrows the guard,
+    since native keeps the objects it names valid only until the scope ends."""
     assert plan.view is not None
-    handle = plan.view.owner
     public, lines, returned = immediate(plan, value_types, body, closure, native)
-    body.prelude.insert(
-        0,
-        f"unsafe {{ {body.call}.view(sys::{handle.view_begin}, sys::{handle.view_end}) }}?;",
-    )
-    body.uses_call = True
-    body.signature.append(f"callback: impl FnOnce(&{public}) -> R")
-    return "R", [
-        *lines,
-        f"let {body.value} = {returned};",
-        f"Ok(callback(&{body.value}))",
-    ]
+    return f"Lent<'_, {public}>", [*lines, f"Ok(Lent::new({returned}))"]
 
 
 def discarded(body: Body, closure: str, native: str) -> tuple[str, str]:
@@ -659,7 +634,6 @@ def method_code(
     value_types,
     body: Body,
     method: str,
-    generic: str,
     public: str,
     ending: list[str],
     *,
@@ -669,10 +643,6 @@ def method_code(
     its return type, and its documentation."""
     function = plan.function
     consuming = bool(plan.consumes)
-    if "\n".join(ending).count(f"{body.parent}.clone()") == 1:
-        ending = [
-            line.replace(f"{body.parent}.clone()", body.parent) for line in ending
-        ]
     mutable = "mut " if body.uses_call or not plan.completion else ""
     prelude, setup, call = body.prelude, body.setup, body.call
     if consuming:
@@ -687,13 +657,13 @@ def method_code(
         body.signature[0] = "self"
         lines = [
             *prelude,
-            f"self.inner.close(|{body.target}| {{",
+            f"self.consume(|{body.target}| {{",
             f"    let {mutable}{call} = Call::new({body.target});",
             *("    " + line for line in [*setup, *ending]),
-            "}).map_err(|error| (self, error))",
+            "})",
         ]
     else:
-        receiver_self = "self.0" if discard else "self"
+        receiver_self = "self.0" if discard else "self.owner" if plan.view else "self"
         lines = [
             f"let {mutable}{call} = {receiver_self}.inner.call();"
             if body.target is not None
@@ -722,9 +692,9 @@ def method_code(
     if body.target is None and not consuming and not plan.unchecked:
         lines.insert(
             1,
-            "maplibre_core::validate_abi_version()?;"
+            "crate::abi::validate_abi_version()?;"
             if returns.startswith(" -> Result")
-            else "maplibre_core::require_abi_version();",
+            else "crate::abi::require_abi_version();",
         )
 
     def has_pointer(value):
@@ -749,7 +719,7 @@ def method_code(
     return (
         doc(value_types.bound, function.name, "    ")
         + safety_doc
-        + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}{generic}({', '.join(body.signature)}){returns} {{\n"
+        + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}({', '.join(body.signature)}){returns} {{\n"
         + "\n".join("        " + line for line in lines)
         + "\n    }\n"
     )

@@ -272,7 +272,7 @@ def native_call(
 
 
 def checked_call(
-    function, arguments, prefix: str = "sys::", runtime: str = "maplibre_core"
+    function, arguments, prefix: str = "sys::", runtime: str = "crate::error"
 ) -> str:
     """Checks a status-returning C call against the diagnostic the runtime lends it."""
     if not function.diagnostic:
@@ -341,6 +341,8 @@ def lower(api: Api | BoundApi) -> Lowered:
         }
         try:
             module, code = operation(plan, value_types)
+            if module == "view" and plan.view:
+                module = f"view:{plan.view.owner.native}"
             if code:
                 chunks[module].append(gated(plan, code))
             if plan.completion and plan.completion.optional:
@@ -378,6 +380,8 @@ def lower(api: Api | BoundApi) -> Lowered:
             and p.completion.discardable
             and any(i.name == p.receiver and i.value.native == native for i in p.inputs)
         ]
+        if views := chunks.pop(f"view:{native}", []):
+            files[f"{root}/{module}.rs"] += rust_owners.view_guard(bound, handle, views)
         if commands:
             owner = rust_owners.owner_name(native)
             view = f"{owner}Discarding"
@@ -408,7 +412,7 @@ def lower(api: Api | BoundApi) -> Lowered:
     )
     from . import rust_sys
 
-    files["crates/maplibre-native-ffi-core/src/status.rs"] = status_source(bound)
+    files["crates/maplibre-native-ffi/src/status.rs"] = status_source(bound)
     sys_declarations = rust_sys.declarations(bound)
     files[rust_sys.PATH] = sys_declarations.render()
     for name, reason in sys_declarations.unsupported.items():

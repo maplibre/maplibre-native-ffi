@@ -109,20 +109,20 @@ impl MetalTextureCompositor {
     /// Samples the frame's texture into the layer's next drawable, and reports
     /// whether it presented.
     pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
-        frame.get_metal_texture(|metadata| {
-            if metadata.width == 0 || metadata.height == 0 {
-                return Err(metal_error("Metal frame has an empty extent"));
-            }
-            // SAFETY: the native view scope keeps this Metal texture live through drawing.
-            let texture = unsafe {
-                metadata
-                    .texture
-                    .cast::<ProtocolObject<dyn MTLTexture>>()
-                    .as_ref()
-            }
-            .ok_or_else(|| metal_error("Metal frame has a null texture"))?;
-            self.draw_texture(texture)
-        })?
+        let view = frame.view()?;
+        let metadata = view.get_metal_texture()?;
+        if metadata.width == 0 || metadata.height == 0 {
+            return Err(metal_error("Metal frame has an empty extent"));
+        }
+        // SAFETY: the view keeps this Metal texture live through drawing.
+        let texture = unsafe {
+            metadata
+                .texture
+                .cast::<ProtocolObject<dyn MTLTexture>>()
+                .as_ref()
+        }
+        .ok_or_else(|| metal_error("Metal frame has a null texture"))?;
+        self.draw_texture(texture)
     }
 
     /// Samples texture into the layer's next drawable, and reports whether it

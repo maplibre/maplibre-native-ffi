@@ -7,7 +7,6 @@
 
 use std::ffi::{c_char, c_void};
 
-use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};
@@ -156,14 +155,14 @@ impl ToNative<*const c_char> for String {
 impl FromNative<sys::mln_buffer_view> for String {
     unsafe fn from_native(native: sys::mln_buffer_view) -> Result<Self> {
         // SAFETY: the caller guarantees the view is readable.
-        unsafe { maplibre_core::string::copy_string_view(native) }
+        unsafe { crate::string::copy_string_view(native) }
     }
 }
 
 impl FromNative<sys::mln_buffer_view> for Vec<u8> {
     unsafe fn from_native(native: sys::mln_buffer_view) -> Result<Self> {
         // SAFETY: the caller guarantees the view is readable.
-        unsafe { maplibre_core::string::copy_string_view_bytes(native) }
+        unsafe { crate::string::copy_string_view_bytes(native) }
     }
 }
 
@@ -182,7 +181,7 @@ impl<T: FromNative<sys::mln_buffer_view>> FromNative<sys::mln_buffer_view> for O
 impl FromNative<*const c_char> for String {
     unsafe fn from_native(native: *const c_char) -> Result<Self> {
         // SAFETY: the caller guarantees a terminated string or null.
-        unsafe { maplibre_core::string::copy_c_string(native) }
+        unsafe { crate::string::copy_c_string(native) }
     }
 }
 
@@ -395,7 +394,7 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
 /// Owns temporary C input allocations through native submission.
 #[derive(Default)]
 pub(crate) struct InputArena {
-    storage: maplibre_core::memory::InputStorage,
+    roots: Vec<Box<dyn std::any::Any>>,
     registrations: Vec<PendingRegistration>,
 }
 
@@ -435,13 +434,21 @@ impl InputArena {
     }
 
     pub(crate) fn store<T: 'static>(&mut self, value: T) -> *const T {
-        self.storage.store(value)
+        let value = Box::new(value);
+        let pointer = &*value as *const T;
+        self.roots.push(value);
+        pointer
     }
     pub(crate) fn array<T: 'static>(&mut self, values: Vec<T>) -> *const T {
-        self.storage.array(values)
+        let pointer = values.as_ptr();
+        self.roots.push(Box::new(values));
+        pointer
     }
     pub(crate) fn c_string(&mut self, value: &str) -> Result<*const c_char> {
-        self.storage.c_string(value)
+        let value = crate::string::c_string(value)?;
+        let pointer = value.as_ptr();
+        self.roots.push(Box::new(value));
+        Ok(pointer)
     }
 }
 
@@ -450,7 +457,7 @@ impl InputArena {
 /// # Safety
 /// A nonempty array must point to `count` initialized values valid for the borrow.
 unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> Result<&'a [T]> {
-    unsafe { maplibre_core::ptr::slice(pointer, count) }
+    unsafe { crate::ptr::slice(pointer, count) }
 }
 
 /// Copies a strided native array whose entries may have unaligned addresses.
@@ -463,7 +470,7 @@ unsafe fn strided_values<T: Copy>(
     stride: usize,
 ) -> Result<Vec<T>> {
     // SAFETY: the caller guarantees each strided entry.
-    Ok(unsafe { maplibre_core::ptr::strided_records(pointer, count, stride) }?.collect())
+    Ok(unsafe { crate::ptr::strided_records(pointer, count, stride) }?.collect())
 }
 
 /// Declares an open C enum: one variant per known value, and `$unknown` for a

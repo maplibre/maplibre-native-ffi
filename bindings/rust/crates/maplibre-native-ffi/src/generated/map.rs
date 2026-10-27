@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) });
+    pub struct MapHandle(mln_map) dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) });
     /// Returns the native handle value, which runtime events report as their source.
     fn id;
 }
@@ -87,7 +87,7 @@ impl MapHandle {
         &self,
         source_id: &str,
         url: &str,
-        options: Option<&GeoJsonSourceOptions>,
+        options: Option<&GeoJsonSourceOptions<'_>>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -113,7 +113,7 @@ impl MapHandle {
         &self,
         source_id: &str,
         coordinates: &[LatLng],
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
@@ -233,7 +233,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let device = device.inner.native();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -252,7 +251,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a ring of caller-owned Metal textures.
@@ -274,7 +273,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -291,7 +289,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a session-owned Metal texture ring.
@@ -313,7 +311,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -330,7 +327,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a Metal surface target.
@@ -352,7 +349,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -369,7 +365,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a ring of caller-owned OpenGL textures.
@@ -381,11 +377,10 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_open_gl_borrowed_texture(
         &self,
-        descriptor: &OpenGlBorrowedTextureDescriptor,
+        descriptor: &OpenGlBorrowedTextureDescriptor<'_>,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -402,7 +397,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a session-owned OpenGL texture ring.
@@ -414,11 +409,10 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_open_gl_owned_texture(
         &self,
-        descriptor: &OpenGlOwnedTextureDescriptor,
+        descriptor: &OpenGlOwnedTextureDescriptor<'_>,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -435,7 +429,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of an OpenGL surface target.
@@ -447,11 +441,10 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn attach_open_gl_surface(
         &self,
-        descriptor: &OpenGlSurfaceDescriptor,
+        descriptor: &OpenGlSurfaceDescriptor<'_>,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -468,7 +461,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a ring of caller-owned Vulkan images.
@@ -490,7 +483,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -507,7 +499,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a session-owned Vulkan texture ring.
@@ -529,7 +521,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -546,7 +537,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a Vulkan surface target.
@@ -568,7 +559,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -585,7 +575,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a ring of caller-owned WebGPU textures.
@@ -602,7 +592,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -619,7 +608,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a session-owned WebGPU texture ring.
@@ -636,7 +625,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -653,7 +641,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Starts attachment of a WebGPU surface target.
@@ -670,7 +658,6 @@ impl MapHandle {
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
-        let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
         let options = call.reference(&options)?;
@@ -687,7 +674,7 @@ impl MapHandle {
             },
             completion::unit,
         )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
     /// Begins a command group, which holds this map's render updates until the
@@ -813,14 +800,10 @@ impl MapHandle {
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
-        self.inner
-            .close(|map| {
-                let mut call = Call::new(map);
-                call.status(|map, out_diagnostic| unsafe {
-                    sys::mln_map_dispose(map, out_diagnostic)
-                })
-            })
-            .map_err(|error| (self, error))
+        self.consume(|map| {
+            let mut call = Call::new(map);
+            call.status(|map, out_diagnostic| unsafe { sys::mln_map_dispose(map, out_diagnostic) })
+        })
     }
 
     /// Submits an ordered debug-log command.
@@ -866,7 +849,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn get_feature_state(
         &self,
-        selector: &FeatureStateSelector,
+        selector: &FeatureStateSelector<'_>,
     ) -> Result<NativeFuture<String>> {
         let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
@@ -1249,17 +1232,15 @@ impl MapHandle {
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
-        self.inner
-            .close(|map| {
-                let call = Call::new(map);
-                call.complete(
-                    |map, completion, out_diagnostic| unsafe {
-                        sys::mln_map_release(map, completion, out_diagnostic)
-                    },
-                    completion::unit,
-                )
-            })
-            .map_err(|error| (self, error))
+        self.consume(|map| {
+            let call = Call::new(map);
+            call.complete(
+                |map, completion, out_diagnostic| unsafe {
+                    sys::mln_map_release(map, completion, out_diagnostic)
+                },
+                completion::unit,
+            )
+        })
     }
 
     /// Removes per-feature state from this map.
@@ -1268,7 +1249,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn remove_feature_state(
         &self,
-        selector: &FeatureStateSelector,
+        selector: &FeatureStateSelector<'_>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
@@ -1502,7 +1483,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_feature_state(
         &self,
-        selector: &FeatureStateSelector,
+        selector: &FeatureStateSelector<'_>,
         state: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
@@ -1639,7 +1620,7 @@ impl MapHandle {
     pub fn set_image_source_image(
         &self,
         source_id: &str,
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -1702,7 +1683,7 @@ impl MapHandle {
     pub fn set_style_image(
         &self,
         image_id: &str,
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
         options: Option<&StyleImageOptions>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
@@ -1971,7 +1952,7 @@ impl MapHandleDiscarding<'_> {
         &self,
         source_id: &str,
         url: &str,
-        options: Option<&GeoJsonSourceOptions>,
+        options: Option<&GeoJsonSourceOptions<'_>>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
@@ -1997,7 +1978,7 @@ impl MapHandleDiscarding<'_> {
         &self,
         source_id: &str,
         coordinates: &[LatLng],
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
@@ -2245,7 +2226,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_remove_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
+    pub fn remove_feature_state(&self, selector: &FeatureStateSelector<'_>) -> Result<()> {
         let mut call = self.0.inner.call();
         let selector = call.reference(&selector)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2456,7 +2437,11 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &str) -> Result<()> {
+    pub fn set_feature_state(
+        &self,
+        selector: &FeatureStateSelector<'_>,
+        state: &str,
+    ) -> Result<()> {
         let mut call = self.0.inner.call();
         let selector = call.reference(&selector)?;
         let state = call.input(&state)?;
@@ -2580,7 +2565,7 @@ impl MapHandleDiscarding<'_> {
     pub fn set_image_source_image(
         &self,
         source_id: &str,
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
@@ -2633,7 +2618,7 @@ impl MapHandleDiscarding<'_> {
     pub fn set_style_image(
         &self,
         image_id: &str,
-        image: &PremultipliedRgba8Image,
+        image: &PremultipliedRgba8Image<'_>,
         options: Option<&StyleImageOptions>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();

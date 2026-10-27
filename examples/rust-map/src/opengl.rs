@@ -98,7 +98,7 @@ impl OpenGlContext {
         Ok((window, context))
     }
 
-    pub fn descriptor(&self) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
+    pub fn descriptor(&self) -> Result<OpenGlContextDescriptor<'static>, Box<dyn Error>> {
         self.platform.descriptor(&self.context)
     }
 
@@ -190,18 +190,18 @@ impl OpenGlTextureCompositor {
         context: &OpenGlContext,
         frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
-        frame.get_open_gl_texture(|metadata| {
-            if metadata.width == 0 || metadata.height == 0 {
-                return Err(compositor_error("OpenGL frame has an empty extent"));
-            }
-            if metadata.target != TEXTURE_TARGET {
-                return Err(compositor_error(format!(
-                    "OpenGL frame has target {}, expected TEXTURE_2D",
-                    metadata.target
-                )));
-            }
-            self.draw_texture(context, metadata.texture)
-        })?
+        let view = frame.view()?;
+        let metadata = view.get_open_gl_texture()?;
+        if metadata.width == 0 || metadata.height == 0 {
+            return Err(compositor_error("OpenGL frame has an empty extent"));
+        }
+        if metadata.target != TEXTURE_TARGET {
+            return Err(compositor_error(format!(
+                "OpenGL frame has target {}, expected TEXTURE_2D",
+                metadata.target
+            )));
+        }
+        self.draw_texture(context, metadata.texture)
     }
 
     fn draw_texture(

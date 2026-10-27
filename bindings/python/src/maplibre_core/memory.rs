@@ -18,8 +18,8 @@ impl InputStorage {
         self.roots.push(Box::new(values));
         pointer
     }
-    pub fn c_string(&mut self, value: &str) -> crate::Result<*const c_char> {
-        let value = crate::string::c_string(value)?;
+    pub fn c_string(&mut self, value: &str) -> super::Result<*const c_char> {
+        let value = super::string::c_string(value)?;
         let pointer = value.as_ptr();
         self.roots.push(Box::new(value));
         Ok(pointer)

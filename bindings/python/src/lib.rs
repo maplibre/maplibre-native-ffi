@@ -1,7 +1,13 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+// A verbatim copy of the former core crate, whose unused items stay until the
+// extension moves onto the safe crate.
+#[allow(dead_code)]
+#[path = "maplibre_core/mod.rs"]
+mod maplibre_core;
+
 use maplibre_core::handle::NativeHandle;
-use maplibre_native_ffi_core::{self as maplibre_core, Error, Status};
+use maplibre_core::{Error, Status};
 use maplibre_native_ffi_sys as sys;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};

@@ -913,22 +913,22 @@ impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
 /// See `mln_feature_state_selector` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct FeatureStateSelector {
+pub struct FeatureStateSelector<'a> {
     /// Source ID. Required.
-    pub source_id: String,
+    pub source_id: &'a str,
     /// Source layer ID, or empty for none. Required for vector-source
     /// disambiguation.
-    pub source_layer_id: String,
+    pub source_layer_id: &'a str,
     /// Optional feature ID. Required by set and get, optional for remove. A
     /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
     /// id 7. Its field bit tells an absent ID from the empty ID "".
-    pub feature_id: Option<String>,
+    pub feature_id: Option<&'a str>,
     /// State key, or empty to select every key. Used only by remove, and
     /// requires feature_id.
-    pub state_key: String,
+    pub state_key: &'a str,
 }
-impl FeatureStateSelector {
-    pub fn new(source_id: String) -> Self {
+impl<'a> FeatureStateSelector<'a> {
+    pub fn new(source_id: &'a str) -> Self {
         Self {
             source_id,
             source_layer_id: Default::default(),
@@ -937,7 +937,7 @@ impl FeatureStateSelector {
         }
     }
 }
-impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
+impl<'a> ToNative<sys::mln_feature_state_selector> for FeatureStateSelector<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_feature_state_selector> {
         let mut raw: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_feature_state_selector>() as _;
@@ -1056,7 +1056,7 @@ impl FromNative<sys::mln_free_camera_options> for FreeCameraOptions {
 /// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct GeoJsonSourceOptions {
+pub struct GeoJsonSourceOptions<'a> {
     /// Minimum tiling zoom. Absent selects 0.
     pub min_zoom: Option<f64>,
     /// Maximum tiling zoom, an integer within \[0, 24\]. Absent selects 18.
@@ -1068,7 +1068,7 @@ pub struct GeoJsonSourceOptions {
     /// Cluster aggregation expressions keyed by property name, as a JSON object
     /// whose members follow the MapLibre Style Spec clusterProperties form, or
     /// empty for none.
-    pub cluster_properties: String,
+    pub cluster_properties: &'a str,
     /// Tile buffer in pixels within \[0, 512\]. Absent selects 128.
     pub buffer: Option<u32>,
     /// Cluster radius in pixels within \[0, 4095\]. Absent selects 50.
@@ -1083,7 +1083,7 @@ pub struct GeoJsonSourceOptions {
     /// Absent selects false.
     pub synchronous_tiling: Option<bool>,
 }
-impl ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
+impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_geo_json_source_options> {
         let mut raw: sys::mln_geo_json_source_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_geo_json_source_options>() as _;
@@ -1381,7 +1381,7 @@ impl HttpHeaderTransform {
             || {
                 Ok(callback::require(&state.callback)?(
                     ResourceKind::from_raw(kind),
-                    unsafe { maplibre_core::string::borrow_string_view(url) }?,
+                    unsafe { crate::string::borrow_string_view(url) }?,
                     &mut HttpHeaderTransformResponse::new(out_response)?,
                 ))
             },
@@ -1431,7 +1431,7 @@ impl HttpHeaderTransformResponse<'_> {
         let arena = &mut InputArena::default();
         let native_name = to_native(&name, arena)?;
         let native_value = to_native(&value, arena)?;
-        maplibre_core::check(|out_diagnostic| unsafe {
+        crate::error::check(|out_diagnostic| unsafe {
             sys::mln_http_header_transform_response_set_header(
                 self.raw.as_ptr(),
                 native_name,
@@ -1659,7 +1659,7 @@ impl LogHandler {
                 LogSeverity::from_raw(severity),
                 LogEvent::from_raw(event),
                 code,
-                unsafe { maplibre_core::string::borrow_string_view(message) }?,
+                unsafe { crate::string::borrow_string_view(message) }?,
             );
             Ok(value)
         })
@@ -2519,7 +2519,7 @@ impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
 /// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct OpenGlBorrowedTextureDescriptor {
+pub struct OpenGlBorrowedTextureDescriptor<'a> {
     /// Logical texture extent. Required. physical_width and physical_height
     /// give the texture's size. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
@@ -2530,18 +2530,18 @@ pub struct OpenGlBorrowedTextureDescriptor {
     pub physical_height: u32,
     /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
-    pub context: OpenGlContextDescriptor,
+    pub context: OpenGlContextDescriptor<'a>,
     /// The ring's textures, one per slot, in slot order. Required.
     pub textures: Vec<OpenGlBorrowedTexture>,
     /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
     pub target: u32,
 }
-impl OpenGlBorrowedTextureDescriptor {
+impl<'a> OpenGlBorrowedTextureDescriptor<'a> {
     pub fn new(
         extent: LogicalExtent,
         physical_width: u32,
         physical_height: u32,
-        context: OpenGlContextDescriptor,
+        context: OpenGlContextDescriptor<'a>,
         textures: Vec<OpenGlBorrowedTexture>,
         target: u32,
     ) -> Self {
@@ -2555,7 +2555,9 @@ impl OpenGlBorrowedTextureDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_open_gl_borrowed_texture_descriptor> for OpenGlBorrowedTextureDescriptor {
+impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
+    for OpenGlBorrowedTextureDescriptor<'a>
+{
     fn to_native(
         &self,
         arena: &mut InputArena,
@@ -2598,22 +2600,22 @@ impl Default for OpenGlClientApi {
 /// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct OpenGlContextDescriptor {
+pub struct OpenGlContextDescriptor<'a> {
     /// Whether the session shares its driver thread and graphics objects with
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
     /// canvas are dedicated to their core worker.
     pub ownership: OpenGlContextOwnership,
-    pub data: OpenGlContextDescriptorData,
+    pub data: OpenGlContextDescriptorData<'a>,
 }
-impl OpenGlContextDescriptor {
-    pub fn new(data: OpenGlContextDescriptorData) -> Self {
+impl<'a> OpenGlContextDescriptor<'a> {
+    pub fn new(data: OpenGlContextDescriptorData<'a>) -> Self {
         Self {
             ownership: Default::default(),
             data,
         }
     }
 }
-impl ToNative<sys::mln_open_gl_context_descriptor> for OpenGlContextDescriptor {
+impl<'a> ToNative<sys::mln_open_gl_context_descriptor> for OpenGlContextDescriptor<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_context_descriptor> {
         let mut raw: sys::mln_open_gl_context_descriptor = unsafe { std::mem::zeroed() };
         raw.ownership = to_native(&self.ownership, arena)?;
@@ -2640,10 +2642,10 @@ impl ToNative<sys::mln_open_gl_context_descriptor> for OpenGlContextDescriptor {
 /// See `mln_open_gl_context_descriptor_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub enum OpenGlContextDescriptorData {
+pub enum OpenGlContextDescriptorData<'a> {
     Wgl(WglContextDescriptor),
     Egl(EglContextDescriptor),
-    WebGl(WebGlContextDescriptor),
+    WebGl(WebGlContextDescriptor<'a>),
 }
 
 native_enum! {
@@ -2683,7 +2685,7 @@ pub struct OpenGlContextProviderFlag: u32 {
 /// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct OpenGlOwnedTextureDescriptor {
+pub struct OpenGlOwnedTextureDescriptor<'a> {
     /// Logical texture extent. Required. A scale_factor that differs from the
     /// map's is accepted and logged as a warning.
     pub extent: LogicalExtent,
@@ -2691,14 +2693,14 @@ pub struct OpenGlOwnedTextureDescriptor {
     /// context whose texture frames the host can acquire. Dedicated EGL, WGL,
     /// or transferred WebGL ownership creates a private core-worker context for
     /// CPU readback.
-    pub context: OpenGlContextDescriptor,
+    pub context: OpenGlContextDescriptor<'a>,
 }
-impl OpenGlOwnedTextureDescriptor {
-    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor) -> Self {
+impl<'a> OpenGlOwnedTextureDescriptor<'a> {
+    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor<'a>) -> Self {
         Self { extent, context }
     }
 }
-impl ToNative<sys::mln_open_gl_owned_texture_descriptor> for OpenGlOwnedTextureDescriptor {
+impl<'a> ToNative<sys::mln_open_gl_owned_texture_descriptor> for OpenGlOwnedTextureDescriptor<'a> {
     fn to_native(
         &self,
         arena: &mut InputArena,
@@ -2716,19 +2718,19 @@ impl ToNative<sys::mln_open_gl_owned_texture_descriptor> for OpenGlOwnedTextureD
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct OpenGlSurfaceDescriptor {
+pub struct OpenGlSurfaceDescriptor<'a> {
     /// Logical surface extent. Required. A scale_factor that differs from the
     /// map's is accepted and logged as a warning.
     pub extent: LogicalExtent,
     /// Borrowed OpenGL context provider data.
-    pub context: OpenGlContextDescriptor,
+    pub context: OpenGlContextDescriptor<'a>,
     /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
     /// EGL, both required. Null for WebGL, whose context carries its canvas
     /// binding.
     pub surface: *mut std::ffi::c_void,
 }
-impl OpenGlSurfaceDescriptor {
-    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor) -> Self {
+impl<'a> OpenGlSurfaceDescriptor<'a> {
+    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor<'a>) -> Self {
         Self {
             extent,
             context,
@@ -2736,7 +2738,7 @@ impl OpenGlSurfaceDescriptor {
         }
     }
 }
-impl ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescriptor {
+impl<'a> ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescriptor<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_surface_descriptor> {
         let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
@@ -2802,7 +2804,7 @@ impl FromNative<sys::mln_open_gl_texture_frame> for OpenGlTextureFrame {
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
-pub struct PremultipliedRgba8Image {
+pub struct PremultipliedRgba8Image<'a> {
     /// Image width in pixels. Required.
     pub width: u32,
     /// Image height in pixels. Required.
@@ -2810,10 +2812,10 @@ pub struct PremultipliedRgba8Image {
     /// Bytes per image row. Required, and at least width \* 4.
     pub stride: u32,
     /// Premultiplied RGBA8 pixels. Required.
-    pub pixels: Vec<u8>,
+    pub pixels: &'a [u8],
 }
-impl PremultipliedRgba8Image {
-    pub fn new(width: u32, height: u32, stride: u32, pixels: Vec<u8>) -> Self {
+impl<'a> PremultipliedRgba8Image<'a> {
+    pub fn new(width: u32, height: u32, stride: u32, pixels: &'a [u8]) -> Self {
         Self {
             width,
             height,
@@ -2822,7 +2824,7 @@ impl PremultipliedRgba8Image {
         }
     }
 }
-impl ToNative<sys::mln_premultiplied_rgba8_image> for PremultipliedRgba8Image {
+impl<'a> ToNative<sys::mln_premultiplied_rgba8_image> for PremultipliedRgba8Image<'a> {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_premultiplied_rgba8_image> {
         let mut raw: sys::mln_premultiplied_rgba8_image = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as _;
@@ -3353,13 +3355,13 @@ impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
 /// See `mln_rendered_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct RenderedFeatureQueryOptions {
+pub struct RenderedFeatureQueryOptions<'a> {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
-    pub layer_ids: Option<Vec<String>>,
+    pub layer_ids: Option<&'a [&'a str]>,
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-    pub filter: String,
+    pub filter: &'a str,
 }
-impl ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryOptions {
+impl<'a> ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_rendered_feature_query_options> {
         let mut raw: sys::mln_rendered_feature_query_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_rendered_feature_query_options>() as _;
@@ -3554,7 +3556,7 @@ impl ResourceProvider {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_provider_callback", (), || {
-            let handle = ResourceRequestHandle::adopt(handle, None)?;
+            let handle = ResourceRequestHandle::adopt(handle)?;
             (state.callback)(unsafe { convert::copy_reference(request) }?, handle);
             Ok(())
         })
@@ -3701,19 +3703,19 @@ impl FromNative<sys::mln_resource_request_info> for ResourceRequestInfo {
 /// See `mln_resource_response` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ResourceResponse {
+pub struct ResourceResponse<'a> {
     pub status: ResourceResponseStatus,
     pub error_reason: ResourceErrorReason,
     /// Response bytes.
-    pub bytes: Vec<u8>,
-    pub error_message: String,
+    pub bytes: &'a [u8],
+    pub error_message: &'a str,
     pub must_revalidate: bool,
     pub modified_unix_ms: Option<i64>,
     pub expires_unix_ms: Option<i64>,
-    pub etag: String,
+    pub etag: &'a str,
     pub retry_after_unix_ms: Option<i64>,
 }
-impl ToNative<sys::mln_resource_response> for ResourceResponse {
+impl<'a> ToNative<sys::mln_resource_response> for ResourceResponse<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_response> {
         let mut raw: sys::mln_resource_response = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_response>() as _;
@@ -3831,10 +3833,10 @@ impl ResourceTransform {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_transform_callback", (), || {
-            let request = ResourceTransformRequestHandle::adopt(request, None)?;
+            let request = ResourceTransformRequestHandle::adopt(request)?;
             (state.callback)(
                 ResourceKind::from_raw(kind),
-                unsafe { maplibre_core::string::borrow_string_view(url) }?,
+                unsafe { crate::string::borrow_string_view(url) }?,
                 request,
             );
             Ok(())
@@ -4288,15 +4290,15 @@ pub enum RuntimeEventType: u32 {
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct RuntimeOptions {
+pub struct RuntimeOptions<'a> {
     /// Directory root for asset:// URLs. Copied during runtime creation. Empty
     /// selects `/android_asset` on Android and `.` elsewhere.
-    pub asset_path: String,
+    pub asset_path: &'a str,
     /// Cache database path. Copied during runtime creation. Empty selects an
     /// in-memory cache.
-    pub cache_path: String,
+    pub cache_path: &'a str,
 }
-impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
+impl<'a> ToNative<sys::mln_runtime_options> for RuntimeOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_options> {
         let mut raw: sys::mln_runtime_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
@@ -4399,14 +4401,14 @@ impl FromNative<sys::mln_source_feature> for SourceFeature {
 /// See `mln_source_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct SourceFeatureQueryOptions {
+pub struct SourceFeatureQueryOptions<'a> {
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
-    pub source_layer_ids: Option<Vec<String>>,
+    pub source_layer_ids: Option<&'a [&'a str]>,
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-    pub filter: String,
+    pub filter: &'a str,
 }
-impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptions {
+impl<'a> ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_source_feature_query_options> {
         let mut raw: sys::mln_source_feature_query_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_source_feature_query_options>() as _;
@@ -4425,7 +4427,7 @@ impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptio
     }
 }
 
-pub use maplibre_core::Status;
+pub use crate::status::Status;
 impl ToNative<i32> for Status {
     fn to_native(&self, _: &mut InputArena) -> Result<i32> {
         Ok(self.as_raw())
@@ -4462,7 +4464,7 @@ impl FromNative<sys::mln_style_expression_info> for StyleExpressionInfo {
 /// See `mln_style_expression_inputs` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleExpressionInputs {
+pub struct StyleExpressionInputs<'a> {
     /// The value of the zoom expression.
     pub zoom: Option<f64>,
     /// The value of the heatmap-density and line-progress expressions, and of
@@ -4471,19 +4473,19 @@ pub struct StyleExpressionInputs {
     /// The value of the elevation expression outside a color-relief layer.
     pub elevation: Option<f64>,
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
-    pub feature: String,
+    pub feature: &'a str,
     /// A UTF-8 JSON object that the feature-state expression reads.
-    pub feature_state: String,
+    pub feature_state: &'a str,
     /// A UTF-8 JSON object that the global-state expression reads.
-    pub global_state: String,
+    pub global_state: &'a str,
     /// The tile that holds the feature, which the within and distance
     /// expressions need to place its geometry.
     pub canonical_tile_id: Option<CanonicalTileId>,
     /// The image IDs that the image expression reports as available. The
     /// expression reports any other ID as unavailable.
-    pub available_images: Vec<String>,
+    pub available_images: &'a [&'a str],
 }
-impl ToNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
+impl<'a> ToNative<sys::mln_style_expression_inputs> for StyleExpressionInputs<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_expression_inputs> {
         let mut raw: sys::mln_style_expression_inputs = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_style_expression_inputs>() as _;
@@ -5511,15 +5513,15 @@ impl ToNative<sys::mln_wake> for Wake {
 /// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct WebGlContextDescriptor {
+pub struct WebGlContextDescriptor<'a> {
     pub kind: WebGlContextKind,
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     pub context: i32,
     /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
     /// canvas must still be transferable when attachment starts.
-    pub canvas_selector: String,
+    pub canvas_selector: &'a str,
 }
-impl ToNative<sys::mln_web_gl_context_descriptor> for WebGlContextDescriptor {
+impl<'a> ToNative<sys::mln_web_gl_context_descriptor> for WebGlContextDescriptor<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_web_gl_context_descriptor> {
         let mut raw: sys::mln_web_gl_context_descriptor = unsafe { std::mem::zeroed() };
         raw.kind = to_native(&self.kind, arena)?;

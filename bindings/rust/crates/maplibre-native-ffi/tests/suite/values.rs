@@ -123,13 +123,14 @@ fn array_inputs_are_copied_when_they_are_submitted() {
         LatLng::new(1.0, 0.0),
     ];
     let expected_coordinates = coordinates.clone();
-    let mut image = PremultipliedRgba8Image {
+    let mut pixels: Vec<u8> = (0..16).collect();
+    let expected_pixels = pixels.clone();
+    let image = PremultipliedRgba8Image {
         width: 2,
         height: 2,
         stride: 8,
-        pixels: (0..16).collect(),
+        pixels: &pixels,
     };
-    let expected_pixels = image.pixels.clone();
     let added_source = fixture
         .map()
         .add_image_source_image("image", &coordinates, &image)
@@ -138,7 +139,7 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 
     // The caller may reuse its arrays as soon as the calls return.
     coordinates.fill(LatLng::new(9.0, 9.0));
-    image.pixels.fill(0);
+    pixels.fill(0);
     wait_on(added_source);
     wait_on(added_image);
 

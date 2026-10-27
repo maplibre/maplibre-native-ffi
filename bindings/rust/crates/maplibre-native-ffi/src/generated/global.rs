@@ -14,7 +14,7 @@ pub unsafe fn init_android(
     context: *mut std::ffi::c_void,
 ) -> Result<()> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_android_init(jni_env, context, out_diagnostic)
     })?;
@@ -38,7 +38,7 @@ pub fn c_version() -> u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
     let meters = call.input(&meters)?;
     call.status(|_, out_diagnostic| unsafe {
@@ -53,7 +53,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn clear_log_callback() -> Result<()> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_clear_callback(out_diagnostic) })?;
     Ok(())
 }
@@ -65,7 +65,7 @@ pub fn clear_log_callback() -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn set_log_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_log_set_async_severity_mask(mask.bits(), out_diagnostic)
     })?;
@@ -81,7 +81,7 @@ pub fn set_log_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn set_log_callback(handler: LogHandler) -> Result<()> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     let handler = call.reference(&handler)?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
     Ok(())
@@ -93,7 +93,7 @@ pub fn set_log_callback(handler: LogHandler) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     let mut out_width: u32 = Default::default();
     let mut out_height: u32 = Default::default();
     let extent = call.input(&extent)?;
@@ -114,7 +114,7 @@ pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)>
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn get_network_status() -> Result<NetworkStatus> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     let mut out_status: sys::mln_network_status = Default::default();
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_network_get_status(&mut out_status, out_diagnostic)
@@ -128,7 +128,7 @@ pub fn get_network_status() -> Result<NetworkStatus> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn set_network_status(status: NetworkStatus) -> Result<()> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_network_set_status(status.as_raw(), out_diagnostic)
     })?;
@@ -141,7 +141,7 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
     let mut call = Call::global();
-    maplibre_core::require_abi_version();
+    crate::abi::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_open_gl_supported_context_provider_mask() });
     OpenGlContextProviderFlag::from_bits_retain(value)
 }
@@ -152,7 +152,7 @@ pub fn open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
 pub fn get_plugin_register_function_v1() -> sys::mln_plugin_register_function_v1 {
     let mut call = Call::global();
-    maplibre_core::require_abi_version();
+    crate::abi::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_plugin_get_register_function_v1() });
     value
 }
@@ -163,7 +163,7 @@ pub fn get_plugin_register_function_v1() -> sys::mln_plugin_register_function_v1
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeters> {
     let mut call = Call::global();
-    maplibre_core::validate_abi_version()?;
+    crate::abi::validate_abi_version()?;
     let mut out_meters: sys::mln_projected_meters = unsafe { std::mem::zeroed() };
     let coordinate = call.input(&coordinate)?;
     call.status(|_, out_diagnostic| unsafe {
@@ -178,7 +178,7 @@ pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeter
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn supported_render_backend_mask() -> RenderBackendFlag {
     let mut call = Call::global();
-    maplibre_core::require_abi_version();
+    crate::abi::require_abi_version();
     let value = call.run(|_| unsafe { sys::mln_supported_render_backend_mask() });
     RenderBackendFlag::from_bits_retain(value)
 }

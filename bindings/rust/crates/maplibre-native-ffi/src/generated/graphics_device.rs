@@ -20,13 +20,13 @@ impl GraphicsDeviceHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
     pub fn create(options: Option<&GraphicsDeviceOptions>) -> Result<GraphicsDeviceHandle> {
         let mut call = Call::global();
-        maplibre_core::validate_abi_version()?;
+        crate::abi::validate_abi_version()?;
         let mut out_device = sys::mln_graphics_device(0);
         let options = call.optional_reference(options.as_ref())?;
         call.status(|_, out_diagnostic| unsafe {
             sys::mln_graphics_device_create(options, &mut out_device, out_diagnostic)
         })?;
-        Ok(GraphicsDeviceHandle::adopt(out_device, None)?)
+        Ok(GraphicsDeviceHandle::adopt(out_device)?)
     }
 
     /// Releases a graphics device.
@@ -34,12 +34,10 @@ impl GraphicsDeviceHandle {
     /// See `mln_graphics_device_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
     pub fn release(self) -> std::result::Result<(), (Self, Error)> {
-        self.inner
-            .close(|device| {
-                let mut call = Call::new(device);
-                call.run(|device| unsafe { sys::mln_graphics_device_release(device) });
-                Ok(())
-            })
-            .map_err(|error| (self, error))
+        self.consume(|device| {
+            let mut call = Call::new(device);
+            call.run(|device| unsafe { sys::mln_graphics_device_release(device) });
+            Ok(())
+        })
     }
 }

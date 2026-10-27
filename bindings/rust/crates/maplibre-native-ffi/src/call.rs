@@ -1,10 +1,9 @@
 //! Keep the receiver and input storage live through the native call. Copy
-//! borrowed outputs before the view scope ends.
+//! borrowed outputs before the call returns, or tie them to a view scope.
 
 use std::ffi::c_void;
 
-use maplibre_native_ffi_core::{self as maplibre_core, handle::NativeHandle};
-use maplibre_native_ffi_sys as sys;
+use maplibre_native_ffi_sys::{self as sys, NativeHandle};
 
 use crate::Result;
 use crate::completion::{self, CommandCompletion, NativeFuture};
@@ -12,11 +11,8 @@ use crate::convert::{self, InputArena, ToNative};
 
 pub(crate) struct Call<'a, H: NativeHandle> {
     native: H,
-    // The receiver and its parent stay alive while borrowed output is copied.
+    // The receiver stays alive while borrowed output is copied.
     _owner: std::marker::PhantomData<&'a H>,
-    // Held through the native call; a view scope keeps borrowed graphics
-    // resources live.
-    _view: Option<ViewScope>,
     arena: InputArena,
 }
 
@@ -31,7 +27,6 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         Self {
             native,
             _owner: std::marker::PhantomData,
-            _view: None,
             arena: InputArena::default(),
         }
     }
@@ -65,7 +60,7 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         &mut self,
         call: impl FnOnce(H, *mut sys::mln_diagnostic) -> sys::mln_status,
     ) -> Result<()> {
-        maplibre_core::check(|diagnostic| call(self.native, diagnostic))?;
+        crate::error::check(|diagnostic| call(self.native, diagnostic))?;
         self.arena.accept_registrations();
         Ok(())
     }
@@ -76,7 +71,7 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         call: impl FnOnce(H, *mut sys::mln_diagnostic) -> (sys::mln_status, bool),
     ) -> Result<()> {
         let mut accepted = false;
-        maplibre_core::check(|diagnostic| {
+        crate::error::check(|diagnostic| {
             let (status, retained) = call(self.native, diagnostic);
             accepted = retained;
             status
@@ -96,7 +91,7 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         call: impl FnOnce(H, *mut sys::mln_diagnostic) -> sys::mln_status,
     ) -> Result<bool> {
         let mut present = true;
-        maplibre_core::check(|diagnostic| {
+        crate::error::check(|diagnostic| {
             let status = call(self.native, diagnostic);
             if status != absent {
                 return status;
@@ -125,7 +120,7 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         mut self,
         submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     ) -> Result<()> {
-        maplibre_core::check(|diagnostic| submit(self.native, std::ptr::null(), diagnostic))?;
+        crate::error::check(|diagnostic| submit(self.native, std::ptr::null(), diagnostic))?;
         self.arena.accept_registrations();
         Ok(())
     }
@@ -143,38 +138,79 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         self.arena.accept_registrations();
         Ok(future)
     }
+}
 
-    /// Keeps borrowed graphics resources live until the call ends.
+/// A native view scope, which keeps the native objects that its owner's
+/// getters lend valid until it drops. Ending it is allowed on any thread.
+pub(crate) struct ViewScope {
+    token: *mut c_void,
+    end: unsafe extern "C" fn(*mut c_void),
+}
+
+// SAFETY: native ends a scope on any thread, and the token is only passed back
+// to that end.
+unsafe impl Send for ViewScope {}
+// SAFETY: a shared scope exposes nothing.
+unsafe impl Sync for ViewScope {}
+
+impl ViewScope {
+    /// Begins a scope on `native`.
     ///
     /// # Safety
     ///
     /// The functions must be the matching view scope functions of `H`.
-    pub(crate) unsafe fn view(
-        &mut self,
+    pub(crate) unsafe fn begin<H: NativeHandle>(
+        native: H,
         begin: unsafe extern "C" fn(
             H,
             *mut *mut c_void,
             *mut sys::mln_diagnostic,
         ) -> sys::mln_status,
         end: unsafe extern "C" fn(*mut c_void),
-    ) -> Result<()> {
+    ) -> Result<Self> {
         let mut token = std::ptr::null_mut();
-        let native = self.native;
         // SAFETY: the caller passes the scope functions of this handle type.
-        maplibre_core::check(|diagnostic| unsafe { begin(native, &mut token, diagnostic) })?;
-        self._view = Some(ViewScope { token, end });
-        Ok(())
+        crate::error::check(|diagnostic| unsafe { begin(native, &mut token, diagnostic) })?;
+        Ok(Self { token, end })
     }
-}
-
-struct ViewScope {
-    token: *mut c_void,
-    end: unsafe extern "C" fn(*mut c_void),
 }
 
 impl Drop for ViewScope {
     fn drop(&mut self) {
         // SAFETY: begin issued the token, and the scope ends it once.
         unsafe { (self.end)(self.token) };
+    }
+}
+
+/// A value that a view getter lends, valid until its view drops.
+///
+/// It reads as the value itself. It can't be copied out of the borrow, since
+/// the native objects that it names, such as a backend texture, stay valid
+/// only while the view lives.
+pub struct Lent<'v, T> {
+    value: T,
+    _view: std::marker::PhantomData<&'v ()>,
+}
+
+impl<T> Lent<'_, T> {
+    pub(crate) fn new(value: T) -> Self {
+        Self {
+            value,
+            _view: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> std::ops::Deref for Lent<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Lent<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
     }
 }

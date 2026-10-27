@@ -23,7 +23,7 @@ impl StyleExpressionHandle {
         options: Option<&StyleExpressionOptions>,
     ) -> Result<StyleExpressionHandle> {
         let mut call = Call::global();
-        maplibre_core::validate_abi_version()?;
+        crate::abi::validate_abi_version()?;
         let mut out_expression = sys::mln_style_expression(0);
         let expression = call.input(&expression)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -35,14 +35,14 @@ impl StyleExpressionHandle {
                 out_diagnostic,
             )
         })?;
-        Ok(StyleExpressionHandle::adopt(out_expression, None)?)
+        Ok(StyleExpressionHandle::adopt(out_expression)?)
     }
 
     /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
     ///
     /// See `mln_style_expression_evaluate` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    pub fn evaluate(&self, inputs: Option<&StyleExpressionInputs>) -> Result<String> {
+    pub fn evaluate(&self, inputs: Option<&StyleExpressionInputs<'_>>) -> Result<String> {
         let mut call = self.inner.call();
         let mut out_json = Vec::new();
         let inputs = call.optional_reference(inputs.as_ref())?;
@@ -80,12 +80,10 @@ impl StyleExpressionHandle {
     /// See `mln_style_expression_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
     pub fn release(self) -> std::result::Result<(), (Self, Error)> {
-        self.inner
-            .close(|expression| {
-                let mut call = Call::new(expression);
-                call.run(|expression| unsafe { sys::mln_style_expression_release(expression) });
-                Ok(())
-            })
-            .map_err(|error| (self, error))
+        self.consume(|expression| {
+            let mut call = Call::new(expression);
+            call.run(|expression| unsafe { sys::mln_style_expression_release(expression) });
+            Ok(())
+        })
     }
 }

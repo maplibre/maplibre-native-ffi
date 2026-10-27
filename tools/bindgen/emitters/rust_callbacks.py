@@ -431,9 +431,9 @@ def callback_parameter_capture(values, parameter, local=None):
             if parameter.value.length == "nul"
             else "borrow_string_view"
         )
-        return f"unsafe {{ maplibre_core::string::{borrow}({local}) }}?"
+        return f"unsafe {{ crate::string::{borrow}({local}) }}?"
     if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
-        return f"{values.public(parameter.value)}::adopt({local}, None)?"
+        return f"{values.public(parameter.value)}::adopt({local})?"
     if parameter.value.kind == "handle":
         return f"{values.name(parameter.value)} {{ state: std::sync::Arc::clone(&request_state), not_sync: std::marker::PhantomData }}"
     return decode(values, parameter.value, local)
@@ -486,7 +486,7 @@ def response_declaration(values, value):
         call = native_call(plan.function, args, diagnostic="out_diagnostic")
         methods.append(
             doc(values.bound, method_name, "    ")
-            + f"    pub fn {method}({', '.join(signature)}) -> Result<()> {{ {' '.join(setup)} maplibre_core::check(|out_diagnostic| unsafe {{ {call} }}) }}"
+            + f"    pub fn {method}({', '.join(signature)}) -> Result<()> {{ {' '.join(setup)} crate::error::check(|out_diagnostic| unsafe {{ {call} }}) }}"
         )
     summary = doc(values.bound, value.native)
     return f"""/// A native response borrowed only for one host callback.

@@ -136,7 +136,7 @@ class RustEmitterTests(unittest.TestCase):
             values,
         )
         self.assertIn(
-            "#[derive(Debug, Clone, PartialEq, Default)]\npub struct RuntimeOptions {",
+            "#[derive(Debug, Clone, PartialEq, Default)]\npub struct RuntimeOptions<'a> {",
             values,
         )
 
@@ -152,7 +152,7 @@ class RustEmitterTests(unittest.TestCase):
         self.assertIn(
             "pub fn supported_render_backend_mask() -> RenderBackendFlag {\n"
             "        let mut call = Call::global();\n"
-            "        maplibre_core::require_abi_version();",
+            "        crate::abi::require_abi_version();",
             source,
         )
 
@@ -161,7 +161,7 @@ class RustEmitterTests(unittest.TestCase):
         prefix = "crates/maplibre-native-ffi/src/generated/"
         self.assertIn("impl RuntimeHandle {", generated[prefix + "runtime.rs"])
         self.assertIn(
-            "    pub fn create(options: &RuntimeOptions) -> Result<RuntimeHandle> {",
+            "    pub fn create(options: &RuntimeOptions<'_>) -> Result<RuntimeHandle> {",
             generated[prefix + "runtime.rs"],
         )
         source = generated[prefix + "global.rs"]
@@ -222,23 +222,22 @@ class RustEmitterTests(unittest.TestCase):
         ]
         # Drop and the sync dispose pass no completion; the release passes one.
         self.assertIn(
-            "dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
+            "dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
             source,
         )
         # Both consume the owner, and a refusal hands it back.
         self.assertIn(
             "pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {\n"
-            "        self.inner.close(|session| {",
+            "        self.consume(|session| {",
             source,
         )
         self.assertIn("call.complete(", source)
         self.assertIn(
             "pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {\n"
-            "        self.inner.close(|session| {",
+            "        self.consume(|session| {",
             source,
         )
         self.assertIn("call.discard(", source)
-        self.assertIn("}).map_err(|error| (self, error))", source)
 
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(
@@ -310,15 +309,14 @@ void mln_query_release(mln_query query);
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text(source)
             sys_crate = root / "crates/maplibre-native-ffi-sys/src"
-            core_crate = root / "crates/maplibre-native-ffi-core/src"
             safe_crate = root / "crates/maplibre-native-ffi/src"
             shutil.copy(SYS / "lib.rs", sys_crate / "lib.rs")
-            shutil.copytree(
-                CRATES / "maplibre-native-ffi-core/src", core_crate, dirs_exist_ok=True
-            )
-            shutil.copy(PROBE / "core.rs", core_crate / "lib.rs")
+            # The probe's own APIs need only what its fixture headers declare.
             for source in (CRATES / "maplibre-native-ffi/src").glob("*.rs"):
-                shutil.copy(source, safe_crate / source.name)
+                if source.name != "binding_support.rs":
+                    shutil.copy(source, safe_crate / source.name)
+            lib = safe_crate / "lib.rs"
+            lib.write_text(lib.read_text().replace("mod binding_support;\n", ""))
             shutil.copy(PROBE / "probe.rs", safe_crate / "probe.rs")
             with (safe_crate / "lib.rs").open("a") as lib:
                 lib.write("\nmod probe;\n\nfn main() {\n    probe::run();\n}\n")
@@ -345,50 +343,24 @@ void mln_query_release(mln_query query);
                     cwd=root,
                 )
             rustc = require_tool(self, "rustc")
-            for name, crate, extern in (
-                ("maplibre_native_ffi_sys", sys_crate, ()),
-                (
-                    "maplibre_native_ffi_core",
-                    core_crate,
-                    ("maplibre_native_ffi_sys",),
-                ),
-            ):
-                rustc.run(
-                    self,
-                    "--edition=2024",
-                    "--crate-type=lib",
-                    f"--crate-name={name}",
-                    f"-Ldependency={root}",
-                    *(
-                        argument
-                        for dependency in extern
-                        for argument in (
-                            "--extern",
-                            f"{dependency}={root / f'lib{dependency}.rlib'}",
-                        )
-                    ),
-                    str(crate / "lib.rs"),
-                    "--out-dir",
-                    str(root),
-                    cwd=root,
-                )
+            rustc.run(
+                self,
+                "--edition=2024",
+                "--crate-type=lib",
+                "--crate-name=maplibre_native_ffi_sys",
+                str(sys_crate / "lib.rs"),
+                "--out-dir",
+                str(root),
+                cwd=root,
+            )
             binary = root / "probe"
             rustc.run(
                 self,
                 "--edition=2024",
                 "--crate-name=maplibre_native_ffi",
                 f"-Ldependency={root}",
-                *(
-                    argument
-                    for dependency in (
-                        "maplibre_native_ffi_sys",
-                        "maplibre_native_ffi_core",
-                    )
-                    for argument in (
-                        "--extern",
-                        f"{dependency}={root / f'lib{dependency}.rlib'}",
-                    )
-                ),
+                "--extern",
+                f"maplibre_native_ffi_sys={root / 'libmaplibre_native_ffi_sys.rlib'}",
                 *(f"-Clink-arg={item}" for item in objects),
                 str(safe_crate / "lib.rs"),
                 "-o",

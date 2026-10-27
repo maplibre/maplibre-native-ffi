@@ -4,7 +4,7 @@ use std::str;
 
 use maplibre_native_ffi_sys as sys;
 
-use crate::error::{Error, Result};
+use super::{Error, Result};
 
 pub fn c_string(value: &str) -> Result<CString> {
     CString::new(value).map_err(|_| embedded_nul_error())
@@ -103,32 +103,4 @@ pub unsafe fn borrow_c_string<'a>(ptr: *const c_char) -> Result<&'a str> {
 
 fn embedded_nul_error() -> Error {
     Error::invalid_argument("C string inputs must not contain embedded NUL characters")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn c_strings_reject_embedded_nul() {
-        let error = c_string("a\0b").unwrap_err();
-
-        assert_eq!(error.status(), crate::Status::InvalidArgument);
-        assert_eq!(
-            error.diagnostic(),
-            "C string inputs must not contain embedded NUL characters"
-        );
-    }
-
-    #[test]
-    fn invalid_native_string_views_are_rejected() {
-        let view = sys::mln_buffer_view {
-            data: std::ptr::null(),
-            size: 1,
-        };
-
-        let error = unsafe { copy_string_view(view) }.unwrap_err();
-        assert_eq!(error.status(), crate::Status::InvalidArgument);
-        assert!(error.diagnostic().contains("must not be null"));
-    }
 }

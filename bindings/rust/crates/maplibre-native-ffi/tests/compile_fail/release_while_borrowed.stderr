@@ -1,0 +1,11 @@
+error[E0505]: cannot move out of `frame` because it is borrowed
+ --> tests/compile_fail/release_while_borrowed.rs:6:13
+  |
+4 | fn release_during_view(frame: AcquiredFrameHandle) {
+  |                        ----- binding `frame` declared here
+5 |     let view = frame.view().unwrap();
+  |                ----- borrow of `frame` occurs here
+6 |     let _ = frame.release(None);
+  |             ^^^^^ move out of `frame` occurs here
+7 |     drop(view);
+  |          ---- borrow later used here

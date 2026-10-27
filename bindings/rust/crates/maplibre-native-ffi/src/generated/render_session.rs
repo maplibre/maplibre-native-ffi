@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) });
+    pub struct RenderSessionHandle(mln_render_session) dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) });
     /// Returns the native handle value.
     fn id;
 }
@@ -45,8 +45,7 @@ impl RenderSessionHandle {
         )? {
             return Ok(None);
         }
-        let parent = self.inner.parent();
-        Ok(Some(AcquiredFrameHandle::adopt(out_frame, parent)?))
+        Ok(Some(AcquiredFrameHandle::adopt(out_frame)?))
     }
 
     /// Ends every frame demand that has not started with
@@ -102,17 +101,15 @@ impl RenderSessionHandle {
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
-        self.inner
-            .close(|session| {
-                let call = Call::new(session);
-                call.complete(
-                    |session, completion, out_diagnostic| unsafe {
-                        sys::mln_render_session_dispose(session, completion, out_diagnostic)
-                    },
-                    completion::unit,
-                )
-            })
-            .map_err(|error| (self, error))
+        self.consume(|session| {
+            let call = Call::new(session);
+            call.complete(
+                |session, completion, out_diagnostic| unsafe {
+                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
+                },
+                completion::unit,
+            )
+        })
     }
 
     /// Consumes a session in any state and retires it, then runs completion, if
@@ -121,14 +118,12 @@ impl RenderSessionHandle {
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
-        self.inner
-            .close(|session| {
-                let call = Call::new(session);
-                call.discard(|session, completion, out_diagnostic| unsafe {
-                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
-                })
+        self.consume(|session| {
+            let call = Call::new(session);
+            call.discard(|session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_dispose(session, completion, out_diagnostic)
             })
-            .map_err(|error| (self, error))
+        })
     }
 
     /// Drains every currently queued terminal frame result.
@@ -252,7 +247,7 @@ impl RenderSessionHandle {
     pub fn query_rendered_features(
         &self,
         geometry: &RenderedQueryGeometry,
-        options: Option<&RenderedFeatureQueryOptions>,
+        options: Option<&RenderedFeatureQueryOptions<'_>>,
     ) -> Result<NativeFuture<Vec<RenderedFeature>>> {
         let mut call = self.inner.call();
         let geometry = call.reference(&geometry)?;
@@ -279,7 +274,7 @@ impl RenderSessionHandle {
     pub fn query_source_features(
         &self,
         source_id: &str,
-        options: Option<&SourceFeatureQueryOptions>,
+        options: Option<&SourceFeatureQueryOptions<'_>>,
     ) -> Result<NativeFuture<Vec<SourceFeature>>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -450,7 +445,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_open_gl_borrowed_texture_target(
         &self,
-        descriptor: &OpenGlBorrowedTextureDescriptor,
+        descriptor: &OpenGlBorrowedTextureDescriptor<'_>,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
@@ -476,7 +471,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_open_gl_surface_target(
         &self,
-        descriptor: &OpenGlSurfaceDescriptor,
+        descriptor: &OpenGlSurfaceDescriptor<'_>,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;

@@ -4,17 +4,19 @@
 #   "ID" = { na = "reason" }
 
 [cases]
-"ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
+"ERR-01" = "bindings/rust/crates/maplibre-native-ffi/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
 # The test covers the mismatch error only. Each generated entry point without a
 # handle, value defaults among them, checks first; the suite links the archive
 # statically, so no library with another ABI version can load in its place.
-"ERR-02" = "bindings/rust/crates/maplibre-native-ffi-core/src/abi.rs::another_c_abi_version_is_rejected_as_unsupported"
+"ERR-02" = "bindings/rust/crates/maplibre-native-ffi/src/abi.rs::another_c_abi_version_is_rejected_as_unsupported"
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
 "LIFE-01" = { na = "a release or dispose consumes its owner, so no second close compiles" }
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
 "LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
 "LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
-"LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops"
+# An owner holds no reference to its parent: native retires a disposed runtime
+# only once its maps are gone, so a map outlives its runtime's owner.
+"LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::dropping_a_runtime_before_its_map_disposes_it_and_the_map_still_releases"
 # A release consumes its owner, so a host keeps the id it read before close.
 "LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events"
 "COMP-01" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_panicking_converter_completes_with_an_error_before_native_release"

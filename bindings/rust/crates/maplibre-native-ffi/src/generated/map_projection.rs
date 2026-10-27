@@ -21,13 +21,13 @@ impl MapProjectionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn create(view: &MapView) -> Result<MapProjectionHandle> {
         let mut call = Call::global();
-        maplibre_core::validate_abi_version()?;
+        crate::abi::validate_abi_version()?;
         let mut out_projection = sys::mln_map_projection(0);
         let view = call.reference(&view)?;
         call.status(|_, out_diagnostic| unsafe {
             sys::mln_map_projection_create(view, &mut out_projection, out_diagnostic)
         })?;
-        Ok(MapProjectionHandle::adopt(out_projection, None)?)
+        Ok(MapProjectionHandle::adopt(out_projection)?)
     }
 
     /// Copies the projection camera.
@@ -203,13 +203,11 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn release(self) -> std::result::Result<(), (Self, Error)> {
-        self.inner
-            .close(|projection| {
-                let mut call = Call::new(projection);
-                call.run(|projection| unsafe { sys::mln_map_projection_release(projection) });
-                Ok(())
-            })
-            .map_err(|error| (self, error))
+        self.consume(|projection| {
+            let mut call = Call::new(projection);
+            call.run(|projection| unsafe { sys::mln_map_projection_release(projection) });
+            Ok(())
+        })
     }
 
     /// Applies a camera update to a standalone projection.

@@ -60,7 +60,7 @@ pub fn run() {
     assert_eq!(probe_read_level().unwrap(), Some(0.5));
 
     // A release consumes its owner.
-    let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7), None).unwrap();
+    let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7)).unwrap();
     assert_eq!(map.id(), 7);
     map.release().unwrap();
 }

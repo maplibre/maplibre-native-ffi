@@ -1,85 +1,86 @@
-use std::any::Any;
-use std::sync::Arc;
-
-use maplibre_native_ffi_core::{
-    self as maplibre_core,
-    handle::{HandleState, NativeHandle},
-};
+use maplibre_native_ffi_sys::NativeHandle;
 
 use crate::Result;
 use crate::call::Call;
+use crate::report::{Report, report};
 
-/// The state that a child handle keeps alive: its parent's owner.
-pub(crate) type Parent = Option<Arc<dyn Any + Send + Sync>>;
-
-/// The shared state behind one public handle type: the native handle, its
-/// parent, and the disposal that `Drop` runs.
-pub(crate) struct OwnerState<H: NativeHandle> {
-    handle: Arc<HandleState<H>>,
-    dispose: fn(H) -> Result<()>,
-    _parent: Parent,
+/// A native handle a destructor attempted to destroy and could not. The handle
+/// stays live.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeHandleLeak {
+    /// The native type name, such as `mln_map`.
+    pub type_name: &'static str,
+    /// The handle id that was not destroyed.
+    pub id: u64,
 }
 
-impl<H: NativeHandle> OwnerState<H> {
-    /// Takes ownership of `raw` with its disposer.
+/// The one owner of a native handle, which `Drop` disposes.
+///
+/// Native keeps a handle's parent alive for as long as the handle needs it,
+/// and serializes calls and releases on the handle, so an owner holds only the
+/// id.
+pub(crate) struct Owner<H: NativeHandle + Send> {
+    native: H,
+    dispose: fn(H) -> Result<()>,
+    type_name: &'static str,
+}
+
+impl<H: NativeHandle + Send> Owner<H> {
+    /// Takes ownership of `native` with its disposer.
     ///
     /// # Safety
     ///
-    /// `raw` must come from an accepted ownership transfer of handle type `H`,
-    /// and `dispose` must be its disposal.
+    /// `native` must come from an accepted ownership transfer of handle type
+    /// `H`, and `dispose` must be its disposal.
     pub(crate) unsafe fn adopt(
-        raw: H,
-        native: &'static str,
+        native: H,
+        type_name: &'static str,
         dispose: fn(H) -> Result<()>,
-        parent: Parent,
-    ) -> Result<Arc<Self>> {
-        let handle = Arc::new(HandleState::new(raw, native, false)?);
-        Ok(Arc::new(Self {
-            handle,
+    ) -> Result<Self> {
+        if native.to_raw() == 0 {
+            return Err(crate::Error::invalid_argument(
+                "native handle must not be zero",
+            ));
+        }
+        Ok(Self {
+            native,
             dispose,
-            _parent: parent,
-        }))
+            type_name,
+        })
     }
 
     pub(crate) fn id(&self) -> u64 {
-        self.handle.raw().to_raw()
-    }
-
-    /// This owner, for a child handle to keep alive.
-    pub(crate) fn parent(self: &Arc<Self>) -> Parent
-    where
-        H: Send + Sync,
-    {
-        Some(Arc::clone(self) as Arc<dyn Any + Send + Sync>)
+        self.native.to_raw()
     }
 
     /// The raw id; native validates whether it still names a live handle.
     pub(crate) fn native(&self) -> H {
-        self.handle.raw()
+        self.native
     }
 
     /// Prepares a call on the raw handle.
     pub(crate) fn call(&self) -> Call<'_, H> {
-        Call::new(self.native())
-    }
-
-    /// Consumes the handle through `close`, which native may refuse.
-    pub(crate) fn close<R>(&self, close: impl FnOnce(H) -> Result<R>) -> Result<R> {
-        self.handle.close_with(close)
+        Call::new(self.native)
     }
 }
 
-impl<H: NativeHandle> Drop for OwnerState<H> {
+impl<H: NativeHandle + Send> Drop for Owner<H> {
     fn drop(&mut self) {
-        if let Some(finalize) = self.handle.finalizer(self.dispose) {
-            maplibre_core::callback::finalize(finalize);
-        }
+        let (native, dispose, type_name) = (self.native, self.dispose, self.type_name);
+        crate::finalize::finalize(move || {
+            if dispose(native).is_err() {
+                report(Report::LeakedHandle(NativeHandleLeak {
+                    type_name,
+                    id: native.to_raw(),
+                }));
+            }
+        });
     }
 }
 
 /// Declares a public handle type that owns one native handle of type
-/// `$native`, which `$dispose` disposes when the last reference drops. The
-/// attributes before `fn id` document its `id`.
+/// `$native`, which `$dispose` disposes when the owner drops. The attributes
+/// before `fn id` document its `id`.
 macro_rules! native_owner {
     (
         $(#[$meta:meta])*
@@ -89,7 +90,7 @@ macro_rules! native_owner {
     ) => {
         $(#[$meta])*
         pub struct $name {
-            pub(crate) inner: std::sync::Arc<$crate::handle::OwnerState<maplibre_native_ffi_sys::$native>>,
+            pub(crate) inner: $crate::handle::Owner<maplibre_native_ffi_sys::$native>,
         }
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -97,22 +98,30 @@ macro_rules! native_owner {
             }
         }
         impl $name {
-            pub(crate) fn adopt(
-                raw: maplibre_native_ffi_sys::$native,
-                parent: $crate::handle::Parent,
-            ) -> $crate::Result<Self> {
+            pub(crate) fn adopt(raw: maplibre_native_ffi_sys::$native) -> $crate::Result<Self> {
                 let dispose: fn(maplibre_native_ffi_sys::$native) -> $crate::Result<()> = $dispose;
                 // SAFETY: generated operations adopt only the handles that an
                 // accepted native call transferred, with their disposal.
                 let inner = unsafe {
-                    $crate::handle::OwnerState::adopt(
-                        raw,
-                        stringify!($native),
-                        dispose,
-                        parent,
-                    )
+                    $crate::handle::Owner::adopt(raw, stringify!($native), dispose)
                 }?;
                 Ok(Self { inner })
+            }
+
+            /// Runs a consuming call, which ends this owner once native
+            /// accepts it and hands it back otherwise.
+            pub(crate) fn consume<R>(
+                self,
+                close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
+            ) -> std::result::Result<R, (Self, $crate::Error)> {
+                match close(self.inner.native()) {
+                    Ok(value) => {
+                        // Native took the handle, so nothing is left to dispose.
+                        std::mem::forget(self);
+                        Ok(value)
+                    }
+                    Err(error) => Err((self, error)),
+                }
             }
 
             $(#[$id_meta])*
@@ -160,35 +169,6 @@ mod tests {
     use maplibre_native_ffi_sys as sys;
     use std::sync::mpsc;
     use std::time::Duration;
-    #[test]
-    fn a_batch_read_on_another_thread_holds_off_release() {
-        let handle = Arc::new(
-            HandleState::new(
-                sys::mln_render_frame_batch(9),
-                "mln_render_frame_batch",
-                true,
-            )
-            .unwrap(),
-        );
-        let (reading, entered) = mpsc::channel();
-        let (finish, finished) = mpsc::channel();
-        let reader = std::thread::spawn({
-            let handle = Arc::clone(&handle);
-            move || {
-                let read = handle.read().unwrap();
-                reading.send(read.native.0).unwrap();
-                finished.recv().unwrap();
-            }
-        });
-        assert_eq!(entered.recv_timeout(Duration::from_secs(10)).unwrap(), 9);
-        let error = handle
-            .close_with::<()>(|_| panic!("release while output is borrowed"))
-            .unwrap_err();
-        assert_eq!(error.status(), crate::Status::InvalidState);
-        finish.send(()).unwrap();
-        reader.join().unwrap();
-        handle.close_with(|_| Ok(())).unwrap();
-    }
 
     #[test]
     fn a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure() {
@@ -199,18 +179,20 @@ mod tests {
             }
         })));
         let id = 0x0d00_0000_0000_0007;
-        let handle = HandleState::new(sys::mln_map(id), "mln_map", false).unwrap();
+        // SAFETY: the disposer never reaches native.
+        let owner = unsafe {
+            Owner::adopt(sys::mln_map(id), "mln_map", |_| {
+                Err(Error::invalid_argument("dispose refused"))
+            })
+        }
+        .unwrap();
 
         // A drop inside a native callback must not dispose on that callback's
         // stack, so the disposal runs on the finalization thread, and its
         // failure reaches the reporter there.
         {
-            let _callback = maplibre_core::callback::CallbackScope::enter();
-            maplibre_core::callback::finalize(
-                handle
-                    .finalizer(|_| Err(Error::invalid_argument("dispose refused")))
-                    .unwrap(),
-            );
+            let _callback = crate::finalize::CallbackScope::enter();
+            drop(owner);
         }
         let received = leaks.recv_timeout(Duration::from_secs(10));
         crate::set_reporter(None);
@@ -224,6 +206,5 @@ mod tests {
             }
         );
         assert_ne!(thread, std::thread::current().id());
-        assert!(handle.is_released());
     }
 }

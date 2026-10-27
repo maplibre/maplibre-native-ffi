@@ -154,6 +154,20 @@ fn a_released_session_lets_the_host_destroy_its_graphics_objects() {
 }
 
 #[test]
+fn an_exit_abandon_reaches_the_session_and_drop_still_disposes_it() {
+    let graphics = Graphics::new();
+    let (_fixture, session) = rendering_fixture(&graphics);
+    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
+    session.handle.abandon_at_exit().unwrap();
+    assert_eq!(
+        session.handle.get_snapshot().unwrap().state,
+        RenderSessionState::Abandoned
+    );
+    drop(session);
+    drop(graphics);
+}
+
+#[test]
 fn a_session_dropped_while_attached_retires_before_its_map_releases() {
     let graphics = Graphics::new();
     let (fixture, session) = rendering_fixture(&graphics);

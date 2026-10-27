@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for crate in maplibre-native-ffi-platform maplibre-native-ffi-sys maplibre-native-ffi-core maplibre-native-ffi; do
+          for crate in maplibre-native-ffi-platform maplibre-native-ffi-sys maplibre-native-ffi; do
             url="https://crates.io/api/v1/crates/$crate/$PUBLISH_VERSION"
             # crates.io rejects API requests without a user agent.
             status="$(

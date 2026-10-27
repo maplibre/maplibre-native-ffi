@@ -13,6 +13,10 @@ class Values:
         # The module and the public type of each owned handle, by C name.
         self.owners: dict[str, str] = {}
         self.handle_types: dict[str, str] = {}
+        self.borrowed = borrowed_records(bound)
+        # The lifetime that a borrowed record's type names: elided where a
+        # signature uses it, and the record's own inside its declaration.
+        self.lifetime = "'_"
 
     def scalar(self, value: ValuePlan) -> str:
         canonical = value.ctype.canonical
@@ -145,6 +149,8 @@ class Values:
         specialized = public(self, value)
         if specialized:
             return specialized
+        if value.native in self.borrowed:
+            return f"{self.name(value)}<{self.lifetime}>"
         return self.scalar(value) if value.kind == "scalar" else self.name(value)
 
     def declaration(self, value: ValuePlan) -> str:
@@ -158,17 +164,30 @@ class Values:
             from .rust_callbacks import declaration as registration
 
             return registration(self, value)
-        if value.kind == "union":
-            return union_enum(self, value)
         if value.kind == "enum":
             return self.enum(value)
-        if value.union_member:
-            return union_declaration(self, value)
-        return declaration(self, value)
+        if value.native in self.borrowed:
+            self.lifetime = "'a"
+        try:
+            if value.kind == "union":
+                return union_enum(self, value)
+            if value.union_member:
+                return union_declaration(self, value)
+            return declaration(self, value)
+        finally:
+            self.lifetime = "'_"
+
+    def generic(self, value: ValuePlan) -> str:
+        """The lifetime parameter of a borrowed record's declaration."""
+        return "<'a>" if value.native in self.borrowed else ""
+
+    def borrowing(self) -> bool:
+        """Whether the declaration being rendered borrows its text and bytes."""
+        return self.lifetime == "'a"
 
     def enum(self, value: ValuePlan) -> str:
         if value.native == STATUS:
-            return "pub use maplibre_core::Status;\nimpl ToNative<i32> for Status { fn to_native(&self, _: &mut InputArena) -> Result<i32> { Ok(self.as_raw()) } }\nimpl FromNative<i32> for Status { unsafe fn from_native(raw: i32) -> Result<Self> { Ok(Self::from_raw(raw)) } }\n"
+            return "pub use crate::status::Status;\nimpl ToNative<i32> for Status { fn to_native(&self, _: &mut InputArena) -> Result<i32> { Ok(self.as_raw()) } }\nimpl FromNative<i32> for Status { unsafe fn from_native(raw: i32) -> Result<Self> { Ok(Self::from_raw(raw)) } }\n"
         public = pascal(value.native)
         raw = self.scalar(value) or "u32"
         if value.enum_kind == "bitmask":
@@ -208,6 +227,65 @@ class Values:
         )
 
 
+def borrowed_records(bound: BoundApi) -> frozenset[str]:
+    """The records and unions that borrow their text and bytes from the
+    caller: those that only go to native and that no registration keeps, which
+    hold text or bytes, directly or in another such record."""
+
+    def values_in(value: ValuePlan | None):
+        while value is not None:
+            yield value
+            value = value.element
+
+    def fields(value: ValuePlan):
+        return (
+            item
+            for field in value.fields
+            if field.role == "value"
+            for item in values_in(field.value)
+        )
+
+    # A registration's state outlives the call that submits it.
+    kept: set[str] = set()
+    pending = [
+        item
+        for value in bound.values.values()
+        if value.registration
+        for field in value.fields
+        if field.name not in value.registration.callbacks
+        for item in values_in(field.value)
+    ]
+    while pending:
+        value = pending.pop()
+        if value.kind in {"record", "union"} and value.native not in kept:
+            kept.add(value.native)
+            pending.extend(fields(value))
+    candidates = [
+        value
+        for native, value in bound.values.items()
+        if value.kind in {"record", "union"}
+        and not value.registration
+        and not value.response
+        and native not in bound.returned
+        and native not in kept
+        and native not in bound.slices
+    ]
+    borrowed: set[str] = set()
+    while added := [
+        value.native
+        for value in candidates
+        if value.native not in borrowed
+        and any(
+            item.kind == "buffer"
+            and item.encoding in {"utf8", "json", "bytes"}
+            or item.native in borrowed
+            for item in fields(value)
+        )
+    ]:
+        borrowed.update(added)
+    return frozenset(borrowed)
+
+
 def _first_constant(value: ValuePlan, number: int) -> str:
     return next(key for key, known in value.enum_values if known == number)
 
@@ -239,7 +317,8 @@ def union_enum(values: Values, owner: ValuePlan) -> str:
     if unknown:
         members += ", Unknown(u32)"
     name = values.name(owner)
-    rendered = f"{doc(values.bound, owner.native)}#[derive(Debug, Clone, PartialEq)]\npub enum {name} {{ {members} }}\n"
+    generic = values.generic(owner)
+    rendered = f"{doc(values.bound, owner.native)}#[derive(Debug, Clone, PartialEq)]\npub enum {name}{generic} {{ {members} }}\n"
     if unknown:
-        rendered += f"impl Default for {name} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
+        rendered += f"impl{generic} Default for {name}{generic} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
     return rendered

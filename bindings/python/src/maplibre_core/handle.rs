@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 pub use maplibre_native_ffi_sys::NativeHandle;
 
-use crate::report::{Report, report};
+use std::io::Write;
 
 /// A native handle a destructor attempted to destroy and could not. The handle
 /// stays live.
@@ -17,7 +17,12 @@ pub struct NativeHandleLeak {
 /// Reports a handle a destructor could not destroy. Never panics: it is called
 /// from `Drop`, where unwinding would abort.
 pub fn report_leak(leak: NativeHandleLeak) {
-    report(Report::LeakedHandle(leak));
+    let _ = writeln!(
+        std::io::stderr(),
+        "maplibre-native-ffi: Leaked {} native handle {:#x}; close it explicitly.",
+        leak.type_name,
+        leak.id
+    );
 }
 
 /// Shared ownership bookkeeping for a generational native id.
@@ -51,9 +56,9 @@ impl<T: NativeHandle> HandleState<T> {
         raw: T,
         type_name: &'static str,
         tracks_borrowed_output: bool,
-    ) -> crate::Result<Self> {
+    ) -> super::Result<Self> {
         if raw.to_raw() == 0 {
-            return Err(crate::Error::invalid_argument(
+            return Err(super::Error::invalid_argument(
                 "native handle must not be zero",
             ));
         }
@@ -77,7 +82,7 @@ impl<T: NativeHandle> HandleState<T> {
     }
 
     /// Holds off release until borrowed output has been copied.
-    pub fn read(self: &Arc<Self>) -> crate::Result<NativeRead<T>> {
+    pub fn read(self: &Arc<Self>) -> super::Result<NativeRead<T>> {
         let mut state = lock(&self.state);
         if state.releasing {
             return Err(Self::in_use());
@@ -91,7 +96,7 @@ impl<T: NativeHandle> HandleState<T> {
 
     /// Fails during a borrowed-output copy; counted owners also block new reads
     /// until the returned guard drops. Native serializes other releases.
-    pub fn reserve(self: &Arc<Self>) -> crate::Result<ReleaseReservation<T>> {
+    pub fn reserve(self: &Arc<Self>) -> super::Result<ReleaseReservation<T>> {
         let mut state = lock(&self.state);
         self.reserve_locked(&mut state)
     }
@@ -99,7 +104,7 @@ impl<T: NativeHandle> HandleState<T> {
     fn reserve_locked(
         self: &Arc<Self>,
         state: &mut Ownership,
-    ) -> crate::Result<ReleaseReservation<T>> {
+    ) -> super::Result<ReleaseReservation<T>> {
         if state.readers != 0 || state.releasing {
             return Err(Self::in_use());
         }
@@ -113,8 +118,8 @@ impl<T: NativeHandle> HandleState<T> {
     /// Marks ownership released only when native accepts the consuming call.
     pub fn close_with<R>(
         self: &Arc<Self>,
-        close: impl FnOnce(T) -> crate::Result<R>,
-    ) -> crate::Result<R> {
+        close: impl FnOnce(T) -> super::Result<R>,
+    ) -> super::Result<R> {
         let mut reservation = self.reserve()?;
         let result = close(self.raw());
         if result.is_ok() {
@@ -127,7 +132,7 @@ impl<T: NativeHandle> HandleState<T> {
     /// The caller schedules this closure where its host can safely call native.
     pub fn finalizer(
         &self,
-        dispose: impl FnOnce(T) -> crate::Result<()> + Send + 'static,
+        dispose: impl FnOnce(T) -> super::Result<()> + Send + 'static,
     ) -> Option<impl FnOnce() + Send + 'static> {
         let mut state = lock(&self.state);
         if state.released {
@@ -143,8 +148,8 @@ impl<T: NativeHandle> HandleState<T> {
         })
     }
 
-    fn in_use() -> crate::Error {
-        crate::Error::new(crate::Status::InvalidState, "borrowed output is in use")
+    fn in_use() -> super::Error {
+        super::Error::new(super::Status::InvalidState, "borrowed output is in use")
     }
 }
 

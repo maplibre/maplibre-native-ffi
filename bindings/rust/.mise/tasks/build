@@ -14,11 +14,9 @@ source "$MISE_MONOREPO_ROOT/tools/env/rust-cross-env.sh" "$usage_preset"
 if [[ -n "$cargo_target" ]]; then
   exec cargo build \
     -p maplibre-native-ffi-sys \
-    -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     --target "$cargo_target"
 fi
 exec cargo build \
   -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
   -p maplibre-native-ffi

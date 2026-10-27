@@ -1,5 +1,4 @@
-//! Handle ownership: the ABI check at creation, close, parent retention, and
-//! exit.
+//! Handle ownership: the ABI check at creation, close, drop order, and exit.
 
 use std::sync::mpsc;
 
@@ -55,16 +54,14 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
 }
 
 #[test]
-fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
+fn dropping_a_runtime_before_its_map_disposes_it_and_the_map_still_releases() {
     let _global = global_state();
     let reports = capture_reports();
 
     let (runtime, map) = Fixture::new().into_parts();
+    // A runtime owner holds no reference to its maps, so its drop disposes it
+    // at once, and native retires it once the map is gone.
     drop(runtime);
-    // The map holds its runtime, so the runtime's worker still runs commands.
-    wait_for(map.set_style_json(BACKGROUND_STYLE_JSON));
-    // Releasing the map drops the last hold on the runtime, which the
-    // binding then disposes on this thread without a leak.
     wait_for(map.release());
 
     set_reporter(None);

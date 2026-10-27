@@ -382,15 +382,15 @@ impl<T> Replacements<T> {
 pub fn require_cpu_complete_producer(
     frame: &AcquiredFrameHandle,
 ) -> maplibre_native_ffi::Result<()> {
-    frame.get_producer_sync(|producer| {
-        if producer.kind == maplibre_native_ffi::GpuSyncKind::CpuComplete {
-            return Ok(());
-        }
-        Err(Error::new(
-            Status::InvalidState,
-            format!("rust-map cannot consume a {producer:?} producer synchronization payload"),
-        ))
-    })?
+    let view = frame.view()?;
+    let producer = view.get_producer_sync()?;
+    if producer.kind == maplibre_native_ffi::GpuSyncKind::CpuComplete {
+        return Ok(());
+    }
+    Err(Error::new(
+        Status::InvalidState,
+        format!("rust-map cannot consume a {producer:?} producer synchronization payload"),
+    ))
 }
 
 pub fn compositor_error(message: impl Into<String>) -> Error {

@@ -256,11 +256,19 @@ pub fn with_frame_view<R>(
     frame: &AcquiredFrameHandle,
     inside: impl FnOnce() -> R,
 ) -> Result<((u32, u32), R)> {
-    match BACKEND {
+    let view = frame.view()?;
+    let size = match BACKEND {
         #[cfg(mln_render_backend = "metal")]
-        BACKEND_METAL => frame.get_metal_texture(|view| ((view.width, view.height), inside())),
+        BACKEND_METAL => view
+            .get_metal_texture()
+            .map(|texture| (texture.width, texture.height)),
         #[cfg(mln_render_backend = "vulkan")]
-        BACKEND_VULKAN => frame.get_vulkan_texture(|view| ((view.width, view.height), inside())),
-        _ => frame.get_open_gl_texture(|view| ((view.width, view.height), inside())),
-    }
+        BACKEND_VULKAN => view
+            .get_vulkan_texture()
+            .map(|texture| (texture.width, texture.height)),
+        _ => view
+            .get_open_gl_texture()
+            .map(|texture| (texture.width, texture.height)),
+    }?;
+    Ok((size, inside()))
 }

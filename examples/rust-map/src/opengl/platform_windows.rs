@@ -28,7 +28,7 @@ impl OpenGlPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenGlContextDescriptor<'static>, Box<dyn Error>> {
         let RawContext::Wgl(raw_context) = context.raw_context() else {
             return Err("glutin did not create a WGL context".into());
         };

@@ -62,7 +62,6 @@ export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/script
 cargo_support_tests() {
   cargo test \
     -p maplibre-native-ffi-sys \
-    -p maplibre-native-ffi-core \
     --target wasm32-unknown-emscripten \
     -Zbuild-std=std,panic_abort \
     -- --test-threads=1
@@ -127,7 +126,6 @@ done
 cargo_support_tests
 cargo clippy \
   -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   --features maplibre-native-ffi/browser-fixtures \
   --target wasm32-unknown-emscripten \

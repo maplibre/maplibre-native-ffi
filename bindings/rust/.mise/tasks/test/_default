@@ -84,7 +84,6 @@ if [[ -n "$cargo_runner" ]]; then
 fi
 cargo test ${cargo_args[@]+"${cargo_args[@]}"} \
   -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   ${test_args[@]+"${test_args[@]}"}
 # Clippy is profile-independent. Every other host preset runs it against the
@@ -96,7 +95,6 @@ if [[ "$usage_profile" == "dev" ]]; then
   fi
   cargo clippy \
     -p maplibre-native-ffi-sys \
-    -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     ${clippy_args[@]+"${clippy_args[@]}"} --all-targets -- -D warnings
 fi

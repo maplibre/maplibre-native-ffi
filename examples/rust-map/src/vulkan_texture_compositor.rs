@@ -113,24 +113,24 @@ impl VulkanTextureCompositor {
     }
 
     pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
-        frame.get_vulkan_texture(|metadata| {
-            if metadata.width == 0 || metadata.height == 0 {
-                return Err(compositor_error("Vulkan frame has an empty extent"));
-            }
-            if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
-                return Err(compositor_error(format!(
-                    "Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
-                    metadata.layout
-                )));
-            }
-            let image_view = vk::ImageView::from_raw(metadata.image_view);
-            if image_view == vk::ImageView::null() {
-                return Err(compositor_error("Vulkan frame has a null image view"));
-            }
-            self.draw_image_view(image_view).map_err(|error| {
-                compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
-            })
-        })?
+        let view = frame.view()?;
+        let metadata = view.get_vulkan_texture()?;
+        if metadata.width == 0 || metadata.height == 0 {
+            return Err(compositor_error("Vulkan frame has an empty extent"));
+        }
+        if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
+            return Err(compositor_error(format!(
+                "Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
+                metadata.layout
+            )));
+        }
+        let image_view = vk::ImageView::from_raw(metadata.image_view);
+        if image_view == vk::ImageView::null() {
+            return Err(compositor_error("Vulkan frame has a null image view"));
+        }
+        self.draw_image_view(image_view).map_err(|error| {
+            compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
+        })
     }
 
     pub fn close(&mut self) -> Result<(), vk::Result> {

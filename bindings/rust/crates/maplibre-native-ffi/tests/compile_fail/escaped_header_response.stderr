@@ -1,0 +1,32 @@
+error[E0521]: borrowed data escapes outside of function
+  --> tests/compile_fail/escaped_header_response.rs:11:5
+   |
+ 9 |     response: &mut HttpHeaderTransformResponse<'_>,
+   |     --------  - let's call the lifetime of this reference `'1`
+   |     |
+   |     `response` is a reference that is only valid in the function body
+10 | ) -> Result<()> {
+11 |     keep(response);
+   |     ^^^^^^^^^^^^^^
+   |     |
+   |     `response` escapes the function body here
+   |     argument requires that `'1` must outlive `'static`
+
+error[E0521]: borrowed data escapes outside of function
+  --> tests/compile_fail/escaped_header_response.rs:11:5
+   |
+ 9 |     response: &mut HttpHeaderTransformResponse<'_>,
+   |     --------
+   |     |
+   |     `response` is a reference that is only valid in the function body
+   |     has type `&mut HttpHeaderTransformResponse<'2>`
+10 | ) -> Result<()> {
+11 |     keep(response);
+   |     ^^^^^^^^^^^^^^
+   |     |
+   |     `response` escapes the function body here
+   |     argument requires that `'2` must outlive `'static`
+   |
+   = note: requirement occurs because of a mutable reference to `HttpHeaderTransformResponse<'static>`
+   = note: mutable references are invariant over their type parameter
+   = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance

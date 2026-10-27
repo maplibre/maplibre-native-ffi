@@ -20,7 +20,7 @@ impl OpenGlPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenGlContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenGlContextDescriptor<'static>, Box<dyn Error>> {
         let RawDisplay::Egl(raw_display) = self.config.display().raw_display() else {
             return Err("glutin did not create an EGL display".into());
         };

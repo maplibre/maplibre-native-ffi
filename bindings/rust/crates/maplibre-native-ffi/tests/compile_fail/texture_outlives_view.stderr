@@ -1,0 +1,8 @@
+error[E0515]: cannot return value referencing local variable `view`
+ --> tests/compile_fail/texture_outlives_view.rs:6:5
+  |
+6 |     view.get_open_gl_texture().unwrap()
+  |     ----^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     |
+  |     returns a value referencing data owned by the current function
+  |     `view` is borrowed here

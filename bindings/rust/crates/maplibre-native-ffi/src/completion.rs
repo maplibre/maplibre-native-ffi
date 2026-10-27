@@ -6,7 +6,6 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
-use maplibre_native_ffi_core as core;
 use maplibre_native_ffi_sys as sys;
 
 use crate::convert::{FromNative, from_native};
@@ -104,7 +103,7 @@ unsafe extern "C" fn complete<T>(
     user_data: *mut c_void,
     result: *const sys::mln_completion_result,
 ) {
-    let _scope = core::callback::CallbackScope::enter();
+    let _scope = crate::finalize::CallbackScope::enter();
     if user_data.is_null() || result.is_null() {
         return;
     }
@@ -148,7 +147,7 @@ unsafe extern "C" fn complete<T>(
 }
 
 unsafe extern "C" fn release<T>(user_data: *mut c_void) {
-    let _scope = core::callback::CallbackScope::enter();
+    let _scope = crate::finalize::CallbackScope::enter();
     if !user_data.is_null() {
         // SAFETY: native calls release once after accepted completion delivery.
         let bridge = unsafe { Box::from_raw(user_data.cast::<Bridge<T>>()) };
@@ -184,7 +183,7 @@ where
         release_user_data: Some(release::<T>),
         queue: sys::mln_delivery_queue(0),
     };
-    if let Err(error) = core::check(|diagnostic| submit(&completion, diagnostic)) {
+    if let Err(error) = crate::error::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions invoke neither callback and retain no pointer.
         drop(unsafe { Box::from_raw(bridge) });
         return Err(error);

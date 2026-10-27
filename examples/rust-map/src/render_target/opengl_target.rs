@@ -275,11 +275,11 @@ fn close_ring(ring: OpenGlRing, gl: Option<&OpenGlContext>) {
     }
 }
 
-fn borrowed_descriptor(
-    context: OpenGlContextDescriptor,
+fn borrowed_descriptor<'a>(
+    context: OpenGlContextDescriptor<'a>,
     ring: &OpenGlRing,
     viewport: Viewport,
-) -> OpenGlBorrowedTextureDescriptor {
+) -> OpenGlBorrowedTextureDescriptor<'a> {
     OpenGlBorrowedTextureDescriptor {
         extent: extent(viewport),
         physical_width: viewport.physical_width,

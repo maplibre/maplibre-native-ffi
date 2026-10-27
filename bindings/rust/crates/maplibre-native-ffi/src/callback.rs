@@ -9,8 +9,8 @@
 use std::ffi::c_void;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use maplibre_native_ffi_core::callback::CallbackScope;
-use maplibre_native_ffi_core::report::{Report, report};
+use crate::finalize::CallbackScope;
+use crate::report::{Report, report};
 use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};

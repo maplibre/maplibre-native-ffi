@@ -199,10 +199,11 @@ pub fn drive<F: Future>(signal: &Arc<Signal>, future: F, mut service: impl FnMut
 /// network. A test that serves resources installs its own.
 pub fn denying_provider() -> ResourceProvider {
     ResourceProvider::new(|request, handle| {
+        let message = format!("the test fixture denies {}", request.requested_url);
         let response = ResourceResponse {
             status: ResourceResponseStatus::Error,
             error_reason: ResourceErrorReason::NotFound,
-            error_message: format!("the test fixture denies {}", request.requested_url),
+            error_message: &message,
             ..Default::default()
         };
         handle
@@ -339,10 +340,10 @@ pub fn await_release(released: &mpsc::Receiver<()>) {
 }
 
 /// A response that serves `bytes`.
-pub fn ok_response(bytes: impl Into<Vec<u8>>) -> ResourceResponse {
+pub fn ok_response(bytes: &(impl AsRef<[u8]> + ?Sized)) -> ResourceResponse<'_> {
     ResourceResponse {
         status: ResourceResponseStatus::Ok,
-        bytes: bytes.into(),
+        bytes: bytes.as_ref(),
         ..Default::default()
     }
 }
