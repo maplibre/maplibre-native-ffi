@@ -1,12 +1,14 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
 # $1. Maps musl, Android, iOS, visionOS, Mac Catalyst, and OpenHarmony presets to their
 # Cargo target. Exports the cross-compilation environment (CC/CXX, linker) from
-# the Zig and Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves
-# `cargo_target` empty for host presets, where Cargo picks its own target and
-# toolchain.
+# the Zig and Rust toolchains, Android NDK, or OpenHarmony SDK, and for targets
+# that run off the host, tools/devices/run as Cargo's runner, which it also
+# names in `cargo_runner`. Leaves `cargo_target` and `cargo_runner` empty for
+# host presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
 
 cargo_target=
+cargo_runner=
 
 case "$1" in
   android-arm-*) cargo_target=armv7-linux-androideabi ;;
@@ -74,7 +76,6 @@ case "$1" in
     export "CFLAGS_$target_env=-fno-sanitize=undefined"
     export "CXXFLAGS_$target_env=-fno-sanitize=undefined"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
-    export "CARGO_TARGET_${target_env_upper}_RUNNER=$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh $1"
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
@@ -119,5 +120,16 @@ case "$1" in
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
     export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
+    ;;
+esac
+
+# Cargo hands each executable it runs for these targets to tools/devices/run,
+# which finds the device from the preset's install.
+case "$1" in
+  android-* | ohos-*64-* | ios-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-*)
+    cargo_runner="$MISE_MONOREPO_ROOT/tools/devices/run"
+    target_env_upper="$(printf '%s' "${cargo_target//-/_}" | tr '[:lower:]' '[:upper:]')"
+    export "CARGO_TARGET_${target_env_upper}_RUNNER=$cargo_runner"
+    export MLN_FFI_DEVICE_INSTALL="$MISE_MONOREPO_ROOT/build/$1/install"
     ;;
 esac
