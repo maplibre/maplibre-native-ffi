@@ -1,0 +1,5 @@
+error[E0616]: field `data` of struct `TextureReadbackView` is private
+ --> tests/compile_fail/readback_kept_from_other_bytes.rs:8:15
+  |
+8 |     shortened.data = &replacement;
+  |               ^^^^ private field

@@ -513,7 +513,7 @@ fn a_queued_readback_lends_its_pixels_from_the_batch() {
             // The bytes are the batch's, which `keep` holds past the handler
             // without a copy.
             let bytes = readback.keep();
-            assert_eq!(bytes.as_ptr(), readback.data.as_ptr());
+            assert_eq!(bytes.as_ptr(), readback.data().as_ptr());
             *keep.borrow_mut() = Some((bytes, readback.info.stride));
         })
         .unwrap();

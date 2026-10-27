@@ -11,7 +11,7 @@ fn escape<'a>(
 ) {
     session
         .queued(queue)
-        .read_texture(move |readback| *escaped.lock().unwrap() = readback.unwrap().data)
+        .read_texture(move |readback| *escaped.lock().unwrap() = readback.unwrap().data())
         .unwrap();
 }
 

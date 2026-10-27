@@ -226,8 +226,7 @@ impl QueuedValue for Readback {
 /// in, so reading them copies nothing.
 #[derive(Clone, Copy)]
 pub struct TextureReadbackView<'b> {
-    /// Pixel bytes, valid while the batch lives.
-    pub data: &'b [u8],
+    data: &'b [u8],
     pub info: TextureImageInfo,
     batch: &'b Arc<BatchOwner>,
 }
@@ -241,7 +240,12 @@ impl std::fmt::Debug for TextureReadbackView<'_> {
     }
 }
 
-impl TextureReadbackView<'_> {
+impl<'b> TextureReadbackView<'b> {
+    /// Pixel bytes, valid while the batch lives.
+    pub fn data(&self) -> &'b [u8] {
+        self.data
+    }
+
     /// Keeps the pixels past the handler by keeping their batch, without a
     /// copy.
     pub fn keep(&self) -> BatchBytes {
