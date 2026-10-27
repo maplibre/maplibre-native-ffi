@@ -20,7 +20,7 @@ steps {
       "include/**/*.h",
       "tests/native/**",
       "tests/uncalled-exports.txt",
-      "scripts/check-export-calls.py",
+      "tools/lint/check-export-calls.py",
     )
     check = "mise run check-export-calls"
   }
@@ -32,9 +32,9 @@ steps {
       "tests/conformance/**",
       "bindings/**",
       "examples/**",
-      "scripts/check-conformance.py",
+      "tools/lint/check-conformance.py",
     )
-    check = "uv run --no-sync python scripts/check-conformance.py --strict"
+    check = "uv run --no-sync python tools/lint/check-conformance.py --strict"
   }
   // Whole-monorepo check: a task can depend on a task in another config root,
   // and each `mise.<env>.toml` adds or changes tasks of its own.
@@ -45,7 +45,7 @@ steps {
   // Whole-repository check: the baseline counts violations per file, so a
   // count that falls in one file has to fail the check until it is lowered.
   ["test-hygiene"] {
-    check = "uv run --no-sync python scripts/check-test-hygiene.py"
+    check = "uv run --no-sync python tools/lint/check-test-hygiene.py"
   }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")

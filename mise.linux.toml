@@ -56,7 +56,7 @@ glibc_floor = "2.17"
 [tasks.check-glibc-floor]
 description = "Verify a built Linux native requires no glibc newer than the floor."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'scripts/check-glibc-floor.sh "{{vars.glibc_floor}}" "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"'
+run = 'tools/lint/check-glibc-floor.sh "{{vars.glibc_floor}}" "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"'
 
 [tasks.check-musl-abi]
 description = "Verify that a built Linux musl native requires the musl libc ABI."

@@ -29,7 +29,7 @@ import shutil
 import subprocess
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIBRARY_STEM = "maplibre-native-c"
 # Upstream defines the plugin registration function, and the library exports
 # it for include/maplibre_native_c/plugin.h; see cmake/mln_ffi_c_api.cmake.
@@ -46,7 +46,7 @@ DUMPBIN_EXPORT = re.compile(r"^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(?P<name>\
 def declared_functions() -> set[str]:
     """The MLN_API functions, parsed the way check-export-calls parses them."""
     spec = importlib.util.spec_from_file_location(
-        "check_export_calls", ROOT / "scripts" / "check-export-calls.py"
+        "check_export_calls", ROOT / "tools" / "lint" / "check-export-calls.py"
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

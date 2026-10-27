@@ -345,11 +345,11 @@ ctest --test-dir "$build_dir" -C Release --output-on-failure --no-tests=error --
 [tasks.check-exports]
 description = "Check that an installed native library exports exactly the public C API."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'python3 scripts/check-exports.py "$usage_preset"'
+run = 'python3 tools/lint/check-exports.py "$usage_preset"'
 
 [tasks.check-export-calls]
 description = "Check that the C tests call every exported function by name."
-run = 'python3 scripts/check-export-calls.py "$@"'
+run = 'python3 tools/lint/check-export-calls.py "$@"'
 
 [tasks."android-sdk-packages"]
 description = "Install the pinned packages into the selected Android SDK."

@@ -4,7 +4,7 @@
 A test that sleeps decides its outcome by elapsed time, and a test that names a
 public or reserved host depends on the network or on DNS. Both rules are errors.
 
-`scripts/test-hygiene-baseline.toml` records the violations that predate these
+`tools/lint/test-hygiene-baseline.toml` records the violations that predate these
 rules, as a count per rule and file. A file absent from the baseline allows no
 violations, and a count above its baseline fails. A count below its baseline
 also fails until `--update` lowers the baseline, so the baseline only shrinks.
@@ -24,8 +24,8 @@ import subprocess
 import sys
 import tomllib
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-BASELINE = ROOT / "scripts" / "test-hygiene-baseline.toml"
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+BASELINE = ROOT / "tools" / "lint" / "test-hygiene-baseline.toml"
 NOT_FETCHED = "lint: not-fetched"
 
 # A path is test code when a directory or file name marks it as one: `tests/`
@@ -153,7 +153,7 @@ def scan() -> dict[str, dict[str, int]]:
 
 def write_baseline(baseline: dict[str, dict[str, int]]) -> None:
     lines = [
-        "# Violations of scripts/check-test-hygiene.py that predate its rules.",
+        "# Violations of tools/lint/check-test-hygiene.py that predate its rules.",
         "# Counts only fall. Run the script with --update after removing some.",
     ]
     for rule in RULES:
@@ -190,7 +190,7 @@ def main() -> int:
             elif have < limit and not args.update:
                 errors.append(
                     f"{path}: {have} {rule} violations, baseline {limit}; "
-                    "run scripts/check-test-hygiene.py --update"
+                    "run tools/lint/check-test-hygiene.py --update"
                 )
     if args.update:
         write_baseline(lowered)

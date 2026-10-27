@@ -23,7 +23,7 @@ case "$usage_preset" in
   linux-gnu-*)
     # Only mise.linux.toml defines the floor, and this task renders on every
     # host.
-    "$MISE_MONOREPO_ROOT/scripts/check-glibc-floor.sh" "$MLN_FFI_GLIBC_FLOOR" "$addon"
+    "$MISE_MONOREPO_ROOT/tools/lint/check-glibc-floor.sh" "$MLN_FFI_GLIBC_FLOOR" "$addon"
     ;;
   ohos-*)
     # OpenHarmony loads a module by library name.

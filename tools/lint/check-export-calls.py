@@ -24,7 +24,7 @@ import pathlib
 import re
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 HEADERS = ROOT / "include"
 BASELINE = ROOT / "tests/uncalled-exports.txt"
 SUITE_DIR = ROOT / "tests/native"

@@ -1,6 +1,6 @@
 # The cases every binding suite covers. Each binding's file in this directory
 # maps every case ID to the test that covers it, or to the reason it does not
-# apply. scripts/check-conformance.py checks both. Native semantics are tested
+# apply. tools/lint/check-conformance.py checks both. Native semantics are tested
 # once, in tests/native; these cases cover what a binding adds on top.
 
 [cases]

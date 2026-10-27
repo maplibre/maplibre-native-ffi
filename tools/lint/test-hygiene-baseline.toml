@@ -1,4 +1,4 @@
-# Violations of scripts/check-test-hygiene.py that predate its rules.
+# Violations of tools/lint/check-test-hygiene.py that predate its rules.
 # Counts only fall. Run the script with --update after removing some.
 
 [sleep]
