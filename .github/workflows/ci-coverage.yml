@@ -308,6 +308,20 @@ jobs:
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
       version: 0.202601.0-dev.0
+  python-wheels:
+    name: Python wheels
+    permissions:
+      actions: read
+      contents: read
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'python-wheels')
+    uses: ./.github/workflows/_python-wheels.yml
+    with:
+      run_id: ${{ github.run_id }}
+      sha: ${{ github.sha }}
+      version: 0.202601.0.dev0
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -323,6 +337,7 @@ jobs:
       - apple-xcframework
       - kotlin-maven
       - dotnet-nuget
+      - python-wheels
     steps:
       - name: Require every planned job
         env:

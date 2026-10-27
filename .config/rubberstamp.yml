@@ -400,3 +400,17 @@ ci:
               - bindings/dotnet/src/Maplibre.NativeFfi.Runtime/**
               - tools/release/dotnet_release.py
           then: apply
+    pypi:
+      covers: >-
+        Builds the Python API wheel and each runtime wheel from the native
+        artifacts of every Linux, macOS, and Windows target, so it runs those
+        targets. Only changes to what the wheels contain or how they are
+        versioned and built need it: the distributions' metadata, the runtime
+        build, and the release stamping. Ordinary Python binding changes and one
+        platform's native packaging don't.
+      rules:
+        - if:
+            files:
+              - bindings/python/.mise/tasks/build-runtime
+              - tools/release/python_release.py
+          then: apply

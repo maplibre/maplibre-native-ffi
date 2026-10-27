@@ -40,6 +40,10 @@ KOTLIN_MAVEN_PLATFORMS = {
 # RUNTIME_PLATFORMS in tools/release/dotnet_release.py names them.
 DOTNET_NUGET_PLATFORMS = {"android", "linux-gnu", "linux-musl", "macos", "windows"}
 
+# These platforms supply the runtime wheels that the Python wheels workflow
+# builds, one per preset in its matrix.
+PYTHON_WHEEL_PLATFORMS = {"linux-gnu", "linux-musl", "macos", "windows"}
+
 
 @dataclasses.dataclass(frozen=True)
 class Target:
@@ -72,6 +76,10 @@ JOBS = {
     "dotnet-nuget": (
         "nuget",
         lambda target: target.platform in DOTNET_NUGET_PLATFORMS,
+    ),
+    "python-wheels": (
+        "pypi",
+        lambda target: target.platform in PYTHON_WHEEL_PLATFORMS,
     ),
 }
 
