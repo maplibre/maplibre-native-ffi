@@ -366,6 +366,69 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/refs" \
             -f "ref=refs/tags/$TAG" -f "sha=$SHA"
 
+  # SwiftPM reads a package from a Git repository at a version tag, and its
+  # binary target needs the checksum of the XCFramework that the release just
+  # published. The distribution repository takes the package in one commit
+  # tagged with this release's tag, over a deploy key that may write to it.
+  distribution:
+    name: Distribution repository
+    needs:
+      - source
+      - native
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    environment:
+      name: distribution
+      url:
+        https://github.com/maplibre/maplibre-native-ffi-distribution/tree/${{
+        github.ref_name }}
+    permissions:
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+      PUBLISH_SHA: ${{ needs.source.outputs.sha }}
+      PUBLISH_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ env.PUBLISH_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        with:
+          cache: false
+          install_args: python
+      - name: Download the checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --dir
+          "$RUNNER_TEMP/assets"
+      # GitHub publishes its host keys, so the job trusts only those.
+      - name: Install the deploy key
+        env:
+          DISTRIBUTION_DEPLOY_KEY: ${{ secrets.DISTRIBUTION_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$DISTRIBUTION_DEPLOY_KEY" ]]; then
+            echo "the distribution environment has no DISTRIBUTION_DEPLOY_KEY secret" >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          gh api meta --jq '.ssh_keys[] | "github.com \(.)"' > ~/.ssh/known_hosts
+          install -m 600 /dev/null ~/.ssh/distribution
+          printf '%s\n' "$DISTRIBUTION_DEPLOY_KEY" > ~/.ssh/distribution
+          echo "GIT_SSH_COMMAND=ssh -i $HOME/.ssh/distribution -o IdentitiesOnly=yes" >> "$GITHUB_ENV"
+      - name: Publish
+        run: |
+          set -euo pipefail
+
+          mise exec --no-deps python -- tools/release/publish-distribution.sh \
+            git@github.com:maplibre/maplibre-native-ffi-distribution.git \
+            "$PUBLISH_TAG" "$RUNNER_TEMP/assets"
+          echo "### Distribution repository $PUBLISH_TAG" >> "$GITHUB_STEP_SUMMARY"
+
   dotnet-nuget:
     name: .NET NuGet
     needs:
@@ -502,6 +565,7 @@ jobs:
     name: Docs
     needs:
       - dart
+      - distribution
       - dotnet
       - go
       - kotlin
