@@ -174,6 +174,11 @@ function(mln_ffi_elf_archive_commands out_var object archive)
     foreach(pattern IN LISTS keep_global)
       list(APPEND keep_arguments "--keep-global-symbol=${pattern}")
     endforeach()
+    # The final link keeps one COMDAT group of each name and discards the
+    # rest. A consumer that links its own copy of the bundled runtime, as Zig
+    # does with libunwind, would lose one copy's members while that copy's now
+    # local code still pointed at them, so the groups are dissolved.
+    list(APPEND keep_arguments --remove-section=.group)
     list(APPEND commands COMMAND "${CMAKE_OBJCOPY}" ${keep_arguments}
          "${object}")
   endif()

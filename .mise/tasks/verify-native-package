@@ -12,6 +12,8 @@
 - The only headers are the C API's and MapLibre Native's plugin header.
 - Each Apple library is stripped, with a matching dSYM beside it.
 - The relocatable CMake package links shared and complete static consumers.
+- A complete ELF archive keeps no COMDAT group, since a consumer's link would
+  discard its private copy of a runtime in favor of the consumer's own.
 """
 
 from __future__ import annotations
@@ -70,6 +72,8 @@ LOADER_NAMES = frozenset(
 PLATFORM_LIBRARY_PREFIXES = ("/System/Library/", "/usr/lib/")
 # Presets whose platform ships the graphics loader.
 PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
+# Presets whose complete static archive holds ELF objects.
+ELF_ARCHIVE_PRESETS = ("android-", "freebsd-", "linux-", "ohos-")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
 # The binary of MaplibreNativeC.framework.
 PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
@@ -87,6 +91,7 @@ VENDORED_LOADER = "carries a library that is not the C API"
 VENDORED_HEADER = "carries a header that is not the C API's"
 UNSTRIPPED = "keeps local symbols"
 MISSING_DSYM = "has no matching dSYM"
+COMDAT_GROUPS = "keeps COMDAT groups"
 REMEDIES = {
     BUILD_HOST_PATH: (
         "The package only loads where these paths exist. Resolve the "
@@ -118,6 +123,11 @@ REMEDIES = {
     MISSING_DSYM: (
         "Debuggers and crash reports find an Apple library's local symbols in "
         "the dSYM beside it, by UUID. mln_ffi_install_apple_dsym writes it."
+    ),
+    COMDAT_GROUPS: (
+        "A consumer that links its own copy of a bundled runtime would have "
+        "one copy's members discarded. mln_ffi_elf_archive_commands removes "
+        "the groups when it localizes the archive's symbols."
     ),
 }
 
@@ -253,6 +263,15 @@ def vendored_header(relative: pathlib.PurePath) -> bool:
     )
 
 
+def comdat_problems(archive: pathlib.Path) -> list[tuple[str, str]]:
+    groups = [
+        line
+        for line in run(["readelf", "--section-groups", str(archive)]).splitlines()
+        if line.startswith("COMDAT group section")
+    ]
+    return [(COMDAT_GROUPS, f"{len(groups)} groups")] if groups else []
+
+
 def image_format(binary: pathlib.Path) -> str | None:
     """The executable format of a file, or None for one that doesn't load."""
     with binary.open("rb") as file:
@@ -331,6 +350,14 @@ def main() -> int:
                 continue
             if vendored_header(relative):
                 problems.append((binary.name, VENDORED_HEADER, str(relative)))
+                continue
+            if binary.name == f"lib{PACKAGED_LIBRARY_STEM}.a" and preset.startswith(
+                ELF_ARCHIVE_PRESETS
+            ):
+                problems.extend(
+                    (binary.name, kind, detail)
+                    for kind, detail in comdat_problems(binary)
+                )
                 continue
             image = image_format(binary)
             if image is None:
