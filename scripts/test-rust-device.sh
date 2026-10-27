@@ -77,9 +77,6 @@ if [[ "$preset" == ios-simulator-* || "$preset" == visionos-simulator-* ]]; then
   export SIMCTL_CHILD_DYLD_LIBRARY_PATH="$native_install_dir/lib"
   if [[ "$preset" == visionos-* ]]; then
     export MLN_FFI_SIMULATOR_RUNTIME=visionOS
-    mise run //:visionos-simulator:boot
-  else
-    mise run //:ios-simulator:boot
   fi
   for test_binary in ${test_binaries[@]+"${test_binaries[@]}"}; do
     "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \

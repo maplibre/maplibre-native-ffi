@@ -1708,7 +1708,7 @@ jobs:
         run: mise run build ios-simulator-arm64-metal
       - name: Boot iOS simulator
         id: boot
-        run: mise run //:ios-simulator:boot
+        run: mise exec -- devices-cli get ios
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test ios-simulator-arm64-metal
@@ -1955,7 +1955,7 @@ jobs:
         run: mise run build tvos-simulator-arm64-metal
       - name: Boot tvOS simulator
         id: boot
-        run: mise run //:tvos-simulator:boot
+        run: mise exec -- devices-cli get tvos
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test tvos-simulator-arm64-metal
@@ -2016,7 +2016,7 @@ jobs:
         run: mise run build visionos-simulator-arm64-metal
       - name: Boot visionOS simulator
         id: boot
-        run: mise run //:visionos-simulator:boot
+        run: mise exec -- devices-cli get visionos
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test visionos-simulator-arm64-metal

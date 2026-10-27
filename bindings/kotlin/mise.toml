@@ -130,26 +130,14 @@ case "$usage_preset" in
   ios-simulator-arm64-metal)
     kotlin_target=iosSimulatorArm64
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
-    mise run //:ios-simulator:boot
-    export MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(
-      "$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" find-booted iOS
-    )
-    if [[ -z "$MLN_FFI_IOS_SIMULATOR_DEVICE_ID" ]]; then
-      echo "No booted iOS simulator device found." >&2
-      exit 2
-    fi
+    MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(devices-cli get ios)
+    export MLN_FFI_IOS_SIMULATOR_DEVICE_ID
     ;;
   tvos-simulator-arm64-metal)
     kotlin_target=tvosSimulatorArm64
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
-    mise run //:tvos-simulator:boot
-    export MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(
-      "$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" find-booted tvOS
-    )
-    if [[ -z "$MLN_FFI_IOS_SIMULATOR_DEVICE_ID" ]]; then
-      echo "No booted tvOS simulator device found." >&2
-      exit 2
-    fi
+    MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(devices-cli get tvos)
+    export MLN_FFI_IOS_SIMULATOR_DEVICE_ID
     ;;
   ios-arm64-metal)
     echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2

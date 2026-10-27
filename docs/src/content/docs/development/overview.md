@@ -44,10 +44,11 @@ running. An emulator boots in minutes under KVM on Linux. Without KVM it runs in
 software, which takes an hour or more on Linux, but the OpenHarmony emulator
 boots in under a minute on an Apple silicon Mac.
 
-Android device tests get a device from
+Android and Apple device tests get a device from
 [devices-cli](https://github.com/sargunv/devices-cli), which gives each worktree
-its own emulator for the ABI and API level they need; run `devices-cli release`
-to stop the worktree's emulators. Set `ANDROID_SERIAL` to use your own device
+its own emulator for the ABI and API level they need, or its own iOS, tvOS, or
+visionOS simulator on the newest installed runtime; run `devices-cli release` to
+stop the worktree's devices. Set `ANDROID_SERIAL` to use your own Android device
 instead, which must run the same ABI and API level.
 
 Every checkout also shares the one OpenHarmony emulator that runs the Oniro

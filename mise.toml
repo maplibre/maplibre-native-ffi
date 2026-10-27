@@ -86,10 +86,11 @@ sdl3_version = "3.4"
 "aqua:Kitware/CMake" = "4.4.4"
 ninja = "1.13.2"
 "github:EmbarkStudios/cargo-about" = "0.9.2" # Rust dependency notices
-# Each worktree's Android emulator, built from a commit with Go, which the Go
-# binding and example use too. devices-cli runs on Linux and macOS only.
+# Each worktree's Android emulator or Apple simulator, built from a commit with
+# Go, which the Go binding and example use too. devices-cli runs on Linux and
+# macOS only.
 "core:go" = "{{vars.go_version}}"
-"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261026232509-ce9acc4b47b7", os = [
+"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261027004735-0319096a0e57", os = [
   "linux",
   "macos",
 ] }
@@ -346,12 +347,11 @@ if [[ "$usage_preset" == linux-musl-* || "$usage_preset" == freebsd-* ||
     "${runner[@]}" "$program"
   done
   exec "${runner[@]}" "$suite" -f /abi/plugin/
-elif [[ "$usage_preset" == ios-simulator-* ]]; then
-  mise run //:apple-simulator:boot iOS
-elif [[ "$usage_preset" == visionos-simulator-* ]]; then
-  mise run //:apple-simulator:boot visionOS
-elif [[ "$usage_preset" == tvos-simulator-* ]]; then
-  mise run //:apple-simulator:boot tvOS
+elif [[ "$usage_preset" == ios-simulator-* || "$usage_preset" == tvos-simulator-* ||
+  "$usage_preset" == visionos-simulator-* ]]; then
+  # The suites run in parallel on the worktree's simulator, which starts here
+  # rather than inside the first suite's timeout.
+  devices-cli get "${usage_preset%%-*}" >/dev/null
 elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* || "$usage_preset" == android-x64-* ]]; then
   export MLN_FFI_TEST_FIXTURE_DIR="$MISE_MONOREPO_ROOT/tests/native/fixtures"
   if [[ "$usage_preset" == ohos-* ]]; then

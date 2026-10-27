@@ -173,8 +173,7 @@ depends = [
   ] },
 ]
 run = '''
-mise run //:ios-simulator:boot
-device=$("$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" find-booted iOS)
+device=$(devices-cli get ios)
 app=.dart_tool/flutter_ios_test
 flutter create --empty --no-pub --org org.maplibre.native_ffi \
   --platforms ios --project-name maplibre_native_ffi_ios_test "$app"

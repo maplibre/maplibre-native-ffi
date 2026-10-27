@@ -193,7 +193,7 @@ def device_boot(preset: str) -> tuple[str, str] | None:
     """The named step that boots the device a target's suites run on, if any.
 
     The suites boot the device themselves when it is not ready, and every boot
-    task reuses a ready device. Booting in a step of its own lets CI tell a
+    command reuses a ready device. Booting in a step of its own lets CI tell a
     device that never came up from a suite that failed on it.
     """
     target_platform = platform(preset)
@@ -210,11 +210,11 @@ def device_boot(preset: str) -> tuple[str, str] | None:
     if target_platform == "freebsd":
         return "Boot FreeBSD virtual machine", "mise run //:freebsd-vm:boot"
     if target_platform == "ios-simulator":
-        return "Boot iOS simulator", "mise run //:ios-simulator:boot"
+        return "Boot iOS simulator", "mise exec -- devices-cli get ios"
     if target_platform == "visionos-simulator":
-        return "Boot visionOS simulator", "mise run //:visionos-simulator:boot"
+        return "Boot visionOS simulator", "mise exec -- devices-cli get visionos"
     if target_platform == "tvos-simulator":
-        return "Boot tvOS simulator", "mise run //:tvos-simulator:boot"
+        return "Boot tvOS simulator", "mise exec -- devices-cli get tvos"
     return None
 
 

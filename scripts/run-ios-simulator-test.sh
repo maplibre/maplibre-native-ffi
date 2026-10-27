@@ -29,9 +29,9 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-script_dir=$(cd "$(dirname "$0")" && pwd)
-runtime=${MLN_FFI_SIMULATOR_RUNTIME:-iOS}
-device=$("$script_dir/apple-simulator.sh" find-booted "$runtime")
+# devices-cli names a platform in lower case, and macOS Bash 3.2 has no ${,,}.
+platform=$(printf '%s' "${MLN_FFI_SIMULATOR_RUNTIME:-iOS}" | tr '[:upper:]' '[:lower:]')
+device=$(devices-cli get "$platform")
 
 # simctl hands the spawned process the variables named SIMCTL_CHILD_<NAME>, with
 # the prefix removed, so the fixture directory travels under that spelling. The

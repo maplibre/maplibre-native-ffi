@@ -12,20 +12,3 @@ host_native_preset = "macos-arm64-metal"
 [env]
 MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
 VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
-
-[tasks."apple-simulator:boot"]
-description = "Boot an available Apple simulator and wait until it is ready."
-usage = 'arg "<runtime>"'
-run = 'bash "$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" boot "$usage_runtime"'
-
-[tasks."ios-simulator:boot"]
-description = "Boot an available iPhone simulator and wait until it is ready."
-run = [{ task = "//:apple-simulator:boot", args = ["iOS"] }]
-
-[tasks."visionos-simulator:boot"]
-description = "Boot an available Apple Vision Pro simulator and wait until it is ready."
-run = [{ task = "//:apple-simulator:boot", args = ["visionOS"] }]
-
-[tasks."tvos-simulator:boot"]
-description = "Boot an available Apple TV simulator and wait until it is ready."
-run = [{ task = "//:apple-simulator:boot", args = ["tvOS"] }]
