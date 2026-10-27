@@ -8,7 +8,7 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import pascal
-from tools.bindgen.protocol import COMPLETION_RESULT
+from tools.bindgen.protocol import COMPLETION_RESULT, STATUS
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
 SCALARS = {
@@ -159,7 +159,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
 
     def constant(value, member: str) -> str | None:
         # A failing status is an error of every call that returns a status.
-        if value.native == "mln_status" and dict(value.enum_values)[member] != 0:
+        if value.native == STATUS and dict(value.enum_values)[member] != 0:
             return f"error.{status_error(member)}"
         return f"{values.public(value)}.{parameter_name(enum_member(value, member))}"
 
@@ -195,17 +195,6 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{member}"
             for member in ("generation", "render_update_generation")
         },
-    )
-
-
-def event_sources(bound: BoundApi) -> frozenset[str]:
-    """The handles that runtime events name as their source."""
-    prefix = "MLN_RUNTIME_EVENT_SOURCE_"
-    return frozenset(
-        "mln_" + member.name.removeprefix(prefix).lower()
-        for enum in bound.source.enums
-        if enum.name == "mln_runtime_event_source_type"
-        for member in enum.values
     )
 
 
@@ -382,7 +371,7 @@ pub const OwnedValue = marshal.OwnedValue;
         )
         source = (
             "///\n/// Runtime events report its `id()` as their source.\n"
-            if handle.native in event_sources(bound)
+            if handle.native in bound.event_sources
             else ""
         )
         commands = any(
@@ -476,7 +465,7 @@ pub const Diagnostic = diagnostics.Diagnostic;
 
 """
     source = docs + prefix + runtime + "\n".join([*owners, *chunks, *variants])
-    status_value = bound.public_values.get("mln_status")
+    status_value = bound.public_values.get(STATUS)
     files = {"maplibre_native_ffi.zig": source}
     if status_value:
         entries = [

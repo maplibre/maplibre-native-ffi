@@ -57,10 +57,6 @@ def supported_platforms(plan: OperationPlan, indent: str = "    ") -> str:
     )
 
 
-# The handles that `mln_runtime_event_source_type` names as an event's source.
-EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
-
-
 def operation_contract(plan: OperationPlan) -> str | None:
     """Reject contracts that the .NET operation skeleton does not implement."""
     function = plan.function
@@ -969,7 +965,7 @@ def emit_operation(
         parameters[index] += " = null"
     if (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [f"using var scope = new NativeCallScope({owner_expression});"]
-    elif function.name == "mln_c_version":
+    elif plan.unchecked:
         # The ABI check calls this function, so reporting the version must not
         # run the check.
         entry = ["EnterUnchecked();"]
@@ -1337,7 +1333,7 @@ def emit(api: Api | BoundApi) -> Emission:
                 "    /// source. It stays readable after close, so events drained later\n"
                 "    /// still match this handle.\n"
                 "    /// </summary>\n"
-                if native in EVENT_SOURCES
+                if native in bound.event_sources
                 else "    /// <summary>\n"
                 "    /// The native handle value. It stays readable after close.\n"
                 "    /// </summary>\n"

@@ -524,11 +524,7 @@ def operation(
             # A call that returns a value cannot fail, so it does not throw.
             # The ABI version check reads the C version, so reading it skips
             # the check.
-            body = (
-                copied
-                if function.name == "mln_c_version"
-                else f"nativeDirect {{ {copied} }}"
-            )
+            body = copied if plan.unchecked else f"nativeDirect {{ {copied} }}"
             return (
                 f"""{doc_comment}{signature} -> {result} {{
   {body}

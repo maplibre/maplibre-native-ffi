@@ -7,7 +7,7 @@ from dataclasses import replace
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
-from tools.bindgen.protocol import COMPLETION_RESULT
+from tools.bindgen.protocol import COMPLETION_RESULT, STATUS
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -874,7 +874,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     # An entry point that takes no handle can be a program's first call, so it
     # checks the C ABI version before anything reaches C. The version itself
     # is what the check reads, so it never fails.
-    if receiver is None and not consuming and function.name != "mln_c_version":
+    if receiver is None and not consuming and not plan.unchecked:
         body.insert(
             1,
             "maplibre_core::validate_abi_version()?;"
@@ -1028,7 +1028,7 @@ def coverage(api: Api | BoundApi) -> dict:
 
 
 def status_source(bound):
-    values = bound.values["mln_status"].enum_values
+    values = bound.values[STATUS].enum_values
     variants = [
         (
             pascal(key.removeprefix("MLN_STATUS_").lower()),
@@ -1039,7 +1039,7 @@ def status_source(bound):
     ]
     return (
         "// Generated from C headers by tools/bindgen. Do not edit.\n"
-        + doc(bound, "mln_status")
+        + doc(bound, STATUS)
         + "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\npub enum Status {\n"
         + "".join(
             f"{doc(bound, 'MLN_STATUS_' + label, '    ')}    {name},\n"

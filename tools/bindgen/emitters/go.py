@@ -155,16 +155,6 @@ def native_call(function, *arguments, diagnostic="diagnostic"):
     return f"C.{function.name}({', '.join(arguments)})"
 
 
-def event_sources(api) -> set[str]:
-    """The handles that a runtime event can name as its source."""
-    return {
-        "mln_" + value.name.removeprefix("MLN_RUNTIME_EVENT_SOURCE_").lower()
-        for enum in api.enums
-        if enum.name == "mln_runtime_event_source_type"
-        for value in enum.values
-    }
-
-
 def public_dispose(handle) -> bool:
     """Whether a handle has a C dispose besides a void release: a separate
     dispose, or a release that disposes and also takes a completion."""
@@ -214,7 +204,6 @@ def lower(api):
             values.require(value)
     owners = []
     used_support = set()
-    sources = event_sources(bound.source)
     for native, handle in sorted(bound.public_handles.items()):
         if handle.dispose in bound.source.runtime_exports:
             continue
@@ -246,7 +235,7 @@ def lower(api):
             doc(bound, native, owner)
             + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
             f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
-            + owner_members(owner, native in sources)
+            + owner_members(owner, native in bound.event_sources)
         )
         used_support.add(disposer)
         if public_dispose(handle):

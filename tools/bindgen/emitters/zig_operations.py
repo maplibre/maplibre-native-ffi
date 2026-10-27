@@ -309,7 +309,7 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
                 else f"return {values.capture(plan.result, native_call)};"
             ]
             infallible = True
-            if mode == "none" and function.name != "mln_c_version":
+            if mode == "none" and not plan.unchecked:
                 # A call without a handle can be a program's first, and with
                 # no error channel it panics on another C ABI version. The
                 # version itself is what the check reads, so it never fails.

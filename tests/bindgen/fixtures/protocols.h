@@ -146,6 +146,11 @@ typedef struct mln_completion {
 } mln_completion;
 #endif
 typedef unsigned long long mln_runtime;
+// The handles that runtime events name as their source.
+typedef enum mln_runtime_event_source_type : unsigned int {
+  MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
+  MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
+} mln_runtime_event_source_type;
 
 #ifdef MLN_PROTOCOL_ABI_VERSION
 // The C ABI version and its query, for a probe that compiles a binding's

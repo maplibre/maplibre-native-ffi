@@ -66,16 +66,6 @@ def pascal(name: str) -> str:
     return "".join(part.capitalize() for part in name.split("_"))
 
 
-def event_sources(api: Api) -> set[str]:
-    """The handles that a runtime event can name as its source."""
-    return {
-        "mln_" + value.name.removeprefix("MLN_RUNTIME_EVENT_SOURCE_").lower()
-        for enum in api.enums
-        if enum.name == "mln_runtime_event_source_type"
-        for value in enum.values
-    }
-
-
 def public_dispose(handle: HandlePlan) -> bool:
     """Whether a handle has a C dispose besides a void release: a separate
     dispose, or a release that disposes and also takes a completion."""
@@ -1214,7 +1204,6 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         value._native = native
         return value
 """)
-    sources = event_sources(api)
     for native, owner in OWNERS.items():
         handle = bound.handles[native]
         # A handle without scoped cleanup, such as a frame, has no `with` block.
@@ -1227,7 +1216,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
             "The native handle value, which runtime events report as their source.\n\n"
             "        It stays readable after close, so events drained later still match\n"
             "        the handle that produced them.\n        "
-            if native in sources
+            if native in bound.event_sources
             else "The native handle value. It stays readable after close."
         )
         # The dispose is the scoped release, which `__exit__` also calls.

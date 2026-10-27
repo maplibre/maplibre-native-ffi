@@ -6,8 +6,6 @@ from .kotlin_operations import disposal_method, method_name, needs_read, receive
 from .kotlin_values import doc, generated_owners, name, owner_name
 
 ASYNC_RELEASABLE = "AsyncReleasable"
-# The handles that `mln_runtime_event_source_type` names as an event's source.
-EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
 
 
 @dataclass(frozen=True)
@@ -108,7 +106,7 @@ def owner(bound, native, plans, factories, members, imports):
         + (
             "   * The native handle value, which runtime events report as their source. It stays readable\n"
             "   * after close, so events drained later still match this handle.\n"
-            if native in EVENT_SOURCES
+            if native in bound.event_sources
             else "   * The native handle value. It stays readable after close.\n"
         )
         + "   */\n"

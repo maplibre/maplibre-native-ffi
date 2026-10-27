@@ -9,6 +9,7 @@ from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
 from ..names import camel, pascal
+from ..protocol import STATUS_OK
 from ..semantic import (
     BoundApi,
     FieldPlan,
@@ -1023,7 +1024,7 @@ class Values:
             # receives without a report.
             deliberate = (
                 "        catch (MaplibreException error)\n"
-                f"            when (({result_type})error.Status != {self.constant('MLN_STATUS_OK')})\n"
+                f"            when (({result_type})error.Status != {self.constant(STATUS_OK)})\n"
                 f"        {{\n{disposals}            return ({result_type})error.Status;\n        }}\n"
                 if callback.status
                 else ""

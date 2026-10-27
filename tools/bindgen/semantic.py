@@ -18,6 +18,7 @@ from . import docs
 from .model import Api, CType, Function, ModelError
 from .names import type_name
 from .protocol import (
+    ABI_VERSION,
     BUFFER_VIEW,
     COMPLETION_RESULT,
     COMPLETION_VALUE_COUNT,
@@ -25,6 +26,8 @@ from .protocol import (
     DELIVERY_BATCH,
     DELIVERY_PAYLOAD,
     DELIVERY_QUEUE,
+    RUNTIME_EVENT_SOURCE,
+    RUNTIME_EVENT_SOURCE_PREFIX,
     STATUS,
     is_completion,
     is_status,
@@ -448,6 +451,9 @@ class OperationPlan:
     # The root handle that this receiverless call creates, which bindings
     # present as a factory on that handle's type, or None.
     factory: str | None = None
+    # Whether the call skips the C ABI version check: the version query that
+    # the check itself calls.
+    unchecked: bool = False
 
     @property
     def name(self) -> str:
@@ -503,6 +509,15 @@ class BoundApi:
             for record in (self.source.records_by_name.get(typedef.name),)
             if record is not None and record.name in self.values
         }
+
+    @functools.cached_property
+    def event_sources(self) -> frozenset[str]:
+        """The handles that runtime events name as their source."""
+        enum = self.source.enums_by_name.get(RUNTIME_EVENT_SOURCE)
+        return frozenset(
+            "mln_" + member.name.removeprefix(RUNTIME_EVENT_SOURCE_PREFIX).lower()
+            for member in (enum.values if enum else ())
+        )
 
     @functools.cached_property
     def enum_numbers(self) -> dict[str, int]:
@@ -1420,6 +1435,7 @@ class Binder:
             absence=absence,
             blocks=metadata.get("blocks"),
             factory=factory,
+            unchecked=function.name == ABI_VERSION,
         )
 
     def copied(self, parameters, result: ValuePlan | None, context: str) -> set[str]:

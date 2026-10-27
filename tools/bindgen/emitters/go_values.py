@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
+from ..protocol import STATUS
 from ..semantic import enum_member_prefix
 from .go import doc, name, native_identifier, symbols
 
@@ -441,7 +442,7 @@ class Values:
                 chunks.append(
                     f'func (value {typename}) String() string {{ switch value {{ {cases} }}; return fmt.Sprintf("{typename}(%d)", value) }}'
                 )
-                if native == "mln_status":
+                if native == STATUS:
                     # Go error strings are lowercase words that name the package.
                     messages = "\n".join(
                         f'case {number}: return "maplibre: {key.removeprefix(prefix).lower().replace("_", " ")}"'

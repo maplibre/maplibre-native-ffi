@@ -3,9 +3,6 @@
 from ..model import ModelError
 from ..names import camel
 
-# The handles that mln_runtime_event_source_type names as an event's source.
-EVENT_SOURCES = {"mln_runtime", "mln_map"}
-
 
 def consumed(plan, owner, values):
     function = plan.function
@@ -199,7 +196,7 @@ def owner_declarations(bound):
             "  /// The native handle, which no later handle in the process reuses\n"
             "  /// and runtime events report as their source. It stays valid after\n"
             "  /// the handle closes.\n"
-            if handle.native in EVENT_SOURCES
+            if handle.native in bound.event_sources
             else "  /// The native handle, which no later handle in the process reuses.\n"
             "  /// It stays valid after the handle closes.\n"
         )

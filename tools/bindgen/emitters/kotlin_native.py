@@ -31,6 +31,7 @@ from ..protocol import (
     DELIVERY_BATCH_VIEW,
     DELIVERY_PAYLOAD,
     DIAGNOSTIC,
+    RENDER_ABANDON_RESULT,
 )
 from ..semantic import DeliverySupport
 from .kotlin_abi import (
@@ -340,7 +341,7 @@ class NativeShims:
             (COMPLETION, "CompletionLayout"),
             (COMPLETION_RESULT, "CompletionResultLayout"),
             (DIAGNOSTIC, "DiagnosticLayout"),
-            ("mln_render_abandon_result", "RenderAbandonResultLayout"),
+            (RENDER_ABANDON_RESULT, "RenderAbandonResultLayout"),
             (DELIVERY, "DeliveryLayout"),
             (DELIVERY_BATCH_VIEW, "DeliveryBatchViewLayout"),
         ):

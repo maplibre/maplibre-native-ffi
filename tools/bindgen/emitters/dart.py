@@ -38,9 +38,6 @@ HOST_ONLY = {"mln_android_init"}
 # leaves out only what none of them can use.
 TARGETS = frozenset({"android", "ios", "linux", "macos", "windows"})
 
-# The handles that mln_runtime_event_source_type names as an event's source.
-EVENT_SOURCES = {"mln_runtime", "mln_map"}
-
 
 def native_call(function, arguments):
     """Call a C function, passing the isolate's diagnostic when it takes one."""
@@ -688,7 +685,7 @@ def lower(api: Api | BoundApi):
             owner, body = lower_function(plan, local_values)
             # The ABI version check reads the C version, so reading it skips
             # the check.
-            if owner == "Globals" and plan.name != "mln_c_version":
+            if owner == "Globals" and not plan.unchecked:
                 body = abi_checked(body)
             # A factory is a static method of the owner of the handle it
             # creates.
@@ -806,7 +803,7 @@ def render_owner(native, handle, bodies, bound, roots):
             "  ///\n"
             "  /// It stays readable after close, so events drained later still match\n"
             "  /// this handle.\n"
-            if native in EVENT_SOURCES
+            if native in bound.event_sources
             else "  /// The native handle id.\n"
         )
         + "  int get id => _state.handleId;\n\n"

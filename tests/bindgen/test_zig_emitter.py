@@ -174,9 +174,6 @@ mln_status mln_session_dispose(mln_session session, const mln_completion *comple
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(
             """
-typedef enum mln_runtime_event_source_type : unsigned {
-  MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
-} mln_runtime_event_source_type;
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
 typedef unsigned long long mln_query BIND("kind=handle;release=mln_query_release");
 void mln_map_release(mln_map map);

@@ -449,9 +449,7 @@ def immediate(plan, values, native):
     if decoded:
         setup.append(decoded)
     # The ABI version check reads the C version, so reading it skips the check.
-    helper = (
-        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
-    )
+    helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -505,9 +503,7 @@ def caller_sized_text(plan, values, native, text):
         f"readBytes(textStorage, {written}).decodeToString()",
     ]
     # The ABI version check reads the C version, so reading it skips the check.
-    helper = (
-        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
-    )
+    helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -524,9 +520,7 @@ def multiple_outputs(plan, values, native):
     setup.append(native.checked(plan.function, arguments))
     setup.append(f"{result_type}({', '.join(copied)})")
     # The ABI version check reads the C version, so reading it skips the check.
-    helper = (
-        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
-    )
+    helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
