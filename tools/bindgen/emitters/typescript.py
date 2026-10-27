@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .. import async_hosts, docs
+from .. import async_hosts, docs, model
 from ..compiler import compile_api
 from ..model import Api
 from ..names import type_name
@@ -710,7 +710,7 @@ def scoped_name(native: str) -> str:
 TARGETS = frozenset({"linux", "macos", "ohos", "web"})
 
 
-def lower(api: Api | BoundApi):
+def lower_operations(api: Api | BoundApi):
     bound = compile_api(api, TARGETS)
     values = Values(bound)
     natives = NativeValues(values)
@@ -738,14 +738,20 @@ def lower(api: Api | BoundApi):
 
 
 def symbols(bound: BoundApi) -> docs.Symbol:
-    """How TypeScript spells the C declarations that its summaries name."""
-    return bound.symbols("typescript", _symbols)
+    """How TypeScript spells the C declarations that its summaries name.
+
+    `lower` records them before it renders a summary.
+    """
+    return bound.symbols("typescript", _unlowered)
 
 
-def _symbols(bound: BoundApi) -> docs.Symbol:
+def _unlowered(bound: BoundApi) -> docs.Symbol:
+    raise AssertionError("TypeScript names its symbols only while it lowers")
+
+
+def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Symbol:
     # The names come from the same lowering that declares them, so a summary
     # names only what this binding generates.
-    _, values, _, lowered, _ = lower(bound)
     methods = {entry.plan.name: entry for entry in lowered}
     # A record that holds only a union presents the union under its own name.
     holders = {
@@ -816,11 +822,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
     )
 
 
-def generate(api: Api | BoundApi) -> dict[str, str]:
+def lower(api: Api | BoundApi) -> model.Lowered:
     from .typescript_native import render_native
     from .typescript_operations import delivered, render_operations, view_scopes
 
-    bound, values, natives, lowered, _ = lower(api)
+    bound, values, natives, lowered, unsupported = lower_operations(api)
+    bound.symbols("typescript", lambda bound: _symbols(bound, values, lowered))
     # The operations name every value, so the value table follows them.
     outputs = render_operations(bound, values, lowered)
     natives.payload_reader(
@@ -831,12 +838,4 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         + values.render()
     )
     outputs.update(render_native(bound, natives, lowered, view_scopes(lowered)))
-    return outputs
-
-
-def coverage(api: Api | BoundApi):
-    _, _, _, lowered, unsupported = lower(api)
-    return {
-        "generated": [entry.plan.name for entry in lowered],
-        "unsupported": unsupported,
-    }
+    return model.Lowered(outputs, unsupported, [entry.plan.name for entry in lowered])

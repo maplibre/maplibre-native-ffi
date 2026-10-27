@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from .. import async_hosts, docs
 from ..managed_contracts import DART_RESERVED
+from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_callbacks
 
@@ -72,10 +73,6 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     from .dart import symbols
 
     return docs.line_comment(found, symbols(bound), indent)
-
-
-class Unsupported(ValueError):
-    pass
 
 
 def public_name(native: str) -> str:

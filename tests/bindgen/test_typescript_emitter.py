@@ -10,6 +10,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    emitted,
     parse,
     parse_sources,
     protocol_header,
@@ -72,8 +73,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.api = real_api()
-        cls.bound, cls.values, _, cls.lowered, _ = typescript.lower(cls.api)
-        cls.coverage = typescript.coverage(cls.api)
+        cls.bound, cls.values, _, cls.lowered, _ = typescript.lower_operations(cls.api)
+        cls.coverage = typescript.lower(cls.api)
 
     def test_each_operation_calls_its_own_function(self):
         # Each operation is one addon export for one C function. A fallible
@@ -81,8 +82,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
         # its status. No call goes through a dispatch table of slots.
         names = [entry.plan.name for entry in self.lowered]
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual(set(names), set(self.coverage["generated"]))
-        self.assertEqual(self.coverage["unsupported"], {})
+        self.assertEqual(set(names), set(self.coverage.generated))
+        self.assertEqual(self.coverage.unsupported, {})
         for entry in self.lowered:
             with self.subTest(function=entry.plan.name):
                 function = entry.plan.function
@@ -153,7 +154,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         # cleanup pass no completion.
         text = next(
             text
-            for name, text in typescript.generate(self.api).items()
+            for name, text in emitted(typescript, self.api).items()
             if name.endswith("generated_operations.ts")
         )
         self.assertIn('defineDisposers(RenderSessionHandle, "close", "dispose");', text)
@@ -193,7 +194,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         # to document it as their source.
         text = next(
             text
-            for name, text in typescript.generate(self.api).items()
+            for name, text in emitted(typescript, self.api).items()
             if name.endswith("generated_operations.ts")
         )
 
@@ -208,8 +209,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
             self.assertNotIn("readonly id", owner(name))
 
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
-        outputs = typescript.generate(
-            parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        outputs = emitted(
+            typescript, parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         )
         operations = outputs["bindings/typescript/src/generated_operations.ts"]
         # Nothing queued reads as an empty array.
@@ -237,7 +238,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         )
 
     def test_a_callback_receives_its_slice_argument_as_a_list(self):
-        values = typescript.generate(self.api)[
+        values = emitted(typescript, self.api)[
             "bindings/typescript/src/generated_values.ts"
         ]
         self.assertIn(
@@ -252,7 +253,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         # The realm sets the delivery queue itself, so a host cannot leave out
         # a callback that C requires in callback mode. A callback that C marks
         # nullable stays optional.
-        generated = typescript.generate(self.api)
+        generated = emitted(typescript, self.api)
         values = generated["bindings/typescript/src/generated_values.ts"]
         operations = generated["bindings/typescript/src/generated_operations.ts"]
         self.assertIn(
@@ -267,7 +268,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
     def test_only_a_required_member_must_be_given(self):
         # A member that a host leaves out is zero, as native reads it, except
         # a required one, which makes its record a required argument too.
-        generated = typescript.generate(self.api)
+        generated = emitted(typescript, self.api)
         values = generated["bindings/typescript/src/generated_values.ts"]
         operations = generated["bindings/typescript/src/generated_operations.ts"]
         self.assertIn("  initialExtent: LogicalExtent;\n", values)
@@ -283,7 +284,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         # A browser page cannot wait for a thread to start, so the export
         # copies its converted arguments and returns, and the Promise settles
         # when the call's thread has created the owner.
-        generated = typescript.generate(self.api)
+        generated = emitted(typescript, self.api)
         operations = generated["bindings/typescript/src/generated_operations.ts"]
         addon = generated["bindings/typescript/native/generated_addon.c"]
         self.assertIn(
@@ -306,7 +307,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertNotIn("mln_runtime arg_out_runtime", addon)
 
     def test_a_factory_is_static_and_a_global_names_its_verb_first(self):
-        operations = typescript.generate(self.api)[
+        operations = emitted(typescript, self.api)[
             "bindings/typescript/src/generated_operations.ts"
         ]
         runtime = operations[operations.index("export class RuntimeHandle ") :]
@@ -316,7 +317,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("export function setLogCallback(handler: LogHandler)", operations)
 
     def test_docs_name_the_binding_symbols_of_c_declarations(self):
-        values = typescript.generate(self.api)[
+        values = emitted(typescript, self.api)[
             "bindings/typescript/src/generated_values.ts"
         ]
         self.assertIn(
@@ -370,10 +371,10 @@ class TypeScriptEmitterTests(unittest.TestCase):
         header = protocol_header(groups=GROUPS, defines=DEFINES)
         api = parse_sources({"api.h": header})
         validate(api)
-        self.assertEqual(typescript.coverage(api)["unsupported"], {})
+        self.assertEqual(typescript.lower(api).unsupported, {})
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            for name, text in typescript.generate(api).items():
+            for name, text in emitted(typescript, api).items():
                 target = root / Path(name).name
                 if "/src/" in name:
                     target = root / "src" / Path(name).name

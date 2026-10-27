@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..semantic import required_callbacks
 from .rust_dynamic_values import dynamic
 from .zig import doc, identifier
@@ -347,10 +347,8 @@ def declaration(values, value):
     encoder_parameters = to_native_parameters(value)
     for name in ("allocator", "roots"):
         if (name in encoder_parameters) != any(name in line for line in writes):
-            raise ModelError(
-                [
-                    f"Zig: {value.native}: toNative {name} use disagrees with its encoding"
-                ]
+            raise Unsupported(
+                f"Zig: {value.native}: toNative {name} use disagrees with its encoding"
             )
     signature = "".join(
         {
@@ -386,8 +384,8 @@ def declaration(values, value):
     )
     if copy and required_callbacks(value):
         # A copy holds no callbacks, so it can't hold the required ones.
-        raise ModelError(
-            [f"Zig: {value.native}: a returned registration requires callbacks"]
+        raise Unsupported(
+            f"Zig: {value.native}: a returned registration requires callbacks"
         )
     encoder = (
         f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{

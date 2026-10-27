@@ -13,7 +13,9 @@ from tools.bindgen.semantic import (
     OperationPlan,
 )
 
-from ..model import Api, CType
+from ..model import Api, CType, Lowered, Unsupported
+
+DIRECTORY = "bindings/rust"
 
 SCALARS = {
     "int8_t": "i8",
@@ -48,10 +50,6 @@ PLATFORM_CFG = {
     "web": 'target_os = "emscripten"',
     "windows": 'target_os = "windows"',
 }
-
-
-class Unsupported(ValueError):
-    pass
 
 
 def gated(plan: OperationPlan, code: str) -> str:
@@ -911,7 +909,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     return module, code
 
 
-def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str]]:
+def lower(api: Api | BoundApi) -> Lowered:
     chunks, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
     from . import rust_owners
@@ -1011,20 +1009,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if name in generated:
             generated.remove(name)
         unsupported.setdefault(name, reason)
-    return files, generated, unsupported
-
-
-def generate(api: Api | BoundApi) -> dict[str, str]:
-    return lower(api)[0]
-
-
-def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api)
-    _, generated, unsupported = lower(bound)
-    return {
-        "generated": generated,
-        "unsupported": unsupported,
-    }
+    return Lowered(
+        {f"{DIRECTORY}/{path}": source for path, source in files.items()},
+        unsupported,
+        generated,
+    )
 
 
 def status_source(bound):

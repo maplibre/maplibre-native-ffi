@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from support import (
     NATIVE_INCLUDE,
     ROOT,
+    emitted,
     parse,
     protocol_groups,
     real_api,
@@ -156,7 +157,7 @@ class KotlinLayoutTests(unittest.TestCase):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)
         home = java.resolve().parents[1]
         machine = next((home / "include").glob("*/jni_md.h")).parent
-        source = kotlin.generate(real_api())[kotlin.JNI]
+        source = emitted(kotlin, real_api())[kotlin.JNI]
         for width in TARGETS:
             with self.subTest(width=width):
                 self.compile(
@@ -175,7 +176,7 @@ class KotlinLayoutTests(unittest.TestCase):
         # thread-start wrapper asserts that its arguments fit the thread start,
         # so compiling the glue against the real prototypes checks both.
         clang = require_tool(self, "clang").executable
-        source = kotlin.generate(real_api())[kotlin.WASM_GLUE]
+        source = emitted(kotlin, real_api())[kotlin.WASM_GLUE]
         with TemporaryDirectory() as directory:
             check = Path(directory) / "glue.c"
             check.write_text(source)
@@ -199,7 +200,7 @@ class KotlinLayoutTests(unittest.TestCase):
             )
 
     def test_a_frame_has_no_scoped_cleanup(self):
-        owners = kotlin.generate(real_api())
+        owners = emitted(kotlin, real_api())
         # A frame's release needs the host's consumer sync and its discard
         # quarantines a slot, so a frame has no `use`, and its release states
         # the consumer's completion.
@@ -208,7 +209,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("public fun release(consumerCompletion: GpuSync?): Unit =", frame)
 
     def test_every_owner_has_the_same_handle_members(self):
-        owners = kotlin.generate(real_api())
+        owners = emitted(kotlin, real_api())
         for handle in (
             "Runtime",
             "Map",
@@ -245,7 +246,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertNotIn("fun release(", projection)
 
     def test_a_dispose_with_a_completion_is_the_release_and_the_dispose(self):
-        outputs = kotlin.generate(parse(DISPOSE_WITH_COMPLETION))
+        outputs = emitted(kotlin, parse(DISPOSE_WITH_COMPLETION))
         owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
         # The release reports retirement through the completion, and the
         # dispose, like every disposer, passes none.
@@ -269,8 +270,8 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("public override fun close() { dispose() }", owner)
 
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
-        outputs = kotlin.generate(
-            parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
+        outputs = emitted(
+            kotlin, parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         )
         api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]
         # The drain copies the slice, then releases the batch even if the copy
@@ -293,7 +294,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertFalse(any("ReadingBatch" in path for path in outputs))
 
     def test_a_callback_receives_its_slice_argument_as_a_list(self):
-        outputs = kotlin.generate(real_api())
+        outputs = emitted(kotlin, real_api())
         values = outputs[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn("public operator fun invoke(events: List<RuntimeEvent>)", values)
         self.assertNotIn("EventBatchView", values)
@@ -305,7 +306,7 @@ class KotlinLayoutTests(unittest.TestCase):
         )
 
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
-        outputs = kotlin.generate(real_api())
+        outputs = emitted(kotlin, real_api())
         values = outputs[f"{GENERATED}/GeneratedValues.kt"]
         options = values.split("public data class MapOptions(")[1].split("\n)")[0]
         self.assertIn("public val initialExtent: LogicalExtent,", options)
@@ -322,7 +323,7 @@ class KotlinLayoutTests(unittest.TestCase):
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
     ):
-        outputs = kotlin.generate(real_api())
+        outputs = emitted(kotlin, real_api())
         runtime = outputs[f"{GENERATED}/RuntimeHandle.kt"]
         self.assertIn("  public companion object {\n", runtime)
         self.assertIn(
@@ -336,7 +337,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("\npublic fun clearLogCallback(): Unit =", api)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
-        values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
+        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn("public sealed interface RenderedQueryGeometry {", values)
         self.assertNotIn("RenderedQueryGeometryData", values)
         # Native never returns a query geometry, so it has no unknown variant;
@@ -349,7 +350,7 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("public data class Unknown(", definition.split("\n}")[0])
 
     def test_docs_name_the_binding_symbols_of_c_declarations(self):
-        values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
+        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn(
             "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or\n"
             "     * `GesturePhase.CANCEL` ended the transitions",
@@ -395,7 +396,7 @@ class KotlinLayoutTests(unittest.TestCase):
                     self.assertIsNotNone(callback.delivery)
 
     def test_callback_results_answer_native_in_their_c_types(self):
-        outputs = kotlin.generate(real_api())
+        outputs = emitted(kotlin, real_api())
         threaded = outputs[
             "src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/ThreadedUpcalls.kt"
         ]
@@ -457,7 +458,7 @@ class KotlinLayoutTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "upcall.c"
-            source.write_text(kotlin.generate(real_api())[kotlin.JNI] + UPCALL_TEST)
+            source.write_text(emitted(kotlin, real_api())[kotlin.JNI] + UPCALL_TEST)
             executable = root / "upcall"
             require_tool(self, "clang").run(
                 self,

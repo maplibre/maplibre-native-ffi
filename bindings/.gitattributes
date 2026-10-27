@@ -205,7 +205,7 @@
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/Wake.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/WakeCallback.g.cs linguist-generated=true
-/generated-coverage.json linguist-generated=true
+/generated-files.json linguist-generated=true
 /go/maplibre/generated_api.go linguist-generated=true
 /go/maplibre/generated_api_android.go linguist-generated=true
 /go/maplibre/generated_api_macos.go linguist-generated=true

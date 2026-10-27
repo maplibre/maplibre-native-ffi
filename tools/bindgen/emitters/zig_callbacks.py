@@ -2,7 +2,7 @@
 
 import re
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..names import camel
 from ..semantic import required_callbacks
 from .zig import identifier, status_error
@@ -296,7 +296,7 @@ def borrow(value, source):
     if value.buffer_form == "view":
         return f"try marshal.borrowView({source})"
     if value.length != "nul":
-        raise ModelError([f"Zig: {value.native}: callback text must be NUL-terminated"])
+        raise Unsupported(f"Zig: {value.native}: callback text must be NUL-terminated")
     if value.nullable:
         return f"if ({source}) |text| std.mem.span(text) else null"
     return f"std.mem.span({source} orelse return error.NativeError)"

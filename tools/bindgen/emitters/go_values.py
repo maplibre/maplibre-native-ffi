@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..protocol import STATUS
 from ..semantic import enum_member_prefix
 from .go import doc, name, native_identifier, symbols
@@ -85,7 +85,7 @@ class Values:
         self.views = {}
 
     def fail(self, value, reason):
-        raise ModelError([f"Go: {value.native}: {reason}"])
+        raise Unsupported(f"Go: {value.native}: {reason}")
 
     def slice(self, value):
         """The array field of a `kind=slice` record, which Go presents as a

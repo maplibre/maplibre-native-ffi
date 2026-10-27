@@ -1,4 +1,4 @@
-"""The generate command's exit status drives CI, so each flag's result matters."""
+"""The generate command's exit status drives CI, and its writes keep the tree current."""
 
 import contextlib
 import io
@@ -17,7 +17,7 @@ UNFORMATTED = patch.object(cli, "format_files", lambda _paths, _root: None)
 
 
 class GenerateCommandTests(unittest.TestCase):
-    def generate(self, root, groups, *, require_complete=False):
+    def generate(self, root, groups):
         """Run generate under `root`, returning its status and diagnostics."""
         errors = io.StringIO()
         with (
@@ -25,7 +25,7 @@ class GenerateCommandTests(unittest.TestCase):
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(errors),
         ):
-            status = cli.generate(parse(groups=groups), require_complete, root=root)
+            status = cli.generate(parse(groups=groups), root=root)
         return status, errors.getvalue()
 
     def test_previous_outputs_that_are_no_longer_generated_are_stale(self):
@@ -48,16 +48,23 @@ class GenerateCommandTests(unittest.TestCase):
             self.assertFalse((root / removed).exists())
             self.assertTrue((root / handwritten).is_file())
 
-    def test_require_complete_fails_while_a_declaration_is_unsupported(self):
-        # The values group declares a nullable counted input that some emitters
-        # report unsupported.
+    def test_the_values_group_fails_generation_before_writing_output(self):
+        # The values group declares a nullable counted input that the Rust
+        # emitter reports unsupported.
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            self.assertEqual(self.generate(root, ("values",))[0], 0)
-            status, _ = self.generate(root, ("values",), require_complete=True)
+            self.assertEqual(self.generate(root, ("keywords",))[0], 0)
+            manifest = (root / cli.MANIFEST).read_text()
+            output = io.StringIO()
+            with UNFORMATTED, contextlib.redirect_stdout(output):
+                status = cli.generate(parse(groups=("values",)), root=root)
             self.assertEqual(status, 1)
-            status, _ = self.generate(root, ("keywords",), require_complete=True)
-            self.assertEqual(status, 0)
+            self.assertIn(
+                "rust: 1 declarations require implementation", output.getvalue()
+            )
+            self.assertIn("mln_probe_roundtrip", output.getvalue())
+            # The previous run's outputs stay as they were.
+            self.assertEqual((root / cli.MANIFEST).read_text(), manifest)
 
     def test_invalid_headers_fail_before_writing_output(self):
         with TemporaryDirectory() as directory:

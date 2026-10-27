@@ -15,7 +15,7 @@ from tools.bindgen.emitters.rust import (
     counted_owner,
     native_call,
 )
-from tools.bindgen.model import Api, CType, Function, ModelError, Record
+from tools.bindgen.model import Api, CType, Function, Lowered, Record, Unsupported
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
@@ -56,6 +56,7 @@ RUNTIME_EXPORTS: set[str] = set()
 # The platforms that runtime wheels serve. One API wheel serves them all, so it
 # leaves out only what none of them can use.
 TARGETS = frozenset({"android", "linux", "macos", "windows"})
+DIRECTORY = "bindings/python"
 
 
 def ctype(type_: CType) -> str:
@@ -75,8 +76,8 @@ def public_dispose(handle: HandlePlan) -> bool:
     )
 
 
-def unsupported(function: Function | Record, reason: str) -> ModelError:
-    return ModelError([f"{function.location}: Python: {function.name}: {reason}"])
+def unsupported(function: Function | Record, reason: str) -> Unsupported:
+    return Unsupported(f"{function.location}: Python: {function.name}: {reason}")
 
 
 # Members every handle owner defines. The release operation alone becomes
@@ -995,7 +996,7 @@ def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
     )
 
 
-def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str]]:
+def lower(api: Api | BoundApi) -> Lowered:
     rust, facade, stubs = defaultdict(list), defaultdict(list), defaultdict(list)
     generated, errors, records = [], {}, set()
     discards = defaultdict(list)
@@ -1034,7 +1035,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         )
         try:
             owner, native, public, stub, record = operation(plan, values)
-        except ModelError as error:
+        except Unsupported as error:
             (
                 values.records,
                 values.inputs,
@@ -1298,26 +1299,17 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         + repr(sorted(set(exports)))
         + "\n"
     )
-    return files, generated, errors
-
-
-def generate(api: Api | BoundApi) -> dict[str, str]:
-    return lower(api)[0]
-
-
-def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api, TARGETS)
-    _, generated, errors = lower(bound)
-    support = [
+    support = tuple(
         plan.name
         for plan in bound.operations
         if plan.support and plan.name not in errors
-    ]
-    return {
-        "generated": generated,
-        "support": support,
-        "unsupported": errors,
-    }
+    )
+    return Lowered(
+        {f"{DIRECTORY}/{path}": source for path, source in files.items()},
+        errors,
+        generated,
+        support,
+    )
 
 
 def error_sources():

@@ -9,6 +9,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    emitted,
     parse,
     real_api,
     require_tool,
@@ -89,7 +90,7 @@ class RustEmitterTests(unittest.TestCase):
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
         api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         validate(api)
-        generated = rust.generate(api)
+        generated = emitted(rust, api)
         prefix = "crates/maplibre-native-ffi/src/generated/"
         source = generated[prefix + "global.rs"]
         self.assertIn("pub fn drain_readings() -> Result<Vec<Reading>> {", source)
@@ -108,7 +109,7 @@ class RustEmitterTests(unittest.TestCase):
         self.assertNotIn("ReadingView", generated[prefix + "values.rs"])
 
     def test_a_callback_receives_its_slice_argument_as_a_vec(self):
-        values = rust.generate(real_api())[
+        values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         self.assertIn("Fn(Vec<RuntimeEvent>) + Send + Sync", values)
@@ -119,7 +120,7 @@ class RustEmitterTests(unittest.TestCase):
         self.assertNotIn("EventBatchView", values)
 
     def test_a_record_with_a_required_member_takes_it_in_place_of_a_default(self):
-        values = rust.generate(real_api())[
+        values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         self.assertIn(
@@ -138,7 +139,7 @@ class RustEmitterTests(unittest.TestCase):
         )
 
     def test_the_c_version_is_a_plain_return_that_checks_no_abi_version(self):
-        source = rust.generate(real_api())[
+        source = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/global.rs"
         ]
         self.assertIn(
@@ -154,7 +155,7 @@ class RustEmitterTests(unittest.TestCase):
         )
 
     def test_a_factory_is_associated_and_a_global_names_its_verb_first(self):
-        generated = rust.generate(real_api())
+        generated = emitted(rust, real_api())
         prefix = "crates/maplibre-native-ffi/src/generated/"
         self.assertIn("impl RuntimeHandle {", generated[prefix + "runtime.rs"])
         self.assertIn(
@@ -169,7 +170,7 @@ class RustEmitterTests(unittest.TestCase):
         )
 
     def test_a_callback_documents_its_arguments_and_returns_a_bool_result(self):
-        values = rust.generate(real_api())[
+        values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         # A closure bound cannot name its arguments, so the field's doc does.
@@ -182,7 +183,7 @@ class RustEmitterTests(unittest.TestCase):
         self.assertIn('callback::invoke("mln_log_callback", false, ||', values)
 
     def test_docs_name_the_rust_symbols_of_c_declarations(self):
-        values = rust.generate(real_api())[
+        values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         self.assertIn(
@@ -193,7 +194,7 @@ class RustEmitterTests(unittest.TestCase):
         self.assertNotIn("`mln_map_cancel_transitions()`", values)
 
     def test_a_status_callback_separates_conversion_from_host_failure(self):
-        values = rust.generate(real_api())[
+        values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         # A conversion's `?` fails the outer result, which is always reported;
@@ -213,8 +214,8 @@ class RustEmitterTests(unittest.TestCase):
             DISPOSE_WITH_COMPLETION, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",)
         )
         validate(api)
-        self.assertEqual(rust.coverage(api)["unsupported"], {})
-        source = rust.generate(api)[
+        self.assertEqual(rust.lower(api).unsupported, {})
+        source = emitted(rust, api)[
             "crates/maplibre-native-ffi/src/generated/session.rs"
         ]
         # Drop and the sync dispose pass no completion; the release passes one.
@@ -247,7 +248,7 @@ void mln_query_release(mln_query query);
 """
         )
         validate(api)
-        generated = rust.generate(api)
+        generated = emitted(rust, api)
         prefix = "crates/maplibre-native-ffi/src/generated/"
         self.assertIn(
             "    /// Returns the native handle value, which runtime events report as their source.\n"
@@ -278,7 +279,7 @@ void mln_query_release(mln_query query);
         )
         validate(api)
         self.assertEqual(
-            set(rust.coverage(api)["generated"]),
+            set(rust.lower(api).generated),
             {
                 "mln_c_version",
                 "mln_probe_batch_points",
@@ -295,7 +296,7 @@ void mln_query_release(mln_query query);
         )
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            files = rust.generate(api)
+            files = emitted(rust, api)
             # Parameters keep their C names, and the body's locals step aside.
             self.assertIn(
                 "call: NewPoint, value: NewPoint, future: NewPoint",
@@ -410,7 +411,7 @@ class RustSysTests(unittest.TestCase):
             crate = root / "sys"
             crate.mkdir()
             (crate / "lib.rs").write_text((SYS / "lib.rs").read_text())
-            (crate / "generated.rs").write_text(rust.generate(api)[rust_sys.PATH])
+            (crate / "generated.rs").write_text(emitted(rust, api)[rust_sys.PATH])
             rust_lines, c_lines = [], []
             for name, fields in sorted(layout.items()):
                 c_type = (

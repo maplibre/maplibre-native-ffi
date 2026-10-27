@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 from support import (
     ROOT,
+    emitted,
     parse,
     parse_sources,
     protocol_header,
@@ -42,16 +43,16 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
             api = self.parse(source)
             for emitter in (dotnet,):
                 with self.subTest(name=name, emitter=emitter.__name__):
-                    self.assertEqual(emitter.coverage(api)["generated"], [])
+                    self.assertEqual(emitter.lower(api).generated, [])
                     self.assertIn(
                         "identifier",
-                        emitter.coverage(api)["unsupported"]["mln_map_run"],
+                        emitter.lower(api).unsupported["mln_map_run"],
                     )
 
             owned = self.parse(source, map_handle=True)
             for emitter in (dart, kotlin):
                 with self.subTest(name=name, emitter=emitter.__name__):
-                    self.assertIn("mln_map_run", emitter.coverage(owned)["generated"])
+                    self.assertIn("mln_map_run", emitter.lower(owned).generated)
 
     def test_native_declarations_keep_inline_array_fields_inline(self):
         # A pointer in place of an inline array would change the struct size,
@@ -76,7 +77,7 @@ void mln_measurement_close(mln_measurement owner);
 BIND("execution=command")
 mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
+        self.assertIn("mln_measurement_change", dart.lower(api).generated)
 
     def test_a_dispose_that_is_the_release_closes_with_a_completion_and_disposes_without(
         self,
@@ -87,7 +88,7 @@ BIND("execution=lifecycle")
 mln_status mln_measurement_dispose(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 mln_status mln_measurement_create(mln_measurement *out_measurement BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        generated = dart.generate(api)
+        generated = dart.lower(api).files[dart.OPERATIONS]
         # The release passes a completion, as an asynchronous release does.
         self.assertIn(
             "Future<void> close() => _state.closeAsync((handle) => _submit((arena, completion) => "
@@ -105,7 +106,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
             generated,
         )
 
-        operations = dotnet.generate(api)["Metrics/MeasurementHandle.Operations.g.cs"]
+        operations = emitted(dotnet, api)["Metrics/MeasurementHandle.Operations.g.cs"]
         self.assertIn("IDisposable, IAsyncDisposable", operations)
         self.assertIn("public Task CloseAsync()", operations)
         self.assertIn(
@@ -126,7 +127,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
         )
 
     def test_every_dotnet_owner_has_the_same_handle_members(self):
-        generated = dotnet.generate(real_api())
+        generated = emitted(dotnet, real_api())
         for path, event_source in (
             ("Runtime/RuntimeHandle.Operations.g.cs", True),
             ("Map/MapHandle.Operations.g.cs", True),
@@ -151,7 +152,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
         # A record struct's own default leaves a string null, so a constructor
         # sets each member a host may omit to zero, and a required member is a
         # required property that the full constructor sets.
-        generated = dotnet.generate(real_api())
+        generated = emitted(dotnet, real_api())
         self.assertIn(
             'public RuntimeOptions()\n        : this("", "") { }',
             generated["Runtime/RuntimeOptions.g.cs"],
@@ -175,7 +176,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
     ):
         text = protocol_header(groups=("delivery", "owned_argument"))
         api = parse_sources({"api.h": text})
-        generated = dart.coverage(api)["generated"]
+        generated = dart.lower(api).generated
         self.assertIn("mln_notice_set_callback", generated)
         self.assertIn("mln_map_set_query_handler", generated)
         # Without a queue, Dart has no way to answer the callback.
@@ -190,9 +191,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
                 )
             }
         )
-        self.assertIn(
-            "mln_notice_set_callback", dart.coverage(synchronous)["unsupported"]
-        )
+        self.assertIn("mln_notice_set_callback", dart.lower(synchronous).unsupported)
 
     def test_reserved_method_identifiers_generate(self):
         source = """
@@ -202,7 +201,7 @@ mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diag
         owned = self.parse(source, map_handle=True)
         for emitter in (dart, kotlin):
             with self.subTest(emitter=emitter.__name__):
-                self.assertIn("mln_map_class", emitter.coverage(owned)["generated"])
+                self.assertIn("mln_map_class", emitter.lower(owned).generated)
 
     def test_dotnet_new_record_generates_in_its_header_namespace(self):
         api = self.parse("""
@@ -213,8 +212,8 @@ BIND("execution=command")
 mln_status mln_map_set_metric(mln_map map, mln_metric metric, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         # The record's header names its public namespace.
-        self.assertIn("Metrics/Metric.g.cs", dotnet.generate(api))
-        self.assertEqual(len(dotnet.coverage(api)["generated"]), 2)
+        self.assertIn("Metrics/Metric.g.cs", emitted(dotnet, api))
+        self.assertEqual(len(dotnet.lower(api).generated), 2)
 
     def test_dotnet_record_field_name_collisions_are_rejected(self):
         api = self.parse("""
@@ -222,13 +221,13 @@ typedef struct mln_metric { double some_value; double someValue; } mln_metric;
 BIND("execution=query;result=mln_metric")
 mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(dotnet.coverage(api)["generated"], [])
+        self.assertEqual(dotnet.lower(api).generated, [])
 
     def test_dotnet_generates_boolean_outputs(self):
         api = self.parse("""
 mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(dotnet.emit(api).functions, ("mln_map_ready",))
+        self.assertEqual(dotnet.lower(api).generated, ["mln_map_ready"])
 
     def test_dotnet_factory_is_static_on_its_handle_and_a_global_names_its_verb_first(
         self,
@@ -239,15 +238,17 @@ void mln_engine_release(mln_engine engine);
 mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_diagnostic *out_diagnostic);
 mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
 """)
-        emission = dotnet.emit(api)
+        emission = dotnet.lower(api)
         self.assertEqual(emission.unsupported, {})
         self.assertIn(
             "public static EngineHandle Create()",
-            emission.files["Metrics/EngineHandle.Operations.g.cs"],
+            emission.files[f"{dotnet.DIRECTORY}/Metrics/EngineHandle.Operations.g.cs"],
         )
         self.assertIn(
             "public static void SetLevelVolume(uint volume)",
-            emission.files["Metrics/MaplibreNative.Operations.g.cs"],
+            emission.files[
+                f"{dotnet.DIRECTORY}/Metrics/MaplibreNative.Operations.g.cs"
+            ],
         )
 
     def test_dotnet_enum_and_flag_set_parameters_cross_as_their_c_types(self):
@@ -261,7 +262,7 @@ mln_status mln_map_set_mode(mln_map map, mln_mode mode, mln_mark_flags marks, ml
 mln_status mln_map_get_mode(mln_map map, mln_mode *out_mode BIND("direction=out"), mln_diagnostic *out_diagnostic);
 mln_status mln_map_get_marks(mln_map map, mln_mark_flags *out_marks BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        emission = dotnet.emit(api)
+        emission = dotnet.lower(api)
         self.assertEqual(emission.unsupported, {})
         operations = "".join(emission.files.values())
         self.assertIn("SetMapMode(ulong map, Mode mode, MarkFlag marks)", operations)
@@ -277,13 +278,9 @@ typedef struct mln_metric { double value; } mln_metric;
 BIND("execution=query;result=mln_metric")
 mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
-        self.assertIn(
-            "mln_map_metric", dotnet.coverage(self.parse(source))["generated"]
-        )
+        self.assertIn("mln_map_metric", dotnet.lower(self.parse(source)).generated)
         changed = source.replace("double value;", 'double value BIND("nullable=true");')
-        self.assertNotIn(
-            "mln_map_metric", dotnet.coverage(self.parse(changed))["generated"]
-        )
+        self.assertNotIn("mln_map_metric", dotnet.lower(self.parse(changed)).generated)
 
     def test_dotnet_field_enum_cannot_generate_colliding_member_names(self):
         api = self.parse("""
@@ -292,7 +289,7 @@ typedef struct mln_metric { mln_mode mode; } mln_metric;
 BIND("execution=query;result=mln_metric")
 mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
+        self.assertNotIn("mln_map_metric", dotnet.lower(api).generated)
 
     def test_dotnet_values_preserve_embedded_presence_defaults_and_keyword_fields(self):
         api = self.parse(
@@ -503,7 +500,7 @@ namespace Maplibre.NativeFfi.Internal.Callback {
             )
             status = next(
                 source
-                for path, source in dotnet.emit(api).files.items()
+                for path, source in dotnet.lower(api).files.items()
                 if path.endswith("/Status.g.cs")
             )
             (root / "Status.g.cs").write_text(status)
@@ -523,7 +520,7 @@ namespace Maplibre.NativeFfi.Internal.Callback {
 
 class DotnetDocTests(unittest.TestCase):
     def test_a_summary_names_the_dotnet_symbols_of_the_c_identifiers(self):
-        outcome = dotnet.generate(real_api())["Map/CameraTransitionOutcome.g.cs"]
+        outcome = emitted(dotnet, real_api())["Map/CameraTransitionOutcome.g.cs"]
         self.assertIn(
             "    /// <c>MapHandle.CancelTransitionsAsync()</c>,\n"
             "    /// <c>MapHandle.CancelCameraTransitionAsync()</c>, or\n"

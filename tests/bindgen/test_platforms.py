@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import parse
+from support import emitted, parse
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import (
@@ -74,7 +74,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
     def test_a_binding_that_cannot_select_a_platform_drops_only_what_none_serve(
         self,
     ):
-        generated = python.generate(api())
+        generated = emitted(python, api())
         operations = generated["python/maplibre_native_ffi/_generated_operations.py"]
         self.assertIn("def use_metal(", operations)
         self.assertIn(
@@ -85,7 +85,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn(
             "CanvasTarget", generated["python/maplibre_native_ffi/_generated_values.py"]
         )
-        typescript_operations = typescript.generate(api())[
+        typescript_operations = emitted(typescript, api())[
             "bindings/typescript/src/generated_operations.ts"
         ]
         # The browser module shares the operations, so a browser-only function
@@ -93,12 +93,12 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertIn("useMetal(", typescript_operations)
         self.assertIn("attachCanvas(", typescript_operations)
         self.assertNotIn("androidStart(", typescript_operations)
-        dart_operations = dart.generate(api())
+        dart_operations = dart.lower(api()).files[dart.OPERATIONS]
         self.assertIn("useMetal(", dart_operations)
         self.assertNotIn("attachCanvas(", dart_operations)
 
     def test_rust_compiles_a_function_only_for_the_platforms_it_serves(self):
-        source = rust.generate(api())["crates/maplibre-native-ffi/src/generated/map.rs"]
+        source = emitted(rust, api())["crates/maplibre-native-ffi/src/generated/map.rs"]
         self.assertIn(
             '    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos", target_os = "visionos"))]\n'
             "    pub fn use_metal(",
@@ -109,7 +109,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn('#[cfg(any(target_os = "android"', source)
 
     def test_swift_compiles_a_function_only_for_the_platforms_it_serves(self):
-        generated = "\n".join(swift.generate(api()).values())
+        generated = "\n".join(emitted(swift, api()).values())
         self.assertIn(
             "#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)\nfunc `useMetal`() throws {\n",
             generated,
@@ -120,7 +120,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn("androidStart", generated)
 
     def test_zig_declares_a_function_void_off_the_platforms_it_serves(self):
-        source = zig.generate(api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, api())["maplibre_native_ffi.zig"]
         self.assertIn(
             "pub const useMetal = if (builtin.os.tag == .maccatalyst or "
             "builtin.os.tag == .macos) struct {\n"
@@ -134,7 +134,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn("attachCanvas", source)
 
     def test_go_builds_a_function_only_for_the_platforms_it_serves(self):
-        generated = go.generate(api())
+        generated = emitted(go, api())
         self.assertNotIn("UseMetal", generated["generated_api.go"])
         self.assertIn(
             "func (receiver *MapHandle) Redraw(", generated["generated_api.go"]
@@ -150,7 +150,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn("AttachCanvas", "".join(generated.values()))
 
     def test_dotnet_marks_the_platforms_that_a_function_serves(self):
-        generated = "\n".join(dotnet.generate(api()).values())
+        generated = "\n".join(emitted(dotnet, api()).values())
         self.assertIn(
             '    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]\n'
             "    public void UseMetal(",
@@ -175,7 +175,7 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
             ["jvmAndroidMain", "androidNativeMain", "macosMain", "linuxMain"],
         )
         self.assertEqual(kotlin.source_sets(frozenset({"web"})), ["wasmJsMain"])
-        generated = kotlin.generate(api())
+        generated = emitted(kotlin, api())
         root = "org/maplibre/nativeffi"
         common = generated[f"src/commonMain/kotlin/{root}/MapHandle.kt"]
         self.assertIn("public fun redraw(", common)

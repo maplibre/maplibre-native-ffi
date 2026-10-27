@@ -8,7 +8,7 @@ from dataclasses import replace
 from typing import NoReturn
 
 from .. import async_hosts, docs
-from ..model import ModelError
+from ..model import Unsupported
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_member
 
 SCALARS = {
@@ -134,7 +134,7 @@ class Values:
         return symbols(self.api)
 
     def fail(self, plan: ValuePlan, reason: str) -> NoReturn:
-        raise ModelError([f"Python: {plan.native}: {reason}"])
+        raise Unsupported(f"Python: {plan.native}: {reason}")
 
     def supported(self, plan: ValuePlan, *, input: bool = False) -> None:
         if plan.response:

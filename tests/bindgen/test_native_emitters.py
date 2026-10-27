@@ -22,6 +22,6 @@ typedef struct mln_store_options {
 BIND("execution=command")
 mln_status mln_map_store(mln_map map, const mln_store_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        report = zig.coverage(api)
-        self.assertIn("retained input requires", report["unsupported"]["mln_map_store"])
-        self.assertNotIn("mln_map_store", report["generated"])
+        report = zig.lower(api)
+        self.assertIn("retained input requires", report.unsupported["mln_map_store"])
+        self.assertNotIn("mln_map_store", report.generated)

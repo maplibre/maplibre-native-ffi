@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import replace
 
 from .. import async_hosts
-from ..model import ModelError
+from ..model import Unsupported
 from .go import GO_KEYWORDS, native_identifier
 from .go_values import name, public
 
@@ -28,7 +28,7 @@ def validate(values, plan):
             next(f.value.native for f in plan.fields if f.name == member)
         ]
         if not callback.context:
-            raise ModelError([f"{plan.native}: callback requires a context"])
+            raise Unsupported(f"{plan.native}: callback requires a context")
         for p in callback.arguments:
             values.require(p.value)
         if callback.result.native != "void":

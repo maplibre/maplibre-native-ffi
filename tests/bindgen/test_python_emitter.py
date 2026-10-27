@@ -8,7 +8,7 @@ import typing
 import unittest
 from unittest.mock import MagicMock, patch
 
-from support import parse, real_api
+from support import emitted, parse, real_api
 
 from tools.bindgen.emitters import python
 from tools.bindgen.schema import validate
@@ -22,7 +22,7 @@ class PythonEmitterTests(unittest.TestCase):
 
     def materialize(self, api, native=None):
         """Execute the generated modules over fakes of the handwritten runtime."""
-        files = python.generate(api)
+        files = emitted(python, api)
         for path, source in files.items():
             if path.endswith((".py", ".pyi")):
                 compile(source, path, "exec")
@@ -83,7 +83,7 @@ typedef struct mln_new_entry {
 BIND("execution=query;result=mln_new_entry;shape=array")
 mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(python.coverage(api)["generated"], ["mln_map_new_entries"])
+        self.assertEqual(python.lower(api).generated, ["mln_map_new_entries"])
         values = self.materialize(api).values
         raw = {
             "title": "Harbor",
@@ -132,7 +132,7 @@ mln_status mln_probe_label_set(
 
     def test_a_nested_registration_defaults_to_a_disabled_one(self):
         api = self.parse(groups=("record_notification",))
-        self.assertIn("mln_map_request_reading", python.coverage(api)["generated"])
+        self.assertIn("mln_map_request_reading", python.lower(api).generated)
         values = self.materialize(api).values
         first = values.ReadingRequest(level=3)
         second = values.ReadingRequest(level=4)
@@ -157,7 +157,7 @@ mln_status mln_probe_hooks_install(
 """,
             groups=("nested_registration", "record_notification"),
         )
-        self.assertIn("mln_probe_hooks_install", python.coverage(api)["generated"])
+        self.assertIn("mln_probe_hooks_install", python.lower(api).generated)
         native = types.SimpleNamespace(_NativeRegistration=lambda *parts: parts)
         values = self.materialize(api, native).values
         package = types.ModuleType("fixture")
@@ -186,7 +186,7 @@ mln_status mln_map_match(mln_map map, double self, double input_self, double py,
                        mln_buffer_view title, double title_view,
                        const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(python.coverage(api)["generated"], ["mln_map_match"])
+        self.assertEqual(python.lower(api).generated, ["mln_map_match"])
         native = MagicMock()
         operations = self.materialize(api, native).operations
         operations.map_match(7, 1.0, 2.0, 3.0, "title", 4.0)
@@ -198,9 +198,9 @@ typedef struct mln_entry { double class; double class_; } mln_entry;
 BIND("execution=query;result=mln_entry")
 mln_status mln_map_entry(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        result = python.coverage(api)
-        self.assertEqual(result["generated"], [])
-        self.assertIn("collide", result["unsupported"]["mln_map_entry"])
+        result = python.lower(api)
+        self.assertEqual(result.generated, [])
+        self.assertIn("collide", result.unsupported["mln_map_entry"])
 
     def test_operations_cannot_take_owner_member_names(self):
         api = self.parse("""
@@ -208,10 +208,10 @@ typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy")
 mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
 mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        result = python.coverage(api)
+        result = python.lower(api)
         # The release alone becomes close.
-        self.assertEqual(result["generated"], ["mln_host_destroy"])
-        self.assertIn("owner member", result["unsupported"]["mln_host_id"])
+        self.assertEqual(result.generated, ["mln_host_destroy"])
+        self.assertIn("owner member", result.unsupported["mln_host_id"])
 
     def test_a_factory_is_a_classmethod_and_a_global_names_its_verb_first(self):
         api = self.parse("""
@@ -220,8 +220,8 @@ void mln_engine_release(mln_engine engine);
 mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_diagnostic *out_diagnostic);
 mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(python.coverage(api)["unsupported"], {})
-        files = python.generate(api)
+        self.assertEqual(python.lower(api).unsupported, {})
+        files = emitted(python, api)
         native = files["src/generated_operations.rs"]
         engine = native.split("\nimpl EngineHandle {\n", 1)[1].split("\n}\n", 1)[0]
         self.assertIn(
@@ -240,14 +240,14 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         self.assertNotIn("import create", exports)
 
     def test_docs_name_the_python_symbols_of_c_declarations(self):
-        values = python.generate(real_api())[
+        values = emitted(python, real_api())[
             "python/maplibre_native_ffi/_generated_values.py"
         ]
         self.assertIn("    `MapHandle.cancel_camera_transition()` matches.\n", values)
         self.assertNotIn("`mln_map_cancel_camera_transition()`", values)
 
     def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):
-        native = python.generate(real_api())["src/generated_operations.rs"]
+        native = emitted(python, real_api())["src/generated_operations.rs"]
 
         def method(owner, name):
             block = native.split(f"\nimpl {owner} {{\n", 1)[1].split("\n}\n", 1)[0]
@@ -279,8 +279,8 @@ typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_dispose
 BIND("execution=lifecycle")
 mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        self.assertEqual(python.coverage(api)["generated"], ["mln_lease_dispose"])
-        files = python.generate(api)
+        self.assertEqual(python.lower(api).generated, ["mln_lease_dispose"])
+        files = emitted(python, api)
         native = files["src/generated_operations.rs"]
         block = native.split("\nimpl LeaseHandle {\n", 1)[1].split("\n}\n", 1)[0]
         close = block.split("fn close(", 1)[1].split("#[pyo3", 1)[0]
@@ -303,7 +303,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         self.assertIn("self._native._exit()", owners)
 
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
-        owners = python.generate(real_api())[
+        owners = emitted(python, real_api())[
             "python/maplibre_native_ffi/_generated_owners.py"
         ]
         classes = {
@@ -347,7 +347,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         )
         native.map_event.return_value = {"kind": None, "tag": 42}
         self.assertEqual(operations.map_event(1), values.UnknownVariant(42))
-        rust = python.generate(api)["src/generated_operations.rs"]
+        rust = emitted(python, api)["src/generated_operations.rs"]
         self.assertIn("Ok(match value.kind {", rust)
 
     def test_an_input_only_union_has_no_unknown_arm(self):
@@ -372,7 +372,7 @@ mln_status mln_shape_draw(const mln_shape* shape, mln_diagnostic* out_diagnostic
         self.assertEqual(
             values.Shape.__value__, values.ShapeDotVariant | values.ShapeSpanVariant
         )
-        rust = python.generate(api)["src/generated_operations.rs"]
+        rust = emitted(python, api)["src/generated_operations.rs"]
         # The selected variant is the value, so its tag is read from it.
         self.assertIn('let field = value;\n    let tag = field.getattr("_tag")?', rust)
 
@@ -411,7 +411,7 @@ mln_status mln_set_level(int32_t state, int32_t status, mln_diagnostic *out_diag
 """,
             groups=("standard_types",),
         )
-        generated = python.generate(api)
+        generated = emitted(python, api)
         facade = generated["python/maplibre_native_ffi/_generated_operations.py"]
         self.assertIn("def set_level(state: int, status: int) -> None:", facade)
         self.assertIn("_native.set_level(state, status)", facade)
@@ -420,7 +420,7 @@ mln_status mln_set_level(int32_t state, int32_t status, mln_diagnostic *out_diag
 
     def test_an_owned_callback_handle_arrives_as_its_owner(self):
         api = self.parse(groups=("owned_argument",))
-        self.assertEqual(python.coverage(api)["unsupported"], {})
+        self.assertEqual(python.lower(api).unsupported, {})
         generated = self.materialize(api)
         owners, values = generated.owners, generated.values
         # The handler hands its callback the received handle's owner.

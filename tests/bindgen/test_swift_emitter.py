@@ -8,6 +8,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    emitted,
     parse,
     parse_sources,
     protocol_header,
@@ -57,7 +58,7 @@ void mln_lease_close(mln_lease lease);
 
 class SwiftEmitterTests(unittest.TestCase):
     def test_every_owner_has_the_same_handle_members(self):
-        owners = swift.generate(parse(EVENT_SOURCE_AND_LEASE))[
+        owners = emitted(swift, parse(EVENT_SOURCE_AND_LEASE))[
             "Generated/GeneratedOwners.swift"
         ]
         for owner in ("MapHandle", "LeaseHandle"):
@@ -81,7 +82,7 @@ class SwiftEmitterTests(unittest.TestCase):
         )
 
     def test_a_dispose_with_a_completion_is_the_close_and_the_dispose(self):
-        outputs = swift.generate(parse(DISPOSE_WITH_COMPLETION))
+        outputs = emitted(swift, parse(DISPOSE_WITH_COMPLETION))
         operations = outputs["Generated/Operations/GeneratedApiLeaseOperations.swift"]
         # The close reports retirement through the completion, and the
         # dispose, like every disposer, passes none.
@@ -113,7 +114,7 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
 
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
-        outputs = swift.generate(real_api())
+        outputs = emitted(swift, real_api())
         values = "".join(
             text for path, text in outputs.items() if path.startswith("Generated/")
         )
@@ -137,7 +138,7 @@ class SwiftEmitterTests(unittest.TestCase):
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
     ):
-        outputs = swift.generate(real_api())
+        outputs = emitted(swift, real_api())
         runtime = outputs[
             "Generated/Operations/GeneratedRuntimeRuntimeOperations.swift"
         ]
@@ -156,7 +157,7 @@ class SwiftEmitterTests(unittest.TestCase):
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = "".join(
             text
-            for path, text in swift.generate(real_api()).items()
+            for path, text in emitted(swift, real_api()).items()
             if path.startswith("Generated/Values/")
         )
         self.assertNotIn("RenderedQueryGeometryData", values)
@@ -169,7 +170,7 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertIn("case unknown(UInt32, Data)", definition.split("\n}")[0])
 
     def test_a_summary_names_the_swift_symbols_of_c_declarations(self):
-        values = swift.generate(real_api())["Generated/Values/GeneratedMapValues.swift"]
+        values = emitted(swift, real_api())["Generated/Values/GeneratedMapValues.swift"]
         summary = " ".join(
             line.strip().removeprefix("///").strip()
             for line in values.split(
@@ -203,7 +204,7 @@ class SwiftEmitterTests(unittest.TestCase):
         )
         api = parse_sources({"api.h": header})
         validate(api)
-        self.assertEqual(swift.coverage(api)["unsupported"], {})
+        self.assertEqual(swift.lower(api).unsupported, {})
         with TemporaryDirectory() as directory:
             root = Path(directory)
             # Generated code imports the C declarations as MaplibreNativeC.
@@ -213,7 +214,7 @@ class SwiftEmitterTests(unittest.TestCase):
                 'module MaplibreNativeC {\n  header "api.h"\n  export *\n}\n'
             )
             sources = []
-            for path, text in swift.generate(api).items():
+            for path, text in emitted(swift, api).items():
                 sources.append(root / "generated" / path)
                 sources[-1].parent.mkdir(parents=True, exist_ok=True)
                 sources[-1].write_text(text)

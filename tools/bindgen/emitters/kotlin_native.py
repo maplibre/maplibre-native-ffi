@@ -889,7 +889,9 @@ class NativeShims:
 
     def delivery_constant(self, metadata_key, record_name, field_type=None):
         """The number of an mln_delivery_type constant that a delivery record's
-        metadata names, or None for an API without the delivery protocol."""
+        metadata names, or None for an API without the delivery protocol or
+        without that delivery, such as completions without a completion
+        runtime."""
         record = self.bound.source.records_by_name.get(record_name)
         if record is None:
             return None
@@ -898,6 +900,8 @@ class NativeShims:
                 continue
             if metadata_key in field.metadata:
                 return self.bound.enum_number(field.metadata[metadata_key])
+        if field_type and field_type not in self.bound.source.records_by_name:
+            return None
         raise LayoutError(f"{record_name}: no field names {metadata_key}")
 
     def deliveries(self):

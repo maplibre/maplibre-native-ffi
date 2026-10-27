@@ -54,7 +54,7 @@ class GenerationTests(unittest.TestCase):
             self.assertEqual(output.sized_by, "points")
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
-                self.assertEqual(emitter.coverage(bound)["unsupported"], {})
+                self.assertEqual(emitter.lower(bound).unsupported, {})
                 self.rendered(emitter, bound)
 
     def test_caller_sized_text_hides_its_capacity_and_length(self):
@@ -70,7 +70,7 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(text.value.encoding, "json")
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
-                self.assertEqual(emitter.coverage(bound)["unsupported"], {})
+                self.assertEqual(emitter.lower(bound).unsupported, {})
                 self.rendered(emitter, bound)
 
     def test_caller_sized_text_rejects_an_unsound_contract(self):
@@ -133,11 +133,11 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             for emitter in EMITTERS:
                 language = emitter.__name__.rsplit(".", 1)[-1]
                 with self.subTest(group=group, emitter=language):
-                    coverage = emitter.coverage(api)
+                    coverage = emitter.lower(api)
                     self.assertEqual(
-                        set(coverage["unsupported"]),
+                        set(coverage.unsupported),
                         PROTOCOL_GAPS.get((group, language), set()),
-                        coverage["unsupported"],
+                        coverage.unsupported,
                     )
                     # No declaration disappears without a reason. Support
                     # functions back the generated values that call them, a
@@ -146,18 +146,18 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                     released = {
                         bound.handles[plan.drain.batch.value.unwrapped.native].release
                         for plan in bound.operations
-                        if plan.drain and plan.name in coverage["generated"]
+                        if plan.drain and plan.name in coverage.generated
                     }
                     scoped = {
                         name
                         for plan in bound.operations
-                        if plan.view and plan.name in coverage["generated"]
+                        if plan.view and plan.name in coverage.generated
                         for name in (plan.view.begin, plan.view.end)
                     }
                     self.assertEqual(
-                        set(coverage["generated"])
-                        | set(coverage["unsupported"])
-                        | set(coverage.get("support", ()))
+                        set(coverage.generated)
+                        | set(coverage.unsupported)
+                        | set(coverage.support)
                         | released
                         | scoped,
                         {function.name for function in api.public_functions},
@@ -202,8 +202,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertNotIn("storedWidth", source)
 
     def rendered(self, emitter, api):
-        output = emitter.generate(api)
-        return "\n".join(output.values()) if isinstance(output, dict) else output
+        return "\n".join(emitter.lower(api).files.values())
 
     def test_portable_scalar_aliases_generate_identically_across_host_expansion(self):
         source = """
@@ -222,7 +221,7 @@ mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction
         after = self.parse(source.replace("UNDERLYING", "long long"))
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
-                self.assertEqual(emitter.coverage(before)["unsupported"], {})
+                self.assertEqual(emitter.lower(before).unsupported, {})
                 self.assertEqual(
                     self.rendered(emitter, before), self.rendered(emitter, after)
                 )
@@ -243,14 +242,14 @@ void mln_global_hook(void (*callback)(void *), void *context);
         names = set(api.functions_by_name)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                generated = set(coverage["generated"])
-                unsupported = set(coverage["unsupported"])
+                coverage = emitter.lower(api)
+                generated = set(coverage.generated)
+                unsupported = set(coverage.unsupported)
                 self.assertFalse(generated & unsupported)
                 self.assertEqual(generated | unsupported, names)
                 self.assertIn("mln_map_scalar", generated)
-                self.assertIn("values", coverage["unsupported"]["mln_map_span"])
-                self.assertTrue(all(coverage["unsupported"].values()))
+                self.assertIn("values", coverage.unsupported["mln_map_span"])
+                self.assertTrue(all(coverage.unsupported.values()))
 
 
 if __name__ == "__main__":

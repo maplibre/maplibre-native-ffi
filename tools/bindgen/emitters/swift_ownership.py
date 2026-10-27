@@ -1,6 +1,6 @@
 """Render native ownership transitions for Swift handle wrappers."""
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..names import camel
 
 
@@ -9,17 +9,13 @@ def consumed(plan, owner, values):
     if plan.consumes == "always" and (
         plan.completion or function.return_type.kind != "void"
     ):
-        raise ModelError(
-            [
-                f"Swift: {function.name}: unconditional consumption requires a void immediate release"
-            ]
+        raise Unsupported(
+            f"Swift: {function.name}: unconditional consumption requires a void immediate release"
         )
     handle = receiver_handle(plan)
     if not handle:
-        raise ModelError(
-            [
-                f"Swift: {function.name}: release inputs require scoped ownership conversion"
-            ]
+        raise Unsupported(
+            f"Swift: {function.name}: release inputs require scoped ownership conversion"
         )
     from .swift import checked, doc, member_doc, native_call
 

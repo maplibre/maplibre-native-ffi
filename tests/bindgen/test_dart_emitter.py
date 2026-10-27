@@ -67,7 +67,7 @@ mln_status mln_drain_readings(
 
 class DartEmitterTests(unittest.TestCase):
     def test_every_owner_has_the_same_handle_members(self):
-        generated = dart.generate(parse(EVENT_SOURCE_AND_LEASE))
+        generated = dart.lower(parse(EVENT_SOURCE_AND_LEASE)).files[dart.OPERATIONS]
         for owner in ("MapHandle", "LeaseHandle"):
             self.assertIn(
                 f"String toString() => '{owner}(id=0x${{id.toRadixString(16)}}, "
@@ -84,7 +84,7 @@ class DartEmitterTests(unittest.TestCase):
 
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
         api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
-        generated = dart.generate(api)
+        generated = dart.lower(api).files[dart.OPERATIONS]
         # The drain copies the slice, then releases the batch even if the copy
         # throws, and nothing queued reads as an empty list.
         self.assertIn("List<Reading> drainReadings() =>", generated)
@@ -99,10 +99,10 @@ class DartEmitterTests(unittest.TestCase):
         )
         # Neither the batch nor its view is public.
         self.assertNotIn("ReadingBatchHandle", generated)
-        self.assertNotIn("class ReadingView", dart.generate_values(api))
+        self.assertNotIn("class ReadingView", dart.lower(api).files[dart.VALUES])
 
     def test_a_callback_receives_its_slice_argument_as_a_list(self):
-        values = dart.generate_values(real_api())
+        values = dart.lower(real_api()).files[dart.VALUES]
         self.assertIn(
             "typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);",
             values,
@@ -110,12 +110,12 @@ class DartEmitterTests(unittest.TestCase):
         self.assertNotIn("EventBatchView", values)
         self.assertIn(
             "callback(_readEventBatchView(payload.events.ref));",
-            dart.generate(real_api()),
+            dart.lower(real_api()).files[dart.OPERATIONS],
         )
 
     def test_a_registration_of_one_callback_is_the_callback(self):
-        values = dart.generate_values(real_api())
-        operations = dart.generate(real_api())
+        values = dart.lower(real_api()).files[dart.VALUES]
+        operations = dart.lower(real_api()).files[dart.OPERATIONS]
         self.assertNotIn("class RuntimeEventHandler", values)
         self.assertIn("setEventHandler(RuntimeEventCallback handler)", operations)
         # An optional lone callback makes its record member optional.
@@ -124,7 +124,7 @@ class DartEmitterTests(unittest.TestCase):
         self.assertIn("final class ResourceProvider {", values)
 
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
-        values = dart.generate_values(real_api())
+        values = dart.lower(real_api()).files[dart.VALUES]
         self.assertIn(
             "const MapOptions({required this.initialExtent, this.mapMode = const "
             "MapMode.fromRawValue(0), this.fastPforEnabled = false, this.eventMask});",
@@ -134,7 +134,7 @@ class DartEmitterTests(unittest.TestCase):
         self.assertIn("List<String> tileUrls = const []", values)
         self.assertIn("required List<MetalBorrowedTexture> textures", values)
         # Reading the C version skips the ABI version check, which reads it.
-        operations = dart.generate(real_api())
+        operations = dart.lower(real_api()).files[dart.OPERATIONS]
         self.assertIn(
             "int cVersion() {\n    final nativeResult = raw.mln_c_version();",
             operations,
@@ -143,7 +143,7 @@ class DartEmitterTests(unittest.TestCase):
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
     ):
-        operations = dart.generate(real_api())
+        operations = dart.lower(real_api()).files[dart.OPERATIONS]
         runtime = operations.split("final class RuntimeHandle ")[1].split("\n}\n")[0]
         self.assertIn(
             "  static RuntimeHandle create(RuntimeOptions options) => "
@@ -155,7 +155,7 @@ class DartEmitterTests(unittest.TestCase):
         )
 
     def test_docs_name_the_dart_symbols_of_c_declarations(self):
-        values = dart.generate_values(real_api())
+        values = dart.lower(real_api()).files[dart.VALUES]
         self.assertIn(
             "  /// `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or\n"
             "  /// `GesturePhase.cancel` ended the transitions",
@@ -164,7 +164,7 @@ class DartEmitterTests(unittest.TestCase):
         self.assertNotIn("`mln_map_cancel_transitions()`", values)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
-        values = dart.generate_values(real_api())
+        values = dart.lower(real_api()).files[dart.VALUES]
         self.assertIn("sealed class RenderedQueryGeometry {", values)
         self.assertNotIn("RenderedQueryGeometryData", values)
         # Native never returns a query geometry, so it has no unknown variant;
@@ -191,7 +191,7 @@ class DartEmitterTests(unittest.TestCase):
         api = parse_sources({"api.h": header})
         validate(api)
         self.assertEqual(
-            set(dart.coverage(api)["generated"]),
+            set(dart.lower(api).generated),
             {
                 "mln_keyword_combine",
                 "mln_probe_batch_points",
@@ -230,8 +230,12 @@ class DartEmitterTests(unittest.TestCase):
             # stands in for the runtime that the binding's values import.
             (root / "runtime").mkdir()
             (root / "runtime/runtime.dart").write_text("export '../runtime.dart';\n")
-            (root / "generated_values.dart").write_text(dart.generate_values(api))
-            (root / "generated_operations.dart").write_text(dart.generate(api))
+            (root / "generated_values.dart").write_text(
+                dart.lower(api).files[dart.VALUES]
+            )
+            (root / "generated_operations.dart").write_text(
+                dart.lower(api).files[dart.OPERATIONS]
+            )
             (root / "maplibre_native_c.g.dart").write_text(
                 dart_native.generate(compile_api(api))
             )

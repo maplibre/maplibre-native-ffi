@@ -1,6 +1,6 @@
 """Generate allocator-free Zig values from resolved scalar and record plans."""
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..semantic import ValuePlan, enum_member_prefix, required_callbacks
 from .zig import SCALARS, doc, documented, identifier, pascal, type_name
 
@@ -140,9 +140,7 @@ class Values:
             return pascal(parent.native.removeprefix("mln_")) + pascal(field.name)
         if value.kind in {"record", "enum", "union"}:
             return type_name(value.native)
-        raise ModelError(
-            [f"Zig: {value.native}: {value.kind} needs a value conversion"]
-        )
+        raise Unsupported(f"Zig: {value.native}: {value.kind} needs a value conversion")
 
     def add(self, value):
         self.public(value)
@@ -176,9 +174,7 @@ class Values:
             if not field.public:
                 continue
             if field.presence and field.presence.variant:
-                raise ModelError(
-                    [f"Zig: {value.native}: variant requires tag decoding"]
-                )
+                raise Unsupported(f"Zig: {value.native}: variant requires tag decoding")
             self.add(field.value)
         self.used[value.native] = value
 
@@ -186,7 +182,7 @@ class Values:
         if not union.tag or any(
             not f.presence or not f.presence.variant for f in union.fields
         ):
-            raise ModelError([f"Zig: {union.native}: union requires tagged variants"])
+            raise Unsupported(f"Zig: {union.native}: union requires tagged variants")
         for field in union.fields:
             self.add(field.value)
 

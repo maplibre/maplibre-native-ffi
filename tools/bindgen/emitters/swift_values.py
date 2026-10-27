@@ -1,6 +1,6 @@
 """Generate Swift record values and C conversion from typed semantic plans."""
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..semantic import enum_member_prefix
 from .swift import SCALARS, camel, doc, identifier, name
 
@@ -62,8 +62,8 @@ class Values:
             return name(value.native.removeprefix("mln_"))
         if value.kind in {"record", "enum"}:
             return name(value.native.removeprefix("mln_"))
-        raise ModelError(
-            [f"Swift: {value.native}: {value.kind} needs a value conversion"]
+        raise Unsupported(
+            f"Swift: {value.native}: {value.kind} needs a value conversion"
         )
 
     def add(self, value):
@@ -78,8 +78,8 @@ class Values:
                 == name(value.native.removeprefix("mln_"))
                 for native in self.bound.public_values
             ):
-                raise ModelError(
-                    [f"Swift: {value.native}: the type alias collides with a value"]
+                raise Unsupported(
+                    f"Swift: {value.native}: the type alias collides with a value"
                 )
             for parameter in callback.arguments:
                 self.add(parameter.value)
@@ -110,8 +110,8 @@ class Values:
             if not field.public:
                 continue
             if field.presence and field.presence.variant:
-                raise ModelError(
-                    [f"Swift: {value.native}: variant requires tag decoding"]
+                raise Unsupported(
+                    f"Swift: {value.native}: variant requires tag decoding"
                 )
             self.add(field.value)
         self.used[value.native] = value
@@ -120,7 +120,7 @@ class Values:
         if not union.tag or any(
             not f.presence or not f.presence.variant for f in union.fields
         ):
-            raise ModelError([f"Swift: {union.native}: union requires tagged variants"])
+            raise Unsupported(f"Swift: {union.native}: union requires tagged variants")
         for field in union.fields:
             self.add(field.value)
 

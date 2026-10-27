@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from ..model import ModelError
+from ..model import Unsupported
 from ..semantic import output_member
 from .go import GO_KEYWORDS, documented_operation, name, native_call
 from .go_values import Values, is_text, public
@@ -25,7 +25,7 @@ def method_name(plan, receiver, handle):
     if handle and handle.handle and plan.name == handle.handle.release:
         return "Close"
     if receiver and method in OWNER_MEMBERS:
-        raise ModelError([f"{plan.name}: {method} is reserved for owner state"])
+        raise Unsupported(f"{plan.name}: {method} is reserved for owner state")
     return method
 
 
@@ -171,8 +171,8 @@ def operation(plan, values, *, discard=False, dispose=False):
         dropped_completion = plan.completion.parameter
         plan = replace(plan, completion=None)
     if plan.role == "support" and not dispose:
-        raise ModelError(
-            [f"{plan.name}: support relationship is emitted with its owner or value"]
+        raise Unsupported(
+            f"{plan.name}: support relationship is emitted with its owner or value"
         )
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver, handle = receiver_of(plan)
@@ -334,8 +334,8 @@ def operation(plan, values, *, discard=False, dispose=False):
     elif plan.consumes:
         access = "Closing" if plan.release else "Answering"
     elif borrows_receiver(plan):
-        raise ModelError(
-            [f"{plan.name}: output that borrows its receiver needs a read guard"]
+        raise Unsupported(
+            f"{plan.name}: output that borrows its receiver needs a read guard"
         )
     else:
         access = "Owned"
@@ -414,7 +414,7 @@ def operation(plan, values, *, discard=False, dispose=False):
         ] + (["ready"] if plan.completion else [])
         taken = set(names) & {labels[p.name] for p in plan.inputs}
         if taken:
-            raise ModelError([f"{plan.name}: results {sorted(taken)} name parameters"])
+            raise Unsupported(f"{plan.name}: results {sorted(taken)} name parameters")
         results = list(zip(names, output_types, strict=True))
         returned = "struct{ " + "; ".join(f"{n} {t}" for n, t in results) + " }"
         converted = returned + "{" + ", ".join(conversions) + "}"
@@ -425,8 +425,8 @@ def operation(plan, values, *, discard=False, dispose=False):
     closure_setup = "".join(line + "\n" for line in body_setup)
     if plan.view:
         if plan.completion:
-            raise ModelError(
-                [f"{plan.name}: borrowed view requires an immediate result"]
+            raise Unsupported(
+                f"{plan.name}: borrowed view requires an immediate result"
             )
         value = outputs[0][1]
         values.views[value.native] = value
@@ -536,6 +536,6 @@ def lower(bound):
                 (plan, documented_operation(bound, plan.name, operation(plan, values)))
             )
             generated.append(plan.name)
-        except ModelError as error:
+        except Unsupported as error:
             errors[plan.name] = str(error)
     return values, chunks, generated, errors

@@ -120,8 +120,11 @@ class Declarations:
             parameters.append(("Pointer<mln_diagnostic>", "out_diagnostic"))
         result = self.native(function.return_type)
         native = ", ".join(native for native, _ in parameters)
+        # A parameter's name is not part of the ABI, so a reserved one is
+        # renamed rather than rejected.
         dart = ", ".join(
-            f"{dart_type(native, self.bound.handles)} {identifier(name)}"
+            f"{dart_type(native, self.bound.handles)} "
+            + (name + "Value" if name in DART_RESERVED else name)
             for native, name in parameters
         )
         return (
@@ -202,7 +205,13 @@ def generate(bound: BoundApi) -> str:
     )
     records = "\n".join(declarations.record(record) for record in api.records)
     enums = "\n".join(declarations.enum(enum.name) for enum in api.enums)
-    functions = "\n".join(declarations.function(function) for function in api.functions)
+    # A function that the binder rejects has no Dart caller, and its
+    # declaration may have no dart:ffi form.
+    functions = "\n".join(
+        declarations.function(function)
+        for function in api.functions
+        if function.name not in bound.unsupported
+    )
     version = bound.source.c_version
     constants = "" if version is None else f"const int MLN_C_VERSION = {version};\n\n"
     return (

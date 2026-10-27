@@ -11,14 +11,10 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .. import docs
+from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import enum_member_prefix, required_callbacks
 from .kotlin_abi import Abi, LayoutError, width_expression
-
-
-class Unsupported(ValueError):
-    pass
-
 
 SCALARS = {
     "bool": ("Boolean", "Bool"),

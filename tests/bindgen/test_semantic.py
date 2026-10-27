@@ -938,7 +938,7 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
         self.assertFalse(model.callbacks["notify"].synchronous)
         # Dart takes the synchronous registration only as a native
         # registration, so it still lowers the call.
-        self.assertIn("attach", dart.coverage(api)["generated"])
+        self.assertIn("attach", dart.lower(api).generated)
         for before, after, error in (
             (
                 "signals wake; gates guard; } settings;",

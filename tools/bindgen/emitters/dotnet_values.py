@@ -7,7 +7,7 @@ import re
 from .. import async_hosts, docs
 from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
-from ..model import Api, ModelError
+from ..model import Api, ModelError, Unsupported
 from ..names import camel, pascal
 from ..protocol import STATUS_OK
 from ..semantic import (
@@ -51,10 +51,6 @@ SCALARS = {
 def raw_handle(handle) -> str:
     """The raw struct that carries one handle plan's issued id."""
     return "Mln" + pascal(handle.stem)
-
-
-class Unsupported(ValueError):
-    pass
 
 
 def member(name: str) -> str:

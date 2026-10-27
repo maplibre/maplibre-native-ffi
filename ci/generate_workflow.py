@@ -299,7 +299,7 @@ def hygiene_job() -> dict:
             "mise run bindings:test-generator",
             env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"},
         ),
-        run("mise run bindings:generate --require-complete"),
+        run("mise run bindings:generate"),
         run("dprint output-resolved-config > /dev/null"),
         run("mise run fix"),
     ]

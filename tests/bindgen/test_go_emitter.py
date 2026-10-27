@@ -3,7 +3,7 @@
 import re
 import unittest
 
-from support import parse, real_api
+from support import emitted, parse, real_api
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import go
@@ -41,7 +41,7 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
         api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         validate(api)
-        source = go.generate(api)["generated_api.go"]
+        source = emitted(go, api)["generated_api.go"]
         self.assertIn("func DrainReadings() ([]Reading, error) {", source)
         # The copy runs only when native published a batch, and a deferred
         # release frees the batch even if the copy panics.
@@ -58,7 +58,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("ReadingView", source)
 
     def test_an_input_only_union_rejects_a_value_its_switch_does_not_name(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         # A pointer to a variant also satisfies the sealed interface, so even a
         # union with no UnknownVariant rejects whatever its switch doesn't name.
         encode = re.search(
@@ -69,7 +69,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("func (UnknownVariant) isRenderedQueryGeometry()", source)
 
     def test_a_zero_literal_is_the_default(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertNotRegex(source, r"func Default[A-Z]")
         # An input starts from a zeroed record, with its size set.
         self.assertIn(
@@ -78,7 +78,7 @@ class GoEmitterTests(unittest.TestCase):
         )
 
     def test_a_factory_is_new_and_a_global_names_its_verb_first(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "func NewRuntime(options RuntimeOptions) (*RuntimeHandle, error) {",
             source,
@@ -87,7 +87,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn("func SetLogCallback(handler LogHandler) error {", source)
 
     def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "// MapHandle.CancelTransitions(), MapHandle.CancelCameraTransition(), or\n"
             "// GesturePhaseCancel ended the transitions,",
@@ -96,7 +96,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("// mln_map_cancel_transitions()", source)
 
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "Callback func(events []RuntimeEvent)",
             source,
@@ -104,7 +104,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("EventBatchView", source)
 
     def test_a_func_names_its_arguments_and_returns_a_bool_result(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "Callback func(severity LogSeverity, event LogEvent, code int64, "
             "message string) bool",
@@ -114,7 +114,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn("(result C.bool) { result = false; ", source)
 
     def test_an_absent_json_result_is_an_empty_string(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "GetStyleLayerProperty(layerId string, propertyName string) "
             "(*Future[string], error) {",
@@ -125,7 +125,7 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn("(*Future[*StyleSourceInfo], error)", source)
 
     def test_a_status_callback_returns_an_error_that_the_trampoline_maps(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "Callback func(kind ResourceKind, url string, "
             "outResponse *HttpHeaderTransformResponseScope) error",
@@ -161,8 +161,8 @@ BIND("execution=lifecycle")
 mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         validate(api)
-        self.assertEqual(go.coverage(api)["generated"], ["mln_lease_dispose"])
-        source = go.generate(api)["generated_api.go"]
+        self.assertEqual(go.lower(api).generated, ["mln_lease_dispose"])
+        source = emitted(go, api)["generated_api.go"]
         # Close returns a future; the owner's disposer passes a null completion.
         self.assertIn(
             "func (receiver *LeaseHandle) Close() (*Future[struct{}], error)", source
@@ -176,7 +176,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         self.assertIn("C.mln_lease_dispose(C.mln_lease(raw), nil, diagnostic)", source)
 
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         disposes = {
             line.split("*", 1)[1].split(")", 1)[0]
             for line in source.splitlines()
@@ -187,7 +187,7 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         )
 
     def test_every_owner_declares_its_state_members(self):
-        source = go.generate(real_api())["generated_api.go"]
+        source = emitted(go, real_api())["generated_api.go"]
         owners = [
             line.split()[1]
             for line in source.splitlines()
@@ -211,10 +211,10 @@ typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy")
 void mln_host_destroy(mln_host host);
 mln_status mln_host_is_closed(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        result = go.coverage(api)
-        self.assertEqual(result["generated"], ["mln_host_destroy"])
+        result = go.lower(api)
+        self.assertEqual(result.generated, ["mln_host_destroy"])
         self.assertIn(
-            "reserved for owner state", result["unsupported"]["mln_host_is_closed"]
+            "reserved for owner state", result.unsupported["mln_host_is_closed"]
         )
 
 

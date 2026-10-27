@@ -9,7 +9,7 @@ from dataclasses import replace
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
-from tools.bindgen.model import Api
+from tools.bindgen.model import Api, Lowered
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
@@ -37,6 +37,8 @@ HOST_ONLY = {"mln_android_init"}
 # The platforms that the package builds for. Its library serves them all, so it
 # leaves out only what none of them can use.
 TARGETS = frozenset({"android", "ios", "linux", "macos", "windows"})
+OPERATIONS = "bindings/dart/lib/src/runtime/generated_operations.dart"
+VALUES = "bindings/dart/lib/src/generated_values.dart"
 
 
 def native_call(function, arguments):
@@ -668,7 +670,7 @@ def attachment_name(owned):
     return "New" + pascal(owned.handle.stem)
 
 
-def lower(api: Api | BoundApi):
+def _lower(api: Api | BoundApi):
     methods, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api, TARGETS)
     values = Values(bound)
@@ -841,10 +843,31 @@ def render_attachments(bound, generated):
     return [chunks[name] for name in sorted(chunks)]
 
 
-def generate(api: Api | BoundApi) -> str:
-    methods, generated, _, values = lower(api)
+def lower(api: Api | BoundApi) -> Lowered:
+    from . import dart_native
+
+    methods, generated, unsupported, values = _lower(api)
     bound = values.bound
-    _, conversions = values.render()
+    # A callback that must answer on its native thread has no Dart form, so its
+    # registration carries native rules instead, and the operations that only
+    # such a callback calls have no caller.
+    registrations = [v for v in values.used.values() if v.registration]
+    for name in async_hosts.rule_answered_operations(bound, registrations):
+        unsupported.pop(name, None)
+    declarations, conversions = values.render()
+    return Lowered(
+        {
+            OPERATIONS: operations(bound, methods, generated, values, conversions),
+            VALUES: "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+            "part of 'values.dart';\n\n" + declarations,
+            dart_native.PATH: dart_native.generate(bound),
+        },
+        unsupported,
+        generated,
+    )
+
+
+def operations(bound, methods, generated, values, conversions) -> str:
     parts = re.split(
         r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|List<\w+>|\w+) _(?:write|read|prepare|deliver)\w+\()",
         conversions,
@@ -926,29 +949,4 @@ def abi_checked(body: str) -> str:
     return (
         f"{signature} {{\n    ensureAbiVersion();\n"
         f"    return {expression.rstrip()[:-1]};\n  }}\n"
-    )
-
-
-def coverage(api: Api | BoundApi):
-    _, generated, unsupported, values = lower(api)
-    bound = values.bound
-    # A callback that must answer on its native thread has no Dart form, so its
-    # registration carries native rules instead, and the operations that only
-    # such a callback calls have no caller.
-    registrations = [v for v in values.used.values() if v.registration]
-    for name in async_hosts.rule_answered_operations(bound, registrations):
-        unsupported.pop(name, None)
-    return {
-        "generated": generated,
-        "unsupported": unsupported,
-    }
-
-
-def generate_values(api: Api | BoundApi) -> str:
-    """The public value types, as a part of the handwritten values.dart."""
-    _, _, _, values = lower(api)
-    declarations, _ = values.render()
-    return (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        "part of 'values.dart';\n\n" + declarations
     )

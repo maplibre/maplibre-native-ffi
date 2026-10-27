@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
-from tools.bindgen.model import Api, Function
+from tools.bindgen.model import Api, Function, Lowered
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
@@ -44,6 +44,7 @@ PLATFORMS = {
     "windows": "windows",
 }
 TARGETS = frozenset(PLATFORMS)
+DIRECTORY = "bindings/dotnet/src/Maplibre.NativeFfi"
 
 
 def supported_platforms(plan: OperationPlan, indent: str = "    ") -> str:
@@ -116,13 +117,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
         ):
             return f"parameter {parameter.name} requires counted-buffer conversion"
     return None
-
-
-@dataclass(frozen=True)
-class Emission:
-    files: dict[str, str]
-    functions: tuple[str, ...]
-    unsupported: dict[str, str]
 
 
 PRIMITIVES = {
@@ -1187,7 +1181,7 @@ def emit_operation(
     )
 
 
-def emit(api: Api | BoundApi) -> Emission:
+def lower(api: Api | BoundApi) -> Lowered:
     methods: dict[str, list[str]] = defaultdict(list)
     # Process globals go beside the other declarations of their header.
     globals_by_directory: dict[str, list[str]] = defaultdict(list)
@@ -1555,17 +1549,8 @@ def emit(api: Api | BoundApi) -> Emission:
             + properties
             + "}\n"
         )
-    return Emission(files, tuple(sorted(supported)), unsupported)
-
-
-def generate(api: Api | BoundApi) -> dict[str, str]:
-    return emit(api).files
-
-
-def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api, TARGETS)
-    result = emit(bound)
-    return {
-        "generated": list(result.functions),
-        "unsupported": result.unsupported,
-    }
+    return Lowered(
+        {f"{DIRECTORY}/{path}": source for path, source in files.items()},
+        unsupported,
+        sorted(supported),
+    )

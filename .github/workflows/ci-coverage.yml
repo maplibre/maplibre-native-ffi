@@ -49,7 +49,7 @@ jobs:
       - env:
           MLN_BINDGEN_REQUIRE_TOOLCHAINS: '1'
         run: mise run bindings:test-generator
-      - run: mise run bindings:generate --require-complete
+      - run: mise run bindings:generate
       - run: dprint output-resolved-config > /dev/null
       - run: mise run fix
       - name: Check generated and formatted files

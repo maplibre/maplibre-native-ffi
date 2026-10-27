@@ -21,6 +21,7 @@ import dataclasses
 from dataclasses import dataclass
 
 from .. import async_hosts, docs
+from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import (
     BoundApi,
@@ -29,10 +30,6 @@ from ..semantic import (
     enum_member_prefix,
     required_member,
 )
-
-
-class Unsupported(ValueError):
-    pass
 
 
 @dataclass(frozen=True)

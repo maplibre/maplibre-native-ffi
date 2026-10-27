@@ -159,3 +159,21 @@ class ModelError(ValueError):
     def __init__(self, diagnostics: list[str]):
         self.diagnostics = sorted(set(diagnostics))
         super().__init__("\n".join(self.diagnostics))
+
+
+class Unsupported(ValueError):
+    """A binding cannot lower a declaration yet, which fails generation."""
+
+
+@dataclass(frozen=True)
+class Lowered:
+    """One binding's output, lowered once from the bound API."""
+
+    # The generated sources, by path from the repository root.
+    files: dict[str, str]
+    # The reason for each declaration that the binding cannot lower, by C name.
+    unsupported: dict[str, str]
+    # The declarations that the binding generates, by C name.
+    generated: list[str]
+    # The support declarations that back the generated values calling them.
+    support: tuple[str, ...] = ()

@@ -15,7 +15,7 @@ import dataclasses
 
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api, served
-from tools.bindgen.model import Api
+from tools.bindgen.model import Api, Lowered
 from tools.bindgen.names import camel
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import BoundApi, DeliverySupport, OperationPlan
@@ -42,6 +42,7 @@ from .kotlin_values import (
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
+DIRECTORY = "bindings/kotlin"
 # The source set and file names of each split lowering's forms.
 SPLIT = {
     kotlin_callbacks.THREADED: (
@@ -240,11 +241,6 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
     )
 
 
-def lower(api: Api | BoundApi):
-    functions, unsupported, *_ = lowered(api)
-    return functions, unsupported
-
-
 def lowered(api: Api | BoundApi):
     """Lowers every operation in its common form, or in each split lowering's form
     when it takes a split registration. A scoped response exists only in the
@@ -374,9 +370,9 @@ def companion(bound, plan) -> str:
     return owner_name(bound.handles[plan.factory]) + ".Companion"
 
 
-def generate(api: Api | BoundApi) -> dict[str, str]:
+def lower(api: Api | BoundApi) -> Lowered:
     bound = compile_api(api, TARGETS)
-    functions, _, rendered, split, values, native = lowered(bound)
+    functions, unsupported, rendered, split, values, native = lowered(bound)
     # The extensions that each platform source set declares.
     platform_extensions: dict[str, list[str]] = {}
     groups = {}
@@ -593,14 +589,8 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             files = getattr(shims, platform)()
         for file, source in files.items():
             outputs[f"{base}/{file}"] = source
-    return outputs
-
-
-def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api, TARGETS)
-    functions, unsupported = lower(bound)
-    generated = [function.name for function in functions]
-    return {
-        "generated": generated,
-        "unsupported": unsupported,
-    }
+    return Lowered(
+        {f"{DIRECTORY}/{path}": source for path, source in outputs.items()},
+        unsupported,
+        [function.name for function in functions],
+    )

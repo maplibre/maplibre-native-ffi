@@ -90,6 +90,15 @@ def parse_directory(directory: Path, clang_args: tuple[str, ...] = ()) -> Api:
     return _MODELS[key]
 
 
+def emitted(emitter, api) -> dict[str, str]:
+    """An emitter's generated files, by path from its binding's directory."""
+    directory = getattr(emitter, "DIRECTORY", None)
+    return {
+        path.removeprefix(f"{directory}/") if directory else path: source
+        for path, source in emitter.lower(api).files.items()
+    }
+
+
 def real_api() -> Api:
     """The repository's own public headers."""
     return parse_directory(ROOT / "include", REAL_CLANG_ARGS)

@@ -12,7 +12,7 @@ an approximate declaration would break the ABI.
 
 from __future__ import annotations
 
-from ..model import Api, CType, Function, Record
+from ..model import Api, CType, Function, Record, Unsupported
 from ..semantic import BoundApi
 
 PATH = "crates/maplibre-native-ffi-sys/src/generated.rs"
@@ -46,10 +46,6 @@ SCALARS = {
     "longlong": "std::ffi::c_longlong",
     "ulonglong": "std::ffi::c_ulonglong",
 }
-
-
-class Unsupported(ValueError):
-    pass
 
 
 def identifier(name: str) -> str:

@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from support import (
     FIXTURES,
     ROOT,
+    emitted,
     parse,
     parse_sources,
     protocol_header,
@@ -51,7 +52,7 @@ class ZigEmitterTests(unittest.TestCase):
     def test_a_drain_returns_its_slice_and_releases_its_batch(self):
         api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
         validate(api)
-        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        source = emitted(zig, api)["maplibre_native_ffi.zig"]
         # call.drain copies the view's strided readings and releases the batch.
         self.assertIn(
             "pub fn drainReadings(allocator: std.mem.Allocator, diagnostic: "
@@ -67,7 +68,7 @@ class ZigEmitterTests(unittest.TestCase):
         self.assertNotIn("ReadingView", source)
 
     def test_a_required_member_has_no_default_initializer(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
             '    @"initial_extent": LogicalExtent,\n'
             '    @"map_mode": MapMode = .@"continuous",\n',
@@ -78,7 +79,7 @@ class ZigEmitterTests(unittest.TestCase):
         self.assertNotIn("Default(", source)
 
     def test_the_c_version_checks_no_abi_version(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn("cVersion() u32 {\n    return c.mln_c_version();\n}", source)
         self.assertIn(
             "supportedRenderBackendMask() RenderBackendFlag {\n"
@@ -87,7 +88,7 @@ class ZigEmitterTests(unittest.TestCase):
         )
 
     def test_a_factory_is_on_its_type_and_a_global_names_its_verb_first(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         runtime = source[source.index("pub const Runtime = struct {") :]
         runtime = runtime[: runtime.index("\n};\n")]
         self.assertIn(
@@ -103,7 +104,7 @@ class ZigEmitterTests(unittest.TestCase):
         )
 
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
             "*const fn (context: ?*anyopaque, events: []const RuntimeEvent) "
             "anyerror!void,",
@@ -112,7 +113,7 @@ class ZigEmitterTests(unittest.TestCase):
         self.assertNotIn("EventBatchView", source)
 
     def test_a_callback_names_its_arguments_and_returns_a_bool_result(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
             '@"callback": *const fn (context: ?*anyopaque, severity: LogSeverity, '
             "event: LogEvent, code: i64, message: []const u8) anyerror!bool,",
@@ -124,7 +125,7 @@ class ZigEmitterTests(unittest.TestCase):
         )
 
     def test_a_status_callback_answers_a_named_status_and_reports_other_errors(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
             "url: []const u8, out_response: HttpHeaderTransformResponse) "
             "anyerror!void = null,",
@@ -149,8 +150,8 @@ mln_status mln_session_dispose(mln_session session, const mln_completion *comple
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
         )
         validate(api)
-        self.assertEqual(zig.coverage(api)["unsupported"], {})
-        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        self.assertEqual(zig.lower(api).unsupported, {})
+        source = emitted(zig, api)["maplibre_native_ffi.zig"]
         # deinit and the sync dispose pass no completion; the release passes one.
         self.assertIn(
             "try status.call(c.mln_session_dispose, .{ raw, null }, null);", source
@@ -181,13 +182,13 @@ void mln_query_release(mln_query query);
 """
         )
         validate(api)
-        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        source = emitted(zig, api)["maplibre_native_ffi.zig"]
         note = "/// Runtime events report its `id()` as their source.\n"
         self.assertIn(note + "pub const Map = struct {", source)
         self.assertNotIn(note + "pub const Query", source)
 
     def test_a_summary_names_the_zig_symbols_of_c_declarations(self):
-        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         outcome = source.split("pub const CameraTransitionOutcome = enum")[1]
         summary = " ".join(
             line.strip().removeprefix("///").strip()
@@ -217,13 +218,13 @@ void mln_query_release(mln_query query);
         )
         api = parse_sources({"api.h": header})
         validate(api)
-        self.assertEqual(zig.coverage(api)["unsupported"], {})
+        self.assertEqual(zig.lower(api).unsupported, {})
         with TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "api.h").write_text(header)
             source = root / "src"
             source.mkdir()
-            for path, text in zig.generate(api).items():
+            for path, text in emitted(zig, api).items():
                 (source / path).write_text(text)
             for path in (BINDING / "src").glob("*.zig"):
                 if not (source / path.name).exists() and path.name != "c.zig":
