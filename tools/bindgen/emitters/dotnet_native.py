@@ -152,7 +152,7 @@ class Declarations:
             f"    public struct {pascal(field.name)}Array\n    {{\n"
             f"        private {self.type(array.element, field=True)} element;\n    }}\n"
             for field in record.fields
-            if (array := self.inline_array(field.type))
+            if (array := self.inline_array(field.type)) and array.element
         )
         layout = "[StructLayout(LayoutKind.Explicit)]\n" if explicit else ""
         return f"{layout}internal unsafe struct {record.name}\n{{\n{fields}{arrays}}}\n"

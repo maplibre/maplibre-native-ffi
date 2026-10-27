@@ -58,6 +58,12 @@ def member(name: str) -> str:
     return "@" + name if name in KEYWORDS["dotnet"] else name
 
 
+def variant_constant(variant: FieldPlan) -> str:
+    """The tag constant that selects a union variant."""
+    assert variant.presence is not None and variant.presence.variant is not None
+    return variant.presence.variant
+
+
 def width(ctype) -> str | None:
     return SCALARS.get(ctype.spelling) or SCALARS.get(ctype.canonical)
 
@@ -235,6 +241,7 @@ class Values:
 
     def public_type(self, plan: ValuePlan) -> str:
         if plan.kind == "handle":
+            assert plan.handle is not None
             return pascal(plan.handle.stem) + "Handle"
         if plan.kind == "callback":
             return public_name(plan.native) + ("?" if plan.nullable else "")
@@ -325,6 +332,7 @@ class Values:
             return f"NativeCallScope.CopyArray<{native}, {public}>({expression}, (nuint)({length}), static item => {element})"
         if plan.native in self.bound.slices:
             array = self.bound.slices[plan.native]
+            assert array.value.length is not None
             if array.value.stride:
                 return (
                     f"Copy{public_name(plan.native)}{pascal(array.name)}({expression})"
@@ -545,9 +553,10 @@ class Values:
                 expression = "default"
             elif field.value.kind == "union":
                 union = field.value
+                assert union.tag is not None
                 tag = next(item for item in plan.fields if item.name == union.tag)
                 arms = [
-                    f"{self.typed_constant(self.native_type(tag.value), variant.presence.variant)} => new {self.member_type(plan, name, field)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
+                    f"{self.typed_constant(self.native_type(tag.value), variant_constant(variant))} => new {self.member_type(plan, name, field)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
                     for variant in union.fields
                 ]
                 if union.empty_variant:
@@ -575,7 +584,7 @@ class Values:
                     else None,
                 )
             presence = field.presence
-            if presence and presence.mask:
+            if presence and presence.mask and presence.bit:
                 condition = self.has_bit(plan, presence.mask, presence.bit)
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
@@ -627,7 +636,7 @@ class Values:
         declaration = ""
         for field in self.fields(plan):
             array = field.value
-            if not array.stride or not array.element:
+            if not array.stride or not array.element or not array.length:
                 continue
             native = self.raw_type(array.element)
             public = self.public_type(array.element)
@@ -745,7 +754,7 @@ class Values:
             )
             presence = field.presence
             indent = "        "
-            if presence and presence.mask:
+            if presence and presence.mask and presence.bit:
                 if put := self.put(plan, presence, field, expression):
                     lines.append(put)
                     continue
@@ -776,7 +785,7 @@ class Values:
     def native_callbacks(self, plan: ValuePlan) -> tuple[FieldPlan, ...]:
         """The callback fields of a registration that also accepts a native
         registration, in registration order, or none."""
-        if not async_hosts.accepts_native(self.bound, plan):
+        if not plan.registration or not async_hosts.accepts_native(self.bound, plan):
             return ()
         return tuple(
             next(field for field in plan.fields if field.name == name)
@@ -801,6 +810,7 @@ class Values:
         call, so a value that also sets a delegate throws after the claim.
         """
         registration = plan.registration
+        assert registration is not None
         release = next(f for f in plan.fields if f.name == registration.release)
         lines = [
             "        if (value.NativeRegistration is { } registration)",
@@ -827,6 +837,7 @@ class Values:
         if not callbacks:
             return ""
         registration = plan.registration
+        assert registration is not None
         name = public_name(plan.native)
         functions = [member(camel(field.name)) for field in callbacks]
         user_data = member(camel(registration.user_data))
@@ -869,6 +880,7 @@ class Values:
         """The statements that store one member's value."""
         encoded = []
         if field.value.kind == "union":
+            assert field.value.tag is not None
             tag = next(item for item in plan.fields if item.name == field.value.tag)
             encoded.append(f"{indent}switch ({expression})")
             encoded.append(f"{indent}{{")
@@ -876,7 +888,7 @@ class Values:
                 encoded.extend(
                     [
                         f"{indent}    case {self.member_type(plan, name, field)}.{pascal(variant.name)} selected:",
-                        f"{indent}        native.{member(field.value.tag)} = {self.typed_constant(self.native_type(tag.value), variant.presence.variant)};",
+                        f"{indent}        native.{member(field.value.tag)} = {self.typed_constant(self.native_type(tag.value), variant_constant(variant))};",
                         f"{indent}        native.{member(field.name)}.{member(variant.name)} = {self.encode(variant.value, 'selected.Value')};",
                         f"{indent}        break;",
                     ]
@@ -889,6 +901,7 @@ class Values:
         if (
             field.value.kind == "buffer"
             and field.value.ctype.pointee
+            and field.value.length
             and field.value.length != "nul"
         ):
             local = "buffer" + pascal(field.name)
@@ -979,7 +992,7 @@ class Values:
                 for parameter in callback.arguments
             )
             setup = "".join(
-                f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.element.native)}({member(parameter.name)});\n"
+                f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.unwrapped.native)}({member(parameter.name)});\n"
                 for parameter in responses
             )
             declared = "".join(
@@ -997,6 +1010,7 @@ class Values:
             cleanup = " ".join(
                 f"response{pascal(parameter.name)}.Expire();" for parameter in responses
             )
+            assert callback.context is not None
             root = f"NativeCallbackRoot.Value({member(callback.context)})"
             invoke = f"(({public_name(plan.native)}){root}).{pascal(name)}?.Invoke({converted});"
             if responses:

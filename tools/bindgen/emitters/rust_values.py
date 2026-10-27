@@ -10,6 +10,9 @@ class Values:
         self.bound = bound
         self.used: dict[str, ValuePlan] = {}
         self.directions: dict[str, set[str]] = {}
+        # The module and the public type of each owned handle, by C name.
+        self.owners: dict[str, str] = {}
+        self.handle_types: dict[str, str] = {}
 
     def scalar(self, value: ValuePlan) -> str:
         canonical = value.ctype.canonical
@@ -89,7 +92,7 @@ class Values:
         if array := self.bound.slices.get(value.native):
             # A slice record presents only its array.
             return self.add(array.value, direction)
-        if value.kind in {"reference", "array"}:
+        if value.kind in {"reference", "array"} and value.element:
             self.add(value.element, direction)
         if value.kind == "enum":
             self.used[value.native] = value

@@ -771,6 +771,7 @@ class Values:
         handlers = []
         for index, field in enumerate(fields):
             callback = self.bound.callbacks[field.value.native]
+            assert callback.delivery is not None
             name = identifier(field.name)
             invoke = f"_deliver{public_name(callback.native)}({member(name, field.value.nullable)}, batch, index, delivery)"
             invoke = f"=> {invoke}"

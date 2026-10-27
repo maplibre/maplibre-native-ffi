@@ -172,9 +172,11 @@ class Values:
         # threadedMain declares, or ASYNC for those that wasmJsMain declares.
         # Each split lowering keeps the callback values that it used and the
         # writers of its split registrations.
-        self.split = None
+        self.split: str | None = None
         self.split_used = {"threaded": {}, "async": {}}
         self.split_writers = {"threaded": {}, "async": {}}
+        # The discarding forms of each split lowering's commands, by C name.
+        self.split_discards: dict[str, dict[str, tuple[str, str | None]]] = {}
 
     def needs_registration(self, value):
         return bool(
@@ -583,7 +585,7 @@ class Values:
         """Name the in-place writer of [record], emitting it once."""
         from . import kotlin_callbacks
 
-        if kotlin_callbacks.split(record, self):
+        if self.split and kotlin_callbacks.split(record, self):
             self.split_writers[self.split].setdefault(record.native, record)
             return "put" + kotlin_callbacks.public_name(record, self)
         self.writers.setdefault(record.native, record)

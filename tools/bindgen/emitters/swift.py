@@ -119,7 +119,7 @@ def owner_type(plan: OperationPlan, bound: BoundApi) -> str | None:
     from .swift_ownership import owner_name
 
     receiver = receiver_native(plan)
-    if plan.scoped_receiver:
+    if plan.scoped_receiver and receiver:
         return name(receiver.removeprefix("mln_"))
     if receiver:
         return owner_name(bound.handles[receiver])
@@ -380,6 +380,8 @@ def operation(
         target = "owner: self"
     signature = f"{modifier}func {method}({', '.join(declarations)})"
     if discard:
+        # Only a method of a receiver has a discarding form.
+        assert owner is not None
         call = native_call(
             function, *["nil" if arg == "completion" else arg for arg in args]
         )
@@ -428,7 +430,9 @@ def operation(
         result_type = returned.native if returned else "void"
         nullable = bool(returned and returned.nullable)
         encoding = (
-            (returned.element.encoding if shape == "array" else returned.encoding)
+            returned.element.encoding
+            if returned and returned.kind == "array" and returned.element
+            else returned.encoding
             if returned
             else None
         )
@@ -444,6 +448,7 @@ def operation(
         elif shape == "none" and result_type == "void":
             result, start = "Void", "Unit"
         else:
+            assert returned is not None
             if returned.ownership != "borrowed":
                 raise unsupported(function, "payload needs a borrowed ownership rule")
             if shape == "value" and returned.kind == "scalar":
@@ -551,6 +556,7 @@ def operation(
             if output_plan.sized_by:
                 value_types.add(value)
                 element = value.element
+                assert element is not None and value.length is not None
                 raw = SCALARS.get(
                     native(output.type.pointee), native(output.type.pointee)
                 )
@@ -570,8 +576,7 @@ def operation(
                     f"{'try ' if 'try ' in copied else ''}value{index}.map {{ item in {copied} }}"
                 )
                 continue
-            if value.kind == "reference":
-                value = value.element
+            value = value.unwrapped
             value_types.add(value)
             if value.kind == "handle":
                 owned = next(

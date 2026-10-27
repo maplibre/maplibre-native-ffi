@@ -287,7 +287,8 @@ class Values:
                 + ","
             )
             copy = self.capture(field.value, f"raw.{local}")
-            if optional:
+            if field.presence and field.presence.mask:
+                assert field.presence.bit is not None
                 mask, bit = identifier(field.presence.mask), field.presence.bit
                 present = f"raw.{mask} & c.{bit} != 0"
                 copies.append(

@@ -127,6 +127,7 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         result = entry.returns.removeprefix("Promise<").removesuffix(">")
         lines = [f"return query<{result}>({start});"]
     elif shape == "attach":
+        assert entry.owned is not None
         member = identifier(output_member(entry.owned.parameter))
         lines = [
             f"const [{member}, ready] = attach({start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});",
@@ -150,6 +151,7 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         lines = [f"return {call} ?? [];"]
     elif shape == "view":
         view = entry.plan.view
+        assert view is not None and entry.view is not None
         scope = (
             f"new ViewScope(ADOPT, this, (handle) => native.{view.begin}(handle), "
             f"(scope) => native.{view.end}(scope))"
@@ -322,6 +324,7 @@ def render_attachments(bound, lowered: list[Lowered]) -> list[str]:
     for entry in lowered:
         if entry.shape != "attach":
             continue
+        assert entry.owned is not None
         name = attachment_name(entry.owned)
         member = identifier(output_member(entry.owned.parameter))
         chunks[name] = (
@@ -340,14 +343,15 @@ def render_attachments(bound, lowered: list[Lowered]) -> list[str]:
 
 
 def render_views(bound, values: Values, lowered: list[Lowered]) -> list[str]:
-    chunks = {}
+    chunks: dict[str, str] = {}
     for entry in lowered:
-        if entry.shape != "view" or entry.view in chunks:
+        if entry.shape != "view" or entry.view is None or entry.view in chunks:
             continue
         value = bound.values[entry.view]
         record = public_name(value.native)
         name = scoped_name(value.native)
         view = entry.plan.view
+        assert view is not None
         # The scope guards only what the view's owner lends; a copy of any
         # other member stays readable after the scope ends.
         getters = "".join(
@@ -594,5 +598,5 @@ def view_scopes(lowered: list[Lowered]) -> set[tuple[str, str]]:
     return {
         (entry.plan.view.begin, entry.plan.view.end)
         for entry in lowered
-        if entry.shape == "view"
+        if entry.shape == "view" and entry.plan.view
     }

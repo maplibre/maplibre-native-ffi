@@ -484,6 +484,7 @@ def operation(plan, values, *, discard=False, dispose=False):
                     0, f"defer C.{release}({labels[plan.drain.batch.name]})"
                 )
             elif outputs[0][1].kind != "handle":
+                assert returned is not None
                 returned = "*" + returned
                 adoptions.append(f"value := {converted}")
                 converted = "&value"

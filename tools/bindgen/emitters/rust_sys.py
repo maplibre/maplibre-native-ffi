@@ -87,6 +87,7 @@ class Declarations:
         """The Rust spelling of a C type, recording every declaration it names."""
         if value.kind == "pointer":
             pointee = value.pointee
+            assert pointee is not None
             if pointee.kind == "function":
                 return self.function_pointer(pointee, ())
             target = (
@@ -94,7 +95,7 @@ class Declarations:
             )
             return ("*const " if pointee.const else "*mut ") + target
         if value.kind == "array":
-            if value.length is None:
+            if value.length is None or value.element is None:
                 raise Unsupported(f"{value.spelling}: flexible arrays have no layout")
             return f"[{self.type(value.element)}; {value.length}]"
         if value.kind in {"typedef", "record", "enum"}:
@@ -117,7 +118,7 @@ class Declarations:
         typedef = self.typedefs.get(name)
         if typedef is not None and typedef.type.kind not in {"record", "enum"}:
             self.typedef_target(typedef)
-        elif typedef is not None and typedef.type.declaration != name:
+        elif typedef is not None and typedef.type.declaration not in {None, name}:
             self.use(typedef.type.declaration)
         # A typedef that names its own record, as `typedef struct x {...} x`
         # does, shares the record's name, so the record's members are visited
@@ -142,6 +143,7 @@ class Declarations:
         if function.variadic:
             raise Unsupported("variadic callbacks have no Rust declaration")
         result = function.result
+        assert result is not None
         returns = "" if result.kind == "void" else f" -> {self.type(result)}"
         return f'Option<unsafe extern "C" fn({", ".join(parameters)}){returns}>'
 
@@ -177,7 +179,7 @@ class Declarations:
             return False
         for field in record.fields:
             value = field.type
-            while value.kind == "array":
+            while value.kind == "array" and value.element:
                 value = value.element
             name = value.declaration
             if name in self.typedefs and self.typedefs[name].type.kind == "record":

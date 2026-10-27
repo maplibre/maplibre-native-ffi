@@ -375,7 +375,7 @@ def lower(api: Api | BoundApi) -> Lowered:
     functions, unsupported, rendered, split, values, native = lowered(bound)
     # The extensions that each platform source set declares.
     platform_extensions: dict[str, list[str]] = {}
-    groups = {}
+    groups: dict[str | None, list[OperationPlan]] = {}
     # The common factories of each handle, which its owner's companion declares.
     factories: dict[str, list[str]] = {}
     for function in functions:
@@ -411,7 +411,12 @@ def lower(api: Api | BoundApi) -> Lowered:
                     else top_level(rendered[plan.name])
                 )
             ]
-            if plan.receiver and plan.completion and plan.completion.discardable:
+            if (
+                receiver
+                and plan.receiver
+                and plan.completion
+                and plan.completion.discardable
+            ):
                 extensions.append(
                     f"/** [{owner_name(bound.handles[receiver])}.{method}] without its completion. */\n"
                     + extension(

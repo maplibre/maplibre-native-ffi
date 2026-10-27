@@ -76,6 +76,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
         result
         and result.kind == "array"
         and result.nullable
+        and value
         and value.buffer_form == "view"
     ):
         return "optional array result needs a presence rule"
@@ -343,6 +344,7 @@ def checked_call(function: Function, arguments: str) -> str:
 def present_call(plan: OperationPlan, arguments: str, absent: str = "null") -> str:
     """Returns `absent` for the absence status, and checks every other status."""
     call = native_call(plan.function, arguments, "Diagnostic")
+    assert plan.absence is not None
     return f"if (!Present({call}, mln_status.{plan.absence.status})) return {absent};"
 
 
@@ -389,6 +391,7 @@ def completion_query(
         return "Task", ""
     shape = "array" if result.kind == "array" else "value"
     value = result.element if shape == "array" else result
+    assert value is not None
     native = value.native
     nullable = result.nullable
     if value.buffer_form == "view" and value.encoding in {"utf8", "json", "bytes"}:
@@ -677,11 +680,14 @@ def emit_operation(
     # Caller-sized text starts in scope memory of a guessed size, and the call
     # runs again with enough memory when the text did not fit.
     text = plan.caller_sized_text
-    text_storage, text_capacity, text_length = (
-        (camel(text.name), camel(text.value.length), camel(text.result_length))
-        if text
-        else (None, None, None)
-    )
+    text_storage, text_capacity, text_length = None, None, None
+    if text:
+        assert text.value.length is not None and text.result_length is not None
+        text_storage, text_capacity, text_length = (
+            camel(text.name),
+            camel(text.value.length),
+            camel(text.result_length),
+        )
     for parameter in function.parameters:
         if parameter.name == (plan.receiver or plan.scoped_receiver):
             continue
@@ -729,6 +735,7 @@ def emit_operation(
         if output and output.sized_by and not asynchronous:
             value = output.value
             element = value.element
+            assert element is not None
             values.supported(value)
             scoped = True
             count = f"{camel(output.sized_by)}.Length"
@@ -775,8 +782,8 @@ def emit_operation(
             and input_plans[parameter.name].encoding in {"utf8", "bytes", "json"}
             and (
                 input_plans[parameter.name].kind == "buffer"
-                or input_plans[parameter.name].element
-                and input_plans[parameter.name].element.kind == "scalar"
+                or (element := input_plans[parameter.name].element) is not None
+                and element.kind == "scalar"
             )
         ):
             value_plan = input_plans[parameter.name]
@@ -908,6 +915,7 @@ def emit_operation(
         elif (
             output_plan
             and output_plan.kind == "scalar"
+            and parameter.type.pointee
             and type_name(parameter.type.pointee) in PRIMITIVES
         ):
             native = PRIMITIVES[type_name(parameter.type.pointee)]
@@ -1014,6 +1022,7 @@ def emit_operation(
             raise Unsupported("a drain requires one slice and no native scope")
         result_type, copied = outputs[0]
         batch = plan.drain.batch.value.unwrapped.handle
+        assert batch is not None
         release = api.functions_by_name[batch.release]
         body = prologue + [
             present_call(plan, arguments, "[]"),
@@ -1374,12 +1383,14 @@ def lower(api: Api | BoundApi) -> Lowered:
         + "".join(
             f"global using static Maplibre.NativeFfi.Internal.C.{enum};\n"
             for enum in sorted(
-                {
-                    typed_mask(field)
-                    for value in bound.values.values()
-                    for field in value.fields
-                }
-                - {None}
+                filter(
+                    None,
+                    {
+                        typed_mask(field)
+                        for value in bound.values.values()
+                        for field in value.fields
+                    },
+                )
             )
         )
     )

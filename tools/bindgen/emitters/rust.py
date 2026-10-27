@@ -84,7 +84,7 @@ def receiver_native(plan: OperationPlan) -> str | None:
     value = next((p.value for p in plan.inputs if p.name == receiver), None)
     if value is None:
         return None
-    return value.element.native if value.kind == "reference" else value.native
+    return value.unwrapped.native
 
 
 def method_name(plan: OperationPlan) -> str:
@@ -314,6 +314,7 @@ def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
         raise Unsupported("completion result requires resolved ownership transfer")
     array = result.kind == "array"
     value = result.element if array else replace(result, nullable=False)
+    assert value is not None
     value_types.add(value, "out")
     public = value_types.public(value)
     raw = SCALARS.get(value.native, "sys::" + value.native)
@@ -482,6 +483,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         parameter_plan = input_plans.get(parameter.name)
         value_plan = parameter_plan.value if parameter_plan else None
         if parameter.name in text_parameters:
+            assert text is not None
             args.append(local)
             if parameter.name == text.name:
                 prelude.append(f"let mut {local} = Vec::new();")
@@ -566,9 +568,9 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif (
             value_plan
             and value_plan.kind == "reference"
-            and value_plan.element.kind == "buffer"
+            and value_plan.unwrapped.kind == "buffer"
         ):
-            element = value_plan.element
+            element = value_plan.unwrapped
             public = "&str" if is_text(element) else "&[u8]"
             signature.append(
                 f"{local}: {'Option<' + public + '>' if value_plan.nullable else public}"
@@ -597,6 +599,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             pointee
             and ctype(pointee) in value_types.bound.values
             and value_types.bound.values[ctype(pointee)].kind == "record"
+            and value_plan is not None
             and parameter_plan is not None
             and parameter_plan.direction == "in"
             and value_plan.kind == "reference"
@@ -623,6 +626,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif plan.drain and parameter.name == plan.drain.view.name:
             value = plan.drain.view.value.unwrapped
             public = value_types.add(value, "out")
+            assert pointee is not None
             raw_type = ctype(pointee)
             prelude += [
                 f"let mut {local}: sys::{raw_type} = unsafe {{ std::mem::zeroed() }};",
@@ -633,8 +637,10 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif parameter.name in output_plans:
             output = output_plans[parameter.name]
             value = output.value
+            assert pointee is not None
             if output.sized_by:
                 element = value.element
+                assert element is not None and value.length is not None
                 value_types.add(element, "out")
                 raw_type = SCALARS.get(ctype(pointee), "sys::" + ctype(pointee))
                 prelude.append(
@@ -655,8 +661,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                     )
                 )
                 continue
-            if value.kind == "reference":
-                value = value.element
+            value = value.unwrapped
             if value.kind == "handle":
                 owned = next(
                     (
@@ -701,7 +706,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 f"parameter {parameter.name}: {parameter.type.spelling} needs ownership/shape lowering"
             )
     method = plan.member
-    if discard and plan.completion.optional:
+    if discard and plan.completion and plan.completion.optional:
         # The release passes the completion, and the dispose, which keeps the
         # C name, passes none.
         method = function.name.removeprefix(f"{receiver}_")
@@ -720,6 +725,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         closure = f"|{closure}|"
     native = native_call(function, args, diagnostic="out_diagnostic")
     if text:
+        assert text.value.length is not None and text.result_length is not None
         storage, capacity, length = (
             names[text.name],
             names[text.value.length],
@@ -771,6 +777,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                     raise Unsupported(
                         f"{release}: a drained batch's release must not fail"
                     )
+                assert plan.absence is not None
                 ending = [
                     f"if !{call_local}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
                     "    return Ok(Vec::new());",

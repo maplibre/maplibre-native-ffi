@@ -239,7 +239,7 @@ def _lower(api):
             + owner_members(owner, native in bound.event_sources)
         )
         used_support.add(disposer)
-        if public_dispose(handle):
+        if handle.dispose and public_dispose(handle):
             plan = bound.operations_by_name[handle.dispose]
             operations.append(
                 documented_operation(
@@ -287,7 +287,7 @@ def _lower(api):
         },
         {
             build: sorted(
-                {p for plan, _ in items for p in served(plan.function, TARGETS)}
+                {p for plan, _ in items for p in served(plan.function, TARGETS) or ()}
             )
             for build, items in constrained.items()
         },

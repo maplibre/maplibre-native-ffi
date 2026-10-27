@@ -21,6 +21,7 @@ from ..semantic import (
     BoundApi,
     OperationPlan,
     OwnedOutputPlan,
+    ValuePlan,
     output_member,
 )
 from .typescript_native_values import NativeValues
@@ -176,7 +177,7 @@ def lower_function(
             lowered.native_parameters.append(("token", "object | undefined"))
             lowered.arguments.append("token")
             index += 1
-    returned: list[tuple[str, object]] = []
+    returned: list[tuple[str, ValuePlan]] = []
     # Caller-sized text starts in call memory of a guessed size, and the call
     # runs again with enough memory when the text did not fit.
     text = plan.caller_sized_text
@@ -214,7 +215,8 @@ def lower_function(
             value = outputs[parameter.name].value
             if plan.drain and parameter.name == plan.drain.batch.name:
                 # The call releases the batch once it copies the slice.
-                handle = value.element.handle
+                handle = value.unwrapped.handle
+                assert handle is not None
                 release = bound.source.functions_by_name[handle.release]
                 if release.diagnostic or release.return_type.kind != "void":
                     raise Unsupported("a drained batch needs a void release")
@@ -241,6 +243,7 @@ def lower_function(
                 # One output element per element of the input array, in call
                 # memory that the input list's count bounds.
                 element = value.element
+                assert element is not None
                 values.check(element, "out")
                 count = f"count_{sized_by}"
                 locals_.append(f"{element.native}* {local} = NULL;")
@@ -264,6 +267,7 @@ def lower_function(
                 locals_.append(f"{element.native} {local};")
                 body.extend(natives.init(element, local))
             else:
+                assert parameter.type.pointee is not None
                 locals_.append(
                     f"{scalar_local(parameter.type.pointee.spelling)} {local};"
                 )
@@ -307,6 +311,7 @@ def lower_function(
                 raise Unsupported("sized input needs a count parameter plan")
             locals_.append(f"size_t count_{parameter.name} = 0;")
             if value.kind == "array":
+                assert value.element is not None
                 locals_.append(f"{value.element.native}* {local} = NULL;")
                 read = natives.read_list(
                     value,
@@ -343,7 +348,7 @@ def lower_function(
                 lowered.native_parameters.append((public_name_, ts))
             continue
         if value.kind == "reference":
-            element = value.element
+            element = value.unwrapped
             values.check(element, "in")
             if element.kind in {"record", "union"}:
                 locals_.append(f"{element.native} {local};")
@@ -351,6 +356,7 @@ def lower_function(
                     element, js, local, path, "goto done"
                 )
             else:
+                assert parameter.type.pointee is not None
                 ctype = scalar_local(parameter.type.pointee.spelling)
                 locals_.append(f"{ctype} {local};")
                 read = [f"memset(&{local}, 0, sizeof {local});"] + natives.read(
@@ -652,6 +658,7 @@ def lower_thread_start(
     name = plan.name
     structure = f"mln_ts_{name}_arguments"
     native = owned.handle.native
+    assert owned.handle.cleanup is not None
     cleanup = bound.source.functions_by_name[owned.handle.cleanup]
     # A dispose takes the handle, then nulls for an optional completion and a
     # diagnostic, which simple_disposer() allows.

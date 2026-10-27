@@ -116,8 +116,8 @@ class NativeValues:
             return [
                 f"{{ const char* text = NULL; if (!mln_ts_read_text(call, {js}, &text, {path})) {fail}; {target} = text; }}"
             ]
-        if value.kind == "reference" and value.element.kind == "buffer":
-            return self.read(value.element, js, target, path, fail)
+        if value.kind == "reference" and value.unwrapped.kind == "buffer":
+            return self.read(value.unwrapped, js, target, path, fail)
         if value.kind == "record" and value.registration:
             entry = self.values.registration(value)
             plan = value.registration
@@ -218,6 +218,7 @@ class NativeValues:
         fail: str,
     ) -> list[str]:
         element = value.element
+        assert element is not None
         return [
             "{",
             f"  {element.native}* items = NULL;",
@@ -289,6 +290,7 @@ class NativeValues:
                 body = self.union_writer(value, field, "member", "child")
             elif field.value.kind == "array":
                 count = field.value.length
+                assert count is not None
                 body = self.read_list(
                     field.value,
                     "member",
@@ -300,6 +302,7 @@ class NativeValues:
                 )
             elif is_counted(field.value):
                 count = field.value.length
+                assert count is not None
                 body = self.read_sized(
                     field.value,
                     "member",
@@ -347,6 +350,7 @@ class NativeValues:
         """Registers a host value with the realm and names its queue in place
         of the registration's callbacks."""
         plan = value.registration
+        assert plan is not None
         return [
             f"if (!mln_ts_read_registration(call, {js}, &{target}.{plan.user_data}, &{target}.{plan.queue}, {path})) {fail};",
         ]
@@ -392,6 +396,7 @@ class NativeValues:
     ) -> list[str]:
         """Statements that read the `{kind, value}` object `js` into a tagged
         union. A kind outside the union's arms fails."""
+        assert field.presence is not None
         arms = {arm.name: arm for arm in field.value.fields}
         cases = union_kinds(field.value)
         kinds = ", ".join(c_string(kind) for _, kind, _ in cases)
@@ -451,7 +456,7 @@ class NativeValues:
             expression = f"mln_ts_text(env, {source}, strlen({source}))"
             return f"(({source}) == NULL ? mln_ts_undefined(env) : {expression})"
         if value.kind == "reference":
-            element = value.element
+            element = value.unwrapped
             if element.kind != "record":
                 return self.to_js(element, f"(*{source})")
             return f"(({source}) == NULL ? mln_ts_undefined(env) : {self.reader(element)}(env, {source}, sizeof *({source})))"
@@ -459,7 +464,7 @@ class NativeValues:
             return (
                 f"{self.reader(value)}(env, &({source}), {size or f'sizeof({source})'})"
             )
-        if value.kind == "array" and size is not None:
+        if value.kind == "array" and value.element and size is not None:
             return f"{self.items_reader(value.element)}(env, {source}, {size})"
         raise Unsupported(f"{value.native}: no C to JavaScript conversion")
 
@@ -553,6 +558,7 @@ class NativeValues:
         if name in self.functions:
             return name
         prototype = f"napi_value {name}(napi_env env, const {record.native}* source, size_t size)"
+        assert field.presence is not None
         tag = field.presence.tag
         lines = [
             "  napi_value result = mln_ts_object(env);",
@@ -589,6 +595,7 @@ class NativeValues:
             return name
         value = field.value
         element = value.element
+        assert element is not None
         ctype = element.native
         prototype = f"napi_value {name}(napi_env env, const {record.native}* source)"
         stride = (
@@ -624,6 +631,7 @@ class NativeValues:
     def decoder(self, result: ValuePlan) -> str:
         """A completion decoder for a function's result value."""
         element = result.element if result.kind == "array" else result
+        assert element is not None
         if element.kind == "handle":
             ctype = "uint64_t"
         elif element.kind == "record" or element.buffer_form == "view":

@@ -51,7 +51,7 @@ _DECLARATION_PREFIX_REVERSED = re.compile(
 
 
 def is_diagnostic_type(native: cindex.Type) -> bool:
-    if native.kind != cindex.TypeKind.POINTER:
+    if native.kind != TypeKind.POINTER:
         return False
     pointee = native.get_pointee()
     return (
@@ -145,6 +145,8 @@ class Extractor:
         prefix = _DECLARATION_PREFIX_REVERSED.match(
             reversed_source, len(source) - start.offset
         )
+        # The pattern matches the empty string, so it always matches.
+        assert prefix is not None
         end = len(source) - prefix.end()
         if source.endswith(b"*/", 0, end):
             comment = source[source.rfind(b"/*", 0, end) : end]

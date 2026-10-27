@@ -293,6 +293,7 @@ class Conventions:
             defaults.update(length="nul", encoding="utf8")
         elif self.is_record(pointee):
             defaults["length"] = "1"
+            assert resolved.pointee is not None
             if is_buffer_view(resolved.pointee) or is_buffer_view(pointee):
                 defaults["encoding"] = "utf8"
         return defaults
@@ -609,7 +610,9 @@ def view_records(api: Api) -> set[str]:
         for function in api.functions
         if "view_owner" in function.metadata
         for parameter in function.parameters
-        if parameter.metadata.get("direction") == "out" and parameter.type.pointee
+        if parameter.metadata.get("direction") == "out"
+        and parameter.type.pointee
+        and parameter.type.pointee.declaration
     }
 
 
@@ -724,7 +727,7 @@ def validate(api: Api) -> None:
             elif not any(
                 field.metadata.get("lifetime") == "owner"
                 for field in api.records_by_name[
-                    views[0].type.pointee.declaration
+                    views[0].type.pointee.declaration or ""
                 ].fields
             ):
                 errors.append(
@@ -1518,6 +1521,7 @@ def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
         signature = callback.type.pointee if callback else None
         if (
             field.name == release
+            or callback is None
             or signature is None
             or signature.kind != "function"
             or "delivery" in callback.metadata

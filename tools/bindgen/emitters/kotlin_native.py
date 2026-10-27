@@ -198,7 +198,7 @@ class Parameter:
     name: str
     c_name: str
     ctype: CType
-    kind: object
+    kind: Primitive | Record
     returned: bool = False
 
     @property
@@ -210,7 +210,7 @@ class Parameter:
 class Signature:
     function: str
     parameters: tuple[Parameter, ...]
-    result: object
+    result: Primitive | Record | None
     result_ctype: CType
     # What the call waits for before it returns, from `blocks=`.
     blocks: str | None = None
@@ -281,10 +281,13 @@ class NativeShims:
         return self.abi.classify(ctype)
 
     def signature(self, function: Function) -> Signature:
-        parameters = [
-            Parameter(identifier(p.name), p.name, p.type, self.classify(p.type))
-            for p in function.parameters
-        ]
+        parameters = []
+        for p in function.parameters:
+            kind = self.classify(p.type)
+            assert kind is not None
+            if isinstance(kind, Array):
+                raise LayoutError(f"{function.name}: array parameters have no carrier")
+            parameters.append(Parameter(identifier(p.name), p.name, p.type, kind))
         if function.diagnostic:
             parameters.append(
                 Parameter(
@@ -292,6 +295,8 @@ class NativeShims:
                 )
             )
         result = self.classify(function.return_type)
+        # C returns no array.
+        assert not isinstance(result, Array)
         if isinstance(result, Record):
             parameters.append(
                 Parameter(
@@ -302,9 +307,6 @@ class NativeShims:
                     returned=True,
                 )
             )
-        for parameter in parameters:
-            if isinstance(parameter.kind, Array):
-                raise LayoutError(f"{function.name}: array parameters have no carrier")
         return Signature(
             function.name,
             tuple(parameters),

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import assert_never
 
 from .. import async_hosts, docs
 from ..model import Unsupported
@@ -59,6 +60,7 @@ def registration(bound: BoundApi, value: ValuePlan) -> Registration:
             "or native rules"
         )
     plan = value.registration
+    assert plan is not None
     callbacks = (
         tuple(async_hosts.queue_callbacks(bound, value))
         if form == "queue"
@@ -260,14 +262,13 @@ def native_fields(public: str) -> str:
 
 def union_kinds(value: ValuePlan) -> list[tuple[str | None, str, str | None]]:
     """(variant constant, kind, arm field) for each arm, then the empty one."""
-    result = [
-        (arm.presence.variant, identifier(arm.name), arm.name) for arm in value.fields
+    result: list[tuple[str | None, str, str | None]] = [
+        (arm.presence.variant if arm.presence else None, identifier(arm.name), arm.name)
+        for arm in value.fields
     ]
     if value.empty_variant:
         constant = value.empty_variant[0]
-        prefix = enum_member_prefix(
-            [constant, *(a.presence.variant for a in value.fields)]
-        )
+        prefix = enum_member_prefix([constant, *(variant for variant, _, _ in result)])
         result.append(
             (constant, identifier(constant.removeprefix(prefix).lower()), None)
         )
@@ -313,7 +314,9 @@ class Values:
         if value.kind == "enum":
             return self.enum_scalar(value)
         if value.kind == "scalar":
-            return self.scalar(value)
+            scalar = self.scalar(value)
+            assert scalar is not None
+            return scalar
         return U64
 
     def registration(self, value: ValuePlan) -> Registration:
@@ -333,7 +336,7 @@ class Values:
         controls |= {
             f.value.length
             for f in value.fields
-            if f.value.kind == "array" or is_counted(f.value)
+            if f.value.length and (f.value.kind == "array" or is_counted(f.value))
         }
         return tuple(f for f in value.fields if f.name not in controls)
 
@@ -467,27 +470,29 @@ class Values:
 
     def ts(self, value: ValuePlan) -> str:
         """The TypeScript type of a value, without its absence."""
-        if value.kind in {"scalar", "enum", "native_pointer"}:
-            return (
-                public_name(value.native)
-                if value.kind == "enum"
-                else self.carrier(value).ts
-            )
-        if value.kind == "handle":
-            return owner_class(value.handle)
-        if value.kind == "buffer":
-            if value.encoding == "json":
-                return "unknown"
-            return "Uint8Array" if value.encoding == "bytes" else "string"
-        if value.kind == "reference":
-            return self.ts(value.element)
-        if value.kind == "array":
-            return f"readonly {self.ts(value.element)}[]"
-        if value.native in self.bound.slices:
-            return self.ts(self.bound.slices[value.native].value)
-        if value.kind in {"record", "union", "callback"}:
-            return public_name(value.native)
-        raise Unsupported(f"{value.native}: no TypeScript type")
+        match value.kind:
+            case "scalar" | "native_pointer":
+                return self.carrier(value).ts
+            case "enum":
+                return public_name(value.native)
+            case "handle":
+                return owner_class(value.handle)
+            case "buffer":
+                if value.encoding == "json":
+                    return "unknown"
+                return "Uint8Array" if value.encoding == "bytes" else "string"
+            case "reference":
+                return self.ts(value.unwrapped)
+            case "array":
+                if not value.element:
+                    raise Unsupported(f"{value.native}: no TypeScript type")
+                return f"readonly {self.ts(value.element)}[]"
+            case "record" | "union" | "callback":
+                if value.native in self.bound.slices:
+                    return self.ts(self.bound.slices[value.native].value)
+                return public_name(value.native)
+            case _:
+                assert_never(value.kind)
 
     def callback_type(self, callback) -> str:
         """The function type of a host callback."""
@@ -659,6 +664,7 @@ class Values:
             alias = f"({self.callback_type(callback)}) | {native}"
         else:
             raise Unsupported(f"{value.native}: no TypeScript form with a native one")
+        assert value.registration is not None
         context = {value.registration.user_data, value.registration.release}
         members = "".join(
             doc(self.bound, f"{value.native}.{field.name}", "  ")

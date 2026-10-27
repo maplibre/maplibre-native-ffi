@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass, field, replace
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from . import docs
+from .docs import Doc, Symbol
 from .model import Api, CType, Function, ModelError
 from .names import type_name
 from .protocol import (
@@ -135,9 +136,27 @@ class CallbackResponsePlan:
     methods: tuple[str, ...]
 
 
+# The shape of a value, which every emitter dispatches on.
+ValueKind = Literal[
+    "scalar",
+    "enum",
+    "handle",
+    "buffer",
+    "callback",
+    "native_pointer",
+    "reference",
+    "array",
+    "record",
+    "union",
+]
+# How a buffer is laid out: "view" for the mln_buffer_view struct, "pointer"
+# for a character or byte pointer with a separate length or NUL terminator.
+BufferForm = Literal["view", "pointer"]
+
+
 @dataclass(frozen=True)
 class ValuePlan:
-    kind: str
+    kind: ValueKind
     native: str
     ctype: CType
     ownership: str = "value"
@@ -158,13 +177,15 @@ class ValuePlan:
     mask_flags: tuple[MaskFlag, ...] = ()
     registration: RegistrationDescriptorPlan | None = None
     response: CallbackResponsePlan | None = None
-    # For kind="buffer": "view" for the mln_buffer_view struct, "pointer" for a
-    # character or byte pointer with a separate length or NUL terminator.
-    buffer_form: str | None = None
+    # Set only for kind="buffer".
+    buffer_form: BufferForm | None = None
 
     @property
     def unwrapped(self) -> ValuePlan:
-        return self.element if self.kind == "reference" else self
+        if self.kind != "reference":
+            return self
+        assert self.element is not None
+        return self.element
 
     @property
     def union_member(self) -> FieldPlan | None:
@@ -531,7 +552,7 @@ class BoundApi:
         return self.enum_numbers[symbol]
 
     @functools.cached_property
-    def docs(self) -> dict[str, docs.Doc]:
+    def docs(self) -> dict[str, Doc]:
         """The documentation of each documented public declaration, by C name.
 
         A registration record, and an operation that takes one directly, end
@@ -571,15 +592,15 @@ class BoundApi:
                 )
         return index
 
-    def doc(self, native: str) -> docs.Doc | None:
+    def doc(self, native: str) -> Doc | None:
         """The documentation of a declaration, or `record.field` member."""
         return self.docs.get(native)
 
     @functools.cached_property
-    def _symbols(self) -> dict[str, docs.Symbol]:
+    def _symbols(self) -> dict[str, Symbol]:
         return {}
 
-    def symbols(self, binding: str, build) -> docs.Symbol:
+    def symbols(self, binding: str, build) -> Symbol:
         """The symbol resolver of `binding`, which `build(self)` makes once."""
         if binding not in self._symbols:
             self._symbols[binding] = build(self)

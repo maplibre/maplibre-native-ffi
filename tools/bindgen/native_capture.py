@@ -8,6 +8,8 @@ each pointer that the header declares.
 
 from __future__ import annotations
 
+from typing import assert_never
+
 from .compiler import compile_api
 from .model import Api, ModelError
 from .semantic import BoundApi, ValuePlan
@@ -147,25 +149,35 @@ def _validate_capture_ownership(plan, *, nested=False, delivered=False):
         _validate_capture_ownership(plan.element, nested=True)
 
 
-def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[str]:
+def _capture(
+    plan: ValuePlan, source: str, target: str, parent: str, depth: int
+) -> list[str]:
     indent = "  " * depth
     if plan.kind in {"scalar", "enum", "handle"}:
         return []
     if plan.kind == "buffer":
-        if plan.buffer_form == "view":
-            return [f"{indent}{target} = buffer(arena, {source});"]
-        if plan.length == "nul":
-            raise ModelError([f"{plan.native}: copied text must be a buffer view"])
-        if plan.length:
-            pointer = (
-                f"static_cast<const std::byte*>({source})"
-                if plan.ctype.pointee and plan.ctype.pointee.kind == "void"
-                else source
-            )
-            return [
-                f"{indent}{target} = bytes(arena, {pointer}, {parent}.{plan.length});"
-            ]
-        raise ModelError([f"{plan.native}: capture buffer requires length"])
+        match plan.buffer_form:
+            case "view":
+                return [f"{indent}{target} = buffer(arena, {source});"]
+            case "pointer":
+                if plan.length == "nul":
+                    raise ModelError(
+                        [f"{plan.native}: copied text must be a buffer view"]
+                    )
+                if not plan.length:
+                    raise ModelError([f"{plan.native}: capture buffer requires length"])
+                pointer = (
+                    f"static_cast<const std::byte*>({source})"
+                    if plan.ctype.pointee and plan.ctype.pointee.kind == "void"
+                    else source
+                )
+                return [
+                    f"{indent}{target} = bytes(arena, {pointer}, {parent}.{plan.length});"
+                ]
+            case None:
+                raise ModelError([f"{plan.native}: buffer has no form"])
+            case _:
+                assert_never(plan.buffer_form)
     if plan.kind == "record":
         lines = []
         for field in plan.fields:
@@ -223,6 +235,8 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
                 lines.extend(_capture(child, child_source, child_target, source, depth))
         return lines
     if plan.kind in {"array", "reference"}:
+        element = plan.element
+        assert element is not None
         length = plan.length if plan.kind == "array" else "1"
         if length is None:
             raise ModelError([f"{plan.native}: capture array requires length"])
@@ -236,7 +250,7 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
             ]
             lines.extend(
                 _capture(
-                    plan.element,
+                    element,
                     f"{source}[index_{depth}]",
                     f"{target}[index_{depth}]",
                     parent,
@@ -245,13 +259,17 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
             )
             lines.append(f"{indent}}}")
             return lines
-        if plan.element.kind in {"scalar", "enum", "handle"}:
+        if element.kind in {"scalar", "enum", "handle"}:
             return [f"{indent}{target} = bytes(arena, {source}, {count});"]
         lines = [
             f"{indent}{target} = span(arena, {source}, {count}, [&]([[maybe_unused]] auto& arena, auto {name}) {{",
             f"{indent}  auto copied_{depth} = {name};",
         ]
-        lines.extend(_capture(plan.element, name, f"copied_{depth}", parent, depth + 1))
+        lines.extend(_capture(element, name, f"copied_{depth}", parent, depth + 1))
         lines.extend([f"{indent}  return copied_{depth};", f"{indent}}});"])
         return lines
-    raise ModelError([f"{plan.native}: native capture does not support {plan.kind}"])
+    if plan.kind in {"callback", "native_pointer", "union"}:
+        raise ModelError(
+            [f"{plan.native}: native capture does not support {plan.kind}"]
+        )
+    assert_never(plan.kind)

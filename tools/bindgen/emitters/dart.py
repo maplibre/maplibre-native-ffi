@@ -239,6 +239,7 @@ def lower_function(
     # synchronously, as a separate dispose does.
     disposed = None
     if dispose:
+        assert plan.completion is not None
         disposed = plan.completion.parameter
         plan = replace(plan, completion=None)
     if plan.consumes == "always" and (
@@ -318,6 +319,7 @@ def lower_function(
         ):
             local += "Value"
         if parameter.name in text_arguments:
+            assert text is not None
             if parameter.name == text.name:
                 setup.append("final text = _CallerSizedText();")
                 returns.append(
@@ -342,6 +344,7 @@ def lower_function(
                 source = camel(output_plan.sized_by)
                 count = f"{source}.length"
                 element = output.element
+                assert element is not None
                 setup.append(
                     f"final {local} = arena<{values.ffi(element)}>({source}.isEmpty ? 1 : {count});"
                 )
@@ -514,9 +517,9 @@ def lower_function(
             else None
         )
         if plan.drain:
-            release = values.bound.source.functions_by_name[
-                plan.drain.batch.value.element.handle.release
-            ]
+            batch = plan.drain.batch.value.unwrapped.handle
+            assert batch is not None
+            release = values.bound.source.functions_by_name[batch.release]
             if release.diagnostic or release.return_type.kind != "void":
                 raise Unsupported("a drained batch needs a void release")
             result = (
@@ -578,6 +581,7 @@ def lower_function(
         values.check(result)
         public = values.public(result)
         element = result.element if result.kind == "array" else result
+        assert element is not None
         bare = replace(element, nullable=False)
         if result.kind != "array" and bare.kind == "buffer":
             bare = replace(bare, nullable=result.nullable)
