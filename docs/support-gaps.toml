@@ -1,4 +1,4 @@
-# Support that ci/workflow.toml cannot record. The support matrix on the docs
+# Support that tools/ci/suites.py cannot record. The support matrix on the docs
 # home page merges these entries with CI coverage, and its generator fails when
 # CI covers an entry, so remove an entry once CI covers it. Each push to main
 # also rewrites the tracking issue's body from this file.

@@ -1,6 +1,6 @@
 import unittest
 
-from ci.workflow import android_commands
+from tools.ci.suites import android_commands
 
 
 class KotlinNativeAndroidTest(unittest.TestCase):

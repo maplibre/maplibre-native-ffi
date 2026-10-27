@@ -113,8 +113,8 @@ def render(matrix: dict[str, Any]) -> str:
         ),
         "",
         (
-            f"Each push to main rewrites this body from [`ci/workflow.toml`]"
-            f"({SOURCE_ROOT}/ci/workflow.toml) and [`docs/support-gaps.toml`]"
+            f"Each push to main rewrites this body from [`tools/ci/suites.py`]"
+            f"({SOURCE_ROOT}/tools/ci/suites.py) and [`docs/support-gaps.toml`]"
             f"({SOURCE_ROOT}/docs/support-gaps.toml). Change those files, not "
             "this issue."
         ),

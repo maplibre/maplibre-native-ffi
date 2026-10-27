@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import fnmatch
 
-from ci.workflow import backend, platform, target_rows
+from ci.workflow import backend, device_boot, platform, preset_sets, runner
+from tools.ci.suites import target_suites
 
 HYGIENE = "hygiene"
 # These platforms supply native inputs to Kotlin Maven staging. The full run
@@ -28,6 +29,54 @@ NAMES = {
 }
 
 
+ZIG_PROJECTS = (
+    "//bindings/zig:",
+    "//examples/zig-map:",
+    "//examples/zig-readback:",
+)
+GRADLE_PROJECTS = ("//bindings/kotlin:", "//:kotlin:")
+SWIFT_PROJECTS = ("//bindings/swift:", "//examples/swift-map:")
+
+
+def target_rows(presets: dict) -> list[dict[str, object]]:
+    configured, _, _, packaged = preset_sets(presets)
+    rows = []
+    # The toolchain cache key covers the runner OS, architecture and image, so
+    # one row per runner label is enough to write every entry the others read.
+    claimed_runners: set[str] = set()
+    for preset in configured:
+        suites = target_suites(presets, preset)
+        tasks = [suite.task for suite in suites]
+        row_runner = runner(preset)
+        rows.append(
+            {
+                "preset": preset,
+                "runner": row_runner,
+                "package": preset in packaged,
+                # The key hashes every `build.zig.zon` and is shared by all
+                # rows on the same runner. Cache keys are immutable, so a row
+                # that fetches only some projects would claim the key with an
+                # incomplete cache.
+                "zig": all(
+                    any(task.startswith(project) for task in tasks)
+                    for project in ZIG_PROJECTS
+                ),
+                # `setup-gradle` restores a Gradle user home and stops the
+                # daemons in its post-action, so Windows file locks do not
+                # outlive the job. A row with no Gradle build pays that setup
+                # and teardown for an empty cache entry.
+                "gradle": any(task.startswith(GRADLE_PROJECTS) for task in tasks),
+                # A Swift package build resolves its dependencies.
+                "swift": any(task.startswith(SWIFT_PROJECTS) for task in tasks),
+                "boot": device_boot(preset),
+                "save_toolchains": row_runner not in claimed_runners,
+                "tasks": tasks,
+            }
+        )
+        claimed_runners.add(row_runner)
+    return rows
+
+
 def job_name(job: str) -> str:
     return (
         f"target / {job.removeprefix('target-')}"
@@ -36,9 +85,9 @@ def job_name(job: str) -> str:
     )
 
 
-def dependencies(source: dict, presets: dict) -> dict[str, list[str]]:
+def dependencies(presets: dict) -> dict[str, list[str]]:
     """Return the target jobs that each packaging job consumes."""
-    packaged = [row["preset"] for row in target_rows(source, presets) if row["package"]]
+    packaged = [row["preset"] for row in target_rows(presets) if row["package"]]
 
     def targets(include) -> list[str]:
         return [f"target-{preset}" for preset in packaged if include(preset)]
@@ -56,7 +105,7 @@ def dependencies(source: dict, presets: dict) -> dict[str, list[str]]:
 
 def unit_jobs(source: dict, presets: dict) -> dict[str, list[str]]:
     """Map each coverage unit to the jobs it owns."""
-    targets = [f"target-{row['preset']}" for row in target_rows(source, presets)]
+    targets = [f"target-{row['preset']}" for row in target_rows(presets)]
     owned = {
         unit: [
             *(
@@ -88,7 +137,7 @@ def job_units(source: dict, presets: dict) -> dict[str, list[str]]:
 
     A unit runs the jobs it owns and every job that those consume.
     """
-    needs = dependencies(source, presets)
+    needs = dependencies(presets)
     running: dict[str, list[str]] = {}
     for unit, jobs in unit_jobs(source, presets).items():
         for job in jobs:

@@ -7,10 +7,12 @@ import json
 import os
 import subprocess
 import unittest
+from unittest import mock
 
 from ci.generate_workflow import ROOT, ci_workflow
 from ci.retry import retryable
 from ci.workflow import load_configuration
+from tools.ci import suites
 
 
 class WorkflowTest(unittest.TestCase):
@@ -39,60 +41,98 @@ class WorkflowTest(unittest.TestCase):
             enabled, ["target-android-x64-egl", "target-android-x64-vulkan"]
         )
 
-    def test_a_job_cannot_run_one_task_as_two_suites(self):
-        source = copy.deepcopy(self.source)
-        source["suites"].append(
-            {
-                "platforms": ["windows"],
-                "commands": [{"task": "//bindings/rust:test", "args": ["release"]}],
-            }
-        )
-        with self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"):
-            ci_workflow(source, self.presets)
+    def test_every_target_job_runs_its_suites_after_build_and_boot(self):
+        jobs = ci_workflow(self.source, self.presets)["jobs"]
+        for name, job in jobs.items():
+            if not name.startswith("target-"):
+                continue
+            with self.subTest(job=name):
+                steps = job["steps"]
+                runs = [step for step in steps if step.get("name") == "Run suites"]
+                self.assertEqual(len(runs), 1)
+                preset = name.removeprefix("target-")
+                self.assertEqual(runs[0]["run"], f"mise run ci:target {preset}")
+                # The default success() gate keeps it, and the uploads after
+                # it, behind the build and boot steps.
+                self.assertNotIn("if", runs[0])
+                ready = max(
+                    index
+                    for index, step in enumerate(steps)
+                    if step.get("id") in ("build", "boot")
+                )
+                self.assertIs(steps[ready + 1], runs[0])
+
+
+class SuitesTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _, cls.presets = load_configuration(ROOT)
+
+    def test_a_target_cannot_run_one_task_as_two_suites(self):
+        extra = {
+            "platforms": ["windows"],
+            "commands": [{"task": "//bindings/rust:test", "args": ["release"]}],
+        }
+        with (
+            mock.patch.object(suites, "SUITES", [*suites.SUITES, extra]),
+            self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"),
+        ):
+            suites.target_suites(self.presets, "windows-x64-wgl")
 
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
-        source = copy.deepcopy(self.source)
-        source["suites"].append(
-            {
-                "platforms": ["windows"],
-                "commands": [
-                    {"task": "//examples/c-map:check"},
-                    {"task": "//examples/c-map:smoke"},
-                ],
-                "environments": [
-                    {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
-                ],
-            }
-        )
-        jobs = ci_workflow(source, self.presets)["jobs"]
-        environments = {
-            (name, step["run"]): step.get("env", {})
-            for name, job in jobs.items()
-            for step in job.get("steps", [])
-            if "STEP_PROBE" in step.get("env", {})
-            or (
-                name.startswith("target-windows-")
-                and "//examples/c-map:" in step.get("run", "")
-            )
+        extra = {
+            "platforms": ["windows"],
+            "commands": [
+                {"task": "//examples/c-map:check"},
+                {"task": "//examples/c-map:smoke"},
+            ],
+            "environments": [
+                {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
+            ],
         }
+        presets = (
+            "windows-x64-wgl",
+            "windows-x64-vulkan",
+            "windows-arm64-wgl",
+            "windows-arm64-vulkan",
+        )
+        with mock.patch.object(suites, "SUITES", [*suites.SUITES, extra]):
+            environments = {
+                (preset, suite.command): suite.env
+                for preset in presets
+                for suite in suites.target_suites(self.presets, preset)
+                if "STEP_PROBE" in suite.env
+                or suite.task.startswith("//examples/c-map:")
+            }
         # The packaged target's consumer environment still applies.
         probed = {"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}
         plain = {"MISE_TASK_SKIP": "//:build"}
         self.assertEqual(
             environments,
             {
-                (f"target-{preset}", f"mise run //examples/c-map:{task} {preset}"): (
+                (preset, ("mise", "run", f"//examples/c-map:{task}", preset)): (
                     probed if preset == "windows-x64-wgl" else plain
                 )
-                for preset in (
-                    "windows-x64-wgl",
-                    "windows-x64-vulkan",
-                    "windows-arm64-wgl",
-                    "windows-arm64-vulkan",
-                )
+                for preset in presets
                 for task in ("check", "smoke")
             },
         )
+
+    def test_an_unpackaged_target_runs_its_consumers_against_its_build_tree(self):
+        presets = copy.deepcopy(self.presets)
+        presets["packagePresets"] = [
+            preset
+            for preset in presets["packagePresets"]
+            if preset["name"] != "linux-gnu-x64-egl"
+        ]
+        listed = suites.target_suites(presets, "linux-gnu-x64-egl")
+        ids = [suite.id for suite in listed]
+        self.assertNotIn("archive", ids)
+        self.assertNotIn("install", ids)
+        self.assertIn("bindings-rust-test", ids)
+        for suite in listed:
+            self.assertNotIn("MISE_TASK_SKIP", suite.env)
+            self.assertEqual(suite.prerequisites, ("build",))
 
 
 class GateTest(unittest.TestCase):
@@ -149,10 +189,9 @@ class RetryTest(unittest.TestCase):
         ):
             with self.subTest(failed=failed):
                 self.assertTrue(retryable([job(target, *failed), *aggregates]))
-        suite = "Run mise run //bindings/kotlin:test android-x64-egl"
+        suite = "Run suites"
         for jobs in (
             [job(target, suite)],
-            [job(target, suite, "Fail if any suite failed")],
             [job(target, "Boot Android emulator", suite)],
             # A job that failed without a failed step timed out, possibly in a
             # hung test.

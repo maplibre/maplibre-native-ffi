@@ -159,16 +159,17 @@ ci:
     source sets such as `androidMain`, Objective-C++, platform conditionals,
     `cmake/platform/`, render backends, SDK setup, or packaging. A test change
     matters only to units that run that suite. The workflows are generated from
-    `ci/`, so changing a unit's generated jobs puts it at risk. Windows runs
-    shared scripts differently, with Git Bash and MSVC, and a tool configured
-    for only some operating systems puts those at risk. A public header change
-    that adds a macro, an inline function, or a construct new to the headers
-    puts MSVC (Windows x64) and Apple Clang and the Swift importer (macOS) at
-    risk, since the C tests and several bindings compile the headers there. A
-    header change that only edits declarations or docs does not. Release
-    workflows don't run on pull requests. Hygiene always runs formatting, lint,
-    generated-code checks, and the tests for `ci/`. Main runs every unit after
-    merge, so a pull request needs only the coverage a reviewer would expect.
+    `ci/`, and `tools/ci/` runs each target job's suites, so changing a unit's
+    jobs or suites puts it at risk. Windows runs shared scripts differently,
+    with Git Bash and MSVC, and a tool configured for only some operating
+    systems puts those at risk. A public header change that adds a macro, an
+    inline function, or a construct new to the headers puts MSVC (Windows x64)
+    and Apple Clang and the Swift importer (macOS) at risk, since the C tests
+    and several bindings compile the headers there. A header change that only
+    edits declarations or docs does not. Release workflows don't run on pull
+    requests. Hygiene always runs formatting, lint, generated-code checks, and
+    the tests for `ci/`. Main runs every unit after merge, so a pull request
+    needs only the coverage a reviewer would expect.
   units:
     docs:
       covers: >-

@@ -16,13 +16,12 @@ sys.path.insert(0, str(REPO_ROOT))
 from ci.workflow import (
     architecture,
     backend,
-    consumer_commands,
     load_configuration,
-    native_commands,
     platform,
     preset_sets,
     runtime_tested,
 )
+from tools.ci.suites import target_suites
 
 PLATFORM_LABELS = {
     "linux-gnu": "Linux GNU",
@@ -184,7 +183,7 @@ def load_gaps() -> tuple[int, list[Target], dict[tuple[str, str], dict[str, str]
 
 
 def support_matrix() -> dict[str, Any]:
-    source, presets = load_configuration(REPO_ROOT)
+    _, presets = load_configuration(REPO_ROOT)
     configured, _, tested, _ = preset_sets(presets)
 
     # coverage[(language, target)] holds the best status and the flavors that
@@ -204,7 +203,7 @@ def support_matrix() -> dict[str, Any]:
         record(
             "c", target, "tested" if runtime_tested(preset, tested) else "build-only"
         )
-        commands = native_commands(preset, tested) + consumer_commands(source, preset)
+        commands = [" ".join(suite.command) for suite in target_suites(presets, preset)]
         for command in commands:
             for flavor, status in command_support(command):
                 if language(flavor) not in LANGUAGE_LABELS:
