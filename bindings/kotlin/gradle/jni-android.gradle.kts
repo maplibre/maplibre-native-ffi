@@ -6,9 +6,7 @@ import org.gradle.api.tasks.bundling.Zip
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.catalogVersionInt
-import org.maplibre.nativeffi.gradle.localBuild
-import org.maplibre.nativeffi.gradle.localBuildPrefix
-import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.nativeInstall
 import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
@@ -88,17 +86,12 @@ tasks.withType<Zip>().configureEach {
 }
 
 androidTargets.forEach { target ->
+  val install = nativeInstall(target.targetPlatform, androidBackend)
   val verifyLocalBuild =
-    registerLocalBuildVerification(
-      "verifyAndroid${target.taskSuffix}LocalBuild",
-      target.targetPlatform,
-      androidBackend,
-    )
+    registerLocalBuildVerification("verifyAndroid${target.taskSuffix}LocalBuild", install)
   packageAndroidRuntimeLibraries.configure { dependsOn(verifyLocalBuild) }
   packageAndroidBindingLibraries.configure { dependsOn(verifyLocalBuild) }
-  val installDir =
-    localBuild?.let { localBuildPrefix(it, nativePreset(target.targetPlatform, androidBackend)) }
-      ?: return@forEach
+  val installDir = install.prefix ?: return@forEach
   val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
   val runtimePackageDir = packagedAndroidRuntimeLibs.map {
     it.dir("$androidBackend/${target.cargoTarget}")

@@ -1,6 +1,5 @@
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
-import java.io.File
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.bundling.Zip
@@ -17,9 +16,7 @@ import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
 import org.maplibre.nativeffi.gradle.catalogVersionInt
 import org.maplibre.nativeffi.gradle.embedMaplibreLicenseBundle
 import org.maplibre.nativeffi.gradle.kotlinNativeTargetPlatform
-import org.maplibre.nativeffi.gradle.localBuild
-import org.maplibre.nativeffi.gradle.localBuildPrefix
-import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.nativeInstall
 import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
@@ -74,18 +71,14 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
       )
   }
 
-/** The install prefix in the local build that serves [targetPlatform] with [backend]. */
-fun runtimeInstall(targetPlatform: String, backend: String): File? = localBuild?.let {
-  localBuildPrefix(it, nativePreset(targetPlatform, backend))
-}
-
 fun configureJvmRuntimeArtifacts(backend: String, classifiers: Collection<String>) {
   val runtimeJars = classifiers.map { classifier ->
     val targetPlatform = HostPlatform.JVM_TARGET_PLATFORMS.getValue(classifier)
     val taskSuffix = classifier.taskSuffix()
+    val nativeInstall = nativeInstall(targetPlatform, backend)
     val verifyLocalBuild =
-      registerLocalBuildVerification("verifyJvm${taskSuffix}LocalBuild", targetPlatform, backend)
-    val install = runtimeInstall(targetPlatform, backend)
+      registerLocalBuildVerification("verifyJvm${taskSuffix}LocalBuild", nativeInstall)
+    val install = nativeInstall.prefix
 
     tasks.register<Jar>("jvm${taskSuffix}RuntimeJar") {
       group = "build"
@@ -146,7 +139,8 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     AndroidTarget.parseAbis(
       providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
     )
-  val referenceInstall = runtimeInstall(androidTargets.first().targetPlatform, backend.id) ?: return
+  val referenceInstall =
+    nativeInstall(androidTargets.first().targetPlatform, backend.id).prefix ?: return
   // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK whose
   // NDK supplies the statically linked libc++. Reading ANDROID_HOME directly
   // would pair the library with a notice from a different NDK whenever
@@ -257,14 +251,10 @@ extensions.configure<KotlinMultiplatformExtension> {
       requireNotNull(configuredNativeTargets[name]) {
         "Unsupported ${backend.displayName} Kotlin/Native runtime target: $name"
       }
-    val targetPlatform = kotlinNativeTargetPlatform(name)
+    val install = nativeInstall(kotlinNativeTargetPlatform(name), runtimeBackend)
     val verifyLocalBuild =
-      registerLocalBuildVerification(
-        "verify${name.capitalized()}LocalBuild",
-        targetPlatform,
-        runtimeBackend,
-      )
-    val runtimeInstallDir = runtimeInstall(targetPlatform, runtimeBackend)
+      registerLocalBuildVerification("verify${name.capitalized()}LocalBuild", install)
+    val runtimeInstallDir = install.prefix
     val staticLibraryOptions =
       targetConfiguration.staticLibraries.flatMap { listOf("-staticLibrary", it) }.toTypedArray()
 

@@ -1,48 +1,114 @@
 package org.maplibre.nativeffi.gradle
 
+import groovy.json.JsonSlurper
 import java.io.File
 import org.gradle.api.Project
 import org.gradle.api.tasks.TaskProvider
 
 /**
  * The Gradle property that names the local build every native input comes from: an install prefix,
- * or a build root that holds `<preset>/install` for each preset a task needs.
+ * or a directory holding installs one level down, such as a CMake build root.
  */
 const val LOCAL_BUILD_PROPERTY = "maplibre.localBuild"
 
 internal const val NATIVE_DESCRIPTOR_PATH = "share/maplibre-native-c/artifact.json"
 
 /** The local build that [LOCAL_BUILD_PROPERTY] names, or null when it is unset. */
-val Project.localBuild: File?
+private val Project.localBuild: File?
   get() = providers.gradleProperty(LOCAL_BUILD_PROPERTY).map(rootProject::file).orNull
 
-/** The install prefix in [localBuild] that serves [preset]. */
-fun localBuildPrefix(localBuild: File, preset: String): File =
-  if (localBuild.resolve(NATIVE_DESCRIPTOR_PATH).isFile) localBuild
-  else localBuild.resolve("$preset/install")
-
-/** The CMake preset that builds [targetPlatform] for [backend]. */
-fun nativePreset(targetPlatform: String, backend: String): String {
-  val suffix =
-    when (backend) {
-      "opengl" -> if (targetPlatform.startsWith("windows-")) "wgl" else "egl"
-      else -> backend
-    }
-  return "$targetPlatform-$suffix"
-}
+/**
+ * The install in the local build that serves one target, or, in [problem], why none does. A task
+ * that needs the install depends on the [registerLocalBuildVerification] task, which reports the
+ * problem, so that a local build missing one target fails only the tasks that need it.
+ */
+class NativeInstall internal constructor(val prefix: File?, internal val problem: String?)
 
 /**
- * The backend a binding test takes from a build root: Metal on Apple, OpenGL on Android, and Vulkan
- * elsewhere.
+ * Finds the install in the local build that serves [targetPlatform] with [backend], or without one,
+ * with the platform's default backend. An install prefix serves its own backend unless [backend] is
+ * given.
  */
-fun defaultBackend(targetPlatform: String): String =
-  when {
-    targetPlatform.startsWith("macos-") ||
-      targetPlatform.startsWith("ios-") ||
-      targetPlatform.startsWith("tvos-") -> "metal"
-    targetPlatform.startsWith("android-") -> "opengl"
-    else -> "vulkan"
+fun Project.nativeInstall(targetPlatform: String, backend: String? = null): NativeInstall {
+  val root =
+    localBuild
+      ?: return NativeInstall(
+        null,
+        "Set -P$LOCAL_BUILD_PROPERTY to an install prefix, or to a directory holding installs " +
+          "one level down, such as a CMake build root",
+      )
+  val request =
+    if (backend == null) "$targetPlatform with its default backend" else "$targetPlatform $backend"
+  if (root.resolve(NATIVE_DESCRIPTOR_PATH).isFile) {
+    // A prefix serves one platform, so a build for several targets names a directory of installs
+    // instead. Only a selected backend can conflict; without one, the prefix's own backend serves.
+    val descriptor = readDescriptor(root)
+    return if (
+      descriptor["targetPlatform"] == targetPlatform &&
+        (backend == null || descriptor["renderBackend"] == backend)
+    ) {
+      NativeInstall(root, null)
+    } else {
+      NativeInstall(
+        null,
+        "$LOCAL_BUILD_PROPERTY names an install prefix built for " +
+          "${descriptor["targetPlatform"]} ${descriptor["renderBackend"]}, which cannot serve $request",
+      )
+    }
   }
+
+  // Without a selected backend, only the target's default backend serves, so that building another
+  // backend under the same directory never changes which install an unchanged request gets.
+  val matches = mutableListOf<File>()
+  val others = mutableListOf<String>()
+  val stale = mutableListOf<File>()
+  val children = root.listFiles()?.filter(File::isDirectory)?.sorted().orEmpty()
+  for (child in children) {
+    for (prefix in listOf(child.resolve("install"), child)) {
+      if (!prefix.resolve(NATIVE_DESCRIPTOR_PATH).isFile) continue
+      val descriptor = readDescriptor(prefix)
+      val platform = descriptor["targetPlatform"]
+      val builtBackend = descriptor["renderBackend"]
+      val defaultBackend = descriptor["defaultBackend"]
+      when {
+        // Installs built before descriptors named their default backend.
+        platform !is String || builtBackend !is String || defaultBackend !is String ->
+          stale += prefix
+        platform == targetPlatform && builtBackend == (backend ?: defaultBackend) ->
+          matches += prefix
+        else -> others += "$prefix ($platform $builtBackend)"
+      }
+    }
+  }
+  matches.singleOrNull()?.let {
+    return NativeInstall(it, null)
+  }
+
+  fun list(lines: List<Any>) = lines.joinToString("") { "\n  $it" }
+  val named = "$LOCAL_BUILD_PROPERTY names $root, which holds"
+  val problem =
+    if (matches.isNotEmpty()) {
+      "$named several installs for $request:${list(matches)}\n" +
+        "Remove all but one, or name one of them as the install prefix."
+    } else {
+      buildString {
+        append("$named no install for $request. Build one.")
+        if (others.isNotEmpty()) append("\nIt holds:${list(others)}")
+        if (stale.isNotEmpty()) {
+          append(
+            "\nThese installs predate the descriptor fields that the lookup reads; rebuild them:" +
+              list(stale),
+          )
+        }
+      }
+    }
+  return NativeInstall(null, problem)
+}
+
+// The configuration cache tracks this readText, so editing a descriptor reconfigures the build.
+private fun readDescriptor(prefix: File): Map<*, *> =
+  JsonSlurper().parseText(prefix.resolve(NATIVE_DESCRIPTOR_PATH).readText()) as? Map<*, *>
+    ?: emptyMap<Any, Any>()
 
 /** The native target platform of a Kotlin/Native target. */
 fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
@@ -58,21 +124,9 @@ fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
       else -> error("No native target platform for Kotlin/Native target $kotlinTarget")
     }
 
-/**
- * Registers a task that checks that the local build serves [targetPlatform]. Without a [backend],
- * the task accepts an install prefix of any backend, and takes the [defaultBackend]'s preset from a
- * build root.
- */
+/** Registers a task that fails with [install]'s problem, if it has one. */
 fun Project.registerLocalBuildVerification(
   taskName: String,
-  targetPlatform: String,
-  backend: String? = null,
-): TaskProvider<VerifyLocalBuild> {
-  val localBuildPath = localBuild?.absolutePath
-  return tasks.register(taskName, VerifyLocalBuild::class.java) {
-    this.localBuildPath.set(localBuildPath)
-    preset.set(nativePreset(targetPlatform, backend ?: defaultBackend(targetPlatform)))
-    expectedTargetPlatform.set(targetPlatform)
-    expectedBackend.set(backend)
-  }
-}
+  install: NativeInstall,
+): TaskProvider<VerifyLocalBuild> =
+  tasks.register(taskName, VerifyLocalBuild::class.java) { problem.set(install.problem) }

@@ -15,11 +15,8 @@ import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
-import org.maplibre.nativeffi.gradle.defaultBackend
 import org.maplibre.nativeffi.gradle.kotlinNativeTargetPlatform
-import org.maplibre.nativeffi.gradle.localBuild
-import org.maplibre.nativeffi.gradle.localBuildPrefix
-import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.nativeInstall
 import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 
 plugins {
@@ -30,16 +27,6 @@ plugins {
 }
 
 val hostPlatform = HostPlatform.current()
-
-/**
- * The C library that a test of [targetPlatform] links or loads: the local build itself when it is
- * an install prefix, or else its preset for the platform's default backend.
- */
-fun testedNativeC(targetPlatform: String): MaplibreNativeCArtifact? = localBuild?.let { root ->
-  MaplibreNativeCArtifact(
-    localBuildPrefix(root, nativePreset(targetPlatform, defaultBackend(targetPlatform))),
-  )
-}
 
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
@@ -142,8 +129,9 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    val targetPlatform = kotlinNativeTargetPlatform(name)
-    testedNativeC(targetPlatform)?.let { maplibreNativeC ->
+    // A test links or loads the local build's install for the platform's default backend.
+    val install = nativeInstall(kotlinNativeTargetPlatform(name))
+    install.prefix?.let(::MaplibreNativeCArtifact)?.let { maplibreNativeC ->
       binaries.all {
         linkerOpts("-L${maplibreNativeC.linkDir}")
         linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
@@ -158,7 +146,7 @@ kotlin {
     val verifyLocalBuild =
       registerLocalBuildVerification(
         "verify${name.replaceFirstChar(Char::uppercaseChar)}LocalBuild",
-        targetPlatform,
+        install,
       )
     binaries.withType<TestExecutable>().configureEach {
       linkTaskProvider.configure { dependsOn(verifyLocalBuild) }
@@ -396,8 +384,8 @@ tasks.configureEach {
   if (name == "mergeAndroidMainJniLibFolders") dependsOn("packageAndroidBindingLibraries")
 }
 
-val verifyJvmLocalBuild =
-  registerLocalBuildVerification("verifyJvmLocalBuild", hostPlatform.targetPlatform)
+val jvmInstall = nativeInstall(hostPlatform.targetPlatform)
+val verifyJvmLocalBuild = registerLocalBuildVerification("verifyJvmLocalBuild", jvmInstall)
 
 class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
   CommandLineArgumentProvider {
@@ -410,7 +398,7 @@ tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   jvmArgumentProviders.add(TestClasspathArguments(classpath))
   dependsOn(verifyJvmLocalBuild)
-  testedNativeC(hostPlatform.targetPlatform)?.let { maplibreNativeC ->
+  jvmInstall.prefix?.let(::MaplibreNativeCArtifact)?.let { maplibreNativeC ->
     systemProperty("java.library.path", maplibreNativeC.runtimeLibraryDir.absolutePath)
     systemProperty(
       "org.maplibre.nativeffi.test.graphics.library",

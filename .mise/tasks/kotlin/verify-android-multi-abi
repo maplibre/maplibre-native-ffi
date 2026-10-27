@@ -43,8 +43,6 @@ for preset in "${presets[@]}"; do
       "${archive_root}/share/maplibre-native-c/artifact.json" \
       "${archive_root}/share/maplibre-native-c/licenses"
   )
-  mkdir -p "${build_root}/${preset}"
-  mv "${build_root}/${archive_root}" "${build_root}/${preset}/install"
 done
 
 for backend in opengl vulkan; do
