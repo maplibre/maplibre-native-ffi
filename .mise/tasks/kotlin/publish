@@ -11,7 +11,7 @@ staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
 repository=MavenStagingRepository
 
 usage() {
-  echo "usage: $(basename "$0") stage <linux|apple> [version]" >&2
+  echo "usage: $(basename "$0") stage [version]" >&2
   echo "       $(basename "$0") verify <maven-staging> [version]" >&2
 }
 
@@ -30,57 +30,36 @@ extract_preset() {
 }
 
 prepare_native_inputs() {
-  local partition="$1"
-  local presets=()
-
-  case "$partition" in
-    linux)
-      presets=(
-        android-arm-egl
-        android-arm-vulkan
-        android-arm64-egl
-        android-arm64-vulkan
-        android-x64-egl
-        android-x64-vulkan
-        linux-gnu-arm64-egl
-        linux-gnu-arm64-vulkan
-        linux-gnu-x64-egl
-        linux-gnu-x64-vulkan
-      )
-      ;;
-    apple)
-      # The Linux and Windows installs feed the JVM runtime classifiers.
-      presets=(
-        linux-gnu-x64-egl
-        linux-gnu-arm64-egl
-        linux-gnu-x64-vulkan
-        linux-gnu-arm64-vulkan
-        macos-arm64-egl
-        macos-arm64-vulkan
-        macos-arm64-metal
-        ios-arm64-metal
-        ios-simulator-arm64-metal
-        tvos-arm64-metal
-        tvos-simulator-arm64-metal
-        windows-x64-wgl
-        windows-arm64-wgl
-        windows-x64-vulkan
-        windows-arm64-vulkan
-      )
-      ;;
-    *)
-      usage
-      return 2
-      ;;
-  esac
+  # The Linux and Windows installs also feed the JVM runtime classifiers.
+  local presets=(
+    android-arm-egl
+    android-arm-vulkan
+    android-arm64-egl
+    android-arm64-vulkan
+    android-x64-egl
+    android-x64-vulkan
+    linux-gnu-arm64-egl
+    linux-gnu-arm64-vulkan
+    linux-gnu-x64-egl
+    linux-gnu-x64-vulkan
+    macos-arm64-egl
+    macos-arm64-vulkan
+    macos-arm64-metal
+    ios-arm64-metal
+    ios-simulator-arm64-metal
+    tvos-arm64-metal
+    tvos-simulator-arm64-metal
+    windows-x64-wgl
+    windows-arm64-wgl
+    windows-x64-vulkan
+    windows-arm64-vulkan
+  )
 
   rm -rf "$build_root"
   for preset in "${presets[@]}"; do
     extract_preset "$preset"
   done
 }
-
-publication_tasks=()
 
 # Adds the tasks that publish each named publication of a project.
 add_publications() {
@@ -92,9 +71,14 @@ add_publications() {
   done
 }
 
-publish_linux() {
+publish() {
   local android_native=(AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64)
   local linux=(LinuxX64 LinuxArm64)
+  local apple=(MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64)
+
+  # Only the Linux and Android Native KLIBs cross-compile; the Apple run keeps
+  # the repository default.
+  publication_tasks=()
   add_publications :bindings:kotlin Android "${android_native[@]}" "${linux[@]}"
   add_publications :bindings:kotlin:runtimes:opengl Android "${android_native[@]}" "${linux[@]}"
   add_publications :bindings:kotlin:runtimes:vulkan "${android_native[@]}" "${linux[@]}"
@@ -102,10 +86,8 @@ publish_linux() {
   # One run packages the Android libraries of one backend.
   ./gradlew "$@" -Pmaplibre.android.backend=vulkan \
     ":bindings:kotlin:runtimes:vulkan:publishAndroidPublicationTo${repository}"
-}
 
-publish_apple() {
-  local apple=(MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64)
+  publication_tasks=()
   add_publications :bindings:kotlin KotlinMultiplatform Jvm "${apple[@]}"
   add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64
   add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm MacosArm64
@@ -114,49 +96,35 @@ publish_apple() {
 }
 
 operation="${1:-}"
-partition="${2:-}"
-version="${3:-}"
 
 case "$operation" in
   stage)
-    if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
+    if [[ "$#" -gt 2 ]]; then
       usage
       exit 2
     fi
-    case "$partition" in
-      linux | apple) ;;
-      *)
-        usage
-        exit 2
-        ;;
-    esac
-    if [[ "$partition" == linux ]]; then
-      # The Linux partition compiles the Android JNI shim with the pinned NDK
-      # compiler, even when the native libraries are prebuilt.
-      mise run //:android-sdk-packages
-    fi
-    staging_root="${staging_base}/maven-staging-${partition}"
+    version="${2:-}"
+    # Gradle compiles the Android JNI shim with the pinned NDK compiler, even
+    # when the native libraries are prebuilt.
+    mise run //:android-sdk-packages
+    staging_root="${staging_base}/maven-staging"
     rm -rf "$staging_root"
-    prepare_native_inputs "$partition"
+    prepare_native_inputs
     release_version_args=()
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")
     fi
-    "publish_${partition}" \
+    publish \
       "${release_version_args[@]}" \
       -Pmaplibre.localBuild="$build_root" \
       -Pmaplibre.maven.localRepository="$staging_root"
     ;;
   verify)
-    if [[ -z "$partition" || "$#" -lt 2 || "$#" -gt 3 ]]; then
+    if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
       usage
       exit 2
     fi
-    verify_args=("$partition")
-    if [[ -n "$version" ]]; then
-      verify_args+=("$version")
-    fi
-    mise run //:kotlin:verify-staging "${verify_args[@]}"
+    mise run //:kotlin:verify-staging "${@:2}"
     ;;
   *)
     usage

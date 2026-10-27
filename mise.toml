@@ -391,7 +391,7 @@ description = "Test CI workflow generation and release tooling."
 run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]
-description = "Merge, sign, and publish Kotlin Maven repositories."
+description = "Sign and publish a verified Kotlin Maven repository."
 run = 'python3 ci/kotlin_release.py "$@"'
 
 [tasks."bindings:generate"]

@@ -23,35 +23,6 @@ def repository_files(root: pathlib.Path) -> list[pathlib.Path]:
     return sorted(path for path in root.rglob("*") if path.is_file())
 
 
-def merge_repositories(output: pathlib.Path, inputs: list[pathlib.Path]) -> None:
-    if output.exists():
-        raise SystemExit(f"merge output already exists: {output}")
-    if len(inputs) < 2:
-        raise SystemExit("merge requires at least two Maven repositories")
-    output.mkdir(parents=True)
-    copied = 0
-    for source in inputs:
-        group_root = source / GROUP_PATH
-        if not group_root.is_dir():
-            raise SystemExit(f"Maven repository input is missing {group_root}")
-        for source_file in repository_files(source):
-            if source_file.is_symlink():
-                raise SystemExit(
-                    f"Maven repository contains a symbolic link: {source_file}"
-                )
-            relative = source_file.relative_to(source)
-            destination = output / relative
-            if destination.exists():
-                raise SystemExit(
-                    f"Maven repository inputs both contain {relative.as_posix()}"
-                )
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, destination)
-            copied += 1
-    if copied == 0:
-        raise SystemExit("Maven repository inputs contain no files")
-
-
 def secret_key_fingerprint(gnupg_home: pathlib.Path) -> str:
     result = subprocess.run(
         [
@@ -300,10 +271,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="operation", required=True)
 
-    merge_parser = subparsers.add_parser("merge")
-    merge_parser.add_argument("output", type=pathlib.Path)
-    merge_parser.add_argument("inputs", type=pathlib.Path, nargs="+")
-
     bundle_parser = subparsers.add_parser("bundle")
     bundle_parser.add_argument("repository", type=pathlib.Path)
     bundle_parser.add_argument("output", type=pathlib.Path)
@@ -318,9 +285,7 @@ def main() -> int:
     upload_snapshot_parser.add_argument("version")
 
     args = parser.parse_args()
-    if args.operation == "merge":
-        merge_repositories(args.output, args.inputs)
-    elif args.operation == "bundle":
+    if args.operation == "bundle":
         create_bundle(args.repository, args.output, args.version)
     elif args.operation == "sign-snapshot":
         sign_snapshot(args.repository, args.version)
