@@ -1,4 +1,6 @@
 [tools]
+# The root installs this Dart too. Naming it here keeps it ahead of the older
+# Dart that Flutter bundles.
 "core:dart" = "{{vars.dart_version}}"
 "core:flutter" = { version = "3.47.7", os = [
   "linux/x64",

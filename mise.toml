@@ -105,6 +105,10 @@ sccache = "0.18.0"
 "core:node" = "26.12.1"
 "aqua:pnpm/pnpm" = "12.15.0"
 
+# dprint formats Dart with the SDK's `dart format`, and the Dart binding builds
+# and tests with this same install.
+"core:dart" = "{{vars.dart_version}}"
+
 # Python ecosystem
 "core:python" = "{{vars.python_version}}"
 "aqua:astral-sh/uv" = "0.13.5"
@@ -416,16 +420,12 @@ bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "
 '''
 
 [tasks.check]
-tools = { "core:dart" = "{{vars.dart_version}}" }
-env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise run //docs:install
 hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:dart" = "{{vars.dart_version}}" }
-env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise run //docs:install
 hk fix --all
