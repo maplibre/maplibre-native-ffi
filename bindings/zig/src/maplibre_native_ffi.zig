@@ -94,7 +94,7 @@ pub const AcquiredFrame = struct {
     ///
     /// See `mln_acquired_frame_get_vulkan_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub const getVulkanTexture = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const getVulkanTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
             return call.scopedView("mln_acquired_frame_get_vulkan_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", VulkanTextureFrame, self, context, use, diagnostic);
         }
@@ -356,7 +356,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub const attachVulkanBorrowedTexture = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const attachVulkanBorrowedTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: Map, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
@@ -367,7 +367,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub const attachVulkanOwnedTexture = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const attachVulkanOwnedTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_vulkan_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
@@ -378,7 +378,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub const attachVulkanSurface = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const attachVulkanSurface = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_vulkan_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
@@ -1293,7 +1293,7 @@ pub const RenderSession = struct {
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub const setVulkanBorrowedTextureTarget = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const setVulkanBorrowedTextureTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: RenderSession, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
             return call.submit("mln_render_session_set_vulkan_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
         }
@@ -1303,7 +1303,7 @@ pub const RenderSession = struct {
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub const setVulkanSurfaceTarget = if (builtin.abi.isAndroid() or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+    pub const setVulkanSurfaceTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: RenderSession, descriptor: VulkanSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
             return call.submit("mln_render_session_set_vulkan_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
         }

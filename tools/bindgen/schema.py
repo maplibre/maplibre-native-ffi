@@ -45,6 +45,7 @@ ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # where a function can do its work; a function without one serves them all.
 PLATFORMS = (
     "android",
+    "freebsd",
     "ios",
     "linux",
     "macos",

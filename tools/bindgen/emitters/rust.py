@@ -40,6 +40,7 @@ SCALARS = {
 # targets with their own environment.
 PLATFORM_CFG = {
     "android": 'target_os = "android"',
+    "freebsd": 'target_os = "freebsd"',
     "ios": 'target_os = "ios"',
     "linux": 'all(target_os = "linux", not(target_env = "ohos"))',
     "macos": 'target_os = "macos"',

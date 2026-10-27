@@ -520,6 +520,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -552,6 +553,7 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -1017,6 +1019,7 @@ impl<K: QueueKind> RenderSessionHandleQueued<'_, K> {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -1051,6 +1054,7 @@ impl<K: QueueKind> RenderSessionHandleQueued<'_, K> {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"

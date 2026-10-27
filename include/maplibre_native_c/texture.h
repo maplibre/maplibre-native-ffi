@@ -562,7 +562,9 @@ MLN_API mln_status mln_map_attach_metal_borrowed_texture(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;platforms=android,linux,macos,ohos,windows")
+MLN_BINDING(
+  "execution=lifecycle;platforms=android,freebsd,linux,macos,ohos,windows"
+)
 MLN_API mln_status mln_map_attach_vulkan_owned_texture(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -598,7 +600,9 @@ MLN_API mln_status mln_map_attach_vulkan_owned_texture(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;platforms=android,linux,macos,ohos,windows")
+MLN_BINDING(
+  "execution=lifecycle;platforms=android,freebsd,linux,macos,ohos,windows"
+)
 MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -827,7 +831,9 @@ MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
  *   those the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;platforms=android,linux,macos,ohos,windows")
+MLN_BINDING(
+  "execution=operation;platforms=android,freebsd,linux,macos,ohos,windows"
+)
 MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
@@ -989,7 +995,9 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_BINDING("view_owner=frame;platforms=android,linux,macos,ohos,windows")
+MLN_BINDING(
+  "view_owner=frame;platforms=android,freebsd,linux,macos,ohos,windows"
+)
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame,
   mln_vulkan_texture_frame* out_frame MLN_BINDING("direction=out"),

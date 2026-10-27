@@ -153,6 +153,7 @@ impl AcquiredFrameView<'_> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"

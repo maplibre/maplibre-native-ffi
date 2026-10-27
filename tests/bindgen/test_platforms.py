@@ -48,7 +48,7 @@ class PlatformAnnotationTests(unittest.TestCase):
             ("web,android", "each platform once, in order"),
             ("macos,macos", "each platform once, in order"),
             (
-                "android,ios,linux,macos,ohos,tvos,visionos,web,windows",
+                "android,freebsd,ios,linux,macos,ohos,tvos,visionos,web,windows",
                 "restates the default",
             ),
         ):

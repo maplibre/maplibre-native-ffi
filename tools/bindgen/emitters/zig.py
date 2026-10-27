@@ -38,6 +38,7 @@ SCALARS = {
 # the package builds for.
 PLATFORMS = {
     "android": "builtin.abi.isAndroid()",
+    "freebsd": "builtin.os.tag == .freebsd",
     "ios": "builtin.os.tag == .maccatalyst",
     "linux": "(builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())",
     "macos": "builtin.os.tag == .macos",

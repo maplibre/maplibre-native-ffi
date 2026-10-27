@@ -473,6 +473,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -511,6 +512,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -549,6 +551,7 @@ impl MapHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -2429,6 +2432,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -2469,6 +2473,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
@@ -2509,6 +2514,7 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(any(
         target_os = "android",
+        target_os = "freebsd",
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
