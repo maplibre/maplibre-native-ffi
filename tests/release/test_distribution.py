@@ -52,6 +52,23 @@ class DistributionTest(unittest.TestCase):
         )
         self.assertEqual((self.tree / XCFRAMEWORK_NAME).read_bytes(), b"xcframework")
 
+    def test_a_local_swift_tree_needs_no_native_archives_or_checksums(self) -> None:
+        checksums = self.assets / "SHA256SUMS"
+        for contents in (None, f"{DIGEST}  {XCFRAMEWORK_NAME}\n"):
+            with self.subTest(checksums=contents):
+                if contents is None:
+                    checksums.unlink()
+                else:
+                    checksums.write_text(contents)
+
+                write(self.tree, Release(self.assets), REPOSITORY)
+
+                self.assertEqual(
+                    (self.tree / XCFRAMEWORK_NAME).read_bytes(), b"xcframework"
+                )
+                self.assertTrue((self.tree / "Package.swift").is_file())
+                self.assertFalse((self.tree / "recipes").exists())
+
     def test_the_package_takes_the_root_manifests_platforms_and_binding(self) -> None:
         write(self.tree, Release(self.assets, "v0.202611.0"), REPOSITORY)
 

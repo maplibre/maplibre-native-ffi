@@ -17,17 +17,12 @@ RECIPE = pathlib.Path("recipes/maplibre-native-c")
 
 
 def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> None:
-    recipe = tree / RECIPE
-    recipe.mkdir(parents=True, exist_ok=True)
-    data_path = recipe / "conandata.yml"
-    data = (
-        json.loads(data_path.read_text("utf-8"))
-        if data_path.exists()
-        else {"sources": {}}
-    )
-    version = "0.0.0" if release.local else parse_tag(release.tag)[1]
+    checksums = release.assets / "SHA256SUMS"
+    # Swift's local package check supplies only the XCFramework.
+    if release.local and not checksums.exists():
+        return
     sources = {}
-    for line in (release.assets / "SHA256SUMS").read_text("utf-8").splitlines():
+    for line in checksums.read_text("utf-8").splitlines():
         digest, _, name = line.partition("  ")
         if not (name.startswith(ARCHIVE_PREFIX) and name.endswith(ARCHIVE_SUFFIX)):
             continue
@@ -38,6 +33,17 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
             else release.url(name),
             "sha256": digest,
         }
+    if release.local and not sources:
+        return
+    recipe = tree / RECIPE
+    recipe.mkdir(parents=True, exist_ok=True)
+    data_path = recipe / "conandata.yml"
+    data = (
+        json.loads(data_path.read_text("utf-8"))
+        if data_path.exists()
+        else {"sources": {}}
+    )
+    version = "0.0.0" if release.local else parse_tag(release.tag)[1]
     if sources:
         data["sources"][version] = sources
     # JSON is also YAML, and needs no additional dependency in the release job.
