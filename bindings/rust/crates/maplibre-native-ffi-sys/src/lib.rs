@@ -1,7 +1,9 @@
-//! Raw declarations for the MapLibre Native public C ABI.
+//! Raw declarations for the MapLibre Native C ABI.
 //!
 //! This crate mirrors the C boundary: constants, layouts, opaque handle types,
-//! and unsafe extern functions. Prefer the safe `maplibre-native-ffi` crate.
+//! and unsafe extern functions. It also declares the delivery queue protocol,
+//! and the exports of `binding_support.h`, which carry no compatibility
+//! promise. Prefer the safe `maplibre-native-ffi` crate.
 //!
 //! # Linking
 //!
@@ -125,5 +127,17 @@ mod tests {
         let status =
             unsafe { super::mln_plugin_register_v1(std::ptr::null(), std::ptr::null_mut(), 0) };
         assert_eq!(status, super::MLN_PLUGIN_STATUS_INVALID_ARGUMENT);
+    }
+
+    /// The delivery protocol links, which nothing above this crate calls yet.
+    #[test]
+    fn links_delivery_queue() {
+        let mut queue = super::mln_delivery_queue(0);
+        // SAFETY: null options are rejected before anything is read, and a
+        // null diagnostic asks for none.
+        let status = unsafe {
+            super::mln_delivery_queue_create(std::ptr::null(), &mut queue, std::ptr::null_mut())
+        };
+        assert_eq!(status, super::MLN_STATUS_INVALID_ARGUMENT);
     }
 }

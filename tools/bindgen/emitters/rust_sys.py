@@ -71,11 +71,11 @@ class Declarations:
             except Unsupported as error:
                 self.used = used
                 self.unsupported[function.name] = f"{function.location}: {error}"
-        # Public types stay declared even when no function names them, since
-        # they are part of the C contract that Rust code builds values for.
+        # Types stay declared even when no function names them, since they are
+        # part of the C contract that Rust code builds values for.
         for kind in (api.enums, api.records, api.typedefs):
             for item in kind:
-                if item.name in api.runtime_types or item.name.startswith("@"):
+                if item.name.startswith("@"):
                     continue
                 used = set(self.used)
                 try:
@@ -269,7 +269,5 @@ class Declarations:
 
 
 def declarations(api: Api | BoundApi) -> Declarations:
-    # The runtime header serves bindings that cannot run code on MapLibre
-    # threads, which Rust does not need.
     source = api.source if isinstance(api, BoundApi) else api
-    return Declarations(source, list(source.public_functions))
+    return Declarations(source, list(source.functions))

@@ -191,16 +191,6 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
     }
 }
 
-unsafe extern "C" {
-    // Binding-internal export from maplibre_native_c/binding_support.h,
-    // which the sys crate does not bind.
-    fn mln_binding_render_session_abandon_at_exit(
-        session: sys::mln_render_session,
-        out_result: *mut sys::mln_render_abandon_result,
-        out_diagnostic: *mut sys::mln_diagnostic,
-    ) -> sys::mln_status;
-}
-
 /// Ends a render session's graphics calls before shutdown disposes it.
 ///
 /// Disposal alone would detach an attached session on its worker while the
@@ -225,7 +215,7 @@ fn end_graphics_at_exit<T: 'static>(raw: u64) {
     // SAFETY: the caller holds sole ownership of the live session, and result
     // is a writable, correctly sized output.
     let _ = unsafe {
-        mln_binding_render_session_abandon_at_exit(
+        sys::mln_binding_render_session_abandon_at_exit(
             sys::mln_render_session(raw),
             &mut result,
             ptr::null_mut(),

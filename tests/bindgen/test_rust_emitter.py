@@ -1,5 +1,7 @@
 """Compile header-driven Rust bindings with the binding's own runtime and run them."""
 
+import importlib.util
+import re
 import shutil
 import unittest
 from pathlib import Path
@@ -396,7 +398,31 @@ void mln_query_release(mln_query query);
             run(self, [str(binary)], root)
 
 
+def check_exports():
+    """tools/lint/check-exports.py, which lists the library's exports."""
+    spec = importlib.util.spec_from_file_location(
+        "check_exports", ROOT / "tools/lint/check-exports.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class RustSysTests(unittest.TestCase):
+    def test_declarations_cover_every_exported_function(self):
+        """The crate declares exactly the functions the library exports, the
+        delivery protocol and binding-support exports included."""
+        exports = check_exports()
+        expected = exports.declared_functions() | exports.EXTRA_EXPORTS
+        declared = re.findall(
+            r"\bpub fn (mln_\w+)\(",
+            (SYS / "lib.rs").read_text() + (SYS / "generated.rs").read_text(),
+        )
+        self.assertEqual(len(declared), len(set(declared)))
+        self.assertEqual(set(declared), expected)
+        self.assertEqual(rust_sys.declarations(real_api()).unsupported, {})
+
     def test_declarations_match_the_c_layout(self):
         """Every emitted record, handle, and enum has the size, alignment, and
         field offsets that the C compiler gives the real headers."""
