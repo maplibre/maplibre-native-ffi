@@ -87,6 +87,24 @@ pub fn set_log_callback(handler: LogHandler) -> Result<()> {
     Ok(())
 }
 
+/// Installs a process-global MapLibre Native log callback. The callback
+/// runs synchronously on the thread that emits the record, or on a MapLibre
+/// background thread for a severity that `set_log_async_severity_mask()`
+/// dispatches asynchronously.
+///
+/// See `mln_log_set_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+pub fn set_log_callback_queued<K: QueueKind>(
+    queue: &DeliveryQueue<K>,
+    handler: LogHandler,
+) -> Result<()> {
+    let mut call = Call::global().queue(queue);
+    crate::abi::validate_abi_version()?;
+    let handler = call.reference(&handler)?;
+    call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
+    Ok(())
+}
+
 /// Computes the physical device-pixel size of a logical extent.
 ///
 /// See `mln_logical_extent_physical_size` in the

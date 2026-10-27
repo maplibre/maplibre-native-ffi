@@ -97,3 +97,48 @@ impl ResourceRequestHandle {
         Ok(out_cancelled)
     }
 }
+
+/// Makes [`ResourceRequestHandle`] calls in queue mode on a [`DeliveryQueue`]. The queue
+/// holds each call's completion handler, which receives the result when
+/// a drain of the queue runs it, and the handlers of the registrations
+/// that the call carries. A call fails with `Status::InvalidState` once
+/// the queue is closed.
+pub struct ResourceRequestHandleQueued<'a, K: QueueKind>(
+    &'a ResourceRequestHandle,
+    &'a DeliveryQueue<K>,
+);
+impl ResourceRequestHandle {
+    pub fn queued<'a, K: QueueKind>(
+        &'a self,
+        queue: &'a DeliveryQueue<K>,
+    ) -> ResourceRequestHandleQueued<'a, K> {
+        ResourceRequestHandleQueued(self, queue)
+    }
+}
+impl<K: QueueKind> ResourceRequestHandleQueued<'_, K> {
+    /// Registers a callback that runs when MapLibre cancels a C API resource
+    /// provider request. The callback runs on the thread that discards the
+    /// request, never a host thread: the runtime's native scheduler thread when
+    /// a committed map or runtime command discards it, such as a style change
+    /// or map destruction, and a MapLibre worker thread otherwise.
+    ///
+    /// See `mln_resource_request_set_cancel_callback` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let mut out_cancelled: bool = Default::default();
+        let handler = call.reference(&handler)?;
+        call.status_registered(|handle, out_diagnostic| {
+            let status = unsafe {
+                sys::mln_resource_request_set_cancel_callback(
+                    handle,
+                    handler,
+                    &mut out_cancelled,
+                    out_diagnostic,
+                )
+            };
+            (status, !out_cancelled)
+        })?;
+        Ok(out_cancelled)
+    }
+}

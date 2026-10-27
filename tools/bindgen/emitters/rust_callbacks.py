@@ -228,6 +228,77 @@ def callback_function(values, callback):
     return f"Fn({signature}){returns} + Send + Sync + 'static"
 
 
+def queued_dispatch(values, value):
+    """The `deliver` function that runs a queue-mode registration's callbacks.
+
+    Each delivery's payload mirrors its callback's arguments by name, so a
+    delivery runs the same trampoline as callback mode, with the record as its
+    state. A delivery whose payload owns handles takes them from the batch
+    first, so the trampoline adopts what it now owns. Returns None when a
+    callback has no queue delivery.
+    """
+    from .rust import delivers_queues
+
+    if (
+        not value.registration
+        or not value.registration.queue
+        or not delivers_queues(values.bound)
+    ):
+        return None
+    arms = []
+    for field, callback in callbacks(values, value):
+        plan = callback.delivery
+        if plan is None:
+            return None
+        record = values.bound.values[plan.record]
+        members = {f.name for f in record.fields}
+        arguments = []
+        for parameter in callback.parameters:
+            if parameter.name == callback.context:
+                arguments.append("state")
+            elif parameter.name == callback.borrowed_owner or parameter.name in members:
+                arguments.append(f"payload.{native_identifier(parameter.name)}")
+            else:
+                raise Unsupported(
+                    f"{callback.native}: delivery {plan.record} lacks {parameter.name}"
+                )
+        owned = any(
+            p.value.kind == "handle" and p.value.ownership == "owned"
+            for p in callback.arguments
+        )
+        public = identifier(field.name)
+        guard = (
+            f'if !callback::taken("{callback.native}", take) {{ return; }} '
+            if owned
+            else ""
+        )
+        if field.value.nullable and field.name not in {
+            f.name for f in required_callbacks(value)
+        }:
+            # Queue mode carries every call, and callback mode leaves an unset
+            # callback's calls to native, so an unset one ignores its delivery.
+            guard = f"if self.{public}.is_none() {{ return; }} " + guard
+        arms.append(
+            f"sys::{plan.constant} => {{ "
+            f"// SAFETY: the delivery's type selects its payload member, which\n"
+            f"// the batch keeps until the handler returns.\n"
+            f"let payload = unsafe {{ delivery.payload.{native_identifier(plan.payload_member)} }}; "
+            f"{guard}"
+            f"unsafe {{ Self::{public}_trampoline({', '.join(arguments)}); }} }}"
+        )
+    return (
+        "    /// Runs the callback that one queued delivery names.\n"
+        "    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {\n"
+        "        let _ = take;\n"
+        "        let state = std::ptr::from_ref(self).cast_mut().cast();\n"
+        "        match delivery.type_ {\n"
+        + "".join(f"            {arm}\n" for arm in arms)
+        + "            _ => {}\n"
+        "        }\n"
+        "    }\n"
+    )
+
+
 def declaration(values, value):
     name = values.name(value)
     raw = f"sys::{value.native}"
@@ -356,6 +427,33 @@ def declaration(values, value):
     user_data = native_identifier(value.registration.user_data)
     release = native_identifier(value.registration.release)
     returned = value.native in values.bound.returned
+    deliver = queued_dispatch(values, value)
+    if deliver:
+        # In queue mode the queue holds the record and native names only the
+        # queue and the record's token, so every callback is left unset.
+        queue = native_identifier(value.registration.queue)
+        callback_fields = [
+            native_identifier(field.name) for field, _ in callbacks(values, value)
+        ]
+        held = (
+            "        if !("
+            + " && ".join(f"raw.{name}.is_none()" for name in callback_fields)
+            + ") {\n"
+            "            let state = self.clone();\n"
+            "            // SAFETY: a queue runs the handler with a delivery of its\n"
+            "            // batch, which stays valid until the handler returns.\n"
+            "            if let Some((queue, token)) = arena.queued_registration(|| std::sync::Arc::new(move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| state.deliver(unsafe { &*delivery.cast() }, take)))? {\n"
+            + "".join(
+                f"                raw.{name} = None;\n" for name in callback_fields
+            )
+            + f"                raw.{user_data} = token;\n"
+            f"                raw.{queue} = queue;\n"
+            "                return Ok(raw);\n"
+            "            }\n"
+            "        }\n"
+        )
+    else:
+        held = ""
     if parameters and returned:
         # A copy holds no callbacks, so it can't hold the required ones.
         raise Unsupported(f"{value.native}: a returned registration requires callbacks")
@@ -369,11 +467,13 @@ def declaration(values, value):
         + f"impl {name} {{\n"
         + "".join(f"    {line}\n" for line in constructors)
         + "\n".join(trampolines)
+        + (deliver or "")
         + "\n}\n"
         + f"impl ToNative<{raw}> for {name} {{\n"
         + f"    fn to_native(&self, arena: &mut InputArena) -> Result<{raw}> {{\n"
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
+        + held
         + f"        if !({empty}) {{\n"
         + "            // SAFETY: the release reclaims exactly this state.\n"
         + f"            raw.{user_data} = unsafe {{ arena.registration(self.clone(), callback::release::<Self>) }};\n"

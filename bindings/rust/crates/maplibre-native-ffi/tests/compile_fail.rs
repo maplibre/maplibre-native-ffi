@@ -1,5 +1,5 @@
-//! The borrows that keep lent native storage valid, checked by the code they
-//! reject.
+//! The borrows that keep lent native storage valid, and the ownership of
+//! queued deliveries, checked by the code they reject.
 
 // A cross-built test binary takes its unwinder from the native library, so it
 // links the crate even where the compile-fail cases don't run.

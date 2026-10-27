@@ -391,28 +391,77 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
     unsafe { T::from_native(*value) }
 }
 
-/// Owns temporary C input allocations through native submission.
+/// A registration's handler in queue mode, which runs its record's callback
+/// for the drained `mln_delivery` it receives a pointer to. `take` transfers
+/// the delivery's owned handles to the binding before a callback adopts them.
+pub(crate) type RegistrationHandler =
+    std::sync::Arc<dyn Fn(*const c_void, &dyn Fn() -> Result<()>) + Send + Sync>;
+
+/// The delivery queue that a queue-mode call stores its registrations' handlers
+/// in.
+pub(crate) trait QueueSink {
+    /// Stores a handler before its registration enters C, and returns the
+    /// queue and the token that the registration names.
+    fn hold(&self, handler: RegistrationHandler) -> Result<(sys::mln_delivery_queue, *mut c_void)>;
+    /// Native accepted the registration, so the queue keeps its handler, or
+    /// drops it when the queue closed during the call.
+    fn accept(&self, user_data: *mut c_void);
+    /// Native rejected the registration, so its handler drops unrun.
+    fn forget(&self, user_data: *mut c_void);
+}
+
+/// Owns temporary C input allocations through native submission, and the
+/// registrations that native has not accepted yet.
 #[derive(Default)]
-pub(crate) struct InputArena {
+pub(crate) struct InputArena<'q> {
     roots: Vec<Box<dyn std::any::Any>>,
-    registrations: Vec<PendingRegistration>,
+    registrations: Vec<PendingRegistration<'q>>,
+    /// The queue that this call's registrations name, in queue mode.
+    queue: Option<&'q dyn QueueSink>,
 }
 
-struct PendingRegistration {
-    pointer: *mut c_void,
-    release: unsafe extern "C" fn(*mut c_void),
+enum PendingRegistration<'q> {
+    Callback {
+        pointer: *mut c_void,
+        release: unsafe extern "C" fn(*mut c_void),
+    },
+    Queued(&'q dyn QueueSink, *mut c_void),
 }
 
-impl Drop for InputArena {
+impl Drop for InputArena<'_> {
     fn drop(&mut self) {
         for registration in self.registrations.drain(..) {
-            // SAFETY: rejected submission left each pending root owned by this arena.
-            unsafe { (registration.release)(registration.pointer) };
+            match registration {
+                // SAFETY: rejected submission left each pending root owned by this arena.
+                PendingRegistration::Callback { pointer, release } => unsafe { release(pointer) },
+                PendingRegistration::Queued(queue, user_data) => queue.forget(user_data),
+            }
         }
     }
 }
 
-impl InputArena {
+impl<'q> InputArena<'q> {
+    /// Puts this call's registrations in queue mode on `queue`.
+    pub(crate) fn set_queue(&mut self, queue: &'q dyn QueueSink) {
+        self.queue = Some(queue);
+    }
+
+    /// Stores a registration's handler in this call's queue, and returns the
+    /// queue and token that the registration names; or `None` in callback
+    /// mode.
+    pub(crate) fn queued_registration(
+        &mut self,
+        handler: impl FnOnce() -> RegistrationHandler,
+    ) -> Result<Option<(sys::mln_delivery_queue, *mut c_void)>> {
+        let Some(queue) = self.queue else {
+            return Ok(None);
+        };
+        let (raw, user_data) = queue.hold(handler())?;
+        self.registrations
+            .push(PendingRegistration::Queued(queue, user_data));
+        Ok(Some((raw, user_data)))
+    }
+
     /// Stores a pending native registration.
     ///
     /// # Safety
@@ -424,13 +473,17 @@ impl InputArena {
     ) -> *mut c_void {
         let pointer = Box::into_raw(Box::new(state)).cast();
         self.registrations
-            .push(PendingRegistration { pointer, release });
+            .push(PendingRegistration::Callback { pointer, release });
         pointer
     }
 
     /// Transfers pending callback roots after native accepts their registration.
     pub(crate) fn accept_registrations(&mut self) {
-        self.registrations.clear();
+        for registration in self.registrations.drain(..) {
+            if let PendingRegistration::Queued(queue, user_data) = registration {
+                queue.accept(user_data);
+            }
+        }
     }
 
     pub(crate) fn store<T: 'static>(&mut self, value: T) -> *const T {

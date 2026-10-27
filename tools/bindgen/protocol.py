@@ -38,6 +38,9 @@ RUNTIME_EVENT_SOURCE = "mln_runtime_event_source_type"
 RUNTIME_EVENT_SOURCE_PREFIX = "MLN_RUNTIME_EVENT_SOURCE_"
 # The record of a render session abandon, whose layout a runtime reads.
 RENDER_ABANDON_RESULT = "mln_render_abandon_result"
+# The texture readback result, whose pixels a queue-mode runtime lends from the
+# batch instead of copying.
+TEXTURE_READBACK_RESULT = "mln_texture_readback_result"
 
 
 def declared_name(type_: CType) -> str:

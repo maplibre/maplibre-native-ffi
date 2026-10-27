@@ -5,6 +5,7 @@ use crate::completion::{self, CommandCompletion, NativeFuture};
 use crate::convert::{
     self, FromNative, InputArena, ToNative, from_native, native_enum, native_flags, to_native,
 };
+use crate::delivery::{self, CompletionHandler, DeliveryQueue, QueueKind};
 use crate::handle::native_owner;
 use crate::{Error, Result};
 use maplibre_native_ffi_sys as sys;

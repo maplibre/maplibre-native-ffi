@@ -1,0 +1,14 @@
+error[E0521]: borrowed data escapes outside of closure
+  --> tests/compile_fail/readback_outlives_handler.rs:14:40
+   |
+10 |     escaped: &'static Mutex<&'a [u8]>,
+   |     ------- `escaped` declared here, outside of the closure body
+...
+14 |         .read_texture(move |readback| *escaped.lock().unwrap() = readback.unwrap().data)
+   |                             --------   ^^^^^^^^^^^^^^ `readback` escapes the closure body here
+   |                             |
+   |                             `readback` is a reference that is only valid in the closure body
+   |
+   = note: requirement occurs because of the type `std::sync::Mutex<&[u8]>`, which makes the generic argument `&[u8]` invariant
+   = note: the struct `std::sync::Mutex<T>` is invariant over the parameter `T`
+   = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance

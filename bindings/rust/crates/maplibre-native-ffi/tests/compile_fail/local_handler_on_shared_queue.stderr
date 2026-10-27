@@ -1,0 +1,25 @@
+error[E0277]: `Rc<()>` cannot be sent between threads safely
+ --> tests/compile_fail/local_handler_on_shared_queue.rs:7:24
+  |
+7 |         .get_style_url(move |_| drop(local))
+  |          ------------- --------^^^^^^^^^^^^
+  |          |             |
+  |          |             `Rc<()>` cannot be sent between threads safely
+  |          |             within this `{closure@$DIR/tests/compile_fail/local_handler_on_shared_queue.rs:7:24: 7:32}`
+  |          required by a bound introduced by this call
+  |
+  = help: within `{closure@$DIR/tests/compile_fail/local_handler_on_shared_queue.rs:7:24: 7:32}`, the trait `Send` is not implemented for `Rc<()>`
+note: required because it's used within this closure
+ --> tests/compile_fail/local_handler_on_shared_queue.rs:7:24
+  |
+7 |         .get_style_url(move |_| drop(local))
+  |                        ^^^^^^^^
+  = note: required for `{closure@$DIR/tests/compile_fail/local_handler_on_shared_queue.rs:7:24: 7:32}` to implement `CompletionHandler<maplibre_native_ffi::Shared, maplibre_native_ffi::Copied<mln_buffer_view, std::string::String>>`
+note: required by a bound in `MapHandleQueued::<'_, K>::get_style_url`
+ --> src/generated/map.rs
+  |
+  |     pub fn get_style_url(
+  |            ------------- required by a bound in this associated function
+  |         &self,
+  |         on_complete: impl CompletionHandler<K, delivery::Copied<sys::mln_buffer_view, String>>,
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `MapHandleQueued::<'_, K>::get_style_url`

@@ -463,6 +463,25 @@ impl CameraTransitionHandler {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.camera_transition_end };
+                if self.callback.is_none() {
+                    return;
+                }
+                unsafe {
+                    Self::callback_trampoline(state, payload.end);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_camera_transition_handler> for CameraTransitionHandler {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_transition_handler> {
@@ -471,6 +490,23 @@ impl ToNative<sys::mln_camera_transition_handler> for CameraTransitionHandler {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -673,6 +709,33 @@ impl CustomGeometrySourceOptions {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.custom_source_fetch_tile };
+                unsafe {
+                    Self::fetch_tile_trampoline(state, payload.tile_id);
+                }
+            }
+            sys::MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.custom_source_cancel_tile };
+                if self.cancel_tile.is_none() {
+                    return;
+                }
+                unsafe {
+                    Self::cancel_tile_trampoline(state, payload.tile_id);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_custom_geometry_source_options> {
@@ -711,6 +774,24 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
         if let Some(item) = &self.wrap {
             raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
             raw.wrap = *item;
+        }
+        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.fetch_tile = None;
+                raw.cancel_tile = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
         }
         if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
             // SAFETY: the release reclaims exactly this state.
@@ -788,6 +869,33 @@ impl CustomVectorSourceOptions {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.custom_source_fetch_tile };
+                unsafe {
+                    Self::fetch_tile_trampoline(state, payload.tile_id);
+                }
+            }
+            sys::MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.custom_source_cancel_tile };
+                if self.cancel_tile.is_none() {
+                    return;
+                }
+                unsafe {
+                    Self::cancel_tile_trampoline(state, payload.tile_id);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_custom_vector_source_options> for CustomVectorSourceOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_custom_vector_source_options> {
@@ -806,6 +914,24 @@ impl ToNative<sys::mln_custom_vector_source_options> for CustomVectorSourceOptio
         if let Some(item) = &self.max_zoom {
             raw.fields |= sys::MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
             raw.max_zoom = *item;
+        }
+        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.fetch_tile = None;
+                raw.cancel_tile = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
         }
         if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
             // SAFETY: the release reclaims exactly this state.
@@ -1664,12 +1790,51 @@ impl LogHandler {
             Ok(value)
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_LOG_RECORD => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.log_record };
+                unsafe {
+                    Self::callback_trampoline(
+                        state,
+                        payload.severity,
+                        payload.event,
+                        payload.code,
+                        payload.message,
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_log_handler> for LogHandler {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_log_handler> {
         let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
         raw.callback = Some(Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -3561,6 +3726,25 @@ impl ResourceProvider {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_RESOURCE_REQUEST => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.resource_request };
+                if !callback::taken("mln_resource_provider_callback", take) {
+                    return;
+                }
+                unsafe {
+                    Self::callback_trampoline(state, payload.request, payload.handle);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_resource_provider> for ResourceProvider {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_provider> {
@@ -3569,6 +3753,23 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
         raw.callback = Some(Self::callback_trampoline as _);
         raw.routes = convert::array(&self.routes, arena)?;
         raw.route_count = convert::count(self.routes.len())?;
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -3638,6 +3839,22 @@ impl ResourceRequestCancelHandler {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.resource_request_cancel };
+                unsafe {
+                    Self::callback_trampoline(state, payload.handle);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCancelHandler {
     fn to_native(
@@ -3647,6 +3864,23 @@ impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCance
         let mut raw: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
         raw.callback = Some(Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -3842,12 +4076,48 @@ impl ResourceTransform {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.resource_transform };
+                if !callback::taken("mln_resource_transform_callback", take) {
+                    return;
+                }
+                unsafe {
+                    Self::callback_trampoline(state, payload.kind, payload.url, payload.request);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_resource_transform> for ResourceTransform {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform> {
         let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
         raw.callback = Some(Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4054,12 +4324,45 @@ impl RuntimeEventHandler {
             Ok(())
         })
     }
+    /// Runs the callback that one queued delivery names.
+    fn deliver(&self, delivery: &sys::mln_delivery, take: &dyn Fn() -> Result<()>) {
+        let _ = take;
+        let state = std::ptr::from_ref(self).cast_mut().cast();
+        match delivery.type_ {
+            sys::MLN_DELIVERY_TYPE_RUNTIME_EVENTS => {
+                // SAFETY: the delivery's type selects its payload member, which
+                // the batch keeps until the handler returns.
+                let payload = unsafe { delivery.payload.runtime_events };
+                unsafe {
+                    Self::callback_trampoline(state, payload.events);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 impl ToNative<sys::mln_runtime_event_handler> for RuntimeEventHandler {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_event_handler> {
         let mut raw: sys::mln_runtime_event_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_runtime_event_handler>() as _;
         raw.callback = Some(Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            let state = self.clone();
+            // SAFETY: a queue runs the handler with a delivery of its
+            // batch, which stays valid until the handler returns.
+            if let Some((queue, token)) = arena.queued_registration(|| {
+                std::sync::Arc::new(
+                    move |delivery: *const std::ffi::c_void, take: &dyn Fn() -> Result<()>| {
+                        state.deliver(unsafe { &*delivery.cast() }, take)
+                    },
+                )
+            })? {
+                raw.callback = None;
+                raw.user_data = token;
+                raw.queue = queue;
+                return Ok(raw);
+            }
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };

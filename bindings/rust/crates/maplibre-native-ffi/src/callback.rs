@@ -103,6 +103,19 @@ pub(crate) fn invoke_status(
     }
 }
 
+/// Takes a queued delivery's owned handles for the `callback` that adopts
+/// them, and reports whether it may run. A failure reaches the reporter, and
+/// the batch keeps the handles, which it releases.
+pub(crate) fn taken(callback: &'static str, take: &dyn Fn() -> Result<()>) -> bool {
+    match take() {
+        Ok(()) => true,
+        Err(error) => {
+            report_error(callback, error);
+            false
+        }
+    }
+}
+
 /// Drops a registration's state of type `S` once native can no longer call
 /// it. A handle that it disposes finalizes off the native callback stack.
 ///

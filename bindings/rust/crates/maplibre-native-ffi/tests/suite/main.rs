@@ -17,6 +17,8 @@ mod callbacks;
 #[cfg(not(target_os = "emscripten"))]
 mod lifecycle;
 #[cfg(not(target_os = "emscripten"))]
+mod queues;
+#[cfg(not(target_os = "emscripten"))]
 mod render;
 #[cfg(not(target_os = "emscripten"))]
 mod values;

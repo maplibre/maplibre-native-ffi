@@ -126,6 +126,28 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Consumes a session in any state and retires it, then runs completion, if
+    /// given, once the host may destroy the target's graphics objects.
+    ///
+    /// See `mln_render_session_dispose` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn release_queued<K: QueueKind>(
+        self,
+        queue: &DeliveryQueue<K>,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> std::result::Result<(), (Self, Error)> {
+        self.consume(|session| {
+            let call = Call::new(session).queue(queue);
+            queue.enqueue(
+                call,
+                on_complete,
+                |session, completion, out_diagnostic| unsafe {
+                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
+                },
+            )
+        })
+    }
+
     /// Drains every currently queued terminal frame result.
     ///
     /// See `mln_render_session_drain_frame_results` in the
@@ -605,6 +627,511 @@ impl RenderSessionHandle {
                 )
             },
             completion::unit,
+        )
+    }
+}
+
+/// Makes [`RenderSessionHandle`] calls in queue mode on a [`DeliveryQueue`]. The queue
+/// holds each call's completion handler, which receives the result when
+/// a drain of the queue runs it, and the handlers of the registrations
+/// that the call carries. A call fails with `Status::InvalidState` once
+/// the queue is closed.
+pub struct RenderSessionHandleQueued<'a, K: QueueKind>(
+    &'a RenderSessionHandle,
+    &'a DeliveryQueue<K>,
+);
+impl RenderSessionHandle {
+    pub fn queued<'a, K: QueueKind>(
+        &'a self,
+        queue: &'a DeliveryQueue<K>,
+    ) -> RenderSessionHandleQueued<'a, K> {
+        RenderSessionHandleQueued(self, queue)
+    }
+}
+impl<K: QueueKind> RenderSessionHandleQueued<'_, K> {
+    /// Ends every frame demand that has not started with
+    /// `RenderResult::NoUpdate` and completes after earlier driver work has
+    /// finished. A running demand finishes its attempt and ends any wait for a
+    /// map update or a free slot. After completion, a new frame demand is
+    /// required to render again, except that a pending still image submits its
+    /// next demand itself; see `MapHandle::request_still_image()`.
+    ///
+    /// See `mln_render_session_barrier` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn barrier(&self, on_complete: impl CompletionHandler<K, delivery::Unit>) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_barrier(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts asynchronous renderer-data clearing.
+    ///
+    /// See `mln_render_session_clear_data` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn clear_data(&self, on_complete: impl CompletionHandler<K, delivery::Unit>) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_clear_data(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts normal graphics-owner teardown and map detachment.
+    ///
+    /// See `mln_render_session_detach` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn detach(&self, on_complete: impl CompletionHandler<K, delivery::Unit>) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_detach(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts asynchronous renderer diagnostic-log emission.
+    ///
+    /// See `mln_render_session_dump_debug_logs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn dump_debug_logs(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_dump_debug_logs(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts a feature-extension query against the latest driver state.
+    ///
+    /// See `mln_render_session_query_feature_extensions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    pub fn query_feature_extensions(
+        &self,
+        source_id: &str,
+        feature: &str,
+        extension: &str,
+        extension_field: &str,
+        arguments: &str,
+        on_complete: impl CompletionHandler<K, delivery::Copied<sys::mln_buffer_view, String>>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let source_id = call.input(&source_id)?;
+        let feature = call.input(&feature)?;
+        let extension = call.input(&extension)?;
+        let extension_field = call.input(&extension_field)?;
+        let arguments = call.input(&arguments)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_query_feature_extensions(
+                    session,
+                    source_id,
+                    feature,
+                    extension,
+                    extension_field,
+                    arguments,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts a rendered-feature query against the last frame that the session
+    /// rendered, so render after a camera or style change for a result that
+    /// matches it.
+    ///
+    /// See `mln_render_session_query_rendered_features` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    pub fn query_rendered_features(
+        &self,
+        geometry: &RenderedQueryGeometry,
+        options: Option<&RenderedFeatureQueryOptions<'_>>,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::CopiedList<sys::mln_rendered_feature, RenderedFeature>,
+        >,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let geometry = call.reference(&geometry)?;
+        let options = call.optional_reference(options.as_ref())?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_query_rendered_features(
+                    session,
+                    geometry,
+                    options,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts a source-feature query against the tiles that the source loaded
+    /// for rendering, which it loads only while a visible layer uses it.
+    ///
+    /// See `mln_render_session_query_source_features` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    pub fn query_source_features(
+        &self,
+        source_id: &str,
+        options: Option<&SourceFeatureQueryOptions<'_>>,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::CopiedList<sys::mln_source_feature, SourceFeature>,
+        >,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let source_id = call.input(&source_id)?;
+        let options = call.optional_reference(options.as_ref())?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_query_source_features(
+                    session,
+                    source_id,
+                    options,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Reads back the latest frame of the session's owned texture as
+    /// premultiplied RGBA8.
+    ///
+    /// See `mln_render_session_read_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    pub fn read_texture(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Readback>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_read_texture(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts best-effort release of renderer caches.
+    ///
+    /// See `mln_render_session_reduce_memory_use` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn reduce_memory_use(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_reduce_memory_use(session, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts an ordered logical resize of the driver and the map. The driver
+    /// applies the extent in order with its other work, and later driver work
+    /// does not wait for the map. The completion runs after both have applied
+    /// it and the map has published its snapshot. Frames render once a map
+    /// update matches the applied extent; static and tile maps publish that
+    /// update for their next still image.
+    ///
+    /// See `mln_render_session_resize` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn resize(
+        &self,
+        extent: LogicalExtent,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let extent = call.input(&extent)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts an ordered replacement of every texture of a caller-owned Metal
+    /// ring.
+    ///
+    /// See `mln_render_session_set_metal_borrowed_texture_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
+    pub unsafe fn set_metal_borrowed_texture_target(
+        &self,
+        descriptor: &MetalBorrowedTextureDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_metal_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered Metal surface replacement.
+    ///
+    /// See `mln_render_session_set_metal_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
+    pub unsafe fn set_metal_surface_target(
+        &self,
+        descriptor: &MetalSurfaceDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_metal_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+    /// ring.
+    ///
+    /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_open_gl_borrowed_texture_target(
+        &self,
+        descriptor: &OpenGlBorrowedTextureDescriptor<'_>,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_open_gl_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered OpenGL surface replacement.
+    ///
+    /// See `mln_render_session_set_open_gl_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_open_gl_surface_target(
+        &self,
+        descriptor: &OpenGlSurfaceDescriptor<'_>,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_open_gl_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered replacement of every image of a caller-owned Vulkan
+    /// ring.
+    ///
+    /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
+    pub unsafe fn set_vulkan_borrowed_texture_target(
+        &self,
+        descriptor: &VulkanBorrowedTextureDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_vulkan_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered Vulkan surface replacement.
+    ///
+    /// See `mln_render_session_set_vulkan_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
+    pub unsafe fn set_vulkan_surface_target(
+        &self,
+        descriptor: &VulkanSurfaceDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_vulkan_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+    /// ring.
+    ///
+    /// See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
+    pub unsafe fn set_web_gpu_borrowed_texture_target(
+        &self,
+        descriptor: &WebGpuBorrowedTextureDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_web_gpu_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts an ordered WebGPU surface replacement.
+    ///
+    /// See `mln_render_session_set_web_gpu_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
+    pub unsafe fn set_web_gpu_surface_target(
+        &self,
+        descriptor: &WebGpuSurfaceDescriptor,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let descriptor = call.reference(&descriptor)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_web_gpu_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
         )
     }
 }

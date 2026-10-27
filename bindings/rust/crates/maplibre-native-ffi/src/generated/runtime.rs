@@ -280,6 +280,27 @@ impl RuntimeHandle {
         })
     }
 
+    /// Starts release of a runtime after checking its children.
+    ///
+    /// See `mln_runtime_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn release_queued<K: QueueKind>(
+        self,
+        queue: &DeliveryQueue<K>,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> std::result::Result<(), (Self, Error)> {
+        self.consume(|runtime| {
+            let call = Call::new(runtime).queue(queue);
+            queue.enqueue(
+                call,
+                on_complete,
+                |runtime, completion, out_diagnostic| unsafe {
+                    sys::mln_runtime_release(runtime, completion, out_diagnostic)
+                },
+            )
+        })
+    }
+
     /// Starts a MapLibre ambient cache maintenance operation for this runtime.
     ///
     /// See `mln_runtime_run_ambient_cache_operation` in the
@@ -475,6 +496,533 @@ impl RuntimeHandle {
                 )
             },
             completion::value::<sys::mln_offline_region_info, _>,
+        )
+    }
+}
+
+/// Makes [`RuntimeHandle`] calls in queue mode on a [`DeliveryQueue`]. The queue
+/// holds each call's completion handler, which receives the result when
+/// a drain of the queue runs it, and the handlers of the registrations
+/// that the call carries. A call fails with `Status::InvalidState` once
+/// the queue is closed.
+pub struct RuntimeHandleQueued<'a, K: QueueKind>(&'a RuntimeHandle, &'a DeliveryQueue<K>);
+impl RuntimeHandle {
+    pub fn queued<'a, K: QueueKind>(
+        &'a self,
+        queue: &'a DeliveryQueue<K>,
+    ) -> RuntimeHandleQueued<'a, K> {
+        RuntimeHandleQueued(self, queue)
+    }
+}
+impl<K: QueueKind> RuntimeHandleQueued<'_, K> {
+    /// Stops event delivery and retires the previous handler.
+    ///
+    /// See `mln_runtime_clear_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_event_handler(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Clears the runtime-scoped outgoing HTTP header transform.
+    ///
+    /// See `mln_runtime_clear_http_header_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_http_header_transform(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_clear_http_header_transform(runtime, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Clears the runtime-scoped network resource provider.
+    ///
+    /// See `mln_runtime_clear_resource_provider` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_resource_provider(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_clear_resource_provider(runtime, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Clears the runtime-scoped URL transform for network resources.
+    ///
+    /// See `mln_runtime_clear_resource_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_resource_transform(
+        &self,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_clear_resource_transform(runtime, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts creation of a map on the runtime.
+    ///
+    /// See `mln_runtime_create_map` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn create_map(
+        &self,
+        options: &MapOptions,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<MapHandle> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let mut out_map = sys::mln_map(0);
+        let options = call.reference(&options)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_create_map(
+                    runtime,
+                    options,
+                    &mut out_map,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )?;
+        Ok(MapHandle::adopt(out_map)?)
+    }
+
+    /// Starts creating an offline region.
+    ///
+    /// See `mln_runtime_create_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn create_offline_region(
+        &self,
+        definition: &OfflineRegionDefinition,
+        metadata: &[u8],
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::Copied<sys::mln_offline_region_info, OfflineRegionInfo>,
+        >,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let metadata_size = convert::count(metadata.len())?;
+        let definition = call.reference(&definition)?;
+        let metadata = metadata.as_ptr().cast();
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_create_offline_region(
+                    runtime,
+                    definition,
+                    metadata,
+                    metadata_size,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Deletes an offline region.
+    ///
+    /// See `mln_runtime_delete_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn delete_offline_region(
+        &self,
+        region_id: i64,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_delete_offline_region(
+                    runtime,
+                    region_id,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts getting one offline region by ID.
+    ///
+    /// See `mln_runtime_get_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn get_offline_region(
+        &self,
+        region_id: i64,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::CopiedOptional<sys::mln_offline_region_info, OfflineRegionInfo>,
+        >,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_get_offline_region(runtime, region_id, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts getting the current download status for an offline region.
+    ///
+    /// See `mln_runtime_get_offline_region_status` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn get_offline_region_status(
+        &self,
+        region_id: i64,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::Copied<sys::mln_offline_region_status, OfflineRegionStatus>,
+        >,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_get_offline_region_status(
+                    runtime,
+                    region_id,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Invalidates cached resources for an offline region.
+    ///
+    /// See `mln_runtime_invalidate_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn invalidate_offline_region(
+        &self,
+        region_id: i64,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_invalidate_offline_region(
+                    runtime,
+                    region_id,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts listing the offline regions in the runtime database.
+    ///
+    /// See `mln_runtime_list_offline_regions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn list_offline_regions(
+        &self,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::CopiedList<sys::mln_offline_region_info, OfflineRegionInfo>,
+        >,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_list_offline_regions(runtime, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Starts merging offline regions from another MapLibre offline database.
+    ///
+    /// See `mln_runtime_merge_offline_regions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn merge_offline_regions(
+        &self,
+        side_database_path: &str,
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::CopiedList<sys::mln_offline_region_info, OfflineRegionInfo>,
+        >,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let side_database_path = call.input(&side_database_path)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_merge_offline_regions(
+                    runtime,
+                    side_database_path,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts a MapLibre ambient cache maintenance operation for this runtime.
+    ///
+    /// See `mln_runtime_run_ambient_cache_operation` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn run_ambient_cache_operation(
+        &self,
+        operation: AmbientCacheOperation,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_run_ambient_cache_operation(
+                    runtime,
+                    operation.as_raw(),
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Selects how runtime and map events reach the host. Map events arrive on
+    /// the runtime's native scheduler thread, and offline events may arrive on
+    /// a MapLibre worker thread.
+    ///
+    /// See `mln_runtime_set_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_event_handler(
+        &self,
+        handler: RuntimeEventHandler,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let handler = call.reference(&handler)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
+            },
+        )
+    }
+
+    /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
+    /// The callback runs synchronously on a MapLibre worker or network thread.
+    ///
+    /// See `mln_runtime_set_http_header_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_http_header_transform(
+        &self,
+        transform: HttpHeaderTransform,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let transform = call.reference(&transform)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_http_header_transform(
+                    runtime,
+                    transform,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts a change to this runtime's maximum ambient cache size.
+    ///
+    /// See `mln_runtime_set_maximum_ambient_cache_size` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_maximum_ambient_cache_size(
+        &self,
+        size: u64,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_maximum_ambient_cache_size(
+                    runtime,
+                    size,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Sets an offline region's native download state.
+    ///
+    /// See `mln_runtime_set_offline_region_download_state` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn set_offline_region_download_state(
+        &self,
+        region_id: i64,
+        state: OfflineRegionDownloadState,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_offline_region_download_state(
+                    runtime,
+                    region_id,
+                    state.as_raw(),
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Enables or disables runtime events for an offline region.
+    ///
+    /// See `mln_runtime_set_offline_region_observed` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn set_offline_region_observed(
+        &self,
+        region_id: i64,
+        observed: bool,
+        on_complete: impl CompletionHandler<K, delivery::Unit>,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_offline_region_observed(
+                    runtime,
+                    region_id,
+                    observed,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Registers or replaces a runtime-scoped network resource provider. The
+    /// callback runs synchronously on a MapLibre thread.
+    ///
+    /// See `mln_runtime_set_resource_provider` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_provider(
+        &self,
+        provider: ResourceProvider,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let provider = call.reference(&provider)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_resource_provider(
+                    runtime,
+                    provider,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Registers or updates a runtime-scoped URL transform for network
+    /// resources. The callback runs on a MapLibre network thread.
+    ///
+    /// See `mln_runtime_set_resource_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_transform(
+        &self,
+        transform: ResourceTransform,
+        on_complete: impl CompletionHandler<K, delivery::Command>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let transform = call.reference(&transform)?;
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_resource_transform(
+                    runtime,
+                    transform,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+        )
+    }
+
+    /// Starts updating opaque binary metadata for an offline region.
+    ///
+    /// See `mln_runtime_update_offline_region_metadata` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn update_offline_region_metadata(
+        &self,
+        region_id: i64,
+        metadata: &[u8],
+        on_complete: impl CompletionHandler<
+            K,
+            delivery::Copied<sys::mln_offline_region_info, OfflineRegionInfo>,
+        >,
+    ) -> Result<()> {
+        let call = self.0.inner.call().queue(self.1);
+        let metadata_size = convert::count(metadata.len())?;
+        let metadata = metadata.as_ptr().cast();
+        self.1.enqueue(
+            call,
+            on_complete,
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_update_offline_region_metadata(
+                    runtime,
+                    region_id,
+                    metadata,
+                    metadata_size,
+                    completion,
+                    out_diagnostic,
+                )
+            },
         )
     }
 }

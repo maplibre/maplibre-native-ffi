@@ -108,7 +108,30 @@ def view_guard(bound: BoundApi, handle: HandlePlan, getters: list[str]) -> str:
     )
 
 
-def module_index(owners: dict[str, HandlePlan], modules: list[str]) -> str:
+def queued_view(handle: HandlePlan, methods: list[str]) -> str:
+    """The view that makes a handle's calls in queue mode: its queue holds each
+    call's completion handler and the handlers of the registrations it
+    carries."""
+    owner = owner_name(handle.native)
+    view = f"{owner}Queued"
+    return (
+        f"\n/// Makes [`{owner}`] calls in queue mode on a [`DeliveryQueue`]. The queue\n"
+        "/// holds each call's completion handler, which receives the result when\n"
+        "/// a drain of the queue runs it, and the handlers of the registrations\n"
+        "/// that the call carries. A call fails with `Status::InvalidState` once\n"
+        "/// the queue is closed.\n"
+        f"pub struct {view}<'a, K: QueueKind>(&'a {owner}, &'a DeliveryQueue<K>);\n"
+        f"impl {owner} {{\n"
+        f"    pub fn queued<'a, K: QueueKind>(&'a self, queue: &'a DeliveryQueue<K>) -> {view}<'a, K> {{\n"
+        f"        {view}(self, queue)\n"
+        "    }\n}\n"
+        f"impl<K: QueueKind> {view}<'_, K> {{\n" + "\n".join(methods) + "}\n"
+    )
+
+
+def module_index(
+    owners: dict[str, HandlePlan], modules: list[str], *, delivers: bool
+) -> str:
     """Declare the generated modules and check that every owner crosses
     threads and that none can be copied, since each is the only owner of its
     handle."""
@@ -116,7 +139,12 @@ def module_index(owners: dict[str, HandlePlan], modules: list[str]) -> str:
         "use crate::call::{Call, Lent};\n"
         "use crate::callback;\n"
         "use crate::completion::{self, CommandCompletion, NativeFuture};\n"
-        "use crate::convert::{self, FromNative, InputArena, ToNative, from_native, native_enum, native_flags, to_native};\n"
+        + (
+            "use crate::delivery::{self, CompletionHandler, DeliveryQueue, QueueKind};\n"
+            if delivers
+            else ""
+        )
+        + "use crate::convert::{self, FromNative, InputArena, ToNative, from_native, native_enum, native_flags, to_native};\n"
         "use crate::handle::native_owner;\n"
         "use crate::{Error, Result};\n"
         "use maplibre_native_ffi_sys as sys;\n\n"

@@ -7,16 +7,16 @@ use maplibre_native_ffi_sys::{self as sys, NativeHandle};
 
 use crate::Result;
 use crate::completion::{self, CommandCompletion, NativeFuture};
-use crate::convert::{self, InputArena, ToNative};
+use crate::convert::{self, InputArena, QueueSink, ToNative};
 
 pub(crate) struct Call<'a, H: NativeHandle> {
     native: H,
     // The receiver stays alive while borrowed output is copied.
     _owner: std::marker::PhantomData<&'a H>,
-    arena: InputArena,
+    arena: InputArena<'a>,
 }
 
-impl Call<'static, ()> {
+impl Call<'_, ()> {
     pub(crate) fn global() -> Self {
         Self::new(())
     }
@@ -29,6 +29,13 @@ impl<'a, H: NativeHandle> Call<'a, H> {
             _owner: std::marker::PhantomData,
             arena: InputArena::default(),
         }
+    }
+
+    /// Puts the call's registrations in queue mode on `queue`, so the queue
+    /// holds their handlers.
+    pub(crate) fn queue(mut self, queue: &'a dyn QueueSink) -> Self {
+        self.arena.set_queue(queue);
+        self
     }
 
     pub(crate) fn input<N, T: ToNative<N> + ?Sized>(&mut self, value: &T) -> Result<N> {

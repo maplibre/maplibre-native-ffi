@@ -1,0 +1,15 @@
+error[E0382]: use of moved value: `delivery`
+ --> tests/compile_fail/delivery_used_after_take.rs:7:13
+  |
+5 |     let delivery = batch.deliveries().next().unwrap();
+  |         -------- move occurs because `delivery` has type `Delivery<'_, maplibre_native_ffi::Shared>`, which does not implement the `Copy` trait
+6 |     let first = delivery.take();
+  |                          ------ `delivery` moved due to this method call
+7 |     (first, delivery.take())
+  |             ^^^^^^^^ value used here after move
+  |
+note: `maplibre_native_ffi::Delivery::<'_, K>::take` takes ownership of the receiver `self`, which moves `delivery`
+ --> src/delivery.rs
+  |
+  |     pub fn take(self) -> TakenDelivery<K> {
+  |                 ^^^^
