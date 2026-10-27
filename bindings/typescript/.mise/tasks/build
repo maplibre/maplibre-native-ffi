@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#MISE description="Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."
+#MISE extends="ffi:preset"
+# mise stops the native build when the preset check fails, so an unsupported
+# preset fails before the native library builds.
+#MISE depends=[{ task = ":_check-preset", args = ["{{usage.preset}}"] }, { task = "//:build", args = ["{{usage.preset}}"] }]
+#MISE env={ MLN_FFI_GLIBC_FLOOR = '{{ vars.glibc_floor | default(value="") }}' }
+#MISE shell="bash"
+set -euo pipefail
+
+cd native
+cmake --preset "$usage_preset"
+cmake --build "build/$usage_preset" --target install --config Release --parallel
+addon="build/$usage_preset/install/maplibre_native_ffi.node"
+nm=nm
+case "$usage_preset" in
+  emscripten-*)
+    # A browser module exports what its link names, which emnapi's loader
+    # calls, and carries no dynamic symbol table to check.
+    ls "build/$usage_preset/install/maplibre_native_ffi".{mjs,wasm}
+    exit 0
+    ;;
+  linux-gnu-*)
+    # Only mise.linux.toml defines the floor, and this task renders on every
+    # host.
+    "$MISE_MONOREPO_ROOT/scripts/check-glibc-floor.sh" "$MLN_FFI_GLIBC_FLOOR" "$addon"
+    ;;
+  ohos-*)
+    # OpenHarmony loads a module by library name.
+    addon="build/$usage_preset/install/libmaplibre_native_ffi.so"
+    nm="$OHOS_SDK_NATIVE/llvm/bin/llvm-nm"
+    ;;
+esac
+case "$usage_preset" in
+  linux-* | ohos-*)
+    exported="$("$nm" -D --defined-only "$addon" | awk '{print $3}' | sort -u)"
+    ;;
+  macos-*)
+    exported="$(nm -gU "$addon" | awk '{print $3}' | sed 's/^_//' | sort -u)"
+    ;;
+esac
+if [[ "$exported" != napi_register_module_v1 ]]; then
+  echo "error: $addon exports more than napi_register_module_v1:" >&2
+  echo "$exported" >&2
+  exit 1
+fi
+echo "$addon exports only napi_register_module_v1"

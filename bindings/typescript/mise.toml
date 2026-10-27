@@ -4,60 +4,6 @@
 "core:bun" = "1.4.4"
 "core:deno" = "2.9.8"
 
-[tasks.build]
-description = "Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."
-extends = "ffi:preset"
-# mise stops the native build when the preset check fails, so an unsupported
-# preset fails before the native library builds.
-depends = [
-  { task = ":_check-preset", args = [
-    "{{usage.preset}}",
-  ] },
-  { task = "//:build", args = [
-    "{{usage.preset}}",
-  ] },
-]
-run = '''
-cd native
-cmake --preset "$usage_preset"
-cmake --build "build/$usage_preset" --target install --config Release --parallel
-addon="build/$usage_preset/install/maplibre_native_ffi.node"
-nm=nm
-case "$usage_preset" in
-  emscripten-*)
-    # A browser module exports what its link names, which emnapi's loader
-    # calls, and carries no dynamic symbol table to check.
-    ls "build/$usage_preset/install/maplibre_native_ffi".{mjs,wasm}
-    exit 0
-    ;;
-  linux-gnu-*)
-    # Only mise.linux.toml defines the floor, and this script renders on every
-    # host.
-    "$MISE_MONOREPO_ROOT/scripts/check-glibc-floor.sh" \
-      "{{ vars.glibc_floor | default(value="") }}" "$addon"
-    ;;
-  ohos-*)
-    # OpenHarmony loads a module by library name.
-    addon="build/$usage_preset/install/libmaplibre_native_ffi.so"
-    nm="$OHOS_SDK_NATIVE/llvm/bin/llvm-nm"
-    ;;
-esac
-case "$usage_preset" in
-  linux-* | ohos-*)
-    exported="$("$nm" -D --defined-only "$addon" | awk '{print $3}' | sort -u)"
-    ;;
-  macos-*)
-    exported="$(nm -gU "$addon" | awk '{print $3}' | sed 's/^_//' | sort -u)"
-    ;;
-esac
-if [[ "$exported" != napi_register_module_v1 ]]; then
-  echo "error: $addon exports more than napi_register_module_v1:" >&2
-  echo "$exported" >&2
-  exit 1
-fi
-echo "$addon exports only napi_register_module_v1"
-'''
-
 [tasks.api]
 description = "Generate the TypeScript API reference HTML with TypeDoc."
 run = '''
@@ -88,39 +34,6 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 rm -rf build/ohpm
 scripts/pack-ohpm.sh --version "$usage_version" build/ohpm "$usage_preset"
-'''
-
-[tasks.test]
-description = "Run the TypeScript binding suite under Node, Bun, and Deno, on ArkTS for an OpenHarmony preset, or in headless Chromium for an Emscripten preset."
-usage = '''
-arg "[preset]" default="{{vars.host_native_preset}}"
-arg "[runtime]" help="One runtime instead of all three, for a desktop preset" {
-  choices "node" "bun" "deno"
-}
-'''
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
-# The preset selects the host: OpenHarmony presets run the suite on ArkTS from
-# a signed HAP on the emulator, Emscripten presets run it as a page in headless
-# Chromium, and desktop presets run it in one process per runtime, after
-# packing the preset's packages as the pack task does.
-run = '''
-case "$usage_preset" in
-  ohos-*)
-    if [[ -n ${usage_runtime:-} ]]; then
-      echo "error: an OpenHarmony preset runs the suite on ArkTS, not $usage_runtime" >&2
-      exit 2
-    fi
-    exec mise run :_test-arkts "$usage_preset"
-    ;;
-  emscripten-*)
-    if [[ -n ${usage_runtime:-} ]]; then
-      echo "error: an Emscripten preset runs the suite in a browser, not $usage_runtime" >&2
-      exit 2
-    fi
-    exec scripts/test-browser.sh "$usage_preset"
-    ;;
-esac
-exec scripts/test-desktop.sh "$usage_preset" ${usage_runtime:-}
 '''
 
 [tasks._check-preset]
