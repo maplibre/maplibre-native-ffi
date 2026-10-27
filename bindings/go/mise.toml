@@ -1,5 +1,4 @@
 [tools]
-"core:go" = "{{vars.go_version}}"
 "github:abhinav/doc2go" = "0.12.2"
 
 [tasks.api]

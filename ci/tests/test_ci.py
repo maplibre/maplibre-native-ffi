@@ -18,18 +18,21 @@ class WorkflowTest(unittest.TestCase):
     def setUpClass(cls):
         cls.source, cls.presets = load_configuration(ROOT)
 
-    def test_android_emulator_diagnostics_are_uploaded_even_after_recovery(self):
+    def test_android_emulator_logs_are_uploaded_even_after_recovery(self):
         jobs = ci_workflow(self.source, self.presets)["jobs"]
         enabled = []
         for name, job in jobs.items():
-            if "MLN_FFI_ANDROID_DIAGNOSTICS_DIR" not in job.get("env", {}):
+            upload = next(
+                (
+                    step
+                    for step in job.get("steps", [])
+                    if step.get("name") == "Upload Android emulator logs"
+                ),
+                None,
+            )
+            if upload is None:
                 continue
             enabled.append(name)
-            upload = next(
-                step
-                for step in job["steps"]
-                if step.get("name") == "Upload Android emulator diagnostics"
-            )
             self.assertEqual(upload["if"], "always()")
             self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
         self.assertEqual(

@@ -14,18 +14,7 @@ api=$MLN_FFI_ANDROID_EMULATOR_API
 if [[ "$preset" == android-x64-egl ]]; then
   api=26
 fi
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  mise run //:android-emulator:boot "$abi" --api "$api"
-fi
-serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-emulator" serial "$abi" --api "$api")
-# adb can briefly report an already booted emulator offline while its server starts.
-perl -e 'alarm shift; exec @ARGV' 30 \
-  "$ANDROID_HOME/platform-tools/adb" -s "$serial" wait-for-device
-device_abi=$("$ANDROID_HOME/platform-tools/adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r')
-if [[ "$device_abi" != "$abi" ]]; then
-  echo "Android device $serial has ABI $device_abi; expected $abi." >&2
-  exit 2
-fi
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
 
 prefix="$MISE_MONOREPO_ROOT/build/$preset/install"
 toolchain=$("$MISE_MONOREPO_ROOT/scripts/android-ndk-prebuilt.sh")

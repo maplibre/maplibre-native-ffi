@@ -1,5 +1,4 @@
 [tools]
-"core:go" = "{{vars.go_version}}"
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
 [env]

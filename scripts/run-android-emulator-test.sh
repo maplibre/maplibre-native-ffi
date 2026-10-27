@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Runs native test executables on ANDROID_SERIAL or on the shared emulator for
-# the ABI and API level, which tools/devices/android-emulator boots when it is
-# not running yet.
+# Runs native test executables on the Android device that
+# tools/devices/android-serial names for the ABI and API level.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
@@ -47,8 +46,8 @@ fi
 test_executables=("$@")
 
 timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
-# Other sessions may be running tests on the same shared emulator, so each run
-# has a directory of its own and removes it when it ends.
+# Other sessions may be running tests on the same device, so each run has a
+# directory of its own and removes it when it ends.
 remote_dir=/data/local/tmp/maplibre-native-ffi-$$
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 # The AVD of the emulator the tests run on, once the device is known; a device
@@ -76,29 +75,25 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
   exit 2
 fi
-if [[ -n "$emulator_api" && ! "$emulator_api" =~ ^[0-9]+$ ]]; then
-  echo "Invalid Android API level: $emulator_api" >&2
-  exit 2
-fi
 if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   echo "Android fixture directory does not exist: $fixture_dir" >&2
   exit 2
 fi
 
 # Says whether the emulator at the serial still runs, and if it exited, prints
-# the tail of the log that tools/devices/android-emulator started it with, which holds
-# the reason the emulator gives. A device that is no emulator reports nothing.
+# the tail of the log that devices-cli started it with, which holds the reason
+# the emulator gives. A device that is no emulator reports nothing.
 report_emulator_state() {
-  local log_dir=${TMPDIR:-/tmp}
+  local log_file="${XDG_STATE_HOME:-$HOME/.local/state}/devices-cli/logs/$serial.log"
   [[ -n "$avd_name" ]] || return 0
   if [[ "$(perl -e 'alarm shift; exec @ARGV' 30 "$adb" -s "$serial" emu avd name 2>/dev/null |
     sed -n 's/\r$//;1p')" == "$avd_name" ]]; then
     echo "The Android emulator at $serial is still running." >&2
   else
     echo "The Android emulator at $serial exited." >&2
-    if [[ -f "${log_dir%/}/android-emulator-$avd_name.log" ]]; then
+    if [[ -f "$log_file" ]]; then
       echo "The end of its log:" >&2
-      tail -50 "${log_dir%/}/android-emulator-$avd_name.log" >&2
+      tail -50 "$log_file" >&2
     fi
   fi
 }
@@ -136,25 +131,7 @@ run_adb() {
   exit "$status"
 }
 
-# An explicit serial selects a connected device. Otherwise the shared emulator
-# for the ABI and API level runs the tests, booted first if it is not running.
-emulator="$MISE_MONOREPO_ROOT/tools/devices/android-emulator"
-if [[ -n "${ANDROID_SERIAL:-}" ]]; then
-  serial=$ANDROID_SERIAL
-  device_abi=$(run_adb "the ABI query" shell getprop ro.product.cpu.abi | tr -d '\r')
-  device_api=$(run_adb "the API level query" shell getprop ro.build.version.sdk | tr -d '\r')
-  if [[ "$device_abi" != "$abi" ]] ||
-    [[ -n "$emulator_api" && "$device_api" != "$emulator_api" ]]; then
-    echo "Android device $serial has ABI $device_abi and API $device_api; expected $abi ${emulator_api:+at API $emulator_api}." >&2
-    exit 2
-  fi
-else
-  emulator_api=${emulator_api:-${MLN_FFI_ANDROID_EMULATOR_API:?MLN_FFI_ANDROID_EMULATOR_API must name the default emulator API level}}
-  if ! serial=$("$emulator" serial "$abi" --api "$emulator_api"); then
-    mise run //:android-emulator:boot "$abi" --api "$emulator_api"
-    serial=$("$emulator" serial "$abi" --api "$emulator_api")
-  fi
-fi
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" ${emulator_api:+--api "$emulator_api"})
 avd_name=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n 's/\r$//;1p') || avd_name=
 
 remove_remote_dir() {

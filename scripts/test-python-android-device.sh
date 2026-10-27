@@ -45,11 +45,8 @@ mise run //:android-sdk-packages
 # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
 # mimalloc initialization. API 26 rejects that syscall before Python can load
 # the wheel, so even the EGL target, whose other suites run on API 26, tests on
-# the default emulator.
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  mise run //:android-emulator:boot "$abi"
-fi
-serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-emulator" serial "$abi")
+# the default API level.
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi")
 export ANDROID_SERIAL="$serial"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it

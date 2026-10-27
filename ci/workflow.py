@@ -199,9 +199,12 @@ def device_boot(preset: str) -> tuple[str, str] | None:
     target_platform = platform(preset)
     if target_platform == "android" and preset in EMULATOR_TESTED:
         # The EGL target's suites run on API 26, as the root `test` task and
-        # the device test scripts boot it.
+        # the device test scripts ask for it.
         api = " --api 26" if backend(preset) == "egl" else ""
-        return "Boot Android emulator", f"mise run //:android-emulator:boot x86_64{api}"
+        return (
+            "Boot Android emulator",
+            f"mise exec -- tools/devices/android-serial x86_64{api}",
+        )
     if target_platform == "ohos" and preset in EMULATOR_TESTED:
         return "Boot OpenHarmony emulator", "mise run //:ohos-emulator:boot"
     if target_platform == "freebsd":

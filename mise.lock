@@ -1313,6 +1313,11 @@ url = "https://dl.google.com/go/go1.27.3.windows-arm64.zip"
 checksum = "sha256:f26081f438319757f8a1b46d7d0b2c5ec7583d4038e485e0aa725cfde7885fff"
 url = "https://dl.google.com/go/go1.27.3.windows-amd64.zip"
 
+[[tools."go:github.com/sargunv/devices-cli"]]
+version = "0.0.0-20261026232509-ce9acc4b47b7"
+backend = "go:github.com/sargunv/devices-cli"
+specifiers = ["v0.0.0-20261026232509-ce9acc4b47b7"]
+
 [[tools."http:anyvm"]]
 version = "0.7.5"
 backend = "http:anyvm"

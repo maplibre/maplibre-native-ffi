@@ -162,13 +162,16 @@ runs:
           echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
 
-    - name: Install the Android emulator debugger
+    # devices-cli runs one emulator per 8 GiB of RAM by default, which leaves a
+    # 16 GiB runner, whose kernel keeps some, room for one. The EGL job's
+    # suites run on API 26 and API 36 at once.
+    - name: Let the Android emulators run side by side
       if:
         ${{ runner.os == 'Linux' && startsWith(inputs.target, 'android-x64-') }}
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install --no-install-recommends --yes gdb
+        mkdir -p ~/.config/devices-cli
+        echo 'max_instances = 2' > ~/.config/devices-cli/config.toml
 
     # The hosted runner image has Android build tools and KVM, but no system
     # QEMU. Keep the emulator dependency out of every other job and the dev

@@ -64,9 +64,8 @@ android_build_tools_version = "36.0.0"
 android_cmake_version = "4.1.2"
 # NDK r30 is the 2026 LTS. Update this pin through validated toolchain upgrades.
 android_ndk_version = "30.0.16248370"
-# The emulator task installs one architecture of this image on demand. The AOSP
-# image carries no Google APIs and is the smallest image with a full graphics
-# stack.
+# devices-cli installs one architecture of this image on demand. The AOSP image
+# carries no Google APIs and is the smallest image with a full graphics stack.
 android_system_image_api = "36"
 dart_version = "3.13.7"
 dotnet_version = "10.0.402"
@@ -87,6 +86,13 @@ sdl3_version = "3.4"
 "aqua:Kitware/CMake" = "4.4.4"
 ninja = "1.13.2"
 "github:EmbarkStudios/cargo-about" = "0.9.2" # Rust dependency notices
+# Each worktree's Android emulator, built from a commit with Go, which the Go
+# binding and example use too. devices-cli runs on Linux and macOS only.
+"core:go" = "{{vars.go_version}}"
+"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261026232509-ce9acc4b47b7", os = [
+  "linux",
+  "macos",
+] }
 sccache = "0.18.0"
 # The FreeBSD suites run in a FreeBSD virtual machine that this QEMU launcher
 # boots on a Linux host. See scripts/boot-freebsd-vm.sh.
@@ -130,8 +136,7 @@ sccache = "0.18.0"
 # because the tool's post-install step takes them as arguments.
 MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
 MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
-# The API level of the shared emulator that Android device tasks look for when
-# they name none.
+# The API level that Android device tasks ask for when they name none.
 MLN_FFI_ANDROID_EMULATOR_API = "{{vars.android_system_image_api}}"
 # Kotlin Gradle installs the wasm target's npm packages with its own Yarn 1,
 # which refuses to run under this repository's package.json because that names
@@ -409,30 +414,6 @@ if [[ -z "$usage_sdk_root" ]]; then
 fi
 bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
-
-[tasks."android-emulator:boot"]
-description = "Boot the shared Android emulator for an ABI and API level, or reuse it, and wait until it is ready."
-usage = '''
-arg "[abi]" default="x86_64" {
-  choices "arm64-v8a" "x86_64"
-}
-flag "--api <api>" default="{{vars.android_system_image_api}}"
-'''
-# sdkmanager and avdmanager run on a JVM. The emulator and its system image are
-# not part of what .mise/bin/sync-android-packages installs, so asking for a
-# boot is what accepts their licenses and pays for their download.
-tools = { "core:java" = "{{vars.java_version}}" }
-run = '"$MISE_MONOREPO_ROOT/tools/devices/android-emulator" boot "$usage_abi" --api "$usage_api"'
-
-[tasks."android-emulator:stop"]
-description = "Stop the shared Android emulator for an ABI and API level, which any session on the machine may be using."
-usage = '''
-arg "[abi]" default="x86_64" {
-  choices "arm64-v8a" "x86_64"
-}
-flag "--api <api>" default="{{vars.android_system_image_api}}"
-'''
-run = '"$MISE_MONOREPO_ROOT/tools/devices/android-emulator" stop "$usage_abi" --api "$usage_api"'
 
 [tasks."ohos-emulator:boot"]
 description = "Boot the shared OpenHarmony emulator, or reuse it, and wait until it is ready."

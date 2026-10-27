@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Prints the serial of the Android device that tests for an ABI and API level
+# run on.
+#
+#   tools/devices/android-serial <abi> [--api <api>]
+#
+# ANDROID_SERIAL wins when it is set. Otherwise devices-cli gives this worktree
+# its own emulator, booted on demand, which keeps running until
+# `devices-cli release`. Either way the device must run the ABI and API level,
+# or this fails naming what it runs. The API level defaults to
+# MLN_FFI_ANDROID_EMULATOR_API.
+set -euo pipefail
+
+usage="usage: tools/devices/android-serial <abi> [--api <api>]"
+abi=${1:-}
+api=${MLN_FFI_ANDROID_EMULATOR_API:-}
+if (($# == 3)) && [[ "$2" == --api ]]; then
+  api=$3
+elif (($# != 1)); then
+  echo "$usage" >&2
+  exit 2
+fi
+if [[ -z "$abi" || ! "$api" =~ ^[0-9]+$ ]]; then
+  echo "$usage" >&2
+  exit 2
+fi
+sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
+adb="$sdk_root/platform-tools/adb"
+
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  serial=$ANDROID_SERIAL
+else
+  # Emulators before this revision can hang for good when a guest process exits
+  # while it still owns GLES objects (gfxstream b/561516389). Until the stable
+  # channel carries the fix, the update comes from the dev channel. devices-cli
+  # installs the emulator only when the SDK has none.
+  minimum_emulator_version=37.3.5
+  emulator_revision=$(sed -n 's/^Pkg\.Revision=//p' "$sdk_root/emulator/source.properties" 2>/dev/null | tr -d '\r')
+  if [[ "$(printf '%s\n' "$minimum_emulator_version" "$emulator_revision" | sort -V | head -n1)" != "$minimum_emulator_version" ]]; then
+    sdkmanager=
+    for candidate in "$sdk_root"/cmdline-tools/latest/bin/sdkmanager "$sdk_root"/cmdline-tools/*/bin/sdkmanager; do
+      if [[ -x "$candidate" ]]; then
+        sdkmanager=$candidate
+        break
+      fi
+    done
+    if [[ -z "$sdkmanager" ]]; then
+      echo "The Android emulator is at revision ${emulator_revision:-<none>}, below $minimum_emulator_version, and $sdk_root has no sdkmanager to update it." >&2
+      exit 1
+    fi
+    echo "Updating the Android emulator from revision ${emulator_revision:-<none>} to $minimum_emulator_version or later." >&2
+    "$sdkmanager" --sdk_root="$sdk_root" --channel=2 --install emulator <<<"y" >&2
+  fi
+  # SwiftShader draws the GLES and Vulkan targets in software, which is what a
+  # runner without a GPU has. The emulator's renderer makes JIT code executable
+  # in memory that its bundled tcmalloc takes with sbrk, which SELinux refuses
+  # as execheap on Fedora; memory that tcmalloc maps instead needs only execmem.
+  serial=$(TCMALLOC_SKIP_SBRK=true devices-cli get android --api "$api" --abi "$abi" -- \
+    -gpu swiftshader -memory 4096 -camera-back none -camera-front none)
+fi
+
+# A call to a device that is still settling can block indefinitely, and an adb
+# server that has just started knows no device until its first scan. The calls
+# keep the caller's stdin, which scripts/run-android-emulator-test.sh keeps
+# from ending.
+bounded_adb() {
+  local status=0
+  perl -e 'alarm shift; exec @ARGV' 30 "$adb" -s "$serial" "$@" || status=$?
+  if ((status)); then
+    echo "adb exited $status during $* on Android device $serial." >&2
+    exit "$status"
+  fi
+}
+bounded_adb wait-for-device
+device_abi=$(bounded_adb shell getprop ro.product.cpu.abi)
+device_api=$(bounded_adb shell getprop ro.build.version.sdk)
+device_abi=${device_abi//$'\r'/}
+device_api=${device_api//$'\r'/}
+if [[ "$device_abi" != "$abi" || "$device_api" != "$api" ]]; then
+  echo "Android device $serial runs ${device_abi:-an unknown ABI} at API ${device_api:-unknown}; the tests need $abi at API $api." >&2
+  exit 1
+fi
+printf '%s\n' "$serial"

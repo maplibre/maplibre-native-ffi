@@ -42,16 +42,13 @@ preset, because CMake caches the compiler path.
 `mise run test` boots an Android or OpenHarmony emulator on demand and leaves it
 running. An emulator boots in minutes under KVM on Linux. Without KVM it runs in
 software, which takes an hour or more on Linux, but the OpenHarmony emulator
-boots in under a minute on an Apple silicon Mac. Every checkout on a machine
-shares one Android emulator per API level and ABI: the AVD `api-<level>-<abi>`,
-such as `api-36-arm64-v8a`, in the default AVD home, at a fixed console port, so
-its serial is always the same: `emulator-5584` for API 36 `arm64-v8a`, 5582 for
-API 36 `x86_64`, 5580 for API 26 `x86_64`, and 5578 for API 26 `arm64-v8a`. A
-task reuses the one that is running, whoever started it, and creates the AVD if
-it is missing. Since another session may be using it, no task stops it; run
-`mise run //:android-emulator:stop <abi> --api <level>` when none is. A boot
-fails when the AVD already runs at another port, or another AVD at its port, and
-names that emulator.
+boots in under a minute on an Apple silicon Mac.
+
+Android device tests get a device from
+[devices-cli](https://github.com/sargunv/devices-cli), which gives each worktree
+its own emulator for the ABI and API level they need; run `devices-cli release`
+to stop the worktree's emulators. Set `ANDROID_SERIAL` to use your own device
+instead, which must run the same ABI and API level.
 
 Every checkout also shares the one OpenHarmony emulator that runs the Oniro
 image mise installed. It forwards hdc from `127.0.0.1:55555`, and a task reuses

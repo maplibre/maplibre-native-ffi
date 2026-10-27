@@ -254,12 +254,12 @@ def target_job(row: dict) -> dict:
             action(
                 "actions/upload-artifact",
                 {
-                    "name": f"android-emulator-diagnostics-{preset}-${{{{ github.run_attempt }}}}",
-                    "path": "${{ env.MLN_FFI_ANDROID_DIAGNOSTICS_DIR }}",
+                    "name": f"android-emulator-logs-{preset}-${{{{ github.run_attempt }}}}",
+                    "path": "~/.local/state/devices-cli/logs",
                     "if-no-files-found": "ignore",
                     "retention-days": 30,
                 },
-                name="Upload Android emulator diagnostics",
+                name="Upload Android emulator logs",
                 **{"if": "always()"},
             )
         )
@@ -285,15 +285,6 @@ def target_job(row: dict) -> dict:
         "runs-on": row["runner"],
         "timeout-minutes": 120,
         "environment": SCCACHE_ENVIRONMENT,
-        **(
-            {
-                "env": {
-                    "MLN_FFI_ANDROID_DIAGNOSTICS_DIR": "${{ github.workspace }}/build/android-emulator-diagnostics"
-                }
-            }
-            if android_emulator
-            else {}
-        ),
         "steps": steps,
     }
 

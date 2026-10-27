@@ -2341,8 +2341,6 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    env:
-      MLN_FFI_ANDROID_DIAGNOSTICS_DIR: ${{ github.workspace }}/build/android-emulator-diagnostics
     steps:
       - name: Check out repository
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
@@ -2359,7 +2357,7 @@ jobs:
         run: mise run build android-x64-egl
       - name: Boot Android emulator
         id: boot
-        run: mise run //:android-emulator:boot x86_64 --api 26
+        run: mise exec -- tools/devices/android-serial x86_64 --api 26
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test android-x64-egl
@@ -2418,12 +2416,12 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
-      - name: Upload Android emulator diagnostics
+      - name: Upload Android emulator logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: android-emulator-diagnostics-android-x64-egl-${{ github.run_attempt }}
-          path: ${{ env.MLN_FFI_ANDROID_DIAGNOSTICS_DIR }}
+          name: android-emulator-logs-android-x64-egl-${{ github.run_attempt }}
+          path: ~/.local/state/devices-cli/logs
           if-no-files-found: ignore
           retention-days: 30
       - name: Fail if any suite failed
@@ -2438,8 +2436,6 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    env:
-      MLN_FFI_ANDROID_DIAGNOSTICS_DIR: ${{ github.workspace }}/build/android-emulator-diagnostics
     steps:
       - name: Check out repository
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
@@ -2456,7 +2452,7 @@ jobs:
         run: mise run build android-x64-vulkan
       - name: Boot Android emulator
         id: boot
-        run: mise run //:android-emulator:boot x86_64
+        run: mise exec -- tools/devices/android-serial x86_64
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test android-x64-vulkan
@@ -2515,12 +2511,12 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
-      - name: Upload Android emulator diagnostics
+      - name: Upload Android emulator logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: android-emulator-diagnostics-android-x64-vulkan-${{ github.run_attempt }}
-          path: ${{ env.MLN_FFI_ANDROID_DIAGNOSTICS_DIR }}
+          name: android-emulator-logs-android-x64-vulkan-${{ github.run_attempt }}
+          path: ~/.local/state/devices-cli/logs
           if-no-files-found: ignore
           retention-days: 30
       - name: Fail if any suite failed
