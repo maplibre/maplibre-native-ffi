@@ -1,5 +1,5 @@
 # Standalone consumer project: c-map builds against an installed
-# maplibre-native-c prefix through pkg-config, the way an external C host
+# maplibre-native-c prefix through find_package, the way an external C host
 # would. The render backend is not a flag here; it follows the artifact the
 # prefix holds.
 cmake_minimum_required(VERSION 3.25)
@@ -19,8 +19,9 @@ file(READ "${MLN_NATIVE_INSTALL_DIR}/share/maplibre-native-c/artifact.json"
      mln_artifact_json)
 string(JSON MLN_RENDER_BACKEND GET "${mln_artifact_json}" renderBackend)
 
+list(PREPEND CMAKE_PREFIX_PATH "${MLN_NATIVE_INSTALL_DIR}")
+find_package(maplibre-native-c CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(MAPLIBRE REQUIRED IMPORTED_TARGET maplibre-native-c)
 pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
 add_executable(
@@ -43,13 +44,15 @@ set_target_properties(
     YES
     C_EXTENSIONS
     OFF
-    # The maplibre-native-c pkg-config file carries its own rpath; SDL's conda
+    # The maplibre-native-c target carries its own rpath; SDL's conda
     # prefix needs one here for runs outside the mise task's LD_LIBRARY_PATH.
     BUILD_RPATH
     "${SDL3_LIBRARY_DIRS}")
 
 target_compile_options(c-map PRIVATE -Wall -Wextra)
-target_link_libraries(c-map PRIVATE PkgConfig::MAPLIBRE PkgConfig::SDL3 m)
+target_link_libraries(
+  c-map
+  PRIVATE maplibre-native-c::maplibre-native-c PkgConfig::SDL3 m)
 
 if(MLN_RENDER_BACKEND STREQUAL "metal")
   target_sources(c-map PRIVATE render/metal/metal.c)

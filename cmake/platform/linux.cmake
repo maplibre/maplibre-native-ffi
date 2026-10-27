@@ -135,6 +135,12 @@ function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(
     ${target}
     INTERFACE Threads::Threads zlibstatic uv_a m ${CMAKE_DL_LIBS})
+  # The Rust standard library in the separate platform archive unwinds through
+  # libgcc_s on glibc, which a C consumer's compiler driver need not link.
+  set(pkg_config_libs -ldl)
+  if(MLN_FFI_ZIG_LIBC STREQUAL "gnu")
+    string(APPEND pkg_config_libs " -lgcc_s")
+  endif()
   set_target_properties(
     ${target}
     PROPERTIES
@@ -149,7 +155,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_STATIC_ARCHIVES
       "mbgl-vendor-icu;zlibstatic;uv_a"
       MLN_FFI_PKG_CONFIG_LIBS
-      -ldl
+      "${pkg_config_libs}"
       MLN_FFI_TEST_SUPPORTED
       TRUE)
   mln_ffi_configure_linux_archive_contents(${target})

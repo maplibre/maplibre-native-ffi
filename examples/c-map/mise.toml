@@ -9,7 +9,7 @@ MLN_FFI_SDL3_PREFIX = { value = "{% if tools['conda:sdl3'] is defined %}{{ tools
 extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$MLN_FFI_SDL3_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export PKG_CONFIG_PATH="$MLN_FFI_SDL3_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 # Without a sysroot, clang takes the default SDK, which can be a Command Line
 # Tools SDK newer than the selected Xcode's linker reads. The presets pin the
 # selected Xcode's SDK the same way.
