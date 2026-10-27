@@ -15,6 +15,6 @@ dev = [
   "libclang==18.1.1",
   "lief==1.0.0; sys_platform == 'darwin'",
   "ruamel-yaml==0.19.1",
-  "ruff==0.17.1",
-  "ty==0.0.90",
+  "ruff==0.17.2",
+  "ty==0.0.91",
 ]
