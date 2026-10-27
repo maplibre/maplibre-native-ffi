@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#MISE description="Build the .NET solution against a native preset's install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
+
+# Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
+# Release exercises the JIT lifetime rules that shipped applications use. The
+# Debug JIT keeps locals alive for the debugger and can hide a missing
+# GC.KeepAlive around a native call.
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet build \
+    Maplibre.NativeFfi.slnx \
+    -c Release \
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
