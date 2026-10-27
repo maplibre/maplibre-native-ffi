@@ -11,7 +11,7 @@ set -euo pipefail
 # The preset selects the runner: Emscripten presets run as a page in headless
 # Chromium, host and Mac Catalyst presets run in process, and cargo hands every
 # other test executable to tools/devices/run, which pushes it to an emulator,
-# spawns it on a simulator, or runs it in Alpine.
+# spawns it on a simulator, or runs it in Alpine or the FreeBSD virtual machine.
 case "$usage_preset" in
   android-arm-*)
     echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/rust:build and test an android-arm64 or android-x64 preset instead." >&2

@@ -1,10 +1,11 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, Android, iOS, visionOS, Mac Catalyst, and OpenHarmony presets to their
-# Cargo target. Exports the cross-compilation environment (CC/CXX, linker) from
-# the Zig and Rust toolchains, Android NDK, or OpenHarmony SDK, and for targets
-# that run off the host, tools/devices/run as Cargo's runner, which it also
-# names in `cargo_runner`. Leaves `cargo_target` and `cargo_runner` empty for
-# host presets, where Cargo picks its own target and toolchain.
+# $1. Maps musl, FreeBSD, Android, iOS, visionOS, Mac Catalyst, and OpenHarmony
+# presets to their Cargo target. Exports the cross-compilation environment
+# (CC/CXX, linker) from the Zig and Rust toolchains, Android NDK, or OpenHarmony
+# SDK, and for targets that run off the host, tools/devices/run as Cargo's
+# runner, which it also names in `cargo_runner`. Leaves `cargo_target` and
+# `cargo_runner` empty for host presets, where Cargo picks its own target and
+# toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -21,6 +22,7 @@ case "$1" in
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
+  freebsd-x64-*) cargo_target=x86_64-unknown-freebsd ;;
   ohos-arm64-*) cargo_target=aarch64-unknown-linux-ohos ;;
   ohos-x64-*) cargo_target=x86_64-unknown-linux-ohos ;;
 esac
@@ -78,6 +80,32 @@ case "$1" in
     export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
     export "$rustflags_variable=${rustflags# }"
     ;;
+  freebsd-x64-*)
+    # The native build's Zig wrappers compile and link against FreeBSD's libc.
+    target_env="${cargo_target//-/_}"
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
+    compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
+    if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
+      echo "The FreeBSD Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+      return 2
+    fi
+    # The libc crate names system libraries that Zig's FreeBSD libc lacks.
+    # Nothing calls into them, so empty libraries stand in at link time.
+    stub_dir="$MISE_MONOREPO_ROOT/build/$1/zig-shim/rust-stubs"
+    mkdir -p "$stub_dir"
+    for library in kvm memstat procstat devstat; do
+      if [[ ! -f "$stub_dir/lib$library.so" ]]; then
+        "$compiler" -shared -o "$stub_dir/lib$library.so" -x c /dev/null
+      fi
+    done
+    rustflags_variable="CARGO_TARGET_${target_env_upper}_RUSTFLAGS"
+    rustflags="${!rustflags_variable:-} -L native=$stub_dir"
+    export "$rustflags_variable=${rustflags# }"
+    export "CC_$target_env=$compiler"
+    export "CXX_$target_env=$compiler_cxx"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$compiler"
+    ;;
   android-*)
     if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
       return 2
@@ -126,7 +154,7 @@ esac
 # Cargo hands each executable it runs for these targets to tools/devices/run,
 # which finds the device from the preset's install.
 case "$1" in
-  android-* | ohos-*64-* | ios-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-*)
+  android-* | ohos-*64-* | ios-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-* | freebsd-x64-*)
     cargo_runner="$MISE_MONOREPO_ROOT/tools/devices/run"
     target_env_upper="$(printf '%s' "${cargo_target//-/_}" | tr '[:lower:]' '[:upper:]')"
     export "CARGO_TARGET_${target_env_upper}_RUNNER=$cargo_runner"

@@ -271,12 +271,6 @@ status = "path-known"
 reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
 
 [[gap]]
-binding = "rust"
-platform = "freebsd"
-status = "path-known"
-reason = "Add the FreeBSD targets to the build and test tasks, and run the suite in the FreeBSD VM."
-
-[[gap]]
 binding = "swift"
 platform = "freebsd"
 status = "path-known"

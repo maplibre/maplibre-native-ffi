@@ -243,7 +243,7 @@ fn static_archive(link_dir: &Path, target_os: &str) -> Result<String, Box<dyn Er
 fn cargo_builds_platform(target_os: &str, target_env: &str) -> bool {
     match target_os {
         "linux" => target_env != "ohos",
-        "windows" | "emscripten" | "android" => true,
+        "freebsd" | "windows" | "emscripten" | "android" => true,
         _ => false,
     }
 }
