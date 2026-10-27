@@ -1,3 +1,5 @@
 .dart_tool/
 # Written by the core release job, and kept in the package by .pubignore.
 /hook/native_release.json
+# The root ignores every build/ directory; this one holds the build:mobile task.
+!/.mise/tasks/build/

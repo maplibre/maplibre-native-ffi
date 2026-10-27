@@ -33,85 +33,8 @@ description = "Pin a release's native archives in the package and stamp its vers
 usage = 'arg "<tag>" help="The release tag, such as v0.202610.2"'
 run = 'python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" . "$usage_tag"'
 
-[tasks.check-publish]
-description = "Check that pub would publish the package as a release prepares it."
-# A copy outside Git stands in for the release checkout, whose prepared files
-# pub would otherwise report as modified.
-run = '''
-copy="$(mktemp -d)"
-trap 'rm -rf "$copy"' EXIT
-package="$copy/maplibre_native_ffi"
-mkdir "$package"
-# -h copies the file that the LICENSE link names.
-git ls-files -z --cached --others --exclude-standard | tar -c -h --null -T - | tar -x -C "$package"
-printf '[{"archive": "maplibre-native-c-linux-gnu-x64-vulkan.tar.gz", "sha256": "%s"}]\n' \
-  "$(printf '0%.0s' {1..64})" >"$copy/artifacts.json"
-python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" "$package" v0.202601.0 --artifacts "$copy/artifacts.json"
-cd "$package"
-dart pub publish --dry-run
-'''
-
 [tasks.build]
 depends = [":analyze"]
-
-[tasks."build:mobile"]
-description = "Build the Dart binding in a Flutter mobile application."
-usage = '''
-arg "[preset]" {
-  choices \
-    "android-arm-egl" \
-    "android-arm-vulkan" \
-    "android-arm64-egl" \
-    "android-arm64-vulkan" \
-    "android-x64-egl" \
-    "android-x64-vulkan" \
-    "ios-arm64-metal" \
-    "ios-simulator-arm64-metal"
-}
-'''
-depends = [
-  { task = "//:build", args = [
-    "{{usage.preset}}",
-  ] },
-  { task = ":_native-prefix", args = [
-    "{{usage.preset}}",
-  ] },
-]
-run = '''
-app=.dart_tool/flutter_smoke
-flutter create \
-  --empty \
-  --no-pub \
-  --org org.maplibre.native_ffi \
-  --platforms android,ios \
-  --project-name maplibre_native_ffi_smoke \
-  "$app"
-cp tool/flutter_smoke/pubspec.yaml "$app/pubspec.yaml"
-cp tool/flutter_smoke/lib/main.dart "$app/lib/main.dart"
-cd "$app"
-flutter pub get
-
-case "$usage_preset" in
-  android-arm-*)
-    flutter build apk --release --target-platform android-arm
-    ;;
-  android-arm64-*)
-    flutter build apk --release --target-platform android-arm64
-    ;;
-  android-x64-*)
-    flutter build apk --release --target-platform android-x64
-    ;;
-  ios-arm64-*)
-    flutter build ios --release --no-codesign
-    ;;
-  ios-simulator-arm64-*)
-    # Flutter prepares native assets for every standard simulator architecture
-    # before Xcode narrows a debug build to the active architecture.
-    printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
-    flutter build ios --debug --simulator --no-codesign
-    ;;
-esac
-'''
 
 [tasks."test:android"]
 description = "Run portable Dart binding suites in a Flutter Android host."
@@ -161,53 +84,4 @@ run_windows = '''
 # The DLL loads its own dependencies from the prefix it was installed into.
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
-'''
-
-[tasks."test:ios"]
-description = "Run portable Dart binding suites in a Flutter iOS simulator host."
-usage = 'arg "[preset]" default="ios-simulator-arm64-metal" { choices "ios-simulator-arm64-metal" }'
-depends = [
-  { task = "//:build", args = [
-    "{{usage.preset}}",
-  ] },
-  { task = ":_native-prefix", args = [
-    "{{usage.preset}}",
-  ] },
-]
-run = '''
-device=$(devices-cli get ios)
-app=.dart_tool/flutter_ios_test
-flutter create --empty --no-pub --org org.maplibre.native_ffi \
-  --platforms ios --project-name maplibre_native_ffi_ios_test "$app"
-cp tool/flutter_ios_test/pubspec.yaml "$app/pubspec.yaml"
-mkdir -p "$app/integration_test" "$app/hook"
-cp tool/flutter_ios_test/hook/build.dart "$app/hook/build.dart"
-cp tool/flutter_ios_test/integration_test/binding_test.dart "$app/integration_test/binding_test.dart"
-cd "$app"
-if ! grep -q '^ARCHS = arm64$' ios/Flutter/Debug.xcconfig; then
-  printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
-fi
-flutter pub get
-# Flutter 3.47 can launch the app before it starts reading the simulator log,
-# miss the app's VM service address, and wait for it without limit
-# (flutter/flutter#181771). The bound turns that wait into a failure, and the
-# tool's verbose log and the app's own log show which step stalled.
-: >test-results.txt
-status=0
-perl -e 'alarm shift; exec @ARGV' 300 \
-  flutter test integration_test/binding_test.dart --device-id "$device" \
-  --timeout 2m --verbose --reporter silent \
-  --file-reporter expanded:test-results.txt >flutter-test.log 2>&1 || status=$?
-cat test-results.txt
-if [[ $status -ne 0 ]]; then
-  cat flutter-test.log
-fi
-if [[ $status -eq 142 ]]; then
-  echo "flutter test did not finish within 5 minutes. The app's Flutter log:" >&2
-  perl -e 'alarm shift; exec @ARGV' 60 \
-    xcrun simctl spawn "$device" log show --last 10m --style compact \
-    --predicate 'process == "Runner" AND senderImagePath ENDSWITH "/Flutter"' |
-    tail -n 20 >&2 || true
-fi
-exit "$status"
 '''

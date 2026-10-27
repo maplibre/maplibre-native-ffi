@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Check that pub would publish the package as a release prepares it."
+#MISE shell="bash"
+set -euo pipefail
+
+# A copy outside Git stands in for the release checkout, whose prepared files
+# pub would otherwise report as modified.
+copy="$(mktemp -d)"
+trap 'rm -rf "$copy"' EXIT
+package="$copy/maplibre_native_ffi"
+mkdir "$package"
+# -h copies the file that the LICENSE link names.
+git ls-files -z --cached --others --exclude-standard | tar -c -h --null -T - | tar -x -C "$package"
+printf '[{"archive": "maplibre-native-c-linux-gnu-x64-vulkan.tar.gz", "sha256": "%s"}]\n' \
+  "$(printf '0%.0s' {1..64})" >"$copy/artifacts.json"
+python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" "$package" v0.202601.0 --artifacts "$copy/artifacts.json"
+cd "$package"
+dart pub publish --dry-run
