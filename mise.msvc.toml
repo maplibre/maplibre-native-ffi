@@ -14,7 +14,7 @@ windows_sdk_version = "10.0.26100"
 # as a /winsysroot tree, which accepts Microsoft's license for them.
 "github:Jake-Shadle/xwin" = { version = "0.10.0", os = [
   "linux",
-], postinstall = 'bash .mise/bin/sync-msvc-sysroot "$MISE_TOOL_INSTALL_PATH" {{vars.msvc_crt_version}} {{vars.windows_sdk_version}}' }
+], postinstall = 'bash tools/deps/sync-msvc-sysroot "$MISE_TOOL_INSTALL_PATH" {{vars.msvc_crt_version}} {{vars.windows_sdk_version}}' }
 
 [env]
 MLN_FFI_WINSYSROOT = { value = "{% if 'github:Jake-Shadle/xwin' in tools %}{{ tools['github:Jake-Shadle/xwin'].path }}/winsysroot{% endif %}", tools = true }

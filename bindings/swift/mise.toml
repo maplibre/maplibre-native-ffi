@@ -1,7 +1,7 @@
 [tools]
 "core:swift" = { version = "6.4.1", os = ["linux/x64", "linux/arm64"] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
-# libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
+# libxml2.so.16. tools/env/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
 "conda:libxml2" = { version = "2.13.9", os = ["linux/x64", "linux/arm64"] }
 
@@ -19,6 +19,6 @@ dir = "../.."
 # those resolutions copy from the shared cache without reaching the network, so
 # CI can tell a fetch failure from a build or test failure.
 run = '''
-source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 swift package resolve
 '''

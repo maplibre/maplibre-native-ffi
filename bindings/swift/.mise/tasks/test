@@ -11,8 +11,8 @@ set -euo pipefail
 # The preset selects the runner: an iOS or tvOS simulator preset builds the test
 # bundle and spawns it on a simulator, a Mac Catalyst preset builds the same
 # executable and runs it on the host, and host presets run in process.
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
-source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 case "$usage_preset" in
   ios-simulator-*)
     if [[ "$usage_configuration" != "debug" ]]; then

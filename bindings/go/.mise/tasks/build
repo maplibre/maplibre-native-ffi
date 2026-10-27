@@ -4,13 +4,13 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
 
 # A host build runs the suite; a cross build proves the package and its tests
 # compile and link for the target.
-source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/go-cross-env.sh" "$usage_preset"
 if [[ -n "$goos" ]]; then
   exec go test -c -tags "$go_test_tags" -o /dev/null ./maplibre
 fi

@@ -1,7 +1,7 @@
 [tasks.build]
 extends = "ffi:preset"
 run = '''
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build "${swift_args[@]}"
@@ -25,7 +25,7 @@ exec ".build/$usage_preset/debug/swift-map" "$usage_render_target"
 [tasks."build:ios-simulator"]
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "ios-simulator-arm64-metal"
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "ios-simulator-arm64-metal"
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
@@ -36,7 +36,7 @@ swift build \
 [tasks."build:ios"]
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "ios-arm64-metal"
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "ios-arm64-metal"
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios \

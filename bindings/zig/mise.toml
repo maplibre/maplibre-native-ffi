@@ -13,7 +13,7 @@ run = "zig build --build-file ../../build.zig --fetch=needed"
 description = "Build the Zig binding against a native preset's install."
 extends = "ffi:preset"
 run = '''
-source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/zig-cross-env.sh" "$usage_preset"
 zig build --build-file ../../build.zig \
   -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \

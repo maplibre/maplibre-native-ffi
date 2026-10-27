@@ -2,7 +2,7 @@
 # Windows SDK.
 #
 # A Windows host takes both from Visual Studio, whose environment
-# .mise/bin/windows-msvc-env.sh loads, and compiles with the LLVM installer's
+# tools/env/windows-msvc-env.sh loads, and compiles with the LLVM installer's
 # clang-cl. Any other host cross-compiles against the /winsysroot tree that
 # MLN_FFI_WINSYSROOT names, which `mise -E msvc install` lays out with xwin, and
 # runs its test binaries under Wine.

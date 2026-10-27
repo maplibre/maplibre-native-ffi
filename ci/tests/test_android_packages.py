@@ -34,7 +34,7 @@ class AndroidPackagesTest(unittest.TestCase):
         return subprocess.run(
             [
                 "bash",
-                str(ROOT / ".mise/bin/sync-android-packages"),
+                str(ROOT / "tools/deps/sync-android-packages"),
                 str(self.sdk),
                 "test-java",
                 "test-ndk",

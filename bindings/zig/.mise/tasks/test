@@ -31,7 +31,7 @@ case "$usage_preset" in
     ;;
 esac
 
-source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/zig-cross-env.sh" "$usage_preset"
 zig build test --build-file ../../build.zig \
   -Doptimize=ReleaseSafe \
   -Dlocal-build="$native_install_dir" \

@@ -49,7 +49,7 @@ if [[ "$usage_preset" == linux-musl-* ]]; then
   # musl's dynamic loader while the packaged native archive remains static.
   export MLN_FFI_RUST_MUSL_DYNAMIC=1
 fi
-source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/rust-cross-env.sh" "$usage_preset"
 cargo_args=()
 if [[ -n "$cargo_target" ]]; then
   cargo_args+=(--target "$cargo_target")

@@ -179,7 +179,7 @@ def _find_tool(tool: str, directory: Path) -> Tool | None:
             environment.update(json.loads(loaded.stdout))
         if tool in {"swift", "swiftc"} and sys.platform.startswith("linux"):
             # The Linux toolchain links a libxml2 that newer distributions lack;
-            # .mise/bin/swift-libxml2-env.sh explains the pinned copy.
+            # tools/env/swift-libxml2-env.sh explains the pinned copy.
             libxml2 = subprocess.run(
                 ["mise", "where", "conda:libxml2"],
                 cwd=directory,

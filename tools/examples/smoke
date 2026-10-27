@@ -26,8 +26,8 @@ preset=$1
 shift
 
 # Puts the preset's DLL directory on PATH on Windows.
-# shellcheck source=scripts/native-env.sh
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$preset"
+# shellcheck source=tools/env/native-env.sh
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$preset"
 # Some examples load the Vulkan loader at run time, from their search path.
 if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
   export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"

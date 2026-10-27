@@ -17,7 +17,7 @@ fi
 serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
 
 prefix="$MISE_MONOREPO_ROOT/build/$preset/install"
-toolchain=$("$MISE_MONOREPO_ROOT/scripts/android-ndk-prebuilt.sh")
+toolchain=$("$MISE_MONOREPO_ROOT/tools/env/android-ndk-prebuilt.sh")
 compiler="$toolchain/bin/${triple}26-clang"
 app=.dart_tool/flutter_android_test
 flutter create --empty --no-pub --org org.maplibre.nativeffi \

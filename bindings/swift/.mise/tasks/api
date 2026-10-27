@@ -5,8 +5,8 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
-source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 rm -rf build/docc
 mkdir -p build
 swift_args=(--scratch-path ".build/$usage_preset")

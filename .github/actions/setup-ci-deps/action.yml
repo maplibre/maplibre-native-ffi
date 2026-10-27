@@ -131,17 +131,17 @@ runs:
           third_party/maplibre-native
           .git/modules/third_party/maplibre-native
         key:
-          mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules')
+          mln-src-v4-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules')
           }}-${{ steps.mln-pin.outputs.sha }}
         # Restore only caches created with the current selective-sync logic.
         # A stale submodule worktree can otherwise report the recorded commit
         # while retaining files from the previous checkout.
         restore-keys: |
-          mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules') }}-
+          mln-src-v4-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules') }}-
 
     - name: Sync MapLibre Native source
       shell: bash
-      run: .mise/bin/sync-submodules
+      run: tools/deps/sync-submodules
 
     - name: Install sccache
       uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11

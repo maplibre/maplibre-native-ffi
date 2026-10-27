@@ -57,7 +57,7 @@ cascade = true
 shell = "bash -e -c"
 
 [vars]
-# The Android SDK packages that .mise/bin/sync-android-packages adds to the
+# The Android SDK packages that tools/deps/sync-android-packages adds to the
 # command-line tools. Gradle reads the package versions from the environment,
 # which `[env]` sets from these.
 android_build_tools_version = "36.0.0"
@@ -173,7 +173,7 @@ auto = true
 
 [deps.submodules]
 auto = true
-run = ".mise/bin/sync-submodules"
+run = "tools/deps/sync-submodules"
 
 [hooks]
 # The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
@@ -366,7 +366,7 @@ if [[ -z "$usage_sdk_root" ]]; then
   echo "Set ANDROID_HOME or pass --sdk-root; install the repository SDK with mise -E android install." >&2
   exit 1
 fi
-bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
+bash tools/deps/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
 
 [tasks.check]

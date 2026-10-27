@@ -4,7 +4,7 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 rm -rf build/doc2go
 mkdir -p build
