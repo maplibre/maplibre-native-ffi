@@ -30,8 +30,6 @@ pub const Native = struct {
     prefix: std.Build.LazyPath,
     target: std.Build.ResolvedTarget,
     backend: RenderBackend,
-    /// The name of the preset that built the install.
-    artifact: []const u8,
 };
 
 const BuildOptions = struct {
@@ -188,7 +186,6 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
         .prefix = prefix,
         .target = target,
         .backend = parseRenderBackend(descriptor.renderBackend),
-        .artifact = descriptor.artifact,
     };
 }
 
@@ -429,32 +426,26 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
     return tests;
 }
 
-fn addAndroidTestRunStep(
-    b: *std.Build,
-    tests: []const *std.Build.Step.Compile,
-    native: Native,
-    android_runner: std.Build.LazyPath,
-    emulator_api: ?[]const u8,
-) *std.Build.Step.Run {
-    const abi = switch (native.target.result.cpu.arch) {
-        .aarch64 => "arm64-v8a",
-        .x86_64 => "x86_64",
-        else => @panic("Android test runner supports ARM64 and x64 targets only"),
-    };
-    const run_tests = b.addSystemCommand(&.{"bash"});
-    run_tests.addFileArg(android_runner);
-    run_tests.addArgs(&.{ "180", abi });
-    run_tests.addFileArg(native.prefix.path(b, "lib/libmaplibre-native-c.so"));
-    run_tests.addArg("--library");
-    run_tests.addFileArg(native.prefix.path(b, "lib/libmln_test_graphics.so"));
-    if (emulator_api) |api| {
-        run_tests.addArgs(&.{ "--api", api });
-    }
-    run_tests.addArg("--");
+/// Runs each test executable through tools/devices/run, which finds the
+/// device for the install and pushes the executable there. One device runs one
+/// executable at a time, so each run waits for the one before it.
+fn addDeviceTestRunSteps(b: *std.Build, test_step: *std.Build.Step, tests: []const *std.Build.Step.Compile, native: Native) void {
+    const install = configurePath(b, native.prefix);
+    var previous: ?*std.Build.Step = null;
     for (tests) |test_executable| {
+        const run_tests = std.Build.Step.Run.create(b, b.fmt("run {s} on its device", .{test_executable.name}));
+        run_tests.addFileArg(b.path("tools/devices/run"));
         run_tests.addArtifactArg(test_executable);
+        run_tests.setEnvironmentVariable("MLN_FFI_DEVICE_INSTALL", install);
+        // --test-timeout bounds only tests that run in process, so the runner
+        // bounds each executable instead.
+        run_tests.setEnvironmentVariable("MLN_FFI_DEVICE_TIMEOUT", "300");
+        // An emulator receives the graphics fixtures beside the executable.
+        run_tests.setEnvironmentVariable("MLN_FFI_DEVICE_LIBRARIES", b.pathJoin(&.{ install, "lib/libmln_test_graphics.so" }));
+        if (previous) |step| run_tests.step.dependOn(step);
+        previous = &run_tests.step;
+        test_step.dependOn(&run_tests.step);
     }
-    return run_tests;
 }
 
 fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) void {
@@ -484,25 +475,11 @@ fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Buil
     if (target.abi == .android and target.cpu.arch == .arm) {
         const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
         test_step.dependOn(&unsupported.step);
-    } else if (target.abi == .android) {
-        const run_tests = addAndroidTestRunStep(
-            b,
-            &test_compiles,
-            options.native,
-            b.path("scripts/run-android-emulator-test.sh"),
-            if (target.cpu.arch == .x86_64 and options.native.backend == .opengl) "26" else null,
-        );
-        test_step.dependOn(&run_tests.step);
-    } else if (target.abi == .musl) {
-        // The executables load Alpine's graphics stack through musl's dynamic
-        // loader, so each one runs in an Alpine container.
-        for (test_compiles) |tests| {
-            const run_tests = b.addSystemCommand(&.{"bash"});
-            run_tests.addFileArg(b.path("scripts/run-musl-test.sh"));
-            run_tests.addArg(options.native.artifact);
-            run_tests.addArtifactArg(tests);
-            test_step.dependOn(&run_tests.step);
-        }
+    } else if (target.abi == .android or target.abi == .musl) {
+        // Android executables run on an emulator, and musl executables load
+        // Alpine's graphics stack through musl's dynamic loader in an Alpine
+        // container.
+        addDeviceTestRunSteps(b, test_step, &test_compiles, options.native);
     } else {
         for (test_compiles) |tests| {
             const run_tests = b.addRunArtifact(tests);
