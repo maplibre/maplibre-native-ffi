@@ -81,6 +81,7 @@ JOBS = {
         "pypi",
         lambda target: target.platform in PYTHON_WHEEL_PLATFORMS,
     ),
+    "typescript-npm": ("npm", lambda target: addon(target) == "typescript"),
 }
 
 
@@ -181,24 +182,29 @@ GRADLE_PROJECTS = ("//bindings/kotlin:", "//:kotlin:")
 SWIFT_PROJECTS = ("//bindings/swift:", "//examples/swift-map:")
 
 
-def row(target: Target, save_toolchains: bool) -> dict[str, object]:
-    """Return how the target job sets up, runs, and uploads for one target."""
+def addon(target: Target) -> str:
+    """Return which package's addon artifact the target job uploads, if any."""
     tasks = [suite.task for suite in target_suites(target)]
-    addon = ""
-    # The npm release publishes the addon that the TypeScript suite built
-    # against the packaged native artifact and tested, for each preset that
+    # The npm packages carry the addon that the TypeScript suite built against
+    # the packaged native artifact and tested, for each preset that
     # bindings/typescript/scripts/pack.ts packs.
     if target.platform in {"linux-gnu", "macos", "emscripten"} and (
         "//bindings/typescript:test" in tasks
     ):
-        addon = "typescript"
-    # The OHPM release packs the addon that each OpenHarmony job built against
-    # the packaged native artifact. The npm release downloads every
+        return "typescript"
+    # The OHPM packages carry the addon that each OpenHarmony job built against
+    # the packaged native artifact. npm packing downloads every
     # typescript-addon artifact, so these take another prefix.
     if target.platform == "ohos" and any(
         f"//bindings/typescript:{action}" in tasks for action in ("build", "test")
     ):
-        addon = "arkts"
+        return "arkts"
+    return ""
+
+
+def row(target: Target, save_toolchains: bool) -> dict[str, object]:
+    """Return how the target job sets up, runs, and uploads for one target."""
+    tasks = [suite.task for suite in target_suites(target)]
     # The key hashes every `build.zig.zon` and is shared by all rows on the
     # same runner. Cache keys are immutable, so a row that fetches only some
     # projects would claim the key with an incomplete cache. A row that runs no
@@ -225,7 +231,7 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         # The boot step's name and command.
         "device": target.device["name"] if target.device else "",
         "device_command": target.device["command"] if target.device else "",
-        "addon": addon,
+        "addon": addon(target),
         # devices-cli writes the logs of the Android emulators it boots.
         "emulator_logs": target.platform == "android" and target.device is not None,
     }

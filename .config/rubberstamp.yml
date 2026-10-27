@@ -414,3 +414,15 @@ ci:
               - bindings/python/.mise/tasks/build-runtime
               - tools/release/python_release.py
           then: apply
+    npm:
+      covers: >-
+        Packs the TypeScript npm packages from the addons that the Linux, macOS,
+        and browser targets built and tested, so it runs those targets. Only
+        changes to what the packages contain or how they are packed need it: the
+        package manifests, the facade bundle, and the packing script. Ordinary
+        TypeScript binding changes and one platform's addon don't.
+      rules:
+        - if:
+            files:
+              - bindings/typescript/scripts/pack.ts
+          then: apply

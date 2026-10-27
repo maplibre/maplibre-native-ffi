@@ -322,6 +322,20 @@ jobs:
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
       version: 0.202601.0.dev0
+  typescript-npm:
+    name: TypeScript npm
+    permissions:
+      actions: read
+      contents: read
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'typescript-npm')
+    uses: ./.github/workflows/_typescript-npm.yml
+    with:
+      run_id: ${{ github.run_id }}
+      sha: ${{ github.sha }}
+      version: 0.202601.0-dev.0
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -338,6 +352,7 @@ jobs:
       - kotlin-maven
       - dotnet-nuget
       - python-wheels
+      - typescript-npm
     steps:
       - name: Require every planned job
         env:

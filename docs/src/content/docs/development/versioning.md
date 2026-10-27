@@ -39,9 +39,9 @@ checkout of a published release tag or from the release run.
   `maplibre-native-ffi`, in that order. In each crate's settings, add a trusted
   publisher for `maplibre/maplibre-native-ffi`, with the workflow `release.yml`
   and the `crates.io` environment.
-- TypeScript: the release run's TypeScript job uploads the packed packages as
-  the `npm-packages-<version>` artifact before it publishes. Download it and run
-  `npm publish --access public <tarball>` for each addon package, then each
+- TypeScript: the release run's TypeScript npm job uploads the packed packages
+  as the `npm-packages-<version>` artifact before they publish. Download it and
+  run `npm publish --access public <tarball>` for each addon package, then each
   backend package, then `@maplibre/native-ffi`. In each package's settings, add
   a trusted publisher for `maplibre/maplibre-native-ffi`, with the workflow
   `release.yml` and the `npm` environment.
