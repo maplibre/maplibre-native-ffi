@@ -108,7 +108,13 @@ function addonOf(preset: string): Addon {
     backend,
     name: `${source.name}-${backend}-${os}-${cpu}${suffix}`,
     platform: { os, cpu, ...(libc === undefined ? {} : { libc }) },
-    files: ["maplibre_native_ffi.node"],
+    // The addon links the shared C library, which loads from beside it.
+    files: [
+      "maplibre_native_ffi.node",
+      os === "darwin"
+        ? "libmaplibre-native-c.dylib"
+        : "libmaplibre-native-c.so",
+    ],
   };
 }
 

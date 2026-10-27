@@ -2,9 +2,11 @@
 # Emscripten preset, which emscripten.cmake links.
 #
 # The presets include the root presets, so a preset name selects the same
-# toolchain, libc floor, and target as the native build. OpenHarmony links the
-# shared C library so an application's own modules can use the same handles;
-# other targets embed the complete static archive from that install prefix.
+# toolchain, libc floor, and target as the native build. A Node-API addon
+# links the shared C library from that install prefix, which its package ships
+# beside it, so a host's own native code can use the same handles. The browser
+# module embeds the complete static archive, since a WebAssembly module has no
+# shared library to load.
 cmake_minimum_required(VERSION 3.28)
 project(maplibre_native_ffi_node LANGUAGES C)
 
@@ -25,13 +27,9 @@ set(MLN_FFI_NATIVE_PREFIX
 # Every Node-API function the addon calls belongs to version 8.
 add_compile_definitions(NAPI_VERSION=8)
 
-if(OHOS)
-  find_library(
-    MLN_FFI_NATIVE_LIBRARY
-    NAMES libmaplibre-native-c.so
-    PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
-    REQUIRED)
-else()
+set(MLN_FFI_SOURCES generated_addon.c generated_values.c realm.c runtime.c)
+
+if(EMSCRIPTEN)
   find_library(
     MLN_FFI_NATIVE_ARCHIVE
     NAMES libmaplibre-native-c.a
@@ -41,13 +39,15 @@ else()
   # layer.
   file(GLOB MLN_FFI_COMPANION_ARCHIVES
        "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
-endif()
-set(MLN_FFI_SOURCES generated_addon.c generated_values.c realm.c runtime.c)
-
-if(EMSCRIPTEN)
   include("${CMAKE_CURRENT_SOURCE_DIR}/emscripten.cmake")
   return()
 endif()
+
+find_library(
+  MLN_FFI_NATIVE_LIBRARY
+  NAMES libmaplibre-native-c.so libmaplibre-native-c.dylib
+  PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+  REQUIRED)
 
 set(MLN_FFI_NODE_API_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/../node_modules/node-api-headers/include"
@@ -58,11 +58,6 @@ if(NOT EXISTS "${MLN_FFI_NODE_API_HEADERS}/node_api.h")
     FATAL_ERROR
       "node_api.h not found in ${MLN_FFI_NODE_API_HEADERS}; "
       "install the TypeScript binding's packages first")
-endif()
-
-include(CheckLinkerFlag)
-if(NOT APPLE)
-  check_linker_flag(C "LINKER:--exclude-libs,ALL" MLN_FFI_LINKER_EXCLUDE_LIBS)
 endif()
 
 if(OHOS)
@@ -95,52 +90,20 @@ function(mln_ffi_node_module target)
         -undefined dynamic_lookup
         "LINKER:-exported_symbol,_napi_register_module_v1")
   else()
-    # The version script exports only the registration entry point and makes
-    # every symbol of the embedded archives local, so a second copy of
-    # MapLibre in the process binds only to its own code. --exclude-libs says
-    # the same for linkers that take it; zig's linker does not. The module
-    # holds native threads that outlive any one realm, so it never unloads.
+    # The version script exports only the registration entry point. The
+    # module holds native threads that outlive any one realm, so it never
+    # unloads.
     target_link_options(
       ${target}
       PRIVATE
         "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map"
         "LINKER:-z,nodelete")
-    if(MLN_FFI_LINKER_EXCLUDE_LIBS)
-      target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
-    endif()
     set_property(
       TARGET ${target}
       APPEND
       PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
   endif()
 endfunction()
-
-file(READ "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/artifact.json"
-     MLN_FFI_ARTIFACT)
-string(
-  JSON MLN_FFI_STATIC_LIBRARY_COUNT
-  LENGTH "${MLN_FFI_ARTIFACT}" staticLinkLibraries)
-set(MLN_FFI_STATIC_LIBRARIES)
-if(MLN_FFI_STATIC_LIBRARY_COUNT GREATER 0)
-  math(EXPR MLN_FFI_LAST "${MLN_FFI_STATIC_LIBRARY_COUNT} - 1")
-  foreach(index RANGE ${MLN_FFI_LAST})
-    string(JSON library GET "${MLN_FFI_ARTIFACT}" staticLinkLibraries ${index})
-    list(APPEND MLN_FFI_STATIC_LIBRARIES "${library}")
-  endforeach()
-endif()
-string(
-  JSON MLN_FFI_FRAMEWORK_COUNT
-  LENGTH "${MLN_FFI_ARTIFACT}" staticLinkFrameworks)
-if(MLN_FFI_FRAMEWORK_COUNT GREATER 0)
-  math(EXPR MLN_FFI_LAST "${MLN_FFI_FRAMEWORK_COUNT} - 1")
-  foreach(index RANGE ${MLN_FFI_LAST})
-    string(
-      JSON framework
-      GET "${MLN_FFI_ARTIFACT}" staticLinkFrameworks ${index})
-    list(APPEND MLN_FFI_STATIC_LIBRARIES
-         "$<LINK_LIBRARY:FRAMEWORK,${framework}>")
-  endforeach()
-endif()
 
 # The shipped module: the binding runtime over the C API.
 add_library(maplibre_native_ffi MODULE ${MLN_FFI_SOURCES})
@@ -152,45 +115,30 @@ target_include_directories(
   PRIVATE
     "${MLN_FFI_ROOT}/include" "${MLN_FFI_NATIVE_PREFIX}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}")
-if(OHOS)
-  target_link_libraries(maplibre_native_ffi PRIVATE "${MLN_FFI_NATIVE_LIBRARY}")
-  set_target_properties(maplibre_native_ffi PROPERTIES INSTALL_RPATH "$ORIGIN")
-else()
-  target_compile_definitions(maplibre_native_ffi PRIVATE MLN_STATIC)
-  target_link_libraries(
+target_link_libraries(maplibre_native_ffi PRIVATE "${MLN_FFI_NATIVE_LIBRARY}")
+if(APPLE)
+  set_target_properties(
     maplibre_native_ffi
-    PRIVATE
-      "${MLN_FFI_NATIVE_ARCHIVE}" ${MLN_FFI_COMPANION_ARCHIVES}
-      ${MLN_FFI_STATIC_LIBRARIES})
+    PROPERTIES INSTALL_RPATH "@loader_path")
+else()
+  set_target_properties(maplibre_native_ffi PROPERTIES INSTALL_RPATH "$ORIGIN")
 endif()
 if(NOT ANDROID AND NOT OHOS)
   find_package(Threads REQUIRED)
   target_link_libraries(maplibre_native_ffi PRIVATE Threads::Threads)
 endif()
-string(
-  JSON MLN_FFI_ZIG_TARGET
-  ERROR_VARIABLE MLN_FFI_NO_ZIG_TARGET
-  GET "${MLN_FFI_ARTIFACT}" zigTarget)
-if(NOT MLN_FFI_NO_ZIG_TARGET AND MLN_FFI_ZIG_TARGET MATCHES "-linux-(gnu|musl)")
-  # The Rust platform archive unwinds through the _Unwind_* functions, which a
-  # Rust link takes from the system unwinder. On Linux, Node and Deno export
-  # them from their executables and Bun does not, so the module links zig's own
-  # static libunwind instead of depending on the host. The macOS system
-  # libraries provide them.
-  target_link_libraries(maplibre_native_ffi PRIVATE unwind)
-endif()
 install(TARGETS maplibre_native_ffi LIBRARY DESTINATION .)
+install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
 # The addon package ships the licenses of the native library it carries, so the
 # install prefix alone is enough to pack it.
 install(
   DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
   DESTINATION licenses)
 if(OHOS)
-  # The OHPM package supplies the same C API to the addon and the host's own
-  # native modules, with the C++ runtime that the device does not carry.
+  # The OHPM package ships the shared C++ runtime beside the addon, which the
+  # device does not carry, and the headers for the host's own native modules.
   install(
-    FILES "${MLN_FFI_NATIVE_LIBRARY}"
-    "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
+    FILES "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
     DESTINATION .)
   install(DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/include/" DESTINATION include)
 endif()

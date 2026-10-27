@@ -1077,7 +1077,7 @@ static void define(
   }
 }
 
-// Native threads of the embedded core outlive any one realm, so the module
+// Native threads of the C library outlive any one realm, so the module
 // never unloads. ELF builds link with -z nodelete, and Darwin builds mark the
 // loaded image when the first realm initializes.
 static void pin_module(void) {
