@@ -418,15 +418,17 @@ auto prepare_readback(
   return MLN_STATUS_OK;
 }
 
+// Shared because std::any holds only copyable values; the image itself moves
+// in from the readback and is never copied.
 struct TextureReadbackResult {
-  std::string bytes;
+  std::shared_ptr<const mln::PremultipliedImage> image;
   mln_texture_image_info info{};
 };
 
 // Checks a finished readback against the image that `info` describes, which
-// the readback captured when it started, and copies it into `out_result`.
+// the readback captured when it started, and moves it into `out_result`.
 auto readback_result(
-  const mln_texture_image_info& info, const mln::PremultipliedImage& image,
+  const mln_texture_image_info& info, mln::PremultipliedImage image,
   std::any& out_result
 ) -> mln_status {
   if (!image.valid()) {
@@ -440,9 +442,7 @@ auto readback_result(
     return MLN_STATUS_NATIVE_ERROR;
   }
   out_result = TextureReadbackResult{
-    .bytes = std::string(
-      reinterpret_cast<const char*>(image.data.get()), image.bytes()
-    ),
+    .image = std::make_shared<const mln::PremultipliedImage>(std::move(image)),
     .info = info,
   };
   return MLN_STATUS_OK;
@@ -504,11 +504,11 @@ auto texture_read_premultiplied_rgba8_start(
     ) {
       auto* readback = std::any_cast<TextureReadbackResult>(&result);
       if (status == MLN_STATUS_OK && readback != nullptr) {
-        state->resolve([bytes = std::move(readback->bytes),
+        state->resolve([image = std::move(readback->image),
                         info =
                           readback->info](const CompletionSink& descriptor) {
           const auto value = mln_texture_readback_result{
-            .data = {.data = bytes.data(), .size = bytes.size()},
+            .data = {.data = image->data.get(), .size = image->bytes()},
             .info = info,
           };
           CompletionValue<&mln_render_session_read_texture>::deliver(
