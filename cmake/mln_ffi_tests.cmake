@@ -324,14 +324,6 @@ function(mln_native_test_environment out_environment out_modifications)
   # compiled objects: an object carrying it would send a second checkout reading
   # fixtures out of the tree that happened to compile it first.
   set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures")
-  mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
-    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=visionOS")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
-    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=tvOS")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT maccatalyst)
-    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=iOS")
-  endif()
   get_target_property(vulkan_icd_file mln_ffi_render_dependencies
                       MLN_FFI_VULKAN_ICD_FILE)
   if(vulkan_icd_file)
@@ -540,6 +532,54 @@ function(mln_native_add_internal_suite out_sources)
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 
+# Whether this target's executables run off the host: on a simulator, an
+# Android or OpenHarmony emulator, in Alpine, in a FreeBSD virtual machine, or
+# under Wine. Mac Catalyst runs on the host. Each of these targets sets
+# CMAKE_SYSTEM_NAME, so a Windows host never runs a test through the dispatcher.
+function(mln_native_runs_off_host out_var)
+  mln_ffi_apple_is_maccatalyst(maccatalyst)
+  set(off_host FALSE)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$" AND NOT maccatalyst)
+    set(off_host TRUE)
+  elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS|FreeBSD)$")
+    set(off_host TRUE)
+  elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    set(off_host TRUE)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_HOST_WIN32)
+    set(off_host TRUE)
+  endif()
+  set(${out_var} ${off_host} PARENT_SCOPE)
+endfunction()
+
+# Bounds a test by its timeout. Off the host, CMake runs the target through
+# tools/devices/run, its emulator, which reads this build's install to find the
+# device. The dispatcher ends the executable 30 seconds before the timeout, so
+# its runner reports and cleans up before CTest stops it. A simulator runs the
+# suites side by side; any other device runs one test at a time.
+function(mln_native_bound_test test_name target timeout)
+  set_tests_properties(${test_name} PROPERTIES TIMEOUT ${timeout})
+  mln_native_runs_off_host(off_host)
+  if(NOT off_host)
+    return()
+  endif()
+  set_target_properties(
+    ${target}
+    PROPERTIES CROSSCOMPILING_EMULATOR "${PROJECT_SOURCE_DIR}/tools/devices/run")
+  math(EXPR deadline "${timeout} - 30")
+  set(environment "MLN_FFI_DEVICE_INSTALL=${CMAKE_INSTALL_PREFIX}"
+      "MLN_FFI_DEVICE_TIMEOUT=${deadline}")
+  # An emulator receives the plugin beside the executable.
+  get_target_property(plugin_type mln_native_test_plugin TYPE)
+  if(plugin_type STREQUAL "SHARED_LIBRARY")
+    list(APPEND environment
+         "MLN_FFI_DEVICE_LIBRARIES=$<TARGET_FILE:mln_native_test_plugin>")
+  endif()
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
+    set_tests_properties(${test_name} PROPERTIES RESOURCE_LOCK device)
+  endif()
+  set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT ${environment})
+endfunction()
+
 # Each exit program makes its calls and returns from main at once, so the
 # process exit that follows is the check. They link the shipped library, as
 # the ABI suite does, and a program whose name ends in a backend tag builds
@@ -571,7 +611,7 @@ function(mln_native_add_exit_tests out_tests)
       target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
     endif()
     add_test(NAME "native-exit/${stem}" COMMAND ${target})
-    set_tests_properties("native-exit/${stem}" PROPERTIES TIMEOUT 60)
+    mln_native_bound_test("native-exit/${stem}" ${target} 60)
     list(APPEND tests "native-exit/${stem}")
   endforeach()
   set(${out_tests} ${tests} PARENT_SCOPE)
@@ -606,25 +646,25 @@ function(mln_ffi_add_native_tests)
   # the fixture directory or the loader path.
   mln_native_test_environment(test_environment test_modifications)
   set(registered_tests)
-  mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$" AND NOT maccatalyst)
-    # A simulator spawns one process per run, so each suite runs as one entry,
-    # with the plugin group in an invocation of its own after the ABI suite.
-    # Each runner's alarm stays below its entry's timeout, so the runner
-    # reports first.
-    set(script "${PROJECT_SOURCE_DIR}/scripts/run-ios-simulator-test.sh")
-    set(runner bash "${script}" "$<TARGET_FILE:mln_native_abi_tests>")
-    add_test(NAME native-abi COMMAND ${runner} 290 -- -x /abi/plugin/)
-    add_test(NAME native-abi/plugin COMMAND ${runner} 110 -- -f /abi/plugin/)
+  mln_native_runs_off_host(off_host)
+  if(off_host)
+    # Off the host, each suite runs as one entry, since a simulator spawns and
+    # an emulator receives one process per run, with the plugin group in an
+    # invocation of its own after the ABI suite.
+    add_test(NAME native-abi COMMAND mln_native_abi_tests -x /abi/plugin/)
+    mln_native_bound_test(native-abi mln_native_abi_tests 300)
     add_test(
-      NAME native-internal
-      COMMAND bash "${script}" "$<TARGET_FILE:mln_native_internal_tests>" 110)
-    set_tests_properties(native-abi PROPERTIES TIMEOUT 300)
-    set_tests_properties(
-      native-abi/plugin
-      PROPERTIES DEPENDS native-abi TIMEOUT 120)
-    set_tests_properties(native-internal PROPERTIES TIMEOUT 120)
+      NAME native-abi/plugin
+      COMMAND mln_native_abi_tests -f /abi/plugin/)
+    mln_native_bound_test(native-abi/plugin mln_native_abi_tests 120)
+    set_tests_properties(native-abi/plugin PROPERTIES DEPENDS native-abi)
+    add_test(NAME native-internal COMMAND mln_native_internal_tests)
+    mln_native_bound_test(native-internal mln_native_internal_tests 120)
     list(APPEND registered_tests native-abi native-abi/plugin native-internal)
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
+      mln_native_add_exit_tests(exit_tests)
+      list(APPEND registered_tests ${exit_tests})
+    endif()
   else()
     # One entry per file, so `ctest --parallel` spreads the suites across
     # processes and a crash takes down one file rather than the run.
@@ -636,14 +676,17 @@ function(mln_ffi_add_native_tests)
       add_test(
         NAME ${test_name}
         COMMAND mln_native_${suite}_tests -f "/${relative}")
-      set_tests_properties(${test_name} PROPERTIES TIMEOUT 120)
+      mln_native_bound_test(${test_name} mln_native_${suite}_tests 120)
       list(APPEND registered_tests ${test_name})
     endforeach()
     mln_native_add_exit_tests(exit_tests)
     list(APPEND registered_tests ${exit_tests})
   endif()
   foreach(test_name IN LISTS registered_tests)
-    set_property(TEST ${test_name} PROPERTY ENVIRONMENT ${test_environment})
+    set_property(
+      TEST ${test_name}
+      APPEND
+      PROPERTY ENVIRONMENT ${test_environment})
     if(test_modifications)
       set_property(
         TEST ${test_name}

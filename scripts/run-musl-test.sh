@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs a musl test executable inside Alpine, where the dynamic loader and
-# graphics implementation share the ABI that the executable targets.
+# graphics implementation share the ABI that the executable targets. The
+# executable gets MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
 preset=${1:?usage: run-musl-test.sh <preset> [executable [arguments...]]}
@@ -53,6 +54,8 @@ esac
     # by the timeout scale.
     export MLN_TEST_TIMEOUT_SCALE="$3"
     export MLN_FFI_TEST_FIXTURE_DIR="$2/tests/native/fixtures"
-    shift 3
-    exec timeout 300 "$@"
-  ' sh "$backend" "$MISE_MONOREPO_ROOT" "${MLN_TEST_TIMEOUT_SCALE:-3}" "$@"
+    timeout_seconds=$4
+    shift 4
+    exec timeout "$timeout_seconds" "$@"
+  ' sh "$backend" "$MISE_MONOREPO_ROOT" "${MLN_TEST_TIMEOUT_SCALE:-3}" \
+  "${MLN_FFI_DEVICE_TIMEOUT:-300}" "$@"

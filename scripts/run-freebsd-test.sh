@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs a FreeBSD test executable in this checkout's FreeBSD virtual machine,
 # where the dynamic loader and graphics implementation share the ABI that the
-# executable targets. See tools/devices/freebsd-host.
+# executable targets. See tools/devices/freebsd-host. The executable gets
+# MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
 preset=${1:?usage: run-freebsd-test.sh <preset> [executable [arguments...]]}
@@ -43,7 +44,7 @@ for argument in \
   "MLN_TEST_TIMEOUT_SCALE=${MLN_TEST_TIMEOUT_SCALE:-3}" \
   "MLN_FFI_TEST_FIXTURE_DIR=$MISE_MONOREPO_ROOT/tests/native/fixtures" \
   ${drivers[@]+"${drivers[@]}"} \
-  timeout 300 \
+  timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" \
   "$@"; do
   command+=" $(quote "$argument")"
 done

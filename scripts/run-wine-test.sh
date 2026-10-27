@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs a Windows test executable under Wine on a Linux host. Wine implements WGL
 # over the host's OpenGL and Vulkan over the host's Vulkan driver, so Windows CI
-# stays the authority on how the Windows targets behave.
+# stays the authority on how the Windows targets behave. The executable gets
+# MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
@@ -27,4 +28,4 @@ if [[ -d "$proton_icu" ]]; then
   export WINEPATH="Z:$(cd "$proton_icu" && pwd)${WINEPATH:+;$WINEPATH}"
 fi
 export MLN_FFI_TEST_FIXTURE_DIR="$MISE_MONOREPO_ROOT/tests/native/fixtures"
-exec timeout 300 "$WINE" "$@"
+exec timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" "$WINE" "$@"

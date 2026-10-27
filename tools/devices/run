@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Runs a test executable built for the native install that MLN_FFI_DEVICE_INSTALL
+# names, on whatever runs that install's target: a simulator, an Android or
+# OpenHarmony emulator, an Alpine container, a FreeBSD virtual machine, or Wine.
+# An executable for any other target runs directly.
+#
+#   tools/devices/run <executable> [argument ...]
+#   tools/devices/run --boot
+#
+# The executable gets MLN_FFI_DEVICE_TIMEOUT seconds, after which the runner
+# ends it and reports. --boot only gets the device ready, so that a caller can
+# boot it before any test's deadline starts. MLN_FFI_DEVICE_LIBRARIES lists, by
+# colons, further shared libraries that an emulator needs beside the
+# executable, such as a plugin it loads.
+set -euo pipefail
+
+usage="usage: tools/devices/run <executable> [argument ...] | --boot"
+if (($# == 0)); then
+  echo "$usage" >&2
+  exit 2
+fi
+install=${MLN_FFI_DEVICE_INSTALL:?MLN_FFI_DEVICE_INSTALL must name a native install}
+descriptor="$install/share/maplibre-native-c/artifact.json"
+if [[ ! -f "$descriptor" ]]; then
+  echo "The native install has no artifact descriptor: $descriptor" >&2
+  exit 2
+fi
+field() {
+  sed -n "s/^[[:space:]]*\"$1\":[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$descriptor"
+}
+artifact=$(field artifact)
+target_platform=$(field targetPlatform)
+devices="$MISE_MONOREPO_ROOT/tools/devices"
+scripts="$MISE_MONOREPO_ROOT/scripts"
+
+# The x64 OpenGL suites run on API 26, the oldest release the library
+# supports; the other Android targets run on the default API level.
+android_api=()
+if [[ "$target_platform" == android-x64 && "$(field renderBackend)" == opengl ]]; then
+  android_api=(--api 26)
+fi
+
+if [[ "$1" == --boot ]]; then
+  if (($# != 1)); then
+    echo "$usage" >&2
+    exit 2
+  fi
+  case "$target_platform" in
+    android-*) "$devices/android-serial" "$(field androidAbi)" ${android_api[@]+"${android_api[@]}"} >/dev/null ;;
+    ohos-*) "$devices/ohos-key" >/dev/null ;;
+    freebsd-*) "$devices/freebsd-host" >/dev/null ;;
+    *-simulator-*) devices-cli get "${target_platform%%-*}" >/dev/null ;;
+  esac
+  exit 0
+fi
+
+timeout_seconds=${MLN_FFI_DEVICE_TIMEOUT:-}
+if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
+  echo "MLN_FFI_DEVICE_TIMEOUT must give the executable's deadline in seconds." >&2
+  exit 2
+fi
+executable=$1
+shift
+libraries=()
+IFS=: read -r -a libraries <<<"${MLN_FFI_DEVICE_LIBRARIES:-}"
+library_arguments=()
+for library in ${libraries[@]+"${libraries[@]}"}; do
+  library_arguments+=(--library "$library")
+done
+
+case "$target_platform" in
+  android-*)
+    exec "$scripts/run-android-emulator-test.sh" "$timeout_seconds" "$(field androidAbi)" \
+      "$install/lib/libmaplibre-native-c.so" ${android_api[@]+"${android_api[@]}"} \
+      ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
+    ;;
+  ohos-*)
+    exec "$scripts/run-ohos-emulator-test.sh" "$timeout_seconds" \
+      "$install/lib/libmaplibre-native-c.so" \
+      "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must point at the OpenHarmony SDK}/llvm/lib/$(field zigTarget)/libc++_shared.so" \
+      ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
+    ;;
+  *-simulator-*)
+    export MLN_FFI_SIMULATOR_RUNTIME=${target_platform%%-*}
+    exec "$scripts/run-ios-simulator-test.sh" "$executable" "$timeout_seconds" -- "$@"
+    ;;
+  linux-musl-*) exec "$scripts/run-musl-test.sh" "$artifact" "$executable" "$@" ;;
+  freebsd-*) exec "$scripts/run-freebsd-test.sh" "$artifact" "$executable" "$@" ;;
+  windows-*) exec "$scripts/run-wine-test.sh" "$executable" "$@" ;;
+  *) exec perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" "$executable" "$@" ;;
+esac
