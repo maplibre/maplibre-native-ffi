@@ -3,16 +3,6 @@ title: Install
 description: Add a language binding and its native library to a project.
 ---
 
-import { Aside } from "@astrojs/starlight/components";
-
-export const SnapshotOnly = () => (
-  <Aside type="caution" title="Snapshot only">
-    This binding has no tagged release yet. Snapshots follow `main`, and package
-    coordinates and the C ABI may change. File a GitHub issue to request a tagged
-    release.
-  </Aside>
-);
-
 Choose a render backend first. Prefer Metal for Apple platforms, OpenGL for
 emulators and virtual machines, and Vulkan for other platforms. Then install the
 C library, a binding for your language, or both. Each section covers its tagged
@@ -384,24 +374,50 @@ release's archives.
 
 ### Swift
 
-<SnapshotOnly />
+Add the package from its
+[distribution repository](https://github.com/maplibre/maplibre-native-ffi-distribution),
+which each release tags with its version, and depend on the `MaplibreNativeFFI`
+product.
 
-The package manifest at the repository root defines the Swift package.
+```swift title="Package.swift"
+.package(
+  url: "https://github.com/maplibre/maplibre-native-ffi-distribution",
+  exact: "{{version}}"
+)
+```
+
+```swift title="Package.swift"
+.product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi-distribution")
+```
+
+On Apple platforms, the package takes the C library from the release's
+[XCFramework](#add-the-xcframework-to-an-apple-app). Its `MaplibreNativeC`
+product is that library, for a native target that calls the C API itself.
+
+On Linux, install the [C library](#build-against-a-prefix), then export
+`PKG_CONFIG_PATH` before you build. SwiftPM drops the rpath that pkg-config
+names, so pass the prefix's `lib` directory to the linker, or put it on the
+loader's search path when you run.
+
+```bash frame="terminal"
+export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+swift build -Xlinker -rpath -Xlinker <prefix>/lib
+```
+
+For the snapshot channel, depend on this repository at `main`, whose package
+always builds against an installed C library. SwiftPM takes the package identity
+from the repository name, so name it as `maplibre-native-ffi`. Install the
+[C library](#build-against-a-prefix) from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+and export `PKG_CONFIG_PATH` as for Linux.
 
 ```swift title="Package.swift"
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
 ```
 
-Depend on the `MaplibreNativeFFI` product. SwiftPM takes the package identity
-from the repository name rather than from the manifest, so name it as
-`maplibre-native-ffi`.
-
 ```swift title="Package.swift"
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
-
-Install the [C library](#build-against-a-prefix), then export `PKG_CONFIG_PATH`
-before you build.
 
 ### TypeScript
 
