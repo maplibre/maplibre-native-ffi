@@ -147,7 +147,10 @@ labels:
 # Each target preset's vendor block in `CMakePresets.json` names the unit that
 # runs it, and `tools/ci/plan.py` names the units of the other jobs. A unit's
 # rule runs it regardless of the plan when a changed file matches, with globs as
-# in GitHub Actions path filters.
+# in GitHub Actions path filters. A rule names only files that no other unit's
+# jobs read: Jev judges a shared file from its diff, so one file never forces
+# several units. The submodule pin is the exception, since its diff names only a
+# commit.
 ci:
   workflow: .github/workflows/ci-coverage.yml
   threshold: 0.6
@@ -236,13 +239,7 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/apple/**
-              - src/render/metal/**
-              - cmake/apple/**
-              - cmake/platform/apple.cmake
-              - mise.macos.toml
               - bindings/kotlin/src/macosTest/**
-              - examples/swift-map/**
               - third_party/maplibre-native
           then: apply
     apple-mobile:
@@ -256,18 +253,9 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/apple/**
-              - src/render/metal/**
-              - cmake/apple/**
-              - cmake/platform/apple.cmake
-              - cmake/toolchains/apple.cmake
-              - cmake/mln_ffi_apple_framework.cmake
               - .mise/tasks/package-xcframework
               - bindings/kotlin/src/iosTest/**
               - bindings/kotlin/src/tvosTest/**
-              - examples/swift-map/Package.swift
-              - examples/swift-map/mise.toml
-              - examples/swift-map/.mise/**
               - examples/swift-map/Sources/SwiftMapIOS/**
               - third_party/maplibre-native
           then: apply
@@ -282,11 +270,6 @@ ci:
             files:
               - src/platform/windows/**
               - src/render/opengl/wgl_*
-              - cmake/platform/windows.cmake
-              - cmake/toolchains/clang-cl.cmake
-              - mise.windows.toml
-              - .github/actions/setup-windows-*/**
-              - .github/actions/setup-ci-deps/**
               - third_party/maplibre-native
           then: apply
     windows-arm64:
@@ -300,10 +283,6 @@ ci:
       rules:
         - if:
             files:
-              - cmake/platform/windows.cmake
-              - cmake/toolchains/clang-cl.cmake
-              - mise.windows.toml
-              - .github/actions/setup-windows-*/**
               - third_party/maplibre-native
           then: apply
     android:
@@ -341,14 +320,9 @@ ci:
               - mise.ohos.*
               - src/platform/ohos/**
               - tests/native/abi/platform/transport.c
-              - bindings/typescript/native/CMake*
-              - bindings/typescript/native/exports.map
-              - bindings/typescript/native/realm.c
-              - bindings/typescript/native/runtime.*
               - bindings/typescript/scripts/build-hap.sh
               - bindings/typescript/scripts/test-arkts.sh
               - bindings/typescript/src/arkts.ts
-              - bindings/typescript/src/internal/**
               - bindings/typescript/test/arkts/**
               - tools/devices/ohos-key
               - third_party/maplibre-native
@@ -398,7 +372,6 @@ ci:
             files:
               - .mise/tasks/ci/pack-dotnet
               - bindings/dotnet/src/Maplibre.NativeFfi.Runtime/**
-              - tools/release/dotnet_release.py
           then: apply
     pypi:
       covers: >-
@@ -411,7 +384,6 @@ ci:
       rules:
         - if:
             files:
-              - bindings/python/.mise/tasks/build-runtime
               - tools/release/python_release.py
           then: apply
     npm:
@@ -421,11 +393,6 @@ ci:
         changes to what the packages contain or how they are packed need it: the
         package manifests, the facade bundle, and the packing script. Ordinary
         TypeScript binding changes and one platform's addon don't.
-      rules:
-        - if:
-            files:
-              - bindings/typescript/scripts/pack.ts
-          then: apply
     ohpm:
       covers: >-
         Packs the ArkTS OHPM packages from the addons that the OpenHarmony
@@ -433,12 +400,6 @@ ci:
         packages contain or how they are packed need it: the OHPM manifest and
         package files, and the packing script. Ordinary TypeScript or ArkTS
         changes and one ABI's addon don't.
-      rules:
-        - if:
-            files:
-              - bindings/typescript/ohpm/**
-              - bindings/typescript/scripts/pack-ohpm.sh
-          then: apply
     swiftpm:
       covers: >-
         Writes the Swift package that a release pushes to the distribution
@@ -452,12 +413,8 @@ ci:
       rules:
         - if:
             files:
-              - Package.swift
-              - tools/release/distribution.py
               - tools/release/swift_package.py
               - bindings/swift/.mise/tasks/test/package
-              - bindings/swift/Sources/MaplibreNativeC/**
-              - examples/swift-map/Package.swift
           then: apply
     vcpkg:
       covers: >-
@@ -468,13 +425,8 @@ ci:
       rules:
         - if:
             files:
-              - tools/release/distribution.py
               - tools/release/vcpkg_registry.py
-              - tools/release/publish-distribution.sh
               - tools/release/test_vcpkg.py
-              - tests/package/**
-              - cmake/mln_ffi_package_config.cmake
-              - cmake/maplibre-native-c-config.cmake.in
           then: apply
     conan:
       covers: >-
@@ -485,7 +437,6 @@ ci:
       rules:
         - if:
             files:
-              - tools/release/distribution.py
               - tools/release/conan_package.py
               - tools/release/conan/**
               - tools/release/check_conan.py
@@ -500,8 +451,6 @@ ci:
       rules:
         - if:
             files:
-              - tools/release/distribution.py
               - tools/release/xmake_package.*
               - tools/release/test_xmake_package.py
-              - tests/package/main.c
           then: apply
