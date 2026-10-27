@@ -155,10 +155,11 @@ class CommandTest(unittest.TestCase):
             )
 
     def test_the_arguments_of_ci_target_do_not_reach_its_suites(self):
-        with mock.patch.dict(os.environ, {"usage_preset": "p", "usage_list": "false"}):
+        # Windows reports the names in upper case.
+        with mock.patch.dict(os.environ, {"usage_preset": "p", "USAGE_LIST": "false"}):
             env = target.environment(
                 Suite("a", ("mise",), {"X": "1"}, None, None, None, ())
             )
         self.assertNotIn("usage_preset", env)
-        self.assertNotIn("usage_list", env)
+        self.assertNotIn("USAGE_LIST", env)
         self.assertEqual(env["X"], "1")

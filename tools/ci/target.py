@@ -47,9 +47,12 @@ def argv(suite: Suite) -> list[str]:
 
 def environment(suite: Suite) -> dict[str, str]:
     # The arguments mise gave this task would reach a child task that declares
-    # none of its own.
+    # none of its own. Windows environment names ignore case, and Python reports
+    # them in upper case there.
     env = {
-        key: value for key, value in os.environ.items() if not key.startswith("usage_")
+        key: value
+        for key, value in os.environ.items()
+        if not key.lower().startswith("usage_")
     }
     if suite.wrapper == "xvfb":
         # Draw on the virtual display's X11 platform rather than the
