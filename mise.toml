@@ -387,7 +387,7 @@ description = "Validate a release tag, or print the next release version."
 run = 'python3 ci/release_version.py "$@"'
 
 [tasks."ci:test"]
-description = "Test CI workflow generation and release tooling."
+description = "Test CI planning and release tooling."
 run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]

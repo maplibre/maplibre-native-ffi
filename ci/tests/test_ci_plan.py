@@ -1,12 +1,11 @@
-"""Check the preset-driven CI plan against the generated workflow's planning."""
+"""Check how the CI plan resolves targets from presets and selects jobs."""
 
 from __future__ import annotations
 
 import collections
+import json
 import unittest
 
-from ci import coverage, workflow
-from ci.workflow import load_configuration
 from tools.ci import plan
 from tools.ci.plan import ROOT
 
@@ -149,14 +148,35 @@ class ResolverTest(unittest.TestCase):
     def test_a_hidden_preset_needs_no_unit_or_runner(self):
         self.assertEqual(plan.targets(presets(preset("_parent", hidden=True))), [])
 
+    def test_a_preset_device_outranks_its_parents_device(self):
+        parent = {**RUNS, "device": {"name": "parent", "command": "boot parent"}}
+        own = {"device": {"name": "own", "command": "boot own"}}
+        source = presets(
+            preset("_parent", hidden=True, vendor=parent, **TARGET),
+            preset("inherited", inherits="_parent"),
+            preset("overridden", inherits="_parent", vendor=own),
+        )
+        self.assertEqual(
+            {target.preset: target.device["name"] for target in plan.targets(source)},
+            {"inherited": "parent", "overridden": "own"},
+        )
+
+    def test_a_device_needs_a_name_and_a_command(self):
+        with self.assertRaisesRegex(SystemExit, "device without exactly a name"):
+            plan.targets(
+                presets(
+                    preset("child", vendor={**RUNS, "device": {"name": "x"}}, **TARGET)
+                )
+            )
+
 
 class PresetTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source, cls.presets = load_configuration(ROOT)
+        cls.presets = json.loads((ROOT / "CMakePresets.json").read_text())
         cls.targets = {target.preset: target for target in plan.targets(cls.presets)}
 
-    def test_musl_overrides_the_unit_and_inherits_the_runner(self):
+    def test_musl_overrides_the_unit_and_inherits_the_gnu_runner(self):
         for architecture in ("x64", "arm64"):
             with self.subTest(architecture=architecture):
                 musl = self.targets[f"linux-musl-{architecture}-egl"]
@@ -165,6 +185,7 @@ class PresetTest(unittest.TestCase):
                     (musl.platform, musl.unit, musl.runner),
                     ("linux-musl", "linux-musl", gnu.runner),
                 )
+                self.assertEqual(gnu.unit, f"linux-{architecture}")
 
     def test_apple_simulators_and_catalyst_override_the_platform(self):
         self.assertEqual(
@@ -187,44 +208,11 @@ class PresetTest(unittest.TestCase):
             },
         )
 
-    def test_every_target_matches_the_generated_workflow(self):
-        rows = coverage.target_rows(self.presets)
-        self.assertEqual(list(self.targets), [row["preset"] for row in rows])
-        for row in rows:
-            name = row["preset"]
-            with self.subTest(preset=name):
-                target = self.targets[name]
-                self.assertEqual(
-                    (
-                        target.platform,
-                        target.architecture,
-                        target.backend,
-                        target.runner,
-                        target.package,
-                    ),
-                    (
-                        workflow.platform(name),
-                        workflow.architecture(name),
-                        workflow.backend(name),
-                        workflow.runner(name),
-                        row["package"],
-                    ),
-                )
-                self.assertEqual(row["runner"], target.runner)
-
-    def test_packaging_jobs_consume_the_generated_workflow_dependencies(self):
-        expected = coverage.dependencies(self.presets)
-        all_targets = list(self.targets.values())
-        for job in expected:
-            with self.subTest(job=job):
-                self.assertEqual(
-                    [f"target-{t.preset}" for t in plan.consumed(job, all_targets)],
-                    expected[job],
-                )
-        self.assertEqual(plan.consumed("docs", all_targets), [])
-
     def selections(self) -> dict[str, tuple[bool, list[str]]]:
-        units = list(self.source["units"])
+        units = sorted(
+            {target.unit for target in self.targets.values()}
+            | {unit for unit, _ in plan.JOBS.values()}
+        )
         return {
             "all": (True, []),
             "empty": (False, []),
@@ -237,30 +225,32 @@ class PresetTest(unittest.TestCase):
             "every unit": (False, units),
         }
 
-    def test_every_selection_runs_the_generated_workflow_jobs(self):
-        running = coverage.job_units(self.source, self.presets)
+    def test_a_selection_runs_its_units_targets_and_what_its_jobs_consume(self):
+        all_targets = list(self.targets.values())
         for name, (run_all, units) in self.selections().items():
             with self.subTest(selection=name):
                 planned = plan.plan(self.presets, run_all, units)
-                selected = [
-                    *(f"target-{row['preset']}" for row in planned["matrix"]),
-                    *planned["jobs"],
-                ]
-                expected = [
+                selected = set(units) if not run_all else None
+                jobs = [
                     job
-                    for job, job_units in running.items()
-                    if run_all or set(units) & set(job_units)
+                    for job, (unit, _) in plan.JOBS.items()
+                    if selected is None or unit in selected
                 ]
-                self.assertEqual(sorted(selected), sorted(expected))
-                self.assertEqual(len(selected), len(set(selected)))
+                self.assertEqual(planned["jobs"], jobs)
+                expected = {
+                    target.preset
+                    for target in all_targets
+                    if selected is None or target.unit in selected
+                } | {
+                    target.preset
+                    for job in jobs
+                    for target in plan.consumed(job, all_targets)
+                }
+                presets = [row["preset"] for row in planned["matrix"]]
+                self.assertEqual(len(presets), len(set(presets)))
+                self.assertEqual(set(presets), expected)
 
     def test_one_selected_row_per_runner_saves_toolchains(self):
-        rows = coverage.target_rows(self.presets)
-        everything = plan.plan(self.presets, True, [])["matrix"]
-        self.assertEqual(
-            [row["save_toolchains"] for row in everything],
-            [row["save_toolchains"] for row in rows],
-        )
         for name, (run_all, units) in self.selections().items():
             with self.subTest(selection=name):
                 matrix = plan.plan(self.presets, run_all, units)["matrix"]

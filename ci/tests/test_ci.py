@@ -1,72 +1,173 @@
-"""Exercise suite configuration, the required check, and retries."""
+"""Exercise the CI workflow, suite configuration, the required check, and retries."""
 
 from __future__ import annotations
 
-import copy
+import dataclasses
 import json
 import os
 import subprocess
 import unittest
 from unittest import mock
 
-from ci.generate_workflow import ROOT, ci_workflow
+from ruamel.yaml import YAML
+
 from ci.retry import retryable
-from ci.workflow import load_configuration
-from tools.ci import suites
+from tools.ci import plan, suites
+from tools.ci.plan import ROOT
+
+
+def load_yaml(path: str) -> dict:
+    return YAML(typ="safe").load((ROOT / path).read_text())
+
+
+def presets() -> dict:
+    return json.loads((ROOT / "CMakePresets.json").read_text())
+
+
+def targets() -> dict[str, plan.Target]:
+    return {target.preset: target for target in plan.targets(presets())}
 
 
 class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source, cls.presets = load_configuration(ROOT)
+        cls.jobs = load_yaml(".github/workflows/ci-coverage.yml")["jobs"]
+        cls.matrix = plan.plan(presets(), True, [])["matrix"]
+
+    def step(self, job: str, name: str) -> dict:
+        (step,) = [step for step in self.jobs[job]["steps"] if step.get("name") == name]
+        return step
 
     def test_android_emulator_logs_are_uploaded_even_after_recovery(self):
-        jobs = ci_workflow(self.source, self.presets)["jobs"]
-        enabled = []
-        for name, job in jobs.items():
-            upload = next(
-                (
-                    step
-                    for step in job.get("steps", [])
-                    if step.get("name") == "Upload Android emulator logs"
-                ),
-                None,
-            )
-            if upload is None:
-                continue
-            enabled.append(name)
-            self.assertEqual(upload["if"], "always()")
-            self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
+        upload = self.step("target", "Upload Android emulator logs")
+        self.assertEqual(upload["if"], "always() && matrix.emulator_logs")
+        self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
         self.assertEqual(
-            enabled, ["target-android-x64-egl", "target-android-x64-vulkan"]
+            [row["preset"] for row in self.matrix if row["emulator_logs"]],
+            ["android-x64-egl", "android-x64-vulkan"],
         )
 
-    def test_every_target_job_runs_its_suites_after_build_and_boot(self):
-        jobs = ci_workflow(self.source, self.presets)["jobs"]
-        for name, job in jobs.items():
-            if not name.startswith("target-"):
-                continue
-            with self.subTest(job=name):
-                steps = job["steps"]
-                runs = [step for step in steps if step.get("name") == "Run suites"]
-                self.assertEqual(len(runs), 1)
-                preset = name.removeprefix("target-")
-                self.assertEqual(runs[0]["run"], f"mise run ci:target {preset}")
-                # The default success() gate keeps it, and the uploads after
-                # it, behind the build and boot steps.
-                self.assertNotIn("if", runs[0])
-                ready = max(
-                    index
-                    for index, step in enumerate(steps)
-                    if step.get("id") in ("build", "boot")
+    def test_the_target_job_runs_its_suites_after_build_and_boot(self):
+        steps = self.jobs["target"]["steps"]
+        runs = [step for step in steps if step.get("name") == "Run suites"]
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["run"], "mise run ci:target ${{ matrix.preset }}")
+        # The default success() gate keeps it, and the uploads after it,
+        # behind the build and boot steps.
+        self.assertNotIn("if", runs[0])
+        ready = max(
+            index
+            for index, step in enumerate(steps)
+            if step.get("id") in ("build", "boot")
+        )
+        self.assertIs(steps[ready + 1], runs[0])
+
+    def test_the_target_job_reads_every_matrix_field(self):
+        text = (ROOT / ".github/workflows/ci-coverage.yml").read_text()
+        for field in self.matrix[0]:
+            with self.subTest(field=field):
+                self.assertIn(f"matrix.{field}", text)
+
+    def test_each_job_other_than_a_target_job_gates_on_the_plan(self):
+        for job in plan.JOBS:
+            with self.subTest(job=job):
+                self.assertEqual(
+                    self.jobs[job]["if"],
+                    f"contains(fromJSON(needs.plan.outputs.jobs), '{job}')",
                 )
-                self.assertIs(steps[ready + 1], runs[0])
+                # A packaging job consumes the target matrix's artifacts.
+                if job != "docs":
+                    self.assertEqual(self.jobs[job]["needs"], ["plan", "target"])
+
+    def test_the_required_check_needs_every_job_that_can_fail_the_run(self):
+        expected = set(self.jobs) - {"required", "support-issue"}
+        self.assertEqual(set(self.jobs["required"]["needs"]), expected)
+
+
+class GateTest(unittest.TestCase):
+    def test_required_check_accepts_only_successes_and_skips(self):
+        required = load_yaml(".github/workflows/ci-coverage.yml")["jobs"]["required"]
+        step = required["steps"][0]
+        needs = required["needs"]
+        results = {job: {"result": "success"} for job in needs}
+
+        def accepts(values, plan_result="success"):
+            env = {
+                "PATH": os.environ["PATH"],
+                "PLAN": plan_result,
+                "RESULTS": json.dumps(values),
+            }
+            command = ["bash", "-c", step["run"]]
+            done = subprocess.run(command, env=env, capture_output=True, check=False)
+            return done.returncode == 0
+
+        self.assertTrue(accepts(results))
+        # Rubberstamp skips the units a change does not need, and an empty
+        # matrix skips the target job.
+        skipped = {job: {"result": "skipped"} for job in needs if job != "plan"}
+        self.assertTrue(accepts({**results, **skipped}))
+        # A failed or skipped plan skips every gated job, which must not pass.
+        failed_plan = {**skipped, "plan": {"result": "failure"}}
+        self.assertFalse(accepts(failed_plan, plan_result="failure"))
+        self.assertFalse(accepts(results, plan_result="skipped"))
+        for job in needs:
+            for result in ("failure", "cancelled"):
+                changed = {**results, job: {"result": result}}
+                self.assertFalse(accepts(changed), (job, result))
+
+
+class VendorTest(unittest.TestCase):
+    def test_every_vendor_unit_is_a_rubberstamp_unit_and_every_unit_runs_a_job(self):
+        units = set(load_yaml(".config/rubberstamp.yml")["ci"]["units"])
+        owned = {target.unit for target in targets().values()}
+        owned |= {unit for unit, _ in plan.JOBS.values()}
+        self.assertEqual(owned, units)
+
+    def test_every_runner_label_is_known(self):
+        labels = set(
+            load_yaml(".github/jactionlint.yaml")["self-hosted-runner"]["labels"]
+        )
+        # The GitHub-hosted labels that targets run on.
+        labels |= {"windows-11-arm"}
+        for target in targets().values():
+            with self.subTest(preset=target.preset):
+                self.assertIn(target.runner, labels)
+
+    def test_each_device_target_boots_its_device(self):
+        android = "tools/devices/android-serial x86_64"
+        freebsd = ("FreeBSD virtual machine", "tools/devices/freebsd-host")
+        self.assertEqual(
+            {
+                name: (target.device["name"], target.device["command"])
+                for name, target in targets().items()
+                if target.device
+            },
+            {
+                "freebsd-x64-egl": freebsd,
+                "freebsd-x64-vulkan": freebsd,
+                "ios-simulator-arm64-metal": ("iOS simulator", "devices-cli get ios"),
+                "tvos-simulator-arm64-metal": (
+                    "tvOS simulator",
+                    "devices-cli get tvos",
+                ),
+                "visionos-simulator-arm64-metal": (
+                    "visionOS simulator",
+                    "devices-cli get visionos",
+                ),
+                # The EGL target's suites run on API 26, as the root `test`
+                # task and the device test scripts ask for it.
+                "android-x64-egl": ("Android emulator", f"{android} --api 26"),
+                "android-x64-vulkan": ("Android emulator", android),
+                # Only x64 EGL runs on the OpenHarmony emulator.
+                "ohos-x64-egl": ("OpenHarmony emulator", "tools/devices/ohos-key"),
+            },
+        )
 
 
 class SuitesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        _, cls.presets = load_configuration(ROOT)
+        cls.targets = targets()
 
     def test_a_target_cannot_run_one_task_as_two_suites(self):
         extra = {
@@ -77,7 +178,7 @@ class SuitesTest(unittest.TestCase):
             mock.patch.object(suites, "SUITES", [*suites.SUITES, extra]),
             self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"),
         ):
-            suites.target_suites(self.presets, "windows-x64-wgl")
+            suites.target_suites(self.targets["windows-x64-wgl"])
 
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         extra = {
@@ -100,7 +201,7 @@ class SuitesTest(unittest.TestCase):
             environments = {
                 (preset, suite.command): suite.env
                 for preset in presets
-                for suite in suites.target_suites(self.presets, preset)
+                for suite in suites.target_suites(self.targets[preset])
                 if "STEP_PROBE" in suite.env
                 or suite.task.startswith("//examples/c-map:")
             }
@@ -119,13 +220,8 @@ class SuitesTest(unittest.TestCase):
         )
 
     def test_an_unpackaged_target_runs_its_consumers_against_its_build_tree(self):
-        presets = copy.deepcopy(self.presets)
-        presets["packagePresets"] = [
-            preset
-            for preset in presets["packagePresets"]
-            if preset["name"] != "linux-gnu-x64-egl"
-        ]
-        listed = suites.target_suites(presets, "linux-gnu-x64-egl")
+        target = dataclasses.replace(self.targets["linux-gnu-x64-egl"], package=False)
+        listed = suites.target_suites(target)
         ids = [suite.id for suite in listed]
         self.assertNotIn("archive", ids)
         self.assertNotIn("install", ids)
@@ -134,34 +230,17 @@ class SuitesTest(unittest.TestCase):
             self.assertNotIn("MISE_TASK_SKIP", suite.env)
             self.assertEqual(suite.prerequisites, ("build",))
 
-
-class GateTest(unittest.TestCase):
-    def test_required_check_accepts_only_successes_and_skips(self):
-        source, presets = load_configuration(ROOT)
-        workflow = ci_workflow(source, presets)
-        step = workflow["jobs"]["required"]["steps"][0]
-        needs = workflow["jobs"]["required"]["needs"]
-        results = {job: {"result": "success"} for job in needs}
-
-        def accepts(values, plan_result="success"):
-            env = {
-                "PATH": os.environ["PATH"],
-                "PLAN": plan_result,
-                "RESULTS": json.dumps(values),
-            }
-            command = ["bash", "-c", step["run"]]
-            done = subprocess.run(command, env=env, capture_output=True, check=False)
-            return done.returncode == 0
-
-        self.assertTrue(accepts(results))
-        skipped = {job: {"result": "skipped"} for job in needs if job != "plan"}
-        self.assertTrue(accepts({**results, **skipped}))
-        self.assertFalse(accepts(results, plan_result="failure"))
-        self.assertFalse(accepts(results, plan_result="skipped"))
-        for job in needs:
-            for result in ("failure", "cancelled"):
-                changed = {**results, job: {"result": result}}
-                self.assertFalse(accepts(changed), (job, result))
+    def test_dart_ios_runs_on_the_simulator_and_builds_for_the_device(self):
+        for preset, action in (
+            ("ios-simulator-arm64-metal", "test:ios"),
+            ("ios-arm64-metal", "build:mobile"),
+        ):
+            commands = [
+                suite.command for suite in suites.target_suites(self.targets[preset])
+            ]
+            self.assertIn(
+                ("mise", "run", f"//bindings/dart:{action}", preset), commands
+            )
 
 
 class RetryTest(unittest.TestCase):
@@ -182,8 +261,10 @@ class RetryTest(unittest.TestCase):
         ]
         target = "target / android-x64-egl"
         for failed in (
+            ["Set up job"],
             ["Set up CI dependencies"],
             ["Boot Android emulator"],
+            ["Boot FreeBSD virtual machine"],
             ["Resolve Swift packages"],
             ["Post Set up CI dependencies"],
         ):
@@ -228,3 +309,7 @@ class RetryTest(unittest.TestCase):
                 ]
             )
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

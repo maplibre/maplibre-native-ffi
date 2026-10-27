@@ -98,7 +98,11 @@
       "vendor": {
         "maplibre-native-ffi": {
           "unit": "freebsd",
-          "runner": "blacksmith-4vcpu-ubuntu-2404"
+          "runner": "blacksmith-4vcpu-ubuntu-2404",
+          "device": {
+            "name": "FreeBSD virtual machine",
+            "command": "tools/devices/freebsd-host"
+          }
         }
       }
     },
@@ -232,6 +236,14 @@
         "MLN_FFI_TARGET_PLATFORM": "android-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-linux-android.24",
         "MLN_FFI_RUST_TARGET": "x86_64-linux-android"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "Android emulator",
+            "command": "tools/devices/android-serial x86_64"
+          }
+        }
       }
     },
     {
@@ -476,6 +488,14 @@
         "MLN_FFI_TARGET_PLATFORM": "ios-simulator-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-ios-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-ios-sim"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "iOS simulator",
+            "command": "devices-cli get ios"
+          }
+        }
       }
     },
     {
@@ -516,6 +536,14 @@
         "MLN_FFI_TARGET_PLATFORM": "tvos-simulator-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-tvos-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-tvos-sim"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "tvOS simulator",
+            "command": "devices-cli get tvos"
+          }
+        }
       }
     },
     {
@@ -527,6 +555,14 @@
         "MLN_FFI_TARGET_PLATFORM": "visionos-simulator-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-visionos-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-visionos-sim"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "visionOS simulator",
+            "command": "devices-cli get visionos"
+          }
+        }
       }
     },
     {
@@ -552,7 +588,15 @@
     {
       "name": "android-x64-egl",
       "displayName": "Android x64 EGL",
-      "inherits": ["_android-x64", "_egl"]
+      "inherits": ["_android-x64", "_egl"],
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "Android emulator",
+            "command": "tools/devices/android-serial x86_64 --api 26"
+          }
+        }
+      }
     },
     {
       "name": "android-x64-vulkan",
@@ -572,7 +616,15 @@
     {
       "name": "ohos-x64-egl",
       "displayName": "OHOS x64 EGL",
-      "inherits": ["_ohos-x64", "_egl"]
+      "inherits": ["_ohos-x64", "_egl"],
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "OpenHarmony emulator",
+            "command": "tools/devices/ohos-key"
+          }
+        }
+      }
     },
     {
       "name": "ohos-x64-vulkan",

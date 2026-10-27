@@ -2,8 +2,10 @@
 
 Each visible configure preset is a target. Its `vendor.maplibre-native-ffi`
 block, usually inherited from a hidden platform preset, names the Rubberstamp
-coverage unit that runs it and the runner label it runs on. This script uses
-only the standard library, so CI can run it with the runner's `python3`.
+coverage unit that runs it, the runner label it runs on, and the device its
+suites run on, if any. A device is the name of the CI step that boots it and
+the command that step runs. This script uses only the standard library, so CI
+can run it with the runner's `python3` from a sparse checkout.
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import argparse
 import dataclasses
 import json
 import pathlib
+
+from tools.ci.suites import target_suites
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 VENDOR = "maplibre-native-ffi"
@@ -38,6 +42,9 @@ class Target:
     unit: str
     runner: str
     package: bool
+    # Whether CMake registers a test preset for the target.
+    tested: bool
+    device: dict[str, str] | None
 
 
 # The jobs other than target jobs: the unit that owns each, and which packaged
@@ -93,16 +100,23 @@ def merged(chain: list[dict], fields) -> dict:
     return {key: value for key, value in result.items() if value is not None}
 
 
-def targets(presets: dict) -> list[Target]:
-    configure = presets.get("configurePresets", [])
-    packaged = set()
-    for preset in presets.get("packagePresets", []):
+def configured(presets: dict, kind: str) -> set[str]:
+    """Return the configure presets that the visible presets of a kind use."""
+    result = set()
+    for preset in presets.get(kind, []):
         if preset.get("hidden", False):
             continue
-        chain = lineage(presets["packagePresets"], preset["name"])
-        packaged.add(
+        chain = lineage(presets[kind], preset["name"])
+        result.add(
             next(item["configurePreset"] for item in chain if "configurePreset" in item)
         )
+    return result
+
+
+def targets(presets: dict) -> list[Target]:
+    configure = presets.get("configurePresets", [])
+    packaged = configured(presets, "packagePresets")
+    tested = configured(presets, "testPresets")
     result = []
     for preset in configure:
         # Hidden presets carry settings for others to inherit and name no target.
@@ -116,6 +130,12 @@ def targets(presets: dict) -> list[Target]:
         if missing:
             raise SystemExit(
                 f"error: preset {name!r} resolves no vendor {', '.join(missing)}"
+            )
+        device = vendor.get("device")
+        if device is not None and sorted(device) != ["command", "name"]:
+            raise SystemExit(
+                f"error: preset {name!r} names a device without exactly a name "
+                "and a command"
             )
         target_platform, _, architecture = variables[
             "MLN_FFI_TARGET_PLATFORM"
@@ -132,6 +152,8 @@ def targets(presets: dict) -> list[Target]:
                 unit=vendor["unit"],
                 runner=vendor["runner"],
                 package=name in packaged,
+                tested=name in tested,
+                device=device,
             )
         )
     return result
@@ -141,6 +163,60 @@ def consumed(job: str, all_targets: list[Target]) -> list[Target]:
     """Return the packaged targets that a job other than a target job consumes."""
     _, include = JOBS[job]
     return [target for target in all_targets if target.package and include(target)]
+
+
+ZIG_PROJECTS = (
+    "//bindings/zig:",
+    "//examples/zig-map:",
+    "//examples/zig-readback:",
+)
+GRADLE_PROJECTS = ("//bindings/kotlin:", "//:kotlin:")
+SWIFT_PROJECTS = ("//bindings/swift:", "//examples/swift-map:")
+
+
+def row(target: Target, save_toolchains: bool) -> dict[str, object]:
+    """Return how the target job sets up, runs, and uploads for one target."""
+    tasks = [suite.task for suite in target_suites(target)]
+    addon = ""
+    # The npm release publishes the addon that the TypeScript suite built
+    # against the packaged native artifact and tested, for each preset that
+    # bindings/typescript/scripts/pack.ts packs.
+    if target.platform in {"linux-gnu", "macos", "emscripten"} and (
+        "//bindings/typescript:test" in tasks
+    ):
+        addon = "typescript"
+    # The OHPM release packs the addon that each OpenHarmony job built against
+    # the packaged native artifact. The npm release downloads every
+    # typescript-addon artifact, so these take another prefix.
+    if target.platform == "ohos" and any(
+        f"//bindings/typescript:{action}" in tasks for action in ("build", "test")
+    ):
+        addon = "arkts"
+    return {
+        "preset": target.preset,
+        "runner": target.runner,
+        "package": target.package,
+        "save_toolchains": save_toolchains,
+        # The key hashes every `build.zig.zon` and is shared by all rows on
+        # the same runner. Cache keys are immutable, so a row that fetches only
+        # some projects would claim the key with an incomplete cache.
+        "zig": all(
+            any(task.startswith(project) for task in tasks) for project in ZIG_PROJECTS
+        ),
+        # `setup-gradle` restores a Gradle user home and stops the daemons in
+        # its post-action, so Windows file locks do not outlive the job. A row
+        # with no Gradle build pays that setup and teardown for an empty cache
+        # entry.
+        "gradle": any(task.startswith(GRADLE_PROJECTS) for task in tasks),
+        # A Swift package build resolves its dependencies.
+        "swift": any(task.startswith(SWIFT_PROJECTS) for task in tasks),
+        # The boot step's name and command.
+        "device": target.device["name"] if target.device else "",
+        "device_command": target.device["command"] if target.device else "",
+        "addon": addon,
+        # devices-cli writes the logs of the Android emulators it boots.
+        "emulator_logs": target.platform == "android" and target.device is not None,
+    }
 
 
 def plan(presets: dict, run_all: bool, units: list[str]) -> dict[str, list]:
@@ -162,14 +238,7 @@ def plan(presets: dict, run_all: bool, units: list[str]) -> dict[str, list]:
     for target in all_targets:
         if target.unit not in selected and target.preset not in needed:
             continue
-        matrix.append(
-            {
-                "preset": target.preset,
-                "runner": target.runner,
-                "package": target.package,
-                "save_toolchains": target.runner not in claimed,
-            }
-        )
+        matrix.append(row(target, target.runner not in claimed))
         claimed.add(target.runner)
     return {"matrix": matrix, "jobs": jobs}
 

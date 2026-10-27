@@ -1,7 +1,8 @@
-# Support that tools/ci/suites.py cannot record. The support matrix on the docs
-# home page merges these entries with CI coverage, and its generator fails when
-# CI covers an entry, so remove an entry once CI covers it. Each push to main
-# also rewrites the tracking issue's body from this file.
+# Support that CI cannot record. CI covers the targets in CMakePresets.json with
+# the suites in tools/ci/suites.py. The support matrix on the docs home page
+# merges these entries with CI coverage, and its generator fails when CI covers
+# an entry, so remove an entry once CI covers it. Each push to main also
+# rewrites the tracking issue's body from this file.
 
 issue = 936
 

@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# [MISE] description="Generate the GitHub Actions CI workflows."
-set -euo pipefail
-cd "${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
-exec uv run --no-sync python -m ci.generate_workflow "$@"

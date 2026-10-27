@@ -4,17 +4,10 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from typing import TYPE_CHECKING
 
-from ci.workflow import (
-    EMULATOR_TESTED,
-    architecture,
-    backend,
-    device_boot,
-    ohos_commands,
-    platform,
-    preset_sets,
-    runtime_tested,
-)
+if TYPE_CHECKING:
+    from tools.ci.plan import Target
 
 DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
 
@@ -196,11 +189,12 @@ def suite_id(task: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", task).strip("-")
 
 
-def desktop_commands(preset: str) -> list[tuple[list[str], dict[str, str], bool]]:
+def desktop_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
     """Each desktop suite command, its environment, and whether it opens a window."""
+    preset = target.preset
     commands = []
     for suite in SUITES:
-        if platform(preset) not in suite["platforms"]:
+        if target.platform not in suite["platforms"]:
             continue
         if preset in suite.get("exclude", []):
             continue
@@ -215,7 +209,7 @@ def desktop_commands(preset: str) -> list[tuple[list[str], dict[str, str], bool]
                 continue
             # Windows surface coverage lives in the native suite. Windowed
             # examples run on Linux and macOS; headless examples still run here.
-            if command.get("display") and platform(preset) == "windows":
+            if command.get("display") and target.platform == "windows":
                 continue
             arguments = [
                 "mise",
@@ -228,10 +222,11 @@ def desktop_commands(preset: str) -> list[tuple[list[str], dict[str, str], bool]
     return commands
 
 
-def android_commands(preset: str, abi: str) -> list[str]:
-    render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
+def android_commands(target: Target, abi: str) -> list[str]:
+    preset = target.preset
+    render_backend = "opengl" if target.backend == "egl" else target.backend
     arguments = f"{render_backend} {abi}"
-    if preset in EMULATOR_TESTED:
+    if target.device:
         # Each device test task cross-compiles the artifact the build task
         # would, so it stands in for that command.
         commands = [
@@ -258,8 +253,20 @@ def android_commands(preset: str, abi: str) -> list[str]:
     return commands
 
 
-def apple_commands(preset: str) -> list[str]:
-    target_platform = platform(preset)
+def ohos_commands(target: Target) -> list[str]:
+    # The emulator executes x64 EGL. Other OpenHarmony targets still prove that
+    # each binding links against its backend-specific native artifact.
+    action = "test" if target.device else "build"
+    return [
+        f"mise run //bindings/rust:{action} {target.preset}",
+        f"mise run //bindings/go:{action} {target.preset}",
+        f"mise run //bindings/typescript:{action} {target.preset}",
+    ]
+
+
+def apple_commands(target: Target) -> list[str]:
+    preset = target.preset
+    target_platform = target.platform
     if target_platform == "ios":
         return [
             f"mise run //bindings/kotlin:ios-build {preset}",
@@ -302,30 +309,39 @@ def apple_commands(preset: str) -> list[str]:
     return []
 
 
-def consumer_commands(preset: str) -> list[tuple[list[str], dict[str, str], bool]]:
+def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
     """The binding and example commands, as `desktop_commands` returns them."""
-    target_platform = platform(preset)
+    target_platform = target.platform
     if target_platform in DESKTOP or target_platform == "emscripten":
-        return desktop_commands(preset)
+        return desktop_commands(target)
     if target_platform == "android":
         abi = {
             "arm": "armeabi-v7a",
             "arm64": "arm64-v8a",
             "x64": "x86_64",
-        }[architecture(preset)]
-        lines = android_commands(preset, abi)
+        }[target.architecture]
+        lines = android_commands(target, abi)
     elif target_platform == "ohos":
-        lines = ohos_commands(preset)
+        lines = ohos_commands(target)
     else:
-        lines = apple_commands(preset)
+        lines = apple_commands(target)
     return [(line.split(" "), {}, False) for line in lines]
 
 
-def native_checks(preset: str, tested: set[str]) -> list[list[str]]:
+def runtime_tested(target: Target) -> bool:
+    """Whether CI executes this target's native suite rather than only building it.
+
+    A target whose suite runs on an emulator registers no test preset.
+    """
+    return target.tested or target.device is not None
+
+
+def native_checks(target: Target) -> list[list[str]]:
     """The checks against the target's own build tree."""
-    target_platform = platform(preset)
+    preset = target.preset
+    target_platform = target.platform
     commands = []
-    if runtime_tested(preset, tested):
+    if runtime_tested(target):
         commands.append(["mise", "run", "test", preset])
     if target_platform == "linux-gnu":
         commands.append(["mise", "run", "check-glibc-floor", preset])
@@ -334,13 +350,13 @@ def native_checks(preset: str, tested: set[str]) -> list[list[str]]:
     return commands
 
 
-def target_suites(presets: dict[str, object], preset: str) -> list[Suite]:
-    """What `ci:target` runs for a preset, in order, after its build and boot."""
-    _, _, tested, packaged = preset_sets(presets)
+def target_suites(target: Target) -> list[Suite]:
+    """What `ci:target` runs for a target, in order, after its build and boot."""
+    preset = target.preset
     # The job builds the target and boots its device in steps of their own
     # before this runs. Each prerequisite runs only after the ones before it
     # succeeded.
-    native = (BUILD, BOOT) if device_boot(preset) else (BUILD,)
+    native = (BUILD, BOOT) if target.device else (BUILD,)
     suites: list[Suite] = []
 
     def add(
@@ -351,7 +367,7 @@ def target_suites(presets: dict[str, object], preset: str) -> list[Suite]:
         step_id: str | None = None,
     ) -> None:
         wrapper, shell, timeout = None, None, None
-        if display and platform(preset) == "linux-gnu":
+        if display and target.platform == "linux-gnu":
             wrapper = "xvfb"
         # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
         # interactive desktop. WGL and the binding suites run in service session 0.
@@ -371,11 +387,11 @@ def target_suites(presets: dict[str, object], preset: str) -> list[Suite]:
             raise SystemExit(f"error: {preset} runs two suites with id {suite.id!r}")
         suites.append(suite)
 
-    for command in native_checks(preset, tested):
+    for command in native_checks(target):
         add(command, native, {})
-    if preset not in packaged:
+    if not target.package:
         # An unpackaged target's consumers run against its build tree.
-        for command, env, display in consumer_commands(preset):
+        for command, env, display in consumer_commands(target):
             add(command, native, env, display)
         return suites
     add(["mise", "run", "archive-native", preset], native, {}, step_id="archive")
@@ -391,7 +407,7 @@ def target_suites(presets: dict[str, object], preset: str) -> list[Suite]:
         {},
         step_id="install",
     )
-    for command, env, display in consumer_commands(preset):
+    for command, env, display in consumer_commands(target):
         # The consumers run against the packaged install, which replaced the
         # build tree, so they must not rebuild it.
         add(

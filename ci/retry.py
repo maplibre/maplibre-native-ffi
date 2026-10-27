@@ -10,25 +10,19 @@ import subprocess
 # failure here says nothing about the code under test, so a rerun is worth its
 # cost. Every other step, test suites above all, fails the run for good.
 INFRASTRUCTURE_STEPS = {
-    "Set up job",
     "Complete job",
     "Check out repository",
     "Plan coverage",
-    "Set up CI dependencies",
     "Resolve Swift packages",
-    "Boot Android emulator",
-    "Boot OpenHarmony emulator",
-    "Boot FreeBSD virtual machine",
-    "Boot iOS simulator",
-    "Boot tvOS simulator",
-    "Boot visionOS simulator",
 }
+# `Set up ` covers the runner's own setup and the CI dependencies, and `Boot `
+# every device a target's vendor block names. A post step belongs to the setup
+# action that registered it, such as a cache save or a Gradle daemon shutdown.
+INFRASTRUCTURE_PREFIXES = ("Set up ", "Boot ", "Post ")
 
 
 def infrastructure_step(name: str) -> bool:
-    # A post step belongs to the setup action that registered it, such as a
-    # cache save or a Gradle daemon shutdown.
-    return name in INFRASTRUCTURE_STEPS or name.startswith("Post ")
+    return name in INFRASTRUCTURE_STEPS or name.startswith(INFRASTRUCTURE_PREFIXES)
 
 
 def failed_in_infrastructure(job: dict) -> bool:

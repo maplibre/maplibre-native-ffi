@@ -2,6 +2,9 @@
 # zizmor-style policy rules (timeouts, unpinned actions, cooldown ≥ 7).
 # Blacksmith runner labels are not in the GitHub-hosted catalog.
 profile: correctness
+# Every third-party action is pinned to a commit, which Dependabot bumps.
+rules:
+  unpinned-uses: error
 self-hosted-runner:
   labels:
     - blacksmith-2vcpu-ubuntu-2404

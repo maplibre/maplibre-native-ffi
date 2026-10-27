@@ -5,8 +5,10 @@
 # - Zig `build.zig.zon` dependencies
 version: 2
 updates:
+  # The root covers `.github/workflows`; each composite action needs its own
+  # directory.
   - package-ecosystem: github-actions
-    directory: /
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: weekly
     labels: [chore, "area:tooling", dependencies]

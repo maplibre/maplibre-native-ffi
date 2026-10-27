@@ -13,15 +13,8 @@ OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
 GAPS_PATH = REPO_ROOT / "docs" / "support-gaps.toml"
 sys.path.insert(0, str(REPO_ROOT))
 
-from ci.workflow import (
-    architecture,
-    backend,
-    load_configuration,
-    platform,
-    preset_sets,
-    runtime_tested,
-)
-from tools.ci.suites import target_suites
+from tools.ci import plan
+from tools.ci.suites import runtime_tested, target_suites
 
 PLATFORM_LABELS = {
     "linux-gnu": "Linux GNU",
@@ -99,14 +92,13 @@ class Target:
         return f"{kind} {self.arch}"
 
 
-def target_from_preset(preset: str) -> Target:
-    target_platform = platform(preset)
-    simulator = target_platform.endswith("-simulator")
+def target_from_preset(preset: plan.Target) -> Target:
+    simulator = preset.platform.endswith("-simulator")
     return Target(
-        platform=target_platform.removesuffix("-simulator"),
-        arch=architecture(preset),
+        platform=preset.platform.removesuffix("-simulator"),
+        arch=preset.architecture,
         backend={"egl": "opengl", "wgl": "opengl", "webgl": "opengl"}.get(
-            backend(preset), backend(preset)
+            preset.backend, preset.backend
         ),
         simulator=simulator,
     )
@@ -183,8 +175,7 @@ def load_gaps() -> tuple[int, list[Target], dict[tuple[str, str], dict[str, str]
 
 
 def support_matrix() -> dict[str, Any]:
-    _, presets = load_configuration(REPO_ROOT)
-    configured, _, tested, _ = preset_sets(presets)
+    presets = json.loads((REPO_ROOT / "CMakePresets.json").read_text())
 
     # coverage[(language, target)] holds the best status and the flavors that
     # reached it.
@@ -198,12 +189,10 @@ def support_matrix() -> dict[str, Any]:
         elif status == "tested":
             coverage[key] = (status, {flavor})
 
-    for preset in configured:
+    for preset in plan.targets(presets):
         target = target_from_preset(preset)
-        record(
-            "c", target, "tested" if runtime_tested(preset, tested) else "build-only"
-        )
-        commands = [" ".join(suite.command) for suite in target_suites(presets, preset)]
+        record("c", target, "tested" if runtime_tested(preset) else "build-only")
+        commands = [" ".join(suite.command) for suite in target_suites(preset)]
         for command in commands:
             for flavor, status in command_support(command):
                 if language(flavor) not in LANGUAGE_LABELS:

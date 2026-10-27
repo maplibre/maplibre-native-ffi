@@ -10,15 +10,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import pathlib
 import signal
 import subprocess
 import time
 
-from ci.workflow import load_configuration
+from tools.ci.plan import ROOT, targets
 from tools.ci.suites import BOOT, BUILD, Suite, target_suites
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
 SECONDS_PER_MINUTE = 60
 
 
@@ -156,8 +154,11 @@ def main() -> int:
         help="print each suite and how it runs, one JSON record per line",
     )
     args = parser.parse_args()
-    _, presets = load_configuration(ROOT)
-    suites = target_suites(presets, args.preset)
+    presets = json.loads((ROOT / "CMakePresets.json").read_text())
+    found = [target for target in targets(presets) if target.preset == args.preset]
+    if not found:
+        parser.error(f"unknown preset {args.preset!r}")
+    suites = target_suites(found[0])
     if args.list:
         for suite in suites:
             print(json.dumps(record(suite)))
