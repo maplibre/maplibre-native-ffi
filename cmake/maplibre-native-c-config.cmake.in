@@ -1,0 +1,52 @@
+@PACKAGE_INIT@
+
+if(TARGET maplibre-native-c::maplibre-native-c)
+  return()
+endif()
+
+if(@MLN_FFI_CMAKE_THREADS@)
+  include(CMakeFindDependencyMacro)
+  find_dependency(Threads)
+endif()
+
+set_and_check(mln_include_dir "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set_and_check(mln_library
+              "@PACKAGE_MLN_FFI_CMAKE_RUNTIME_DIR@/@MLN_FFI_CMAKE_LIBRARY@")
+add_library(maplibre-native-c::maplibre-native-c @MLN_FFI_CMAKE_TYPE@ IMPORTED)
+set_target_properties(
+  maplibre-native-c::maplibre-native-c
+  PROPERTIES
+    IMPORTED_LOCATION "${mln_library}"
+    INTERFACE_INCLUDE_DIRECTORIES "${mln_include_dir}"
+    INTERFACE_LINK_LIBRARIES "@MLN_FFI_CMAKE_LIBRARIES@"
+    INTERFACE_LINK_OPTIONS "@MLN_FFI_CMAKE_LINK_OPTIONS@;@MLN_FFI_CMAKE_RPATH@"
+    INTERFACE_COMPILE_OPTIONS "@MLN_FFI_CMAKE_COMPILE_OPTIONS@")
+
+if(NOT "@MLN_FFI_CMAKE_IMPLIB@" STREQUAL "")
+  set_and_check(mln_implib
+                "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@MLN_FFI_CMAKE_IMPLIB@")
+  set_target_properties(maplibre-native-c::maplibre-native-c
+                        PROPERTIES IMPORTED_IMPLIB "${mln_implib}")
+endif()
+
+if(NOT "@MLN_FFI_CMAKE_STATIC_ARCHIVE@" STREQUAL "")
+  set_and_check(mln_static_archive
+                "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@MLN_FFI_CMAKE_STATIC_ARCHIVE@")
+  add_library(maplibre-native-c::maplibre-native-c-static STATIC IMPORTED)
+  set_target_properties(
+    maplibre-native-c::maplibre-native-c-static
+    PROPERTIES
+      IMPORTED_LOCATION "${mln_static_archive}"
+      INTERFACE_INCLUDE_DIRECTORIES "${mln_include_dir}"
+      INTERFACE_COMPILE_DEFINITIONS MLN_STATIC
+      INTERFACE_LINK_LIBRARIES "@MLN_FFI_CMAKE_STATIC_LIBRARIES@"
+      INTERFACE_LINK_OPTIONS "@MLN_FFI_CMAKE_LINK_OPTIONS@"
+      INTERFACE_COMPILE_OPTIONS "@MLN_FFI_CMAKE_COMPILE_OPTIONS@")
+endif()
+
+if("@MLN_FFI_CMAKE_TYPE@" STREQUAL "STATIC")
+  set_target_properties(
+    maplibre-native-c::maplibre-native-c
+    PROPERTIES INTERFACE_COMPILE_DEFINITIONS MLN_STATIC
+               INTERFACE_LINK_LIBRARIES "@MLN_FFI_CMAKE_STATIC_LIBRARIES@")
+endif()

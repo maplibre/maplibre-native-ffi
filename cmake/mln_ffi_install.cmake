@@ -1,4 +1,5 @@
 include(GNUInstallDirs)
+include(mln_ffi_package_config)
 
 function(mln_ffi_install_zig_libc)
   get_target_property(MLN_FFI_ZIG_LIBC_SYSROOT mln_ffi_platform_dependencies
@@ -164,6 +165,8 @@ function(mln_ffi_install_emscripten_options)
       PARENT_SCOPE)
 
   list(REMOVE_DUPLICATES compile_options)
+  set(MLN_FFI_CMAKE_LINK_OPTIONS "${link_options}" PARENT_SCOPE)
+  set(MLN_FFI_CMAKE_COMPILE_OPTIONS "${compile_options}" PARENT_SCOPE)
   list(JOIN compile_options " " pkg_config_compile_options)
   set(MLN_FFI_PKG_CONFIG_CFLAGS
       "${MLN_FFI_PKG_CONFIG_CFLAGS} ${pkg_config_compile_options}"
@@ -265,6 +268,7 @@ function(mln_ffi_install_c_api_library target)
   mln_ffi_install_emscripten_options()
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
                                MLN_FFI_STATIC_LINK_FRAMEWORKS)
+  mln_ffi_install_package_config(${target})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
                             ${MLN_FFI_STATIC_LINK_LIBRARIES})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON

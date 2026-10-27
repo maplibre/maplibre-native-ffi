@@ -11,18 +11,20 @@
   Android and OpenHarmony ship theirs with the platform.
 - The only headers are the C API's and MapLibre Native's plugin header.
 - Each Apple library is stripped, with a matching dSYM beside it.
+- The relocatable CMake package links shared and complete static consumers.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
-
 
 # System libraries, or paths relative to the loading binary.
 MACHO_ALLOWED_PREFIXES = (
@@ -124,7 +126,8 @@ def run(command: list[str]) -> str:
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise SystemExit(
-            f"{command[0]} failed for {command[-1]}:\n{result.stderr.strip()}"
+            f"{command[0]} failed for {command[-1]}:\n"
+            f"{result.stdout.strip()}\n{result.stderr.strip()}"
         )
     return result.stdout
 
@@ -276,6 +279,36 @@ def binary_problems(
     return pe_problems(binary)
 
 
+def verify_cmake_package(root: pathlib.Path, prefix: pathlib.Path, preset: str) -> None:
+    """Build consumers from the extracted prefix with the preset's toolchain."""
+    configs = list(
+        prefix.glob("lib*/cmake/maplibre-native-c/maplibre-native-c-config.cmake")
+    )
+    if len(configs) != 1:
+        raise SystemExit(f"expected one maplibre-native-c CMake config in {prefix}")
+    source = prefix.parent / "consumer"
+    shutil.copytree(root / "tests/package", source)
+    (source / "CMakePresets.json").write_text(
+        json.dumps({"version": 8, "include": [str(root / "CMakePresets.json")]}),
+        encoding="utf-8",
+    )
+    build = source / "build"
+    run(
+        [
+            "cmake",
+            "--preset",
+            preset,
+            "-S",
+            str(source),
+            "-B",
+            str(build),
+            f"-Dmaplibre-native-c_DIR={configs[0].parent}",
+            f"-DMLN_PACKAGE_PREFIX={prefix}",
+        ]
+    )
+    run(["cmake", "--build", str(build), "--config", "Release"])
+
+
 def main() -> int:
     preset = os.environ["usage_preset"]
     root = pathlib.Path(os.environ["MISE_MONOREPO_ROOT"])
@@ -302,9 +335,12 @@ def main() -> int:
             image = image_format(binary)
             if image is None:
                 continue
-            if binary.name != PACKAGED_FRAMEWORK_BINARY and not binary.name.removeprefix(
-                "lib"
-            ).startswith(PACKAGED_LIBRARY_STEM):
+            if (
+                binary.name != PACKAGED_FRAMEWORK_BINARY
+                and not binary.name.removeprefix("lib").startswith(
+                    PACKAGED_LIBRARY_STEM
+                )
+            ):
                 problems.append((binary.name, VENDORED_LOADER, str(relative)))
                 # Its dependencies don't matter once it's removed.
                 continue
@@ -318,6 +354,9 @@ def main() -> int:
                     (binary.name, kind, detail)
                     for kind, detail in dsym_problems(binary, pathlib.Path(directory))
                 )
+        verify_cmake_package(
+            root, pathlib.Path(directory) / f"maplibre-native-c-{preset}", preset
+        )
 
     if not problems:
         return 0
