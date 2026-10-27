@@ -295,6 +295,10 @@ jobs:
       MISE_NO_HOOKS: "1"
       PUBLISH_SHA: ${{ needs.source.outputs.sha }}
       PUBLISH_VERSION: ${{ needs.source.outputs.version }}
+      # The official ohpm ships only in Huawei's command-line tools, which this
+      # mirror serves without a login.
+      OHPM_TOOLS_URL: https://repo.huaweicloud.com/harmonyos/ohpm/5.1.0/commandline-tools-linux-x64-5.1.0.840.zip
+      OHPM_TOOLS_SHA256: 1dcefa4741dc289277560b2802040e0c45b433898d8db453d711d5376e0478f1
     steps:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
@@ -308,9 +312,18 @@ jobs:
         with:
           name: ohpm-packages-${{ env.PUBLISH_VERSION }}
           path: build/ohpm
-      - uses: ./.github/actions/setup-ohpm
-      # A version that OHPM already lists is skipped, so a rerun after a
-      # partial publish resumes where it stopped.
+      - name: Install ohpm
+        run: |
+          set -euo pipefail
+
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/tools.zip" "$OHPM_TOOLS_URL"
+          echo "$OHPM_TOOLS_SHA256  $RUNNER_TEMP/tools.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/tools.zip" 'command-line-tools/ohpm/*' -d "$RUNNER_TEMP"
+          rm "$RUNNER_TEMP/tools.zip"
+          echo "$RUNNER_TEMP/command-line-tools/ohpm/bin" >> "$GITHUB_PATH"
+      # ohpm checks each package as the registry will before any of them
+      # publishes. A version that OHPM already lists is skipped, so a rerun
+      # after a partial publish resumes where it stopped.
       - name: Publish
         env:
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
@@ -319,6 +332,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          for har in build/ohpm/*.har; do
+            mise exec --no-deps core:node -- ohpm prepublish "$har"
+          done
           mise exec --no-deps core:node -- python3 tools/release/ohpm_publish.py ohpm build/ohpm/*.har
           for har in build/ohpm/*.har; do
             echo "### $(basename "$har" .har) awaits OHPM's review" >> "$GITHUB_STEP_SUMMARY"

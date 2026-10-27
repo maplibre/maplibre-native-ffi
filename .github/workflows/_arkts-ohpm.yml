@@ -64,15 +64,6 @@ jobs:
           done
           mise exec --no-deps core:node -- bindings/typescript/scripts/pack-ohpm.sh \
             --version "$PACKAGE_VERSION" build/ohpm "${presets[@]}"
-      - uses: ./.github/actions/setup-ohpm
-      # ohpm checks each package as the registry will.
-      - name: Check the packages
-        run: |
-          set -euo pipefail
-
-          for har in build/ohpm/*.har; do
-            mise exec --no-deps core:node -- ohpm prepublish "$har"
-          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ohpm-packages-${{ env.PACKAGE_VERSION }}
