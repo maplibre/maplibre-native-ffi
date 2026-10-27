@@ -94,6 +94,14 @@ class MaplibreNativeC(ConanFile):
             )
         self._source()
 
+    def _libraries(self):
+        main = (
+            "maplibre-native-c-static"
+            if self.settings.os == "Windows"
+            else "maplibre-native-c"
+        )
+        return [main, "mln_ffi_platform"]
+
     def package_id(self):
         self.info.settings.rm_safe("compiler")
 
@@ -108,17 +116,17 @@ class MaplibreNativeC(ConanFile):
                 src=os.path.join(self.build_folder, directory),
                 dst=os.path.join(self.package_folder, directory),
             )
-        library = (
-            "maplibre-native-c-static.lib"
-            if self.settings.os == "Windows"
-            else "libmaplibre-native-c.a"
-        )
-        copy(
-            self,
-            library,
-            src=os.path.join(self.build_folder, "lib"),
-            dst=os.path.join(self.package_folder, "lib"),
-        )
+        # Where the Rust platform support is a separate archive, the static
+        # library needs it too.
+        for library in self._libraries():
+            copy(
+                self,
+                f"{library}.lib"
+                if self.settings.os == "Windows"
+                else f"lib{library}.a",
+                src=os.path.join(self.build_folder, "lib"),
+                dst=os.path.join(self.package_folder, "lib"),
+            )
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "maplibre-native-c")
@@ -126,9 +134,17 @@ class MaplibreNativeC(ConanFile):
             "cmake_target_name", "maplibre-native-c::maplibre-native-c"
         )
         self.cpp_info.libs = [
-            "maplibre-native-c-static"
-            if self.settings.os == "Windows"
-            else "maplibre-native-c"
+            library
+            for library in self._libraries()
+            if os.path.exists(
+                os.path.join(
+                    self.package_folder,
+                    "lib",
+                    f"{library}.lib"
+                    if self.settings.os == "Windows"
+                    else f"lib{library}.a",
+                )
+            )
         ]
         self.cpp_info.defines = ["MLN_STATIC"]
         descriptor = json.loads(
