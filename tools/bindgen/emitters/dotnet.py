@@ -489,7 +489,6 @@ def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str |
     function = plan.function
     handle = bound.handles.get(receiver_native(plan))
     name = pascal(plan.member)
-    answers = bool(plan.consumes and not plan.release and not plan.completion)
     if handle and function.name == handle.discard:
         return name
     if (
@@ -497,8 +496,8 @@ def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str |
         and handle
         and function.name == handle.release
         and handle.release_inputs
-    ) or (answers and handle):
-        return name if answers else "Release"
+    ) or (plan.answers and handle):
+        return name if plan.answers else "Release"
     if (
         handle is not None
         and function.name == handle.release
@@ -563,13 +562,12 @@ def emit_operation(
     # A release with inputs, or an answer that consumes its receiver, runs
     # through the owner's state, which marks the handle closed once native
     # accepts it. An answer keeps its name, and a repeated one reaches native.
-    answers = bool(plan.consumes and not plan.release and not plan.completion)
     if (
         plan.consumes
         and handle_plan
         and function.name == handle_plan.release
         and handle_plan.release_inputs
-    ) or (answers and handle_plan):
+    ) or (plan.answers and handle_plan):
         declarations, arguments = [], ["live"]
         # The release runs synchronously, so its scope outlives the call. The
         # release delegate cannot capture the scope, so the arguments convert
@@ -609,7 +607,7 @@ def emit_operation(
                 f"public void {declared}({', '.join(declarations)})",
                 [
                     *body,
-                    f"state.Release((live, diagnostic) => {call}{', idempotent: false' if answers else ''});",
+                    f"state.Release((live, diagnostic) => {call}{', idempotent: false' if plan.answers else ''});",
                 ],
             ),
             set(values.plans),

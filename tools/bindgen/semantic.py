@@ -437,10 +437,77 @@ class AbsencePlan:
     output: ParameterPlan
 
 
+# The form of an operation's call, which emitters dispatch on:
+# - "discard": the cleanup of a dropped owner, which no scope runs.
+# - "release": a release or dispose that consumes its receiver and returns.
+# - "release_async": a release that consumes its receiver and completes later.
+# - "answer": an immediate call that consumes its receiver but is no release.
+# - "thread_start": an immediate call that waits for a native thread to start.
+# - "attach": a completion that readies the owner the call creates at once.
+# - "command": a completion that reports a disposition.
+# - "query": a completion that delivers a result.
+# - "run": any other completion, which reports only success.
+# - "view": a call inside its owner's borrowed view scope.
+# - "drain": a call that publishes a batch and a slice view of it.
+# - "owned": an immediate call that creates an owner.
+# - "call": any other immediate call.
+OperationShape = Literal[
+    "discard",
+    "release",
+    "release_async",
+    "answer",
+    "thread_start",
+    "attach",
+    "command",
+    "query",
+    "run",
+    "view",
+    "drain",
+    "owned",
+    "call",
+]
+
+
+def operation_shape(
+    execution: str,
+    *,
+    discard: bool,
+    release: bool,
+    consumes: str | None,
+    blocks: str | None,
+    completion: CompletionPlan | None,
+    result: ValuePlan | None,
+    view: BorrowedViewPlan | None,
+    drain: DrainPlan | None,
+    owned: bool,
+) -> OperationShape:
+    """The one shape of an operation, by the first rule that matches."""
+    if discard:
+        return "discard"
+    if release:
+        return "release_async" if completion else "release"
+    if consumes and not completion:
+        return "answer"
+    if blocks:
+        return "thread_start"
+    if completion:
+        if completion.immediate_owners:
+            return "attach"
+        if execution == "command":
+            return "command"
+        return "query" if result else "run"
+    if view:
+        return "view"
+    if drain:
+        return "drain"
+    return "owned" if owned else "call"
+
+
 @dataclass(frozen=True)
 class OperationPlan:
     function: Function
     execution: str
+    shape: OperationShape
     receiver: str | None
     inputs: tuple[ParameterPlan, ...]
     outputs: tuple[ParameterPlan, ...]
@@ -483,6 +550,13 @@ class OperationPlan:
     @property
     def role(self) -> str:
         return "support" if self.support else "public"
+
+    @property
+    def answers(self) -> bool:
+        """Whether the call answers its receiver once and consumes it, as a
+        resource request's completion does. It keeps its own name, and a
+        repeated one reaches native."""
+        return self.shape == "answer"
 
     @property
     def caller_sized_text(self) -> ParameterPlan | None:
@@ -1332,11 +1406,12 @@ class Binder:
         # A release consumes its handle; another call that answers its handle
         # once declares consumes=, as a resource request's completion does.
         consumes = metadata.get("consumes")
-        release = False
+        release = discard = False
         for handle in self.handles.values():
             if function.name in {handle.release, handle.cleanup}:
                 consumes = handle.release_consumes
                 release = True
+                discard = function.name == handle.discard
                 if function.name == handle.dispose and function.name != handle.release:
                     support = DisposeSupport(handle)
                 break
@@ -1438,6 +1513,18 @@ class Binder:
         return OperationPlan(
             function,
             metadata["execution"],
+            operation_shape(
+                metadata["execution"],
+                discard=discard,
+                release=release,
+                consumes=consumes,
+                blocks=metadata.get("blocks"),
+                completion=completion,
+                result=result,
+                view=view,
+                drain=drain,
+                owned=bool(owners),
+            ),
             receiver,
             tuple(inputs),
             tuple(outputs),

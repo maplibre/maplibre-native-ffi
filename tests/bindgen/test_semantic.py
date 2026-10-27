@@ -2,6 +2,7 @@
 
 import re
 import unittest
+from typing import get_args
 
 from support import parse, parse_sources, protocol_header
 
@@ -10,6 +11,7 @@ from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
     DeliveryPlan,
     DisposeSupport,
+    OperationShape,
     bind,
     enum_member_prefix,
 )
@@ -736,6 +738,64 @@ void release_request(request value);
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
+
+    def test_each_operation_takes_the_first_shape_that_it_matches(self):
+        source = """
+typedef unsigned long root BIND("kind=handle;release=release_root");
+typedef unsigned long child BIND("kind=handle;release=close_child;parent=root;abandon=abandon_child");
+typedef unsigned long request BIND("kind=handle;release=release_request");
+BIND("execution=lifecycle") mln_status release_root(
+  root value, const mln_completion *done, mln_diagnostic *out_diagnostic);
+mln_status close_child(child value, mln_diagnostic *out_diagnostic);
+mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
+void release_request(request value);
+BIND("consumes=success") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("blocks=thread_start") mln_status start(root *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("execution=lifecycle") mln_status attach(
+  root parent, child *owner BIND("direction=out"),
+  const mln_completion *done, mln_diagnostic *out_diagnostic);
+BIND("execution=command") mln_status refresh(root value, const mln_completion *done, mln_diagnostic *out_diagnostic);
+BIND("execution=query;result=double") mln_status zoom(root value, const mln_completion *done, mln_diagnostic *out_diagnostic);
+BIND("execution=operation") mln_status reload(root value, const mln_completion *done, mln_diagnostic *out_diagnostic);
+mln_status jump(root value, double zoom, mln_diagnostic *out_diagnostic);
+"""
+        model = bind(
+            parse(source, groups=("borrowed_view", "strided_records")),
+            require_complete=True,
+        )
+        operations = (*model.operations, *model.runtime_operations)
+        shapes = {operation.name: operation.shape for operation in operations}
+        # A drain and a thread start also create owners, a lifecycle release
+        # also completes, and a discard is also its handle's cleanup.
+        self.assertEqual(
+            shapes,
+            {
+                "mln_frame_discard": "discard",
+                "mln_frame_release": "release",
+                "close_child": "release",
+                "release_request": "release",
+                "mln_probe_ledger_release": "release",
+                "mln_probe_reading_batch_release": "release",
+                "release_root": "release_async",
+                "answer": "answer",
+                "start": "thread_start",
+                "attach": "attach",
+                "refresh": "command",
+                "zoom": "query",
+                "reload": "run",
+                "mln_frame_get_texture": "view",
+                "mln_probe_ledger_drain": "drain",
+                "mln_frame_acquire": "owned",
+                "mln_probe_ledger_open": "owned",
+                "abandon_child": "call",
+                "jump": "call",
+            },
+        )
+        self.assertEqual(set(shapes.values()), set(get_args(OperationShape)))
+        self.assertEqual(
+            [operation.name for operation in operations if operation.answers],
+            ["answer"],
+        )
 
     def test_counted_output_preserves_array_storage(self):
         model = bind(
