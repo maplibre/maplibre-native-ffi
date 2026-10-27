@@ -459,8 +459,8 @@ ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/native-f
 ### Zig
 
 Add the package from a release. The Zig binding does not support the iOS device
-or simulator, tvOS, OpenHarmony, or Emscripten. Mac Catalyst builds target
-`aarch64-maccatalyst`.
+or simulator, tvOS, visionOS, OpenHarmony, or Emscripten. Mac Catalyst builds
+target `aarch64-maccatalyst`.
 
 ```bash frame="terminal"
 zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/v{{version}}/maplibre-native-ffi-zig.tar.gz
@@ -514,9 +514,10 @@ zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/downlo
 ```
 
 To build against your own copy of the [C library](#build-against-a-prefix),
-pass the dependency a `local-build` path. Name an install prefix, or a build
-directory that holds `<preset>/install` for each target. A path from the command
-line must be absolute. A Git dependency on the repository needs a local build.
+pass the dependency a `local-build` path. Name an install prefix, or a
+directory holding installs one level down, such as a CMake build root. A path
+from the command line must be absolute. A Git dependency on the repository needs
+a local build.
 
 ```zig title="build.zig"
 const maplibre = b.dependency("maplibre_native_ffi", .{
