@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Generate doc2go HTML API reference for the Go binding."
+#MISE extends="ffi:preset"
+#MISE shell="bash"
+set -euo pipefail
+
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
+rm -rf build/doc2go
+mkdir -p build
+# Document the public maplibre package only; omit ./... so internal/
+# packages are not published under the docs site.
+doc2go \
+  -out build/doc2go \
+  -home github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre \
+  -pagefind=false \
+  ./maplibre
