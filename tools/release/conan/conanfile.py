@@ -22,7 +22,7 @@ class MaplibreNativeC(ConanFile):
     license = "BSD-2-Clause"
     homepage = "https://github.com/maplibre/maplibre-native-ffi"
     description = "The C API for MapLibre Native, as a prebuilt static library"
-    settings = "os", "arch"
+    settings = "os", "arch", "compiler"
     options: ClassVar[dict[str, list[str]]] = {
         "backend": ["default", "metal", "opengl", "vulkan", "webgpu"],
         "libc": ["gnu", "musl"],
@@ -85,7 +85,17 @@ class MaplibreNativeC(ConanFile):
             raise ConanInvalidConfiguration(f"No native archive for {key}") from None
 
     def validate(self):
+        if (
+            self.settings.os == "Windows"
+            and self.settings.get_safe("compiler.runtime") != "static"
+        ):
+            raise ConanInvalidConfiguration(
+                "Windows archives require -s compiler.runtime=static"
+            )
         self._source()
+
+    def package_id(self):
+        self.info.settings.rm_safe("compiler")
 
     def build(self):
         get(self, **self._source(), strip_root=True)

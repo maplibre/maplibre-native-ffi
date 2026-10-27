@@ -80,8 +80,9 @@ Link `maplibre-native-c::maplibre-native-c` after
 complete static C library. Select a renderer with
 `-o "maplibre-native-c/*:backend=metal"`, `opengl`, `vulkan`, or `webgpu`;
 `default` selects the platform's default renderer. Linux defaults to glibc;
-select musl with `-o "maplibre-native-c/*:libc=musl"`. Run `git pull` in the
-clone to make new release versions available.
+select musl with `-o "maplibre-native-c/*:libc=musl"`. Windows consumers must
+select the static MSVC runtime with `-s compiler.runtime=static`. Run `git pull`
+in the clone to make new release versions available.
 """
 
 
