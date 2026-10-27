@@ -2,7 +2,11 @@ package org.maplibre.nativeffi.gradle
 
 import groovy.json.JsonSlurper
 import java.io.File
+import java.io.Serializable
 import org.gradle.api.Project
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
 import org.gradle.api.tasks.TaskProvider
 
 /**
@@ -22,7 +26,7 @@ private val Project.localBuild: File?
  * that needs the install depends on the [registerLocalBuildVerification] task, which reports the
  * problem, so that a local build missing one target fails only the tasks that need it.
  */
-class NativeInstall internal constructor(val prefix: File?, internal val problem: String?)
+data class NativeInstall(val prefix: File?, internal val problem: String?) : Serializable
 
 /**
  * Finds the install in the local build that serves [targetPlatform] with [backend], or without one,
@@ -37,6 +41,43 @@ fun Project.nativeInstall(targetPlatform: String, backend: String? = null): Nati
         "Set -P$LOCAL_BUILD_PROPERTY to an install prefix, or to a directory holding installs " +
           "one level down, such as a CMake build root",
       )
+  // The configuration cache tracks the answer rather than every file the lookup reads, so a build
+  // or descriptor under the root reconfigures only when it changes the answer. What the chosen
+  // descriptor says beyond the answer, such as its link libraries, is tracked on its own.
+  val install =
+    providers
+      .of(NativeInstallSource::class.java) {
+        parameters.root.set(root.absolutePath)
+        parameters.targetPlatform.set(targetPlatform)
+        parameters.backend.set(backend)
+      }
+      .get()
+  install.prefix?.let {
+    providers
+      .fileContents(layout.projectDirectory.file(it.resolve(NATIVE_DESCRIPTOR_PATH).path))
+      .asBytes
+      .get()
+  }
+  return install
+}
+
+internal abstract class NativeInstallSource :
+  ValueSource<NativeInstall, NativeInstallSource.Parameters> {
+  interface Parameters : ValueSourceParameters {
+    val root: Property<String>
+    val targetPlatform: Property<String>
+    val backend: Property<String>
+  }
+
+  override fun obtain(): NativeInstall =
+    findInstall(
+      File(parameters.root.get()),
+      parameters.targetPlatform.get(),
+      parameters.backend.orNull,
+    )
+}
+
+private fun findInstall(root: File, targetPlatform: String, backend: String?): NativeInstall {
   val request =
     if (backend == null) "$targetPlatform with its default backend" else "$targetPlatform $backend"
   if (root.resolve(NATIVE_DESCRIPTOR_PATH).isFile) {
@@ -105,7 +146,6 @@ fun Project.nativeInstall(targetPlatform: String, backend: String? = null): Nati
   return NativeInstall(null, problem)
 }
 
-// The configuration cache tracks this readText, so editing a descriptor reconfigures the build.
 private fun readDescriptor(prefix: File): Map<*, *> =
   JsonSlurper().parseText(prefix.resolve(NATIVE_DESCRIPTOR_PATH).readText()) as? Map<*, *>
     ?: emptyMap<Any, Any>()
