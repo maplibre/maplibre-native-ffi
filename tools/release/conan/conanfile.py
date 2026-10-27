@@ -75,7 +75,9 @@ class MaplibreNativeC(ConanFile):
                 backend = "webgpu"
             else:
                 backend = "opengl"
-        suffix = "webgl" if self.settings.os == "Emscripten" else "egl"
+        suffix = {"Windows": "wgl", "Emscripten": "webgl"}.get(
+            str(self.settings.os), "egl"
+        )
         key = f"{self._platform}-{suffix if backend == 'opengl' else backend}"
         try:
             return self.conan_data["sources"][str(self.version)][key]
