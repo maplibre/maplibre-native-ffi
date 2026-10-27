@@ -184,9 +184,11 @@ impl Drop for ViewScope {
 
 /// A value that a view getter lends, valid until its view drops.
 ///
-/// It reads as the value itself. It can't be copied out of the borrow, since
-/// the native objects that it names, such as a backend texture, stay valid
-/// only while the view lives.
+/// It reads as the value itself, and its borrow keeps the view open while the
+/// value is held. The native objects that it names, such as a backend
+/// texture, stay valid only while the view lives. Their names are plain data
+/// that can still be copied out, so a name used after the view ends is the
+/// fault of the unsafe graphics call that uses it.
 pub struct Lent<'v, T> {
     value: T,
     _view: std::marker::PhantomData<&'v ()>,
