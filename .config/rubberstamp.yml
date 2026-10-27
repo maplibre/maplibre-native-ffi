@@ -184,8 +184,6 @@ ci:
       rules:
         - if:
             files:
-              - cmake/mln_ffi_rust.cmake
-              - cmake/toolchains/zig.cmake
               - third_party/maplibre-native
           then: apply
     linux-arm64:
@@ -199,8 +197,6 @@ ci:
       rules:
         - if:
             files:
-              - cmake/mln_ffi_rust.cmake
-              - cmake/toolchains/zig.cmake
               - third_party/maplibre-native
           then: apply
     linux-musl:
@@ -212,9 +208,6 @@ ci:
       rules:
         - if:
             files:
-              - cmake/mln_ffi_rust.cmake
-              - cmake/platform/linux.cmake
-              - cmake/toolchains/zig.cmake
               - third_party/maplibre-native
           then: apply
     freebsd:
@@ -227,9 +220,6 @@ ci:
       rules:
         - if:
             files:
-              - cmake/mln_ffi_rust.cmake
-              - cmake/platform/linux.cmake
-              - cmake/toolchains/zig.cmake
               - scripts/run-freebsd-test.sh
               - tools/devices/freebsd-host
               - third_party/maplibre-native
