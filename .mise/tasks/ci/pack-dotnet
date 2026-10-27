@@ -7,4 +7,4 @@
 #USAGE arg "<version>" help="Package version"
 set -euo pipefail
 
-exec python ci/dotnet_release.py package "${usage_input?}" "${usage_output?}" "${usage_version?}"
+exec python tools/release/dotnet_release.py package "${usage_input?}" "${usage_output?}" "${usage_version?}"

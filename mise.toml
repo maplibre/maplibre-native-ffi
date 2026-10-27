@@ -387,19 +387,22 @@ run = "pnpm dlx actions-up"
 
 [tasks."ci:prepare-native-package"]
 description = "Prepare native package snapshot or tagged release assets."
-run = 'python3 ci/native_package_release.py "$@"'
+run = 'python3 tools/release/native_package_release.py "$@"'
 
 [tasks."ci:release-version"]
 description = "Validate a release tag, or print the next release version."
-run = 'python3 ci/release_version.py "$@"'
+run = 'python3 tools/release/release_version.py "$@"'
 
 [tasks."ci:test"]
 description = "Test CI planning and release tooling."
-run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"'
+run = [
+  'uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"',
+  'PYTHONPATH="$MISE_MONOREPO_ROOT/tools/release${PYTHONPATH:+:$PYTHONPATH}" uv run --no-sync python -m unittest discover -s tests/release -p "test_*.py"',
+]
 
 [tasks."kotlin:prepare-release"]
 description = "Sign and publish a verified Kotlin Maven repository."
-run = 'python3 ci/kotlin_release.py "$@"'
+run = 'python3 tools/release/kotlin_release.py "$@"'
 
 [tasks."bindings:generate"]
 description = "Regenerate native declarations and public binding APIs from C headers."

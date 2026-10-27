@@ -103,7 +103,7 @@ jobs:
           for har in build/ohpm/*.har; do
             mise exec --no-deps core:node -- ohpm prepublish "$har"
           done
-          mise exec --no-deps core:node -- python3 ci/ohpm_publish.py ohpm build/ohpm/*.har
+          mise exec --no-deps core:node -- python3 tools/release/ohpm_publish.py ohpm build/ohpm/*.har
           for har in build/ohpm/*.har; do
             echo "### $(basename "$har" .har) awaits OHPM's review" >> "$GITHUB_STEP_SUMMARY"
           done

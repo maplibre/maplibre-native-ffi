@@ -12,7 +12,7 @@ import tempfile
 
 from native_package_release import package_presets
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 MANAGED_PROJECT = (
     ROOT / "bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj"
 )

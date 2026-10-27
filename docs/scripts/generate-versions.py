@@ -9,7 +9,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "versions.json"
 sys.path.insert(0, str(REPO_ROOT))
 
-from ci.release_version import release_tags
+from tools.release.release_version import release_tags
 
 
 def main() -> int:

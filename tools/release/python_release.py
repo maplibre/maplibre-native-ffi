@@ -20,7 +20,7 @@ from release_version import parse_version
 
 BACKENDS = ("opengl", "metal", "vulkan")
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
-LICENSE = pathlib.Path(__file__).resolve().parents[1] / "LICENSE"
+LICENSE = pathlib.Path(__file__).resolve().parents[2] / "LICENSE"
 DEV_SUFFIX = re.compile(r"\.dev[0-9]+\Z")
 
 

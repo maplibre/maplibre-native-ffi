@@ -13,7 +13,7 @@ prefix=()
 if [[ -n "${usage_preset:-}" ]]; then
   prefix=(--prefix "$MISE_MONOREPO_ROOT/build/$usage_preset/install")
 fi
-python3 "$MISE_MONOREPO_ROOT/ci/python_release.py" . "$usage_version" "${prefix[@]}"
+python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" . "$usage_version" "${prefix[@]}"
 '''
 
 [tasks._test-android]

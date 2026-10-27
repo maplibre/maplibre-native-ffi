@@ -13,6 +13,6 @@ mkdir "$package"
 git ls-files -z --cached --others --exclude-standard | tar -c -h --null -T - | tar -x -C "$package"
 printf '[{"archive": "maplibre-native-c-linux-gnu-x64-vulkan.tar.gz", "sha256": "%s"}]\n' \
   "$(printf '0%.0s' {1..64})" >"$copy/artifacts.json"
-python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" "$package" v0.202601.0 --artifacts "$copy/artifacts.json"
+python3 "$MISE_MONOREPO_ROOT/tools/release/dart_release.py" "$package" v0.202601.0 --artifacts "$copy/artifacts.json"
 cd "$package"
 dart pub publish --dry-run
