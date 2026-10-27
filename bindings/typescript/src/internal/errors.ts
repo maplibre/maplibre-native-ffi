@@ -38,8 +38,8 @@ export class MaplibreError extends Error {
 }
 
 /**
- * The loaded addon embeds a C library whose C ABI version this package does
- * not support. Install the facade and the addon package at the same version.
+ * The loaded addon uses a C library whose C ABI version this package does not
+ * support. Install the facade and the addon package at the same version.
  * The status is {@link Status.unsupported}.
  */
 export class AbiVersionMismatchError extends MaplibreError {

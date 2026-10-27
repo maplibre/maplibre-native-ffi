@@ -33,6 +33,9 @@ cp "$binding/test/arkts/TestAbility.ts" "$work/ets/TestAbility.ts"
 # does: the addon, C library, and C++ runtime from the package's libs, beside
 # the application's own libraries.
 "$binding/scripts/pack-ohpm.sh" "$work/ohpm" "$preset"
+# A native module in the application links the package's C library and
+# headers, as one that installs the package from oh_modules would.
+"$binding/scripts/verify-ohpm.sh" "$work"/ohpm/*.har
 tar -xzf "$work"/ohpm/*.har -C "$work/ohpm"
 cp -R "$work/ohpm/package/libs/." "$work/libs/"
 # One bundle with three entries: the hypium runner, a spawned realm, and a

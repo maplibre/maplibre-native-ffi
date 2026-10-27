@@ -86,8 +86,8 @@ export let hooks: HostHooks = {};
 export const EXPECTED_C_ABI_VERSION = MLN_C_VERSION;
 
 /**
- * Checks the C ABI version of the addon's embedded library before any other
- * call and makes it the addon that every operation calls.
+ * Checks the C ABI version of the addon's C library before any other call and
+ * makes it the addon that every operation calls.
  */
 export function bindAddon(
   addon: Addon,

@@ -19,6 +19,11 @@
       "compatibleSdkType": "OpenHarmony"
     },
     {
+      "name": "libmaplibre-native-c.so",
+      "compatibleSdkVersion": 12,
+      "compatibleSdkType": "OpenHarmony"
+    },
+    {
       "name": "libc++_shared.so",
       "compatibleSdkVersion": 12,
       "compatibleSdkType": "OpenHarmony"
