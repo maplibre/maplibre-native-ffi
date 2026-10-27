@@ -4,6 +4,24 @@ set -euo pipefail
 repo_root="${MISE_MONOREPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 if [[ "${MLN_FFI_DPRINT_SCOPED_TOOLS:-}" == "1" ]]; then
+  # dart format reads the package's language version from
+  # .dart_tool/package_config.json, so resolve the binding's packages first.
+  # dprint runs this wrapper for many files at once and pub rewrites that file
+  # in place, so every wrapper checks it under a lock, and only a stale one
+  # resolves. Progress goes to stderr: dprint reads the formatted file from
+  # stdout.
+  package="$repo_root/bindings/dart"
+  config="$package/.dart_tool/package_config.json"
+  mkdir -p "$package/.dart_tool"
+  exec 9>"$package/.dart_tool/deps.lock"
+  perl -MFcntl=:flock -e 'open my $lock, ">&=", 9 or die $!; flock $lock, LOCK_EX or die $!'
+  if [[ ! -s "$config" || "$package/pubspec.yaml" -nt "$config" || "$package/pubspec.lock" -nt "$config" ]]; then
+    # The wrapper has already decided under the lock, so force pub, which may
+    # leave an unchanged file untouched; marking it settles the next check.
+    mise -C "$package" deps install dart --force >&2
+    touch "$config"
+  fi
+  exec 9>&-
   exec dart "$@"
 fi
 
