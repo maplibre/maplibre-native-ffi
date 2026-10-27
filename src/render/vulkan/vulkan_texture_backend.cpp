@@ -497,13 +497,14 @@ auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
                              .setUsage(vk::BufferUsageFlagBits::eTransferDst)
                              .setSharingMode(vk::SharingMode::eExclusive);
 
+  // The host only reads this buffer, so prefer cached memory: copying out of
+  // uncached memory takes about 40 times as long on discrete GPUs. Cached
+  // memory may not be coherent, so the copy invalidates it first.
   auto allocation_info = VmaAllocationCreateInfo{};
   allocation_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-  allocation_info.requiredFlags =
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  allocation_info.flags =
-    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-    VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  allocation_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  allocation_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+                          VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
   auto buffer_allocation = mln::vulkan::BufferAllocation{allocator};
   if (!buffer_allocation.create(allocation_info, buffer_info)) {
@@ -567,6 +568,13 @@ auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
     }
   );
 
+  if (
+    vmaInvalidateAllocation(
+      allocator, buffer_allocation.allocation, 0, VK_WHOLE_SIZE
+    ) != VK_SUCCESS
+  ) {
+    throw std::runtime_error("Vulkan readback host memory invalidate failed");
+  }
   if (buffer_allocation.mappedBuffer == nullptr) {
     if (
       vmaMapMemory(
