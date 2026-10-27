@@ -20,6 +20,32 @@ auto on_browser_main_thread() noexcept -> bool {
 #endif
 }
 
+// Android and OpenHarmony define __linux__ too, and size their own defaults.
+#if defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+
+auto reserve_default_thread_stack() noexcept -> void {
+  auto attributes = pthread_attr_t{};
+  if (pthread_getattr_default_np(&attributes) != 0) {
+    return;
+  }
+  auto stack_size = std::size_t{0};
+  static_cast<void>(pthread_attr_getstacksize(&attributes, &stack_size));
+  if (
+    stack_size < WorkerThread::kStackSize &&
+    pthread_attr_setstacksize(&attributes, WorkerThread::kStackSize) == 0
+  ) {
+    static_cast<void>(pthread_setattr_default_np(&attributes));
+  }
+  pthread_attr_destroy(&attributes);
+}
+
+#else
+
+auto reserve_default_thread_stack() noexcept -> void {}
+
+#endif
+
 #if defined(_WIN32) || defined(__EMSCRIPTEN__)
 
 // Windows sizes thread stacks from the executable's own header, and

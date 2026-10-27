@@ -881,6 +881,7 @@ auto create_runtime(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   watch_process_exit();
+  reserve_default_thread_stack();
 
   RuntimeCreationGuard result;
   result.runtime = std::make_shared<RuntimeObject>();

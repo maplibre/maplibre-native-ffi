@@ -1,9 +1,11 @@
 // Runtime release against a map's physical cleanup, which runs on a teardown
 // lane after the map's own release has completed.
 
+#include <cstddef>
 #include <thread>
 
 #include "completion/completion.hpp"
+#include "execution/worker_thread.hpp"
 #include "internal/support/sync_points.hpp"
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
@@ -343,6 +345,26 @@ void runtime_release_waits_for_worker_thread_destruction() {
   );
 }
 
+#if defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+// MapLibre starts its own threads with the process's default stack, and host
+// callbacks run on them, so creating a runtime raises musl's 128 KiB default.
+void a_runtime_raises_musls_default_thread_stack() {
+  const auto runtime = create_runtime();
+  auto attributes = pthread_attr_t{};
+  TEST_ASSERT_EQUAL_INT(0, pthread_getattr_default_np(&attributes));
+  auto stack_size = std::size_t{0};
+  TEST_ASSERT_EQUAL_INT(0, pthread_attr_getstacksize(&attributes, &stack_size));
+  pthread_attr_destroy(&attributes);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+    mln::core::WorkerThread::kStackSize, stack_size
+  );
+  auto released = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_runtime_release(runtime, &released.descriptor, nullptr));
+  MLN_TEST_OK(mln_test_completion_settle(&released));
+}
+#endif
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -353,4 +375,8 @@ MLN_TEST_GROUP {
   RUN_TEST(submission_failure_callbacks_can_submit_again);
   RUN_TEST(a_deferred_runtime_release_does_not_hold_other_retirements);
   RUN_TEST(map_release_waits_for_a_lease_queued_after_close_begins);
+#if defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+  RUN_TEST(a_runtime_raises_musls_default_thread_stack);
+#endif
 }

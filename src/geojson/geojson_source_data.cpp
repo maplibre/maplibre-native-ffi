@@ -23,6 +23,7 @@
 #include "geojson/geojson_source_data.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/worker_thread.hpp"
 #include "geojson/geojson.hpp"
 #include "map/map.hpp"
 #include "style/style_value.hpp"
@@ -493,6 +494,8 @@ auto geojson_source_data_create(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  // Preparation can run before any runtime, so it raises the stack itself.
+  reserve_default_thread_stack();
   auto scheduler = mln::Scheduler::GetSequenced();
   pin_sequenced_scheduler(scheduler);
   auto index =

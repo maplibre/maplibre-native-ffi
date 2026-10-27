@@ -512,6 +512,13 @@ function(mln_native_add_internal_suite out_sources)
        "${MLN_NATIVE_TESTS_DIR}/internal/support/*.cpp")
   add_executable(mln_native_internal_tests ${test_sources} ${internal_support})
   mln_native_configure_suite(mln_native_internal_tests "${registry_dir}")
+  # musl takes its default thread stack from the executable, and Zig links a
+  # large one, so the suite keeps musl's own 128 KiB, as a JVM host does.
+  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    target_link_options(
+      mln_native_internal_tests
+      PRIVATE "LINKER:-z,stack-size=131072")
+  endif()
   # The suite shares the library's C++ types, such as std::any, so it builds
   # without RTTI as the library does.
   mln_ffi_configure_c_api_compile_options(mln_native_internal_tests)

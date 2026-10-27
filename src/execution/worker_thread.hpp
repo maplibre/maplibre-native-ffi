@@ -14,6 +14,11 @@ namespace mln::core {
 // loop, so it must not wait for a thread that may not have started.
 [[nodiscard]] auto on_browser_main_thread() noexcept -> bool;
 
+// Raises the process's default thread stack to WorkerThread::kStackSize on
+// musl. MapLibre starts its file source and scheduler threads with
+// std::thread, which takes that default, and host callbacks run on them.
+auto reserve_default_thread_stack() noexcept -> void;
+
 // A joinable thread for native workers that run map, style, and render work.
 //
 // std::thread takes the platform default stack, which musl fixes at 128 KiB
