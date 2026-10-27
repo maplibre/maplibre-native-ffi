@@ -475,10 +475,10 @@ fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Buil
     if (target.abi == .android and target.cpu.arch == .arm) {
         const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
         test_step.dependOn(&unsupported.step);
-    } else if (target.abi == .android or target.abi == .musl) {
-        // Android executables run on an emulator, and musl executables load
+    } else if (target.abi == .android or target.abi == .musl or target.os.tag == .freebsd) {
+        // Android executables run on an emulator, musl executables load
         // Alpine's graphics stack through musl's dynamic loader in an Alpine
-        // container.
+        // container, and FreeBSD executables run in a FreeBSD virtual machine.
         addDeviceTestRunSteps(b, test_step, &test_compiles, options.native);
     } else {
         for (test_compiles) |tests| {

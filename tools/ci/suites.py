@@ -61,6 +61,12 @@ SUITES: list[dict] = [
             },
         ],
     },
+    # A Linux runner cross-builds the FreeBSD suite, which runs in the FreeBSD
+    # virtual machine.
+    {
+        "platforms": ["freebsd"],
+        "commands": [{"task": "//bindings/zig:test"}],
+    },
     # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
     {
         "platforms": ["linux-gnu", "macos", "windows"],
@@ -312,7 +318,7 @@ def apple_commands(target: Target) -> list[str]:
 def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
     """The binding and example commands, as `desktop_commands` returns them."""
     target_platform = target.platform
-    if target_platform in DESKTOP or target_platform == "emscripten":
+    if target_platform in DESKTOP or target_platform in {"emscripten", "freebsd"}:
         return desktop_commands(target)
     if target_platform == "android":
         abi = {

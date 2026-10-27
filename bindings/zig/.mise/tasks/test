@@ -4,14 +4,15 @@
 #MISE shell="bash"
 set -euo pipefail
 
-# Android presets use their matching emulator, musl presets run in Alpine, and
-# other host presets run in process. Each test gets 30 seconds times
-# MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in Alpine's
-# software renderer, and to 1 on the host; the fixture scales its waits by the
-# same value.
+# Android presets use their matching emulator, musl presets run in Alpine,
+# FreeBSD presets run in the worktree's FreeBSD virtual machine, and other host
+# presets run in process. Each test gets 30 seconds times
+# MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in the software
+# renderers of Alpine and the virtual machine, and to 1 on the host; the fixture
+# scales its waits by the same value.
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 case "$usage_preset" in
-  android-* | linux-musl-*)
+  android-* | linux-musl-* | freebsd-*)
     export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
     ;;
   windows-*)

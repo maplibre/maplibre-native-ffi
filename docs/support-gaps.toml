@@ -325,12 +325,6 @@ platform = "ios"
 status = "path-known"
 reason = "Add an app host with a Node-API runtime, package the addon, and run simulator tests."
 
-[[gap]]
-binding = "zig"
-platform = "freebsd"
-status = "path-known"
-reason = "Zig 0.17 targets FreeBSD 14. Add the target to `build.zig` and run the suite in the FreeBSD VM."
-
 # Platforms that a binding cannot reach by design, because another binding of
 # its language is the route there. A platform that the language's only route
 # cannot reach yet is a gap instead.

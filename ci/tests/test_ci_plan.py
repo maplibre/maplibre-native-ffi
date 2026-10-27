@@ -194,6 +194,7 @@ class PresetTest(unittest.TestCase):
             "android": "fetch",
             "ios-maccatalyst": "fetch",
             "windows": "fetch",
+            "freebsd": "fetch",
         }
         expected = {}
         for name, target in self.targets.items():
