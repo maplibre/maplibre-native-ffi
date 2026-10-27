@@ -73,8 +73,11 @@ function(mln_ffi_node_module target)
       PROPERTIES PREFIX "lib" SUFFIX ".so" C_VISIBILITY_PRESET hidden)
     target_link_libraries(${target} PRIVATE "${MLN_FFI_ACE_NAPI}")
     # The SDK toolchain passes --gcc-toolchain to every compile, and clang
-    # ignores it for C.
-    target_compile_options(${target} PRIVATE -Wno-unused-command-line-argument)
+    # ignores it for C. The preset's OHOS_COMPATIBLE_SDK_VERSION is the
+    # module's API floor, which clang checks with the availability warning.
+    target_compile_options(
+      ${target}
+      PRIVATE -Wno-unused-command-line-argument -Werror=unguarded-availability)
   else()
     set_target_properties(
       ${target}

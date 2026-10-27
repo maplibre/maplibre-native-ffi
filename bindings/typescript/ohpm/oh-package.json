@@ -9,23 +9,19 @@
   "repository": "https://github.com/maplibre/maplibre-native-ffi",
   "homepage": "https://maplibre.org/maplibre-native-ffi/",
   "bugs": { "url": "https://github.com/maplibre/maplibre-native-ffi/issues" },
-  "compatibleSdkVersion": 20,
   "compatibleSdkType": "OpenHarmony",
   "obfuscated": false,
   "nativeComponents": [
     {
       "name": "libmaplibre_native_ffi.so",
-      "compatibleSdkVersion": 20,
       "compatibleSdkType": "OpenHarmony"
     },
     {
       "name": "libmaplibre-native-c.so",
-      "compatibleSdkVersion": 20,
       "compatibleSdkType": "OpenHarmony"
     },
     {
       "name": "libc++_shared.so",
-      "compatibleSdkVersion": 20,
       "compatibleSdkType": "OpenHarmony"
     }
   ],

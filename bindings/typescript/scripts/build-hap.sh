@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # Builds and signs a test HAP from staged sources and libraries.
 #
-#   build-hap.sh <work-dir> <bundle-name> <abi>
+#   build-hap.sh <work-dir> <bundle-name> <abi> <api>
 #
 # <work-dir>/ets holds the ES module sources, and <work-dir>/libs/<abi> the
-# native libraries. DevEco Studio drives these steps through hvigor, which is
+# native libraries. The HAP requires and targets API level <api>. DevEco Studio drives these steps through hvigor, which is
 # not published; every tool that hvigor calls ships in the OpenHarmony SDK:
 # es2abc compiles the sources into one merged modules.abc, restool compiles
 # the resources, app_packing_tool packs the HAP, and hap-sign-tool signs it
 # with the SDK's debug signing material. The HAP is <work-dir>/entry_test.hap.
 set -euo pipefail
 
-work=${1:?usage: build-hap.sh <work-dir> <bundle-name> <abi>}
-bundle=${2:?usage: build-hap.sh <work-dir> <bundle-name> <abi>}
-abi=${3:?usage: build-hap.sh <work-dir> <bundle-name> <abi>}
+usage="usage: build-hap.sh <work-dir> <bundle-name> <abi> <api>"
+work=${1:?$usage}
+bundle=${2:?$usage}
+abi=${3:?$usage}
+api=${4:?$usage}
 module=entry_test
 sdk="$(dirname "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must name the OpenHarmony native SDK}")"
 tools="$sdk/toolchains"
@@ -63,8 +65,8 @@ cat >"$manifest" <<JSON
     "vendor": "maplibre",
     "versionCode": 1,
     "versionName": "1.0.0",
-    "minAPIVersion": 20,
-    "targetAPIVersion": 20,
+    "minAPIVersion": $api,
+    "targetAPIVersion": $api,
     "apiReleaseType": "Release",
     "debug": true,
     "bundleType": "app",

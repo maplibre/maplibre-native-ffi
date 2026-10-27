@@ -25,6 +25,10 @@ if (($# == 0)); then
 fi
 binding="$(cd "$(dirname "$0")/.." && pwd)"
 staging="$binding/build/ohpm-packages"
+# The package declares the API floor that every OpenHarmony preset compiles
+# against, which the CI packing job reads without a configured build.
+api=$(jq -er '.configurePresets[] | select(.name == "_ohos")
+  | .cacheVariables.OHOS_COMPATIBLE_SDK_VERSION' "$binding/../../CMakePresets.json")
 rm -rf "$staging"
 mkdir -p "$out"
 
@@ -52,8 +56,10 @@ for preset in "$@"; do
     # The formatter writes a .json5 file in JSON5's own style, which jq cannot
     # read, so the manifest is kept as JSON, which JSON5 readers accept too.
     jq --arg name "@maplibre/native-ffi-$backend" --arg version "$version" \
-      '.name = $name | .version = $version' "$binding/ohpm/oh-package.json" \
-      >"$package/oh-package.json5"
+      --argjson api "$api" \
+      '.name = $name | .version = $version | .compatibleSdkVersion = $api
+        | .nativeComponents[].compatibleSdkVersion = $api' \
+      "$binding/ohpm/oh-package.json" >"$package/oh-package.json5"
     # OHPM's review rejects a package whose changelog does not name its version.
     printf '\n## %s\n\nSee the [release notes](%s/v%s).\n' "$version" \
       https://github.com/maplibre/maplibre-native-ffi/releases/tag "$version" \

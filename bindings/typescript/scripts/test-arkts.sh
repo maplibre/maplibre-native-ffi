@@ -60,7 +60,9 @@ patch --batch --forward --fuzz=0 -p1 -d "$work/ets/hypium" \
 perl -pi -e 's#from "\@ohos/hypium"#from "./hypium/index"#' "$work/ets/TestRunner.js"
 cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
-"$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi"
+# The application requires the API floor that the package declares.
+api=$(jq -er .compatibleSdkVersion "$work/ohpm/package/oh-package.json5")
+"$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi" "$api"
 
 connect_key=$("$binding/../../tools/devices/ohos-key")
 hdc=(hdc -t "$connect_key")

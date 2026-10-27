@@ -10,6 +10,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
   # unused. Keep the warning non-fatal without weakening other platforms.
   add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-unused-command-line-argument>
                       $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-command-line-argument>)
+  # The toolchain appends OHOS_COMPATIBLE_SDK_VERSION to the target triple, and
+  # the SDK headers mark each declaration with the API that introduced it.
+  # Clang checks a call against that floor only when this warning is enabled.
+  add_compile_options($<$<COMPILE_LANGUAGE:C>:-Werror=unguarded-availability>
+                      $<$<COMPILE_LANGUAGE:CXX>:-Werror=unguarded-availability>)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

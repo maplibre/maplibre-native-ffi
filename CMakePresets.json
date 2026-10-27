@@ -269,18 +269,26 @@
       }
     },
     {
-      "name": "_ohos-arm64",
+      "name": "_ohos",
       "hidden": true,
       "inherits": "_single-config",
       "toolchainFile": "$env{OHOS_SDK_NATIVE}/build/cmake/ohos.toolchain.cmake",
       "cacheVariables": {
-        "OHOS_ARCH": "arm64-v8a",
         "OHOS_STL": "c++_shared",
+        "OHOS_COMPATIBLE_SDK_VERSION": "20",
         "MLN_FFI_ENABLE_CLANG_TIDY": false,
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
+      }
+    },
+    {
+      "name": "_ohos-arm64",
+      "hidden": true,
+      "inherits": "_ohos",
+      "cacheVariables": {
+        "OHOS_ARCH": "arm64-v8a",
         "MLN_FFI_TARGET_PLATFORM": "ohos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-ohos",
-        "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-ohos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
+        "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-ohos"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -294,16 +302,12 @@
     {
       "name": "_ohos-x64",
       "hidden": true,
-      "inherits": "_single-config",
-      "toolchainFile": "$env{OHOS_SDK_NATIVE}/build/cmake/ohos.toolchain.cmake",
+      "inherits": "_ohos",
       "cacheVariables": {
         "OHOS_ARCH": "x86_64",
-        "OHOS_STL": "c++_shared",
-        "MLN_FFI_ENABLE_CLANG_TIDY": false,
         "MLN_FFI_TARGET_PLATFORM": "ohos-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-linux-ohos",
-        "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-ohos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
+        "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-ohos"
       },
       "vendor": {
         "maplibre-native-ffi": {
