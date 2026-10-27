@@ -490,6 +490,7 @@ ci:
               - tools/release/conan/**
               - tools/release/check_conan.py
               - tests/distribution/conan/**
+          then: apply
     xmake:
       covers: >-
         Writes the xmake repository that a release pushes to the distribution
