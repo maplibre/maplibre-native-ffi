@@ -1,7 +1,13 @@
 ---
 import supportMatrix from "../generated/support-matrix.json";
 
-type Status = "tested" | "build-only" | "path-known" | "blocked" | "unknown";
+type Status =
+  | "tested"
+  | "build-only"
+  | "path-known"
+  | "blocked"
+  | "unknown"
+  | "not-applicable";
 
 type Cell = {
   status: string;
@@ -14,6 +20,7 @@ const glyphs: Record<Status, string> = {
   "path-known": "○",
   blocked: "✕",
   unknown: "?",
+  "not-applicable": "–",
 };
 
 const statusLabels = new Map(
@@ -40,15 +47,15 @@ const rows = supportMatrix.platforms.flatMap((platform) => {
   );
 });
 
-// Gaps that share a language and reason collapse into one entry, as in the
+// Gaps that share a binding and reason collapse into one entry, as in the
 // tracking issue.
 function gapGroups(status: string) {
   const groups = new Map<
     string,
-    { language: string; platforms: string[]; reason: string; link?: string }
+    { binding: string; platforms: string[]; reason: string; link?: string }
   >();
   for (const gap of supportMatrix.gaps as {
-    language: string;
+    binding: string;
     platform: string;
     status: string;
     reason: string;
@@ -57,7 +64,7 @@ function gapGroups(status: string) {
     if (gap.status !== status) {
       continue;
     }
-    const key = [gap.language, gap.reason, gap.link].join("\n");
+    const key = [gap.binding, gap.reason, gap.link].join("\n");
     const group = groups.get(key);
     if (group) {
       group.platforms.push(gap.platform);
@@ -80,8 +87,8 @@ function codeSpans(text: string) {
     .map((part, index) => ({ part, code: index % 2 === 1 }));
 }
 
-function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
-  const label = `${language} on ${row.platform} ${row.arch} with ${row.backend}: ${statusLabels.get(cell.status)}`;
+function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
+  const label = `${binding} on ${row.platform} ${row.arch} with ${row.backend}: ${statusLabels.get(cell.status)}`;
   return cell.detail ? `${label}. ${cell.detail}` : label;
 }
 ---
@@ -104,10 +111,10 @@ function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
           <th scope="col">Platform</th>
           <th scope="col">Arch</th>
           <th scope="col">Backend</th>
-          {supportMatrix.languages.map((language) => (
-            <th scope="col" class="language">
-              <a href={`${sourceRoot}/${language.sourceDirectory}`}>
-                {language.label}
+          {supportMatrix.bindings.map((binding) => (
+            <th scope="col" class="binding">
+              <a href={`${sourceRoot}/${binding.sourceDirectory}`}>
+                {binding.label}
               </a>
             </th>
           ))}
@@ -128,7 +135,7 @@ function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
             )}
             <th scope="row" class="secondary">{row.backend}</th>
             {row.cells.map((cell, index) => {
-              const label = cellLabel(supportMatrix.languages[index].label, row, cell);
+              const label = cellLabel(supportMatrix.bindings[index].label, row, cell);
               return (
                 <td>
                   <span
@@ -156,7 +163,7 @@ function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
           {section.gaps.map((gap) => (
             <li>
               <strong>
-                {gap.language} on {gap.platforms.join(", ")}:
+                {gap.binding} on {gap.platforms.join(", ")}:
               </strong>{" "}
               {codeSpans(gap.reason).map(({ part, code }) => (code ? (
                 <code>{part}</code>
@@ -174,8 +181,9 @@ function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
     ))}
   </details>
   <p class="note">
-    Hover a cell for details. OpenGL uses WGL on Windows and EGL on other
-    platforms. macOS EGL uses ANGLE.{" "}
+    Hover a cell for details. TypeScript runs under Node, Bun, and Deno, in
+    ArkTS apps on OpenHarmony, and in the browser. OpenGL uses WGL on Windows
+    and EGL on other platforms. macOS EGL uses ANGLE.{" "}
     <a href={`${issueRoot}/${supportMatrix.issue}`}>
       Issue #{supportMatrix.issue}
     </a>{" "}
@@ -223,11 +231,11 @@ thead th {
   color: var(--sl-color-gray-3);
   font-weight: 400;
 }
-th.language {
+th.binding {
   padding: 0;
   height: 6rem;
 }
-th.language a {
+th.binding a {
   display: block;
   margin-inline: auto;
   writing-mode: vertical-rl;
@@ -279,6 +287,9 @@ td {
   background: var(--sl-color-gray-6);
   border-color: var(--sl-color-gray-5);
   color: var(--sl-color-white);
+}
+.not-applicable {
+  color: var(--sl-color-gray-4);
 }
 .note {
   color: var(--sl-color-gray-3);

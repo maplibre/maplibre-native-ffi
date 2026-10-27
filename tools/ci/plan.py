@@ -65,6 +65,7 @@ class Target:
 # consumes.
 JOBS = {
     "docs": ("docs", lambda target: False),
+    "support-matrix": ("support-matrix", lambda target: False),
     "android-multi": ("android", lambda target: target.platform == "android"),
     # Every Metal preset is an Apple one, and each contributes one XCFramework
     # slice.

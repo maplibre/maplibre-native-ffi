@@ -76,7 +76,7 @@ class WorkflowTest(unittest.TestCase):
                 )
                 # A packaging job consumes the target matrix's artifacts, and
                 # those of the jobs it names in JOB_NEEDS.
-                if job != "docs":
+                if job not in ("docs", "support-matrix"):
                     self.assertEqual(
                         self.jobs[job]["needs"],
                         ["plan", "target", *plan.JOB_NEEDS.get(job, ())],

@@ -15,11 +15,17 @@ ICONS = {
     "path-known": "⬜",
     "blocked": "⛔",
     "unknown": "❓",
+    "not-applicable": "➖",
 }
-NOT_APPLICABLE = "➖"
-# A platform or architecture shows the furthest status any of its rows reached.
-PRECEDENCE = ["tested", "build-only", "path-known", "blocked", "unknown"]
-ARCHITECTURES = ["x64", "arm64", "arm", "riscv64", "loongarch64", "wasm32"]
+# A platform shows the furthest status any of its rows reached.
+PRECEDENCE = [
+    "tested",
+    "build-only",
+    "path-known",
+    "blocked",
+    "unknown",
+    "not-applicable",
+]
 
 
 def best(statuses: list[str]) -> str:
@@ -49,12 +55,12 @@ def table(header: list[str], rows: list[list[str]]) -> list[str]:
     ]
 
 
-def language_grid(matrix: dict[str, Any]) -> list[str]:
-    languages = matrix["languages"]
+def binding_grid(matrix: dict[str, Any]) -> list[str]:
+    bindings = matrix["bindings"]
     rows = []
     for platform in matrix["platforms"]:
         row = [platform["label"]]
-        for index in range(len(languages)):
+        for index in range(len(bindings)):
             statuses = [
                 backend["cells"][index]["status"]
                 for arch in platform["architectures"]
@@ -62,38 +68,19 @@ def language_grid(matrix: dict[str, Any]) -> list[str]:
             ]
             row.append(ICONS[best(statuses)])
         rows.append(row)
-    return table(["Platform", *(language["label"] for language in languages)], rows)
-
-
-def architecture_grid(matrix: dict[str, Any]) -> list[str]:
-    rows = []
-    for platform in matrix["platforms"]:
-        statuses: dict[str, list[str]] = {}
-        for arch in platform["architectures"]:
-            for backend in arch["backends"]:
-                statuses.setdefault(arch["arch"], []).append(
-                    backend["cells"][0]["status"]
-                )
-        rows.append(
-            [platform["label"]]
-            + [
-                ICONS[best(statuses[arch])] if arch in statuses else NOT_APPLICABLE
-                for arch in ARCHITECTURES
-            ]
-        )
-    return table(["Platform", *ARCHITECTURES], rows)
+    return table(["Platform", *(binding["label"] for binding in bindings)], rows)
 
 
 def gap_list(matrix: dict[str, Any], status: str) -> list[str]:
-    # Gaps that share a language and reason collapse into one line.
+    # Gaps that share a binding and reason collapse into one line.
     grouped: dict[tuple[str, str, str], list[str]] = {}
     for gap in matrix["gaps"]:
         if gap["status"] == status:
-            key = (gap["language"], gap["reason"], gap.get("link", ""))
+            key = (gap["binding"], gap["reason"], gap.get("link", ""))
             grouped.setdefault(key, []).append(gap["platform"])
     lines = []
-    for (language, reason, link), platforms in grouped.items():
-        line = f"- **{language} / {', '.join(platforms)}:** {reason}"
+    for (binding, reason, link), platforms in grouped.items():
+        line = f"- **{binding} on {', '.join(platforms)}:** {reason}"
         if link:
             line += f" ([{link_label(link)}]({link}))"
         lines.append(line)
@@ -120,16 +107,15 @@ def render(matrix: dict[str, Any]) -> str:
             "this issue."
         ),
         "",
-        f"{legend} · {NOT_APPLICABLE} does not apply",
+        legend,
         "",
-        "A cell shows the furthest status of any architecture and backend in it.",
-        "Kotlin covers Kotlin/JVM, Kotlin/Android, Kotlin/Native, and Kotlin/Wasm.",
+        (
+            "A cell shows the furthest status of any architecture and backend on "
+            "its platform. TypeScript runs under Node, Bun, and Deno, in ArkTS "
+            "apps on OpenHarmony, and in the browser."
+        ),
         "",
-        *language_grid(matrix),
-        "",
-        "The C library's architectures:",
-        "",
-        *architecture_grid(matrix),
+        *binding_grid(matrix),
         "",
         "## Blocked",
         "",

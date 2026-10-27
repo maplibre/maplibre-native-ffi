@@ -490,6 +490,7 @@ jobs:
       - python-wheels
       - typescript-npm
       - arkts-ohpm
+      - support-matrix
     steps:
       - name: Require every planned job
         env:
@@ -498,19 +499,16 @@ jobs:
         run: |
           test "$PLAN" = success &&
           jq -e -n --argjson results "$RESULTS" 'all($results[]; .result == "success" or .result == "skipped")'
-  # The tracking issue follows main, while the site it summarizes follows
-  # snapshot deploys. Only a push to main may write the issue.
-  support-issue:
-    name: support issue
+  # Renders the tracking issue's body, which checks the support data, and shows
+  # it in the run summary.
+  support-matrix:
+    name: support matrix
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
-    if: github.event_name == 'push'
-    permissions:
-      contents: read
-      issues: write
-    concurrency:
-      group: support-issue
-      cancel-in-progress: false
+    needs: plan
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'support-matrix')
+    outputs:
+      issue: ${{ steps.render.outputs.issue }}
     steps:
       - name: Check out repository
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
@@ -520,13 +518,44 @@ jobs:
         with:
           cache: false
           install_args: python
-      - name: Rewrite the support issue body
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Render the support issue body
+        id: render
         run: |
           set -euo pipefail
 
           mise exec -- python docs/scripts/generate-support-matrix.py
           mise exec -- python docs/scripts/render-support-issue.py > "$RUNNER_TEMP/support-issue.md"
-          issue="$(jq -r '.issue' docs/src/generated/support-matrix.json)"
-          gh issue edit "$issue" --body-file "$RUNNER_TEMP/support-issue.md"
+          cat "$RUNNER_TEMP/support-issue.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "issue=$(jq -r '.issue' docs/src/generated/support-matrix.json)" >> "$GITHUB_OUTPUT"
+      - name: Upload the support issue body
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: support-issue-${{ github.sha }}
+          path: ${{ runner.temp }}/support-issue.md
+          if-no-files-found: error
+          retention-days: 1
+  # The tracking issue follows main, while the site it summarizes follows
+  # snapshot deploys. Only a push to main may write the issue, from a job that
+  # runs none of the repository's code.
+  support-issue:
+    name: support issue
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    needs: support-matrix
+    if: github.event_name == 'push'
+    permissions:
+      issues: write
+    concurrency:
+      group: support-issue
+      cancel-in-progress: false
+    steps:
+      - name: Download the support issue body
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: support-issue-${{ github.sha }}
+          path: ${{ runner.temp }}
+      - name: Rewrite the support issue body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ needs.support-matrix.outputs.issue }}
+        run: gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/support-issue.md"

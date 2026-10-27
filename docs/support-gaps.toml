@@ -43,272 +43,309 @@ platform = "freebsd"
 arch = "arm64"
 backends = ["vulkan", "opengl"]
 
-# Languages that cannot reach a platform until an upstream project changes.
+# Bindings that cannot reach a platform until an upstream project changes.
 # The reason is Markdown and appears in the matrix and the issue; the link
 # points upstream.
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "emscripten"
 status = "blocked"
 reason = "dart2wasm forbids user imports of `dart:ffi`, so the browser needs a separate JavaScript backend."
 link = "https://github.com/dart-lang/sdk/blob/3.13.5/CHANGELOG.md"
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "freebsd"
 status = "blocked"
 reason = "The Dart SDK does not support FreeBSD, and only a community port exists."
 link = "https://github.com/dart-lang/sdk/issues/52374"
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "ios-maccatalyst"
 status = "blocked"
 reason = "Flutter does not target Mac Catalyst, and Dart's build hooks build iOS code only for the device and simulator."
 link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/ios_sdk.dart"
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "ohos"
 status = "blocked"
 reason = "Neither the Dart SDK nor Flutter targets OpenHarmony, and Dart's build hooks have no OpenHarmony OS."
 link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "tvos"
 status = "blocked"
 reason = "Neither the Dart SDK nor Flutter targets tvOS."
 link = "https://github.com/flutter/flutter/issues/47928"
 
 [[gap]]
-language = "dart"
+binding = "dart"
 platform = "visionos"
 status = "blocked"
 reason = "Neither Flutter nor Dart's build hooks target visionOS."
 link = "https://github.com/flutter/flutter/issues/142933"
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "freebsd"
 status = "blocked"
 reason = "Microsoft ships no .NET for FreeBSD, and the ports tree carries .NET 9, older than the binding's `net10.0`."
 link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/requirements/freebsd-requirements.md"
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "ohos"
 status = "blocked"
 reason = "The .NET port to OpenHarmony is still landing on the runtime's main branch, so no release supports it, including the binding's `net10.0`."
 link = "https://github.com/dotnet/runtime/issues/132866"
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "visionos"
 status = "blocked"
 reason = ".NET's Apple workloads cover iOS, tvOS, Mac Catalyst, and macOS, but not visionOS."
 link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
 
 [[gap]]
-language = "go"
+binding = "go"
 platform = "emscripten"
 status = "blocked"
 reason = "Go's `js/wasm` port has no cgo ABI."
 link = "https://github.com/golang/go/issues/55351"
 
 [[gap]]
-language = "kotlin"
+binding = "kotlin-native"
+platform = "freebsd"
+status = "blocked"
+reason = "Kotlin/Native has no FreeBSD target."
+link = "https://kotlinlang.org/docs/native-target-support.html"
+
+[[gap]]
+binding = "kotlin-native"
+platform = "linux-musl"
+status = "blocked"
+reason = "Kotlin/Native binaries cannot run on musl."
+link = "https://youtrack.jetbrains.com/issue/KT-38876"
+
+[[gap]]
+binding = "kotlin-native"
 platform = "ios-maccatalyst"
 status = "blocked"
 reason = "Kotlin/Native has no Mac Catalyst target."
 link = "https://youtrack.jetbrains.com/issue/KT-40442"
 
 [[gap]]
-language = "kotlin"
+binding = "kotlin-native"
 platform = "ohos"
 status = "blocked"
-reason = "Kotlin Multiplatform has no OpenHarmony target."
+reason = "Kotlin/Native has no OpenHarmony target."
 link = "https://youtrack.jetbrains.com/issue/KT-63976"
 
 [[gap]]
-language = "kotlin"
+binding = "kotlin-native"
 platform = "visionos"
 status = "blocked"
 reason = "Kotlin/Native has no visionOS target."
 link = "https://youtrack.jetbrains.com/issue/KT-59571"
 
 [[gap]]
-language = "python"
+binding = "python"
 platform = "emscripten"
 status = "blocked"
 reason = "PyEmscripten wheels forbid the pthreads that the C library needs."
 link = "https://peps.python.org/pep-0783/#the-pyemscripten-platform"
 
 [[gap]]
-language = "swift"
+binding = "swift"
 platform = "emscripten"
 status = "blocked"
 reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
 
 [[gap]]
-language = "swift"
+binding = "swift"
 platform = "ohos"
 status = "blocked"
 reason = "Swift has no OpenHarmony target, and Swift.org ships no OpenHarmony SDK. The only port, a community Swift 6.0.3 toolchain, runs on aarch64 devices alone, so it cannot cross-compile from Linux or macOS or reach the x64 emulator that CI uses, and it does not promise SwiftPM."
 link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "emscripten"
 status = "blocked"
 reason = "Zig 0.17.0 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
 link = "https://github.com/ziglang/zig/issues/22807"
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "ios"
 status = "blocked"
 reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "ohos"
 status = "blocked"
 reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
 link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "tvos"
 status = "blocked"
 reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "visionos"
 status = "blocked"
 reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
 
-# Languages with a known path to a platform that no one has started.
+# Bindings with a known path to a platform that no one has started.
 
 [[gap]]
-language = "c"
+binding = "c"
 platform = "windows-mingw"
 status = "path-known"
 reason = "Build with llvm-mingw and a static libc++, link the Rust platform crate for `*-pc-windows-gnullvm`, and run the suite on the Windows runners. MapLibre Native needs no change."
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "android"
 status = "path-known"
 reason = "Add a `net10.0-android` host, package the native assets, initialize Android services, and run an emulator test app."
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "ios"
 status = "path-known"
 reason = "Add a `net10.0-ios` host, package or statically link the native assets, and run a simulator test app."
 
 [[gap]]
-language = "dotnet"
+binding = "dotnet"
 platform = "emscripten"
 status = "path-known"
 reason = "Add a browser WebAssembly host that links the native archives through `NativeFileReference` with matching Emscripten flags, and run browser tests."
 
 [[gap]]
-language = "go"
+binding = "go"
 platform = "windows-mingw"
 status = "path-known"
 reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
 
 [[gap]]
-language = "go"
+binding = "go"
 platform = "freebsd"
 status = "path-known"
 reason = "Run the cgo suite in the FreeBSD VM. Go supports cgo on `freebsd/amd64` and `freebsd/arm64`."
 
 [[gap]]
-language = "go"
+binding = "go"
 platform = "ios"
 status = "path-known"
 reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
 
 [[gap]]
-language = "kotlin"
+binding = "kotlin-jvm"
 platform = "linux-musl"
 status = "path-known"
-reason = "Kotlin/JVM needs musl natives that the loader selects on musl hosts. Kotlin/Native binaries cannot run on musl."
-link = "https://youtrack.jetbrains.com/issue/KT-38876"
+reason = "Package musl natives that the loader selects on musl hosts, and run the JVM suite in Alpine."
 
 [[gap]]
-language = "kotlin"
+binding = "kotlin-jvm"
 platform = "freebsd"
 status = "path-known"
-reason = "Kotlin/JVM runs on the OpenJDK ports and needs FreeBSD natives that the loader selects. Kotlin/Native has no FreeBSD target."
-link = "https://kotlinlang.org/docs/native-target-support.html"
+reason = "The OpenJDK ports run the JVM suite. Package FreeBSD natives that the loader selects, and run the suite in the FreeBSD VM."
 
 [[gap]]
-language = "python"
+binding = "kotlin-native"
+platform = "windows-mingw"
+status = "path-known"
+reason = "Once the C library builds with MinGW, declare `mingwX64`, Kotlin/Native's only Windows target, and run the native suite on the Windows runners."
+
+[[gap]]
+binding = "python"
 platform = "freebsd"
 status = "path-known"
 reason = "Build and test the extension in the FreeBSD VM. PyPI rejects FreeBSD wheel tags, so the package cannot publish one."
 link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
 
 [[gap]]
-language = "python"
+binding = "python"
 platform = "ios"
 status = "path-known"
 reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
 
 [[gap]]
-language = "rust"
+binding = "rust"
 platform = "windows-mingw"
 status = "path-known"
 reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
 
 [[gap]]
-language = "rust"
+binding = "rust"
 platform = "freebsd"
 status = "path-known"
 reason = "Add the FreeBSD targets to the build and test tasks, and run the suite in the FreeBSD VM."
 
 [[gap]]
-language = "swift"
+binding = "swift"
 platform = "freebsd"
 status = "path-known"
 reason = "Swift.org ships a preview toolchain for FreeBSD 14 on x64 only. Run the suite with it in the FreeBSD VM."
 link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
 
 [[gap]]
-language = "swift"
+binding = "swift"
 platform = "android"
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
 
 [[gap]]
-language = "typescript"
+binding = "typescript"
 platform = "freebsd"
 status = "path-known"
 reason = "Build the addon and run the Node suite in the FreeBSD VM. Node supports FreeBSD x64 as experimental and ships no official binaries."
 
 [[gap]]
-language = "typescript"
+binding = "typescript"
 platform = "android"
 status = "path-known"
 reason = "Add an app host with a Node-API runtime, package the addon, and run emulator tests."
 
 [[gap]]
-language = "typescript"
+binding = "typescript"
 platform = "ios"
 status = "path-known"
 reason = "Add an app host with a Node-API runtime, package the addon, and run simulator tests."
 
 [[gap]]
-language = "zig"
+binding = "zig"
 platform = "freebsd"
 status = "path-known"
 reason = "Zig 0.17 targets FreeBSD 14. Add the target to `build.zig` and run the suite in the FreeBSD VM."
+
+# Platforms that a binding cannot reach by design, because another binding of
+# its language is the route there. A platform that the language's only route
+# cannot reach yet is a gap instead.
+
+[[not-applicable]]
+binding = "kotlin-jvm"
+platforms = ["ios", "ios-maccatalyst", "tvos", "visionos"]
+reason = "No JVM runs on Apple's mobile platforms. Kotlin/Native is the route there."
+
+[[not-applicable]]
+binding = "kotlin-jvm"
+platforms = ["ohos"]
+reason = "No JVM runs on OpenHarmony. Kotlin/Native is the route there."
+
+[[not-applicable]]
+binding = "kotlin-jvm"
+platforms = ["emscripten"]
+reason = "No JVM runs in the browser. Kotlin/Wasm is the route there."

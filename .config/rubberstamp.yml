@@ -182,6 +182,16 @@ ci:
         each binding's API reference with its own tool (Doxygen, Dokka, DocC,
         DocFX, dart doc, and others) from the C headers and binding sources.
       rules: [{ if: { files: ["docs/**"] }, then: apply }]
+    support-matrix:
+      covers: >-
+        Renders the support tracking issue's body from the CI targets, the
+        suites that each target runs, and `docs/support-gaps.toml`, and fails
+        when that data contradicts itself. Changes that add, remove, or rename a
+        target or a binding suite need it, as do changes to the support data or
+        the scripts that render it. Changes to what a suite tests don't.
+      rules:
+        - if: { files: ["docs/scripts/render-support-issue.py"] }
+          then: apply
     linux-x64:
       covers: >-
         Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
