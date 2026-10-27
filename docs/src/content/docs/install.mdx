@@ -173,8 +173,8 @@ The package downloads the C library for each target when it builds. Releases
 include macOS for arm64 alone.
 
 To build against your own copy of the [C library](#build-against-a-prefix),
-name it in your application's pubspec. Name an install prefix, or a build
-directory that holds `<preset>/install` for each target. A relative path
+name it in your application's pubspec. Name an install prefix, or a directory
+holding installs one level down, such as a CMake build root. A relative path
 resolves against the pubspec. A Git dependency on the package needs a local
 build.
 

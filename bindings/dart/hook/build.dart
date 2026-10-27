@@ -16,9 +16,9 @@ const String _defines = 'hooks.user_defines.maplibre_native_ffi';
 const String _defaultReleaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
-/// The release that a published package downloads, with the SHA-256
-/// digest of each archive in it. The release workflow writes this file, and
-/// git ignores it.
+/// The release that a published package downloads, with its artifact index:
+/// each archive's name, SHA-256 digest, and descriptor. The release workflow
+/// writes this file, and git ignores it.
 const String _pinPath = 'hook/native_release.json';
 
 Future<void> main(List<String> arguments) async {
@@ -30,16 +30,14 @@ Future<void> main(List<String> arguments) async {
     final code = input.config.code;
     final platform = _targetPlatform(code);
     final backend = _selectedBackend(input, code.targetOS);
-    final preset = '$platform-${_backendSuffix(backend, code.targetOS)}';
     final localBuild = input.userDefines.path('local_build');
     final prefix = localBuild == null
-        ? await _download(input, output, preset, _releaseUrl(input))
+        ? await _download(input, output, platform, backend, _releaseUrl(input))
         : _localPrefix(
             Uri.directory(localBuild.toFilePath()),
             platform,
             backend,
-            preset,
-            output,
+            code.targetOS,
           );
 
     // A download is unpacked under its pinned digest, so the pin file, which
@@ -51,6 +49,7 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
+    dependOn(_descriptor(prefix));
     final library = _libraryFile(prefix, code.targetOS);
     dependOn(library);
     output.assets.code.add(
@@ -115,20 +114,6 @@ String? _selectedBackend(BuildInput input, OS os) =>
       ),
     };
 
-/// The backend half of the preset serving [os]: the [selected] backend, or
-/// else Metal on Apple platforms, OpenGL on Android, and Vulkan elsewhere.
-/// Preset names spell OpenGL by its context provider.
-String _backendSuffix(String? selected, OS os) {
-  final backend =
-      selected ??
-      switch (os) {
-        OS.macOS || OS.iOS => 'metal',
-        OS.android => 'opengl',
-        _ => 'vulkan',
-      };
-  return backend == 'opengl' ? (os == OS.windows ? 'wgl' : 'egl') : backend;
-}
-
 /// The base URL of the release downloads: the GitHub releases, or else a mirror
 /// that the application names, which serves each release tag as a directory.
 String _releaseUrl(BuildInput input) =>
@@ -141,55 +126,117 @@ String _releaseUrl(BuildInput input) =>
       ),
     };
 
-/// Resolves a local build, which is either an install prefix or a CMake build
-/// root holding an install for each preset.
-Uri _localPrefix(
-  Uri directory,
-  String platform,
-  String? backend,
-  String preset,
-  BuildOutputBuilder output,
-) {
+/// Resolves a local build: an install prefix, or a directory holding installs
+/// one level down, such as a CMake build root.
+Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
+  final request = _request(platform, backend);
   if (_descriptor(directory).existsSync()) {
     // A prefix serves one platform, so a build for several targets names a
-    // build root instead. Only a selected backend can conflict; without one,
-    // the prefix's own backend serves.
-    final descriptor =
-        jsonDecode(_descriptor(directory).readAsStringSync())
-            as Map<String, Object?>;
-    final built =
-        '${descriptor['targetPlatform']} ${descriptor['renderBackend']}';
+    // directory of installs instead. Only a selected backend can conflict;
+    // without one, the prefix's own backend serves.
+    final descriptor = _readDescriptor(directory);
     if (descriptor['targetPlatform'] != platform ||
         (backend != null && descriptor['renderBackend'] != backend)) {
       throw StateError(
-        '$_defines.local_build names an install prefix built for $built, '
-        'which cannot serve $platform${backend == null ? '' : ' $backend'}.',
+        '$_defines.local_build names an install prefix built for '
+        '${descriptor['targetPlatform']} ${descriptor['renderBackend']}, '
+        'which cannot serve $request.',
       );
     }
     return directory;
   }
-  final prefix = directory.resolve('$preset/install/');
-  // Registered before the existence check so that building the preset later
-  // reruns this hook.
-  output.dependencies.add(_descriptor(prefix).absolute.uri);
-  if (!_descriptor(prefix).existsSync()) {
+
+  // Without a selected backend, only the target's default backend serves, so
+  // that building another backend under the same directory never changes
+  // which install an unchanged request gets.
+  final matches = <Uri>[];
+  final others = <String>[];
+  final stale = <String>[];
+  final root = Directory.fromUri(directory);
+  final children = root.existsSync()
+      ? (root.listSync().whereType<Directory>().toList()
+          ..sort((a, b) => a.path.compareTo(b.path)))
+      : const <Directory>[];
+  for (final child in children) {
+    for (final prefix in [child.uri.resolve('install/'), child.uri]) {
+      if (!_descriptor(prefix).existsSync()) {
+        continue;
+      }
+      final descriptor = _readDescriptor(prefix);
+      if (_isStale(descriptor)) {
+        stale.add(prefix.toFilePath());
+      } else if (_serves(descriptor, platform, backend)) {
+        matches.add(prefix);
+      } else {
+        others.add(
+          '${prefix.toFilePath()} (${descriptor['targetPlatform']} '
+          '${descriptor['renderBackend']})',
+        );
+      }
+    }
+  }
+  if (matches.length == 1) {
+    return matches.single;
+  }
+
+  String list(Iterable<String> lines) =>
+      lines.map((line) => '\n  $line').join();
+  final named =
+      '$_defines.local_build names ${directory.toFilePath()}, which holds';
+  if (matches.isNotEmpty) {
     throw StateError(
-      '$_defines.local_build names ${directory.toFilePath()}, which is neither '
-      'an install prefix nor a build root holding $preset.',
+      '$named several installs for $request:'
+      '${list(matches.map((prefix) => prefix.toFilePath()))}\n'
+      'Remove all but one, or name one of them as the install prefix.',
     );
   }
-  return prefix;
+  final select = backend == null
+      ? ', or select a backend in $_defines.backend.${os.name}'
+      : '';
+  throw StateError(
+    '$named no install for $request. Build one$select.'
+    '${others.isEmpty ? '' : '\nIt holds:${list(others)}'}'
+    '${stale.isEmpty ? '' : '\nThese installs predate the descriptor fields '
+              'that the lookup reads; rebuild them:${list(stale)}'}',
+  );
 }
+
+/// Describes a request for [platform] with the [backend] selected for it.
+String _request(String platform, String? backend) => backend == null
+    ? '$platform with its default backend'
+    : '$platform $backend';
+
+/// Whether [descriptor] lacks the fields that a lookup matches on, as an
+/// install built before descriptors named their default backend does.
+bool _isStale(Map<String, Object?> descriptor) =>
+    descriptor['targetPlatform'] is! String ||
+    descriptor['renderBackend'] is! String ||
+    descriptor['defaultBackend'] is! String;
+
+/// Whether [descriptor] serves [platform] with the [backend] selected for it,
+/// or without one, with the platform's default backend.
+bool _serves(
+  Map<String, Object?> descriptor,
+  String platform,
+  String? backend,
+) =>
+    !_isStale(descriptor) &&
+    descriptor['targetPlatform'] == platform &&
+    descriptor['renderBackend'] == (backend ?? descriptor['defaultBackend']);
+
+Map<String, Object?> _readDescriptor(Uri prefix) =>
+    jsonDecode(_descriptor(prefix).readAsStringSync()) as Map<String, Object?>;
 
 File _descriptor(Uri prefix) =>
     File.fromUri(prefix.resolve('share/maplibre-native-c/artifact.json'));
 
-/// Downloads and unpacks [preset] from the pinned release, unless an earlier
-/// build already did.
+/// Downloads and unpacks the pinned release's archive for [platform] with the
+/// [backend] selected for it, unless an earlier build already did.
 Future<Uri> _download(
   BuildInput input,
   BuildOutputBuilder output,
-  String preset,
+  String platform,
+  String? backend,
   String releaseUrl,
 ) async {
   final pinFile = File.fromUri(input.packageRoot.resolve(_pinPath));
@@ -202,11 +249,19 @@ Future<Uri> _download(
   output.dependencies.add(pinFile.absolute.uri);
   final pin = jsonDecode(pinFile.readAsStringSync()) as Map<String, Object?>;
   final tag = pin['tag']! as String;
-  final archiveName = 'maplibre-native-c-$preset.tar.gz';
-  final digest = (pin['sha256']! as Map<String, Object?>)[archiveName];
-  if (digest is! String) {
-    throw UnsupportedError('$tag publishes no $archiveName.');
+  final entries = [
+    for (final entry
+        in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
+      if (_serves(entry, platform, backend)) entry,
+  ];
+  if (entries.length != 1) {
+    throw UnsupportedError(
+      '$tag publishes ${entries.isEmpty ? 'no' : entries.length} archives '
+      'for ${_request(platform, backend)}; expected one.',
+    );
   }
+  final archiveName = entries.single['archive']! as String;
+  final digest = entries.single['sha256']! as String;
 
   // The digest names the unpacked prefix, and an unpacked prefix is complete
   // because it is renamed into place.
@@ -236,9 +291,11 @@ Future<Uri> _download(
           ..writeAsBytesSync(entry.content);
       }
     }
-    // The archive holds a single `maplibre-native-c-<preset>/` root.
+    // The archive holds a single root named after it.
     Directory.fromUri(
-      scratch.uri.resolve('maplibre-native-c-$preset/'),
+      scratch.uri.resolve(
+        '${archiveName.replaceFirst(RegExp(r'\.tar\.gz$'), '')}/',
+      ),
     ).renameSync(prefix.path);
   } on FileSystemException {
     // A concurrent build that unpacked the same digest first leaves the same
