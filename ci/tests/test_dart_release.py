@@ -43,14 +43,7 @@ class DartReleaseTest(unittest.TestCase):
 
         self.assertEqual(
             json.loads((self.package / "hook/native_release.json").read_text()),
-            {
-                "tag": "v0.202610.2",
-                "sha256": {
-                    "maplibre-native-c-android-arm64-egl.tar.gz": "aaa",
-                    "maplibre-native-c-macos-arm64-metal.tar.gz": "bbb",
-                },
-                "artifacts": ARTIFACTS,
-            },
+            {"tag": "v0.202610.2", "artifacts": ARTIFACTS},
         )
         self.assertIn(
             "version: 0.202610.2\n", (self.package / "pubspec.yaml").read_text()

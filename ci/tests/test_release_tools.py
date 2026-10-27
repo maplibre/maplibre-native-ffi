@@ -379,14 +379,7 @@ class NativePackageReleaseTest(unittest.TestCase):
             ],
         )
         artifacts = json.loads((self.release_dir / ARTIFACTS_NAME).read_text())
-        self.assertEqual(
-            pin,
-            {
-                "tag": f"v{self.version}",
-                "sha256": {archive.name: artifacts[0]["sha256"]},
-                "artifacts": artifacts,
-            },
-        )
+        self.assertEqual(pin, {"tag": f"v{self.version}", "artifacts": artifacts})
         self.assertIn(f'.version = "{self.version}",', manifest)
         self.assertIn(
             f'        .@"{self.preset}" = .{{\n'

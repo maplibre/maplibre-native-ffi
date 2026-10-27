@@ -84,11 +84,9 @@ def native_archives(
 def pin(tag: str, artifacts: list[dict]) -> str:
     """The pin by which a published package downloads its native library.
 
-    The pin holds the release tag and the release's artifact index, and maps
-    each archive to its SHA-256 digest for the readers that look one up by name.
+    The pin holds the release tag and the release's artifact index.
     """
-    digests = {entry["archive"]: entry["sha256"] for entry in artifacts}
-    content = {"tag": tag, "sha256": digests, "artifacts": artifacts}
+    content = {"tag": tag, "artifacts": artifacts}
     return json.dumps(content, indent=2) + "\n"
 
 
