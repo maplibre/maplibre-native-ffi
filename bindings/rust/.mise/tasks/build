@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#MISE description="Build the Rust crates against a native preset's install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
+
+# A host build lets cargo pick its own target and toolchain. Cross builds name
+# the target and point every tool that compiles or links at the platform SDK.
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
+if [[ -n "$cargo_target" ]]; then
+  exec cargo build \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    --target "$cargo_target"
+fi
+exec cargo build \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi
