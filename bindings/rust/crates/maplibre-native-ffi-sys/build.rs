@@ -138,92 +138,54 @@ fn local_prefix(
         // A prefix serves one target, so a build for several targets names a
         // directory of installs instead. Only a selected backend can conflict;
         // without one, the prefix's own backend serves.
-        let identity = read_identity(directory).ok_or_else(|| {
-            format!(
-                "{LOCAL_BUILD_ENV} names an install prefix built before artifact descriptors \
-                 recorded their Rust target and default backend; rebuild it"
-            )
-        })?;
-        if identity.rust_target != target
-            || backend.is_some_and(|backend| backend != identity.render_backend)
-        {
+        let identity = read_identity(directory);
+        if !identity.serves(target, backend.or(identity.render_backend.as_deref())) {
             return Err(format!(
                 "{LOCAL_BUILD_ENV} names an install prefix built for {} {}, which cannot serve \
-                 {target}{}",
-                identity.rust_target,
-                identity.render_backend,
-                backend
-                    .map(|backend| format!(" {backend}"))
-                    .unwrap_or_default()
+                 {}",
+                identity.rust_target.unwrap_or_default(),
+                identity.render_backend.unwrap_or_default(),
+                request(target, backend)
             )
             .into());
         }
         return Ok(directory.to_path_buf());
     }
 
-    let mut matches = Vec::new();
-    let mut other_backends = Vec::new();
-    let mut stale = Vec::new();
-    for prefix in installs(directory)? {
-        let Some(identity) = read_identity(&prefix) else {
-            stale.push(prefix);
-            continue;
-        };
-        if identity.rust_target != target {
-            continue;
-        }
-        // Without a selected backend only the target's default serves, so
-        // building another backend beside it never changes the answer.
-        if identity.render_backend == backend.unwrap_or(&identity.default_backend) {
-            matches.push(prefix);
-        } else {
-            other_backends.push(format!(
-                "\n  {} ({})",
-                prefix.display(),
-                identity.render_backend
-            ));
-        }
-    }
+    // Without a selected backend only the target's default serves, so building
+    // another backend beside it never changes the answer.
+    let matches: Vec<PathBuf> = installs(directory)?
+        .into_iter()
+        .filter(|prefix| read_identity(prefix).serves(target, backend))
+        .collect();
     match matches.as_slice() {
         [prefix] => Ok(prefix.clone()),
-        [] => {
-            let wanted = backend.map_or_else(
-                || "its default backend".to_owned(),
-                |backend| format!("the {backend} backend"),
-            );
-            let mut message = format!(
-                "{LOCAL_BUILD_ENV} names {}, which holds no install for {target} with {wanted}. \
-                 Build that install",
-                directory.display()
-            );
-            if !other_backends.is_empty() {
-                message += &format!(
-                    ", or enable the backend feature of one of these:{}",
-                    other_backends.concat()
-                );
-            }
-            if !stale.is_empty() {
-                message += &format!(
-                    "\nThese installs predate artifact descriptors that record their Rust target \
-                     and default backend; rebuild them:{}",
-                    stale
-                        .iter()
-                        .map(|prefix| format!("\n  {}", prefix.display()))
-                        .collect::<String>()
-                );
-            }
-            Err(message.into())
-        }
-        prefixes => Err(format!(
-            "{LOCAL_BUILD_ENV} names {}, which holds several installs for {target} with the same \
-             backend; name one of them instead:{}",
+        [] => Err(format!(
+            "{LOCAL_BUILD_ENV} names {}, which holds no install for {}. Build it, or enable \
+             another backend feature.",
             directory.display(),
+            request(target, backend)
+        )
+        .into()),
+        prefixes => Err(format!(
+            "{LOCAL_BUILD_ENV} names {}, which holds several installs for {}; name one of them \
+             instead:{}",
+            directory.display(),
+            request(target, backend),
             prefixes
                 .iter()
                 .map(|prefix| format!("\n  {}", prefix.display()))
                 .collect::<String>()
         )
         .into()),
+    }
+}
+
+/// Describes a request for `target` with the `backend` selected for it.
+fn request(target: &str, backend: Option<&str>) -> String {
+    match backend {
+        Some(backend) => format!("{target} with the {backend} backend"),
+        None => format!("{target} with its default backend"),
     }
 }
 
@@ -250,19 +212,32 @@ fn installs(directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     Ok(prefixes)
 }
 
-/// The descriptor fields that choose an install. An install built before
-/// descriptors recorded all of them has none.
-#[derive(Deserialize)]
+/// The descriptor fields that choose an install, which a release pin's
+/// artifact index repeats for each archive.
+#[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Identity {
-    rust_target: String,
-    render_backend: String,
-    default_backend: String,
+    rust_target: Option<String>,
+    render_backend: Option<String>,
+    default_backend: Option<String>,
 }
 
-fn read_identity(prefix: &Path) -> Option<Identity> {
-    let contents = fs::read_to_string(prefix.join(DESCRIPTOR_PATH)).ok()?;
-    serde_json::from_str(&contents).ok()
+impl Identity {
+    /// Whether this serves `target` with the `backend` selected for it, or
+    /// without one, with the target's default backend.
+    fn serves(&self, target: &str, backend: Option<&str>) -> bool {
+        self.rust_target.as_deref() == Some(target)
+            && self.render_backend.is_some()
+            && self.render_backend.as_deref() == backend.or(self.default_backend.as_deref())
+    }
+}
+
+/// Reads an install's identity, which lacks every field it cannot read.
+fn read_identity(prefix: &Path) -> Identity {
+    fs::read_to_string(prefix.join(DESCRIPTOR_PATH))
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .unwrap_or_default()
 }
 
 #[derive(Deserialize)]
@@ -366,13 +341,11 @@ mod download {
     /// An archive of the release, with its digest and the fields of its
     /// artifact descriptor that choose it.
     #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
     struct Artifact {
         archive: String,
         sha256: String,
-        rust_target: Option<String>,
-        render_backend: String,
-        default_backend: Option<String>,
+        #[serde(flatten)]
+        identity: Identity,
     }
 
     /// Downloads and unpacks the pinned release's archive for `target` and
@@ -398,19 +371,12 @@ mod download {
         let artifact = pin
             .artifacts
             .iter()
-            .find(|artifact| {
-                artifact.rust_target.as_deref() == Some(target)
-                    && Some(artifact.render_backend.as_str())
-                        == backend.or(artifact.default_backend.as_deref())
-            })
+            .find(|artifact| artifact.identity.serves(target, backend))
             .ok_or_else(|| {
                 format!(
-                    "{} publishes no archive for {target} with {}",
+                    "{} publishes no archive for {}",
                     pin.tag,
-                    backend.map_or_else(
-                        || "its default backend".to_owned(),
-                        |backend| format!("the {backend} backend")
-                    )
+                    request(target, backend)
                 )
             })?;
         let archive_name = &artifact.archive;

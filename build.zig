@@ -58,15 +58,14 @@ fn configurePath(b: *std.Build, path: std.Build.LazyPath) []const u8 {
     };
 }
 
-/// An install prefix and its artifact descriptor, which is null if the
-/// install predates a field that the lookup matches on.
+/// An install prefix and its artifact descriptor.
 const Install = struct {
     prefix: []const u8,
-    descriptor: ?ArtifactDescriptor,
+    descriptor: ArtifactDescriptor,
 };
 
 /// Reads the install at `prefix`, or returns null if it has no artifact
-/// descriptor.
+/// descriptor or one that lacks a field the lookup matches on.
 fn readInstall(b: *std.Build, prefix: []const u8) ?Install {
     const path = b.pathJoin(&.{ prefix, descriptor_sub_path });
     const contents = std.Io.Dir.cwd().readFileAlloc(b.graph.io, path, b.allocator, .limited(4096)) catch |err| switch (err) {
@@ -74,7 +73,7 @@ fn readInstall(b: *std.Build, prefix: []const u8) ?Install {
         else => std.debug.panic("failed to read {s}: {t}", .{ path, err }),
     };
     const parsed = std.json.parseFromSlice(ArtifactDescriptor, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch |err| switch (err) {
-        error.MissingField => return .{ .prefix = prefix, .descriptor = null },
+        error.MissingField => return null,
         else => std.debug.panic("invalid native artifact descriptor: {s}", .{path}),
     };
     return .{ .prefix = prefix, .descriptor = parsed.value };
@@ -170,7 +169,7 @@ fn localInstall(
         // A prefix serves one target, so a build for several targets names a
         // directory of installs instead. Only a selected backend can
         // conflict; without one, the prefix's own backend serves.
-        const descriptor = install.descriptor.?;
+        const descriptor = install.descriptor;
         if (!servesTarget(descriptor, target) or (backend != null and !servesBackend(descriptor, backend))) {
             std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
                 descriptor.artifact,
@@ -181,44 +180,24 @@ fn localInstall(
         return install;
     }
 
-    const installs = installsBelow(b, directory);
+    var matches: std.ArrayList(u8) = .empty;
     var chosen: ?Install = null;
-    var several = false;
-    for (installs) |install| {
-        const descriptor = install.descriptor orelse continue;
-        if (!servesTarget(descriptor, target) or !servesBackend(descriptor, backend)) continue;
-        several = chosen != null;
-        if (several) break;
+    var count: usize = 0;
+    for (installsBelow(b, directory)) |install| {
+        if (!servesTarget(install.descriptor, target) or !servesBackend(install.descriptor, backend)) continue;
+        matches.print(b.allocator, "\n  {s}", .{install.prefix}) catch @panic("OOM");
         chosen = install;
+        count += 1;
     }
-    if (several) {
-        var message: std.ArrayList(u8) = .empty;
-        for (installs) |install| {
-            const descriptor = install.descriptor orelse continue;
-            if (!servesTarget(descriptor, target) or !servesBackend(descriptor, backend)) continue;
-            message.print(b.allocator, "\n  {s}", .{install.prefix}) catch @panic("OOM");
-        }
-        std.debug.panic("-Dlocal-build names {s}, which holds several installs for {s}:{s}\nRemove all but one, or name one install prefix with -Dlocal-build.", .{
-            directory,
-            requestName(b, target, backend),
-            message.items,
-        });
-    }
-    const install = chosen orelse {
-        var message: std.ArrayList(u8) = .empty;
-        for (installs) |install| {
-            if (install.descriptor) |descriptor| {
-                message.print(b.allocator, "\n  {s} ({s})", .{ install.prefix, descriptor.artifact }) catch @panic("OOM");
-            } else {
-                message.print(b.allocator, "\n  {s} (stale: rebuild it)", .{install.prefix}) catch @panic("OOM");
-            }
-        }
-        std.debug.panic("-Dlocal-build names {s}, which holds no install for {s}. Build the preset for it, or select a backend with -Dbackend. Installs found:{s}", .{
-            directory,
-            requestName(b, target, backend),
-            if (message.items.len == 0) " none" else message.items,
-        });
-    };
+    if (count > 1) std.debug.panic("-Dlocal-build names {s}, which holds several installs for {s}:{s}\nRemove all but one, or name one install prefix with -Dlocal-build.", .{
+        directory,
+        requestName(b, target, backend),
+        matches.items,
+    });
+    const install = chosen orelse std.debug.panic("-Dlocal-build names {s}, which holds no install for {s}. Build it, or select another backend with -Dbackend.", .{
+        directory,
+        requestName(b, target, backend),
+    });
     trackInstall(b, install);
     return install;
 }
@@ -262,9 +241,6 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
         if (!std.fs.path.isAbsolute(dir)) std.debug.panic("-Dlocal-build must be an absolute path; found {s}", .{dir});
     }
     const prefix_install = if (local_dir) |dir| readInstall(b, dir) else null;
-    if (prefix_install) |install| {
-        if (install.descriptor == null) std.debug.panic("-Dlocal-build names an install prefix built before its descriptor named a default backend; rebuild it: {s}", .{install.prefix});
-    }
     const target = targetOption(b, if (prefix_install) |install| install.descriptor else null);
     switch (target.result.os.tag) {
         .ios, .tvos, .visionos => @panic("The Zig binding does not support iOS, tvOS, or visionOS targets, including simulators"),
@@ -279,7 +255,7 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
 
     const prefix: std.Build.LazyPath, const descriptor = if (local_dir) |dir| local: {
         const install = localInstall(b, dir, prefix_install, target.result, selected_backend);
-        break :local .{ .{ .cwd_relative = install.prefix }, install.descriptor.? };
+        break :local .{ .{ .cwd_relative = install.prefix }, install.descriptor };
     } else publishedNative(b, target.result, selected_backend);
     return .{
         .prefix = prefix,

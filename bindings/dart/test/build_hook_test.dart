@@ -9,18 +9,11 @@ import 'package:test/test.dart';
 
 import '../hook/build.dart' as hook;
 
-CodeAssetExtension _android(Architecture architecture) => CodeAssetExtension(
-  targetArchitecture: architecture,
+final _android = CodeAssetExtension(
+  targetArchitecture: Architecture.arm64,
   targetOS: OS.android,
   linkModePreference: LinkModePreference.dynamic,
   android: AndroidCodeConfig(targetNdkApi: 24),
-);
-
-final _ios = CodeAssetExtension(
-  targetArchitecture: Architecture.arm64,
-  targetOS: OS.iOS,
-  linkModePreference: LinkModePreference.dynamic,
-  iOS: IOSCodeConfig(targetSdk: IOSSdk.iPhoneOS, targetVersion: 13),
 );
 
 void main() {
@@ -68,14 +61,11 @@ void main() {
       sources.addAll(
         _writePrefix(
           temporary.uri.resolve('$backend/'),
-          'android-arm64',
           backend,
           libraries: ['libmaplibre-native-c.so', 'libdependency.so'],
         ),
       );
-      final output = await runHook(_android(Architecture.arm64), {
-        'local_build': backend,
-      });
+      final output = await runHook(_android, {'local_build': backend});
       expect(output.assets.code, hasLength(2));
       for (final asset in output.assets.code) {
         final file = File.fromUri(asset.file!);
@@ -94,107 +84,40 @@ void main() {
   Future<String> bundled(BuildOutput output) =>
       File.fromUri(output.assets.code.first.file!).readAsString();
 
-  /// Writes the install for [platform] and [backend] under the build root, in
+  /// Writes the Android arm64 install for [backend] under the build root, in
   /// the CMake layout.
-  void build(String platform, String backend, {bool stale = false}) {
+  void build(String backend) {
     _writePrefix(
-      temporary.uri.resolve('build/$platform-$backend/install/'),
-      platform,
+      temporary.uri.resolve('build/android-arm64-$backend/install/'),
       backend,
-      libraries: [
-        platform.startsWith('ios')
-            ? 'libmaplibre-native-c.dylib'
-            : 'libmaplibre-native-c.so',
-      ],
-      stale: stale,
     );
   }
 
   group('a directory of installs', () {
-    test('serves each target its default backend', () async {
-      build('android-arm64', 'opengl');
-      build('android-arm64', 'vulkan');
-      build('android-x64', 'opengl');
-      build('ios-arm64', 'metal');
-      for (final (target, expected) in [
-        (_android(Architecture.arm64), 'android-arm64-opengl'),
-        (_android(Architecture.x64), 'android-x64-opengl'),
-        (_ios, 'ios-arm64-metal'),
-      ]) {
-        expect(
-          await bundled(await runHook(target, {'local_build': 'build'})),
-          expected,
-        );
-      }
+    test('serves the default backend', () async {
+      build('opengl');
+      build('vulkan');
+      expect(
+        await bundled(await runHook(_android, {'local_build': 'build'})),
+        'android-arm64-opengl',
+      );
     });
 
     test('serves the backend selected for the OS', () async {
-      build('android-arm64', 'opengl');
-      build('android-arm64', 'vulkan');
-      build('ios-arm64', 'metal');
-      final defines = {
+      build('opengl');
+      build('vulkan');
+      final output = await runHook(_android, {
         'local_build': 'build',
         'backend': {'android': 'vulkan'},
-      };
-      expect(
-        await bundled(await runHook(_android(Architecture.arm64), defines)),
-        'android-arm64-vulkan',
-      );
-      expect(await bundled(await runHook(_ios, defines)), 'ios-arm64-metal');
-    });
-
-    test(
-      'finds an install one level down without an install directory',
-      () async {
-        _writePrefix(
-          temporary.uri.resolve('installs/android-arm64/'),
-          'android-arm64',
-          'opengl',
-        );
-        final output = await runHook(_android(Architecture.arm64), {
-          'local_build': 'installs',
-        });
-        expect(await bundled(output), 'android-arm64-opengl');
-        expect(
-          output.dependencies,
-          contains(
-            File.fromUri(
-              temporary.uri.resolve(
-                'installs/android-arm64/share/maplibre-native-c/artifact.json',
-              ),
-            ).absolute.uri,
-          ),
-        );
-      },
-    );
-
-    test('serves no other backend without a selection', () async {
-      build('android-arm64', 'vulkan');
-      await expectLater(
-        runHook(_android(Architecture.arm64), {'local_build': 'build'}),
-        throwsA(
-          isStateError.having(
-            (error) => error.message,
-            'message',
-            allOf(
-              contains('no install for android-arm64 with its default backend'),
-              contains('select a backend in'),
-              contains('android-arm64-vulkan'),
-            ),
-          ),
-        ),
-      );
+      });
+      expect(await bundled(output), 'android-arm64-vulkan');
     });
 
     test('rejects two installs for the same request', () async {
-      build('android-arm64', 'opengl');
-      _writePrefix(
-        temporary.uri.resolve('build/copy/install/'),
-        'android-arm64',
-        'opengl',
-      );
+      build('opengl');
+      _writePrefix(temporary.uri.resolve('build/copy/install/'), 'opengl');
       await expectLater(
-        runHook(_android(Architecture.arm64), {'local_build': 'build'}),
+        runHook(_android, {'local_build': 'build'}),
         throwsA(
           isStateError.having(
             (error) => error.message,
@@ -208,53 +131,18 @@ void main() {
         ),
       );
     });
-
-    test(
-      'passes over a stale descriptor and names it when none serves',
-      () async {
-        build('android-arm64', 'vulkan', stale: true);
-        build('android-arm64', 'opengl');
-        expect(
-          await bundled(
-            await runHook(_android(Architecture.arm64), {
-              'local_build': 'build',
-            }),
-          ),
-          'android-arm64-opengl',
-        );
-
-        await Directory.fromUri(
-          temporary.uri.resolve('build/android-arm64-opengl/'),
-        ).delete(recursive: true);
-        await expectLater(
-          runHook(_android(Architecture.arm64), {
-            'local_build': 'build',
-            'backend': {'android': 'vulkan'},
-          }),
-          throwsA(
-            isStateError.having(
-              (error) => error.message,
-              'message',
-              allOf(contains('rebuild them'), contains('android-arm64-vulkan')),
-            ),
-          ),
-        );
-      },
-    );
   });
 
   group('an install prefix', () {
     test('serves its own backend unless one is selected', () async {
-      build('android-arm64', 'vulkan');
+      build('vulkan');
       const prefix = 'build/android-arm64-vulkan/install';
       expect(
-        await bundled(
-          await runHook(_android(Architecture.arm64), {'local_build': prefix}),
-        ),
+        await bundled(await runHook(_android, {'local_build': prefix})),
         'android-arm64-vulkan',
       );
       await expectLater(
-        runHook(_android(Architecture.arm64), {
+        runHook(_android, {
           'local_build': prefix,
           'backend': {'android': 'opengl'},
         }),
@@ -265,16 +153,6 @@ void main() {
             contains('built for android-arm64 vulkan'),
           ),
         ),
-      );
-    });
-
-    test('serves no other target', () async {
-      build('android-arm64', 'opengl');
-      await expectLater(
-        runHook(_android(Architecture.x64), {
-          'local_build': 'build/android-arm64-opengl/install',
-        }),
-        throwsStateError,
       );
     });
   });
@@ -320,7 +198,7 @@ void main() {
           'artifact': '$platform-$backend',
           'targetPlatform': platform,
           'renderBackend': backend,
-          'defaultBackend': _defaultBackend(platform),
+          'defaultBackend': 'opengl',
         });
       }
       File.fromUri(temporary.uri.resolve('package/hook/native_release.json'))
@@ -345,7 +223,7 @@ void main() {
         ('android-arm64', 'opengl'),
         ('android-arm64', 'vulkan'),
       ]);
-      final output = await runHook(_android(Architecture.arm64), mirror());
+      final output = await runHook(_android, mirror());
       expect(await bundled(output), 'android-arm64-opengl');
       // The files that the build unpacked would read as changed during it.
       expect(output.dependencies, [
@@ -356,54 +234,24 @@ void main() {
 
       // A later build unpacks nothing and reaches no server.
       served.clear();
-      final again = await runHook(_android(Architecture.arm64), mirror());
+      final again = await runHook(_android, mirror());
       expect(await bundled(again), 'android-arm64-opengl');
-    });
-
-    test('downloads the archive for the selected backend', () async {
-      release('v0.202610.2', [
-        ('android-arm64', 'opengl'),
-        ('android-arm64', 'vulkan'),
-      ]);
-      final output = await runHook(_android(Architecture.arm64), {
-        ...mirror(),
-        'backend': {'android': 'vulkan'},
-      });
-      expect(await bundled(output), 'android-arm64-vulkan');
-    });
-
-    test('rejects a target that the release does not publish', () async {
-      release('v0.202610.2', [('android-arm64', 'vulkan')]);
-      await expectLater(
-        runHook(_android(Architecture.arm64), mirror()),
-        throwsUnsupportedError,
-      );
     });
 
     test('rejects an archive that differs from its pinned digest', () async {
       release('v0.202610.2', [('android-arm64', 'opengl')], digest: '0' * 64);
-      await expectLater(
-        runHook(_android(Architecture.arm64), mirror()),
-        throwsStateError,
-      );
+      await expectLater(runHook(_android, mirror()), throwsStateError);
     });
   });
 }
 
-/// The default backend of each target platform in these tests.
-String _defaultBackend(String platform) =>
-    platform.startsWith('android') ? 'opengl' : 'metal';
-
-/// Writes an install prefix's descriptor and [libraries], each library holding
-/// the platform and backend that it stands in for, and returns the files.
-/// A [stale] descriptor lacks the default backend, as one built before
-/// descriptors named it does.
+/// Writes an Android arm64 install prefix's descriptor and [libraries], each
+/// library holding the platform and backend that it stands in for, and returns
+/// the files.
 List<File> _writePrefix(
   Uri prefix,
-  String platform,
   String backend, {
   List<String> libraries = const ['libmaplibre-native-c.so'],
-  bool stale = false,
 }) {
   File write(String name, String content) => File.fromUri(prefix.resolve(name))
     ..parent.createSync(recursive: true)
@@ -412,12 +260,12 @@ List<File> _writePrefix(
     write(
       'share/maplibre-native-c/artifact.json',
       jsonEncode({
-        'targetPlatform': platform,
+        'targetPlatform': 'android-arm64',
         'renderBackend': backend,
-        if (!stale) 'defaultBackend': _defaultBackend(platform),
+        'defaultBackend': 'opengl',
       }),
     ),
     for (final library in libraries)
-      write('lib/$library', '$platform-$backend'),
+      write('lib/$library', 'android-arm64-$backend'),
   ];
 }

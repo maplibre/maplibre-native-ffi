@@ -149,56 +149,31 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
   // Without a selected backend, only the target's default backend serves, so
   // that building another backend under the same directory never changes
   // which install an unchanged request gets.
-  final matches = <Uri>[];
-  final others = <String>[];
-  final stale = <String>[];
   final root = Directory.fromUri(directory);
-  final children = root.existsSync()
-      ? (root.listSync().whereType<Directory>().toList()
-          ..sort((a, b) => a.path.compareTo(b.path)))
-      : const <Directory>[];
-  for (final child in children) {
-    for (final prefix in [child.uri.resolve('install/'), child.uri]) {
-      if (!_descriptor(prefix).existsSync()) {
-        continue;
-      }
-      final descriptor = _readDescriptor(prefix);
-      if (_isStale(descriptor)) {
-        stale.add(prefix.toFilePath());
-      } else if (_serves(descriptor, platform, backend)) {
-        matches.add(prefix);
-      } else {
-        others.add(
-          '${prefix.toFilePath()} (${descriptor['targetPlatform']} '
-          '${descriptor['renderBackend']})',
-        );
-      }
-    }
-  }
-  if (matches.length == 1) {
-    return matches.single;
-  }
-
-  String list(Iterable<String> lines) =>
-      lines.map((line) => '\n  $line').join();
+  final matches = [
+    if (root.existsSync())
+      for (final child in root.listSync().whereType<Directory>())
+        for (final prefix in [child.uri.resolve('install/'), child.uri])
+          if (_descriptor(prefix).existsSync() &&
+              _serves(_readDescriptor(prefix), platform, backend))
+            prefix,
+  ]..sort((a, b) => a.path.compareTo(b.path));
   final named =
       '$_defines.local_build names ${directory.toFilePath()}, which holds';
-  if (matches.isNotEmpty) {
+  if (matches.length > 1) {
     throw StateError(
       '$named several installs for $request:'
-      '${list(matches.map((prefix) => prefix.toFilePath()))}\n'
+      '${matches.map((prefix) => '\n  ${prefix.toFilePath()}').join()}\n'
       'Remove all but one, or name one of them as the install prefix.',
     );
   }
-  final select = backend == null
-      ? ', or select a backend in $_defines.backend.${os.name}'
-      : '';
-  throw StateError(
-    '$named no install for $request. Build one$select.'
-    '${others.isEmpty ? '' : '\nIt holds:${list(others)}'}'
-    '${stale.isEmpty ? '' : '\nThese installs predate the descriptor fields '
-              'that the lookup reads; rebuild them:${list(stale)}'}',
-  );
+  if (matches.isEmpty) {
+    throw StateError(
+      '$named no install for $request. Build it, or select another backend '
+      'in $_defines.backend.${os.name}.',
+    );
+  }
+  return matches.single;
 }
 
 /// Describes a request for [platform] with the [backend] selected for it.
@@ -206,23 +181,18 @@ String _request(String platform, String? backend) => backend == null
     ? '$platform with its default backend'
     : '$platform $backend';
 
-/// Whether [descriptor] lacks the fields that a lookup matches on, as an
-/// install built before descriptors named their default backend does.
-bool _isStale(Map<String, Object?> descriptor) =>
-    descriptor['targetPlatform'] is! String ||
-    descriptor['renderBackend'] is! String ||
-    descriptor['defaultBackend'] is! String;
-
 /// Whether [descriptor] serves [platform] with the [backend] selected for it,
 /// or without one, with the platform's default backend.
 bool _serves(
   Map<String, Object?> descriptor,
   String platform,
   String? backend,
-) =>
-    !_isStale(descriptor) &&
-    descriptor['targetPlatform'] == platform &&
-    descriptor['renderBackend'] == (backend ?? descriptor['defaultBackend']);
+) {
+  final wanted = backend ?? descriptor['defaultBackend'];
+  return wanted != null &&
+      descriptor['targetPlatform'] == platform &&
+      descriptor['renderBackend'] == wanted;
+}
 
 Map<String, Object?> _readDescriptor(Uri prefix) =>
     jsonDecode(_descriptor(prefix).readAsStringSync()) as Map<String, Object?>;

@@ -26,7 +26,7 @@ private val Project.localBuild: File?
  * that needs the install depends on the [registerLocalBuildVerification] task, which reports the
  * problem, so that a local build missing one target fails only the tasks that need it.
  */
-data class NativeInstall(val prefix: File?, internal val problem: String?)
+data class NativeInstall(val prefix: File?, internal val problem: String?) : Serializable
 
 /**
  * Finds the install in the local build that serves [targetPlatform] with [backend], or without one,
@@ -41,10 +41,10 @@ fun Project.nativeInstall(targetPlatform: String, backend: String? = null): Nati
         "Set -P$LOCAL_BUILD_PROPERTY to an install prefix, or to a directory holding installs " +
           "one level down, such as a CMake build root",
       )
-  // The configuration cache tracks the lookup rather than every file it reads; see [Lookup.equals]
-  // for when a cached lookup still serves. What the chosen descriptor says beyond the answer, such
-  // as its link libraries, is tracked on its own.
-  val lookup =
+  // The configuration cache reruns the lookup to validate itself, so it tracks the answer rather
+  // than every file the lookup reads. What the chosen descriptor says beyond the answer, such as
+  // its link libraries, is tracked on its own.
+  val install =
     providers
       .of(NativeInstallSource::class.java) {
         parameters.root.set(root.absolutePath)
@@ -52,45 +52,24 @@ fun Project.nativeInstall(targetPlatform: String, backend: String? = null): Nati
         parameters.backend.set(backend)
       }
       .get()
-  lookup.prefix?.let {
+  install.prefix?.let {
     providers
       .fileContents(layout.projectDirectory.file(it.resolve(NATIVE_DESCRIPTOR_PATH).path))
       .asBytes
       .get()
   }
-  return NativeInstall(lookup.prefix, lookup.problem)
+  return install
 }
 
-/** A lookup's answer, and every install in the local build that matches its request. */
-internal class Lookup(val prefix: File?, val problem: String?, val matches: List<File>) :
-  Serializable {
-  /**
-   * Whether this lookup, stored by the configuration cache, still serves when a fresh lookup finds
-   * [other]. Gradle reuses the configuration only if the stored lookup equals the fresh one. A
-   * chosen install keeps serving while it still matches, so that a second matching build is
-   * reported only when configuration runs for another reason. A failed lookup keeps failing the
-   * same way until an install appears or the failure changes kind, whatever unrelated installs come
-   * and go.
-   */
-  override fun equals(other: Any?): Boolean =
-    other is Lookup &&
-      if (prefix != null) {
-        prefix in other.matches
-      } else {
-        other.prefix == null && matches.isEmpty() == other.matches.isEmpty()
-      }
-
-  override fun hashCode(): Int = 0
-}
-
-internal abstract class NativeInstallSource : ValueSource<Lookup, NativeInstallSource.Parameters> {
+internal abstract class NativeInstallSource :
+  ValueSource<NativeInstall, NativeInstallSource.Parameters> {
   interface Parameters : ValueSourceParameters {
     val root: Property<String>
     val targetPlatform: Property<String>
     val backend: Property<String>
   }
 
-  override fun obtain(): Lookup =
+  override fun obtain(): NativeInstall =
     findInstall(
       File(parameters.root.get()),
       parameters.targetPlatform.get(),
@@ -98,7 +77,7 @@ internal abstract class NativeInstallSource : ValueSource<Lookup, NativeInstallS
     )
 }
 
-private fun findInstall(root: File, targetPlatform: String, backend: String?): Lookup {
+private fun findInstall(root: File, targetPlatform: String, backend: String?): NativeInstall {
   val request =
     if (backend == null) "$targetPlatform with its default backend" else "$targetPlatform $backend"
   if (root.resolve(NATIVE_DESCRIPTOR_PATH).isFile) {
@@ -109,63 +88,49 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): L
       descriptor["targetPlatform"] == targetPlatform &&
         (backend == null || descriptor["renderBackend"] == backend)
     ) {
-      Lookup(root, null, listOf(root))
+      NativeInstall(root, null)
     } else {
-      Lookup(
+      NativeInstall(
         null,
         "$LOCAL_BUILD_PROPERTY names an install prefix built for " +
           "${descriptor["targetPlatform"]} ${descriptor["renderBackend"]}, which cannot serve $request",
-        emptyList(),
       )
     }
   }
 
   // Without a selected backend, only the target's default backend serves, so that building another
   // backend under the same directory never changes which install an unchanged request gets.
-  val matches = mutableListOf<File>()
-  val others = mutableListOf<String>()
-  val stale = mutableListOf<File>()
-  val children = root.listFiles()?.filter(File::isDirectory)?.sorted().orEmpty()
-  for (child in children) {
-    for (prefix in listOf(child.resolve("install"), child)) {
-      if (!prefix.resolve(NATIVE_DESCRIPTOR_PATH).isFile) continue
-      val descriptor = readDescriptor(prefix)
-      val platform = descriptor["targetPlatform"]
-      val builtBackend = descriptor["renderBackend"]
-      val defaultBackend = descriptor["defaultBackend"]
-      when {
-        // Installs built before descriptors named their default backend.
-        platform !is String || builtBackend !is String || defaultBackend !is String ->
-          stale += prefix
-        platform == targetPlatform && builtBackend == (backend ?: defaultBackend) ->
-          matches += prefix
-        else -> others += "$prefix ($platform $builtBackend)"
+  val matches =
+    root
+      .listFiles()
+      ?.filter(File::isDirectory)
+      .orEmpty()
+      .flatMap { listOf(it.resolve("install"), it) }
+      .filter { prefix ->
+        prefix.resolve(NATIVE_DESCRIPTOR_PATH).isFile &&
+          readDescriptor(prefix).let {
+            val wanted = backend ?: it["defaultBackend"]
+            wanted != null &&
+              it["targetPlatform"] == targetPlatform &&
+              it["renderBackend"] == wanted
+          }
       }
-    }
-  }
-  matches.singleOrNull()?.let {
-    return Lookup(it, null, matches)
-  }
-
-  fun list(lines: List<Any>) = lines.joinToString("") { "\n  $it" }
+      .sorted()
   val named = "$LOCAL_BUILD_PROPERTY names $root, which holds"
-  val problem =
-    if (matches.isNotEmpty()) {
-      "$named several installs for $request:${list(matches)}\n" +
-        "Remove all but one, or name one of them as the install prefix."
-    } else {
-      buildString {
-        append("$named no install for $request. Build one.")
-        if (others.isNotEmpty()) append("\nIt holds:${list(others)}")
-        if (stale.isNotEmpty()) {
-          append(
-            "\nThese installs predate the descriptor fields that the lookup reads; rebuild them:" +
-              list(stale),
-          )
-        }
-      }
-    }
-  return Lookup(null, problem, matches)
+  return when (matches.size) {
+    1 -> NativeInstall(matches.single(), null)
+    0 ->
+      NativeInstall(
+        null,
+        "$named no install for $request. Build it, or select another backend.",
+      )
+    else ->
+      NativeInstall(
+        null,
+        "$named several installs for $request:${matches.joinToString("") { "\n  $it" }}\n" +
+          "Remove all but one, or name one of them as the install prefix.",
+      )
+  }
 }
 
 private fun readDescriptor(prefix: File): Map<*, *> =
