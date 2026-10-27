@@ -36,6 +36,10 @@ KOTLIN_MAVEN_PLATFORMS = {
     "windows",
 }
 
+# These platforms supply the runtime packages of .NET NuGet packing, as
+# RUNTIME_PLATFORMS in tools/release/dotnet_release.py names them.
+DOTNET_NUGET_PLATFORMS = {"android", "linux-gnu", "linux-musl", "macos", "windows"}
+
 
 @dataclasses.dataclass(frozen=True)
 class Target:
@@ -64,6 +68,10 @@ JOBS = {
     "kotlin-maven": (
         "maven",
         lambda target: target.platform in KOTLIN_MAVEN_PLATFORMS,
+    ),
+    "dotnet-nuget": (
+        "nuget",
+        lambda target: target.platform in DOTNET_NUGET_PLATFORMS,
     ),
 }
 

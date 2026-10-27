@@ -294,6 +294,20 @@ jobs:
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
       version: 0.1.0-SNAPSHOT
+  dotnet-nuget:
+    name: .NET NuGet
+    permissions:
+      actions: read
+      contents: read
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'dotnet-nuget')
+    uses: ./.github/workflows/_dotnet-nuget.yml
+    with:
+      run_id: ${{ github.run_id }}
+      sha: ${{ github.sha }}
+      version: 0.0.0-ci
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -308,6 +322,7 @@ jobs:
       - android-multi
       - apple-xcframework
       - kotlin-maven
+      - dotnet-nuget
     steps:
       - name: Require every planned job
         env:

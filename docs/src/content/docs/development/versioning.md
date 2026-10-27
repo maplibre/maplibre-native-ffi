@@ -53,7 +53,7 @@ and `GPG_PASSPHRASE` hold the key that signs every release and snapshot file.
 
 NuGet.org trusted publishing can create a package, so .NET needs no first
 publish by hand. Add a trusted publishing policy for
-`maplibre/maplibre-native-ffi`, with the workflow `_dotnet-nuget.yml` and the
+`maplibre/maplibre-native-ffi`, with the workflow `release.yml` and the
 `nuget.org` environment, and set the repository variable `NUGET_USER` to the
 NuGet.org account that owns the policy.
 
