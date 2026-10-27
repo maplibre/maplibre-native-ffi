@@ -58,9 +58,10 @@ BINDING_LABELS = {
     "dotnet": "C#",
     "dart": "Dart",
     "go": "Go",
-    "kotlin-jvm": "Kotlin (JVM, Android)",
-    # Kotlin/Wasm reaches only the browser, which Kotlin/Native does not.
-    "kotlin-native": "Kotlin (Native, Wasm)",
+    # Kotlin's columns name what each ships: JARs for the JVM and Android, whose
+    # AAR wraps one, and KLIBs for Kotlin/Native and Kotlin/Wasm.
+    "kotlin-jvm": "Kotlin (JAR)",
+    "kotlin-native": "Kotlin (KLIB)",
     "python": "Python",
     "rust": "Rust",
     "swift": "Swift",
