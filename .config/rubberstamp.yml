@@ -439,3 +439,23 @@ ci:
               - bindings/typescript/ohpm/**
               - bindings/typescript/scripts/pack-ohpm.sh
           then: apply
+    swiftpm:
+      covers: >-
+        Writes the Swift package that a release pushes to the distribution
+        repository, with the XCFramework that the Apple Metal targets built,
+        then builds and runs the Swift example against it on macOS and builds it
+        for iOS, so it runs those targets. Only changes to what the package
+        contains or how it is written need it: the release's distribution tool,
+        the root manifest's platforms and binding target, and the C module
+        shims. Ordinary Swift binding changes and one Apple target's native
+        packaging don't.
+      rules:
+        - if:
+            files:
+              - Package.swift
+              - tools/release/distribution.py
+              - tools/release/swift_package.py
+              - bindings/swift/.mise/tasks/test/package
+              - bindings/swift/Sources/MaplibreNativeC/**
+              - examples/swift-map/Package.swift
+          then: apply

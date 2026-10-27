@@ -74,9 +74,13 @@ class WorkflowTest(unittest.TestCase):
                     self.jobs[job]["if"],
                     f"contains(fromJSON(needs.plan.outputs.jobs), '{job}')",
                 )
-                # A packaging job consumes the target matrix's artifacts.
+                # A packaging job consumes the target matrix's artifacts, and
+                # those of the jobs it names in JOB_NEEDS.
                 if job != "docs":
-                    self.assertEqual(self.jobs[job]["needs"], ["plan", "target"])
+                    self.assertEqual(
+                        self.jobs[job]["needs"],
+                        ["plan", "target", *plan.JOB_NEEDS.get(job, ())],
+                    )
 
     def test_the_required_check_needs_every_job_that_can_fail_the_run(self):
         expected = set(self.jobs) - {"required", "support-issue"}

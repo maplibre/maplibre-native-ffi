@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#MISE description="Write the Swift package as a release does, with a local XCFramework, then smoke-test the macOS example and build the iOS one against it."
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "[assets]" default="build/packages/native/dist" help="Directory that holds MaplibreNativeC.xcframework.zip"
+set -euo pipefail
+
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+# The package takes a copy of the XCFramework where a release's would take its
+# URL, so it builds as a consumer's dependency on the release would.
+package="$scratch/maplibre-native-ffi-distribution"
+python3 tools/release/distribution.py "$package" "$usage_assets" --local
+
+# The example's copy depends on the package under the root package's name, so
+# its product references stay as they are.
+git ls-files -z --cached --others --exclude-standard -- examples/swift-map/Sources |
+  tar -c --null -T - | tar -x -C "$scratch"
+example="$scratch/examples/swift-map"
+sed "s|path: \"\.\./\.\.\"|path: \"$package\"|" examples/swift-map/Package.swift >"$example/Package.swift"
+if ! grep -qF "path: \"$package\"" "$example/Package.swift"; then
+  echo "examples/swift-map/Package.swift no longer depends on the repository root" >&2
+  exit 1
+fi
+
+cd "$example"
+swift build --product swift-map --scratch-path "$scratch/build/macos"
+"$MISE_MONOREPO_ROOT/tools/examples/smoke" macos-arm64-metal "$scratch/build/macos/debug/swift-map"
+swift build \
+  --product swift-map-ios \
+  --scratch-path "$scratch/build/ios" \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --triple arm64-apple-ios15.0

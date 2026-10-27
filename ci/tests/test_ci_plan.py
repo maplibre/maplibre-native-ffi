@@ -260,11 +260,13 @@ class PresetTest(unittest.TestCase):
             with self.subTest(selection=name):
                 planned = plan.plan(self.presets, run_all, units)
                 selected = set(units) if not run_all else None
-                jobs = [
+                owned = {
                     job
                     for job, (unit, _) in plan.JOBS.items()
                     if selected is None or unit in selected
-                ]
+                }
+                owned |= {need for job in owned for need in plan.JOB_NEEDS.get(job, ())}
+                jobs = [job for job in plan.JOBS if job in owned]
                 self.assertEqual(planned["jobs"], jobs)
                 expected = {
                     target.preset
@@ -289,6 +291,12 @@ class PresetTest(unittest.TestCase):
                 self.assertEqual(
                     saving, collections.Counter({row["runner"]: 1 for row in matrix})
                 )
+
+    def test_a_job_runs_the_jobs_whose_artifacts_it_downloads(self):
+        self.assertEqual(
+            plan.plan(self.presets, False, ["swiftpm"])["jobs"],
+            ["apple-xcframework", "swift-package"],
+        )
 
     def test_an_unknown_unit_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown coverage units: nope"):

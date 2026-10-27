@@ -83,7 +83,12 @@ JOBS = {
     ),
     "typescript-npm": ("npm", lambda target: addon(target) == "typescript"),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
+    "swift-package": ("swiftpm", lambda target: target.backend == "metal"),
 }
+# The jobs whose artifacts a job downloads, which run whenever it does. A job
+# that a skipped one needs would skip it too, and a skip passes the required
+# check.
+JOB_NEEDS = {"swift-package": ("apple-xcframework",)}
 
 
 def lineage(presets: list[dict], name: str) -> list[dict]:
@@ -248,7 +253,9 @@ def plan(presets: dict, run_all: bool, units: list[str]) -> dict[str, list]:
     if unknown:
         raise SystemExit(f"error: unknown coverage units: {', '.join(unknown)}")
     selected = known if run_all else set(units)
-    jobs = [job for job, (unit, _) in JOBS.items() if unit in selected]
+    planned = {job for job, (unit, _) in JOBS.items() if unit in selected}
+    planned |= {need for job in planned for need in JOB_NEEDS.get(job, ())}
+    jobs = [job for job in JOBS if job in planned]
     needed = {target.preset for job in jobs for target in consumed(job, all_targets)}
     matrix = []
     # The toolchain cache key covers the runner OS, architecture and image, so
