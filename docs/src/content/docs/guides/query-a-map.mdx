@@ -20,20 +20,36 @@ renders.
 Search a box of a few logical pixels around the position rather than a point,
 because symbols and thin lines are small targets.
 
-<Code code={region(querySnippet, "geometry")} lang="c" title="query-rendered-features.c" />
+<Code
+  code={region(querySnippet, "geometry")}
+  lang="c"
+  title="query-rendered-features.c"
+/>
 
-Name the layers that your host treats as selectable, so that background and
-land fills stay out of the result.
+Name the layers that your host treats as selectable, so that background and land
+fills stay out of the result.
 
-<Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
+<Code
+  code={region(querySnippet, "layers")}
+  lang="c"
+  title="query-rendered-features.c"
+/>
 
-<Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
+<Code
+  code={region(querySnippet, "query")}
+  lang="c"
+  title="query-rendered-features.c"
+/>
 
 Each hit carries its feature as GeoJSON and the ID of the style layer that drew
 it. A feature that several layers draw, such as a fill and its outline, yields
 one hit per layer. Copy what you keep.
 
-<Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />
+<Code
+  code={region(querySnippet, "read")}
+  lang="c"
+  title="query-rendered-features.c"
+/>
 
-The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines the geometry, options, and
-results.
+The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines
+the geometry, options, and results.

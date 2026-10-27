@@ -21,7 +21,11 @@ element names the operator, followed by its arguments.
 `["get", "mag"]` reads the feature property named `mag`, and `["linear"]`
 selects linear interpolation.
 
-<Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
+<Code
+  code={region(styleByData, "expression")}
+  lang="c"
+  title="style-by-data.c"
+/>
 
 This property interpolates the circle radius from 4 pixels at magnitude 1 to 24
 pixels at magnitude 6.
@@ -36,4 +40,5 @@ The `filter` property selects which source features the layer draws.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines property and filter commands.
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines
+property and filter commands.

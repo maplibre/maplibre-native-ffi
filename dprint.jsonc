@@ -37,6 +37,9 @@
     "proseWrap": "always",
     "sortPackageJson": false,
   },
+  // Prettier is the last plugin, so it formats only the types that no plugin
+  // above claims, MDX among them.
+  "prettier": { "proseWrap": "always" },
   "ruff": { "indentWidth": 4, "lineLength": 88 },
   "ktfmt": { "style": "google", "lineWidth": 100 },
   "googleJavaFormat": { "lineWidth": 100 },
@@ -97,11 +100,6 @@
         "command": "swiftformat stdin --stdin-path {{file_path}} --indent {{indent_width}} --max-width {{line_width}} --quiet",
         "exts": ["swift"],
       },
-      {
-        "command": "pnpm --dir docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
-        "exts": ["mdx"],
-        "cacheKeyFiles": ["pnpm-lock.yaml"],
-      },
     ],
   },
   "plugins": [
@@ -115,5 +113,6 @@
     "https://plugins.dprint.dev/sargunv/google-java-format-0.1.0.json@168697c8e19478c6492a5f9117d163f6241b26010d04946f8441a9236616486e",
     "https://plugins.dprint.dev/csharpier-0.1.1.wasm",
     "https://plugins.dprint.dev/jakebailey/gofumpt-v0.0.20.wasm",
+    "https://plugins.dprint.dev/prettier-0.72.0.json@6e7af2cb2182a5a11358d3adde9ae0ef3b94b7d2e5dcfdd252e3f7c3916541fe",
   ],
 }

@@ -1,6 +1,8 @@
 ---
 title: Attach a render target
-description: Choose a render target and execution placement, then replace or release it safely.
+description:
+  Choose a render target and execution placement, then replace or release it
+  safely.
 sidebar:
   order: 3
 ---
@@ -58,11 +60,15 @@ graphics device that native code creates, and read its pixels back.
 [Render a static image](/maplibre-native-ffi/guides/render-a-static-image/)
 shows that path.
 
-A borrowed texture target names the host's textures and their physical size.
-A ring of two textures lets the session render while the host reads the previous
+A borrowed texture target names the host's textures and their physical size. A
+ring of two textures lets the session render while the host reads the previous
 frame.
 
-<Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
+<Code
+  code={region(renderTarget, "borrowed")}
+  lang="c"
+  title="render-target.c"
+/>
 
 The [surface reference](/maplibre-native-ffi/reference/c/surface_8h.html) and
 [texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) cover
@@ -79,7 +85,11 @@ For borrowed textures, release acquired frames, allocate a new ring, and replace
 the target. Replace a native surface the same way when the host recreates its
 window or view.
 
-<Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
+<Code
+  code={region(renderTarget, "set-target")}
+  lang="c"
+  title="render-target.c"
+/>
 
 To shut down, release acquired frames, detach the session, and keep servicing a
 caller driver until detach completes. Then dispose the session, and destroy the
@@ -89,6 +99,11 @@ can no longer be serviced; the
 [session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
 states what it keeps until the process exits.
 
-<Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />
+<Code
+  code={region(renderTarget, "teardown")}
+  lang="c"
+  title="render-target.c"
+/>
 
-Continue with [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/).
+Continue with
+[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/).

@@ -1,6 +1,8 @@
 ---
 title: Render a static image
-description: Attach a texture target on a graphics device, request one still image, and read the finished pixels.
+description:
+  Attach a texture target on a graphics device, request one still image, and
+  read the finished pixels.
 sidebar:
   order: 7
 ---
@@ -20,9 +22,9 @@ Create a static map at the image size.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
-Create a graphics device for the build's render backend. Every native build
-can create one. A browser build attaches an owned texture target on a context
-that the host creates in JavaScript.
+Create a graphics device for the build's render backend. Every native build can
+create one. A browser build attaches an owned texture target on a context that
+the host creates in JavaScript.
 
 <Code code={region(stillImage, "device")} lang="c" title="still-image.c" />
 
@@ -32,15 +34,19 @@ the device once the attach call returns.
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-After attachment completes, load the style and request a still image on the
-map. The request renders its own frame on the session once the map has loaded
-what the image shows.
+After attachment completes, load the style and request a still image on the map.
+The request renders its own frame on the session once the map has loaded what
+the image shows.
 
 <Code code={region(stillImage, "request")} lang="c" title="still-image.c" />
 
 Start readback once the still-image completion arrives.
 
-<Code code={region(stillImage, "start-readback")} lang="c" title="still-image.c" />
+<Code
+  code={region(stillImage, "start-readback")}
+  lang="c"
+  title="still-image.c"
+/>
 
 ## Read the pixels
 
@@ -49,4 +55,5 @@ Copy the pixels that you keep.
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />
 
 Detach the session, then release the map and runtime. The
-[texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) defines readback and its pixel layout.
+[texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) defines
+readback and its pixel layout.

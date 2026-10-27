@@ -1,6 +1,8 @@
 ---
 title: Run the render loop
-description: Submit frame demand, service graphics work when required, and drain owned results.
+description:
+  Submit frame demand, service graphics work when required, and drain owned
+  results.
 sidebar:
   order: 4
 ---
@@ -31,7 +33,11 @@ return from the wake without waiting. Keep servicing while presentation is
 paused, because attachment, queries, readback, resize, and detach also need
 driver work.
 
-<Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
+<Code
+  code={region(frameLoopSnippet, "service")}
+  lang="c"
+  title="frame-loop.c"
+/>
 
 If the graphics thread can no longer run,
 [abandon the target](/maplibre-native-ffi/guides/attach-a-render-target/#resize-and-release).
@@ -41,11 +47,16 @@ If the graphics thread can no longer run,
 When the frame wake fires, schedule a drain on the host loop. Drain until the
 queue is empty, read each batch, and release it.
 
-<Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
+<Code
+  code={region(frameLoopSnippet, "results")}
+  lang="c"
+  title="frame-loop.c"
+/>
 
 Each result's outcome tells the host when to demand again, as the
-[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html) describes. To read a texture
-target, acquire its frame and follow the synchronization that the
+[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
+describes. To read a texture target, acquire its frame and follow the
+synchronization that the
 [texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) states.
 [Render a static image](/maplibre-native-ffi/guides/render-a-static-image/)
 shows CPU readback.

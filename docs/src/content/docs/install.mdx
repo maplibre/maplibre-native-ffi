@@ -18,8 +18,8 @@ yourself, see the
 [development overview](/maplibre-native-ffi/development/overview/).
 
 A preset name has the form `<platform>-<arch>-<backend>`, as in
-`macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their
-context provider in place of the backend: `egl`, `wgl`, or `webgl`.
+`macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their context
+provider in place of the backend: `egl`, `wgl`, or `webgl`.
 [Platforms](#platforms) lists the backends and providers for each platform.
 
 ### Build against a prefix
@@ -77,8 +77,8 @@ target("app")
     add_packages("maplibre-native-c")
 ```
 
-Omit `backend` to take the platform's default. On Linux, set `libc = "musl"`
-in `configs` when building for musl.
+Omit `backend` to take the platform's default. On Linux, set `libc = "musl"` in
+`configs` when building for musl.
 
 ### Add the XCFramework to an Apple app
 
@@ -106,8 +106,8 @@ library, and the sections that need an installed prefix say so.
 ### Kotlin
 
 Add Maven Central, the binding, and the runtime for your backend. The runtime
-carries the native library for every ABI. On the JVM, the binding needs JDK 22 or
-later.
+carries the native library for every ABI. On the JVM, the binding needs JDK 22
+or later.
 
 ```kotlin title="build.gradle.kts"
 repositories {
@@ -130,8 +130,8 @@ On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.
 
 For the snapshot channel, add the Maven snapshot repository and take the
-snapshot version of both modules. The runtime modules and Android
-initialization match the release.
+snapshot version of both modules. The runtime modules and Android initialization
+match the release.
 
 ```kotlin title="build.gradle.kts"
 repositories {
@@ -181,8 +181,8 @@ gh release download unstable-native-snapshot --repo maplibre/maplibre-native-ffi
 </configuration>
 ```
 
-A snapshot's version is the next release's version with a `-dev` suffix, so
-take the newest prerelease of both packages.
+A snapshot's version is the next release's version with a `-dev` suffix, so take
+the newest prerelease of both packages.
 
 ```bash frame="terminal"
 dotnet add package Maplibre.NativeFfi --prerelease
@@ -200,11 +200,10 @@ dart pub add maplibre_native_ffi
 The package downloads the C library for each target when it builds. Releases
 include macOS for arm64 alone.
 
-To build against your own copy of the [C library](#build-against-a-prefix),
-name it in your application's pubspec. Name an install prefix, or a directory
-holding installs one level down, such as a CMake build root. A relative path
-resolves against the pubspec. A Git dependency on the package needs a local
-build.
+To build against your own copy of the [C library](#build-against-a-prefix), name
+it in your application's pubspec. Name an install prefix, or a directory holding
+installs one level down, such as a CMake build root. A relative path resolves
+against the pubspec. A Git dependency on the package needs a local build.
 
 ```yaml title="pubspec.yaml"
 hooks:
@@ -250,8 +249,8 @@ hooks:
         android: vulkan
 ```
 
-The backends are `opengl`, `metal`, and `vulkan`. The keys are `android`,
-`ios`, `linux`, `macos`, and `windows`.
+The backends are `opengl`, `metal`, and `vulkan`. The keys are `android`, `ios`,
+`linux`, `macos`, and `windows`.
 
 To download through a mirror, name its base URL in `release_url`. The mirror
 serves each release tag as a directory that holds that release's archives.
@@ -319,8 +318,8 @@ dependencies = [
 
 For the snapshot channel, install both distributions from the
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
-A snapshot's version is a development release of the next release, so pip
-takes it only with `--pre`.
+A snapshot's version is a development release of the next release, so pip takes
+it only with `--pre`.
 
 ```bash frame="terminal"
 pip install --pre maplibre-native-ffi maplibre-native-ffi-runtime-vulkan --find-links https://github.com/maplibre/maplibre-native-ffi/releases/expanded_assets/unstable-native-snapshot
@@ -407,8 +406,8 @@ The snapshot rebuilds `main` once a day. If `main` has moved past it, replace
 `branch` with a `rev` set to the commit that the release names.
 
 To download through a mirror, set `MAPLIBRE_NATIVE_FFI_RELEASE_URL` to its base
-URL. The mirror serves each release tag as a directory that holds that
-release's archives.
+URL. The mirror serves each release tag as a directory that holds that release's
+archives.
 
 ### Swift
 
@@ -475,9 +474,8 @@ macOS. Releases include macOS for arm64 alone. Deno imports the package as
 
 In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
 `@maplibre/native-ffi-webgpu` with WebGPU. Serve `maplibre_native_ffi.mjs` and
-`maplibre_native_ffi.wasm` from the backend's `-wasm32` package as static
-files, such as from Vite's `public` directory, and load them before any other
-call:
+`maplibre_native_ffi.wasm` from the backend's `-wasm32` package as static files,
+such as from Vite's `public` directory, and load them before any other call:
 
 ```ts
 import { loadModule, RuntimeHandle } from "@maplibre/native-ffi";
@@ -486,8 +484,8 @@ await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
 const runtime = await RuntimeHandle.create();
 ```
 
-npm has no snapshot channel. To try `main`, pack the packages for your preset
-in a checkout of this repository, then install the tarballs:
+npm has no snapshot channel. To try `main`, pack the packages for your preset in
+a checkout of this repository, then install the tarballs:
 
 ```bash frame="terminal"
 mise run //bindings/typescript:pack linux-gnu-x64-vulkan
@@ -556,20 +554,21 @@ dependency `.@"system-root"` as the NDK's `sysroot` directory, and
 names `usr/include` and its target subdirectory as the include directories, and
 the target's CRT directory, `usr/lib/<target>/<API level>`, as both `crt_dir`
 and `cc_dir`. Call `setLibCFile` with the same file on each artifact that
-imports the module. An app ships
-`libmaplibre-native-c.so` in its `lib/<abi>` directory.
+imports the module. An app ships `libmaplibre-native-c.so` in its `lib/<abi>`
+directory.
 
-The [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
-publishes the same package from `main`. Run the same `zig fetch --save` again
-to move to the latest snapshot.
+The
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+publishes the same package from `main`. Run the same `zig fetch --save` again to
+move to the latest snapshot.
 
 ```bash frame="terminal"
 zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-ffi-zig.tar.gz
 ```
 
-To build against your own copy of the [C library](#build-against-a-prefix),
-pass the dependency its install prefix as `local-build`, which serves the one
-target it was built for. A path from the command line must be absolute. A Git
+To build against your own copy of the [C library](#build-against-a-prefix), pass
+the dependency its install prefix as `local-build`, which serves the one target
+it was built for. A path from the command line must be absolute. A Git
 dependency on the repository needs a local build.
 
 ```zig title="build.zig"
@@ -590,10 +589,9 @@ provider.
 ### macOS
 
 macOS runs the Metal, Vulkan, and OpenGL backends, with EGL as the OpenGL
-context provider. Apple provides neither Vulkan
-nor EGL, so a host that chooses one of those backends loads
-[MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
-[ANGLE](https://chromium.googlesource.com/angle/angle) itself.
+context provider. Apple provides neither Vulkan nor EGL, so a host that chooses
+one of those backends loads [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
+or [ANGLE](https://chromium.googlesource.com/angle/angle) itself.
 
 ### Windows
 
@@ -621,8 +619,9 @@ A Kotlin/Native target gets the native library from its runtime KLIB, and the
 app packages nothing else for it.
 
 An app's native code, built with CMake or ndk-build, links the runtime AAR's
-library through [Prefab](https://developer.android.com/build/native-dependencies).
-The app can use any `ANDROID_STL`.
+library through
+[Prefab](https://developer.android.com/build/native-dependencies). The app can
+use any `ANDROID_STL`.
 
 ```kotlin title="build.gradle.kts"
 android {
@@ -641,8 +640,8 @@ find_package(maplibre-native-c REQUIRED CONFIG)
 target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
 ```
 
-Android platform initialization is required once per process, before creating
-a runtime. Pass an `android.content.Context`; every binding exposes this call
+Android platform initialization is required once per process, before creating a
+runtime. Pass an `android.content.Context`; every binding exposes this call
 under its own name.
 
 ### iOS

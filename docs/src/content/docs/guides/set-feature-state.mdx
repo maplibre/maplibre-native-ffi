@@ -1,6 +1,7 @@
 ---
 title: Set feature state
-description: Set per-feature state, use it in style expressions, and read it back.
+description:
+  Set per-feature state, use it in style expressions, and read it back.
 sidebar:
   order: 15
 ---
@@ -39,15 +40,27 @@ Remove a key when its value is no longer needed.
 
 ## Read state back
 
-<Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
+<Code
+  code={region(featureStateRead, "get")}
+  lang="c"
+  title="feature-state-read.c"
+/>
 
 The result is a JSON object.
 
-<Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
+<Code
+  code={region(featureStateRead, "member")}
+  lang="c"
+  title="feature-state-read.c"
+/>
 
 Copy what you keep.
 
-<Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
+<Code
+  code={region(featureStateRead, "read")}
+  lang="c"
+  title="feature-state-read.c"
+/>
 
-The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines selectors and feature-state
-commands.
+The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines
+selectors and feature-state commands.

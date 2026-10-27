@@ -1,6 +1,8 @@
 ---
 title: Query a source
-description: Read the features that a source holds, and expand a cluster into the features under it.
+description:
+  Read the features that a source holds, and expand a cluster into the features
+  under it.
 sidebar:
   order: 14
 ---
@@ -11,8 +13,8 @@ import { region } from "../../../snippets";
 import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
 import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
 
-A source query reads the loaded features of a source, including features that
-no layer draws. To find features at a screen position, use
+A source query reads the loaded features of a source, including features that no
+layer draws. To find features at a screen position, use
 [Query a map](/maplibre-native-ffi/guides/query-a-map/). The query covers only
 the tiles loaded for the current camera, so its result changes as the camera
 moves.
@@ -22,23 +24,39 @@ moves.
 A vector source needs its source-layer IDs, because one tile can hold several
 layers.
 
-<Code code={region(sourceFeatures, "options")} lang="c" title="query-source-features.c" />
+<Code
+  code={region(sourceFeatures, "options")}
+  lang="c"
+  title="query-source-features.c"
+/>
 
 Name the source by its style source ID.
 
-<Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
+<Code
+  code={region(sourceFeatures, "query")}
+  lang="c"
+  title="query-source-features.c"
+/>
 
 Each hit carries its feature as GeoJSON and, for a vector source, the source
 layer it came from, which a feature-state call needs. Copy what you keep.
 
-<Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
+<Code
+  code={region(sourceFeatures, "read")}
+  lang="c"
+  title="query-source-features.c"
+/>
 
 ## Expand a cluster
 
 The `supercluster` extension's `leaves` field returns the features inside a
 cluster feature from a GeoJSON source. Its arguments are a JSON object.
 
-<Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
+<Code
+  code={region(clusterLeaves, "arguments")}
+  lang="c"
+  title="cluster-leaves.c"
+/>
 
 Pass the cluster feature from a query result.
 
@@ -46,7 +64,11 @@ Pass the cluster feature from a query result.
 
 The result is a GeoJSON FeatureCollection.
 
-<Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
+<Code
+  code={region(clusterLeaves, "leaves")}
+  lang="c"
+  title="cluster-leaves.c"
+/>
 
-The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines source queries and extension
-results.
+The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines
+source queries and extension results.

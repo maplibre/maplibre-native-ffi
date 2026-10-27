@@ -1,6 +1,7 @@
 ---
 title: Work offline
-description: Download an offline region and read the regions stored in the cache database.
+description:
+  Download an offline region and read the regions stored in the cache database.
 sidebar:
   order: 16
 ---
@@ -22,7 +23,11 @@ Download a region when the host must draw a known area without a network.
 
 Define the style, area, and zoom range that the host needs.
 
-<Code code={region(offlineRegion, "define")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "define")}
+  lang="c"
+  title="offline-region.c"
+/>
 
 Choose a tile pyramid for a bounding box, or a geometry for a GeoJSON shape.
 
@@ -30,22 +35,42 @@ Choose a tile pyramid for a bounding box, or a geometry for a GeoJSON shape.
 
 Create the region with metadata such as a display name.
 
-<Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "create")}
+  lang="c"
+  title="offline-region.c"
+/>
 
-<Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "result")}
+  lang="c"
+  title="offline-region.c"
+/>
 
 Keep the region ID for later operations.
 
-<Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "region-id")}
+  lang="c"
+  title="offline-region.c"
+/>
 
 Observe the region, then activate its download.
 
-<Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "download")}
+  lang="c"
+  title="offline-region.c"
+/>
 
 Drain its progress and error events, as
 [Handle events](/maplibre-native-ffi/guides/handle-events/) describes.
 
-<Code code={region(offlineRegion, "progress")} lang="c" title="offline-region.c" />
+<Code
+  code={region(offlineRegion, "progress")}
+  lang="c"
+  title="offline-region.c"
+/>
 
 Set the download state to inactive to pause it, and to active to resume it.
 
@@ -58,19 +83,35 @@ Load MBTiles through an `mbtiles://` source instead.
 
 List regions to read what earlier host runs stored.
 
-<Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
+<Code
+  code={region(offlineStorage, "list")}
+  lang="c"
+  title="offline-storage.c"
+/>
 
 Copy what you keep.
 
-<Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
+<Code
+  code={region(offlineStorage, "result")}
+  lang="c"
+  title="offline-storage.c"
+/>
 
 Each entry has an ID, a definition, and metadata.
 
-<Code code={region(offlineStorage, "entries")} lang="c" title="offline-storage.c" />
+<Code
+  code={region(offlineStorage, "entries")}
+  lang="c"
+  title="offline-storage.c"
+/>
 
 Delete a region that the host no longer needs.
 
-<Code code={region(offlineStorage, "delete")} lang="c" title="offline-storage.c" />
+<Code
+  code={region(offlineStorage, "delete")}
+  lang="c"
+  title="offline-storage.c"
+/>
 
-The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines region operations, merges, and
-storage controls.
+The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines region
+operations, merges, and storage controls.

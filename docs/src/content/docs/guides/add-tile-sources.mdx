@@ -1,6 +1,7 @@
 ---
 title: Add tile sources
-description: Add a vector, raster, or elevation tile source and draw it with a style layer.
+description:
+  Add a vector, raster, or elevation tile source and draw it with a style layer.
 sidebar:
   order: 9
 ---
@@ -15,8 +16,8 @@ import rasterDemSnippet from "../../../../snippets/c/tile-source-raster-dem.c?ra
 Drawing a tile endpoint takes two style objects: a source that describes where
 the tiles are and how to read them, and a layer that draws them. Both belong to
 the loaded style. Add them after a style-loaded event and again after every
-later style load, as
-[Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
+later style load, as [Load a style](/maplibre-native-ffi/guides/load-a-style/)
+describes.
 
 How you describe the source depends on what the server publishes. MapLibre reads
 tile URLs and properties from a TileJSON document. For other servers, supply the
@@ -28,7 +29,11 @@ Set `url` in the source JSON when the server publishes a TileJSON document,
 which supplies the tile URLs, zoom range, and attribution. Then add a layer that
 names the source.
 
-<Code code={region(tilejsonSnippet, "source")} lang="c" title="tile-source-tilejson.c" />
+<Code
+  code={region(tilejsonSnippet, "source")}
+  lang="c"
+  title="tile-source-tilejson.c"
+/>
 
 Set `encoding` to `"mlt"` for MapLibre Tiles. Tiles whose integer streams use
 FastPFOR also need the FastPFOR map option.
@@ -36,7 +41,11 @@ FastPFOR also need the FastPFOR map option.
 A vector tile carries several named layers. A layer that draws one of them sets
 `source` to the source ID and `source-layer` to the name inside the tile.
 
-<Code code={region(tilejsonSnippet, "layer")} lang="c" title="tile-source-tilejson.c" />
+<Code
+  code={region(tilejsonSnippet, "layer")}
+  lang="c"
+  title="tile-source-tilejson.c"
+/>
 
 ## From URL templates
 
@@ -44,26 +53,46 @@ Supply URL templates with the `{z}`, `{x}`, and `{y}` placeholders when the
 server has no TileJSON document. Set the bounds, zoom range, and attribution to
 match the server.
 
-<Code code={region(templatesSnippet, "json")} lang="c" title="tile-source-templates.c" />
+<Code
+  code={region(templatesSnippet, "json")}
+  lang="c"
+  title="tile-source-templates.c"
+/>
 
 Add the source JSON, then add a raster layer that names the source.
 
-<Code code={region(templatesSnippet, "source")} lang="c" title="tile-source-templates.c" />
+<Code
+  code={region(templatesSnippet, "source")}
+  lang="c"
+  title="tile-source-templates.c"
+/>
 
 ## Elevation tiles and hillshade
 
-Raster-DEM tiles encode elevation in their color channels. Set the encoding
-that the server publishes.
+Raster-DEM tiles encode elevation in their color channels. Set the encoding that
+the server publishes.
 
-<Code code={region(rasterDemSnippet, "json")} lang="c" title="tile-source-raster-dem.c" />
+<Code
+  code={region(rasterDemSnippet, "json")}
+  lang="c"
+  title="tile-source-raster-dem.c"
+/>
 
 A raster-DEM source takes the same tile URL templates as a raster source.
 
-<Code code={region(rasterDemSnippet, "source")} lang="c" title="tile-source-raster-dem.c" />
+<Code
+  code={region(rasterDemSnippet, "source")}
+  lang="c"
+  title="tile-source-raster-dem.c"
+/>
 
 Add a hillshade layer with a JSON object that names the raster-DEM source.
 
-<Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />
+<Code
+  code={region(rasterDemSnippet, "layer")}
+  lang="c"
+  title="tile-source-raster-dem.c"
+/>
 
 The [style specification](https://maplibre.org/maplibre-style-spec/sources/)
 defines the JSON fields for each source type.

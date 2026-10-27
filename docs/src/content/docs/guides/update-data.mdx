@@ -16,20 +16,36 @@ features keeps its own collection and publishes all of it after each change.
 Add the source once, with an empty collection. Later updates use the same source
 ID, so the layers that draw it stay in place.
 
-<Code code={region(liveUpdates, "add")} lang="c" title="geojson-live-updates.c" />
+<Code
+  code={region(liveUpdates, "add")}
+  lang="c"
+  title="geojson-live-updates.c"
+/>
 
 Serialize the collection as one GeoJSON FeatureCollection.
 
-<Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
+<Code
+  code={region(liveUpdates, "features")}
+  lang="c"
+  title="geojson-live-updates.c"
+/>
 
 Prepare it with the source's options. Preparing a large dataset takes time, so
 run it on a host worker thread.
 
-<Code code={region(liveUpdates, "prepare")} lang="c" title="geojson-live-updates.c" />
+<Code
+  code={region(liveUpdates, "prepare")}
+  lang="c"
+  title="geojson-live-updates.c"
+/>
 
 Install the prepared data on the source, then release it.
 
-<Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
+<Code
+  code={region(liveUpdates, "publish")}
+  lang="c"
+  title="geojson-live-updates.c"
+/>
 
 When a feed delivers faster than the display refreshes, publish once per frame.
 
@@ -40,7 +56,11 @@ the next map update, which suits small, frequent updates such as a tracked
 position, but it can delay rendering for a large dataset. Set it when you add
 the source, or override it around a burst of updates.
 
-<Code code={region(liveUpdates, "synchronous-tiling")} lang="c" title="geojson-live-updates.c" />
+<Code
+  code={region(liveUpdates, "synchronous-tiling")}
+  lang="c"
+  title="geojson-live-updates.c"
+/>
 
-The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines prepared data and tiling
-options.
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines
+prepared data and tiling options.

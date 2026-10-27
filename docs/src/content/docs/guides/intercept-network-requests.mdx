@@ -1,7 +1,8 @@
 ---
 title: Intercept network requests
-description: Rewrite a resource URL, add request headers, or answer a request
-  from host storage.
+description:
+  Rewrite a resource URL, add request headers, or answer a request from host
+  storage.
 sidebar:
   order: 17
 ---
@@ -26,16 +27,28 @@ Use a transform to sign a URL or select another host. Check the destination
 before you add credentials, because styles can request tiles, sprites, and
 glyphs from origins that the host does not control.
 
-<Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
+<Code
+  code={region(transformSnippet, "match")}
+  lang="c"
+  title="resource-transform.c"
+/>
 
 Complete the request with the replacement URL, which consumes it, or release it
 to keep the URL. A host can also answer later, from any thread.
 
-<Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
+<Code
+  code={region(transformSnippet, "rewrite")}
+  lang="c"
+  title="resource-transform.c"
+/>
 
 Register the transform before you load resources that need it.
 
-<Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
+<Code
+  code={region(transformSnippet, "install")}
+  lang="c"
+  title="resource-transform.c"
+/>
 
 ## Add HTTP headers
 
@@ -43,49 +56,82 @@ Use a header transform for credentials that belong in headers, and check the
 transformed origin before you return them. A host that cannot run code on
 MapLibre threads supplies a table of header rules instead of a callback.
 
-<Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
+<Code
+  code={region(headerSnippet, "match")}
+  lang="c"
+  title="http-header-transform.c"
+/>
 
 Set the header names and values.
 
-<Code code={region(headerSnippet, "set")} lang="c" title="http-header-transform.c" />
+<Code
+  code={region(headerSnippet, "set")}
+  lang="c"
+  title="http-header-transform.c"
+/>
 
 Register the transform, and clear or replace it when credentials change.
 
-<Code code={region(headerSnippet, "install")} lang="c" title="http-header-transform.c" />
+<Code
+  code={region(headerSnippet, "install")}
+  lang="c"
+  title="http-header-transform.c"
+/>
 
 ### Platform support
 
 Header transforms are unavailable on OpenHarmony and in the browser. Use a
 provider there.
 
-The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
-covers redirect handling and the request paths that bypass transforms.
+The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
+redirect handling and the request paths that bypass transforms.
 
 ## Supply response bytes
 
 Use a provider for host-managed storage or a custom URL scheme. Match requests
 that the host serves, and pass the others to MapLibre's network stack.
 
-<Code code={region(providerSnippet, "match")} lang="c" title="resource-provider.c" />
+<Code
+  code={region(providerSnippet, "match")}
+  lang="c"
+  title="resource-provider.c"
+/>
 
 When bytes are already available, complete the request in the callback.
 Completing or passing a request through consumes its handle, so release only a
 handle that neither call accepted.
 
-<Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
+<Code
+  code={region(providerSnippet, "complete")}
+  lang="c"
+  title="resource-provider.c"
+/>
 
 Register routes to restrict which requests reach the provider, and register it
 before you load its resources.
 
-<Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
+<Code
+  code={region(providerSnippet, "install")}
+  lang="c"
+  title="resource-provider.c"
+/>
 
 For asynchronous I/O, keep the request handle and complete it when the bytes
 arrive. Use a cancel callback to stop an in-flight fetch, and pass a request
 that the host declines to native loading.
 
-<Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
+<Code
+  code={region(providerSnippet, "cancel")}
+  lang="c"
+  title="resource-provider.c"
+/>
 
-<Code code={region(providerSnippet, "pass-through")} lang="c" title="resource-provider.c" />
+<Code
+  code={region(providerSnippet, "pass-through")}
+  lang="c"
+  title="resource-provider.c"
+/>
 
-The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) defines
-request ownership, cancellation, callback reentry, and registration retirement.
+The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
+defines request ownership, cancellation, callback reentry, and registration
+retirement.

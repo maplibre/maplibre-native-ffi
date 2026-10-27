@@ -1,6 +1,7 @@
 ---
 title: Handle events
-description: Select event types and receive them through callbacks or a delivery queue.
+description:
+  Select event types and receive them through callbacks or a delivery queue.
 sidebar:
   order: 5
 ---
@@ -20,7 +21,11 @@ Select map events on the map and offline events on the runtime. The default
 subscription includes every event type; narrow it to the types that the host
 reads.
 
-<Code code={region(handleEvents, "subscribe")} lang="c" title="handle-events.c" />
+<Code
+  code={region(handleEvents, "subscribe")}
+  lang="c"
+  title="handle-events.c"
+/>
 
 ## Receive and route events
 
@@ -54,13 +59,14 @@ host-owned sources and layers after this event, as
 [Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
 Keep a frame demand waiting for an update to render new map state.
-[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/) shows how
-to request frames and drain their results.
+[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/) shows
+how to request frames and drain their results.
 
 A loading-failed event carries failure text for a style or resource request.
 Observe command completions as well: events and completions report different
 outcomes, as [Failures](/maplibre-native-ffi/concepts/#failures) explains.
 
 Events carry generations for hosts that need to relate them to commands or
-snapshots. The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
-covers payloads, queued-event ownership, and generation ordering.
+snapshots. The
+[runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
+payloads, queued-event ownership, and generation ordering.

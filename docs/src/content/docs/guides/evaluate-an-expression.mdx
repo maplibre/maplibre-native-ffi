@@ -18,21 +18,34 @@ with a layer's filter. Expressions follow the same rules as in MapLibre GL JS's
 Parse an expression once. The handle needs no runtime or map, and any thread can
 evaluate it, including several threads at once.
 
-<Code code={region(evaluateExpression, "create")} lang="c" title="evaluate-expression.c" />
+<Code
+  code={region(evaluateExpression, "create")}
+  lang="c"
+  title="evaluate-expression.c"
+/>
 
 The inputs hold what the expression reads: the zoom, a GeoJSON feature, its
 feature state, the global state, and the other values that a layer passes. An
 expression that needs an input you leave out, such as the zoom or the feature,
 fails to evaluate.
 
-<Code code={region(evaluateExpression, "inputs")} lang="c" title="evaluate-expression.c" />
+<Code
+  code={region(evaluateExpression, "inputs")}
+  lang="c"
+  title="evaluate-expression.c"
+/>
 
-The result is JSON. A call reports the result's length whether or not the
-buffer held it, without the NUL terminator, so a C host can ask for the length
-first and then fill a buffer one byte longer. The language bindings size the
-buffer themselves and return the JSON.
+The result is JSON. A call reports the result's length whether or not the buffer
+held it, without the NUL terminator, so a C host can ask for the length first
+and then fill a buffer one byte longer. The language bindings size the buffer
+themselves and return the JSON.
 
-<Code code={region(evaluateExpression, "evaluate")} lang="c" title="evaluate-expression.c" />
+<Code
+  code={region(evaluateExpression, "evaluate")}
+  lang="c"
+  title="evaluate-expression.c"
+/>
 
-The [style expression reference](/maplibre-native-ffi/reference/c/style__expression_8h.html)
+The
+[style expression reference](/maplibre-native-ffi/reference/c/style__expression_8h.html)
 defines the inputs, the expected result type, and how each value serializes.

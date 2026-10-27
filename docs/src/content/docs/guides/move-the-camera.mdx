@@ -1,6 +1,7 @@
 ---
 title: Move the camera
-description: Choose a camera transition, apply gesture input, and fit geographic bounds.
+description:
+  Choose a camera transition, apply gesture input, and fit geographic bounds.
 sidebar:
   order: 6
 ---
@@ -31,13 +32,13 @@ animate it.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
-Use fly for a long move. Its curved path zooms out while crossing the
-distance.
+Use fly for a long move. Its curved path zooms out while crossing the distance.
 
 <CameraPaths />
 
 Keep requesting frames while the repaint flag is set, as
-[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/) describes.
+[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/)
+describes.
 
 ## Apply gesture input
 
@@ -45,7 +46,11 @@ Relative camera deltas apply pointer movement to the current camera. Prefer them
 to computing a new camera from an earlier snapshot. Begin the gesture when the
 interaction starts and end or cancel it when the interaction finishes.
 
-<Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
+<Code
+  code={region(gestureSnippet, "bracket")}
+  lang="c"
+  title="camera-gesture.c"
+/>
 
 A drag uses the movement since the previous input in logical pixels.
 
@@ -53,27 +58,47 @@ A drag uses the movement since the previous input in logical pixels.
 
 A pinch combines centroid movement and scaling about the new centroid.
 
-<Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
+<Code
+  code={region(gestureSnippet, "pinch")}
+  lang="c"
+  title="camera-gesture.c"
+/>
 
 A rotation or tilt can change bearing and pitch about the same anchor.
 
-<Code code={region(gestureSnippet, "rotate")} lang="c" title="camera-gesture.c" />
+<Code
+  code={region(gestureSnippet, "rotate")}
+  lang="c"
+  title="camera-gesture.c"
+/>
 
 Use an animated delta for release momentum, or end the gesture without changing
 camera fields when it has no momentum.
 
-<Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
+<Code
+  code={region(gestureSnippet, "release")}
+  lang="c"
+  title="camera-gesture.c"
+/>
 
 ## Fit geographic bounds
 
 Compute a camera that fits the region into the viewport. Pass padding in logical
 pixels to leave room for overlays.
 
-<Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
+<Code
+  code={region(fitBoundsSnippet, "padding")}
+  lang="c"
+  title="camera-fit-bounds.c"
+/>
 
 Apply the returned camera with the transition timing that you want.
 
-<Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
+<Code
+  code={region(fitBoundsSnippet, "fit")}
+  lang="c"
+  title="camera-fit-bounds.c"
+/>
 
 ## Observe or stop a transition
 
