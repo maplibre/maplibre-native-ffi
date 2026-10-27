@@ -35,21 +35,29 @@ else
   # channel carries the fix, the update comes from the dev channel. devices-cli
   # installs the emulator only when the SDK has none.
   minimum_emulator_version=37.3.5
-  emulator_revision=$(sed -n 's/^Pkg\.Revision=//p' "$sdk_root/emulator/source.properties" 2>/dev/null | tr -d '\r')
+  emulator_revision=$(sed -n 's/^Pkg\.Revision=//p' "$sdk_root/emulator/source.properties" 2>/dev/null | tr -d '\r') || true
   if [[ "$(printf '%s\n' "$minimum_emulator_version" "$emulator_revision" | sort -V | head -n1)" != "$minimum_emulator_version" ]]; then
-    sdkmanager=
-    for candidate in "$sdk_root"/cmdline-tools/latest/bin/sdkmanager "$sdk_root"/cmdline-tools/*/bin/sdkmanager; do
-      if [[ -x "$candidate" ]]; then
-        sdkmanager=$candidate
-        break
-      fi
+    # Google's android CLI needs no JDK, and its canary packages include the
+    # dev channel. sdkmanager, which runs on a JVM, serves command-line tools
+    # that predate it.
+    install=()
+    for tool in android sdkmanager; do
+      for candidate in "$sdk_root"/cmdline-tools/latest/bin/"$tool" "$sdk_root"/cmdline-tools/*/bin/"$tool"; do
+        [[ -x "$candidate" ]] || continue
+        if [[ "$tool" == android ]]; then
+          install=("$candidate" --sdk="$sdk_root" sdk install --canary emulator)
+        else
+          install=("$candidate" --sdk_root="$sdk_root" --channel=2 --install emulator)
+        fi
+        break 2
+      done
     done
-    if [[ -z "$sdkmanager" ]]; then
-      echo "The Android emulator is at revision ${emulator_revision:-<none>}, below $minimum_emulator_version, and $sdk_root has no sdkmanager to update it." >&2
+    if ((${#install[@]} == 0)); then
+      echo "The Android emulator is at revision ${emulator_revision:-<none>}, below $minimum_emulator_version, and $sdk_root has no android CLI or sdkmanager to update it." >&2
       exit 1
     fi
     echo "Updating the Android emulator from revision ${emulator_revision:-<none>} to $minimum_emulator_version or later." >&2
-    "$sdkmanager" --sdk_root="$sdk_root" --channel=2 --install emulator <<<"y" >&2
+    "${install[@]}" <<<"y" >&2
   fi
   # SwiftShader draws the GLES and Vulkan targets in software, which is what a
   # runner without a GPU has. The emulator's renderer makes JIT code executable

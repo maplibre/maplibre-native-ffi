@@ -154,7 +154,7 @@ class AndroidSerialTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="android serial ")
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
-        sdk = self.directory / "sdk"
+        self.sdk = sdk = self.directory / "sdk"
         (sdk / "platform-tools").mkdir(parents=True)
         (sdk / "emulator").mkdir()
         (sdk / "emulator/source.properties").write_text("Pkg.Revision=37.3.5\n")
@@ -204,6 +204,22 @@ class AndroidSerialTest(unittest.TestCase):
             self.arguments.read_text().splitlines()[:7],
             ["get", "android", "--api", "26", "--abi", "x86_64", "--"],
         )
+
+    def test_an_sdk_without_the_emulator_installs_it_without_a_jdk(self):
+        (self.sdk / "emulator/source.properties").unlink()
+        (self.sdk / "cmdline-tools/latest/bin").mkdir(parents=True)
+        installed = self.directory / "installed"
+        self.write_command(
+            self.sdk / "cmdline-tools/latest/bin/android",
+            f'printf "%s\\n" "$@" > "{installed}"\n',
+        )
+        result = self.serial("x86_64")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            installed.read_text().splitlines(),
+            [f"--sdk={self.sdk}", "sdk", "install", "--canary", "emulator"],
+        )
+        self.assertEqual(result.stdout, "emulator-5556\n")
 
     def test_the_api_level_defaults_to_the_shared_one(self):
         result = self.serial("x86_64")
