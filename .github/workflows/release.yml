@@ -366,10 +366,8 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/refs" \
             -f "ref=refs/tags/$TAG" -f "sha=$SHA"
 
-  # SwiftPM reads a package from a Git repository at a version tag, and its
-  # binary target needs the checksum of the XCFramework that the release just
-  # published. The distribution repository takes the package in one commit
-  # tagged with this release's tag, over a deploy key that may write to it.
+  # SwiftPM and vcpkg consume the distribution repository. Each release
+  # commits its packages and registry versions together, then tags the commit.
   distribution:
     name: Distribution repository
     needs:
@@ -397,12 +395,16 @@ jobs:
         with:
           cache: false
           install_args: python
-      - name: Download the checksums
+      - name: Download the distribution inputs
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --dir
-          "$RUNNER_TEMP/assets"
+          gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --pattern
+          'maplibre-native-c-linux-gnu-*.tar.gz' --pattern
+          'maplibre-native-c-macos-*.tar.gz' --pattern
+          'maplibre-native-c-windows-*.tar.gz' --pattern
+          'maplibre-native-c-freebsd-*.tar.gz' --pattern
+          'maplibre-native-c-android-*.tar.gz' --dir "$RUNNER_TEMP/assets"
       # GitHub publishes its host keys, so the job trusts only those.
       - name: Install the deploy key
         env:

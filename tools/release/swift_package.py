@@ -109,6 +109,8 @@ let package = Package(
 
 
 def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> None:
+    if release.local and not (release.assets / XCFRAMEWORK_NAME).exists():
+        return
     root_manifest = (repository / MANIFEST).read_text(encoding="utf-8")
     (tree / MANIFEST).write_text(
         manifest(root_manifest, binary_target(tree, release)), encoding="utf-8"

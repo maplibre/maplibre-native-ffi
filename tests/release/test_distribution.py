@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import shutil
 import tempfile
@@ -19,8 +20,11 @@ class DistributionTest(unittest.TestCase):
         root = pathlib.Path(temporary.name)
         self.assets = root / "assets"
         self.assets.mkdir()
+        archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
+        archive.write_bytes(b"native archive")
+        archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (self.assets / "SHA256SUMS").write_text(
-            f"{'0' * 64}  maplibre-native-c-macos-arm64-metal.tar.gz\n"
+            f"{archive_digest}  maplibre-native-c-macos-arm64-metal.tar.gz\n"
             f"{DIGEST}  {XCFRAMEWORK_NAME}\n"
         )
         (self.assets / XCFRAMEWORK_NAME).write_bytes(b"xcframework")
@@ -105,7 +109,16 @@ class DistributionTest(unittest.TestCase):
         )
         self.assertEqual(
             sorted(path.name for path in self.tree.iterdir()),
-            [".git", ".spi.yml", "LICENSE", "Package.swift", "README.md", "Sources"],
+            [
+                ".git",
+                ".spi.yml",
+                "LICENSE",
+                "Package.swift",
+                "README.md",
+                "Sources",
+                "ports",
+                "versions",
+            ],
         )
         self.assertEqual(
             sorted(path.name for path in (self.tree / "Sources").iterdir()),

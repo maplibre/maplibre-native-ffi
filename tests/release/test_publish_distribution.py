@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import subprocess
@@ -36,7 +37,12 @@ class PublishDistributionTest(unittest.TestCase):
         root = pathlib.Path(temporary.name)
         self.assets = root / "assets"
         self.assets.mkdir()
-        (self.assets / "SHA256SUMS").write_text(f"{DIGEST}  {XCFRAMEWORK_NAME}\n")
+        archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
+        archive.write_bytes(b"native archive")
+        archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        (self.assets / "SHA256SUMS").write_text(
+            f"{archive_digest}  {archive.name}\n{DIGEST}  {XCFRAMEWORK_NAME}\n"
+        )
         self.remote = root / "distribution.git"
         subprocess.run(
             ["git", "init", "--quiet", "--bare", "--initial-branch=main", self.remote],
@@ -93,7 +99,9 @@ class PublishDistributionTest(unittest.TestCase):
 
     def test_a_tag_that_names_another_tree_fails(self) -> None:
         self.publish("v0.202611.0")
-        (self.assets / "SHA256SUMS").write_text(f"{'0' * 64}  {XCFRAMEWORK_NAME}\n")
+        (self.assets / "SHA256SUMS").write_text(
+            (self.assets / "SHA256SUMS").read_text().replace(DIGEST, "0" * 64)
+        )
 
         rerun = self.publish("v0.202611.0")
 

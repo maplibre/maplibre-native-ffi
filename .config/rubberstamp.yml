@@ -459,3 +459,20 @@ ci:
               - bindings/swift/Sources/MaplibreNativeC/**
               - examples/swift-map/Package.swift
           then: apply
+    vcpkg:
+      covers: >-
+        Installs the distribution repository's vcpkg port through a Git registry
+        and builds a CMake consumer against this run's Linux x64 OpenGL archive.
+        Changes to the registry generator, distribution publishing, or consumer
+        check need it.
+      rules:
+        - if:
+            files:
+              - tools/release/distribution.py
+              - tools/release/vcpkg_registry.py
+              - tools/release/publish-distribution.sh
+              - tools/release/test_vcpkg.py
+              - tests/package/**
+              - cmake/mln_ffi_package_config.cmake
+              - cmake/maplibre-native-c-config.cmake.in
+          then: apply

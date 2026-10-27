@@ -4,7 +4,7 @@
 #
 #   publish-distribution.sh <remote> <tag> <assets>
 #
-# <assets> holds the release's SHA256SUMS. A rerun finds the tag that an earlier
+# <assets> holds the release's native archives and SHA256SUMS. A rerun finds the tag that an earlier
 # attempt pushed and stops, and one that stopped between the two pushes tags
 # the commit it pushed. A tag that names another tree fails, since a published
 # tag must not move.
