@@ -307,7 +307,7 @@ jobs:
     with:
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
-      version: 0.0.0-ci
+      version: 0.202601.0-dev.0
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
