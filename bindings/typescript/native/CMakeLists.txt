@@ -2,9 +2,9 @@
 # Emscripten preset, which emscripten.cmake links.
 #
 # The presets include the root presets, so a preset name selects the same
-# toolchain, libc floor, and target as the native build. The addon embeds the
-# complete static archive from that build's install prefix, so one module per
-# target carries the whole library.
+# toolchain, libc floor, and target as the native build. OpenHarmony links the
+# shared C library so an application's own modules can use the same handles;
+# other targets embed the complete static archive from that install prefix.
 cmake_minimum_required(VERSION 3.28)
 project(maplibre_native_ffi_node LANGUAGES C)
 
@@ -20,20 +20,28 @@ get_filename_component(
   ABSOLUTE)
 set(MLN_FFI_NATIVE_PREFIX
     "${MLN_FFI_ROOT}/build/${MLN_FFI_ARTIFACT_NAME}/install"
-    CACHE PATH "Install prefix of the native build that the addon embeds")
+    CACHE PATH "Install prefix of the native build that the addon links")
 
 # Every Node-API function the addon calls belongs to version 8.
 add_compile_definitions(NAPI_VERSION=8)
 
-find_library(
-  MLN_FFI_NATIVE_ARCHIVE
-  NAMES libmaplibre-native-c.a
-  PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
-  REQUIRED)
-# The archives that ship beside the complete one, such as the Rust platform
-# layer.
-file(GLOB MLN_FFI_COMPANION_ARCHIVES
-     "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
+if(OHOS)
+  find_library(
+    MLN_FFI_NATIVE_LIBRARY
+    NAMES libmaplibre-native-c.so
+    PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+    REQUIRED)
+else()
+  find_library(
+    MLN_FFI_NATIVE_ARCHIVE
+    NAMES libmaplibre-native-c.a
+    PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+    REQUIRED)
+  # The archives that ship beside the complete one, such as the Rust platform
+  # layer.
+  file(GLOB MLN_FFI_COMPANION_ARCHIVES
+       "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
+endif()
 set(MLN_FFI_SOURCES generated_addon.c generated_values.c realm.c runtime.c)
 
 if(EMSCRIPTEN)
@@ -134,7 +142,7 @@ if(MLN_FFI_FRAMEWORK_COUNT GREATER 0)
   endforeach()
 endif()
 
-# The shipped module: the binding runtime over the embedded core.
+# The shipped module: the binding runtime over the C API.
 add_library(maplibre_native_ffi MODULE ${MLN_FFI_SOURCES})
 mln_ffi_node_module(maplibre_native_ffi)
 # The source headers come first, for the binding runtime header that the
@@ -144,20 +152,20 @@ target_include_directories(
   PRIVATE
     "${MLN_FFI_ROOT}/include" "${MLN_FFI_NATIVE_PREFIX}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}")
-target_compile_definitions(maplibre_native_ffi PRIVATE MLN_STATIC)
-target_link_libraries(
-  maplibre_native_ffi
-  PRIVATE
-    "${MLN_FFI_NATIVE_ARCHIVE}" ${MLN_FFI_COMPANION_ARCHIVES}
-    ${MLN_FFI_STATIC_LIBRARIES})
+if(OHOS)
+  target_link_libraries(maplibre_native_ffi PRIVATE "${MLN_FFI_NATIVE_LIBRARY}")
+  set_target_properties(maplibre_native_ffi PROPERTIES INSTALL_RPATH "$ORIGIN")
+else()
+  target_compile_definitions(maplibre_native_ffi PRIVATE MLN_STATIC)
+  target_link_libraries(
+    maplibre_native_ffi
+    PRIVATE
+      "${MLN_FFI_NATIVE_ARCHIVE}" ${MLN_FFI_COMPANION_ARCHIVES}
+      ${MLN_FFI_STATIC_LIBRARIES})
+endif()
 if(NOT ANDROID AND NOT OHOS)
   find_package(Threads REQUIRED)
   target_link_libraries(maplibre_native_ffi PRIVATE Threads::Threads)
-endif()
-if(OHOS)
-  # The OpenHarmony presets build the archive against the shared C++ runtime,
-  # which the application ships beside the addon.
-  target_link_libraries(maplibre_native_ffi PRIVATE c++_shared)
 endif()
 string(
   JSON MLN_FFI_ZIG_TARGET
@@ -172,17 +180,19 @@ if(NOT MLN_FFI_NO_ZIG_TARGET AND MLN_FFI_ZIG_TARGET MATCHES "-linux-(gnu|musl)")
   target_link_libraries(maplibre_native_ffi PRIVATE unwind)
 endif()
 install(TARGETS maplibre_native_ffi LIBRARY DESTINATION .)
-# The addon package ships the licenses of the native library it embeds, so the
+# The addon package ships the licenses of the native library it carries, so the
 # install prefix alone is enough to pack it.
 install(
   DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
   DESTINATION licenses)
 if(OHOS)
-  # The OHPM package ships the shared C++ runtime beside the addon, which the
-  # device does not carry.
+  # The OHPM package supplies the same C API to the addon and the host's own
+  # native modules, with the C++ runtime that the device does not carry.
   install(
-    FILES "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
+    FILES "${MLN_FFI_NATIVE_LIBRARY}"
+    "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
     DESTINATION .)
+  install(DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/include/" DESTINATION include)
 endif()
 
 # The suite's graphics objects come from the native build's test graphics

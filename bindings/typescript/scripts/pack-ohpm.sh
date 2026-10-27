@@ -6,9 +6,9 @@
 # A user installs one package, such as @maplibre/native-ffi-opengl. OHPM has
 # no per-platform packages, so a backend's HAR holds the files in ohpm/package,
 # the manifest in ohpm/oh-package.json, the bundled ArkTS entry, and, for each
-# ABI that a preset names, the addon and the shared C++ runtime that the build
-# task installed. Every package takes the same version, 0.0.0 unless --version
-# names one.
+# ABI that a preset names, the addon, shared C library, and shared C++ runtime
+# that the build task installed. The C headers live under include/. Every
+# package takes the same version, 0.0.0 unless --version names one.
 set -euo pipefail
 
 usage="usage: pack-ohpm.sh [--version <version>] <out dir> <preset>..."
@@ -59,12 +59,13 @@ for preset in "$@"; do
       https://github.com/maplibre/maplibre-native-ffi/releases/tag "$version" \
       >>"$package/CHANGELOG.md"
   fi
-  # Every preset embeds the same native library, with the same licenses.
+  # Every ABI of a backend carries the same headers and licenses.
   install="$binding/native/build/$preset/install"
   mkdir -p "$package/libs/$abi"
-  cp "$install/libmaplibre_native_ffi.so" "$install/libc++_shared.so" \
+  cp "$install/libmaplibre_native_ffi.so" "$install/libmaplibre-native-c.so" \
+    "$install/libc++_shared.so" \
     "$package/libs/$abi/"
-  cp -R "$install/licenses" "$package/"
+  cp -R "$install/include" "$install/licenses" "$package/"
 done
 
 for package in "$staging"/*/package; do
