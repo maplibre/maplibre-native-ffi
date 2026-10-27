@@ -27,6 +27,8 @@
       "toolchainFile": "${fileDir}/cmake/toolchains/zig.cmake",
       "cacheVariables": {
         "MLN_FFI_TARGET_ARCHITECTURE": "x64",
+        "MLN_FFI_TARGET_PLATFORM": "linux-gnu-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-gnu",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
       }
@@ -38,6 +40,8 @@
       "toolchainFile": "${fileDir}/cmake/toolchains/zig.cmake",
       "cacheVariables": {
         "MLN_FFI_TARGET_ARCHITECTURE": "arm64",
+        "MLN_FFI_TARGET_PLATFORM": "linux-gnu-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-gnu",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
       }
@@ -48,6 +52,8 @@
       "inherits": "_linux-x64",
       "cacheVariables": {
         "MLN_FFI_ZIG_LIBC": "musl",
+        "MLN_FFI_TARGET_PLATFORM": "linux-musl-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-linux-musl",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-musl"
       }
     },
@@ -57,6 +63,8 @@
       "inherits": "_linux-arm64",
       "cacheVariables": {
         "MLN_FFI_ZIG_LIBC": "musl",
+        "MLN_FFI_TARGET_PLATFORM": "linux-musl-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-linux-musl",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-musl"
       }
     },
@@ -68,6 +76,8 @@
       "cacheVariables": {
         "MLN_FFI_TARGET_ARCHITECTURE": "x64",
         "MLN_FFI_ZIG_OS": "freebsd",
+        "MLN_FFI_TARGET_PLATFORM": "freebsd-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-freebsd",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-freebsd",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
       }
@@ -81,6 +91,8 @@
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "CMAKE_OSX_DEPLOYMENT_TARGET": "14.3",
         "CMAKE_OSX_SYSROOT": "macosx",
+        "MLN_FFI_TARGET_PLATFORM": "macos-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-macos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-darwin",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
       }
@@ -94,6 +106,8 @@
         "CMAKE_SYSTEM_NAME": "iOS",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
+        "MLN_FFI_TARGET_PLATFORM": "ios-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-ios",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
       }
     },
@@ -106,6 +120,8 @@
         "CMAKE_SYSTEM_NAME": "tvOS",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
+        "MLN_FFI_TARGET_PLATFORM": "tvos-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-tvos",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
       }
     },
@@ -118,6 +134,8 @@
         "CMAKE_SYSTEM_NAME": "visionOS",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "CMAKE_OSX_DEPLOYMENT_TARGET": "1.0",
+        "MLN_FFI_TARGET_PLATFORM": "visionos-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-visionos",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
       }
     },
@@ -139,6 +157,8 @@
       "inherits": "_android",
       "cacheVariables": {
         "ANDROID_ABI": "armeabi-v7a",
+        "MLN_FFI_TARGET_PLATFORM": "android-arm",
+        "MLN_FFI_ZIG_TARGET": "arm-linux-android.24",
         "MLN_FFI_RUST_TARGET": "armv7-linux-androideabi"
       }
     },
@@ -148,6 +168,8 @@
       "inherits": "_android",
       "cacheVariables": {
         "ANDROID_ABI": "arm64-v8a",
+        "MLN_FFI_TARGET_PLATFORM": "android-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-linux-android.24",
         "MLN_FFI_RUST_TARGET": "aarch64-linux-android"
       }
     },
@@ -157,6 +179,8 @@
       "inherits": "_android",
       "cacheVariables": {
         "ANDROID_ABI": "x86_64",
+        "MLN_FFI_TARGET_PLATFORM": "android-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-linux-android.24",
         "MLN_FFI_RUST_TARGET": "x86_64-linux-android"
       }
     },
@@ -166,6 +190,8 @@
       "inherits": "_single-config",
       "toolchainFile": "${fileDir}/cmake/toolchains/emscripten.cmake",
       "cacheVariables": {
+        "MLN_FFI_TARGET_PLATFORM": "emscripten-wasm32",
+        "MLN_FFI_ZIG_TARGET": "wasm32-emscripten",
         "MLN_FFI_RUST_TARGET": "wasm32-unknown-emscripten",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "webgpu"
       }
@@ -179,6 +205,8 @@
         "OHOS_ARCH": "arm64-v8a",
         "OHOS_STL": "c++_shared",
         "MLN_FFI_ENABLE_CLANG_TIDY": false,
+        "MLN_FFI_TARGET_PLATFORM": "ohos-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-linux-ohos",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-ohos",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
       }
@@ -192,6 +220,8 @@
         "OHOS_ARCH": "x86_64",
         "OHOS_STL": "c++_shared",
         "MLN_FFI_ENABLE_CLANG_TIDY": false,
+        "MLN_FFI_TARGET_PLATFORM": "ohos-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-linux-ohos",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-ohos",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
       }
@@ -216,6 +246,8 @@
         "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
         "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
         "MLN_FFI_TARGET_ARCHITECTURE": "x64",
+        "MLN_FFI_TARGET_PLATFORM": "windows-x64",
+        "MLN_FFI_ZIG_TARGET": "x86_64-windows-msvc",
         "MLN_FFI_RUST_TARGET": "x86_64-pc-windows-msvc"
       }
     },
@@ -227,6 +259,8 @@
         "CMAKE_C_COMPILER_TARGET": "aarch64-pc-windows-msvc",
         "CMAKE_CXX_COMPILER_TARGET": "aarch64-pc-windows-msvc",
         "MLN_FFI_TARGET_ARCHITECTURE": "arm64",
+        "MLN_FFI_TARGET_PLATFORM": "windows-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-windows-msvc",
         "MLN_FFI_RUST_TARGET": "aarch64-pc-windows-msvc"
       }
     },
@@ -359,6 +393,8 @@
       "inherits": ["_ios-arm64", "_metal"],
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "iphonesimulator",
+        "MLN_FFI_TARGET_PLATFORM": "ios-simulator-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-ios-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-ios-sim"
       }
     },
@@ -368,6 +404,8 @@
       "inherits": ["_ios-arm64", "_metal"],
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "macosx",
+        "MLN_FFI_TARGET_PLATFORM": "ios-maccatalyst-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-maccatalyst",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-ios-macabi"
       }
     },
@@ -395,6 +433,8 @@
       "inherits": ["_tvos-arm64", "_metal"],
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "appletvsimulator",
+        "MLN_FFI_TARGET_PLATFORM": "tvos-simulator-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-tvos-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-tvos-sim"
       }
     },
@@ -404,6 +444,8 @@
       "inherits": ["_visionos-arm64", "_metal"],
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "xrsimulator",
+        "MLN_FFI_TARGET_PLATFORM": "visionos-simulator-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-visionos-simulator",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-visionos-sim"
       }
     },

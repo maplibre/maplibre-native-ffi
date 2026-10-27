@@ -258,10 +258,6 @@ function(mln_ffi_install_c_api_library target)
   if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
   endif()
-  get_target_property(MLN_FFI_ZIG_TARGET mln_ffi_platform_dependencies
-                      MLN_FFI_ZIG_TARGET)
-  get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
-                      MLN_FFI_TARGET_PLATFORM)
   set(MLN_FFI_ANDROID_ABI_ENTRY "")
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(MLN_FFI_ANDROID_ABI_ENTRY "\n  \"androidAbi\": \"${ANDROID_ABI}\",")

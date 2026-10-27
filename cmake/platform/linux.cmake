@@ -153,28 +153,6 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_TEST_SUPPORTED
       TRUE)
   mln_ffi_configure_linux_archive_contents(${target})
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-    set(target_architecture arm64)
-    set(zig_architecture aarch64)
-  else()
-    set(target_architecture x64)
-    set(zig_architecture x86_64)
-  endif()
-  if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-    set(target_platform "freebsd-${target_architecture}")
-    set(zig_target "${zig_architecture}-freebsd")
-  elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl")
-    set(target_platform "linux-musl-${target_architecture}")
-    set(zig_target "${zig_architecture}-linux-musl")
-  else()
-    set(target_platform "linux-gnu-${target_architecture}")
-    set(zig_target "${zig_architecture}-linux-gnu")
-  endif()
-  set_target_properties(
-    ${target}
-    PROPERTIES
-      MLN_FFI_TARGET_PLATFORM "${target_platform}" MLN_FFI_ZIG_TARGET
-      "${zig_target}")
 endfunction()
 
 function(mln_ffi_configure_platform target)

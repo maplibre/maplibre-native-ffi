@@ -29,6 +29,14 @@ function(mln_ffi_configure_options)
     CACHE MLN_FFI_DEFAULT_RENDER_BACKEND
     PROPERTY STRINGS metal opengl vulkan webgpu)
   set(MLN_FFI_RUST_TARGET "" CACHE STRING "Rust target triple for this build")
+  set(MLN_FFI_TARGET_PLATFORM ""
+      CACHE STRING "Platform name that bindings match this artifact by")
+  set(MLN_FFI_ZIG_TARGET "" CACHE STRING "Zig target triple for this build")
+  foreach(variable IN ITEMS MLN_FFI_TARGET_PLATFORM MLN_FFI_ZIG_TARGET)
+    if(NOT ${variable})
+      message(FATAL_ERROR "The build needs ${variable}, which the preset sets")
+    endif()
+  endforeach()
 
   string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
   string(TOLOWER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"

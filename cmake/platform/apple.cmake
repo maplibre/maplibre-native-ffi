@@ -83,64 +83,17 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_STATIC_ARCHIVES
       mbgl-vendor-icu)
 
-  mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
-  mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
-        MLN_FFI_TEST_SUPPORTED TRUE)
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    if(MLN_FFI_APPLE_MACCATALYST)
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM ios-maccatalyst-arm64 MLN_FFI_ZIG_TARGET
-          aarch64-maccatalyst MLN_FFI_TEST_SUPPORTED TRUE)
-    elseif(MLN_FFI_APPLE_SIMULATOR)
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM ios-simulator-arm64 MLN_FFI_ZIG_TARGET
-          aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
-    else()
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM ios-arm64 MLN_FFI_ZIG_TARGET aarch64-ios
-          MLN_FFI_TEST_SUPPORTED FALSE)
-    endif()
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
-    if(MLN_FFI_APPLE_SIMULATOR)
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM tvos-simulator-arm64 MLN_FFI_ZIG_TARGET
-          aarch64-tvos-simulator MLN_FFI_TEST_SUPPORTED TRUE)
-    else()
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM tvos-arm64 MLN_FFI_ZIG_TARGET aarch64-tvos
-          MLN_FFI_TEST_SUPPORTED FALSE)
-    endif()
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
-    if(MLN_FFI_APPLE_SIMULATOR)
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM visionos-simulator-arm64 MLN_FFI_ZIG_TARGET
-          aarch64-visionos-simulator MLN_FFI_TEST_SUPPORTED TRUE)
-    else()
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_TARGET_PLATFORM visionos-arm64 MLN_FFI_ZIG_TARGET
-          aarch64-visionos MLN_FFI_TEST_SUPPORTED FALSE)
-    endif()
-  else()
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|iOS|tvOS|visionOS)$")
     message(FATAL_ERROR "Unsupported Apple platform: ${CMAKE_SYSTEM_NAME}")
+  endif()
+  # The host runs the suite for macOS, Mac Catalyst, and simulators, but not
+  # for devices.
+  mln_ffi_apple_is_embedded(MLN_FFI_APPLE_EMBEDDED)
+  mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
+  if(MLN_FFI_APPLE_EMBEDDED AND NOT MLN_FFI_APPLE_SIMULATOR)
+    set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED FALSE)
+  else()
+    set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED TRUE)
   endif()
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
