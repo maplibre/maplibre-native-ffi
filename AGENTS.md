@@ -63,8 +63,10 @@ change MapLibre Native's code: add it to an issue yourself when the engine
 causes the bug or lacks the capability.
 
 PR titles follow Conventional Commits, since they become the squash-merge commit
-message. Write a short title and description for a reviewer who will read the
-diff. Say what the diff, its doc comments, and CI can't:
+message. Mark a title breaking only for a change to a user-facing contract,
+never for tooling, tests, or CI. Write a short title and description for a
+reviewer who will read the diff. Say what the diff, its doc comments, and CI
+can't:
 
 - Open with the problem and what users can now do, or what maintainers gain.
 - Show one small example of new API, or a bug's trigger with before and after.
