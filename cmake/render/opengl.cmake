@@ -51,6 +51,21 @@ function(mln_ffi_configure_render_dependencies target)
         INTERFACE
           "${MLN_FFI_EGL_LIBRARY}" "${MLN_FFI_GLES_LIBRARY}" ${CMAKE_DL_LIBS})
     else()
+      # The host's EGL and GLES headers share an include directory with its
+      # libc, whose headers would shadow the target's in a cross build, so only
+      # the Khronos directories are staged for FindOpenGL to find.
+      find_path(MLN_FFI_HOST_EGL_INCLUDE_DIR EGL/egl.h REQUIRED)
+      set(MLN_FFI_GL_INCLUDE_DIR "${CMAKE_BINARY_DIR}/khronos-include")
+      file(MAKE_DIRECTORY "${MLN_FFI_GL_INCLUDE_DIR}")
+      foreach(MLN_FFI_GL_HEADER_DIR EGL GLES3 KHR)
+        file(
+          CREATE_LINK "${MLN_FFI_HOST_EGL_INCLUDE_DIR}/${MLN_FFI_GL_HEADER_DIR}"
+          "${MLN_FFI_GL_INCLUDE_DIR}/${MLN_FFI_GL_HEADER_DIR}" SYMBOLIC)
+      endforeach()
+      set(OPENGL_EGL_INCLUDE_DIR "${MLN_FFI_GL_INCLUDE_DIR}"
+          CACHE PATH "" FORCE)
+      set(OPENGL_GLES3_INCLUDE_DIR "${MLN_FFI_GL_INCLUDE_DIR}"
+          CACHE PATH "" FORCE)
       find_package(OpenGL REQUIRED COMPONENTS EGL GLES3)
       # Headers only, for the same reason as the branch above. Linking these had
       # reached no shipped binary either, but only because the GNU linker drops
