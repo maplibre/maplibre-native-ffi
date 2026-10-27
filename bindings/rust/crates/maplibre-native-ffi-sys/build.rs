@@ -117,68 +117,45 @@ fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
     }
 }
 
-/// Resolves a local build, which is either an install prefix or a directory
-/// holding installs one level down, such as a CMake build root.
+/// Checks the install prefix of a local build, which serves one target with its
+/// own backend unless a feature selects another.
 fn local_prefix(
-    directory: &Path,
+    prefix: &Path,
     target: &str,
     backend: Option<&str>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     // A relative path would resolve against this crate's own directory, which
     // the consumer neither chooses nor sees.
-    if !directory.is_absolute() {
+    if !prefix.is_absolute() {
         return Err(format!(
             "{LOCAL_BUILD_ENV} must be an absolute path; found {}. To set a path relative to \
              the workspace, use `relative = true` in the [env] table of .cargo/config.toml.",
-            directory.display()
+            prefix.display()
         )
         .into());
     }
-    if directory.join(DESCRIPTOR_PATH).is_file() {
-        // A prefix serves one target, so a build for several targets names a
-        // directory of installs instead. Only a selected backend can conflict;
-        // without one, the prefix's own backend serves.
-        let identity = read_identity(directory);
-        if !identity.serves(target, backend.or(identity.render_backend.as_deref())) {
-            return Err(format!(
-                "{LOCAL_BUILD_ENV} names an install prefix built for {} {}, which cannot serve \
-                 {}",
-                identity.rust_target.unwrap_or_default(),
-                identity.render_backend.unwrap_or_default(),
-                request(target, backend)
-            )
-            .into());
-        }
-        return Ok(directory.to_path_buf());
+    if !prefix.join(DESCRIPTOR_PATH).is_file() {
+        return Err(format!(
+            "{LOCAL_BUILD_ENV} names {}, which is not an install prefix because it lacks \
+             {DESCRIPTOR_PATH}",
+            prefix.display()
+        )
+        .into());
     }
-
-    // Without a selected backend only the target's default serves, so building
-    // another backend beside it never changes the answer.
-    let matches: Vec<PathBuf> = installs(directory)?
-        .into_iter()
-        .filter(|prefix| read_identity(prefix).serves(target, backend))
-        .collect();
-    match matches.as_slice() {
-        [prefix] => Ok(prefix.clone()),
-        [] => Err(format!(
-            "{LOCAL_BUILD_ENV} names {}, which holds no install for {}. Build it, or enable \
-             another backend feature.",
-            directory.display(),
+    let descriptor = read_descriptor(prefix)?;
+    if descriptor.rust_target != target
+        || backend.is_some_and(|backend| backend != descriptor.render_backend)
+    {
+        return Err(format!(
+            "{LOCAL_BUILD_ENV} names an install prefix built for {} with the {} backend, which \
+             cannot serve {}",
+            descriptor.rust_target,
+            descriptor.render_backend,
             request(target, backend)
         )
-        .into()),
-        prefixes => Err(format!(
-            "{LOCAL_BUILD_ENV} names {}, which holds several installs for {}; name one of them \
-             instead:{}",
-            directory.display(),
-            request(target, backend),
-            prefixes
-                .iter()
-                .map(|prefix| format!("\n  {}", prefix.display()))
-                .collect::<String>()
-        )
-        .into()),
+        .into());
     }
+    Ok(prefix.to_path_buf())
 }
 
 /// Describes a request for `target` with the `backend` selected for it.
@@ -189,60 +166,29 @@ fn request(target: &str, backend: Option<&str>) -> String {
     }
 }
 
-/// The install prefixes one level down: each `<name>/install` of a CMake build
-/// root, and each `<name>` that is itself a prefix, such as an unpacked
-/// release archive.
-fn installs(directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let entries = fs::read_dir(directory).map_err(|error| {
-        format!(
-            "{LOCAL_BUILD_ENV} names {}, which cannot be read: {error}",
-            directory.display()
-        )
-    })?;
-    let mut prefixes = Vec::new();
-    for entry in entries {
-        let path = entry?.path();
-        for prefix in [path.join("install"), path] {
-            if prefix.join(DESCRIPTOR_PATH).is_file() {
-                prefixes.push(prefix);
-            }
-        }
-    }
-    prefixes.sort();
-    Ok(prefixes)
-}
-
 /// The descriptor fields that choose an install, which a release pin's
 /// artifact index repeats for each archive.
-#[derive(Default, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Identity {
-    rust_target: Option<String>,
-    render_backend: Option<String>,
-    default_backend: Option<String>,
+    rust_target: String,
+    render_backend: String,
+    default_backend: String,
 }
 
 impl Identity {
     /// Whether this serves `target` with the `backend` selected for it, or
     /// without one, with the target's default backend.
     fn serves(&self, target: &str, backend: Option<&str>) -> bool {
-        self.rust_target.as_deref() == Some(target)
-            && self.render_backend.is_some()
-            && self.render_backend.as_deref() == backend.or(self.default_backend.as_deref())
+        self.rust_target == target
+            && self.render_backend == backend.unwrap_or(&self.default_backend)
     }
-}
-
-/// Reads an install's identity, which lacks every field it cannot read.
-fn read_identity(prefix: &Path) -> Identity {
-    fs::read_to_string(prefix.join(DESCRIPTOR_PATH))
-        .ok()
-        .and_then(|contents| serde_json::from_str(&contents).ok())
-        .unwrap_or_default()
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArtifactDescriptor {
+    rust_target: String,
     render_backend: String,
     static_link_libraries: Vec<String>,
     static_link_frameworks: Vec<String>,

@@ -64,25 +64,20 @@ const Install = struct {
     descriptor: ArtifactDescriptor,
 };
 
-/// Reads the install at `prefix`, or returns null if it has no artifact
-/// descriptor or one that lacks a field the lookup matches on.
-fn readInstall(b: *std.Build, prefix: []const u8) ?Install {
+/// Reads the install prefix that -Dlocal-build names, and rebuilds when its
+/// descriptor changes.
+fn localInstall(b: *std.Build, prefix: []const u8) Install {
+    // A relative path would reach the run-time search path as written.
+    if (!std.fs.path.isAbsolute(prefix)) std.debug.panic("-Dlocal-build must be an absolute path; found {s}", .{prefix});
     const path = b.pathJoin(&.{ prefix, descriptor_sub_path });
     const contents = std.Io.Dir.cwd().readFileAlloc(b.graph.io, path, b.allocator, .limited(4096)) catch |err| switch (err) {
-        error.FileNotFound, error.NotDir => return null,
+        error.FileNotFound, error.NotDir => std.debug.panic("-Dlocal-build names {s}, which is not an install prefix because it lacks {s}", .{ prefix, descriptor_sub_path }),
         else => std.debug.panic("failed to read {s}: {t}", .{ path, err }),
     };
-    const parsed = std.json.parseFromSlice(ArtifactDescriptor, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch |err| switch (err) {
-        error.MissingField => return null,
-        else => std.debug.panic("invalid native artifact descriptor: {s}", .{path}),
-    };
+    const parsed = std.json.parseFromSlice(ArtifactDescriptor, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch
+        std.debug.panic("invalid native artifact descriptor: {s}", .{path});
+    b.dependOnFileContents(.{ .cwd_relative = path });
     return .{ .prefix = prefix, .descriptor = parsed.value };
-}
-
-/// Rebuilds when the chosen install's descriptor changes. Only the chosen
-/// install counts, so a new build beside it changes no answer.
-fn trackInstall(b: *std.Build, install: Install) void {
-    b.dependOnFileContents(.{ .cwd_relative = b.pathJoin(&.{ install.prefix, descriptor_sub_path }) });
 }
 
 /// The target that an artifact's Zig target names. An Android API level
@@ -103,8 +98,7 @@ fn servesTarget(descriptor: ArtifactDescriptor, target: std.Target) bool {
 }
 
 /// Whether an artifact has the selected backend, or with none selected, its
-/// platform's default backend. Never "the only candidate", so building another
-/// backend can't change the answer to an unchanged request.
+/// platform's default backend.
 fn servesBackend(descriptor: ArtifactDescriptor, backend: ?RenderBackend) bool {
     const wanted = if (backend) |selected| @tagName(selected) else descriptor.defaultBackend;
     return std.mem.eql(u8, descriptor.renderBackend, wanted);
@@ -130,76 +124,6 @@ fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.Resolv
         artifact_target.os.tag == host.os.tag and
         artifact_target.abi == host.abi;
     return b.standardTargetOptions(.{ .default_target = if (native_host) .{} else artifact_query });
-}
-
-/// The installs one level below `directory`, at `<name>/install` or `<name>`.
-fn installsBelow(b: *std.Build, directory: []const u8) []const Install {
-    const io = b.graph.io;
-    var dir = std.Io.Dir.cwd().openDir(io, directory, .{ .iterate = true }) catch |err|
-        std.debug.panic("failed to open -Dlocal-build {s}: {t}", .{ directory, err });
-    defer dir.close(io);
-    var installs: std.ArrayList(Install) = .empty;
-    var entries = dir.iterate();
-    while (entries.next(io) catch |err| std.debug.panic("failed to list {s}: {t}", .{ directory, err })) |entry| {
-        if (entry.kind != .directory and entry.kind != .sym_link) continue;
-        const child = b.pathJoin(&.{ directory, entry.name });
-        for ([_][]const u8{ b.pathJoin(&.{ child, "install" }), child }) |prefix| {
-            const install = readInstall(b, prefix) orelse continue;
-            installs.append(b.allocator, install) catch @panic("OOM");
-        }
-    }
-    std.mem.sort(Install, installs.items, {}, struct {
-        fn lessThan(_: void, lhs: Install, rhs: Install) bool {
-            return std.mem.lessThan(u8, lhs.prefix, rhs.prefix);
-        }
-    }.lessThan);
-    return installs.items;
-}
-
-/// Resolves a local build, which is either an install prefix or a directory
-/// holding installs one level down, such as a CMake build root.
-fn localInstall(
-    b: *std.Build,
-    directory: []const u8,
-    prefix_install: ?Install,
-    target: std.Target,
-    backend: ?RenderBackend,
-) Install {
-    if (prefix_install) |install| {
-        // A prefix serves one target, so a build for several targets names a
-        // directory of installs instead. Only a selected backend can
-        // conflict; without one, the prefix's own backend serves.
-        const descriptor = install.descriptor;
-        if (!servesTarget(descriptor, target) or (backend != null and !servesBackend(descriptor, backend))) {
-            std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
-                descriptor.artifact,
-                requestName(b, target, backend),
-            });
-        }
-        trackInstall(b, install);
-        return install;
-    }
-
-    var matches: std.ArrayList(u8) = .empty;
-    var chosen: ?Install = null;
-    var count: usize = 0;
-    for (installsBelow(b, directory)) |install| {
-        if (!servesTarget(install.descriptor, target) or !servesBackend(install.descriptor, backend)) continue;
-        matches.print(b.allocator, "\n  {s}", .{install.prefix}) catch @panic("OOM");
-        chosen = install;
-        count += 1;
-    }
-    if (count > 1) std.debug.panic("-Dlocal-build names {s}, which holds several installs for {s}:{s}\nRemove all but one, or name one install prefix with -Dlocal-build.", .{
-        directory,
-        requestName(b, target, backend),
-        matches.items,
-    });
-    const install = chosen orelse std.debug.panic("-Dlocal-build names {s}, which holds no install for {s}. Build it, or select another backend with -Dbackend.", .{
-        directory,
-        requestName(b, target, backend),
-    });
-    trackInstall(b, install);
-    return install;
 }
 
 /// The release archive for the request, which the published package declares
@@ -235,13 +159,8 @@ fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) s
 /// the native library they select: from the local build if one is named, and
 /// otherwise from the release that the package was published with.
 fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
-    const local_dir = if (local_build) |path| configurePath(b, path) else null;
-    if (local_dir) |dir| {
-        // A relative path would reach the run-time search path as written.
-        if (!std.fs.path.isAbsolute(dir)) std.debug.panic("-Dlocal-build must be an absolute path; found {s}", .{dir});
-    }
-    const prefix_install = if (local_dir) |dir| readInstall(b, dir) else null;
-    const target = targetOption(b, if (prefix_install) |install| install.descriptor else null);
+    const local = if (local_build) |path| localInstall(b, configurePath(b, path)) else null;
+    const target = targetOption(b, if (local) |install| install.descriptor else null);
     switch (target.result.os.tag) {
         .ios, .tvos, .visionos => @panic("The Zig binding does not support iOS, tvOS, or visionOS targets, including simulators"),
         .emscripten => @panic("The Zig binding does not support Emscripten"),
@@ -253,9 +172,17 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
         "Render backend. Defaults to the target's default, which the native artifact names.",
     );
 
-    const prefix: std.Build.LazyPath, const descriptor = if (local_dir) |dir| local: {
-        const install = localInstall(b, dir, prefix_install, target.result, selected_backend);
-        break :local .{ .{ .cwd_relative = install.prefix }, install.descriptor };
+    const prefix: std.Build.LazyPath, const descriptor = if (local) |install| local: {
+        // A prefix serves one target, with its own backend unless one is
+        // selected.
+        const descriptor = install.descriptor;
+        if (!servesTarget(descriptor, target.result) or (selected_backend != null and !servesBackend(descriptor, selected_backend))) {
+            std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
+                descriptor.artifact,
+                requestName(b, target.result, selected_backend),
+            });
+        }
+        break :local .{ .{ .cwd_relative = install.prefix }, descriptor };
     } else publishedNative(b, target.result, selected_backend);
     return .{
         .prefix = prefix,
@@ -269,7 +196,7 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
 /// this repository that depends on this package by path.
 pub fn localNative(b: *std.Build) Native {
     const local_build = localBuildOption(b) orelse
-        @panic("missing required -Dlocal-build=<install prefix or build root>");
+        @panic("missing required -Dlocal-build=<install prefix>");
     return resolveNative(b, local_build);
 }
 
@@ -277,7 +204,7 @@ fn localBuildOption(b: *std.Build) ?std.Build.LazyPath {
     return b.option(
         std.Build.LazyPath,
         "local-build",
-        "Absolute path to a native install prefix, or to a directory holding installs one level down, such as a CMake build root",
+        "Absolute path to a native install prefix",
     );
 }
 
