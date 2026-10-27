@@ -77,6 +77,8 @@ vcpkg_extract_source_archive(source ARCHIVE "${download}")
 file(INSTALL "${source}/" DESTINATION "${CURRENT_PACKAGES_DIR}")
 file(RENAME "${CURRENT_PACKAGES_DIR}/share/maplibre-native-c/LICENSE"
             "${CURRENT_PACKAGES_DIR}/share/maplibre-native-c/copyright")
+file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage"
+     DESTINATION "${CURRENT_PACKAGES_DIR}/share/maplibre-native-c")
 """
 USAGE = """\
 Select exactly one feature: opengl, metal, or vulkan. Available archives cover
