@@ -90,13 +90,13 @@ ninja = "1.13.2"
 # Go, which the Go binding and example use too. devices-cli runs on Linux and
 # macOS only.
 "core:go" = "{{vars.go_version}}"
-"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261027004735-0319096a0e57", os = [
+"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261027012014-caddba712662", os = [
   "linux",
   "macos",
 ] }
 sccache = "0.18.0"
 # The FreeBSD suites run in a FreeBSD virtual machine that this QEMU launcher
-# boots on a Linux host. See scripts/boot-freebsd-vm.sh.
+# boots on a Linux host. See tools/devices/freebsd-host.
 "http:anyvm" = { version = "0.7.5", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5", os = [
   "linux",
 ] }
@@ -414,14 +414,6 @@ if [[ -z "$usage_sdk_root" ]]; then
 fi
 bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
-
-[tasks."freebsd-vm:boot"]
-description = "Boot this checkout's FreeBSD virtual machine, or reuse it, and wait until it is ready."
-run = '"$MISE_MONOREPO_ROOT/scripts/boot-freebsd-vm.sh"'
-
-[tasks."freebsd-vm:stop"]
-description = "Shut down this checkout's FreeBSD virtual machine."
-run = '"$MISE_MONOREPO_ROOT/scripts/stop-freebsd-vm.sh"'
 
 [tasks.check]
 tools = { "core:dart" = "{{vars.dart_version}}" }

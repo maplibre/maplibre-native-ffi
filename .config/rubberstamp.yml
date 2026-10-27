@@ -228,6 +228,8 @@ ci:
             files:
               - cmake/mln_ffi_rust.cmake
               - cmake/toolchains/zig.cmake
+              - scripts/run-freebsd-test.sh
+              - tools/devices/freebsd-host
               - third_party/maplibre-native
           then: apply
     macos:

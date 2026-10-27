@@ -994,7 +994,7 @@ jobs:
         run: mise run build freebsd-x64-egl
       - name: Boot FreeBSD virtual machine
         id: boot
-        run: mise run //:freebsd-vm:boot
+        run: mise exec -- tools/devices/freebsd-host
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test freebsd-x64-egl
@@ -1042,7 +1042,7 @@ jobs:
         run: mise run build freebsd-x64-vulkan
       - name: Boot FreeBSD virtual machine
         id: boot
-        run: mise run //:freebsd-vm:boot
+        run: mise exec -- tools/devices/freebsd-host
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test freebsd-x64-vulkan

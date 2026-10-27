@@ -18,6 +18,7 @@ INFRASTRUCTURE_STEPS = {
     "Resolve Swift packages",
     "Boot Android emulator",
     "Boot OpenHarmony emulator",
+    "Boot FreeBSD virtual machine",
     "Boot iOS simulator",
     "Boot tvOS simulator",
     "Boot visionOS simulator",

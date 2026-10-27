@@ -208,7 +208,10 @@ def device_boot(preset: str) -> tuple[str, str] | None:
     if target_platform == "ohos" and preset in EMULATOR_TESTED:
         return "Boot OpenHarmony emulator", "mise exec -- tools/devices/ohos-key"
     if target_platform == "freebsd":
-        return "Boot FreeBSD virtual machine", "mise run //:freebsd-vm:boot"
+        return (
+            "Boot FreeBSD virtual machine",
+            "mise exec -- tools/devices/freebsd-host",
+        )
     if target_platform == "ios-simulator":
         return "Boot iOS simulator", "mise exec -- devices-cli get ios"
     if target_platform == "visionos-simulator":

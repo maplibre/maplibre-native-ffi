@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs a FreeBSD test executable in this checkout's FreeBSD virtual machine,
 # where the dynamic loader and graphics implementation share the ABI that the
-# executable targets. See scripts/boot-freebsd-vm.sh.
+# executable targets. See tools/devices/freebsd-host.
 set -euo pipefail
 
 preset=${1:?usage: run-freebsd-test.sh <preset> [executable [arguments...]]}
@@ -30,8 +30,7 @@ case "$preset" in
     ;;
 esac
 
-"$MISE_MONOREPO_ROOT/scripts/boot-freebsd-vm.sh" >&2
-host=$("$MISE_MONOREPO_ROOT/scripts/freebsd-vm-host.sh")
+host=$("$MISE_MONOREPO_ROOT/tools/devices/freebsd-host")
 
 # ssh joins its arguments into one command line for the remote shell, so each
 # one is quoted for that shell.
