@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Generate pdoc HTML API reference for the Python binding."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":_install", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+rm -rf build/pdoc
+mkdir -p build/pdoc
+# Pass public submodules explicitly: package __all__ is a reexport list, so
+# pdoc's walker would otherwise omit the generated API page.
+modules="$(
+  uv run --project . --group docs --no-sync python -c '
+import maplibre_native_ffi
+import pkgutil
+
+names = ["maplibre_native_ffi"]
+for module in pkgutil.iter_modules(maplibre_native_ffi.__path__):
+  if not module.name.startswith("_"):
+    names.append(f"maplibre_native_ffi.{module.name}")
+print(" ".join(names))
+'
+)"
+# shellcheck disable=SC2086 # Each module is its own argument.
+uv run --project . --group docs --no-sync pdoc $modules -o build/pdoc

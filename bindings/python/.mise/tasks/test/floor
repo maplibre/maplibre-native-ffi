@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Run the Python suite on the oldest supported Python."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":_install", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+# The default interpreter is the newest Python. This runs the suite against the
+# same wheels on the oldest Python that requires-python admits.
+venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-floor"
+uv venv --quiet --allow-existing --python 3.12 "$venv"
+uv pip install --quiet --python "$venv" "pytest>=9,<10"
+uv pip install --quiet --python "$venv" --reinstall --no-index dist/*.whl
+python="$venv/bin/python"
+# A venv on Windows keeps its interpreter under Scripts.
+[[ -x "$python" ]] || python="$venv/Scripts/python.exe"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  "$python" -m pytest

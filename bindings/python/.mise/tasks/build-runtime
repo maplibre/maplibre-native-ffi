@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#MISE description="Build the runtime wheel for a preset's render backend into dist/."
+#MISE extends="ffi:preset"
+#MISE shell="bash"
+set -euo pipefail
+
+# The extension embeds the native archive, so a wheel carries one binary and
+# needs no repair. On Linux the link goes through zig: the archive is built
+# against the glibc in cmake/toolchains/zig.cmake, and the host's linker
+# would bind its libm references to the build machine's glibc instead.
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
+  "$install_dir/share/maplibre-native-c/artifact.json")
+if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
+  echo "No Python runtime serves the backend of $usage_preset." >&2
+  exit 2
+fi
+maturin_flags=()
+if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
+# Zig links a musl target against its own musl, so the wheel takes a
+# musllinux tag and needs no repair either.
+case "$usage_preset" in
+  linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
+  linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
+esac
+cd "runtimes/$backend"
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$install_dir" \
+  uv run --project ../.. --no-sync maturin build --release --out ../../dist \
+  ${maturin_flags[@]+"${maturin_flags[@]}"}

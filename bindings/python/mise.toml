@@ -2,34 +2,6 @@
 description = "Build the API wheel, which holds the Python modules, into dist/."
 run = "uv build --wheel --out-dir dist ."
 
-# The extension embeds the native archive, so a wheel carries one binary and
-# needs no repair. On Linux the link goes through zig: the archive is built
-# against the glibc in cmake/toolchains/zig.cmake, and the host's linker
-# would bind its libm references to the build machine's glibc instead.
-[tasks.build-runtime]
-description = "Build the runtime wheel for a preset's render backend into dist/."
-extends = "ffi:preset"
-run = '''
-install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
-  "$install_dir/share/maplibre-native-c/artifact.json")
-if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
-  echo "No Python runtime serves the backend of $usage_preset." >&2
-  exit 2
-fi
-maturin_flags=()
-if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
-# Zig links a musl target against its own musl, so the wheel takes a
-# musllinux tag and needs no repair either.
-case "$usage_preset" in
-  linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
-  linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
-esac
-cd "runtimes/$backend"
-MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$install_dir" \
-  uv run --project ../.. --no-sync maturin build --release --out ../../dist "${maturin_flags[@]}"
-'''
-
 [tasks.prepare-release]
 description = "Version and license the API and runtime distributions before their wheels build."
 usage = '''
@@ -42,97 +14,6 @@ if [[ -n "${usage_preset:-}" ]]; then
   prefix=(--prefix "$MISE_MONOREPO_ROOT/build/$usage_preset/install")
 fi
 python3 "$MISE_MONOREPO_ROOT/ci/python_release.py" . "$usage_version" "${prefix[@]}"
-'''
-
-[tasks._install]
-description = "Build and install the API and the preset's runtime for local tests."
-hide = true
-extends = "ffi:preset"
-run = '''
-if [[ "$usage_preset" == android-* ]]; then
-  exit 0
-fi
-# Clear the wheel directory so the install cannot take a stale build.
-rm -rf dist
-mise run --no-deps --skip-deps :build-api
-mise run --no-deps --skip-deps :build-runtime "$usage_preset"
-# A musl extension cannot load into the host's glibc Python, so the test
-# installs the wheels in Alpine instead.
-if [[ "$usage_preset" == linux-musl-* ]]; then
-  exit 0
-fi
-# Another preset's runtime would refuse the import beside this one.
-uv pip uninstall --quiet --python "$MISE_MONOREPO_ROOT/.venv" \
-  maplibre-native-ffi-runtime-opengl \
-  maplibre-native-ffi-runtime-metal \
-  maplibre-native-ffi-runtime-vulkan
-uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index dist/*.whl
-'''
-
-[tasks.api]
-description = "Generate pdoc HTML API reference for the Python binding."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":_install", args = ["{{usage.preset}}"] }]
-# Pass public submodules explicitly: package __all__ is a reexport list, so
-# pdoc's walker would otherwise omit the generated API page.
-run = '''
-rm -rf build/pdoc
-mkdir -p build/pdoc
-modules="$(
-  uv run --project . --group docs --no-sync python -c '
-import maplibre_native_ffi
-import pkgutil
-
-names = ["maplibre_native_ffi"]
-for module in pkgutil.iter_modules(maplibre_native_ffi.__path__):
-  if not module.name.startswith("_"):
-    names.append(f"maplibre_native_ffi.{module.name}")
-print(" ".join(names))
-'
-)"
-uv run --project . --group docs --no-sync pdoc $modules -o build/pdoc
-'''
-
-[tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":_install", args = ["{{usage.preset}}"] }]
-run = '''
-if [[ "$usage_preset" == android-* ]]; then
-  exec mise run :_test-android "$usage_preset"
-fi
-if [[ "$usage_preset" == linux-musl-* ]]; then
-  # The image runs the pinned Python. The repository mounts read-only, so
-  # neither pytest nor Python writes beside the tests.
-  # shellcheck disable=SC2016
-  MLN_FFI_MUSL_TEST_IMAGE="python:{{vars.python_version}}-alpine3.24" \
-    exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" sh -euc '
-      python -m venv /tmp/venv
-      /tmp/venv/bin/pip install --quiet --no-cache-dir --disable-pip-version-check "pytest>=9,<10" "$1"/dist/*.whl
-      cd "$1"
-      MAPLIBRE_NATIVE_C_INSTALL_DIR="$2" PYTHONDONTWRITEBYTECODE=1 \
-        exec /tmp/venv/bin/python -m pytest -p no:cacheprovider
-    ' sh "$PWD" "$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-fi
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync python -m pytest
-'''
-
-# The default interpreter is the newest Python. This runs the suite against the
-# same wheels on the oldest Python that requires-python admits.
-[tasks."test:floor"]
-description = "Run the Python suite on the oldest supported Python."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":_install", args = ["{{usage.preset}}"] }]
-run = '''
-venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-floor"
-uv venv --quiet --allow-existing --python 3.12 "$venv"
-uv pip install --quiet --python "$venv" "pytest>=9,<10"
-uv pip install --quiet --python "$venv" --reinstall --no-index dist/*.whl
-python="$venv/bin/python"
-# A venv on Windows keeps its interpreter under Scripts.
-[[ -x "$python" ]] || python="$venv/Scripts/python.exe"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  "$python" -m pytest
 '''
 
 [tasks._test-android]

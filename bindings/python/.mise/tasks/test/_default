@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Test the Python binding against a native preset's install."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":_install", args = ["{{usage.preset}}"] }]
+#MISE env={ MLN_FFI_MUSL_TEST_IMAGE = "python:{{vars.python_version}}-alpine3.24" }
+#MISE shell="bash"
+set -euo pipefail
+
+if [[ "$usage_preset" == android-* ]]; then
+  exec mise run :_test-android "$usage_preset"
+fi
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  # The image runs the pinned Python. The repository mounts read-only, so
+  # neither pytest nor Python writes beside the tests.
+  # shellcheck disable=SC2016
+  exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" sh -euc '
+    python -m venv /tmp/venv
+    /tmp/venv/bin/pip install --quiet --no-cache-dir --disable-pip-version-check "pytest>=9,<10" "$1"/dist/*.whl
+    cd "$1"
+    MAPLIBRE_NATIVE_C_INSTALL_DIR="$2" PYTHONDONTWRITEBYTECODE=1 \
+      exec /tmp/venv/bin/python -m pytest -p no:cacheprovider
+  ' sh "$PWD" "$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+fi
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync python -m pytest

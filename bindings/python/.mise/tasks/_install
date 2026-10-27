@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Build and install the API and the preset's runtime for local tests."
+#MISE hide=true
+#MISE extends="ffi:preset"
+#MISE shell="bash"
+set -euo pipefail
+
+if [[ "$usage_preset" == android-* ]]; then
+  exit 0
+fi
+# Clear the wheel directory so the install cannot take a stale build.
+rm -rf dist
+mise run --no-deps --skip-deps :build-api
+mise run --no-deps --skip-deps :build-runtime "$usage_preset"
+# A musl extension cannot load into the host's glibc Python, so the test
+# installs the wheels in Alpine instead.
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  exit 0
+fi
+# Another preset's runtime would refuse the import beside this one.
+uv pip uninstall --quiet --python "$MISE_MONOREPO_ROOT/.venv" \
+  maplibre-native-ffi-runtime-opengl \
+  maplibre-native-ffi-runtime-metal \
+  maplibre-native-ffi-runtime-vulkan
+uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index dist/*.whl
