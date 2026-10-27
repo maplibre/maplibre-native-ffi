@@ -209,8 +209,10 @@ class NativePackageReleaseTest(unittest.TestCase):
         (sources / "maplibre_native_ffi.zig").write_text("// binding\n")
 
     def write_presets(self, *presets: str) -> None:
+        configure = [{"name": "_base", "hidden": True}]
+        configure += [{"name": name, "inherits": "_base"} for name in presets]
         (self.repository / "CMakePresets.json").write_text(
-            json.dumps({"packagePresets": [{"name": name} for name in presets]})
+            json.dumps({"configurePresets": configure})
         )
 
     def archive(self) -> pathlib.Path:

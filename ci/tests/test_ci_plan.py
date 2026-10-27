@@ -10,8 +10,8 @@ from tools.ci import plan
 from tools.ci.plan import ROOT
 
 
-def presets(*configure: dict, package: tuple[dict, ...] = ()) -> dict:
-    return {"configurePresets": list(configure), "packagePresets": list(package)}
+def presets(*configure: dict) -> dict:
+    return {"configurePresets": list(configure)}
 
 
 def preset(name: str, inherits=None, hidden=False, vendor=None, **variables) -> dict:
@@ -109,18 +109,15 @@ class ResolverTest(unittest.TestCase):
         )
         self.assertEqual(target.backend, "egl")
 
-    def test_a_package_preset_marks_its_configure_preset_packaged(self):
+    def test_a_target_runs_ctest_unless_its_vendor_block_says_not(self):
         source = presets(
-            preset("packaged", vendor=RUNS, **TARGET),
-            preset("unpackaged", vendor=RUNS, **TARGET),
-            package=(
-                {"name": "_package", "hidden": True, "configurePreset": "packaged"},
-                {"name": "packaged", "inherits": "_package"},
-            ),
+            preset("_device", hidden=True, vendor={"ctest": False}),
+            preset("tested", vendor=RUNS, **TARGET),
+            preset("untested", inherits="_device", vendor=RUNS, **TARGET),
         )
         self.assertEqual(
-            [(target.preset, target.package) for target in plan.targets(source)],
-            [("packaged", True), ("unpackaged", False)],
+            [(target.preset, target.tested) for target in plan.targets(source)],
+            [("tested", True), ("untested", False)],
         )
 
     def test_a_missing_parent_fails(self):

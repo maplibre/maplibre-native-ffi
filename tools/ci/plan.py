@@ -4,8 +4,10 @@ Each visible configure preset is a target. Its `vendor.maplibre-native-ffi`
 block, usually inherited from a hidden platform preset, names the Rubberstamp
 coverage unit that runs it, the runner label it runs on, and the device its
 suites run on, if any. A device is the name of the CI step that boots it and
-the command that step runs. This script uses only the standard library, so CI
-can run it with the runner's `python3` from a sparse checkout.
+the command that step runs. `ctest: false` marks a target whose native tests
+CI runs only on the device the target names, if any. This script uses only the
+standard library, so CI can run it with the runner's `python3` from a sparse
+checkout.
 """
 
 from __future__ import annotations
@@ -41,15 +43,14 @@ class Target:
     backend: str
     unit: str
     runner: str
-    package: bool
-    # Whether CMake registers a test preset for the target.
+    # False when CI runs the target's native tests only on its device.
     tested: bool
     device: dict[str, str] | None
 
 
-# The jobs other than target jobs: the unit that owns each, and which packaged
-# targets it consumes. A job runs whenever its unit does, and so do the targets
-# it consumes.
+# The jobs other than target jobs: the unit that owns each, and which targets it
+# consumes. A job runs whenever its unit does, and so do the targets it
+# consumes.
 JOBS = {
     "docs": ("docs", lambda target: False),
     "android-multi": ("android", lambda target: target.platform == "android"),
@@ -100,23 +101,8 @@ def merged(chain: list[dict], fields) -> dict:
     return {key: value for key, value in result.items() if value is not None}
 
 
-def configured(presets: dict, kind: str) -> set[str]:
-    """Return the configure presets that the visible presets of a kind use."""
-    result = set()
-    for preset in presets.get(kind, []):
-        if preset.get("hidden", False):
-            continue
-        chain = lineage(presets[kind], preset["name"])
-        result.add(
-            next(item["configurePreset"] for item in chain if "configurePreset" in item)
-        )
-    return result
-
-
 def targets(presets: dict) -> list[Target]:
     configure = presets.get("configurePresets", [])
-    packaged = configured(presets, "packagePresets")
-    tested = configured(presets, "testPresets")
     result = []
     for preset in configure:
         # Hidden presets carry settings for others to inherit and name no target.
@@ -151,8 +137,7 @@ def targets(presets: dict) -> list[Target]:
                 backend=backend,
                 unit=vendor["unit"],
                 runner=vendor["runner"],
-                package=name in packaged,
-                tested=name in tested,
+                tested=vendor.get("ctest", True),
                 device=device,
             )
         )
@@ -160,9 +145,9 @@ def targets(presets: dict) -> list[Target]:
 
 
 def consumed(job: str, all_targets: list[Target]) -> list[Target]:
-    """Return the packaged targets that a job other than a target job consumes."""
+    """Return the targets that a job other than a target job consumes."""
     _, include = JOBS[job]
-    return [target for target in all_targets if target.package and include(target)]
+    return [target for target in all_targets if include(target)]
 
 
 ZIG_PROJECTS = (
@@ -195,7 +180,6 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
     return {
         "preset": target.preset,
         "runner": target.runner,
-        "package": target.package,
         "save_toolchains": save_toolchains,
         # The key hashes every `build.zig.zon` and is shared by all rows on
         # the same runner. Cache keys are immutable, so a row that fetches only

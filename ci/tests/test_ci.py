@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import os
 import subprocess
@@ -218,17 +217,6 @@ class SuitesTest(unittest.TestCase):
                 for task in ("check", "smoke")
             },
         )
-
-    def test_an_unpackaged_target_runs_its_consumers_against_its_build_tree(self):
-        target = dataclasses.replace(self.targets["linux-gnu-x64-egl"], package=False)
-        listed = suites.target_suites(target)
-        ids = [suite.id for suite in listed]
-        self.assertNotIn("archive", ids)
-        self.assertNotIn("install", ids)
-        self.assertIn("bindings-rust-test", ids)
-        for suite in listed:
-            self.assertNotIn("MISE_TASK_SKIP", suite.env)
-            self.assertEqual(suite.prerequisites, ("build",))
 
     def test_dart_ios_runs_on_the_simulator_and_builds_for_the_device(self):
         for preset, action in (

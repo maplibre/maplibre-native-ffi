@@ -331,7 +331,7 @@ def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], b
 def runtime_tested(target: Target) -> bool:
     """Whether CI executes this target's native suite rather than only building it.
 
-    A target whose suite runs on an emulator registers no test preset.
+    A target marked `ctest: false` runs its suite only on the device it names.
     """
     return target.tested or target.device is not None
 
@@ -389,11 +389,6 @@ def target_suites(target: Target) -> list[Suite]:
 
     for command in native_checks(target):
         add(command, native, {})
-    if not target.package:
-        # An unpackaged target's consumers run against its build tree.
-        for command, env, display in consumer_commands(target):
-            add(command, native, env, display)
-        return suites
     add(["mise", "run", "archive-native", preset], native, {}, step_id="archive")
     add(
         [

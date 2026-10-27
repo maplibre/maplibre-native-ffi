@@ -181,7 +181,8 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-cmake --workflow --preset "$usage_preset"
+cmake --preset "$usage_preset"
+cmake --build "build/$usage_preset" --target install --config Release --parallel
 '''
 
 [tasks."test:wasm"]

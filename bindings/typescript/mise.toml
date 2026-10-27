@@ -19,7 +19,8 @@ depends = [
 ]
 run = '''
 cd native
-cmake --workflow --preset "$usage_preset"
+cmake --preset "$usage_preset"
+cmake --build "build/$usage_preset" --target install --config Release --parallel
 addon="build/$usage_preset/install/maplibre_native_ffi.node"
 nm=nm
 case "$usage_preset" in

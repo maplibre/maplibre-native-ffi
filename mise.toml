@@ -237,7 +237,8 @@ run = [
   { task = "//:check-cross-sdk", args = [
     "{{usage.preset}}",
   ] },
-  '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
+  '.mise/bin/with-sccache-basedirs cmake --preset "$usage_preset"',
+  '.mise/bin/with-sccache-basedirs cmake --build "$MISE_MONOREPO_ROOT/build/$usage_preset" --target install --config Release --parallel',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
 ]
@@ -310,7 +311,7 @@ run = [
   { task = "//:check-exports", args = [
     "{{usage.preset}}",
   ] },
-  'cpack --preset "$usage_preset"',
+  'cpack --config "$MISE_MONOREPO_ROOT/build/$usage_preset/CPackConfig.cmake" -G TGZ -C Release',
   { task = "//:verify-native-package", args = [
     "{{usage.preset}}",
   ] },
@@ -327,12 +328,18 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # located. A target that registers no tests fails rather than passes.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
+# A device build that no emulator or simulator runs registers no tests, so it
+# fails before a device boots for nothing.
+if ctest --test-dir "$build_dir" -C Release --show-only | grep -q '^Total Tests: 0[[:space:]]*$'; then
+  echo "error: $usage_preset registers no native tests to run" >&2
+  exit 2
+fi
 # The device boots here rather than inside the first test's timeout.
 MLN_FFI_DEVICE_INSTALL="$build_dir/install" "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
 # The Rust platform crate's pure helpers, such as redirect resolution, have
 # unit tests that run on the host.
 cargo test --locked -p maplibre-native-ffi-platform --lib
-ctest --test-dir "$build_dir" --output-on-failure --no-tests=error --timeout 300 --parallel
+ctest --test-dir "$build_dir" -C Release --output-on-failure --no-tests=error --timeout 300 --parallel
 '''
 
 [tasks.check-exports]

@@ -51,12 +51,15 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def package_presets(repository: pathlib.Path) -> list[str]:
+    """The presets that a release publishes: every visible configure preset."""
     presets = json.loads(
         (repository / "CMakePresets.json").read_text(encoding="utf-8")
-    ).get("packagePresets", [])
-    names = sorted(preset["name"] for preset in presets)
+    ).get("configurePresets", [])
+    names = sorted(
+        preset["name"] for preset in presets if not preset.get("hidden", False)
+    )
     if not names:
-        raise SystemExit("CMakePresets.json defines no native package presets")
+        raise SystemExit("CMakePresets.json defines no native configure presets")
     return names
 
 
