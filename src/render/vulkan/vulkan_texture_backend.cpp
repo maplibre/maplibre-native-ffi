@@ -550,6 +550,21 @@ auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
         buffer_allocation.buffer, region, getDispatcher()
       );
 
+      // The fence wait alone does not make the copy visible to the host.
+      const auto to_host =
+        vk::BufferMemoryBarrier()
+          .setBuffer(buffer_allocation.buffer)
+          .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+          .setDstAccessMask(vk::AccessFlagBits::eHostRead)
+          .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+          .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+          .setOffset(0)
+          .setSize(VK_WHOLE_SIZE);
+      command_buffer->pipelineBarrier(
+        vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
+        {}, nullptr, to_host, nullptr, getDispatcher()
+      );
+
       const auto to_shader_read =
         vk::ImageMemoryBarrier()
           .setImage(source_image)
