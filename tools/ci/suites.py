@@ -94,8 +94,10 @@ SUITES: list[dict] = [
             {"task": "//examples/dotnet-map:smoke", "display": True},
         ],
     },
+    # A Linux runner cross-builds the FreeBSD suite, which runs in the FreeBSD
+    # virtual machine.
     {
-        "platforms": ["linux-gnu", "macos"],
+        "platforms": ["linux-gnu", "macos", "freebsd"],
         "commands": [{"task": "//bindings/go:test"}],
     },
     # go-map drives OpenGL through EGL, on Linux only.
@@ -312,7 +314,7 @@ def apple_commands(target: Target) -> list[str]:
 def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
     """The binding and example commands, as `desktop_commands` returns them."""
     target_platform = target.platform
-    if target_platform in DESKTOP or target_platform == "emscripten":
+    if target_platform in DESKTOP or target_platform in {"emscripten", "freebsd"}:
         return desktop_commands(target)
     if target_platform == "android":
         abi = {

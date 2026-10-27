@@ -85,7 +85,7 @@ fi
 # replaces the native tree with its packaged install. Preserve them across that
 # replacement.
 zig_shim_stash=""
-if [[ "$preset" == linux-musl-* && -d "$build_dir/zig-shim" ]]; then
+if [[ ("$preset" == linux-musl-* || "$preset" == freebsd-*) && -d "$build_dir/zig-shim" ]]; then
   zig_shim_stash="$(mktemp -d)"
   mv "$build_dir/zig-shim" "$zig_shim_stash/"
 fi

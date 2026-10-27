@@ -1,7 +1,7 @@
 # Sourced by the Go binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, Android, and OpenHarmony presets to GOOS/GOARCH and exports the
-# cross C toolchain from the native build's Zig wrappers, the Android NDK, or
-# the OpenHarmony SDK. Leaves `goos` empty for host presets. OpenHarmony has no
+# $1. Maps musl, FreeBSD, Android, and OpenHarmony presets to GOOS/GOARCH and
+# exports the cross C toolchain from the native build's Zig wrappers, the
+# Android NDK, or the OpenHarmony SDK. Leaves `goos` empty for host presets. OpenHarmony has no
 # Go port, so its presets build GOOS=linux binaries against the OHOS sysroot;
 # the Oniro emulator runs them.
 # shellcheck shell=bash
@@ -34,8 +34,12 @@ case "$1" in
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
     ;;
-  linux-musl-arm64-* | linux-musl-x64-*)
-    goos=linux
+  linux-musl-arm64-* | linux-musl-x64-* | freebsd-x64-*)
+    if [[ "$1" == freebsd-* ]]; then
+      goos=freebsd
+    else
+      goos=linux
+    fi
     if [[ "$1" == linux-musl-arm64-* ]]; then
       goarch=arm64
     else
@@ -44,7 +48,7 @@ case "$1" in
     compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
     compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
     if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
-      echo "The musl Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+      echo "The Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
       return 2
     fi
     # The binding links the C API's shared library, which makes Zig link musl

@@ -4,9 +4,9 @@
 #MISE shell="bash"
 set -euo pipefail
 
-# Host presets run in process; musl, Android, and OpenHarmony x64 presets
-# cross-build and run each test binary through tools/devices/run, which runs it
-# in Alpine or the worktree's emulator.
+# Host presets run in process; musl, FreeBSD, Android, and OpenHarmony x64
+# presets cross-build and run each test binary through tools/devices/run, which
+# runs it in Alpine, the worktree's FreeBSD virtual machine, or its emulator.
 case "$usage_preset" in
   android-arm-*)
     echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/go:build and test an android-arm64 or android-x64 preset instead." >&2
@@ -34,7 +34,8 @@ if [[ -n "$goos" ]]; then
   export MLN_FFI_DEVICE_INSTALL="$native_install_dir"
   export MLN_FFI_DEVICE_TIMEOUT=300
   export MLN_FFI_DEVICE_LIBRARIES="$native_install_dir/lib/libmln_test_graphics.so"
-  # Alpine sees only the repository, so the test binaries are built inside it.
+  # Alpine and the FreeBSD virtual machine see only the repository, so the
+  # test binaries are built inside it.
   export GOTMPDIR="$MISE_MONOREPO_ROOT/build/$usage_preset/go-tmp"
   mkdir -p "$GOTMPDIR"
   # The device boots here rather than inside the first binary's deadline.

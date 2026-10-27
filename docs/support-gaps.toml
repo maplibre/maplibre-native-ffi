@@ -241,12 +241,6 @@ reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the s
 
 [[gap]]
 binding = "go"
-platform = "freebsd"
-status = "path-known"
-reason = "Run the cgo suite in the FreeBSD VM. Go supports cgo on `freebsd/amd64` and `freebsd/arm64`."
-
-[[gap]]
-binding = "go"
 platform = "ios"
 status = "path-known"
 reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
