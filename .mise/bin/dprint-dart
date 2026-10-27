@@ -7,5 +7,5 @@ if [[ "${MLN_FFI_DPRINT_SCOPED_TOOLS:-}" == "1" ]]; then
   exec dart "$@"
 fi
 
-exec mise -C "$repo_root/bindings/dart" x -- \
+exec mise -C "$repo_root/bindings/dart" x --no-deps -- \
   env MLN_FFI_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-dart" "$@"

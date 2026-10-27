@@ -7,5 +7,5 @@ if [[ "${MLN_FFI_DPRINT_SCOPED_TOOLS:-}" == "1" ]]; then
   exec zig "$@"
 fi
 
-exec mise -C "$repo_root/bindings/zig" x -- \
+exec mise -C "$repo_root/bindings/zig" x --no-deps -- \
   env MLN_FFI_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-zig" "$@"
