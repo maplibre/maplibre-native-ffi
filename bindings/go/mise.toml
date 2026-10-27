@@ -37,18 +37,46 @@ exec go test -count=1 -tags "$go_test_tags" ./...
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: musl presets run in Alpine, Android presets and
-# OpenHarmony x64 presets push to an emulator, and host presets run in process.
+# Host presets run in process; musl, Android, and OpenHarmony x64 presets
+# cross-build and run each test binary through tools/devices/run, which runs it
+# in Alpine or the worktree's emulator.
 run = '''
 case "$usage_preset" in
-  linux-musl-* | android-* | ohos-*)
-    exec "$MISE_MONOREPO_ROOT/scripts/test-go-device.sh" "$usage_preset"
+  android-arm-*)
+    echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/go:build and test an android-arm64 or android-x64 preset instead." >&2
+    exit 2
+    ;;
+  ohos-x64-egl) ;;
+  ohos-x64-*)
+    echo "The OpenHarmony emulator runs EGL only; check $usage_preset with //bindings/go:build and test ohos-x64-egl instead." >&2
+    exit 2
+    ;;
+  ohos-*)
+    echo "The OpenHarmony emulator runs an x64 guest; check $usage_preset with //bindings/go:build and test ohos-x64-egl instead." >&2
+    exit 2
     ;;
 esac
 
 source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$usage_preset"
+if [[ -n "$goos" ]]; then
+  # The render tests load tests/graphics, which travels beside the C API
+  # library. Go's own timeout ends a hung binary with a goroutine dump before
+  # the device runner's deadline ends it without one.
+  export MLN_FFI_DEVICE_INSTALL="$native_install_dir"
+  export MLN_FFI_DEVICE_TIMEOUT=300
+  export MLN_FFI_DEVICE_LIBRARIES="$native_install_dir/lib/libmln_test_graphics.so"
+  # Alpine sees only the repository, so the test binaries are built inside it.
+  export GOTMPDIR="$MISE_MONOREPO_ROOT/build/$usage_preset/go-tmp"
+  mkdir -p "$GOTMPDIR"
+  # The device boots here rather than inside the first binary's deadline.
+  "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
+  go test -count=1 -p 1 -timeout 270s -v -exec "$MISE_MONOREPO_ROOT/tools/devices/run" -tags "$go_test_tags" ./...
+  exec go vet -tags "$go_test_tags" ./...
+fi
+
 # The race detector also turns on checkptr's unsafe.Pointer checks. Go has no
 # race detector for windows/arm64.
 race=-race
