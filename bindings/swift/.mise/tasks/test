@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+#MISE description="Test the Swift binding against a native preset's install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+#USAGE arg "[configuration]" default="debug" {
+#USAGE   choices "debug" "release"
+#USAGE }
+set -euo pipefail
+
+# The preset selects the runner: an iOS or tvOS simulator preset builds the test
+# bundle and spawns it on a simulator, a Mac Catalyst preset builds the same
+# executable and runs it on the host, and host presets run in process.
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+case "$usage_preset" in
+  ios-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path .build/ios-simulator \
+      --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+      --triple arm64-apple-ios15.0-simulator \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
+  tvos-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path .build/tvos-simulator \
+      --sdk "$(xcrun --sdk appletvsimulator --show-sdk-path)" \
+      --triple arm64-apple-tvos15.0-simulator \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/AppleTVSimulator.platform/Developer/Library/Frameworks"
+    export MLN_FFI_SIMULATOR_RUNTIME=tvOS
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/tvos-simulator/arm64-apple-tvos-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
+  visionos-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
+    # Xcode recognizes visionOS and supplies its Swift Testing framework.
+    xcodebuild -quiet \
+      -scheme MaplibreNativeFFIIOSSimulatorTests \
+      -sdk xrsimulator -destination 'generic/platform=visionOS Simulator' \
+      -derivedDataPath .build/visionos-simulator -configuration Debug \
+      ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
+      "HEADER_SEARCH_PATHS=\$(inherited) \"$native_install_dir/include\"" \
+      "LIBRARY_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\"" \
+      'OTHER_LDFLAGS=$(inherited) -lmaplibre-native-c' \
+      "LD_RUNPATH_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\" \"$(xcode-select -p)/Platforms/XRSimulator.platform/Developer/Library/Frameworks\"" \
+      build
+    export MLN_FFI_SIMULATOR_RUNTIME=visionOS
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/visionos-simulator/Build/Products/Debug-xrsimulator/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
+  ios-maccatalyst-*)
+    # swift test loads the bundle into a macOS helper, which rejects a
+    # Catalyst image.
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path ".build/$usage_preset" \
+      -c "$usage_configuration" \
+      --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+      --triple arm64-apple-ios15.0-macabi \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks"
+    exec ".build/$usage_preset/arm64-apple-ios-macabi/$usage_configuration/MaplibreNativeFFIIOSSimulatorTests"
+    ;;
+  ios-* | tvos-* | visionos-*)
+    echo "The Swift binding tests need a runnable target; test an ios-simulator, tvos-simulator, visionos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
+    exit 2
+    ;;
+esac
+swift_args=(--scratch-path ".build/$usage_preset" -c "$usage_configuration")
+swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+# Swift Build crashes on Linux; see the api task.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
+if [[ "$usage_configuration" == "release" ]]; then
+  # The suite uses @testable import. Keep testing enabled while leaving the
+  # optimizer on so ARC lifetime behavior matches a release consumer.
+  swift_args+=(-Xswiftc -enable-testing)
+fi
+# A crashing test process otherwise reports only its signal, and swift-testing
+# prints out of order, so nothing names the test or frame that crashed.
+export SWIFT_BACKTRACE="${SWIFT_BACKTRACE:-enable=yes,interactive=no}"
+swift test "${swift_args[@]}"
+swift package describe --type json >/dev/null

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#MISE description="Build the Swift binding against a native preset's install."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+case "$usage_preset" in
+  ios-arm64-metal)
+    exec swift build \
+      --product MaplibreNativeFFI \
+      --scratch-path .build/ios \
+      --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+      --triple arm64-apple-ios15.0
+    ;;
+  tvos-arm64-metal)
+    exec swift build \
+      --product MaplibreNativeFFI \
+      --scratch-path .build/tvos \
+      --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
+      --triple arm64-apple-tvos15.0
+    ;;
+  visionos-arm64-metal)
+    # SwiftPM's native build system does not recognize visionOS triples.
+    exec xcodebuild -quiet \
+      -scheme MaplibreNativeFFI \
+      -sdk xros -destination 'generic/platform=visionOS' \
+      -derivedDataPath .build/visionos -configuration Debug \
+      ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
+      "HEADER_SEARCH_PATHS=\$(inherited) \"$native_install_dir/include\"" \
+      "LIBRARY_SEARCH_PATHS=\$(inherited) \"$native_install_dir/lib\"" \
+      'OTHER_LDFLAGS=$(inherited) -lmaplibre-native-c' build
+    ;;
+  ios-maccatalyst-*)
+    # A product build also compiles the DocC plugin's dependencies, whose
+    # manifests leave SwiftPM a Catalyst floor the compiler rejects.
+    exec swift build \
+      --target MaplibreNativeFFI \
+      --scratch-path ".build/$usage_preset" \
+      --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+      --triple arm64-apple-ios15.0-macabi
+    ;;
+  ios-*)
+    echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+  tvos-*)
+    echo "The Swift binding builds for a tvOS device with tvos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+  visionos-*)
+    echo "The Swift binding builds for a visionOS device with visionos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+esac
+swift_args=(--scratch-path ".build/$usage_preset")
+swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+# Swift Build crashes on Linux; see the api task.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
+swift build --target MaplibreNativeFFI "${swift_args[@]}"

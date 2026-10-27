@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="Generate DocC HTML API reference for the Swift binding."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+rm -rf build/docc
+mkdir -p build
+swift_args=(--scratch-path ".build/$usage_preset")
+# Swift Build, SwiftPM's default build system since 6.4, intermittently
+# segfaults on Linux while planning a build. Drop this once
+# https://github.com/swiftlang/swift-build/issues/1786 is fixed.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
+swift package "${swift_args[@]}" \
+  --allow-writing-to-directory build/docc \
+  generate-documentation \
+  --target MaplibreNativeFFI \
+  --output-path build/docc \
+  --transform-for-static-hosting \
+  --hosting-base-path maplibre-native-ffi/reference/swift
