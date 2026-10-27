@@ -59,11 +59,7 @@ cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi"
 
-emulator="$binding/../../tools/devices/ohos-emulator"
-if ! connect_key=$("$emulator" key); then
-  "$emulator" boot
-  connect_key=$("$emulator" key)
-fi
+connect_key=$("$binding/../../tools/devices/ohos-key")
 hdc=(hdc -t "$connect_key")
 
 # The origin listens on a free port here, and the device reaches it on the

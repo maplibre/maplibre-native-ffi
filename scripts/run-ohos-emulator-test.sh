@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs native test executables on the shared OpenHarmony emulator, which
-# tools/devices/ohos-emulator boots when it is not running yet. Every executable
-# runs and reports its own exit status; the first failure stops the batch.
+# Runs native test executables on the worktree's OpenHarmony emulator, which
+# tools/devices/ohos-key boots when it is not running yet. Every executable runs
+# and reports its own exit status; the first failure stops the batch.
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
@@ -34,8 +34,8 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-# Other sessions may be running tests on the same shared emulator, so each run
-# has a directory of its own and removes it when it ends.
+# Other suites may be running tests on the same emulator, so each run has a
+# directory of its own and removes it when it ends.
 remote_dir=/data/local/tmp/maplibre-native-ffi-$$
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
@@ -54,11 +54,7 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-emulator="$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator"
-if ! connect_key=$("$emulator" key); then
-  "$emulator" boot
-  connect_key=$("$emulator" key)
-fi
+connect_key=$("$MISE_MONOREPO_ROOT/tools/devices/ohos-key")
 
 remove_remote_dir() {
   perl -e 'alarm shift; exec @ARGV' 30 \

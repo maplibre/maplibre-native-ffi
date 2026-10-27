@@ -353,7 +353,7 @@ ci:
               - bindings/typescript/src/arkts.ts
               - bindings/typescript/src/internal/**
               - bindings/typescript/test/arkts/**
-              - tools/devices/ohos-emulator
+              - tools/devices/ohos-key
               - third_party/maplibre-native
           then: apply
     web:

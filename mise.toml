@@ -415,14 +415,6 @@ fi
 bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
 
-[tasks."ohos-emulator:boot"]
-description = "Boot the shared OpenHarmony emulator, or reuse it, and wait until it is ready."
-run = '"$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator" boot'
-
-[tasks."ohos-emulator:stop"]
-description = "Stop the shared OpenHarmony emulator, which any session on the machine may be using."
-run = '"$MISE_MONOREPO_ROOT/tools/devices/ohos-emulator" stop'
-
 [tasks."freebsd-vm:boot"]
 description = "Boot this checkout's FreeBSD virtual machine, or reuse it, and wait until it is ready."
 run = '"$MISE_MONOREPO_ROOT/scripts/boot-freebsd-vm.sh"'

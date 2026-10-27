@@ -2676,7 +2676,7 @@ jobs:
         run: mise run build ohos-x64-egl
       - name: Boot OpenHarmony emulator
         id: boot
-        run: mise run //:ohos-emulator:boot
+        run: mise exec -- tools/devices/ohos-key
       - id: test
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run test ohos-x64-egl

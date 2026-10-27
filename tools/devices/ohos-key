@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Prints the hdc connect key of the OpenHarmony emulator that tests run on.
+# devices-cli gives this worktree its own emulator on the Oniro image that mise
+# installed, booted on demand, which keeps running until `devices-cli release`.
+set -euo pipefail
+
+if [[ -z "${OHOS_EMULATOR_IMAGES:-}" ]]; then
+  oniro=$(mise where http:oniro-emulator)
+  export OHOS_EMULATOR_IMAGES="$oniro/images"
+fi
+exec devices-cli get ohos
