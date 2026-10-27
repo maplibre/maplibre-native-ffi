@@ -215,7 +215,6 @@ ci:
               - cmake/mln_ffi_rust.cmake
               - cmake/platform/linux.cmake
               - cmake/toolchains/zig.cmake
-              - tools/devices/run
               - third_party/maplibre-native
           then: apply
     freebsd:
@@ -233,7 +232,6 @@ ci:
               - cmake/toolchains/zig.cmake
               - scripts/run-freebsd-test.sh
               - tools/devices/freebsd-host
-              - tools/devices/run
               - third_party/maplibre-native
           then: apply
     macos:
@@ -278,7 +276,6 @@ ci:
               - examples/swift-map/mise.toml
               - examples/swift-map/.mise/**
               - examples/swift-map/Sources/SwiftMapIOS/**
-              - tools/devices/run
               - third_party/maplibre-native
           then: apply
     windows-x64:
@@ -334,7 +331,6 @@ ci:
               - .mise/tasks/kotlin/check-android-api-floor
               - .mise/tasks/kotlin/verify-android-multi-abi
               - tools/devices/android-serial
-              - tools/devices/run
               - third_party/maplibre-native
           then: apply
     ohos:
@@ -362,7 +358,6 @@ ci:
               - bindings/typescript/src/internal/**
               - bindings/typescript/test/arkts/**
               - tools/devices/ohos-key
-              - tools/devices/run
               - third_party/maplibre-native
           then: apply
     web:
