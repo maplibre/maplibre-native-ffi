@@ -1247,7 +1247,8 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
         for p, name in zip(callback.arguments, names)
         if values.owned_argument(callback, p)
     ]
-    lines = [f"const callback = {target};"]
+    read = f"const callback = {target};"
+    lines = [] if owned else [read]
     if names:
         lines.append(
             f"const [{', '.join(names)}] = args as Parameters<{function_type}>;"
@@ -1257,12 +1258,13 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
             raise Unsupported(f"{callback.native}: one owned argument at most")
         parameter, name = owned[0]
         handle = values.argument_handle(parameter)
-        # The owner adopts the handle before the callback runs, so closing it
-        # after a failure releases an unanswered request, which native code
-        # then settles.
+        # The owner adopts the handle before the host value is read, so
+        # closing it after a failure, even a throwing getter's, releases an
+        # unanswered request, which native code then settles.
         lines += [
             f"const owner = adopt({name} as unknown as bigint, () => new {owner_class(handle)}(ADOPT, {name} as unknown as bigint), {disposer(handle)});",
             "try {",
+            f"  {read}",
             f"  callback({', '.join('owner' if n == name else n for n in names)});",
             "} catch (error) {",
             "  owner.close();",

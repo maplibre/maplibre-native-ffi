@@ -4794,7 +4794,6 @@ defineCallbacks([
   },
   // mln_resource_provider_callback
   (target, args) => {
-    const callback = (target as ResourceProvider).callback;
     const [request, handleValue] = args as Parameters<
       NonNullable<ResourceProvider["callback"]>
     >;
@@ -4804,6 +4803,7 @@ defineCallbacks([
       (disposed) => native.mln_resource_request_release(disposed, undefined),
     );
     try {
+      const callback = (target as ResourceProvider).callback;
       callback(request, owner);
     } catch (error) {
       owner.close();
@@ -4817,7 +4817,6 @@ defineCallbacks([
   },
   // mln_resource_transform_callback
   (target, args) => {
-    const callback = target as ResourceTransform;
     const [kind, url, request] = args as Parameters<ResourceTransform>;
     const owner = adopt(
       request as unknown as bigint,
@@ -4827,6 +4826,7 @@ defineCallbacks([
         native.mln_resource_transform_request_release(disposed, undefined),
     );
     try {
+      const callback = target as ResourceTransform;
       callback(kind, url, owner);
     } catch (error) {
       owner.close();

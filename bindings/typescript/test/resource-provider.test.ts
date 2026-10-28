@@ -153,6 +153,32 @@ test("a provider callback error is reported and fails the request", async () => 
   assert.match(errors[0]!, /provider failed/);
 });
 
+test("a provider whose callback getter throws fails the request", async () => {
+  const errors = captureReportedErrors();
+  const url = "custom://throwing-getter-style.json";
+  let armed = false;
+  const fixture = await openRuntime({
+    provider: {
+      routes: [styleRoute(url)],
+      get callback(): ResourceProvider["callback"] {
+        if (armed) {
+          throw new Error("getter failed");
+        }
+        return (_request, handle) => handle.close();
+      },
+    },
+  });
+  const map = await fixture.openMap();
+  armed = true;
+
+  await bounded(map.setStyleUrl(url), "a command");
+  // The adapter adopts the handle before it reads the callback, so the getter
+  // that throws still leaves the request to be released.
+  await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed, map.id);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0]!, /getter failed/);
+});
+
 test(
   "a transform answers its request after its callback returns",
   async () => {
