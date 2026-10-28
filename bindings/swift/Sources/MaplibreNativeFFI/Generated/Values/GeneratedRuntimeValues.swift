@@ -314,7 +314,7 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
-/// Render modes reported by render observer events.
+/// Render modes reported by render observer events and frame results.
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

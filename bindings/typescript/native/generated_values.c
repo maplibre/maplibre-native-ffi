@@ -1649,6 +1649,10 @@ napi_value mln_ts_read_render_frame_result(
         mln_ts_read_map_view(env, &(source->view), sizeof(source->view))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "mode", mln_ts_number(env, (double)(source->mode))
+      ))
+    return NULL;
   return result;
 }
 

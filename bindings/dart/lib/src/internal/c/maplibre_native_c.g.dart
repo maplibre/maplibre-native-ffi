@@ -912,6 +912,8 @@ final class mln_render_frame_result extends Struct {
   @Bool()
   external bool needs_repaint;
   external mln_map_view view;
+  @Uint32()
+  external int mode;
 }
 
 final class mln_render_session_attach_options extends Struct {

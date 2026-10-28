@@ -1436,7 +1436,8 @@ internal static unsafe class GeneratedValues
             value.generation,
             value.frame_generation,
             value.needs_repaint != 0,
-            CopyMapView(value.view)
+            CopyMapView(value.view),
+            (RenderMode)value.mode
         );
 
     internal static mln_render_session_attach_options NativeRenderSessionAttachOptions(

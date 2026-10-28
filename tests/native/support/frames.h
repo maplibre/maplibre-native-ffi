@@ -70,14 +70,12 @@ mln_render_frame_result mln_test_render_batch_result(
 );
 
 // Renders each update that the map publishes, one frame per batch of updates,
-// until the map reports idle and the session has rendered its latest update.
-// After it returns, no update reaches a demand until the case publishes one.
-// The case drains the runtime's events only through this call meanwhile.
-// Returns whether a frame finished on the way, and copies the statistics of
-// the latest one to `latest_stats` unless it is null.
-bool mln_test_render_until_idle(
-  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture,
-  mln_rendering_stats* latest_stats
+// until a frame shows the map settled, as mln_render_frame_result.mode
+// describes. After it returns, no update reaches a demand until the case
+// publishes one. The case drains the runtime's events only through this call
+// meanwhile, and the call discards them.
+void mln_test_render_until_idle(
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 );
 
 // Requests a forced frame, waits for it to render, and acquires it.

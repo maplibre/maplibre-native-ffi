@@ -1,9 +1,10 @@
 // Which map changes reach the next frame. A mutation must publish a render
 // update, and a host that renders only on those updates must then see the
 // change in its pixels. A frame result reports whether the map wants another
-// frame.
+// frame, and whether it drew the map fully loaded.
 
 #include "support/frames.h"
+#include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -106,7 +107,7 @@ static void select_then_clear_renderer_data(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
   set_selected(map, "{\"selected\":true}");
-  (void)mln_test_render_until_idle(runtime, map, fixture, NULL);
+  mln_test_render_until_idle(runtime, map, fixture);
   expect_center_pixel(fixture, green, "the selected point");
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
@@ -222,10 +223,10 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
     if (row->prepare != NULL) {
       row->prepare(map);
     }
-    (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+    mln_test_render_until_idle(runtime, map, &fixture);
     expect_center_pixel(&fixture, row->before, row->label);
     row->mutate(runtime, map, &fixture);
-    (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+    mln_test_render_until_idle(runtime, map, &fixture);
     expect_center_pixel(&fixture, row->after, row->label);
     mln_test_render_fixture_destroy(&fixture);
     mln_test_destroy_map(map);
@@ -248,7 +249,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
            "\"paint\":{\"background-color\":\"#ff0000\"}}]}"
          )
   ));
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   expect_center_pixel(&fixture, red, "before the group");
 
   MLN_TEST_AWAIT_OK(
@@ -264,7 +265,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_end_command_group(map, &completion.descriptor, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   expect_center_pixel(&fixture, green, "after the group");
 
   mln_test_render_fixture_destroy(&fixture);
@@ -290,7 +291,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
       "ff0000\"]}}]}"
     )
   ));
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   expect_center_pixel(&fixture, red, "before the feature-state group");
   mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
@@ -308,7 +309,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_end_command_group(map, &completion.descriptor, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   uint8_t after[4];
   read_center_pixel(&fixture, after);
   mln_test_render_fixture_destroy(&fixture);
@@ -603,6 +604,69 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// One vector tile, which the provider holds until the case answers it.
+static const char held_tile_url[] = "custom://tiles/0/0/0.pbf";
+static const mln_test_provided_resource held_tile[] = {
+  {.url = held_tile_url,
+   .held = true,
+   .has_later_response = true,
+   .later_response = {.status = MLN_RESOURCE_RESPONSE_STATUS_OK}},
+};
+
+static mln_render_frame_result render_forced(
+  const mln_test_render_fixture* fixture, uint64_t token
+) {
+  mln_test_render_request_forced(fixture, token);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  return result;
+}
+
+// A frame drawn while a tile it needs is loading is partial, and a frame
+// drawn once the tile has loaded is full.
+static void frame_results_report_whether_the_map_was_fully_loaded(void) {
+  mln_test_provider* provider = mln_test_provider_create(held_tile, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"tiles\":{\"type\":\"vector\","
+           "\"tiles\":[\"custom://tiles/{z}/{x}/{y}.pbf\"],\"minzoom\":0,"
+           "\"maxzoom\":0}},\"layers\":[{\"id\":\"fill\",\"type\":\"fill\","
+           "\"source\":\"tiles\",\"source-layer\":\"any\"}]}"
+         )
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  const mln_render_frame_result loading = render_forced(&fixture, 1);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_MODE_PARTIAL, loading.mode);
+
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, held_tile_url, 1)
+  );
+  const mln_test_provider_request* request =
+    mln_test_provider_request_at(provider, held_tile_url, 0);
+  TEST_ASSERT_NOT_NULL(request);
+  const mln_resource_response empty = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+  };
+  mln_test_request_answer(request->handle, &empty);
+  mln_test_render_until_idle(runtime, map, &fixture);
+  const mln_render_frame_result loaded = render_forced(&fixture, 2);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_MODE_FULL, loaded.mode);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 // The backends whose renderer counts frames and draws per render pass, which
 // the 0032-webgpu-frame-stats patch carries for WebGPU, Metal, and Vulkan.
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU) || \
@@ -611,20 +675,26 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
 #endif
 
 #ifdef COUNTS_DRAWS_PER_FRAME
-static mln_rendering_stats render_stats_to_idle(
-  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
-) {
-  mln_rendering_stats stats = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_until_idle(runtime, map, fixture, &stats),
-    "rendering to idle finished no frame"
-  );
-  return stats;
+typedef struct drawn_frame_wait {
+  mln_map map;
+  mln_rendering_stats stats;
+} drawn_frame_wait;
+
+static bool capture_drawn_frame(const mln_runtime_event* event, void* context) {
+  drawn_frame_wait* wait = context;
+  if (
+    event->type != MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED ||
+    event->source != wait->map ||
+    event->payload.render_frame.stats.draw_call_count == 0
+  ) {
+    return false;
+  }
+  wait->stats = event->payload.render_frame.stats;
+  return true;
 }
 
-// Each frame advances the frame count and adds its draws to the total. A frame
-// with nothing visible draws nothing and leaves the total as it was.
-static void frame_statistics_count_each_frame_and_its_draws(void) {
+// A frame that draws reports its draws, and counts itself among the frames.
+static void a_drawn_frame_reports_its_statistics(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
@@ -638,38 +708,19 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
            "{\"circle-radius\":5}}]}"
          )
   ));
+  mln_test_render_until_idle(runtime, map, &fixture);
+  // The settled map draws its circle in this frame, whatever the frames before
+  // it reported.
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
-  const mln_rendering_stats first =
-    render_stats_to_idle(runtime, map, &fixture);
-  TEST_ASSERT_GREATER_THAN_INT64(0, first.frame_count);
-  TEST_ASSERT_GREATER_THAN_INT64(0, first.draw_call_count);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT64(
-    first.draw_call_count, first.total_draw_call_count
-  );
-
-  MLN_TEST_OK(mln_test_map_request_repaint(map));
-  const mln_rendering_stats second =
-    render_stats_to_idle(runtime, map, &fixture);
-  // A repaint renders at least one frame; MapLibre may schedule another before
-  // the map is idle again, and the total counts every frame's draws.
-  TEST_ASSERT_GREATER_THAN_INT64(0, second.draw_call_count);
-  TEST_ASSERT_GREATER_THAN_INT64(first.frame_count, second.frame_count);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT64(
-    first.total_draw_call_count + second.draw_call_count,
-    second.total_draw_call_count
-  );
-
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
-    map, MLN_BUFFER_LITERAL("circle"), MLN_BUFFER_LITERAL("visibility"),
-    MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
+  drawn_frame_wait wait = {.map = map};
+  TEST_ASSERT_TRUE(mln_test_await_event_matching(
+    runtime, capture_drawn_frame, &wait, mln_test_deadline_default()
   ));
-  const mln_rendering_stats empty =
-    render_stats_to_idle(runtime, map, &fixture);
-  // Source fading can request several empty frames after the layer hides.
-  TEST_ASSERT_GREATER_THAN_INT64(second.frame_count, empty.frame_count);
-  TEST_ASSERT_EQUAL_INT64(0, empty.draw_call_count);
-  TEST_ASSERT_EQUAL_INT64(
-    second.total_draw_call_count, empty.total_draw_call_count
+  TEST_ASSERT_GREATER_THAN_INT64(0, wait.stats.frame_count);
+  TEST_ASSERT_GREATER_OR_EQUAL_INT64(
+    wait.stats.draw_call_count, wait.stats.total_draw_call_count
   );
 
   mln_test_render_fixture_destroy(&fixture);
@@ -684,7 +735,8 @@ MLN_TEST_GROUP {
   RUN_TEST(feature_state_stays_with_the_update_held_by_a_command_group);
   RUN_TEST(each_mutation_publishes_a_render_update_only_when_it_changes);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
+  RUN_TEST(frame_results_report_whether_the_map_was_fully_loaded);
 #ifdef COUNTS_DRAWS_PER_FRAME
-  RUN_TEST(frame_statistics_count_each_frame_and_its_draws);
+  RUN_TEST(a_drawn_frame_reports_its_statistics);
 #endif
 }

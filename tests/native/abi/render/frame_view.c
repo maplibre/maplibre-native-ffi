@@ -298,7 +298,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   for (size_t index = 0; index < row_count; index += 1) {
     const view_row* row = &rows[index];
     apply(map, row);
-    mln_test_render_until_idle(runtime, map, &fixture, NULL);
+    mln_test_render_until_idle(runtime, map, &fixture);
     const mln_render_frame_result frame = render_frame(&fixture, index + 1);
     drawn[index] = drawn_dot(&fixture, row->label);
     expect_matches(&frame.view, row, drawn[index]);
@@ -367,7 +367,7 @@ static void each_frame_of_a_transition_reports_its_own_view(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   apply(map, &rows[0]);
-  mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
 
   mln_camera_update update = {
     .size = sizeof(mln_camera_update),

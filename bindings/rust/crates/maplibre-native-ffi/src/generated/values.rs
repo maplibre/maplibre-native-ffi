@@ -3123,6 +3123,11 @@ pub struct RenderFrameResult {
     /// their coordinates. Zero, with a size of zero, unless disposition is
     /// `RenderResult::Rendered`.
     pub view: MapView,
+    /// `RenderMode::Full` when the frame drew its update with the style and
+    /// every tile and image that the update needs loaded. Partial unless
+    /// disposition is `RenderResult::Rendered`. It matches the mode field of
+    /// `RuntimeEventType::MapRenderFrameFinished`.
+    pub mode: RenderMode,
 }
 impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
     unsafe fn from_native(raw: sys::mln_render_frame_result) -> Result<Self> {
@@ -3134,12 +3139,13 @@ impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
             frame_generation: raw.frame_generation,
             needs_repaint: raw.needs_repaint,
             view: unsafe { from_native(raw.view) }?,
+            mode: RenderMode::from_raw(raw.mode),
         })
     }
 }
 
 native_enum! {
-/// Render modes reported by render observer events.
+/// Render modes reported by render observer events and frame results.
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

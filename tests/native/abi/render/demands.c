@@ -595,7 +595,7 @@ static void a_waiting_demand_renders_the_next_map_update(void) {
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   const uint64_t idle_generation =
     read_snapshot(fixture.session).rendered_update_generation;
 
@@ -635,7 +635,7 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   request_waiting(&fixture, 621);
   expect_waiting(&fixture);
 
@@ -690,7 +690,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   MLN_TEST_INVALID(
     mln_render_session_request_frame(fixture.session, &forced_wait, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
 
   request_waiting(&fixture, 611);
   expect_waiting(&fixture);

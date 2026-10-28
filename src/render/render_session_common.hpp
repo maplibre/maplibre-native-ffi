@@ -556,10 +556,10 @@ class RenderableSlotRing {
 };
 
 // Records the frame status that mln::Renderer reports synchronously out of
-// render(), so render_session_render_update_on_driver() can return its repaint
-// flag with the terminal frame result, and forwards every callback to the
-// map's observer so runtime event delivery is unchanged. Runs entirely on the
-// session's driver thread.
+// render(), so render_session_render_update_on_driver() can return its render
+// mode and repaint flag with the terminal frame result, and forwards every
+// callback to the map's observer so runtime event delivery is unchanged. Runs
+// entirely on the session's driver thread.
 class SessionFrameObserver final : public mln::RendererObserver {
  public:
   auto set_delegate(mln::RendererObserver* delegate) -> void {
@@ -568,9 +568,12 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  [[nodiscard]] auto mode() const -> mln_render_mode { return mode_; }
+
   auto begin_render() -> void {
     frame_completed_ = false;
     needs_repaint_ = false;
+    mode_ = MLN_RENDER_MODE_PARTIAL;
   }
 
   [[nodiscard]] auto frame_completed() const -> bool {
@@ -618,6 +621,8 @@ class SessionFrameObserver final : public mln::RendererObserver {
       return;
     }
     needs_repaint_ = repaint;
+    mode_ =
+      mode == RenderMode::Full ? MLN_RENDER_MODE_FULL : MLN_RENDER_MODE_PARTIAL;
     frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
@@ -717,6 +722,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  mln_render_mode mode_ = MLN_RENDER_MODE_PARTIAL;
   bool frame_completed_ = false;
   bool suppress_frame_callbacks_ = false;
 };

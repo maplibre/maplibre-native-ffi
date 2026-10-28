@@ -1068,6 +1068,7 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
     view = readMapView(source + 48),
+    mode = RenderMode(readU32(source + 256)),
   )
 
 internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
@@ -1233,7 +1234,7 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    256,
+    264,
   ) { item ->
     readRenderFrameResult(item)
   }

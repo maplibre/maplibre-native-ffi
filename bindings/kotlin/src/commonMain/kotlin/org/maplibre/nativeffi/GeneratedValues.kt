@@ -676,7 +676,7 @@ public value class RenderDriverKind(public val rawValue: UInt) {
 }
 
 /**
- * Render modes reported by render observer events.
+ * Render modes reported by render observer events and frame results.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -1847,6 +1847,12 @@ public data class RenderFrameResult(
    * is `RenderResult.RENDERED`.
    */
   public val view: MapView,
+  /**
+   * `RenderMode.FULL` when the frame drew its update with the style and every tile and image that
+   * the update needs loaded. Partial unless disposition is `RenderResult.RENDERED`. It matches the
+   * mode field of `RuntimeEventType.MAP_RENDER_FRAME_FINISHED`.
+   */
+  public val mode: RenderMode,
 )
 
 /**

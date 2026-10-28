@@ -105,11 +105,11 @@ static void only_images_set_with_keep_unused_survive_when_unused(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(style_json)));
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
 
   supply(map, "kept-icon", true);
   supply(map, "dropped-icon", false);
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   TEST_ASSERT_TRUE(read_image(map, "kept-icon").keep_unused);
   TEST_ASSERT_FALSE(read_image(map, "dropped-icon").keep_unused);
 
@@ -122,7 +122,7 @@ static void only_images_set_with_keep_unused_survive_when_unused(void) {
   supply(map, "other-icon", false);
   set_icon_image(map, "kept", "other-icon");
   set_icon_image(map, "dropped", "other-icon");
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   reduce_memory_use(map, &fixture);
   TEST_ASSERT_TRUE(read_image(map, "kept-icon").found);
   TEST_ASSERT_FALSE(read_image(map, "dropped-icon").found);
@@ -138,7 +138,7 @@ static void only_images_set_with_keep_unused_survive_when_unused(void) {
   TEST_ASSERT_TRUE(read_image(map, "kept-icon").found);
 
   supply(map, "kept-icon", false);
-  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
+  mln_test_render_until_idle(runtime, map, &fixture);
   reduce_memory_use(map, &fixture);
   TEST_ASSERT_FALSE(read_image(map, "kept-icon").found);
 

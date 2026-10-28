@@ -88,7 +88,7 @@ static void render_style(
   mln_buffer_view style, uint8_t* pixels
 ) {
   MLN_TEST_OK(mln_test_map_set_style_json(map, style));
-  TEST_ASSERT_TRUE(mln_test_render_until_idle(runtime, map, fixture, NULL));
+  mln_test_render_until_idle(runtime, map, fixture);
   read_pixels(fixture, pixels);
 }
 

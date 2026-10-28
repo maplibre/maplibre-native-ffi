@@ -141,6 +141,11 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// their coordinates. Zero, with a size of zero, unless disposition is
   /// `RenderResult.rendered`.
   public var view: MapView
+  /// `RenderMode.full` when the frame drew its update with the style and every
+  /// tile and image that the update needs loaded. Partial unless disposition is
+  /// `RenderResult.rendered`. It matches the mode field of
+  /// `RuntimeEventType.mapRenderFrameFinished`.
+  public var mode: RenderMode
   public init(
     disposition: RenderResult = .init(rawValue: 0),
     token: UInt64 = 0,
@@ -148,7 +153,8 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     generation: UInt64 = 0,
     frameGeneration: UInt64 = 0,
     needsRepaint: Bool = false,
-    view: MapView = .init()
+    view: MapView = .init(),
+    mode: RenderMode = .init(rawValue: 0)
   ) {
     self.disposition = disposition
     self.token = token
@@ -157,6 +163,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     self.frameGeneration = frameGeneration
     self.needsRepaint = needsRepaint
     self.view = view
+    self.mode = mode
   }
 
   init(raw: mln_render_frame_result) {
@@ -167,6 +174,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     frameGeneration = raw.frame_generation
     needsRepaint = raw.needs_repaint
     view = MapView(raw: raw.view)
+    mode = RenderMode(rawValue: raw.mode.rawValue)
   }
 }
 

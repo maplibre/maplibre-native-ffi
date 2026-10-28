@@ -531,7 +531,7 @@ final class RenderDriverKind extends _Enum {
   };
 }
 
-/// Render modes reported by render observer events.
+/// Render modes reported by render observer events and frame results.
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1742,6 +1742,7 @@ final class RenderFrameResult extends _Value {
     this.frameGeneration = 0,
     this.needsRepaint = false,
     this.view = const MapView(),
+    this.mode = const RenderMode.fromRawValue(0),
   });
   final RenderResult disposition;
   final int token;
@@ -1775,6 +1776,12 @@ final class RenderFrameResult extends _Value {
   /// `RenderResult.rendered`.
   final MapView view;
 
+  /// `RenderMode.full` when the frame drew its update with the style and every
+  /// tile and image that the update needs loaded. Partial unless disposition is
+  /// `RenderResult.rendered`. It matches the mode field of
+  /// `RuntimeEventType.mapRenderFrameFinished`.
+  final RenderMode mode;
+
   @override
   List<Object?> get _members => [
     disposition,
@@ -1784,6 +1791,7 @@ final class RenderFrameResult extends _Value {
     frameGeneration,
     needsRepaint,
     view,
+    mode,
   ];
   @override
   String toString() => _describe('RenderFrameResult', const [
@@ -1794,6 +1802,7 @@ final class RenderFrameResult extends _Value {
     'frameGeneration',
     'needsRepaint',
     'view',
+    'mode',
   ]);
 }
 

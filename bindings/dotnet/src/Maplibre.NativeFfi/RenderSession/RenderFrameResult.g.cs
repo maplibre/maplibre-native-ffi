@@ -39,6 +39,12 @@ namespace Maplibre.NativeFfi;
 /// their coordinates. Zero, with a size of zero, unless disposition is
 /// <c>RenderResult.Rendered</c>.
 /// </param>
+/// <param name="Mode">
+/// <c>RenderMode.Full</c> when the frame drew its update with the style and
+/// every tile and image that the update needs loaded. Partial unless
+/// disposition is <c>RenderResult.Rendered</c>. It matches the mode field of
+/// <c>RuntimeEventType.MapRenderFrameFinished</c>.
+/// </param>
 public readonly partial record struct RenderFrameResult(
     RenderResult Disposition,
     ulong Token,
@@ -46,5 +52,6 @@ public readonly partial record struct RenderFrameResult(
     ulong Generation,
     ulong FrameGeneration,
     bool NeedsRepaint,
-    MapView View
+    MapView View,
+    RenderMode Mode
 );

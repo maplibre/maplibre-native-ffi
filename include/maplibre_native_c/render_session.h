@@ -175,6 +175,19 @@ typedef struct mln_render_frame_result {
    * MLN_RENDER_RESULT_RENDERED.
    */
   mln_map_view view;
+  /**
+   * MLN_RENDER_MODE_FULL when the frame drew its update with the style and
+   * every tile and image that the update needs loaded. Partial unless
+   * disposition is MLN_RENDER_RESULT_RENDERED. It matches the mode field of
+   * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED.
+   *
+   * A full frame without needs_repaint, whose map_update_generation is at or
+   * past the latest_render_update_generation of a map snapshot that reports
+   * no transition in progress, shows the map settled, as
+   * MLN_RUNTIME_EVENT_MAP_IDLE reports: fully loaded, needing no further
+   * frame, and drawing the state of every command that snapshot observes.
+   */
+  mln_render_mode mode;
 } mln_render_frame_result;
 
 /**

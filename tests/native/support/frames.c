@@ -165,82 +165,52 @@ mln_render_frame_result mln_test_render_batch_result(
   return *mln_test_render_view_result(&view, index);
 }
 
-typedef struct idle_wait {
-  mln_runtime runtime;
-  mln_map map;
-  const mln_test_render_fixture* fixture;
-  bool idle;
-  bool has_stats;
-  mln_rendering_stats stats;
-} idle_wait;
-
-// Idle ends the wait. Each finished frame's statistics replace the ones before.
-// The runtime's other maps report their own frames, which say nothing of this
-// one.
-static bool record_idle_or_stats(
-  const mln_runtime_event* event, void* context
+// Whether a rendered frame shows the map settled: fully loaded, wanting no
+// further frame, and drawing the newest update the map has published.
+static bool frame_shows_settled_map(
+  mln_map map, const mln_render_frame_result* frame
 ) {
-  idle_wait* wait = context;
-  if (
-    event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
-    event->source != wait->map
-  ) {
+  if (frame->mode != MLN_RENDER_MODE_FULL || frame->needs_repaint) {
     return false;
   }
-  if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
-    wait->idle = true;
-  } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
-    wait->has_stats = true;
-    wait->stats = event->payload.render_frame.stats;
-  }
-  return false;
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  return !snapshot.transition_in_progress &&
+         frame->map_update_generation >=
+           snapshot.latest_render_update_generation;
 }
 
-// A frame's finished and idle events reach the queue from the map's run loop
-// after the session publishes the frame's result, so a drain right away would
-// see them only on a later turn of the wait. A fence on the map waits them
-// out, but it can join a burst of runtime work scheduled ahead of the frame's
-// message; a second fence then runs behind it.
-static void drain_idle_events(idle_wait* wait) {
-  (void)mln_test_render_fixture_service(wait->fixture);
-  MLN_TEST_OK(mln_test_map_fence(wait->map));
-  MLN_TEST_OK(mln_test_map_fence(wait->map));
-  (void)mln_test_drain_counting_matching(
-    wait->runtime, record_idle_or_stats, wait
-  );
-}
-
-bool mln_test_render_until_idle(
-  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture,
-  mln_rendering_stats* latest_stats
+void mln_test_render_until_idle(
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
   MLN_TEST_OK(mln_test_map_fence(map));
-  idle_wait wait = {.runtime = runtime, .map = map, .fixture = fixture};
   const mln_test_deadline deadline = mln_test_deadline_default();
+  // The first demand renders an update the case published. When there is none,
+  // a forced frame shows whether the update the session last drew settled the
+  // map. After an unsettled frame, the next update brings what the map lacked.
+  mln_frame_demand_flags flags = 0;
   for (;;) {
-    if (wait.idle) {
-      mln_render_session_snapshot snapshot = {
-        .size = sizeof(mln_render_session_snapshot)
-      };
-      MLN_TEST_OK(
-        mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
-      );
-      if (!snapshot.pending_changes) {
-        if (latest_stats != NULL && wait.has_stats) {
-          *latest_stats = wait.stats;
-        }
-        return wait.has_stats;
-      }
-    }
     mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-    demand.flags = 0;
+    demand.flags = flags;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
-    mln_render_frame_batch_release(mln_test_render_wait_for_results(fixture));
-    drain_idle_events(&wait);
+    const mln_render_frame_batch batch =
+      mln_test_render_wait_for_results(fixture);
+    const mln_render_frame_result frame =
+      mln_test_render_batch_result(batch, 0);
+    mln_render_frame_batch_release(batch);
+    (void)mln_test_drain_all(runtime);
+    if (frame.disposition == MLN_RENDER_RESULT_RENDERED) {
+      if (frame_shows_settled_map(map, &frame)) {
+        return;
+      }
+      flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+    } else if (frame.disposition == MLN_RENDER_RESULT_NO_UPDATE) {
+      flags = MLN_FRAME_DEMAND_FORCE;
+    }
     TEST_ASSERT_FALSE_MESSAGE(
-      mln_test_deadline_passed(deadline), "the map never reported idle"
+      mln_test_deadline_passed(deadline), "the map never settled"
     );
   }
 }

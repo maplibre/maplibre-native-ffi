@@ -682,6 +682,7 @@ internal unsafe struct mln_render_frame_result
     public ulong frame_generation;
     public byte needs_repaint;
     public mln_map_view view;
+    public mln_render_mode mode;
 }
 
 internal unsafe struct mln_render_session_attach_options

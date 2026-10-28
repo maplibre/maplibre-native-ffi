@@ -1096,6 +1096,7 @@ pub struct mln_render_frame_result {
     pub frame_generation: u64,
     pub needs_repaint: bool,
     pub view: mln_map_view,
+    pub mode: mln_render_mode,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

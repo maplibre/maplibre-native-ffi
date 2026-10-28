@@ -4246,6 +4246,11 @@ pub const RenderFrameResult = struct {
     /// coordinates. Zero, with a size of zero, unless disposition is
     /// `RenderResult.rendered`.
     view: MapView = .{},
+    /// `RenderMode.full` when the frame drew its update with the style and
+    /// every tile and image that the update needs loaded. Partial unless
+    /// disposition is `RenderResult.rendered`. It matches the mode field of
+    /// `RuntimeEventType.map_render_frame_finished`.
+    mode: RenderMode = .partial,
     pub fn fromNative(raw: c.mln_render_frame_result) RenderFrameResult {
         return .{
             .disposition = RenderResult.fromNative(raw.disposition),
@@ -4255,11 +4260,12 @@ pub const RenderFrameResult = struct {
             .frame_generation = raw.frame_generation,
             .needs_repaint = raw.needs_repaint,
             .view = MapView.fromNative(raw.view),
+            .mode = RenderMode.fromNative(raw.mode),
         };
     }
 };
 
-/// Render modes reported by render observer events.
+/// Render modes reported by render observer events and frame results.
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

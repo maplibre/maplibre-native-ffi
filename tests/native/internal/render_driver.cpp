@@ -321,9 +321,7 @@ void graphics_failures_finish_demands_and_lose_the_target() {
        }) {
     auto fixture = Fixture{};
     create_fixture(fixture);
-    static_cast<void>(mln_test_render_until_idle(
-      fixture.runtime, fixture.map, &fixture.render, nullptr
-    ));
+    mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
     install_frame_failure(fixture, failure);
     auto blocker = DriverBlocker{};
     block_driver(fixture, blocker);
@@ -384,9 +382,7 @@ void graphics_failures_finish_demands_and_lose_the_target() {
 void an_unavailable_drawable_releases_its_slot_for_a_retry() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   install_frame_failure(fixture, FrameFailure::Drawable);
   mln_test_render_request_forced(&fixture.render, 9102);
   auto batch = wait_for_results(fixture);
@@ -489,9 +485,7 @@ void an_update_during_a_failed_still_image_attempt_retries_it() {
 void an_idle_demand_reports_a_failed_backend_activation() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   install_frame_failure(fixture, FrameFailure::Activation);
   auto demand = mln_frame_demand{};
   demand.size = sizeof(mln_frame_demand);
@@ -523,9 +517,7 @@ void an_idle_demand_reports_a_failed_backend_activation() {
 void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   mln_test_render_request_forced(&fixture.render, 9002);
@@ -693,9 +685,7 @@ void unforced_demands_supersede_and_forced_demands_render() {
 void supersession_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto before = mln_render_session_snapshot{};
   before.size = sizeof(before);
   MLN_TEST_OK(
@@ -738,9 +728,7 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
 void scheduler_service_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   const auto live = mln::core::lease_render_session(fixture.render.session);
@@ -1372,9 +1360,7 @@ auto request_waiting(const Fixture& fixture, uint64_t token) -> mln_status {
 }
 
 void render_until_idle(const Fixture& fixture) {
-  static_cast<void>(mln_test_render_until_idle(
-    fixture.runtime, fixture.map, &fixture.render, nullptr
-  ));
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
 }
 
 // Runs after every work item that the driver already holds. Dumping debug

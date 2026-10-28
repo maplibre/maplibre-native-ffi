@@ -477,7 +477,7 @@ class RenderDriverKind(UnknownIntEnum):
 
 
 class RenderMode(UnknownIntEnum):
-    """Render modes reported by render observer events.
+    """Render modes reported by render observer events and frame results.
 
     See `mln_render_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2682,6 +2682,13 @@ class RenderFrameResult:
     `RenderResult.RENDERED`.
     """
 
+    mode: RenderMode
+    """`RenderMode.FULL` when the frame drew its update with the style and every
+    tile and image that the update needs loaded. Partial unless disposition
+    is `RenderResult.RENDERED`. It matches the mode field of
+    `RuntimeEventType.MAP_RENDER_FRAME_FINISHED`.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2692,6 +2699,7 @@ class RenderFrameResult:
             frame_generation=raw["frame_generation"],
             needs_repaint=raw["needs_repaint"],
             view=MapView._from_native(raw["view"]),
+            mode=RenderMode(raw["mode"]),
         )
 
 

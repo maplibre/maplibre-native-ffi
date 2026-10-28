@@ -277,7 +277,7 @@ typedef enum mln_camera_change_mode : uint32_t {
   MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 } mln_camera_change_mode;
 
-/** Render modes reported by render observer events. */
+/** Render modes reported by render observer events and frame results. */
 typedef enum mln_render_mode : uint32_t {
   MLN_RENDER_MODE_PARTIAL = 0,
   MLN_RENDER_MODE_FULL = 1,

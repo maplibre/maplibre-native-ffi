@@ -618,7 +618,7 @@ func (value RenderDriverKind) String() string {
 }
 
 // RenderMode corresponds to mln_render_mode. Render modes reported by render
-// observer events.
+// observer events and frame results.
 //
 // See mln_render_mode in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -3524,6 +3524,11 @@ type RenderFrameResult struct {
 	// NewMapProjection() to place overlays where the frame drew their coordinates.
 	// Zero, with a size of zero, unless disposition is RenderResultRendered.
 	View MapView
+	// RenderModeFull when the frame drew its update with the style and every tile
+	// and image that the update needs loaded. Partial unless disposition is
+	// RenderResultRendered. It matches the mode field of
+	// RuntimeEventTypeMapRenderFrameFinished.
+	Mode RenderMode
 }
 
 func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
@@ -3535,6 +3540,7 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.NeedsRepaint = bool(raw.needs_repaint)
 	result.View = copyMapView(raw.view)
+	result.Mode = RenderMode(raw.mode)
 	return result
 }
 

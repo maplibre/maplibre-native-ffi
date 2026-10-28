@@ -2101,8 +2101,8 @@ namespace {
 
 auto render_session_render_update_on_driver(
   mln_render_session_object& session, mln_render_result* out_result,
-  bool* out_needs_repaint, uint64_t* out_map_update_generation,
-  mln_map_view* out_view
+  mln_render_mode* out_mode, bool* out_needs_repaint,
+  uint64_t* out_map_update_generation, mln_map_view* out_view
 ) -> mln_status {
   auto* live = &session;
   if (!live->attached || !has_backend(live)) {
@@ -2110,6 +2110,7 @@ auto render_session_render_update_on_driver(
     return MLN_STATUS_INVALID_STATE;
   }
   *out_result = MLN_RENDER_RESULT_NO_UPDATE;
+  *out_mode = MLN_RENDER_MODE_PARTIAL;
   *out_needs_repaint = false;
 
   auto* backend = renderer_backend(live);
@@ -2279,6 +2280,7 @@ auto render_session_render_update_on_driver(
     live->pending_changes = false;
   }
   *out_result = MLN_RENDER_RESULT_RENDERED;
+  *out_mode = live->frame_observer.mode();
   *out_needs_repaint = live->frame_observer.needs_repaint();
   return MLN_STATUS_OK;
 }
@@ -2657,7 +2659,8 @@ auto finish_demand_locked(
       session.generation,
       0,
       false,
-      {}
+      {},
+      MLN_RENDER_MODE_PARTIAL
     },
     wakes
   );
@@ -2901,6 +2904,7 @@ auto run_frame_demand(
     .frame_generation = 0,
     .needs_repaint = false,
     .view = {},
+    .mode = MLN_RENDER_MODE_PARTIAL,
   };
   const auto waits_for_update =
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
@@ -3012,6 +3016,7 @@ auto run_frame_demand(
       }
     }
     auto disposition = MLN_RENDER_RESULT_NO_UPDATE;
+    auto mode = MLN_RENDER_MODE_PARTIAL;
     auto needs_repaint = false;
     auto view = mln_map_view{};
     auto metadata = std::any{};
@@ -3031,7 +3036,8 @@ auto run_frame_demand(
         presents && (demand->flags & MLN_FRAME_DEMAND_PRESENT) == 0
       };
       const auto status = render_session_render_update_on_driver(
-        *session, &disposition, &needs_repaint, &rendered_map_generation, &view
+        *session, &disposition, &mode, &needs_repaint, &rendered_map_generation,
+        &view
       );
       if (status != MLN_STATUS_OK) {
         scope.reset();
@@ -3045,6 +3051,7 @@ auto run_frame_demand(
     result.disposition = disposition;
     result.map_update_generation = rendered_map_generation;
     if (disposition == MLN_RENDER_RESULT_RENDERED) {
+      result.mode = mode;
       result.needs_repaint = needs_repaint;
       result.view = view;
       auto metadata_request = RenderFrameMetadata{};
@@ -3079,6 +3086,7 @@ auto run_frame_demand(
           result.frame_generation = 0;
           result.needs_repaint = false;
           result.view = mln_map_view{};
+          result.mode = MLN_RENDER_MODE_PARTIAL;
           publish_frame_result(session, result);
           return;
         }
@@ -3124,6 +3132,7 @@ auto run_frame_demand(
     result.frame_generation = 0;
     result.needs_repaint = false;
     result.view = mln_map_view{};
+    result.mode = MLN_RENDER_MODE_PARTIAL;
   }
   if (
     waits_for_update && result.disposition == MLN_RENDER_RESULT_NO_UPDATE &&
@@ -3237,7 +3246,8 @@ auto render_session_request_frame(
           live->generation,
           0,
           false,
-          {}
+          {},
+          MLN_RENDER_MODE_PARTIAL
         },
         wakes
       );

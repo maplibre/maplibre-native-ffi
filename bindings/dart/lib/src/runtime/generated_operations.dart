@@ -243,6 +243,7 @@ RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
       frameGeneration: source.frame_generation,
       needsRepaint: source.needs_repaint,
       view: _readMapView(source.view),
+      mode: RenderMode.fromRawValue(source.mode),
     );
 
 VulkanTextureFrame _readVulkanTextureFrame(

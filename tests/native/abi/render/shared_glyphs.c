@@ -72,7 +72,7 @@ static void render_text(
   MLN_TEST_OK(
     mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(text_style_json))
   );
-  TEST_ASSERT_TRUE(mln_test_render_until_idle(runtime, map, fixture, NULL));
+  mln_test_render_until_idle(runtime, map, fixture);
   mln_texture_image_info info = {0};
   MLN_TEST_OK(mln_test_render_read_back(fixture, &info, pixels, pixel_bytes));
   TEST_ASSERT_EQUAL_size_t(pixel_bytes, info.byte_length);

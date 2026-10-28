@@ -792,6 +792,7 @@ fn generated_copy_mln_render_frame_result(
     )?;
     dict.set_item("needs_repaint", generated_value(py, value.needs_repaint)?)?;
     dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
+    dict.set_item("mode", generated_value(py, value.mode)?)?;
     Ok(dict.into_any().unbind())
 }
 
