@@ -44,7 +44,7 @@ static bool frame_finished_while_retained(void* context) {
 
 static bool repaint_waits_for_a_demand(void* context) {
   const mln_render_session_snapshot snapshot = session_snapshot(context);
-  return snapshot.pending_changes;
+  return snapshot.map_update_generation > snapshot.rendered_update_generation;
 }
 
 static void request_next(replacement_wait* wait) {

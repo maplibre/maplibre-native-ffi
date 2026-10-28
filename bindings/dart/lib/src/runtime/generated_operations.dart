@@ -1772,7 +1772,6 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   renderedUpdateGeneration: source.rendered_update_generation,
   frameGeneration: source.frame_generation,
   acquiredFrameCount: source.acquired_frame_count,
-  pendingChanges: source.pending_changes,
 );
 
 Pointer<raw.mln_screen_box> _writeScreenBox(

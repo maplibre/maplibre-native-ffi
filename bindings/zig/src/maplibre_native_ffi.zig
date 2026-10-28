@@ -4411,9 +4411,6 @@ pub const RenderSessionSnapshot = struct {
     frame_generation: u64 = 0,
     /// Acquired frames that the host has not released or discarded.
     acquired_frame_count: u32 = 0,
-    /// True when a map update or an accepted resize arrived after the latest
-    /// rendered frame.
-    pending_changes: bool = false,
     pub fn fromNative(raw: c.mln_render_session_snapshot) RenderSessionSnapshot {
         return .{
             .state = RenderSessionState.fromNative(raw.state),
@@ -4423,7 +4420,6 @@ pub const RenderSessionSnapshot = struct {
             .rendered_update_generation = raw.rendered_update_generation,
             .frame_generation = raw.frame_generation,
             .acquired_frame_count = raw.acquired_frame_count,
-            .pending_changes = raw.pending_changes,
         };
     }
 };

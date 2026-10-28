@@ -4447,7 +4447,6 @@ final class RenderSessionSnapshot extends _Value {
     this.renderedUpdateGeneration = 0,
     this.frameGeneration = 0,
     this.acquiredFrameCount = 0,
-    this.pendingChanges = false,
   });
   final RenderSessionState state;
 
@@ -4471,10 +4470,6 @@ final class RenderSessionSnapshot extends _Value {
   /// Acquired frames that the host has not released or discarded.
   final int acquiredFrameCount;
 
-  /// True when a map update or an accepted resize arrived after the latest
-  /// rendered frame.
-  final bool pendingChanges;
-
   @override
   List<Object?> get _members => [
     state,
@@ -4484,7 +4479,6 @@ final class RenderSessionSnapshot extends _Value {
     renderedUpdateGeneration,
     frameGeneration,
     acquiredFrameCount,
-    pendingChanges,
   ];
   @override
   String toString() => _describe('RenderSessionSnapshot', const [
@@ -4495,7 +4489,6 @@ final class RenderSessionSnapshot extends _Value {
     'renderedUpdateGeneration',
     'frameGeneration',
     'acquiredFrameCount',
-    'pendingChanges',
   ]);
 }
 

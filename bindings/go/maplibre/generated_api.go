@@ -3628,9 +3628,6 @@ type RenderSessionSnapshot struct {
 	FrameGeneration uint64
 	// Acquired frames that the host has not released or discarded.
 	AcquiredFrameCount uint32
-	// True when a map update or an accepted resize arrived after the latest
-	// rendered frame.
-	PendingChanges bool
 }
 
 func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionSnapshot {
@@ -3642,7 +3639,6 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.RenderedUpdateGeneration = uint64(raw.rendered_update_generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
-	result.PendingChanges = bool(raw.pending_changes)
 	return result
 }
 

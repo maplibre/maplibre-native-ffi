@@ -236,11 +236,6 @@ typedef struct mln_render_session_snapshot {
   uint64_t frame_generation;
   /** Acquired frames that the host has not released or discarded. */
   uint32_t acquired_frame_count;
-  /**
-   * True when a map update or an accepted resize arrived after the latest
-   * rendered frame.
-   */
-  bool pending_changes;
 } mln_render_session_snapshot;
 
 /** What abandon did with a session's graphics resources. */

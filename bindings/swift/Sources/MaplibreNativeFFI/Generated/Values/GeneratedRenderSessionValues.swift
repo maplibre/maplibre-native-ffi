@@ -237,9 +237,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var frameGeneration: UInt64
   /// Acquired frames that the host has not released or discarded.
   public var acquiredFrameCount: UInt32
-  /// True when a map update or an accepted resize arrived after the latest
-  /// rendered frame.
-  public var pendingChanges: Bool
   public init(
     state: RenderSessionState = .init(rawValue: 0),
     extent: LogicalExtent = .init(),
@@ -247,8 +244,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     mapUpdateGeneration: UInt64 = 0,
     renderedUpdateGeneration: UInt64 = 0,
     frameGeneration: UInt64 = 0,
-    acquiredFrameCount: UInt32 = 0,
-    pendingChanges: Bool = false
+    acquiredFrameCount: UInt32 = 0
   ) {
     self.state = state
     self.extent = extent
@@ -257,7 +253,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     self.renderedUpdateGeneration = renderedUpdateGeneration
     self.frameGeneration = frameGeneration
     self.acquiredFrameCount = acquiredFrameCount
-    self.pendingChanges = pendingChanges
   }
 
   init(raw: mln_render_session_snapshot) {
@@ -268,7 +263,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     renderedUpdateGeneration = raw.rendered_update_generation
     frameGeneration = raw.frame_generation
     acquiredFrameCount = raw.acquired_frame_count
-    pendingChanges = raw.pending_changes
   }
 }
 

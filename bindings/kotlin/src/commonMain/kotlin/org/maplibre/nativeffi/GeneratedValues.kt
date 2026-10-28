@@ -3166,8 +3166,6 @@ public data class RenderSessionSnapshot(
   public val frameGeneration: ULong,
   /** Acquired frames that the host has not released or discarded. */
   public val acquiredFrameCount: UInt,
-  /** True when a map update or an accepted resize arrived after the latest rendered frame. */
-  public val pendingChanges: Boolean,
 )
 
 /**

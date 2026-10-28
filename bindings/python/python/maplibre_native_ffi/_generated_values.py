@@ -2813,11 +2813,6 @@ class RenderSessionSnapshot:
     acquired_frame_count: int
     """Acquired frames that the host has not released or discarded."""
 
-    pending_changes: bool
-    """True when a map update or an accepted resize arrived after the latest
-    rendered frame.
-    """
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2828,7 +2823,6 @@ class RenderSessionSnapshot:
             rendered_update_generation=raw["rendered_update_generation"],
             frame_generation=raw["frame_generation"],
             acquired_frame_count=raw["acquired_frame_count"],
-            pending_changes=raw["pending_changes"],
         )
 
 

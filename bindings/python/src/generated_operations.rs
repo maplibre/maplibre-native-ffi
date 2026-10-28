@@ -837,10 +837,6 @@ fn generated_copy_mln_render_session_snapshot(
         "acquired_frame_count",
         generated_value(py, value.acquired_frame_count)?,
     )?;
-    dict.set_item(
-        "pending_changes",
-        generated_value(py, value.pending_changes)?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 

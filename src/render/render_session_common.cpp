@@ -3185,7 +3185,6 @@ auto render_session_get_snapshot(
     .rendered_update_generation = live->rendered_update_generation,
     .frame_generation = live->frame_generation,
     .acquired_frame_count = live->acquired_frame_count,
-    .pending_changes = live->pending_changes,
   };
   return MLN_STATUS_OK;
 }

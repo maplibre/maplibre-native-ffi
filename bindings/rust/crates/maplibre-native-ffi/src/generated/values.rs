@@ -3302,9 +3302,6 @@ pub struct RenderSessionSnapshot {
     pub frame_generation: u64,
     /// Acquired frames that the host has not released or discarded.
     pub acquired_frame_count: u32,
-    /// True when a map update or an accepted resize arrived after the latest
-    /// rendered frame.
-    pub pending_changes: bool,
 }
 impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
     unsafe fn from_native(raw: sys::mln_render_session_snapshot) -> Result<Self> {
@@ -3316,7 +3313,6 @@ impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
             rendered_update_generation: raw.rendered_update_generation,
             frame_generation: raw.frame_generation,
             acquired_frame_count: raw.acquired_frame_count,
-            pending_changes: raw.pending_changes,
         })
     }
 }

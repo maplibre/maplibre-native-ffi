@@ -1475,8 +1475,7 @@ internal static unsafe class GeneratedValues
             value.map_update_generation,
             value.rendered_update_generation,
             value.frame_generation,
-            value.acquired_frame_count,
-            value.pending_changes != 0
+            value.acquired_frame_count
         );
 
     internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>

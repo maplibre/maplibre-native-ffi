@@ -957,8 +957,6 @@ final class mln_render_session_snapshot extends Struct {
   external int frame_generation;
   @Uint32()
   external int acquired_frame_count;
-  @Bool()
-  external bool pending_changes;
 }
 
 final class mln_rendered_feature extends Struct {

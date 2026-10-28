@@ -1948,11 +1948,6 @@ export interface RenderSessionSnapshot {
    * Acquired frames that the host has not released or discarded.
    */
   readonly acquiredFrameCount: number;
-  /**
-   * True when a map update or an accepted resize arrived after the latest
-   * rendered frame.
-   */
-  readonly pendingChanges: boolean;
 }
 
 /**

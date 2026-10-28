@@ -1128,7 +1128,6 @@ pub struct mln_render_session_snapshot {
     pub rendered_update_generation: u64,
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
-    pub pending_changes: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

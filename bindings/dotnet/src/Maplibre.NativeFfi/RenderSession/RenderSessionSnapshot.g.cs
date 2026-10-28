@@ -29,10 +29,6 @@ namespace Maplibre.NativeFfi;
 /// <param name="AcquiredFrameCount">
 /// Acquired frames that the host has not released or discarded.
 /// </param>
-/// <param name="PendingChanges">
-/// True when a map update or an accepted resize arrived after the latest
-/// rendered frame.
-/// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     LogicalExtent Extent,
@@ -40,6 +36,5 @@ public readonly partial record struct RenderSessionSnapshot(
     ulong MapUpdateGeneration,
     ulong RenderedUpdateGeneration,
     ulong FrameGeneration,
-    uint AcquiredFrameCount,
-    bool PendingChanges
+    uint AcquiredFrameCount
 );

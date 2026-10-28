@@ -714,7 +714,6 @@ internal unsafe struct mln_render_session_snapshot
     public ulong rendered_update_generation;
     public ulong frame_generation;
     public uint acquired_frame_count;
-    public byte pending_changes;
 }
 
 internal unsafe struct mln_rendered_feature
