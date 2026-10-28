@@ -12,8 +12,8 @@ passed; `mise run ci:release-version --next` names it.
 
 ## Find what changed
 
-Work from the code at the two endpoints, not from PR titles or descriptions. PRs
-only point to where to look, and a description can be stale.
+PR titles and descriptions show where to look, but confirm each change in the
+code at the two endpoints, since a description can be stale.
 
 - The C API: diff `include/maplibre_native_c/`, and read the implementation
   where a header doesn't say how behavior changed.
