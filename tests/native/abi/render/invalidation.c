@@ -643,12 +643,22 @@ static void frame_results_report_whether_the_map_was_fully_loaded(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
+  // A frame of the loaded style asks for the tile. The first update the
+  // session finds can still be one from before the style loaded.
+  const mln_test_deadline deadline = mln_test_deadline_default();
+  while (mln_test_provider_requests(provider, held_tile_url) == 0) {
+    mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
+    MLN_TEST_OK(
+      mln_render_session_request_frame(fixture.session, &demand, NULL)
+    );
+    mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
+    TEST_ASSERT_FALSE_MESSAGE(
+      mln_test_deadline_passed(deadline), "the map never asked for its tile"
+    );
+  }
   const mln_render_frame_result loading = render_forced(&fixture, 1);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_MODE_PARTIAL, loading.mode);
 
-  TEST_ASSERT_TRUE(
-    mln_test_provider_wait_for_requests(provider, held_tile_url, 1)
-  );
   const mln_test_provider_request* request =
     mln_test_provider_request_at(provider, held_tile_url, 0);
   TEST_ASSERT_NOT_NULL(request);
