@@ -63,8 +63,9 @@ impl GeneratedDispatcher {
                 }
                 state.woken = false;
             }
-            // SAFETY: the queue stays live until shutdown joins this thread.
-            // Only this thread dispatches it, so the call never reports busy.
+            // SAFETY: the queue is a valid handle, which shutdown may have
+            // released; dispatch then runs nothing. Only this thread
+            // dispatches it, so the call never reports busy.
             unsafe { sys::mln_delivery_queue_dispatch(self.queue, ptr::null_mut()) };
         }
     }
@@ -148,11 +149,10 @@ fn generated_on_dispatcher_thread() -> bool {
 }
 
 /// Stops the dispatcher at interpreter shutdown, before the interpreter
-/// finalizes, so no Python code runs after it. The call that runs when the
-/// hook does finishes first. The queue is then released, which abandons every
-/// pending call and refuses later ones, and each live render session ends its
-/// graphics calls before the host's own exit teardown can destroy its
-/// graphics objects.
+/// finalizes, so no Python code runs after it. Releasing the queue abandons
+/// every pending call and refuses later ones; the call that runs when the hook
+/// does finishes first. Each live render session then ends its graphics calls
+/// before the host's own exit teardown can destroy its graphics objects.
 #[pyfunction]
 fn generated_stop_dispatcher(py: Python<'_>) {
     let Some(dispatcher) = *generated_lock(&GENERATED_DISPATCHER) else {
@@ -166,12 +166,13 @@ fn generated_stop_dispatcher(py: Python<'_>) {
     dispatcher.wake.signal.notify_one();
     // The running call may need the interpreter to finish.
     py.detach(move || {
+        // Released before the join, so the running dispatch abandons the
+        // calls it has not started.
+        // SAFETY: the queue is released once, and stopping refuses new uses.
+        unsafe { sys::mln_delivery_queue_release(dispatcher.queue) };
         if let Some(thread) = thread {
             let _ = thread.join();
         }
-        // SAFETY: the dispatcher thread has stopped, so nothing dispatches
-        // the queue, and it is released once.
-        unsafe { sys::mln_delivery_queue_release(dispatcher.queue) };
         generated_abandon_sessions_at_exit();
     });
 }
