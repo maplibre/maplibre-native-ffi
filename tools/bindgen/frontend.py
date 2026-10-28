@@ -30,7 +30,7 @@ from .model import (
     Typedef,
 )
 from .names import type_name
-from .protocol import DELIVERY_BATCH, DELIVERY_QUEUE, DIAGNOSTIC
+from .protocol import DELIVERY_QUEUE, DIAGNOSTIC
 from .schema import apply_defaults
 
 # libclang creates its enum members after class construction. Its Python
@@ -572,13 +572,12 @@ def extract_headers(
 
 def delivery_functions(api: Api) -> set[str]:
     """The functions of the queue delivery protocol: those that take or return
-    a delivery queue or batch handle."""
+    a delivery queue handle."""
     return {
         function.name
         for function in api.functions
         if any(
-            type_name(parameter.type.pointee or parameter.type)
-            in {DELIVERY_QUEUE, DELIVERY_BATCH}
+            type_name(parameter.type.pointee or parameter.type) == DELIVERY_QUEUE
             for parameter in function.parameters
         )
     }

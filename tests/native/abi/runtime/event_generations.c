@@ -87,27 +87,25 @@ static void record_event(const mln_runtime_event* event) {
   record->fully_loaded = snapshot.fully_loaded;
 }
 
+static void record_visited_event(
+  const mln_runtime_event* event, void* context
+) {
+  (void)context;
+  record_event(event);
+}
+
 // Drains the queue into the recorder without asserting, so a wake or a
 // completion may call it; the recorder keeps a failure for the test to report.
 static void recorder_drain(void) {
   recorder_lock();
   while (!recorder.callbacks) {
-    mln_delivery_batch batch = MLN_HANDLE_NULL;
-    mln_event_batch_view view = {.size = sizeof(view)};
-    const mln_status drained =
-      mln_test_drain_event_delivery(recorder.runtime, &batch, &view, NULL);
-    // An empty queue publishes no batch.
-    if (drained == MLN_STATUS_NOT_READY) break;
-    if (drained != MLN_STATUS_OK) {
+    const mln_status dispatched =
+      mln_test_dispatch_events(recorder.runtime, record_visited_event, NULL);
+    if (dispatched == MLN_STATUS_NOT_READY) break;
+    if (dispatched != MLN_STATUS_OK) {
       recorder.drain_failed = true;
       break;
     }
-    for (size_t index = 0; index < view.event_count; index += 1) {
-      record_event(
-        MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index)
-      );
-    }
-    mln_delivery_batch_release(batch);
   }
   recorder_unlock();
 }

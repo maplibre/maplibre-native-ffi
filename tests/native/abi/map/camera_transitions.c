@@ -112,6 +112,21 @@ typedef struct end_observation {
   double snapshot_zoom;
 } end_observation;
 
+typedef struct did_change_search {
+  end_observation* observation;
+  uint64_t generation;
+} did_change_search;
+
+static void find_did_change(const mln_runtime_event* event, void* context) {
+  did_change_search* search = context;
+  if (
+    event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
+    event->generation == search->generation
+  ) {
+    search->observation->did_change_queued = true;
+  }
+}
+
 // Drains the queue and reads the published snapshot from inside the callback.
 // The callback runs after the MapLibre update that ended the transition
 // returns, so the camera events of that update are queued.
@@ -119,23 +134,12 @@ static void observe_end(
   mln_test_transition_end* probe, const mln_camera_transition_end* end
 ) {
   end_observation* observation = probe->context;
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_event_batch_view view = {.size = sizeof(view)};
+  did_change_search search = {
+    .observation = observation, .generation = end->generation
+  };
   while (
-    mln_test_drain_event_delivery(observation->runtime, &batch, &view, NULL) ==
+    mln_test_dispatch_events(observation->runtime, find_did_change, &search) ==
     MLN_STATUS_OK) {
-    for (size_t index = 0; index < view.event_count; index += 1) {
-      const mln_runtime_event* event =
-        MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index);
-      if (
-        event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
-        event->generation == end->generation
-      ) {
-        observation->did_change_queued = true;
-      }
-    }
-    mln_delivery_batch_release(batch);
-    batch = MLN_HANDLE_NULL;
   }
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   if (

@@ -363,8 +363,8 @@ void queue_request_cancel(
   void* registration, mln_resource_request handle
 ) noexcept {
   static_cast<mln::delivery::QueuedRegistration*>(registration)
-    ->push_reserved<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
-      mln_resource_request_cancel_delivery{.handle = handle}
+    ->push_reserved(
+      mln::delivery::ResourceRequestCancelArguments{.handle = handle}
     );
 }
 
@@ -722,8 +722,7 @@ auto set_resource_request_cancel_callback(
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
   const auto queue_status = mln::delivery::resolve_registration_queue(
-    "cancel handler", handler->queue, handler->callback != nullptr,
-    handler->release_user_data != nullptr, queue
+    "cancel handler", handler->queue, handler->callback != nullptr, queue
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
@@ -736,13 +735,13 @@ auto set_resource_request_cancel_callback(
     registration = std::make_unique<Registration>(
       std::move(queue), handler->user_data, handler->release_user_data,
       std::initializer_list<Registration::Callback>{
-        Registration::callback<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
+        Registration::callback<mln::delivery::ResourceRequestCancelArguments>(
           handler->callback
         )
       }
     );
-    registration->reserve<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
-      mln_resource_request_cancel_delivery{.handle = handle}
+    registration->reserve(
+      mln::delivery::ResourceRequestCancelArguments{.handle = handle}
     );
   }
   const std::scoped_lock lock(live->mutex);

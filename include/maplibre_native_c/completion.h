@@ -83,14 +83,14 @@ typedef void (*mln_completion_callback)(
 );
 
 /**
- * Callback or queue state for one asynchronous submission. The completion may
- * run, or its delivery be queued, before the submitting call returns.
+ * Callback state for one asynchronous submission. The completion may run, or
+ * be queued, before the submitting call returns.
  *
- * The struct itself is borrowed for the submission call. A non-null completion
- * sets callback, queue, or both. MLN_STATUS_OK transfers callback, user_data,
- * and release_user_data to the C API. The completion runs exactly once. The
- * release callback runs after the completion returns. A non-OK submission
- * invokes neither callback and leaves user_data owned by the caller.
+ * The struct itself is borrowed for the submission call. MLN_STATUS_OK
+ * transfers callback, user_data, and release_user_data to the C API. The
+ * completion runs exactly once. The release callback runs after the completion
+ * returns. A non-OK submission invokes neither callback and leaves user_data
+ * owned by the caller.
  *
  * A command, which the header marks MLN_BINDING("execution=command"), also
  * accepts a null completion, which discards its outcome and runs no callback.
@@ -117,40 +117,26 @@ typedef void (*mln_completion_callback)(
  * graphics-driver work that can only progress on its current thread.
  *
  * A completion that names a queue runs in mln_delivery_queue_dispatch()
- * instead, or, without a callback, reaches the queue as one
- * MLN_DELIVERY_TYPE_COMPLETION delivery. Releasing the queue before then
- * discards it. See delivery.h. Where another function waits for a completion
- * and its release to return, a completion that names a queue has returned
- * once native has queued its result, or has discarded the result because the
- * queue was released or the process is exiting. Dispatching or draining the
- * queue is the host's step.
+ * instead. Releasing the queue before then discards it. See delivery.h. Where
+ * another function waits for a completion and its release to return, a
+ * completion that names a queue has returned once native has queued its result,
+ * or has discarded the result because the queue was released or the process is
+ * exiting. Dispatching the queue is the host's step.
  */
 typedef struct mln_completion {
   uint32_t size;
-  /**
-   * Receives the terminal result.
-   *
-   * Required unless queue drains.
-   */
+  /** Receives the terminal result. */
   mln_completion_callback callback;
-  /**
-   * Opaque host token when queue drains; native code never dereferences or
-   * releases it. Keep token state until delivery is handled or the queue is
-   * abandoned.
-   */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the completing thread after the completion
    * returns.
-   *
-   * Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. With callback, the completion and its release run in
-   * mln_delivery_queue_dispatch(). Without one, the queue drains: the terminal
-   * result is copied into one MLN_DELIVERY_TYPE_COMPLETION delivery carrying
-   * user_data. The call may be queued before the submission returns. A
+   * Optional. The completion and its release run in
+   * mln_delivery_queue_dispatch(). The call may be queued before the
+   * submission returns. A
    * rejected submission queues nothing and needs no cleanup. A submission
    * rejects an invalid queue handle with MLN_STATUS_INVALID_ARGUMENT and a
    * released queue with MLN_STATUS_INVALID_STATE.

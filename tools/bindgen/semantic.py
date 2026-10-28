@@ -24,8 +24,6 @@ from .protocol import (
     COMPLETION_RESULT,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
-    DELIVERY_BATCH,
-    DELIVERY_PAYLOAD,
     DELIVERY_QUEUE,
     RUNTIME_EVENT_SOURCE,
     RUNTIME_EVENT_SOURCE_PREFIX,
@@ -33,7 +31,7 @@ from .protocol import (
     is_completion,
     is_status,
 )
-from .schema import record_reaches, validate
+from .schema import queued_callbacks, record_reaches, validate
 
 
 @dataclass(frozen=True)
@@ -126,7 +124,8 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    # The member that names a delivery queue in place of the callback, or None.
+    # The member that names the delivery queue whose dispatch runs the
+    # callbacks, or None.
     queue: str | None = None
 
 
@@ -217,7 +216,7 @@ def plain_value(value: ValuePlan) -> bool:
 # Field roles that hold control state: a struct's size, reserved space, an
 # array's count or stride, a presence mask, a union tag, a
 # callback context, a registration's release callback, and a registration's
-# delivery queue, which a binding runtime sets in place of the callback.
+# delivery queue, which a binding runtime sets.
 CONTROL_ROLES = frozenset(
     {
         "size",
@@ -283,8 +282,7 @@ def required_member(field: FieldPlan) -> bool:
 def required_callbacks(value: ValuePlan) -> tuple[FieldPlan, ...]:
     """The callbacks that a registration requires of its host.
 
-    A callback that C does not mark nullable is required whenever the host
-    leaves the delivery queue unset, which every binding's public shape does.
+    A callback that C does not mark nullable is required.
     """
     if not value.registration:
         return ()
@@ -310,20 +308,6 @@ class ParameterPlan:
 
 
 @dataclass(frozen=True)
-class DeliveryPlan:
-    """How a queue carries a copy of one callback's arguments.
-
-    `constant` is the mln_delivery_type value, `payload_member` the
-    mln_delivery_payload member that holds the copy, and `record` the record
-    whose fields mirror the callback's arguments other than its context.
-    """
-
-    constant: str
-    payload_member: str
-    record: str
-
-
-@dataclass(frozen=True)
 class CallbackPlan:
     native: str
     parameters: tuple[ParameterPlan, ...]
@@ -332,10 +316,11 @@ class CallbackPlan:
     context: str | None = None
     borrowed_owner: str | None = None
     status: bool = False
-    # How a delivery queue carries the call, for a registration in queue mode.
-    delivery: DeliveryPlan | None = None
-    # The result that native code answers in queue mode, from the
-    # `queue_result=` of a callback that returns a value.
+    # Whether a registration that names a delivery queue carries the callback,
+    # so native code copies its arguments and queues the call.
+    queued: bool = False
+    # The result that native code answers for a queued call, from the
+    # `queue_result=` of a queued callback that returns a value.
     queue_result: str | None = None
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
@@ -404,7 +389,7 @@ class ViewSupport:
 class DeliverySupport:
     """The operation belongs to the queue delivery protocol.
 
-    A binding runtime creates, drains, and releases delivery queues itself, so
+    A binding runtime creates, dispatches, and releases delivery queues itself, so
     the operation is a runtime export with no public member.
     """
 
@@ -825,6 +810,7 @@ class Binder:
         self.enums = {enum.name: enum for enum in api.enums}
         self.values: dict[str, ValuePlan] = {}
         self.callbacks: dict[str, CallbackPlan] = {}
+        self.queued = queued_callbacks(api)
         self.resolving: set[str] = set()
         self.returned: set[str] = set()
         self.lent: set[str] = set()
@@ -1352,9 +1338,8 @@ class Binder:
                 result = self.value(function.return_type, metadata, context + " return")
         support: DisposeSupport | ViewSupport | DeliverySupport | None = None
         for parameter in function.parameters:
-            delivery_handle = type_name(parameter.type.pointee or parameter.type)
-            if delivery_handle in {DELIVERY_QUEUE, DELIVERY_BATCH}:
-                support = DeliverySupport(delivery_handle)
+            if type_name(parameter.type.pointee or parameter.type) == DELIVERY_QUEUE:
+                support = DeliverySupport(DELIVERY_QUEUE)
                 break
         completion_parameter = next(
             (
@@ -1676,26 +1661,9 @@ class Binder:
             typedef.metadata.get("borrowed_owner"),
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
-            delivery=self.delivery(typedef),
-            queue_result=(
-                typedef.metadata.get("queue_result")
-                if "delivery" in typedef.metadata
-                else None
-            ),
+            queued=name in self.queued,
+            queue_result=typedef.metadata.get("queue_result"),
         )
-
-    def delivery(self, typedef) -> DeliveryPlan | None:
-        """The queue delivery that a callback's `delivery=` names."""
-        constant = typedef.metadata.get("delivery")
-        if constant is None:
-            return None
-        payload = self.api.records_by_name[DELIVERY_PAYLOAD]
-        member = next(
-            field
-            for field in payload.fields
-            if field.metadata.get("variant") == constant
-        )
-        return DeliveryPlan(constant, member.name, type_name(member.type))
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:
         operations, diagnostics, unsupported = [], [], {}

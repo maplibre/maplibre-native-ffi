@@ -32,7 +32,6 @@ enum class HandleKind : std::uint8_t {
   RenderFrameBatch = 21,
   GeoJsonSourceData = 22,
   DeliveryQueue = 23,
-  DeliveryBatch = 24,
   StyleExpression = 25,
   GraphicsDevice = 26,
 };

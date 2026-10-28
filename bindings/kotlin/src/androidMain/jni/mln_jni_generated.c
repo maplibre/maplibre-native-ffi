@@ -112,21 +112,6 @@ static jint mln_c_version_jni(JNIEnv* env, jclass type) {
   return (jint)mln_c_version();
 }
 
-static void mln_delivery_batch_release_jni(
-  JNIEnv* env, jclass type, jlong batch
-) {
-  mln_delivery_batch_release((mln_delivery_batch)batch);
-}
-
-static jint mln_delivery_batch_take_jni(
-  JNIEnv* env, jclass type, jlong batch, jlong index, jlong out_diagnostic
-) {
-  return (jint)mln_delivery_batch_take(
-    (mln_delivery_batch)batch, (size_t)index,
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_delivery_queue_create_jni(
   JNIEnv* env, jclass type, jlong options, jlong out_queue, jlong out_diagnostic
 ) {
@@ -142,17 +127,6 @@ static jint mln_delivery_queue_dispatch_jni(
 ) {
   return (jint)mln_delivery_queue_dispatch(
     (mln_delivery_queue)queue, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_delivery_queue_drain_jni(
-  JNIEnv* env, jclass type, jlong queue, jlong out_batch, jlong out_view,
-  jlong out_diagnostic
-) {
-  return (jint)mln_delivery_queue_drain(
-    (mln_delivery_queue)queue, MLN_JNI_POINTER(mln_delivery_batch*, out_batch),
-    MLN_JNI_POINTER(mln_delivery_batch_view*, out_view),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
@@ -2195,12 +2169,9 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_view_end_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
-  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
-  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
-  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",
    (void*)mln_geo_json_source_data_create_jni},
@@ -2558,12 +2529,9 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_view_end_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
-  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
-  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
-  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",
    (void*)mln_geo_json_source_data_create_jni},

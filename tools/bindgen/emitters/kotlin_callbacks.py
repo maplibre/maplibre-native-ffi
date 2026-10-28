@@ -83,13 +83,9 @@ def status_callback(callback):
 
 
 def answered(callback):
-    """Whether a callback's queue mode answers in its place: it has a queue
-    delivery and returns a value that its host callback would compute."""
-    return (
-        callback.delivery is not None
-        and callback.result.native != "void"
-        and not status_callback(callback)
-    )
+    """Whether native code answers a queued call in the callback's place: it
+    returns a value that its host callback would compute."""
+    return callback.queue_result is not None
 
 
 def form(value, values):

@@ -85,20 +85,40 @@ static lent_completion call_with_callback(mln_map map, map_query query) {
   return lent;
 }
 
+typedef struct lent_wait {
+  mln_delivery_queue queue;
+  lent_completion* lent;
+  mln_status failure;
+} lent_wait;
+
+static bool dispatched_lent(void* context) {
+  lent_wait* wait = context;
+  const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
+  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+    wait->failure = status;
+    return true;
+  }
+  return atomic_load(&wait->lent->done);
+}
+
+// The same, with the completion copied into queue and read in its dispatch.
 static lent_completion call_with_queue(
   mln_map map, mln_delivery_queue queue, map_query query
 ) {
-  MLN_TEST_OK(query(
-    map, &(mln_completion){.size = sizeof(mln_completion), .queue = queue},
-    MLN_TEST_DIAGNOSTIC
-  ));
-  const mln_delivery* delivery = NULL;
-  const mln_delivery_batch batch =
-    mln_test_delivery_await_single(queue, &delivery);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
   lent_completion lent = {0};
-  read_lent_completion(&lent, &delivery->payload.completion);
-  mln_delivery_batch_release(batch);
+  atomic_init(&lent.done, false);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = record_lent_completion,
+    .user_data = &lent,
+    .queue = queue,
+  };
+  MLN_TEST_OK(query(map, &completion, MLN_TEST_DIAGNOSTIC));
+  lent_wait wait = {.queue = queue, .lent = &lent};
+  TEST_ASSERT_TRUE(mln_test_await(
+    dispatched_lent, &wait, mln_test_deadline_default(), "a completion"
+  ));
+  MLN_TEST_OK(wait.failure);
   return lent;
 }
 

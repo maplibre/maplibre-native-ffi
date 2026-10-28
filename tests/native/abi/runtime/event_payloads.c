@@ -169,36 +169,34 @@ static void log_reset(event_log* log) {
   log->drain_failed = false;
 }
 
+static void log_event(const mln_runtime_event* event, void* context) {
+  event_log* log = context;
+  if (log->overflowed) return;
+  const size_t type_slot = event->type % 64U;
+  log->seen_per_type[type_slot] += 1;
+  if (log->seen_per_type[type_slot] > MLN_TEST_EVENTS_KEPT_PER_TYPE) {
+    return;
+  }
+  if (log->count == sizeof(log->events) / sizeof(*log->events)) {
+    log->overflowed = true;
+    return;
+  }
+  recorded_event* record = &log->events[log->count];
+  log->count += 1;
+  record->event = *event;
+  copy_view(record->message, sizeof(record->message), event->message);
+  record_payload_text(record, event);
+}
+
 // Drains without asserting, so a wait predicate may call it; the log records a
 // failure for the next assertion to report.
 static void log_drain_quietly(mln_runtime runtime, event_log* log) {
-  while (true) {
-    mln_event_batch_view batch = {.size = sizeof(batch)};
-    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
+  for (;;) {
+    const mln_status status = mln_test_dispatch_events(runtime, log_event, log);
+    if (status == MLN_STATUS_NOT_READY) return;
+    if (status != MLN_STATUS_OK) {
       log->drain_failed = true;
       return;
-    }
-    if (batch.event_count == 0) {
-      return;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event = MLN_STRIDED_AT(
-        mln_runtime_event, batch.events, batch.event_size, index
-      );
-      const size_t type_slot = event->type % 64U;
-      log->seen_per_type[type_slot] += 1;
-      if (log->seen_per_type[type_slot] > MLN_TEST_EVENTS_KEPT_PER_TYPE) {
-        continue;
-      }
-      if (log->count == sizeof(log->events) / sizeof(*log->events)) {
-        log->overflowed = true;
-        return;
-      }
-      recorded_event* record = &log->events[log->count];
-      log->count += 1;
-      record->event = *event;
-      copy_view(record->message, sizeof(record->message), event->message);
-      record_payload_text(record, event);
     }
   }
 }

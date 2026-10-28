@@ -21,22 +21,25 @@ namespace {
 // Small results and diagnostics share the storage reserved for fallback.
 constexpr auto reserved_result_bytes = std::size_t{256};
 
-// Marks a queue item as the completion's delivery, or as a call to its
-// callback and release when the completion has a callback.
+// Marks a queue item as a call to the completion's callback and release.
 auto set_completion_item(
   delivery::DeliveryItem& item, const mln_completion& descriptor
 ) noexcept -> void {
-  item.view.type = MLN_DELIVERY_TYPE_COMPLETION;
-  item.view.user_data = descriptor.user_data;
-  if (descriptor.callback == nullptr) return;
-  item.dispatched = true;
+  item.user_data = descriptor.user_data;
   item.callback = reinterpret_cast<delivery::HostFunction>(descriptor.callback);
   item.release = descriptor.release_user_data;
   item.invoke = [](delivery::DeliveryItem& call) noexcept {
     reinterpret_cast<mln_completion_callback>(call.callback)(
-      call.view.user_data, &call.view.payload.completion
+      call.user_data, static_cast<const mln_completion_result*>(call.arguments)
     );
   };
+}
+
+// Places the result record first in an item's arena, where the fallback item
+// keeps it too.
+template <bool Writing>
+auto place_result(delivery::Arena<Writing>& arena) -> mln_completion_result* {
+  return arena.template allocate<mln_completion_result>(1);
 }
 
 // Static storage keeps fallback delivery independent of allocation.
@@ -112,6 +115,7 @@ auto CompletionSink::deliver_queued(
                                      : sizeof(delivery::DeliveryItem);
     auto measure =
       delivery::Arena<false>{.offset = header, .borrow_bytes = borrow_bytes};
+    static_cast<void>(place_result(measure));
     static_cast<void>(copy_result(measure, result, capture));
     const auto reserved_size =
       sizeof(delivery::DeliveryItem) + reserved_result_bytes;
@@ -132,24 +136,29 @@ auto CompletionSink::deliver_queued(
       .capacity = measure.offset,
       .borrow_bytes = borrow_bytes,
     };
-    item->view.payload.completion = copy_result(arena, result, capture);
+    auto* record = place_result(arena);
+    item->arguments = record;
+    *record = copy_result(arena, result, capture);
   } catch (...) {
     // The fallback reports the failure.
-    if (item == nullptr) item = std::move(owner_->fallback_);
+    if (item == nullptr || item->arguments == nullptr) {
+      item = std::move(owner_->fallback_);
+    }
     if (item == nullptr) return;
-    item->view.payload.completion = mln_completion_result{
-      .size = sizeof(mln_completion_result),
-      .status = MLN_STATUS_NATIVE_ERROR,
-      .disposition = result.disposition,
-      .value_size = 0,
-      .generation = result.generation,
-      .render_update_generation = result.render_update_generation,
-      .diagnostic =
-        mln_buffer_view{
-          .data = uncopyable_result, .size = sizeof(uncopyable_result) - 1
-        },
-      .value = nullptr,
-      .value_count = 0,
+    *static_cast<mln_completion_result*>(item->arguments) =
+      mln_completion_result{
+        .size = sizeof(mln_completion_result),
+        .status = MLN_STATUS_NATIVE_ERROR,
+        .disposition = result.disposition,
+        .value_size = 0,
+        .generation = result.generation,
+        .render_update_generation = result.render_update_generation,
+        .diagnostic =
+          mln_buffer_view{
+            .data = uncopyable_result, .size = sizeof(uncopyable_result) - 1
+          },
+        .value = nullptr,
+        .value_count = 0,
     };
   }
   // A released queue refuses the item.
@@ -281,8 +290,7 @@ auto make_completion_sink(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto status = delivery::resolve_registration_queue(
-    "completion", completion->queue, completion->callback != nullptr,
-    completion->release_user_data != nullptr, queue
+    "completion", completion->queue, completion->callback != nullptr, queue
   );
   if (status != MLN_STATUS_OK) return status;
   try {
@@ -290,10 +298,15 @@ auto make_completion_sink(
     sink.descriptor_.queue = MLN_HANDLE_NULL;
     if (queue != nullptr) {
       sink.queue_ = std::move(queue);
-      fallback = delivery::ItemPtr{delivery::detail::allocate_item(
-        sizeof(delivery::DeliveryItem) + reserved_result_bytes
-      )};
+      const auto size = sizeof(delivery::DeliveryItem) + reserved_result_bytes;
+      fallback = delivery::ItemPtr{delivery::detail::allocate_item(size)};
       set_completion_item(*fallback, sink.descriptor_);
+      auto arena = delivery::Arena<true>{
+        .storage = reinterpret_cast<std::byte*>(fallback.get()),
+        .offset = sizeof(delivery::DeliveryItem),
+        .capacity = size,
+      };
+      fallback->arguments = place_result(arena);
     }
   } catch (...) {
     set_thread_error("asynchronous completion state could not be allocated");

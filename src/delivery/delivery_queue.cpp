@@ -55,13 +55,6 @@ struct DeliveryQueueObject {
   std::shared_ptr<DeliveryQueueState> state;
 };
 
-struct DeliveryBatchObject {
-  std::mutex mutex;
-  std::vector<ItemPtr> items;
-  // Contiguous copies of each item's view, which point into the items.
-  std::vector<mln_delivery> views;
-};
-
 // The payload text of one event, and the font stack array that points at it.
 // The event's views point into the vectors' heap storage, which stays put when
 // the vectors move.
@@ -77,14 +70,23 @@ struct EventDeliveryItem final : DeliveryItem {
   std::vector<EventStrings> strings;
 
   mln_event_batch_view batch_view{};
+  RuntimeEventArguments record{.events = &batch_view};
 
-  explicit EventDeliveryItem(void* user_data) {
-    view.type = MLN_DELIVERY_TYPE_RUNTIME_EVENTS;
-    view.user_data = user_data;
-    view.payload.runtime_events.events = &batch_view;
+  EventDeliveryItem(void* user_data, mln_runtime_event_callback function) {
+    this->user_data = user_data;
+    arguments = &record;
+    callback = reinterpret_cast<HostFunction>(function);
+    invoke = &run;
     destroy = [](DeliveryItem* item) noexcept {
       delete static_cast<EventDeliveryItem*>(item);
     };
+  }
+
+  // Appends can move the shared message storage while the item is queued, so
+  // the call finalizes the event pointers.
+  static auto run(DeliveryItem& item) noexcept -> void {
+    static_cast<EventDeliveryItem&>(item).finalize();
+    invoke_delivered<RuntimeEventArguments>(item);
   }
 
   auto append(
@@ -117,8 +119,6 @@ struct EventDeliveryItem final : DeliveryItem {
     refresh();
   }
 
-  // Finalize pointers after the item leaves the queue: appends can move the
-  // shared message storage while the item is still queued.
   auto finalize() noexcept -> void {
     auto offset = std::size_t{0};
     for (auto& event : events) {
@@ -161,12 +161,6 @@ struct HandleTraits<mln::delivery::DeliveryQueueObject> {
   static constexpr auto leasable = true;
 };
 
-template <>
-struct HandleTraits<mln::delivery::DeliveryBatchObject> {
-  static constexpr auto kind = HandleKind::DeliveryBatch;
-  static constexpr auto leasable = true;
-};
-
 }  // namespace mln::core
 
 namespace mln::delivery {
@@ -206,17 +200,10 @@ auto allocate_owning_item(std::size_t size, std::shared_ptr<const void> owner)
 
 }  // namespace detail
 
-auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr {
-  auto item = ItemPtr{detail::allocate_item(sizeof(DeliveryItem))};
-  item->view.type = type;
-  item->view.user_data = user_data;
-  return item;
-}
-
 auto make_release_call(void* user_data, mln_user_data_release release)
   -> ItemPtr {
-  auto item = make_light_item(MLN_DELIVERY_TYPE_RETIRED, user_data);
-  item->dispatched = true;
+  auto item = ItemPtr{detail::allocate_item(sizeof(DeliveryItem))};
+  item->user_data = user_data;
   item->release = release;
   return item;
 }
@@ -238,8 +225,6 @@ auto abandon_items(DeliveryItem* items) noexcept -> void {
 }
 
 auto run_call(DeliveryItem& item) noexcept -> void {
-  if (item.view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS)
-    static_cast<EventDeliveryItem&>(item).finalize();
   // The call receives the handles that the copy owns.
   item.taken = true;
   try {
@@ -248,7 +233,7 @@ auto run_call(DeliveryItem& item) noexcept -> void {
     // Host callbacks must not unwind through the C boundary.
   }
   try {
-    if (item.release != nullptr) item.release(item.view.user_data);
+    if (item.release != nullptr) item.release(item.user_data);
   } catch (...) {
     // Host release callbacks must not unwind through the C boundary.
   }
@@ -270,22 +255,17 @@ auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
   {
     const auto lock = std::scoped_lock{mutex_};
     if (closed_) return false;
-    auto& list = item->dispatched ? calls_ : records_;
     auto* raw = item.release();
     raw->next = nullptr;
-    if (list.tail == nullptr) {
-      list.head = raw;
-    } else {
-      list.tail->next = raw;
-    }
-    if (list.tail == nullptr || (!raw->dispatched && wake_on_push_)) {
-      if (!raw->dispatched) wake_on_push_ = false;
+    if (tail_ == nullptr) {
+      head_ = raw;
       // Copying the wake under the lock keeps it alive across the call, even
       // when the receiver releases the queue from inside the wake.
       wake = wake_;
+    } else {
+      tail_->next = raw;
     }
-    list.tail = raw;
-    ++list.count;
+    tail_ = raw;
   }
   if (wake != nullptr) wake->notify();
   return true;
@@ -293,102 +273,35 @@ auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
 
 auto DeliveryQueueState::push_event(
   mln_runtime_event event, std::string_view message, void* user_data,
-  std::vector<std::string> strings, HostFunction callback
+  mln_runtime_event_callback callback, std::vector<std::string> strings
 ) -> void {
   if (core::process_exiting()) return;
-  const auto dispatched = callback != nullptr;
   auto wake = std::shared_ptr<core::Wake>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     if (closed_) return;
-    auto& list = dispatched ? calls_ : records_;
-    auto* tail = list.tail;
     if (
-      tail != nullptr && tail->view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS &&
-      tail->view.user_data == user_data && tail->callback == callback
+      tail_ != nullptr && tail_->invoke == &EventDeliveryItem::run &&
+      tail_->user_data == user_data &&
+      tail_->callback == reinterpret_cast<HostFunction>(callback)
     ) {
-      static_cast<EventDeliveryItem*>(tail)->append(
+      static_cast<EventDeliveryItem*>(tail_)->append(
         event, message, std::move(strings)
       );
     } else {
-      auto item = std::make_unique<EventDeliveryItem>(user_data);
+      auto item = std::make_unique<EventDeliveryItem>(user_data, callback);
       item->append(event, message, std::move(strings));
-      if (dispatched) {
-        item->dispatched = true;
-        item->callback = callback;
-        item->invoke = &invoke_delivered<MLN_DELIVERY_TYPE_RUNTIME_EVENTS>;
-      }
       auto* raw = item.release();
-      if (tail == nullptr) {
-        list.head = raw;
+      if (tail_ == nullptr) {
+        head_ = raw;
         wake = wake_;
       } else {
-        tail->next = raw;
+        tail_->next = raw;
       }
-      list.tail = raw;
-      ++list.count;
-    }
-    if (!dispatched && wake_on_push_) {
-      wake_on_push_ = false;
-      wake = wake_;
+      tail_ = raw;
     }
   }
   if (wake != nullptr) wake->notify();
-}
-
-auto DeliveryQueueState::drain(mln_delivery_batch_view& view)
-  -> mln_delivery_batch {
-  const auto drain_lock = std::scoped_lock{drain_mutex_};
-  auto* items = static_cast<DeliveryItem*>(nullptr);
-  auto* last = static_cast<DeliveryItem*>(nullptr);
-  auto count = std::size_t{};
-  {
-    const auto lock = std::scoped_lock{mutex_};
-    items = std::exchange(records_.head, nullptr);
-    last = std::exchange(records_.tail, nullptr);
-    count = std::exchange(records_.count, 0);
-  }
-  if (items == nullptr) return MLN_HANDLE_NULL;
-  auto batch = std::shared_ptr<DeliveryBatchObject>{};
-  auto handle = MLN_HANDLE_NULL;
-  try {
-    batch = std::make_shared<DeliveryBatchObject>();
-    batch->items.reserve(count);
-    batch->views.reserve(count);
-    handle = handle_table<DeliveryBatchObject>().insert(batch);
-  } catch (...) {
-    {
-      const auto lock = std::scoped_lock{mutex_};
-      if (!closed_) {
-        // Pushes only append and drains are serialized, so the items go back
-        // ahead of everything pushed since.
-        last->next = records_.head;
-        records_.head = std::exchange(items, nullptr);
-        if (records_.tail == nullptr) records_.tail = last;
-        records_.count += count;
-        wake_on_push_ = true;
-      }
-    }
-    // Closure may have finished while the batch allocation was in progress.
-    // Dispose outside the lock, as close() does for pending items.
-    abandon_items(items);
-    throw;
-  }
-  while (items != nullptr) {
-    auto* next = std::exchange(items->next, nullptr);
-    if (items->view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS)
-      static_cast<EventDeliveryItem*>(items)->finalize();
-    batch->views.push_back(items->view);
-    batch->items.emplace_back(items);
-    items = next;
-  }
-  view = mln_delivery_batch_view{
-    .size = sizeof(mln_delivery_batch_view),
-    .delivery_size = sizeof(mln_delivery),
-    .deliveries = batch->views.data(),
-    .delivery_count = batch->views.size(),
-  };
-  return handle;
 }
 
 auto DeliveryQueueState::dispatch() noexcept -> DispatchResult {
@@ -417,9 +330,8 @@ auto DeliveryQueueState::run_calls() noexcept -> bool {
   {
     const auto lock = std::scoped_lock{mutex_};
     if (closed_) return false;
-    calls = std::exchange(calls_.head, nullptr);
-    calls_.tail = nullptr;
-    calls_.count = 0;
+    calls = std::exchange(head_, nullptr);
+    tail_ = nullptr;
   }
   auto ran = false;
   while (calls != nullptr) {
@@ -439,21 +351,19 @@ auto DeliveryQueueState::run_calls() noexcept -> bool {
 }
 
 auto DeliveryQueueState::close() noexcept -> void {
-  auto records = static_cast<DeliveryItem*>(nullptr);
   auto calls = static_cast<DeliveryItem*>(nullptr);
   auto wake = std::shared_ptr<core::Wake>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     closed_ = true;
-    records = std::exchange(records_, ItemList{}).head;
-    calls = std::exchange(calls_, ItemList{}).head;
+    calls = std::exchange(head_, nullptr);
+    tail_ = nullptr;
     wake = std::move(wake_);
   }
   if (wake != nullptr) wake->close();
   // The wake's user data is released when its last reference drops: here, or
   // in a push whose notify is still running.
   wake.reset();
-  abandon_items(records);
   abandon_items(calls);
 }
 
@@ -513,30 +423,6 @@ auto release_delivery_queue(mln_delivery_queue queue) noexcept -> void {
   if (object != nullptr) object->state->close();
 }
 
-auto drain_delivery_queue(
-  mln_delivery_queue queue, mln_delivery_batch* out_batch,
-  mln_delivery_batch_view* out_view
-) -> mln_status {
-  if (out_batch == nullptr || *out_batch != MLN_HANDLE_NULL) {
-    core::set_thread_error("out_batch must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_view == nullptr || out_view->size < sizeof(mln_delivery_batch_view)) {
-    core::set_thread_error(
-      "out_view must not be null and must have a valid size"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto state = resolve_delivery_queue(queue);
-  if (state == nullptr) return core::recorded_handle_fault_status();
-  auto view = mln_delivery_batch_view{};
-  const auto batch = state->drain(view);
-  if (batch == MLN_HANDLE_NULL) return MLN_STATUS_NOT_READY;
-  *out_batch = batch;
-  *out_view = view;
-  return MLN_STATUS_OK;
-}
-
 auto dispatch_delivery_queue(mln_delivery_queue queue) -> mln_status {
   const auto state = resolve_delivery_queue(queue);
   if (state == nullptr) return core::recorded_handle_fault_status();
@@ -550,32 +436,6 @@ auto dispatch_delivery_queue(mln_delivery_queue queue) -> mln_status {
       return MLN_STATUS_BUSY;
   }
   return MLN_STATUS_NATIVE_ERROR;
-}
-
-auto take_delivery(mln_delivery_batch batch, std::size_t index) -> mln_status {
-  const auto live = handle_table<DeliveryBatchObject>().lease(batch);
-  if (live == nullptr) return core::recorded_handle_fault_status();
-  const auto lock = std::scoped_lock{live->mutex};
-  if (index >= live->items.size()) {
-    core::set_thread_error("delivery index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto& item = *live->items[index];
-  if (item.discard == nullptr) return MLN_STATUS_OK;
-  if (item.taken) {
-    core::set_thread_error("delivery was already taken");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  item.taken = true;
-  return MLN_STATUS_OK;
-}
-
-auto release_delivery_batch(mln_delivery_batch batch) noexcept -> void {
-  if (batch == MLN_HANDLE_NULL) return;
-  try {
-    static_cast<void>(handle_table<DeliveryBatchObject>().remove(batch));
-  } catch (...) {
-  }
 }
 
 }  // namespace mln::delivery

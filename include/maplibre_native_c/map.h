@@ -353,7 +353,6 @@ typedef struct mln_camera_transition_end {
  * Threads:
  * The callback runs on the runtime worker.
  */
-MLN_BINDING("delivery=MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END")
 typedef void (*mln_camera_transition_end_callback)(
   void* user_data, const mln_camera_transition_end* end
 );
@@ -362,26 +361,22 @@ typedef void (*mln_camera_transition_end_callback)(
  * Callback that one camera command copies to report the end of its
  * transitions.
  *
- * A handler with neither a callback nor a queue is disabled, and a disabled
- * handler must not carry release_user_data. See
+ * A handler without a callback is disabled, and a disabled handler must not
+ * carry release_user_data or a queue. See
  * mln_animation_options.end_handler for when the callback runs.
  */
 typedef struct mln_camera_transition_handler {
   mln_camera_transition_end_callback callback MLN_BINDING("nullable=true");
-  /** Opaque host token when queue drains; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the runtime worker after the callback
    * returns. A rejected command runs neither callback, and the caller keeps
-   * user_data. Null when queue drains.
+   * user_data.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. With callback, the callback and release_user_data run in
-   * mln_delivery_queue_dispatch(). Without one, the queue drains: the end is
-   * copied into one MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END delivery carrying
-   * user_data, followed by one MLN_DELIVERY_TYPE_RETIRED delivery where a
-   * callback's release_user_data would run. A command rejects an invalid queue
+   * Optional. The callback and release_user_data run in
+   * mln_delivery_queue_dispatch(). A command rejects an invalid queue
    * handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
    * MLN_STATUS_INVALID_STATE.
    */

@@ -19,9 +19,6 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
     switch (kind) {
       case core::HandleKind::AcquiredFrame:
         return core::acquired_frame_discard(handle);
-      case core::HandleKind::DeliveryBatch:
-        release_delivery_batch(handle);
-        return MLN_STATUS_OK;
       case core::HandleKind::DeliveryQueue:
         release_delivery_queue(handle);
         return MLN_STATUS_OK;

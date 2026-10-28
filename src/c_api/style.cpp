@@ -64,9 +64,7 @@ auto queue_tile_fetch(
 ) noexcept -> void {
   static_cast<void>(
     static_cast<const mln::delivery::QueuedRegistration*>(registration)
-      ->push<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE>(
-        mln_custom_source_tile_delivery{.tile_id = tile_id}
-      )
+      ->push(mln::delivery::CustomSourceFetchTileArguments{.tile_id = tile_id})
   );
 }
 
@@ -75,9 +73,7 @@ auto queue_tile_cancel(
 ) noexcept -> void {
   static_cast<void>(
     static_cast<const mln::delivery::QueuedRegistration*>(registration)
-      ->push<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE>(
-        mln_custom_source_tile_delivery{.tile_id = tile_id}
-      )
+      ->push(mln::delivery::CustomSourceCancelTileArguments{.tile_id = tile_id})
   );
 }
 
@@ -106,10 +102,10 @@ struct OwnedCallbackSourceOptions {
     registration = std::make_unique<Registration>(
       std::move(queue), options.user_data, options.release_user_data,
       std::initializer_list<Registration::Callback>{
-        Registration::callback<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE>(
+        Registration::callback<mln::delivery::CustomSourceFetchTileArguments>(
           options.fetch_tile
         ),
-        Registration::callback<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE>(
+        Registration::callback<mln::delivery::CustomSourceCancelTileArguments>(
           options.cancel_tile
         ),
       }
@@ -191,16 +187,8 @@ auto add_callback_source(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
-  if (
-    options->queue != MLN_HANDLE_NULL && options->fetch_tile == nullptr &&
-    options->cancel_tile != nullptr
-  ) {
-    mln::core::set_thread_error("a drained source must not carry cancel_tile");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto queue_status = mln::delivery::resolve_registration_queue(
-    "custom source", options->queue, options->fetch_tile != nullptr,
-    options->release_user_data != nullptr, queue
+    "custom source", options->queue, options->fetch_tile != nullptr, queue
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
   auto id = OwnedView{source_id};

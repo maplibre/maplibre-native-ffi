@@ -143,7 +143,7 @@ class Values:
             return
         if value.kind == "callback":
             callback = self.bound.callbacks[value.native]
-            if not callback.delivery and not self.wake_callback(callback):
+            if not callback.queued:
                 raise Unsupported(
                     "callback must answer on its native thread, which Dart cannot run"
                 )
@@ -200,9 +200,6 @@ class Values:
         self.used[value.native] = value
 
     # How each registration reaches this isolate; see async_hosts.py.
-    def wake_callback(self, callback):
-        return async_hosts.wake_callback(callback)
-
     def wake(self, value):
         return async_hosts.is_wake(self.bound, value)
 

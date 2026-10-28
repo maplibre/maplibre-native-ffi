@@ -1,10 +1,11 @@
-// Delivery queues: the wake on each empty-to-nonempty transition, draining,
-// batch lifetimes, release, and handle validation.
+// Delivery queues: the wake on each empty-to-nonempty transition, concurrent
+// dispatch, calls that outlive their producer, release, and handle validation.
 
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-// Submits a runtime command whose completion goes to queue with user_data.
+// Submits a runtime command whose completion queue dispatches to the call log
+// with user_data.
 static void submit_queued_command(
   mln_runtime runtime, mln_delivery_queue queue, void* user_data
 ) {
@@ -13,6 +14,7 @@ static void submit_queued_command(
 }
 
 static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
+  mln_test_calls_reset();
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
@@ -27,25 +29,15 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&queue.wakes));
 
-  mln_test_delivery_drain drain;
-  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
-  TEST_ASSERT_EQUAL_size_t(2, drain.view.delivery_count);
-  TEST_ASSERT_EQUAL_PTR(
-    (void*)1, mln_test_delivery_at(&drain.view, 0)->user_data
-  );
-  TEST_ASSERT_EQUAL_PTR(
-    (void*)2, mln_test_delivery_at(&drain.view, 1)->user_data
-  );
-  mln_delivery_batch_release(drain.batch);
-
-  // An empty queue reports NOT_READY and leaves the outputs alone.
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
+  TEST_ASSERT_EQUAL_size_t(2, mln_test_calls.count);
+  TEST_ASSERT_EQUAL_PTR((void*)1, mln_test_call_at(0)->user_data);
+  TEST_ASSERT_EQUAL_PTR((void*)2, mln_test_call_at(1)->user_data);
   MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_test_delivery_drain_into(queue.handle, &drain)
+    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, drain.batch);
-  TEST_ASSERT_NULL(drain.view.deliveries);
 
-  // The drain re-armed the wake.
+  // The dispatch re-armed the wake.
   const mln_completion third =
     mln_test_queue_completion(queue.handle, (void*)3);
   MLN_TEST_OK(mln_map_set_debug_options(map, 0, &third, NULL));
@@ -57,86 +49,95 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-enum { concurrent_completions = 64, concurrent_drainers = 4 };
+enum { concurrent_completions = 64, concurrent_dispatchers = 4 };
 
-typedef struct concurrent_drain {
+typedef struct concurrent_dispatch {
   mln_delivery_queue queue;
   atomic_int seen[concurrent_completions];
   atomic_int total;
-} concurrent_drain;
+} concurrent_dispatch;
 
-static void drain_until_all_seen(void* argument) {
-  concurrent_drain* drain = argument;
+static concurrent_dispatch shared_dispatch;
+
+// Runs on whichever thread's dispatch takes the call.
+static void count_concurrent_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)result;
+  const uintptr_t slot = (uintptr_t)user_data - 1;
+  if (slot < concurrent_completions) {
+    atomic_fetch_add(&shared_dispatch.seen[slot], 1);
+  }
+  atomic_fetch_add(&shared_dispatch.total, 1);
+}
+
+static void dispatch_until_all_seen(void* argument) {
+  concurrent_dispatch* dispatch = argument;
   const mln_test_deadline deadline = mln_test_deadline_default();
-  while (atomic_load(&drain->total) < concurrent_completions &&
+  while (atomic_load(&dispatch->total) < concurrent_completions &&
          !mln_test_deadline_passed(deadline)) {
-    mln_delivery_batch batch = MLN_HANDLE_NULL;
-    mln_delivery_batch_view view = {.size = sizeof(view)};
-    const mln_status status =
-      mln_delivery_queue_drain(drain->queue, &batch, &view, NULL);
-    if (status != MLN_STATUS_OK) continue;
-    for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery = MLN_STRIDED_AT(
-        mln_delivery, view.deliveries, view.delivery_size, index
-      );
-      const uintptr_t slot = (uintptr_t)delivery->user_data - 1;
-      if (slot < concurrent_completions) {
-        atomic_fetch_add(&drain->seen[slot], 1);
-      }
-      atomic_fetch_add(&drain->total, 1);
-    }
-    mln_delivery_batch_release(batch);
+    (void)mln_delivery_queue_dispatch(dispatch->queue, NULL);
   }
 }
 
-static void concurrent_drains_deliver_each_item_exactly_once(void) {
+// Dispatches that race, each one BUSY while another runs, still run each call
+// exactly once.
+static void concurrent_dispatches_run_each_call_exactly_once(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
-  static concurrent_drain drain;
-  drain.queue = queue.handle;
-  atomic_store(&drain.total, 0);
+  shared_dispatch.queue = queue.handle;
+  atomic_store(&shared_dispatch.total, 0);
   for (size_t index = 0; index < concurrent_completions; index += 1) {
-    atomic_store(&drain.seen[index], 0);
+    atomic_store(&shared_dispatch.seen[index], 0);
   }
 
-  mln_test_thread* threads[concurrent_drainers];
-  for (size_t index = 0; index < concurrent_drainers; index += 1) {
-    threads[index] = mln_test_thread_start(drain_until_all_seen, &drain);
+  mln_test_thread* threads[concurrent_dispatchers];
+  for (size_t index = 0; index < concurrent_dispatchers; index += 1) {
+    threads[index] =
+      mln_test_thread_start(dispatch_until_all_seen, &shared_dispatch);
   }
   for (uintptr_t index = 0; index < concurrent_completions; index += 1) {
-    submit_queued_command(runtime, queue.handle, (void*)(index + 1));
+    const mln_completion completion = {
+      .size = sizeof(completion),
+      .callback = count_concurrent_completion,
+      .user_data = (void*)(index + 1),
+      .queue = queue.handle,
+    };
+    MLN_TEST_OK(
+      mln_runtime_clear_resource_transform(runtime, &completion, NULL)
+    );
   }
-  for (size_t index = 0; index < concurrent_drainers; index += 1) {
+  for (size_t index = 0; index < concurrent_dispatchers; index += 1) {
     mln_test_thread_join(threads[index]);
   }
 
-  TEST_ASSERT_EQUAL_INT(concurrent_completions, atomic_load(&drain.total));
+  TEST_ASSERT_EQUAL_INT(
+    concurrent_completions, atomic_load(&shared_dispatch.total)
+  );
   for (size_t index = 0; index < concurrent_completions; index += 1) {
-    TEST_ASSERT_EQUAL_INT(1, atomic_load(&drain.seen[index]));
+    TEST_ASSERT_EQUAL_INT(1, atomic_load(&shared_dispatch.seen[index]));
   }
   mln_test_delivery_queue_release(&queue);
   mln_test_destroy_runtime(runtime);
 }
 
-// A drained batch belongs to the host: releasing the queue and the runtime
-// leaves it readable.
-static void a_batch_outlives_its_queue_and_runtime(void) {
+// A queued call belongs to the queue: releasing the runtime that produced it
+// leaves it to run.
+static void a_queued_call_outlives_its_runtime(void) {
+  mln_test_calls_reset();
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
   submit_queued_command(runtime, queue.handle, (void*)7);
-  const mln_delivery* delivery = NULL;
-  const mln_delivery_batch batch =
-    mln_test_delivery_await_single(queue.handle, &delivery);
-
-  mln_test_delivery_queue_release(&queue);
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
   mln_test_destroy_runtime(runtime);
 
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
-  TEST_ASSERT_EQUAL_PTR((void*)7, delivery->user_data);
-  MLN_TEST_OK(delivery->payload.completion.status);
-  mln_delivery_batch_release(batch);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
+  TEST_ASSERT_EQUAL_size_t(1, mln_test_calls.count);
+  TEST_ASSERT_EQUAL_PTR((void*)7, mln_test_call_at(0)->user_data);
+  MLN_TEST_OK(mln_test_call_at(0)->status);
+  mln_test_delivery_queue_release(&queue);
 }
 
 // A wake that releases its own queue on the first call.
@@ -184,26 +185,17 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
 
   // A submission that names the released queue is rejected.
+  const mln_completion rejected = mln_test_queue_completion(wake.queue, NULL);
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_runtime_clear_resource_transform(
-      runtime,
-      &(mln_completion){.size = sizeof(mln_completion), .queue = wake.queue},
-      NULL
-    )
+    mln_runtime_clear_resource_transform(runtime, &rejected, NULL)
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
   mln_test_destroy_runtime(runtime);
 }
 
 static void handles_report_their_status(void) {
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_delivery_batch_view view = {.size = sizeof(view)};
-  MLN_TEST_INVALID(
-    mln_delivery_queue_drain(MLN_HANDLE_NULL, &batch, &view, NULL)
-  );
   mln_delivery_queue_release(MLN_HANDLE_NULL);
-  mln_delivery_batch_release(MLN_HANDLE_NULL);
 
   mln_delivery_queue unused = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_delivery_queue_create(NULL, &unused, NULL));
@@ -220,53 +212,15 @@ static void handles_report_their_status(void) {
   MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, NULL));
   mln_delivery_queue occupied = queue;
   MLN_TEST_INVALID(mln_delivery_queue_create(&options, &occupied, NULL));
-  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, NULL, &view, NULL));
-  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, &batch, NULL, NULL));
-  view.size = 1;
-  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, &batch, &view, NULL));
-  view.size = sizeof(view);
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_drain(queue, &batch, &view, NULL)
-  );
   mln_delivery_queue_release(queue);
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_delivery_queue_drain(queue, &batch, &view, NULL)
-  );
   // Release of a released handle is a no-op.
   mln_delivery_queue_release(queue);
-  // A handle of another type is invalid.
-  mln_runtime runtime = mln_test_create_runtime();
-  MLN_TEST_INVALID(mln_delivery_queue_drain(runtime, &batch, &view, NULL));
-  mln_test_destroy_runtime(runtime);
-}
-
-static void take_reports_its_status(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  mln_runtime runtime = mln_test_create_runtime();
-  submit_queued_command(runtime, queue.handle, NULL);
-  const mln_delivery* delivery = NULL;
-  mln_delivery_batch batch =
-    mln_test_delivery_await_single(queue.handle, &delivery);
-  // A delivery that owns nothing takes as often as the host asks.
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  MLN_TEST_INVALID(mln_delivery_batch_take(batch, 1, NULL));
-  mln_delivery_batch_release(batch);
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_delivery_batch_take(batch, 0, NULL)
-  );
-
-  mln_test_delivery_queue_release(&queue);
-  mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
   RUN_TEST(the_wake_fires_once_per_empty_to_nonempty_transition);
-  RUN_TEST(concurrent_drains_deliver_each_item_exactly_once);
-  RUN_TEST(a_batch_outlives_its_queue_and_runtime);
+  RUN_TEST(concurrent_dispatches_run_each_call_exactly_once);
+  RUN_TEST(a_queued_call_outlives_its_runtime);
   RUN_TEST(releasing_from_the_wake_neither_deadlocks_nor_wakes_again);
   RUN_TEST(handles_report_their_status);
-  RUN_TEST(take_reports_its_status);
 }

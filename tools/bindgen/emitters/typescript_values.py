@@ -431,10 +431,10 @@ class Values:
         return parameter.value.handle or self.bound.handles[parameter.value.native]
 
     def check_callback(self, value: ValuePlan) -> None:
-        """Accept a callback that native code can queue or a wake, whose
+        """Accept a callback that native code can queue, whose
         arguments this binding can convert."""
         callback = self.bound.callbacks[value.native]
-        if not callback.delivery and not async_hosts.wake_callback(callback):
+        if not callback.queued:
             raise Unsupported(
                 "callback must answer on its native thread, which TypeScript cannot run"
             )

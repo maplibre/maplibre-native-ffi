@@ -71,9 +71,7 @@ typedef enum mln_log_event : uint32_t {
  * MapLibre background thread for a severity that
  * mln_log_set_async_severity_mask() dispatches asynchronously.
  */
-MLN_BINDING(
-  "failure=false;delivery=MLN_DELIVERY_TYPE_LOG_RECORD;queue_result=true"
-)
+MLN_BINDING("failure=false;queue_result=true")
 typedef bool (*mln_log_callback)(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
@@ -82,38 +80,28 @@ typedef bool (*mln_log_callback)(
 /**
  * Process-global log callback.
  *
- * The handler sets callback, queue, or both. The struct itself is borrowed
- * for mln_log_set_callback().
+ * The struct itself is borrowed for mln_log_set_callback().
  */
 typedef struct mln_log_handler {
   uint32_t size;
-  /**
-   * Receives each record.
-   *
-   * Required unless queue drains.
-   */
+  /** Receives each record. */
   mln_log_callback callback;
-  /** Opaque host token when queue drains; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data after the final callback returns, when the
    * handler is replaced or cleared.
    *
    * It runs on the thread that replaces or clears the handler, under the
-   * same restrictions as the callback. Null when queue drains.
+   * same restrictions as the callback.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Native code consumes each record and queues a copy. With
-   * callback, the callback and release_user_data run in
-   * mln_delivery_queue_dispatch(), where they may call the C API. Without one,
-   * the queue drains: each copy is an MLN_DELIVERY_TYPE_LOG_RECORD delivery
-   * carrying user_data, and replacing or clearing the handler queues one
-   * MLN_DELIVERY_TYPE_RETIRED delivery after the handler's final record. A
-   * record the queue refuses, because the queue was released or the copy
-   * could not be allocated, goes to the platform logger instead. The queue's
-   * wake and wake release run inline on the logging thread, under the same
-   * restrictions as the log callback.
+   * Optional. Native code consumes each record and queues a copy, and the
+   * callback and release_user_data run in mln_delivery_queue_dispatch(),
+   * where they may call the C API. A record the queue refuses, because the
+   * queue was released or the copy could not be allocated, goes to the platform
+   * logger instead. The queue's wake and wake release run inline on the logging
+   * thread, under the same restrictions as the log callback.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
@@ -142,8 +130,7 @@ typedef struct mln_log_handler {
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when handler is null, handler->size is too
- *   small, neither callback nor queue is set, release_user_data is set
- *   without a callback, or queue is an invalid handle.
+ *   small, callback is null, or queue is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
@@ -155,7 +142,7 @@ MLN_API mln_status mln_log_set_callback(
  * Clears the process-global log callback.
  *
  * The C API invokes or queues the cleared handler's release_user_data, if any,
- * or queues its MLN_DELIVERY_TYPE_RETIRED delivery, before returning.
+ * before returning.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

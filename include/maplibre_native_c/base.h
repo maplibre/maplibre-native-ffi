@@ -179,15 +179,10 @@ typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"
   "dispose=mln_render_frame_batch_release"
 );
-/** A host-owned queue that holds deliveries until its host drains them. */
+/** A host-owned queue that holds callback calls until its host dispatches. */
 typedef uint64_t mln_delivery_queue MLN_BINDING(
   "kind=handle;release=mln_delivery_queue_release;"
   "dispose=mln_delivery_queue_release"
-);
-/** An owned batch of deliveries from one drain. */
-typedef uint64_t mln_delivery_batch MLN_BINDING(
-  "kind=handle;release=mln_delivery_batch_release;"
-  "dispose=mln_delivery_batch_release"
 );
 
 /**

@@ -1,5 +1,5 @@
 // Transforms for a host that cannot run code on a MapLibre thread: a queued
-// resource transform, which the host answers after draining, and native header
+// resource transform, which the host answers after dispatch, and native header
 // rules, which answer inside the call. Covers what registration copies and
 // rejects, and, against a loopback server, the answer that reaches the
 // transport.
@@ -33,26 +33,57 @@ static mln_buffer_view copy_view(const char* text) {
 }
 #endif
 
+// What the last dispatched transform call received, copied during the call.
+// Dispatch runs on the case's thread.
+typedef struct kept_transform {
+  size_t calls;
+  void* user_data;
+  mln_resource_kind kind;
+  bool url_terminated;
+  char url[256];
+  mln_resource_transform_request request;
+} kept_transform;
+
+static kept_transform kept;
+
+// Keeps the request for the case to answer after dispatch returns.
+static void keep_transform(
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
+  mln_resource_transform_request request
+) {
+  kept.calls += 1;
+  kept.user_data = user_data;
+  kept.kind = kind;
+  kept.url_terminated = mln_test_lent_text_is_terminated(url);
+  const size_t size =
+    url.size < sizeof(kept.url) ? url.size : sizeof(kept.url) - 1;
+  memcpy(kept.url, url.data, size);
+  kept.url[size] = '\0';
+  kept.request = request;
+  mln_test_record_call('t', user_data, MLN_STATUS_OK, 0);
+}
+
 static mln_resource_transform queue_transform(
   mln_delivery_queue queue, void* tag
 ) {
+  memset(&kept, 0, sizeof(kept));
+  mln_test_calls_reset();
   return (mln_resource_transform){
     .size = sizeof(mln_resource_transform),
+    .callback = keep_transform,
     .user_data = tag,
     .queue = queue,
   };
 }
 
-// A queue transform carries no release_user_data and no callback, and names a
-// live queue.
+// A queue does not stand in for a transform's callback.
 static void a_queue_transform_rejects_an_invalid_shape(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
   mln_resource_transform transform = queue_transform(queue.handle, NULL);
-  transform.release_user_data = free;
+  transform.callback = NULL;
   MLN_TEST_INVALID(mln_test_set_resource_transform(runtime, &transform));
-  transform = queue_transform(queue.handle, NULL);
   transform.queue = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_test_set_resource_transform(runtime, &transform));
   mln_test_destroy_runtime(runtime);
@@ -148,25 +179,22 @@ static void rule_registrations_reject_an_invalid_rule(void) {
 
 #if MLN_TEST_PLATFORM_HTTP
 
-static mln_delivery_batch await_transform(
-  mln_delivery_queue queue, void* tag,
-  const mln_resource_transform_delivery** out_transform
+// Dispatches queue until one more transform call has kept its request, and
+// returns the request.
+static mln_resource_transform_request await_transform(
+  mln_delivery_queue queue, void* tag
 ) {
-  const mln_delivery* delivery = NULL;
-  const mln_delivery_batch batch =
-    mln_test_delivery_await_single(queue, &delivery);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM, delivery->type
-  );
-  TEST_ASSERT_EQUAL_PTR(tag, delivery->user_data);
-  *out_transform = &delivery->payload.resource_transform;
-  return batch;
+  const size_t before = kept.calls;
+  mln_test_dispatch_until_calls(queue, mln_test_calls.count + 1);
+  TEST_ASSERT_EQUAL_size_t(before + 1, kept.calls);
+  TEST_ASSERT_EQUAL_PTR(tag, kept.user_data);
+  return kept.request;
 }
 
-// The request waits for the host, which answers after draining: the transport
-// fetches the URL the host names. An answer is one-shot, and the handle still
-// needs its release.
-static void the_host_answers_a_drained_transform(void) {
+// The request waits for the host, which answers after its dispatched call:
+// the transport fetches the URL the host names. An answer is one-shot, and the
+// handle still needs its release.
+static void the_host_answers_a_dispatched_transform_later(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/rewritten.json",
      .body = empty_style_json,
@@ -190,15 +218,11 @@ static void the_host_answers_a_drained_transform(void) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, original));
 
-  const mln_resource_transform_delivery* delivered = NULL;
-  const mln_delivery_batch batch =
-    await_transform(queue.handle, &tag, &delivered);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, delivered->kind);
-  TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(delivered->url));
-  TEST_ASSERT_EQUAL_STRING(original, delivered->url.data);
-  const mln_resource_transform_request request = delivered->request;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  const mln_resource_transform_request request =
+    await_transform(queue.handle, &tag);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, kept.kind);
+  TEST_ASSERT_TRUE(kept.url_terminated);
+  TEST_ASSERT_EQUAL_STRING(original, kept.url);
 
   MLN_TEST_INVALID(
     mln_resource_transform_request_complete(request, (mln_buffer_view){0}, NULL)
@@ -230,11 +254,11 @@ static void the_host_answers_a_drained_transform(void) {
   mln_test_http_server_stop(server);
 }
 
-// A request the host never takes is released with its batch, and one the host
-// releases unanswered: both keep their URLs.
+// A request the host releases unanswered, and one that a released queue
+// abandons: both keep their URLs.
 static void an_unanswered_transform_keeps_its_url(void) {
   static const mln_test_http_route routes[] = {
-    {.path = "/untaken.json",
+    {.path = "/abandoned.json",
      .body = empty_style_json,
      .body_size = sizeof(empty_style_json) - 1},
     {.path = "/released.json",
@@ -242,9 +266,11 @@ static void an_unanswered_transform_keeps_its_url(void) {
      .body_size = sizeof(empty_style_json) - 1},
   };
   mln_test_http_server* server = mln_test_http_server_start(routes, 2);
-  char untaken[256];
+  char abandoned[256];
   char released[256];
-  mln_test_http_server_url(server, "/untaken.json", untaken, sizeof(untaken));
+  mln_test_http_server_url(
+    server, "/abandoned.json", abandoned, sizeof(abandoned)
+  );
   mln_test_http_server_url(
     server, "/released.json", released, sizeof(released)
   );
@@ -255,35 +281,33 @@ static void an_unanswered_transform_keeps_its_url(void) {
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
 
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_url(map, untaken));
-  const mln_resource_transform_delivery* delivered = NULL;
-  mln_delivery_batch_release(await_transform(queue.handle, NULL, &delivered));
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-  mln_test_destroy_map(map);
-
-  map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, released));
-  const mln_delivery_batch batch =
-    await_transform(queue.handle, NULL, &delivered);
-  const mln_resource_transform_request request = delivered->request;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
-  mln_resource_transform_request_release(request);
+  mln_resource_transform_request_release(await_transform(queue.handle, NULL));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   TEST_ASSERT_EQUAL_INT(
     1, mln_test_http_server_requests(server, "/released.json")
+  );
+  mln_test_destroy_map(map);
+
+  map = mln_test_create_map(runtime);
+  const int wakes = atomic_load(&queue.wakes);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, abandoned));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, wakes + 1));
+  mln_test_delivery_queue_release(&queue);
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/abandoned.json")
   );
 
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
   mln_test_http_server_stop(server);
 }
 
-// Clearing the transform retires its queue registration after the last
-// request it delivered.
-static void retirement_follows_the_last_transform(void) {
+// Clearing the transform queues its release after the last request it
+// queued.
+static void the_release_follows_the_last_transform(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/style.json",
      .body = empty_style_json,
@@ -295,26 +319,20 @@ static void retirement_follows_the_last_transform(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   int tag = 0;
-  const mln_resource_transform transform = queue_transform(queue.handle, &tag);
+  mln_resource_transform transform = queue_transform(queue.handle, &tag);
+  transform.release_user_data = mln_test_record_release;
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, url));
-  const mln_resource_transform_delivery* delivered = NULL;
-  const mln_delivery_batch batch =
-    await_transform(queue.handle, &tag, &delivered);
-  const mln_resource_transform_request request = delivered->request;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  const mln_resource_transform_request request =
+    await_transform(queue.handle, &tag);
 
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
-  const mln_delivery* retired = NULL;
-  const mln_delivery_batch retirement =
-    mln_test_delivery_await_single(queue.handle, &retired);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, retired->type);
-  TEST_ASSERT_EQUAL_PTR(&tag, retired->user_data);
-  mln_delivery_batch_release(retirement);
-  // The clear leaves a request already delivered waiting for its answer.
+  mln_test_dispatch_until_calls(queue.handle, 2);
+  TEST_ASSERT_EQUAL_CHAR('r', mln_test_call_at(1)->kind);
+  TEST_ASSERT_EQUAL_PTR(&tag, mln_test_call_at(1)->user_data);
+  // The clear leaves a request already dispatched waiting for its answer.
   mln_resource_transform_request_release(request);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   mln_test_destroy_map(map);
@@ -466,12 +484,8 @@ static void header_rules_match_the_rewritten_url(void) {
 
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, original));
-  const mln_resource_transform_delivery* delivered = NULL;
-  const mln_delivery_batch batch =
-    await_transform(queue.handle, NULL, &delivered);
-  const mln_resource_transform_request request = delivered->request;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  const mln_resource_transform_request request =
+    await_transform(queue.handle, NULL);
   MLN_TEST_OK(mln_resource_transform_request_complete(
     request, mln_buffer_view_from_cstr(rewritten), NULL
   ));
@@ -498,9 +512,9 @@ MLN_TEST_GROUP {
   RUN_TEST(a_queue_transform_rejects_an_invalid_shape);
   RUN_TEST(rule_registrations_reject_an_invalid_rule);
 #if MLN_TEST_PLATFORM_HTTP
-  RUN_TEST(the_host_answers_a_drained_transform);
+  RUN_TEST(the_host_answers_a_dispatched_transform_later);
   RUN_TEST(an_unanswered_transform_keeps_its_url);
-  RUN_TEST(retirement_follows_the_last_transform);
+  RUN_TEST(the_release_follows_the_last_transform);
 #endif
 #if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(the_first_matching_header_rule_supplies_its_headers);

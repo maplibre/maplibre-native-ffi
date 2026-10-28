@@ -44,7 +44,6 @@ const mln_buffer_view mln_test_red_background_style_json =
 // holds. Tracking is thread local so one thread's teardown leaves another
 // thread's runtime alone.
 static MLN_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
-static MLN_TEST_THREAD_LOCAL mln_delivery_batch drained_batch;
 static atomic_flag event_queues_lock = ATOMIC_FLAG_INIT;
 static struct {
   mln_runtime runtime;
@@ -71,6 +70,26 @@ mln_delivery_queue mln_test_event_queue(mln_runtime runtime) {
   return queue;
 }
 
+// The visit that the running mln_test_dispatch_events() on this thread passes
+// each event to, and whether a dispatched event broke the message contract.
+static MLN_TEST_THREAD_LOCAL mln_test_event_visit current_visit;
+static MLN_TEST_THREAD_LOCAL void* current_visit_context;
+static MLN_TEST_THREAD_LOCAL bool unterminated_message;
+
+// Every queued event's message is lent text, so every dispatch checks it.
+static void visit_events(void* user_data, const mln_event_batch_view* events) {
+  (void)user_data;
+  for (size_t index = 0; index < events->event_count; index += 1) {
+    const mln_runtime_event* event = MLN_STRIDED_AT(
+      mln_runtime_event, events->events, events->event_size, index
+    );
+    if (!mln_test_lent_text_is_terminated(event->message)) {
+      unterminated_message = true;
+    }
+    if (current_visit != NULL) current_visit(event, current_visit_context);
+  }
+}
+
 void mln_test_configure_events(mln_runtime runtime, mln_wake wake) {
   mln_delivery_queue queue = MLN_HANDLE_NULL;
   const mln_delivery_queue_options options = {
@@ -87,7 +106,7 @@ void mln_test_configure_events(mln_runtime runtime, mln_wake wake) {
   atomic_flag_clear_explicit(&event_queues_lock, memory_order_release);
   TEST_ASSERT_LESS_THAN_size_t(128, slot);
   const mln_runtime_event_handler handler = {
-    .size = sizeof(handler), .queue = queue
+    .size = sizeof(handler), .callback = visit_events, .queue = queue
   };
   // Discarded: a handler accepted before a map's creation receives the map's
   // first events, so no case waits for this command.
@@ -337,7 +356,6 @@ mln_map mln_test_create_map(mln_runtime runtime) {
 }
 
 void mln_test_destroy_runtime(mln_runtime runtime) {
-  mln_test_release_drained_batch();
   MLN_TEST_OK(mln_test_runtime_close(runtime));
   release_event_queue(runtime);
   if (tracked_runtime == runtime) {
@@ -358,7 +376,6 @@ mln_status mln_test_map_fence(mln_map map) {
 }
 
 void mln_test_destroy_map(mln_map map) {
-  mln_test_release_drained_batch();
   const mln_completion release = mln_test_discard_completion();
   MLN_TEST_OK(mln_map_release(map, &release, MLN_TEST_DIAGNOSTIC));
   untrack_map(map);
@@ -516,112 +533,74 @@ void mln_test_thread_join(mln_test_thread* thread) {
   free(thread);
 }
 
-mln_status mln_test_drain_event_delivery(
-  mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
-  mln_diagnostic* diagnostic
+mln_status mln_test_dispatch_events(
+  mln_runtime runtime, mln_test_event_visit visit, void* context
 ) {
-  mln_delivery_batch_view deliveries = {.size = sizeof(deliveries)};
-  const mln_status status = mln_delivery_queue_drain(
-    mln_test_event_queue(runtime), batch, &deliveries, diagnostic
+  current_visit = visit;
+  current_visit_context = context;
+  unterminated_message = false;
+  const mln_status status = mln_delivery_queue_dispatch(
+    mln_test_event_queue(runtime), MLN_TEST_DIAGNOSTIC
   );
-  if (status != MLN_STATUS_OK) return status;
-  if (
-    deliveries.delivery_count != 1 ||
-    deliveries.deliveries[0].type != MLN_DELIVERY_TYPE_RUNTIME_EVENTS
-  ) {
-    mln_delivery_batch_release(*batch);
-    *batch = MLN_HANDLE_NULL;
-    return MLN_STATUS_INVALID_STATE;
-  }
-  *view = *deliveries.deliveries[0].payload.runtime_events.events;
-  return MLN_STATUS_OK;
-}
-
-mln_status mln_test_drain_events(
-  mln_runtime runtime, mln_event_batch_view* out_batch
-) {
-  if (out_batch == NULL || out_batch->size < sizeof(mln_event_batch_view)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  mln_test_release_drained_batch();
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  const mln_status status = mln_test_drain_event_delivery(
-    runtime, &batch, out_batch, MLN_TEST_DIAGNOSTIC
-  );
-  if (status == MLN_STATUS_NOT_READY) {
-    *out_batch = (mln_event_batch_view){.size = sizeof(mln_event_batch_view)};
-    return MLN_STATUS_OK;
-  }
-  if (status != MLN_STATUS_OK) return status;
-  drained_batch = batch;
-  // Every queued event's message is lent text, so every drain checks it. Wait
-  // predicates drain, so this reports a failure rather than asserting.
-  for (size_t index = 0; index < out_batch->event_count; index += 1) {
-    const mln_runtime_event* event = MLN_STRIDED_AT(
-      mln_runtime_event, out_batch->events, out_batch->event_size, index
+  current_visit = NULL;
+  current_visit_context = NULL;
+  // Wait predicates dispatch, so this reports a failure rather than asserting.
+  if (unterminated_message) {
+    (void)snprintf(
+      mln_test_diagnostic()->message, MLN_DIAGNOSTIC_MESSAGE_CAPACITY,
+      "a queued event message lacks its NUL terminator"
     );
-    if (!mln_test_lent_text_is_terminated(event->message)) {
-      (void)snprintf(
-        mln_test_diagnostic()->message, MLN_DIAGNOSTIC_MESSAGE_CAPACITY,
-        "a queued event message lacks its NUL terminator"
-      );
-      return MLN_STATUS_NATIVE_ERROR;
-    }
+    return MLN_STATUS_NATIVE_ERROR;
   }
-  return MLN_STATUS_OK;
+  return status;
 }
 
 size_t mln_test_drain_all(mln_runtime runtime) {
   return mln_test_drain_counting(runtime, 0);
 }
 
+typedef struct type_count {
+  uint32_t type;
+  size_t total;
+} type_count;
+
+static void count_type(const mln_runtime_event* event, void* context) {
+  type_count* count = context;
+  if (count->type == 0 || event->type == count->type) count->total += 1;
+}
+
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
-  size_t total = 0;
-  for (;;) {
-    mln_event_batch_view batch = {.size = sizeof(batch)};
-    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
-      return total;
-    }
-    if (batch.event_count == 0) {
-      return total;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event = MLN_STRIDED_AT(
-        mln_runtime_event, batch.events, batch.event_size, index
-      );
-      if (type == 0 || event->type == type) {
-        total += 1;
-      }
-    }
+  type_count count = {.type = type};
+  while (mln_test_dispatch_events(runtime, count_type, &count) ==
+         MLN_STATUS_OK) {
   }
+  return count.total;
 }
 
 typedef struct event_search {
   mln_runtime runtime;
   mln_test_event_match match;
   void* context;
+  bool matched;
   bool drain_failed;
 } event_search;
 
-// Drains the whole queue, so a match leaves the queue empty and the events
+static void match_event(const mln_runtime_event* event, void* context) {
+  event_search* search = context;
+  if (!search->matched) search->matched = search->match(event, search->context);
+}
+
+// Dispatches the whole queue, so a match leaves the queue empty and the events
 // after it discarded.
 static bool drain_until_match(void* context) {
   event_search* search = context;
-  bool matched = false;
   for (;;) {
-    mln_event_batch_view batch = {.size = sizeof(batch)};
-    if (mln_test_drain_events(search->runtime, &batch) != MLN_STATUS_OK) {
+    const mln_status status =
+      mln_test_dispatch_events(search->runtime, match_event, search);
+    if (status == MLN_STATUS_NOT_READY) return search->matched;
+    if (status != MLN_STATUS_OK) {
       search->drain_failed = true;
       return true;
-    }
-    if (batch.event_count == 0) {
-      return matched;
-    }
-    for (size_t index = 0; index < batch.event_count && !matched; index += 1) {
-      const mln_runtime_event* event = MLN_STRIDED_AT(
-        mln_runtime_event, batch.events, batch.event_size, index
-      );
-      matched = search->match(event, search->context);
     }
   }
 }
@@ -639,27 +618,25 @@ bool mln_test_await_event_matching(
          !search.drain_failed;
 }
 
+typedef struct match_count {
+  mln_test_event_match match;
+  void* context;
+  size_t total;
+} match_count;
+
+static void count_match(const mln_runtime_event* event, void* context) {
+  match_count* count = context;
+  if (count->match(event, count->context)) count->total += 1;
+}
+
 size_t mln_test_drain_counting_matching(
   mln_runtime runtime, mln_test_event_match match, void* context
 ) {
-  size_t total = 0;
-  for (;;) {
-    mln_event_batch_view batch = {.size = sizeof(batch)};
-    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
-      return total;
-    }
-    if (batch.event_count == 0) {
-      return total;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event = MLN_STRIDED_AT(
-        mln_runtime_event, batch.events, batch.event_size, index
-      );
-      if (match(event, context)) {
-        total += 1;
-      }
-    }
+  match_count count = {.match = match, .context = context};
+  while (mln_test_dispatch_events(runtime, count_match, &count) ==
+         MLN_STATUS_OK) {
   }
+  return count.total;
 }
 
 typedef struct event_copy {
@@ -738,11 +715,6 @@ bool mln_test_wait_until(mln_runtime runtime, const atomic_bool* flag) {
   );
 }
 
-void mln_test_release_drained_batch(void) {
-  mln_delivery_batch_release(drained_batch);
-  drained_batch = MLN_HANDLE_NULL;
-}
-
 void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json) {
   mln_test_completion applied = mln_test_completion_default(0);
   MLN_TEST_OK(
@@ -754,7 +726,6 @@ void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json) {
 }
 
 bool mln_test_reclaim_thread_resources(void) {
-  mln_test_release_drained_batch();
   // Render session before map before runtime: the C API keeps a map with a live
   // session and a runtime with live maps alive on purpose.
   bool reclaimed = mln_test_render_reclaim_thread_sessions();

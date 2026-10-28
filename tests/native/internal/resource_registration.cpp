@@ -12,7 +12,31 @@
 #include "support/test_support.h"
 
 namespace {
-void rejected_provider_registration_queues_no_retirement() {
+// The calls that this file's queues dispatched.
+struct DispatchedCalls {
+  std::size_t requests = 0;
+  std::size_t cancels = 0;
+  std::size_t releases = 0;
+  mln_resource_request cancelled = MLN_HANDLE_NULL;
+};
+
+DispatchedCalls dispatched;
+
+void release_queued_request(
+  void*, const mln_resource_request_info*, mln_resource_request handle
+) {
+  ++dispatched.requests;
+  mln_resource_request_release(handle);
+}
+
+void record_queued_cancel(void*, mln_resource_request handle) {
+  ++dispatched.cancels;
+  dispatched.cancelled = handle;
+}
+
+void record_queued_release(void*) { ++dispatched.releases; }
+
+void rejected_provider_registration_queues_no_release() {
   auto unexpected_retirements = std::size_t{};
   for (auto budget = std::size_t{}; budget < 24; ++budget) {
     auto runtime = mln_runtime{MLN_HANDLE_NULL};
@@ -26,6 +50,8 @@ void rejected_provider_registration_queues_no_retirement() {
     MLN_TEST_OK(mln_delivery_queue_create(&queue_options, &queue, nullptr));
     const auto provider = mln_resource_provider{
       .size = sizeof(mln_resource_provider),
+      .callback = release_queued_request,
+      .release_user_data = record_queued_release,
       .queue = queue,
       .routes = nullptr,
       .route_count = 0,
@@ -43,16 +69,9 @@ void rejected_provider_registration_queues_no_retirement() {
     } else {
       mln_test_completion_reject(&completion);
       mln_test_completion_destroy(&completion);
-      auto batch = MLN_HANDLE_NULL;
-      auto view = mln_delivery_batch_view{
-        .size = sizeof(mln_delivery_batch_view),
-      };
-      const auto drained =
-        mln_delivery_queue_drain(queue, &batch, &view, nullptr);
-      if (drained == MLN_STATUS_OK) {
-        unexpected_retirements += view.delivery_count;
-        mln_delivery_batch_release(batch);
-      }
+      dispatched = {};
+      static_cast<void>(mln_delivery_queue_dispatch(queue, nullptr));
+      unexpected_retirements += dispatched.releases;
     }
     auto released = mln_test_completion_default(0);
     MLN_TEST_OK(mln_runtime_release(runtime, &released.descriptor, nullptr));
@@ -60,7 +79,7 @@ void rejected_provider_registration_queues_no_retirement() {
     mln_delivery_queue_release(queue);
   }
   TEST_ASSERT_EQUAL_size_t_MESSAGE(
-    0, unexpected_retirements, "a rejected provider queued its retirement"
+    0, unexpected_retirements, "a rejected provider queued its release"
   );
 }
 
@@ -168,7 +187,9 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
     mln_delivery_queue_options{.size = sizeof(mln_delivery_queue_options)};
   MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, nullptr));
   const auto descriptor = mln_resource_provider{
-    .size = sizeof(mln_resource_provider), .queue = queue
+    .size = sizeof(mln_resource_provider),
+    .callback = release_queued_request,
+    .queue = queue,
   };
   MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, descriptor));
   const auto live = mln::core::lease_runtime(runtime);
@@ -210,7 +231,7 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
   );
 }
 
-void a_queued_cancel_precedes_retirement_when_allocations_fail() {
+void a_queued_cancel_precedes_its_release_when_allocations_fail() {
   auto loop = mln::util::RunLoop{};
   auto handle = mln_resource_request{MLN_HANDLE_NULL};
   auto request = mln::core::request_custom_resource(
@@ -228,7 +249,10 @@ void a_queued_cancel_precedes_retirement_when_allocations_fail() {
     mln_delivery_queue_options{.size = sizeof(mln_delivery_queue_options)};
   MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, nullptr));
   const auto handler = mln_resource_request_cancel_handler{
-    .size = sizeof(mln_resource_request_cancel_handler), .queue = queue
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = record_queued_cancel,
+    .release_user_data = record_queued_release,
+    .queue = queue,
   };
   auto cancelled = false;
   MLN_TEST_OK(mln_resource_request_set_cancel_callback(
@@ -239,18 +263,11 @@ void a_queued_cancel_precedes_retirement_when_allocations_fail() {
     const auto faults = mln::native_tests::AllocationFaults{};
     request.reset();
   }
-  auto batch = mln_delivery_batch{MLN_HANDLE_NULL};
-  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
-  MLN_TEST_OK(mln_delivery_queue_drain(queue, &batch, &view, nullptr));
-  TEST_ASSERT_EQUAL_size_t(2, view.delivery_count);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL, view.deliveries[0].type
-  );
-  TEST_ASSERT_EQUAL_UINT64(
-    handle, view.deliveries[0].payload.resource_request_cancel.handle
-  );
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, view.deliveries[1].type);
-  mln_delivery_batch_release(batch);
+  dispatched = {};
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue, nullptr));
+  TEST_ASSERT_EQUAL_size_t(1, dispatched.cancels);
+  TEST_ASSERT_EQUAL_UINT64(handle, dispatched.cancelled);
+  TEST_ASSERT_EQUAL_size_t(1, dispatched.releases);
   mln_resource_request_release(handle);
   mln_delivery_queue_release(queue);
 }
@@ -330,7 +347,7 @@ MLN_TEST_GROUP {
   RUN_TEST(reserved_decisions_are_cancelled_with_the_native_request);
   RUN_TEST(a_failed_provider_copy_delivers_with_persistent_allocation_failure);
   RUN_TEST(pass_through_retry_starts_native_after_scheduling_failure);
-  RUN_TEST(a_queued_cancel_precedes_retirement_when_allocations_fail);
-  RUN_TEST(rejected_provider_registration_queues_no_retirement);
+  RUN_TEST(a_queued_cancel_precedes_its_release_when_allocations_fail);
+  RUN_TEST(rejected_provider_registration_queues_no_release);
   RUN_TEST(rejected_callback_registrations_never_release_caller_data);
 }

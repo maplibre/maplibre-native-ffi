@@ -1,31 +1,109 @@
-// Queue-mode completions: what a delivery copies, descriptor validation, owned
-// results, and completions whose queue the host released.
+// Queued completions: what a dispatched completion receives, descriptor
+// validation, results that outlive their producer, and completions whose
+// queue the host released.
 
 #include <string.h>
 
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-static bool view_contains(mln_buffer_view view, const char* needle) {
-  const size_t length = strlen(needle);
-  const char* bytes = view.data;
-  for (size_t offset = 0; offset + length <= view.size; offset += 1) {
-    if (memcmp(bytes + offset, needle, length) == 0) return true;
-  }
-  return false;
+// What one dispatched completion received, copied during the call.
+typedef struct captured_result {
+  size_t calls;
+  void* user_data;
+  uint32_t size;
+  mln_status status;
+  mln_command_disposition disposition;
+  uint64_t generation;
+  bool has_value;
+  size_t value_count;
+  char diagnostic[256];
+  // The first layer of a style layer list, for the list case.
+  char layer_id[32];
+  char layer_type[32];
+} captured_result;
+
+static void copy_text(char* out, size_t capacity, mln_buffer_view text) {
+  const size_t size = text.size < capacity - 1 ? text.size : capacity - 1;
+  if (size != 0) memcpy(out, text.data, size);
+  out[size] = '\0';
 }
 
-static const mln_completion_result* await_completion(
-  mln_delivery_queue queue, void* user_data, mln_delivery_batch* out_batch
+static captured_result* capture_target;
+
+static void capture_result(
+  void* user_data, const mln_completion_result* result
 ) {
-  const mln_delivery* delivery = NULL;
-  *out_batch = mln_test_delivery_await_single(queue, &delivery);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
-  TEST_ASSERT_EQUAL_PTR(user_data, delivery->user_data);
-  TEST_ASSERT_EQUAL_UINT32(
-    sizeof(mln_completion_result), delivery->payload.completion.size
+  captured_result* captured = capture_target;
+  captured->calls += 1;
+  captured->user_data = user_data;
+  captured->size = result->size;
+  captured->status = result->status;
+  captured->disposition = result->disposition;
+  captured->generation = result->generation;
+  captured->has_value = result->value != NULL;
+  captured->value_count = result->value_count;
+  copy_text(
+    captured->diagnostic, sizeof(captured->diagnostic), result->diagnostic
   );
-  return &delivery->payload.completion;
+}
+
+static void capture_layers(
+  void* user_data, const mln_completion_result* result
+) {
+  capture_result(user_data, result);
+  if (result->status != MLN_STATUS_OK || result->value_count == 0) return;
+  const mln_style_layer_info* layer = result->value;
+  copy_text(
+    capture_target->layer_id, sizeof(capture_target->layer_id), layer->id
+  );
+  copy_text(
+    capture_target->layer_type, sizeof(capture_target->layer_type), layer->type
+  );
+}
+
+static mln_completion capturing_completion(
+  mln_delivery_queue queue, void* user_data, captured_result* captured,
+  mln_completion_callback callback
+) {
+  memset(captured, 0, sizeof(*captured));
+  capture_target = captured;
+  return (mln_completion){
+    .size = sizeof(mln_completion),
+    .callback = callback,
+    .user_data = user_data,
+    .queue = queue,
+  };
+}
+
+typedef struct capture_wait {
+  mln_delivery_queue queue;
+  const captured_result* captured;
+  mln_status failure;
+} capture_wait;
+
+static bool captured_a_result(void* context) {
+  capture_wait* wait = context;
+  const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
+  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+    wait->failure = status;
+    return true;
+  }
+  return wait->captured->calls != 0;
+}
+
+// Dispatches queue until the capturing completion has run once.
+static void await_capture(
+  mln_delivery_queue queue, const captured_result* captured, void* user_data
+) {
+  capture_wait wait = {.queue = queue, .captured = captured};
+  TEST_ASSERT_TRUE(mln_test_await(
+    captured_a_result, &wait, mln_test_deadline_default(), "a completion"
+  ));
+  MLN_TEST_OK(wait.failure);
+  TEST_ASSERT_EQUAL_size_t(1, captured->calls);
+  TEST_ASSERT_EQUAL_PTR(user_data, captured->user_data);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_completion_result), captured->size);
 }
 
 static void operation_and_command_completions_reach_the_queue(void) {
@@ -35,44 +113,45 @@ static void operation_and_command_completions_reach_the_queue(void) {
   mln_map map = mln_test_create_map(runtime);
   int operation_tag = 0;
   int command_tag = 0;
+  captured_result captured;
 
-  mln_completion completion =
-    mln_test_queue_completion(queue.handle, &operation_tag);
-  MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &completion, NULL));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  const mln_completion_result* result =
-    await_completion(queue.handle, &operation_tag, &batch);
-  MLN_TEST_OK(result->status);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, result->disposition
+  mln_completion completion = capturing_completion(
+    queue.handle, &operation_tag, &captured, capture_result
   );
-  TEST_ASSERT_EQUAL_UINT64(0, result->generation);
-  TEST_ASSERT_NULL(result->value);
-  TEST_ASSERT_EQUAL_size_t(0, result->diagnostic.size);
-  mln_delivery_batch_release(batch);
+  MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &completion, NULL));
+  await_capture(queue.handle, &captured, &operation_tag);
+  MLN_TEST_OK(captured.status);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED, captured.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT64(0, captured.generation);
+  TEST_ASSERT_FALSE(captured.has_value);
+  TEST_ASSERT_EQUAL_STRING("", captured.diagnostic);
 
-  completion = mln_test_queue_completion(queue.handle, &command_tag);
+  completion =
+    capturing_completion(queue.handle, &command_tag, &captured, capture_result);
   MLN_TEST_OK(mln_map_set_style_json(
     map, mln_test_background_style_json, &completion, NULL
   ));
-  result = await_completion(queue.handle, &command_tag, &batch);
-  MLN_TEST_OK(result->status);
+  await_capture(queue.handle, &captured, &command_tag);
+  MLN_TEST_OK(captured.status);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, result->disposition
+    MLN_COMMAND_DISPOSITION_COMMITTED, captured.disposition
   );
-  TEST_ASSERT_TRUE(result->generation > 0);
-  mln_delivery_batch_release(batch);
+  TEST_ASSERT_TRUE(captured.generation > 0);
 
   // A failed command copies its status and diagnostic.
-  completion = mln_test_queue_completion(queue.handle, &command_tag);
+  completion =
+    capturing_completion(queue.handle, &command_tag, &captured, capture_result);
   MLN_TEST_OK(mln_map_remove_style_layer(
     map, MLN_BUFFER_LITERAL("absent-layer"), &completion, NULL
   ));
-  result = await_completion(queue.handle, &command_tag, &batch);
-  MLN_TEST_STATUS(MLN_STATUS_NOT_FOUND, result->status);
-  TEST_ASSERT_EQUAL_UINT32(MLN_COMMAND_DISPOSITION_FAILED, result->disposition);
-  TEST_ASSERT_TRUE(view_contains(result->diagnostic, "layer does not exist"));
-  mln_delivery_batch_release(batch);
+  await_capture(queue.handle, &captured, &command_tag);
+  MLN_TEST_STATUS(MLN_STATUS_NOT_FOUND, captured.status);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_FAILED, captured.disposition
+  );
+  TEST_ASSERT_NOT_NULL(strstr(captured.diagnostic, "layer does not exist"));
 
   mln_test_destroy_map(map);
   mln_test_delivery_queue_release(&queue);
@@ -89,24 +168,12 @@ static void a_rejected_submission_queues_nothing(void) {
     mln_runtime_clear_resource_transform(MLN_HANDLE_NULL, &completion, NULL)
   );
 
-  // A drained completion with a release, or neither a callback nor a queue.
-  mln_test_completion callback = mln_test_completion_default(0);
-  completion = callback.descriptor;
+  // A queue does not stand in for the callback.
   completion.callback = NULL;
-  completion.queue = queue.handle;
   MLN_TEST_INVALID(
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)
   );
   completion = (mln_completion){.size = sizeof(mln_completion)};
-  MLN_TEST_INVALID(
-    mln_runtime_clear_resource_transform(runtime, &completion, NULL)
-  );
-  mln_test_completion_reject(&callback);
-  mln_test_completion_destroy(&callback);
-
-  // Queue mode carries no release callback.
-  completion = mln_test_queue_completion(queue.handle, NULL);
-  completion.release_user_data = mln_test_delivery_count_wake_release;
   MLN_TEST_INVALID(
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)
   );
@@ -119,9 +186,8 @@ static void a_rejected_submission_queues_nothing(void) {
 
   // Rejected submissions return before accepting any work or completion.
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
-  mln_test_delivery_drain drain;
   MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_test_delivery_drain_into(queue.handle, &drain)
+    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
   );
 
   // A released queue reports as a released handle.
@@ -134,8 +200,8 @@ static void a_rejected_submission_queues_nothing(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A command accepts a null completion, but a present one still names exactly
-// one of a callback and a queue.
+// A command accepts a null completion, but a present one still names a
+// callback.
 static void a_command_validates_a_present_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -147,9 +213,10 @@ static void a_command_validates_a_present_completion(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A later command's completion reaches the queue after every earlier
-// submission's on the same map, including across a discarded command.
+// A later command's completion runs after every earlier submission's on the
+// same map, including across a discarded command.
 static void a_later_completion_follows_earlier_queued_completions(void) {
+  mln_test_calls_reset();
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
@@ -167,30 +234,20 @@ static void a_later_completion_follows_earlier_queued_completions(void) {
     mln_test_queue_completion(queue.handle, &later_tag);
   MLN_TEST_OK(mln_map_set_debug_options(map, 0, &later, NULL));
 
-  void* order[2] = {NULL, NULL};
-  size_t seen = 0;
-  while (seen < 2) {
-    const mln_test_delivery_drain drain =
-      mln_test_delivery_await_batch(queue.handle);
-    for (size_t index = 0; index < drain.view.delivery_count; index += 1) {
-      const mln_delivery* delivery = mln_test_delivery_at(&drain.view, index);
-      TEST_ASSERT_TRUE(seen < 2);
-      TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
-      MLN_TEST_OK(delivery->payload.completion.status);
-      order[seen++] = delivery->user_data;
-    }
-    mln_delivery_batch_release(drain.batch);
-  }
-  TEST_ASSERT_EQUAL_PTR(&command_tag, order[0]);
-  TEST_ASSERT_EQUAL_PTR(&later_tag, order[1]);
+  mln_test_dispatch_until_calls(queue.handle, 2);
+  TEST_ASSERT_EQUAL_size_t(2, mln_test_calls.count);
+  TEST_ASSERT_EQUAL_PTR(&command_tag, mln_test_call_at(0)->user_data);
+  MLN_TEST_OK(mln_test_call_at(0)->status);
+  TEST_ASSERT_EQUAL_PTR(&later_tag, mln_test_call_at(1)->user_data);
+  MLN_TEST_OK(mln_test_call_at(1)->status);
 
   mln_test_destroy_map(map);
   mln_test_delivery_queue_release(&queue);
   mln_test_destroy_runtime(runtime);
 }
 
-// A list result's strings live in the batch, past the map and runtime that
-// produced them.
+// A list result's strings live in the queued call, past the map and runtime
+// that produced them.
 static void list_results_outlive_the_runtime(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -198,28 +255,26 @@ static void list_results_outlive_the_runtime(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
 
+  captured_result captured;
   const mln_completion completion =
-    mln_test_queue_completion(queue.handle, NULL);
+    capturing_completion(queue.handle, NULL, &captured, capture_layers);
   MLN_TEST_OK(mln_map_list_style_layers(map, &completion, NULL));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  const mln_completion_result* result =
-    await_completion(queue.handle, NULL, &batch);
-  MLN_TEST_OK(result->status);
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
 
-  TEST_ASSERT_EQUAL_size_t(1, result->value_count);
-  const mln_style_layer_info* layer = result->value;
-  TEST_ASSERT_EQUAL_size_t(strlen("background"), layer->id.size);
-  TEST_ASSERT_EQUAL_MEMORY("background", layer->id.data, layer->id.size);
-  TEST_ASSERT_EQUAL_MEMORY("background", layer->type.data, layer->type.size);
-  mln_delivery_batch_release(batch);
+  await_capture(queue.handle, &captured, NULL);
+  MLN_TEST_OK(captured.status);
+  TEST_ASSERT_EQUAL_size_t(1, captured.value_count);
+  TEST_ASSERT_EQUAL_STRING("background", captured.layer_id);
+  TEST_ASSERT_EQUAL_STRING("background", captured.layer_type);
+  mln_test_delivery_queue_release(&queue);
 }
 
 // The runtime's own release completes through the queue, after its threads
 // are gone.
 static void runtime_release_completes_through_the_queue(void) {
+  mln_test_calls_reset();
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   // Created outside the fixtures, which would release it again.
@@ -230,11 +285,9 @@ static void runtime_release_completes_through_the_queue(void) {
   const mln_completion completion =
     mln_test_queue_completion(queue.handle, &tag);
   MLN_TEST_OK(mln_runtime_release(runtime, &completion, NULL));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  const mln_completion_result* result =
-    await_completion(queue.handle, &tag, &batch);
-  MLN_TEST_OK(result->status);
-  mln_delivery_batch_release(batch);
+  mln_test_dispatch_until_calls(queue.handle, 1);
+  TEST_ASSERT_EQUAL_PTR(&tag, mln_test_call_at(0)->user_data);
+  MLN_TEST_OK(mln_test_call_at(0)->status);
   mln_test_delivery_queue_release(&queue);
 }
 
@@ -266,7 +319,8 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void runtime_release_can_finish_before_queued_results_are_drained(void) {
+static void runtime_release_can_finish_before_queued_results_run(void) {
+  mln_test_calls_reset();
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
@@ -275,12 +329,10 @@ static void runtime_release_can_finish_before_queued_results_are_drained(void) {
   const mln_completion queued = mln_test_queue_completion(queue.handle, NULL);
   MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &queued, NULL));
   MLN_TEST_AWAIT_OK(mln_runtime_release(runtime, &completion.descriptor, NULL));
-  mln_test_delivery_drain drain;
-  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
-  const size_t count = drain.view.delivery_count;
-  mln_delivery_batch_release(drain.batch);
+  TEST_ASSERT_EQUAL_size_t(0, mln_test_calls.count);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
   mln_test_delivery_queue_release(&queue);
-  TEST_ASSERT_EQUAL_size_t(1, count);
+  TEST_ASSERT_EQUAL_size_t(1, mln_test_calls.count);
 }
 
 MLN_TEST_GROUP {
@@ -290,6 +342,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_later_completion_follows_earlier_queued_completions);
   RUN_TEST(list_results_outlive_the_runtime);
   RUN_TEST(runtime_release_completes_through_the_queue);
-  RUN_TEST(runtime_release_can_finish_before_queued_results_are_drained);
+  RUN_TEST(runtime_release_can_finish_before_queued_results_run);
   RUN_TEST(a_completion_for_a_released_queue_is_discarded);
 }

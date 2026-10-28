@@ -57,8 +57,6 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_geo_json_source_data";
     case HandleKind::DeliveryQueue:
       return "mln_delivery_queue";
-    case HandleKind::DeliveryBatch:
-      return "mln_delivery_batch";
     case HandleKind::StyleExpression:
       return "mln_style_expression";
     case HandleKind::GraphicsDevice:

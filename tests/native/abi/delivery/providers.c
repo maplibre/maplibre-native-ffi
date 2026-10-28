@@ -1,6 +1,6 @@
-// Queue-mode resource providers: copied requests that the host completes after
-// draining, untaken and cancelled requests, retirement, and requests that a
-// released queue fails.
+// Queued resource providers: copied requests that the host completes after
+// dispatch, cancelled requests, release order, and requests that a released
+// queue fails.
 
 #include <string.h>
 
@@ -14,11 +14,52 @@
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
+// What the last dispatched provider call received, copied during the call.
+// Dispatch runs on the case's thread.
+typedef struct kept_request {
+  size_t calls;
+  void* user_data;
+  mln_resource_request handle;
+  uint32_t size;
+  mln_resource_kind kind;
+  bool urls_terminated;
+  size_t prior_etag_size;
+  char requested_url[128];
+} kept_request;
+
+static kept_request kept;
+
+// Keeps the request's handle for the case to answer after dispatch returns.
+static void keep_request(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  kept.calls += 1;
+  kept.user_data = user_data;
+  kept.handle = handle;
+  kept.size = request->size;
+  kept.kind = request->kind;
+  kept.urls_terminated =
+    mln_test_lent_text_is_terminated(request->requested_url) &&
+    mln_test_lent_text_is_terminated(request->resolved_url) &&
+    mln_test_lent_text_is_terminated(request->prior_etag);
+  kept.prior_etag_size = request->prior_etag.size;
+  const size_t size = request->requested_url.size < sizeof(kept.requested_url)
+                        ? request->requested_url.size
+                        : sizeof(kept.requested_url) - 1;
+  memcpy(kept.requested_url, request->requested_url.data, size);
+  kept.requested_url[size] = '\0';
+  mln_test_record_call('p', user_data, MLN_STATUS_OK, 0);
+}
+
 static mln_resource_provider queue_provider(
   mln_delivery_queue queue, void* tag
 ) {
+  memset(&kept, 0, sizeof(kept));
+  mln_test_calls_reset();
   return (mln_resource_provider){
     .size = sizeof(mln_resource_provider),
+    .callback = keep_request,
     .user_data = tag,
     .queue = queue,
   };
@@ -33,23 +74,18 @@ static mln_resource_response style_response(void) {
   };
 }
 
-// Waits for one request delivery and returns its batch.
-static mln_delivery_batch await_request(
-  mln_delivery_queue queue, void* tag,
-  const mln_resource_request_delivery** out_request
-) {
-  const mln_delivery* delivery = NULL;
-  const mln_delivery_batch batch =
-    mln_test_delivery_await_single(queue, &delivery);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RESOURCE_REQUEST, delivery->type);
-  TEST_ASSERT_EQUAL_PTR(tag, delivery->user_data);
-  *out_request = &delivery->payload.resource_request;
-  return batch;
+// Dispatches queue until one provider call has kept its request, and returns
+// the request's handle.
+static mln_resource_request await_request(mln_delivery_queue queue, void* tag) {
+  mln_test_dispatch_until_calls(queue, 1);
+  TEST_ASSERT_EQUAL_size_t(1, kept.calls);
+  TEST_ASSERT_EQUAL_PTR(tag, kept.user_data);
+  return kept.handle;
 }
 
-// The host drains a copied request on its own thread, takes its handle, and
-// completes it there. The style loads with the host's response.
-static void the_host_completes_a_drained_request(void) {
+// The host dispatches a copied request on its own thread, keeps its handle,
+// and completes it after the call. The style loads with the host's response.
+static void the_host_completes_a_dispatched_request_later(void) {
   static const char style_url[] = "custom://queued-provider-style.json";
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -60,30 +96,14 @@ static void the_host_completes_a_drained_request(void) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, style_url));
 
-  const mln_resource_request_delivery* request = NULL;
-  const mln_delivery_batch batch = await_request(queue.handle, &tag, &request);
-  TEST_ASSERT_EQUAL_UINT32(
-    sizeof(mln_resource_request_info), request->request->size
-  );
+  const mln_resource_request handle = await_request(queue.handle, &tag);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_resource_request_info), kept.size);
   // The copy keeps each URL NUL-terminated and leaves the absent entity tag
   // empty.
-  TEST_ASSERT_TRUE(
-    mln_test_lent_text_is_terminated(request->request->requested_url)
-  );
-  TEST_ASSERT_TRUE(
-    mln_test_lent_text_is_terminated(request->request->resolved_url)
-  );
-  TEST_ASSERT_TRUE(
-    mln_test_lent_text_is_terminated(request->request->prior_etag)
-  );
-  TEST_ASSERT_EQUAL_size_t(0, request->request->prior_etag.size);
-  TEST_ASSERT_EQUAL_STRING(style_url, request->request->requested_url.data);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, request->request->kind);
-  const mln_resource_request handle = request->handle;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  // A delivery's owned handle transfers once.
-  MLN_TEST_INVALID_STATE(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  TEST_ASSERT_TRUE(kept.urls_terminated);
+  TEST_ASSERT_EQUAL_size_t(0, kept.prior_etag_size);
+  TEST_ASSERT_EQUAL_STRING(style_url, kept.requested_url);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, kept.kind);
 
   const mln_resource_response response = style_response();
   MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
@@ -99,65 +119,31 @@ static void the_host_completes_a_drained_request(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// Releasing a batch without taking the handle fails the request, so the
-// style load reports an error instead of waiting.
-static void an_untaken_request_fails(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  const mln_resource_provider provider = queue_provider(queue.handle, NULL);
-  mln_runtime runtime = mln_test_create_runtime();
-  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://untaken.json"));
-
-  const mln_resource_request_delivery* request = NULL;
-  mln_delivery_batch_release(await_request(queue.handle, NULL, &request));
-  char message[256] = {0};
-  TEST_ASSERT_TRUE(
-    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
-  );
-  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
-
-  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
-}
-
-// A wake that completes every request it drains, on the thread that pushed
-// it, before the provider has answered HANDLE.
+// A wake that dispatches its queue on the thread that pushed the request,
+// before the provider has answered HANDLE, and a provider call that completes
+// each request there.
 typedef struct completing_wake {
   mln_delivery_queue queue;
   atomic_int completed;
 } completing_wake;
 
+static void complete_request(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)request;
+  completing_wake* wake = user_data;
+  const mln_resource_response response = style_response();
+  if (mln_resource_request_complete(handle, &response, NULL) == MLN_STATUS_OK) {
+    atomic_fetch_add(&wake->completed, 1);
+  } else {
+    mln_resource_request_release(handle);
+  }
+}
+
 static void complete_from_wake(void* user_data) {
   completing_wake* wake = user_data;
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_delivery_batch_view view = {.size = sizeof(view)};
-  while (mln_delivery_queue_drain(wake->queue, &batch, &view, NULL) ==
-         MLN_STATUS_OK) {
-    for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery = MLN_STRIDED_AT(
-        mln_delivery, view.deliveries, view.delivery_size, index
-      );
-      if (delivery->type != MLN_DELIVERY_TYPE_RESOURCE_REQUEST) continue;
-      const mln_resource_request handle =
-        delivery->payload.resource_request.handle;
-      if (mln_delivery_batch_take(batch, index, NULL) != MLN_STATUS_OK) {
-        continue;
-      }
-      const mln_resource_response response = style_response();
-      if (
-        mln_resource_request_complete(handle, &response, NULL) == MLN_STATUS_OK
-      ) {
-        atomic_fetch_add(&wake->completed, 1);
-      } else {
-        mln_resource_request_release(handle);
-      }
-    }
-    mln_delivery_batch_release(batch);
-    batch = MLN_HANDLE_NULL;
+  while (mln_delivery_queue_dispatch(wake->queue, NULL) == MLN_STATUS_OK) {
   }
   mln_test_pulse();
 }
@@ -171,7 +157,12 @@ static void a_request_completed_before_handle_returns_loads(void) {
     .wake = {.callback = complete_from_wake, .user_data = &wake},
   };
   MLN_TEST_OK(mln_delivery_queue_create(&options, &wake.queue, NULL));
-  const mln_resource_provider provider = queue_provider(wake.queue, NULL);
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = complete_request,
+    .user_data = &wake,
+    .queue = wake.queue,
+  };
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
@@ -199,9 +190,10 @@ static void ignore_cancel(void* user_data, mln_resource_request handle) {
   (void)handle;
 }
 
-// MapLibre may cancel a queued request before the host drains it. The host
-// still takes the handle, sees the cancellation, and registers nothing.
-static void a_request_cancelled_before_the_drain_reports_it(void) {
+// MapLibre may cancel a queued request before the host dispatches it. The
+// call still receives the handle, the host sees the cancellation, and
+// registers nothing.
+static void a_request_cancelled_before_dispatch_reports_it(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_provider provider = queue_provider(queue.handle, NULL);
@@ -214,11 +206,7 @@ static void a_request_cancelled_before_the_drain_reports_it(void) {
   // A new style discards the pending style request.
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
 
-  const mln_resource_request_delivery* request = NULL;
-  const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
-  mln_resource_request handle = request->handle;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  mln_resource_request handle = await_request(queue.handle, NULL);
   TEST_ASSERT_TRUE(mln_test_await(
     request_cancelled, &handle, mln_test_deadline_default(),
     "the request to be cancelled"
@@ -241,39 +229,33 @@ static void a_request_cancelled_before_the_drain_reports_it(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// Replacing a queue provider retires it after its last request delivery.
-static void retirement_follows_the_last_request(void) {
+// Replacing a queue provider queues its release after its last request.
+static void the_release_follows_the_last_request(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   int first = 0;
   int second = 0;
   mln_resource_provider provider = queue_provider(queue.handle, &first);
+  provider.release_user_data = mln_test_record_release;
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://retired.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
 
-  provider = queue_provider(queue.handle, &second);
+  provider.user_data = &second;
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
 
-  mln_test_delivery_drain drain;
-  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
-  const mln_delivery_batch_view view = drain.view;
-  TEST_ASSERT_EQUAL_size_t(3, view.delivery_count);
-  const mln_delivery* request = mln_test_delivery_at(&view, 0);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RESOURCE_REQUEST, request->type);
-  TEST_ASSERT_EQUAL_PTR(&first, request->user_data);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_DELIVERY_TYPE_RETIRED, mln_test_delivery_at(&view, 1)->type
-  );
-  TEST_ASSERT_EQUAL_PTR(&first, mln_test_delivery_at(&view, 1)->user_data);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_DELIVERY_TYPE_RETIRED, mln_test_delivery_at(&view, 2)->type
-  );
-  TEST_ASSERT_EQUAL_PTR(&second, mln_test_delivery_at(&view, 2)->user_data);
-  mln_delivery_batch_release(drain.batch);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
+  TEST_ASSERT_EQUAL_size_t(3, mln_test_calls.count);
+  TEST_ASSERT_EQUAL_CHAR('p', mln_test_call_at(0)->kind);
+  TEST_ASSERT_EQUAL_PTR(&first, mln_test_call_at(0)->user_data);
+  TEST_ASSERT_EQUAL_CHAR('r', mln_test_call_at(1)->kind);
+  TEST_ASSERT_EQUAL_PTR(&first, mln_test_call_at(1)->user_data);
+  TEST_ASSERT_EQUAL_CHAR('r', mln_test_call_at(2)->kind);
+  TEST_ASSERT_EQUAL_PTR(&second, mln_test_call_at(2)->user_data);
+  mln_resource_request_release(kept.handle);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -303,8 +285,8 @@ static void a_released_queue_fails_requests(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Releasing a queue that holds an undrained request releases its handle,
-// which fails the request instead of leaving its load waiting.
+// Releasing a queue that holds a request it has not dispatched releases its
+// handle, which fails the request instead of leaving its load waiting.
 static void releasing_a_queue_fails_its_pending_requests(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -331,10 +313,11 @@ static void a_queue_provider_rejects_an_invalid_shape(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
-  mln_resource_provider provider = queue_provider(MLN_HANDLE_NULL, NULL);
+  // A queue does not stand in for the callback.
+  mln_resource_provider provider = queue_provider(queue.handle, NULL);
+  provider.callback = NULL;
   MLN_TEST_INVALID(mln_test_set_resource_provider(runtime, &provider));
-  provider = queue_provider(queue.handle, NULL);
-  provider.release_user_data = mln_test_delivery_count_wake_release;
+  provider.queue = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_test_set_resource_provider(runtime, &provider));
   mln_test_delivery_queue_release(&queue);
   provider = queue_provider(queue.handle, NULL);
@@ -577,14 +560,8 @@ static void routes_filter_a_queue_provider(void) {
 
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://routed/style.json"));
-  const mln_resource_request_delivery* request = NULL;
-  const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
-  TEST_ASSERT_EQUAL_STRING(
-    "custom://routed/style.json", request->request->requested_url.data
-  );
-  const mln_resource_request handle = request->handle;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  const mln_resource_request handle = await_request(queue.handle, NULL);
+  TEST_ASSERT_EQUAL_STRING("custom://routed/style.json", kept.requested_url);
   const mln_resource_response response = style_response();
   MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
@@ -609,9 +586,10 @@ static void transform_to(
   ));
 }
 
-// The host can decline after taking a queued request. The resource transform
-// still applies, and the request never visits the provider a second time.
-static void a_drained_request_can_pass_through_once(void) {
+// The host can decline a request after its dispatched call. The resource
+// transform still applies, and the request never visits the provider a second
+// time.
+static void a_dispatched_request_can_pass_through_once(void) {
   const mln_test_http_route route = {
     .path = "/rewritten.json",
     .body = inline_style_json,
@@ -639,11 +617,7 @@ static void a_drained_request_can_pass_through_once(void) {
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, original));
-  const mln_resource_request_delivery* request = NULL;
-  const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
-  const mln_resource_request handle = request->handle;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
+  const mln_resource_request handle = await_request(queue.handle, NULL);
   TEST_ASSERT_EQUAL_INT(
     0, mln_test_http_server_requests(server, "/rewritten.json")
   );
@@ -672,11 +646,10 @@ static void a_drained_request_can_pass_through_once(void) {
 #endif
 
 MLN_TEST_GROUP {
-  RUN_TEST(the_host_completes_a_drained_request);
-  RUN_TEST(an_untaken_request_fails);
+  RUN_TEST(the_host_completes_a_dispatched_request_later);
   RUN_TEST(a_request_completed_before_handle_returns_loads);
-  RUN_TEST(a_request_cancelled_before_the_drain_reports_it);
-  RUN_TEST(retirement_follows_the_last_request);
+  RUN_TEST(a_request_cancelled_before_dispatch_reports_it);
+  RUN_TEST(the_release_follows_the_last_request);
   RUN_TEST(a_released_queue_fails_requests);
   RUN_TEST(releasing_a_queue_fails_its_pending_requests);
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
@@ -685,6 +658,6 @@ MLN_TEST_GROUP {
 #if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(routes_filter_a_callback_provider);
   RUN_TEST(routes_filter_a_queue_provider);
-  RUN_TEST(a_drained_request_can_pass_through_once);
+  RUN_TEST(a_dispatched_request_can_pass_through_once);
 #endif
 }

@@ -4,14 +4,13 @@ Dart isolates and Node-API realms run host code only on their own thread, after
 native code returns, and Python runs it only on its binding's dispatcher
 thread. Such a host gives each registration one of five forms:
 
-- `queue`: the registration names a delivery queue, and every callback has a
-  queue delivery. Native code answers each call itself and queues it, and the
-  callbacks run when the isolate, the realm's event loop, or the dispatcher
-  thread dispatches the queue.
+- `queue`: the registration names a delivery queue. Native code answers each
+  call itself and queues it, and the callbacks run when the isolate, the
+  realm's event loop, or the dispatcher thread dispatches the queue.
 - `wake`: the registration's one callback only asks to be called again. The
   host names its queue, so dispatch runs the callback.
-- `rules`: every callback must answer on its native thread and has no queue
-  delivery. The host leaves them unset, so the native rules that the
+- `rules`: every callback must answer on its native thread, and the
+  registration names no queue. The host leaves them unset, so the native rules that the
   registration carries answer each call.
 - `native`: the callbacks are optional and synchronous, so native code relies
   on their work being done when they return. The host accepts only a native
@@ -42,14 +41,12 @@ def callback_fields(value: ValuePlan) -> list[FieldPlan]:
 
 def wake_callback(callback: CallbackPlan) -> bool:
     """Whether a callback only asks to be called again: it takes nothing but
-    its context, returns nothing, and native code neither waits for it nor
-    delivers it through a queue."""
+    its context, returns nothing, and native code does not wait for it."""
     return (
         bool(callback.context)
         and not callback.parameters[1:]
         and callback.result.native == "void"
         and not callback.synchronous
-        and not callback.delivery
     )
 
 
@@ -65,29 +62,22 @@ def is_wake(bound: BoundApi, value: ValuePlan) -> bool:
 
 
 def queue_callbacks(bound: BoundApi, value: ValuePlan) -> list[FieldPlan]:
-    """The callbacks of a registration that a delivery queue carries, or none.
-
-    The host sets the registration's queue in place of every callback, so
-    every callback must have a delivery.
-    """
+    """The callbacks of a registration that a delivery queue carries, or none."""
     if not value.registration or not value.registration.queue:
         return []
-    fields = callback_fields(value)
-    if not all(bound.callbacks[f.value.native].delivery for f in fields):
-        return []
-    return fields
+    return callback_fields(value)
 
 
 def omitted(bound: BoundApi, field: FieldPlan) -> bool:
     """Whether the host leaves a callback field unset: an optional callback
-    that must answer on its native thread and has no queue delivery, such as
+    that must answer on its native thread and that no queue carries, such as
     the HTTP header transform's, whose registration then applies native
     rules."""
     if field.value.kind != "callback" or not field.value.nullable:
         return False
     callback = bound.callbacks[field.value.native]
     return (
-        callback.delivery is None
+        not callback.queued
         and callback.result.native != "void"
         and not callback.synchronous
     )

@@ -2,8 +2,8 @@
 #define MLN_NATIVE_TESTS_DELIVERY_H
 
 // Helpers that the queue delivery cases share: a queue whose wake counts its
-// calls, drains that keep their views, waits for the next drained batch,
-// indexed access by the delivery stride, and queue-mode completions.
+// calls, a log of the calls that a case's queues dispatch, waits for the next
+// dispatched calls, and completions that a queue dispatches to the log.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -66,80 +66,108 @@ static inline void mln_test_delivery_queue_release(
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue->wake_releases, 1));
 }
 
-// One drained batch and the view that the drain wrote.
-typedef struct mln_test_delivery_drain {
-  mln_delivery_queue queue;
-  mln_delivery_batch batch;
-  mln_delivery_batch_view view;
-} mln_test_delivery_drain;
+// The calls that this file's queues dispatched, in the order they ran. A
+// case dispatches on its own thread, so nothing guards the log. Callbacks
+// record instead of asserting, since a failed assertion would unwind through
+// the dispatch that runs them.
+enum { mln_test_max_calls = 128 };
 
-// Drains queue into drain, checking the view on success.
-static inline mln_status mln_test_delivery_drain_into(
-  mln_delivery_queue queue, mln_test_delivery_drain* drain
+typedef struct mln_test_call {
+  // 'c' for a completion and 'r' for a release; a case adds its own kinds.
+  char kind;
+  void* user_data;
+  mln_status status;
+  uint64_t generation;
+} mln_test_call;
+
+static struct {
+  size_t count;
+  mln_test_call calls[mln_test_max_calls];
+} mln_test_calls;
+
+static inline void mln_test_calls_reset(void) { mln_test_calls.count = 0; }
+
+static inline void mln_test_record_call(
+  char kind, void* user_data, mln_status status, uint64_t generation
 ) {
-  drain->queue = queue;
-  drain->batch = MLN_HANDLE_NULL;
-  drain->view = (mln_delivery_batch_view){
-    .size = sizeof(mln_delivery_batch_view),
-  };
-  const mln_status status =
-    mln_delivery_queue_drain(queue, &drain->batch, &drain->view, NULL);
-  if (status == MLN_STATUS_OK) {
-    TEST_ASSERT_TRUE(drain->view.delivery_size >= sizeof(mln_delivery));
+  if (mln_test_calls.count < mln_test_max_calls) {
+    mln_test_calls.calls[mln_test_calls.count] = (mln_test_call){
+      .kind = kind,
+      .user_data = user_data,
+      .status = status,
+      .generation = generation,
+    };
   }
-  return status;
+  mln_test_calls.count += 1;
 }
 
-static inline bool mln_test_delivery_try_drain(void* context) {
-  mln_test_delivery_drain* drain = (mln_test_delivery_drain*)context;
-  const mln_status status = mln_test_delivery_drain_into(drain->queue, drain);
-  if (status == MLN_STATUS_NOT_READY) return false;
-  MLN_TEST_OK(status);
-  return true;
+static inline const mln_test_call* mln_test_call_at(size_t index) {
+  TEST_ASSERT_LESS_THAN_size_t(mln_test_calls.count, index);
+  TEST_ASSERT_LESS_THAN_size_t(mln_test_max_calls, index);
+  return &mln_test_calls.calls[index];
 }
 
-// Waits for the queue to hold a delivery and drains it. The wait re-checks on
-// every pulse, which the counting wake sends.
-static inline mln_test_delivery_drain mln_test_delivery_await_batch(
-  mln_delivery_queue queue
+static inline size_t mln_test_count_calls(char kind, void* user_data) {
+  size_t total = 0;
+  for (size_t index = 0;
+       index < mln_test_calls.count && index < mln_test_max_calls; ++index) {
+    const mln_test_call* call = &mln_test_calls.calls[index];
+    if (call->kind == kind && call->user_data == user_data) total += 1;
+  }
+  return total;
+}
+
+static inline void mln_test_record_completion(
+  void* user_data, const mln_completion_result* result
 ) {
-  mln_test_delivery_drain drain = {.queue = queue};
+  mln_test_record_call('c', user_data, result->status, result->generation);
+}
+
+static inline void mln_test_record_release(void* user_data) {
+  mln_test_record_call('r', user_data, MLN_STATUS_OK, 0);
+}
+
+typedef struct mln_test_call_wait {
+  mln_delivery_queue queue;
+  size_t count;
+  mln_status failure;
+} mln_test_call_wait;
+
+static inline bool mln_test_dispatched_calls(void* context) {
+  mln_test_call_wait* wait = (mln_test_call_wait*)context;
+  const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
+  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+    wait->failure = status;
+    return true;
+  }
+  return mln_test_calls.count >= wait->count;
+}
+
+// Dispatches queue as its wake pulses until the log holds `count` calls.
+static inline void mln_test_dispatch_until_calls(
+  mln_delivery_queue queue, size_t count
+) {
+  mln_test_call_wait wait = {
+    .queue = queue, .count = count, .failure = MLN_STATUS_OK
+  };
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_await(
-      mln_test_delivery_try_drain, &drain, mln_test_deadline_default(),
-      "delivery batch"
+      mln_test_dispatched_calls, &wait, mln_test_deadline_default(),
+      "dispatched calls"
     ),
-    "no delivery arrived"
+    "the queue did not run the calls"
   );
-  return drain;
+  MLN_TEST_OK(wait.failure);
 }
 
-// Steps to one delivery by the stride that native reports.
-static inline const mln_delivery* mln_test_delivery_at(
-  const mln_delivery_batch_view* view, size_t index
-) {
-  TEST_ASSERT_TRUE(index < view->delivery_count);
-  return MLN_STRIDED_AT(
-    mln_delivery, view->deliveries, view->delivery_size, index
-  );
-}
-
-// Waits for one batch that holds exactly one delivery and returns it.
-static inline mln_delivery_batch mln_test_delivery_await_single(
-  mln_delivery_queue queue, const mln_delivery** out_delivery
-) {
-  const mln_test_delivery_drain drain = mln_test_delivery_await_batch(queue);
-  TEST_ASSERT_EQUAL_size_t(1, drain.view.delivery_count);
-  *out_delivery = mln_test_delivery_at(&drain.view, 0);
-  return drain.batch;
-}
-
-// A completion that delivers to queue with user_data.
+// A completion that queue dispatches to mln_test_record_completion with
+// user_data.
 static inline mln_completion mln_test_queue_completion(
   mln_delivery_queue queue, void* user_data
 ) {
   return (mln_completion){
     .size = sizeof(mln_completion),
+    .callback = mln_test_record_completion,
     .user_data = user_data,
     .queue = queue,
   };

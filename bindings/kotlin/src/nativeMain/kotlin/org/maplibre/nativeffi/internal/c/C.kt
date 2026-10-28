@@ -109,17 +109,6 @@ internal actual object C {
 
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
 
-  actual fun mln_delivery_batch_release(batch: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_delivery_batch_release(batch.toULong())
-  }
-
-  actual fun mln_delivery_batch_take(batch: Long, index: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_delivery_batch_take(
-      batch.toULong(),
-      index.convert(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_create(
       options.toCPointer(),
@@ -130,19 +119,6 @@ internal actual object C {
   actual fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_dispatch(
       queue.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_delivery_queue_drain(
-    queue: Long,
-    outBatch: Long,
-    outView: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_drain(
-      queue.toULong(),
-      outBatch.toCPointer(),
-      outView.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

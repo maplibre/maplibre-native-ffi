@@ -32,7 +32,7 @@ reads.
 A callback borrows a span of events until it returns, so copy what the host
 keeps.
 
-<Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
+<Code code={region(handleEvents, "receive")} lang="c" title="handle-events.c" />
 
 Check the source kind and ID before interpreting an event, because one runtime
 can serve several maps. Bindings expose a handle's ID for this comparison.
@@ -46,9 +46,10 @@ Read the structured payload according to its type.
 ## Receive callbacks on the host loop
 
 A host that cannot run code on a native thread, such as a JavaScript engine,
-creates one delivery queue and sets it in place of the callbacks of each
-registration. The queue's wake schedules a drain on the host loop, and each
-drain returns the queued completions, events, and requests in one batch. The
+creates one delivery queue and names it beside the callbacks of each
+registration. Native code then queues each call instead of making it. The
+queue's wake schedules a dispatch on the host loop, and each dispatch runs the
+queued completions, event callbacks, and request callbacks there, in order. The
 [delivery reference](/maplibre-native-ffi/reference/c/delivery_8h.html) states
 the queue's rules.
 

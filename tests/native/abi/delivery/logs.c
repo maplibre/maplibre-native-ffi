@@ -1,7 +1,7 @@
-// Queue-mode log handlers: copied records, retirement on replace and clear,
-// records that a released queue refuses, and dispatched records that may call
-// the C API. Every case changes the
-// process-global handler, so each runs inside restoring_log_state().
+// Queued log handlers: copied records, release on replace and clear, records
+// that a released queue refuses, and dispatched records that may call the C
+// API. Every case changes the process-global handler, so each runs inside
+// restoring_log_state().
 
 #include <string.h>
 
@@ -35,14 +35,6 @@ static bool is_dump_record(const char* message) {
          strncmp(message, dump_style_url, sizeof(dump_style_url) - 1) == 0;
 }
 
-static mln_log_handler queue_handler(mln_delivery_queue queue, void* tag) {
-  return (mln_log_handler){
-    .size = sizeof(mln_log_handler),
-    .user_data = tag,
-    .queue = queue,
-  };
-}
-
 // Writes the three dump records of a map with an empty style, synchronously
 // when the async mask leaves info records synchronous.
 static void dump_debug_logs(void) {
@@ -56,43 +48,61 @@ static void dump_debug_logs(void) {
 
 enum { max_seen = 64 };
 
-// What the queue delivered, copied before each batch is released.
-typedef struct seen_deliveries {
+// What the queue ran: this case's dump records and every release, copied
+// during each call. Dispatch runs on the case's thread.
+typedef struct seen_calls {
   size_t count;
-  uint32_t types[max_seen];
+  bool unterminated;
+  char kinds[max_seen];
   void* user_data[max_seen];
-  mln_log_delivery records[max_seen];
+  mln_log_severity severities[max_seen];
+  mln_log_event events[max_seen];
+  int64_t codes[max_seen];
   char messages[max_seen][96];
-} seen_deliveries;
+} seen_calls;
 
-static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
-  while (true) {
-    mln_test_delivery_drain drain;
-    const mln_status status = mln_test_delivery_drain_into(queue, &drain);
-    if (status == MLN_STATUS_NOT_READY) return;
-    MLN_TEST_OK(status);
-    for (size_t index = 0; index < drain.view.delivery_count; index += 1) {
-      const mln_delivery* delivery = mln_test_delivery_at(&drain.view, index);
-      // Keep only this case's dump records and every retirement.
-      if (delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD) {
-        const mln_buffer_view message = delivery->payload.log_record.message;
-        TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(message));
-        if (!is_dump_record(message.data)) continue;
-      }
-      TEST_ASSERT_TRUE(seen->count < max_seen);
-      const size_t slot = seen->count++;
-      seen->types[slot] = delivery->type;
-      seen->user_data[slot] = delivery->user_data;
-      if (delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD) {
-        seen->records[slot] = delivery->payload.log_record;
-        strncpy(
-          seen->messages[slot], delivery->payload.log_record.message.data,
-          sizeof(seen->messages[slot]) - 1
-        );
-      }
-    }
-    mln_delivery_batch_release(drain.batch);
+static seen_calls seen;
+
+static bool record_log(
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
+) {
+  if (!mln_test_lent_text_is_terminated(message)) seen.unterminated = true;
+  if (!is_dump_record(message.data) || seen.count == max_seen) return false;
+  const size_t slot = seen.count++;
+  seen.kinds[slot] = 'l';
+  seen.user_data[slot] = user_data;
+  seen.severities[slot] = severity;
+  seen.events[slot] = event;
+  seen.codes[slot] = code;
+  strncpy(seen.messages[slot], message.data, sizeof(seen.messages[slot]) - 1);
+  return false;
+}
+
+static void record_log_release(void* user_data) {
+  if (seen.count == max_seen) return;
+  const size_t slot = seen.count++;
+  seen.kinds[slot] = 'r';
+  seen.user_data[slot] = user_data;
+}
+
+static mln_log_handler queue_handler(mln_delivery_queue queue, void* tag) {
+  return (mln_log_handler){
+    .size = sizeof(mln_log_handler),
+    .callback = record_log,
+    .user_data = tag,
+    .release_user_data = record_log_release,
+    .queue = queue,
+  };
+}
+
+static void dispatch_all(mln_delivery_queue queue) {
+  memset(&seen, 0, sizeof(seen));
+  mln_status status = MLN_STATUS_OK;
+  while ((status = mln_delivery_queue_dispatch(queue, NULL)) == MLN_STATUS_OK) {
   }
+  MLN_TEST_STATUS(MLN_STATUS_NOT_READY, status);
+  TEST_ASSERT_FALSE(seen.unterminated);
 }
 
 LOG_STATE_CASE(a_queue_handler_copies_each_record) {
@@ -113,32 +123,28 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
   // A cleared handler queues nothing more.
   dump_debug_logs();
 
-  static seen_deliveries seen;
-  memset(&seen, 0, sizeof(seen));
-  drain_all(queue.handle, &seen);
+  dispatch_all(queue.handle);
   TEST_ASSERT_EQUAL_size_t(4, seen.count);
   static const char* const expected[3] = {
     dump_separator, dump_style_url, dump_separator
   };
   for (size_t index = 0; index < 3; index += 1) {
-    TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_LOG_RECORD, seen.types[index]);
+    TEST_ASSERT_EQUAL_CHAR('l', seen.kinds[index]);
     TEST_ASSERT_EQUAL_PTR(&tag, seen.user_data[index]);
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_LOG_SEVERITY_INFO, seen.records[index].severity
-    );
-    TEST_ASSERT_EQUAL_UINT32(MLN_LOG_EVENT_GENERAL, seen.records[index].event);
-    TEST_ASSERT_EQUAL_INT64(-1, seen.records[index].code);
+    TEST_ASSERT_EQUAL_UINT32(MLN_LOG_SEVERITY_INFO, seen.severities[index]);
+    TEST_ASSERT_EQUAL_UINT32(MLN_LOG_EVENT_GENERAL, seen.events[index]);
+    TEST_ASSERT_EQUAL_INT64(-1, seen.codes[index]);
     TEST_ASSERT_EQUAL_STRING(expected[index], seen.messages[index]);
   }
-  // Clearing the handler retires it after its final record.
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, seen.types[3]);
+  // Clearing the handler releases it after its final record.
+  TEST_ASSERT_EQUAL_CHAR('r', seen.kinds[3]);
   TEST_ASSERT_EQUAL_PTR(&tag, seen.user_data[3]);
   mln_test_delivery_queue_release(&queue);
 }
 
-// Replacing a queue handler retires it once, as the last delivery for its
-// user data; clearing retires the replacement.
-LOG_STATE_CASE(replace_and_clear_retire_a_queue_handler_once) {
+// Replacing a queue handler releases it once, as the last call for its user
+// data; clearing releases the replacement.
+LOG_STATE_CASE(replace_and_clear_release_a_queue_handler_once) {
   static mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   int first = 0;
@@ -150,13 +156,11 @@ LOG_STATE_CASE(replace_and_clear_retire_a_queue_handler_once) {
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
 
-  static seen_deliveries seen;
-  memset(&seen, 0, sizeof(seen));
-  drain_all(queue.handle, &seen);
+  dispatch_all(queue.handle);
   TEST_ASSERT_EQUAL_size_t(2, seen.count);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, seen.types[0]);
+  TEST_ASSERT_EQUAL_CHAR('r', seen.kinds[0]);
   TEST_ASSERT_EQUAL_PTR(&first, seen.user_data[0]);
-  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, seen.types[1]);
+  TEST_ASSERT_EQUAL_CHAR('r', seen.kinds[1]);
   TEST_ASSERT_EQUAL_PTR(&second, seen.user_data[1]);
   mln_test_delivery_queue_release(&queue);
 }
@@ -166,10 +170,11 @@ LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {
   mln_test_delivery_queue_create(&queue);
   int tag = 0;
 
-  mln_log_handler handler = queue_handler(MLN_HANDLE_NULL, &tag);
+  // A queue does not stand in for the callback.
+  mln_log_handler handler = queue_handler(queue.handle, &tag);
+  handler.callback = NULL;
   MLN_TEST_INVALID(mln_log_set_callback(&handler, NULL));
-  handler = queue_handler(queue.handle, &tag);
-  handler.release_user_data = mln_test_delivery_count_wake_release;
+  handler.release_user_data = NULL;
   MLN_TEST_INVALID(mln_log_set_callback(&handler, NULL));
 
   mln_test_delivery_queue_release(&queue);
@@ -270,7 +275,7 @@ LOG_STATE_CASE(a_dispatched_handler_may_call_the_c_api) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_queue_handler_copies_each_record);
-  RUN_TEST(replace_and_clear_retire_a_queue_handler_once);
+  RUN_TEST(replace_and_clear_release_a_queue_handler_once);
   RUN_TEST(a_queue_handler_rejects_an_invalid_shape);
   RUN_TEST(a_handler_on_a_released_queue_refuses_its_records);
   RUN_TEST(a_dispatched_handler_may_call_the_c_api);

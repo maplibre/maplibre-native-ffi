@@ -9,7 +9,6 @@ from support import parse, parse_sources, protocol_header
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
-    DeliveryPlan,
     DisposeSupport,
     OperationShape,
     bind,
@@ -894,19 +893,14 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         with self.assertRaisesRegex(ModelError, "without registrations"):
             bind(self.parse(source), require_complete=True)
 
-    def test_delivered_callbacks_name_the_payload_that_copies_them(self):
+    def test_queue_registrations_queue_their_callbacks(self):
         text = protocol_header(groups=("delivery", "owned_argument"))
         model = bind(parse_sources({"api.h": text}), require_complete=True)
-        self.assertEqual(
-            model.callbacks["mln_notice_callback"].delivery,
-            DeliveryPlan("MLN_DELIVERY_TYPE_NOTICE", "notice", "mln_notice_delivery"),
-        )
-        self.assertEqual(
-            model.callbacks["mln_query_callback"].delivery.record,
-            "mln_query_delivery",
-        )
-        # What queue mode answers in place of a callback with a result; a void
-        # callback needs no answer.
+        self.assertTrue(model.callbacks["mln_notice_callback"].queued)
+        self.assertTrue(model.callbacks["mln_query_callback"].queued)
+        self.assertFalse(model.callbacks["mln_notice_release"].queued)
+        # What native code answers for a queued call to a callback with a
+        # result; a void callback needs no answer.
         self.assertEqual(model.callbacks["mln_notice_callback"].queue_result, "1")
         self.assertIsNone(model.callbacks["mln_query_callback"].queue_result)
         registration = model.operations_by_name[
@@ -921,11 +915,10 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         self.assertFalse(queue.public)
         # A runtime drives the protocol, so it stays out of every public API.
         self.assertIn(
-            "mln_delivery_queue_drain",
+            "mln_delivery_queue_dispatch",
             {plan.name for plan in model.runtime_operations},
         )
-        self.assertNotIn("mln_delivery_queue_drain", model.operations_by_name)
-        self.assertNotIn("mln_delivery_type", model.public_values)
+        self.assertNotIn("mln_delivery_queue_dispatch", model.operations_by_name)
         self.assertNotIn("mln_delivery_queue", model.public_handles)
         stray = (
             "typedef struct stray { mln_delivery_queue queue "
@@ -937,11 +930,6 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         )
         for before, after, error in (
             (
-                "delivery=MLN_DELIVERY_TYPE_NOTICE",
-                "delivery=MLN_DELIVERY_TYPE_UNKNOWN",
-                "unknown constant",
-            ),
-            (
                 ";queue_result=1",
                 "",
                 "declares its queue_result",
@@ -952,9 +940,9 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                 "queue_result must be an integer",
             ),
             (
-                "  int code;\n  const char* text",
-                '  const char* text BIND("lifetime=owner");\n  int code',
-                "must mirror",
+                queue_member,
+                "} mln_notice_handler",
+                "queue_result requires a queued callback",
             ),
             (
                 queue_member,
@@ -970,8 +958,8 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                 "at most one delivery queue",
             ),
             (
-                "typedef struct mln_notice_delivery {",
-                stray + "typedef struct mln_notice_delivery {",
+                "mln_status mln_notice_set_callback(",
+                stray + "mln_status mln_notice_set_callback(",
                 "requires a callback registration",
             ),
         ):
@@ -982,15 +970,15 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                     require_complete=True,
                 )
 
-    def test_a_queue_registration_without_deliveries_only_dispatches(self):
-        # A callback without a delivery has no record to drain, so its
-        # registration names a queue only for dispatch. A registration whose
-        # other callback drains must give every callback a delivery.
+    def test_a_queue_registration_queues_every_callback(self):
+        # A registration that names a queue queues each of its callbacks,
+        # including one that takes nothing but its context.
         source = """
 typedef void (*mln_ping_callback)(void* context);
 typedef struct mln_ping_handler {
   unsigned int size;
   mln_ping_callback callback;
+  mln_notice_callback notice;
   void* context BIND("kind=context");
   mln_notice_release release;
   mln_delivery_queue queue BIND("kind=delivery_queue");
@@ -1005,12 +993,8 @@ mln_status mln_ping_set_callback(
             model.operations_by_name["mln_ping_set_callback"].registrations[0].queue,
             "queue",
         )
-        mixed = text.replace(
-            "  mln_ping_callback callback;\n",
-            "  mln_ping_callback callback;\n  mln_notice_callback notice;\n",
-        )
-        with self.assertRaisesRegex(ModelError, "callback callback requires delivery="):
-            bind(parse_sources({"api.h": mixed}), require_complete=True)
+        self.assertTrue(model.callbacks["mln_ping_callback"].queued)
+        self.assertTrue(model.callbacks["mln_notice_callback"].queued)
 
     def test_synchronous_callbacks_run_on_their_thread(self):
         source = """
@@ -1038,8 +1022,8 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
                 "synchronous requires a callback",
             ),
             (
-                'BIND("synchronous=true") typedef void (*gate)(void *context);',
-                'BIND("synchronous=true") typedef unsigned (*gate)(void *context) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE");',
+                "typedef struct signals { notify signal",
+                "typedef struct signals { gate signal",
                 "cannot be delivered through a queue",
             ),
         ):

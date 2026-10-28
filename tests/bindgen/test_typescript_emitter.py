@@ -276,9 +276,9 @@ class TypeScriptEmitterTests(unittest.TestCase):
     def test_a_registration_without_its_queue_requires_each_non_nullable_callback(
         self,
     ):
-        # The realm sets the delivery queue itself, so a host cannot leave out
-        # a callback that C requires in callback mode. A callback that C marks
-        # nullable stays optional.
+        # The realm sets the delivery queue itself, and a host cannot leave out
+        # a callback that C requires. A callback that C marks nullable stays
+        # optional.
         generated = emitted(typescript, self.api)
         values = generated["bindings/typescript/src/generated_values.ts"]
         operations = generated["bindings/typescript/src/generated_operations.ts"]

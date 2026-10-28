@@ -4,14 +4,6 @@
 
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 
-static const mln_runtime_event* batch_event(
-  const mln_event_batch_view* batch, size_t index
-) {
-  return MLN_STRIDED_AT(
-    mln_runtime_event, batch->events, batch->event_size, index
-  );
-}
-
 typedef struct foreign_thread_probe {
   mln_runtime runtime;
   mln_map map;
@@ -22,11 +14,7 @@ typedef struct foreign_thread_probe {
 
 static void call_event_api_from_a_foreign_thread(void* argument) {
   foreign_thread_probe* probe = argument;
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_event_batch_view view = {.size = sizeof(view)};
-  probe->drain_status =
-    mln_test_drain_event_delivery(probe->runtime, &batch, &view, NULL);
-  mln_delivery_batch_release(batch);
+  probe->drain_status = mln_test_dispatch_events(probe->runtime, NULL, NULL);
   probe->runtime_mask_status = mln_runtime_set_event_mask(
     probe->runtime, MLN_RUNTIME_EVENT_FLAG_ALL, NULL
   );
@@ -119,6 +107,26 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct map_sourced_count {
+  mln_map map;
+  size_t events;
+  size_t map_sourced;
+  size_t wrong_source;
+  size_t missing_message;
+} map_sourced_count;
+
+static void count_map_sourced(const mln_runtime_event* event, void* context) {
+  map_sourced_count* count = context;
+  count->events += 1;
+  if (event->source_type == MLN_RUNTIME_EVENT_SOURCE_MAP) {
+    if (event->source != count->map) count->wrong_source += 1;
+    count->map_sourced += 1;
+  }
+  if (event->message.size != 0 && event->message.data == NULL) {
+    count->missing_message += 1;
+  }
+}
+
 // Closing a source prevents future publication without rewriting history that
 // is already queued.
 static void queued_events_outlive_the_map_that_produced_them(void) {
@@ -127,29 +135,33 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_destroy_map(map);
 
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_event_batch_view view = {.size = sizeof(view)};
-  MLN_TEST_OK(mln_test_drain_event_delivery(runtime, &batch, &view, NULL));
-  TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
-
-  size_t map_sourced = 0;
-  for (size_t index = 0; index < view.event_count; index += 1) {
-    const mln_runtime_event* event =
-      MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index);
-    if (event->source_type == MLN_RUNTIME_EVENT_SOURCE_MAP) {
-      TEST_ASSERT_EQUAL_UINT64(map, event->source);
-      map_sourced += 1;
-    }
-    if (event->message.size != 0) TEST_ASSERT_NOT_NULL(event->message.data);
-  }
-  TEST_ASSERT_GREATER_THAN_size_t(0, map_sourced);
+  map_sourced_count count = {.map = map};
+  MLN_TEST_OK(mln_test_dispatch_events(runtime, count_map_sourced, &count));
+  TEST_ASSERT_GREATER_THAN_size_t(0, count.events);
+  TEST_ASSERT_GREATER_THAN_size_t(0, count.map_sourced);
+  TEST_ASSERT_EQUAL_size_t(0, count.wrong_source);
+  TEST_ASSERT_EQUAL_size_t(0, count.missing_message);
 
   mln_test_destroy_runtime(runtime);
-  TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
-  mln_delivery_batch_release(batch);
 }
 
-// Message views retain each event's bytes until the delivery batch is released.
+typedef struct loading_failures {
+  size_t count;
+  size_t without_message;
+} loading_failures;
+
+static void count_loading_failure(
+  const mln_runtime_event* event, void* context
+) {
+  loading_failures* failures = context;
+  if (event->type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) return;
+  failures->count += 1;
+  if (event->message.size == 0 || event->message.data == NULL) {
+    failures->without_message += 1;
+  }
+}
+
+// Each failure event carries its own message.
 static void each_event_carries_its_message(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first = mln_test_create_map(runtime);
@@ -164,37 +176,16 @@ static void each_event_carries_its_message(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(second));
 
-  mln_delivery_batch delivery = MLN_HANDLE_NULL;
-  mln_event_batch_view batch = {.size = sizeof(batch)};
-  MLN_TEST_OK(mln_test_drain_event_delivery(runtime, &delivery, &batch, NULL));
-
-  size_t failures = 0;
-  mln_buffer_view retained[2] = {0};
-  char copied[2][512] = {0};
-  for (size_t index = 0; index < batch.event_count; index += 1) {
-    const mln_runtime_event* event = batch_event(&batch, index);
-    if (event->type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
-      continue;
-    }
-    TEST_ASSERT_GREATER_THAN_UINT32(0, event->message.size);
-    TEST_ASSERT_NOT_NULL(event->message.data);
-    TEST_ASSERT_LESS_THAN_size_t(2, failures);
-    TEST_ASSERT_LESS_OR_EQUAL_size_t(sizeof(copied[0]), event->message.size);
-    retained[failures] = event->message;
-    memcpy(copied[failures], event->message.data, event->message.size);
-    failures += 1;
-  }
-  TEST_ASSERT_EQUAL_size_t(2, failures);
+  loading_failures failures = {0};
+  MLN_TEST_OK(
+    mln_test_dispatch_events(runtime, count_loading_failure, &failures)
+  );
+  TEST_ASSERT_EQUAL_size_t(2, failures.count);
+  TEST_ASSERT_EQUAL_size_t(0, failures.without_message);
 
   mln_test_destroy_map(second);
   mln_test_destroy_map(first);
   mln_test_destroy_runtime(runtime);
-  for (size_t index = 0; index < failures; index += 1) {
-    TEST_ASSERT_EQUAL_MEMORY(
-      copied[index], retained[index].data, retained[index].size
-    );
-  }
-  mln_delivery_batch_release(delivery);
 }
 
 // The masks change from any thread, and the runtime setter rejects unknown
@@ -248,52 +239,53 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
 }
 
 typedef struct event_completion_order {
-  mln_delivery_queue queue;
+  mln_runtime runtime;
   mln_map map;
   uint64_t event_generation;
   uint64_t completion_generation;
+  mln_status completion_status;
+  size_t events_after_completion;
+  size_t foreign_events;
+  size_t stale_snapshots;
+  bool style_loaded_first;
   bool style_loaded;
   bool completed;
 } event_completion_order;
 
-static bool drain_until_completion(void* context) {
+// Records rather than asserts: a failing assertion must not unwind through
+// the dispatch that calls this.
+static void order_event(const mln_runtime_event* event, void* context) {
   event_completion_order* order = context;
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_delivery_batch_view view = {.size = sizeof(view)};
+  if (order->completed) order->events_after_completion += 1;
+  if (event->source != order->map) order->foreign_events += 1;
+  if (event->type != MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) return;
+  order->style_loaded = true;
+  order->event_generation = event->generation;
+  mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+  if (
+    mln_map_get_snapshot(order->map, &snapshot, NULL) != MLN_STATUS_OK ||
+    snapshot.generation < event->generation
+  ) {
+    order->stale_snapshots += 1;
+  }
+}
+
+static void order_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  event_completion_order* order = user_data;
+  order->style_loaded_first = order->style_loaded;
+  order->completion_status = result->status;
+  order->completion_generation = result->generation;
+  order->completed = true;
+}
+
+static bool dispatch_until_completion(void* context) {
+  event_completion_order* order = context;
   const mln_status status =
-    mln_delivery_queue_drain(order->queue, &batch, &view, NULL);
+    mln_test_dispatch_events(order->runtime, order_event, order);
   if (status == MLN_STATUS_NOT_READY) return false;
   MLN_TEST_OK(status);
-  for (size_t item = 0; item < view.delivery_count; ++item) {
-    const mln_delivery* delivery =
-      MLN_STRIDED_AT(mln_delivery, view.deliveries, view.delivery_size, item);
-    if (delivery->type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS) {
-      const mln_event_batch_view* events =
-        delivery->payload.runtime_events.events;
-      for (size_t index = 0; index < events->event_count; ++index) {
-        const mln_runtime_event* event = MLN_STRIDED_AT(
-          mln_runtime_event, events->events, events->event_size, index
-        );
-        TEST_ASSERT_FALSE(order->completed);
-        TEST_ASSERT_EQUAL_UINT64(order->map, event->source);
-        if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
-          order->style_loaded = true;
-          order->event_generation = event->generation;
-          mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
-          MLN_TEST_OK(mln_map_get_snapshot(order->map, &snapshot, NULL));
-          TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
-            event->generation, snapshot.generation
-          );
-        }
-      }
-    } else if (delivery->type == MLN_DELIVERY_TYPE_COMPLETION) {
-      TEST_ASSERT_TRUE(order->style_loaded);
-      MLN_TEST_OK(delivery->payload.completion.status);
-      order->completed = true;
-      order->completion_generation = delivery->payload.completion.generation;
-    }
-  }
-  mln_delivery_batch_release(batch);
   return order->completed;
 }
 
@@ -301,35 +293,26 @@ static void events_and_their_completion_share_fifo_order(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_drain_all(runtime);
-  event_completion_order order = {
-    .queue = mln_test_event_queue(runtime), .map = map
-  };
+  event_completion_order order = {.runtime = runtime, .map = map};
   const mln_completion completion = {
-    .size = sizeof(completion), .queue = order.queue
+    .size = sizeof(completion),
+    .callback = order_completion,
+    .user_data = &order,
+    .queue = mln_test_event_queue(runtime),
   };
   MLN_TEST_OK(mln_map_set_style_json(
     map, mln_test_background_style_json, &completion, NULL
   ));
   TEST_ASSERT_TRUE(mln_test_await(
-    drain_until_completion, &order, mln_test_deadline_default(),
+    dispatch_until_completion, &order, mln_test_deadline_default(),
     "events followed by their completion"
   ));
+  TEST_ASSERT_TRUE(order.style_loaded_first);
+  MLN_TEST_OK(order.completion_status);
+  TEST_ASSERT_EQUAL_size_t(0, order.events_after_completion);
+  TEST_ASSERT_EQUAL_size_t(0, order.foreign_events);
+  TEST_ASSERT_EQUAL_size_t(0, order.stale_snapshots);
   TEST_ASSERT_EQUAL_UINT64(order.event_generation, order.completion_generation);
-  mln_test_completion clear = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_runtime_clear_event_handler(runtime, &clear.descriptor, NULL)
-  );
-  MLN_TEST_OK(mln_test_completion_settle(&clear));
-  mln_delivery_batch retired = MLN_HANDLE_NULL;
-  mln_delivery_batch_view retired_view = {.size = sizeof(retired_view)};
-  MLN_TEST_OK(
-    mln_delivery_queue_drain(order.queue, &retired, &retired_view, NULL)
-  );
-  TEST_ASSERT_EQUAL_size_t(1, retired_view.delivery_count);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_DELIVERY_TYPE_RETIRED, retired_view.deliveries[0].type
-  );
-  mln_delivery_batch_release(retired);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

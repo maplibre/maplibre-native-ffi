@@ -34,7 +34,7 @@ static bool asks_for_a_repaint(const mln_runtime_event* event) {
 
 void receive_events(void* user_data, const mln_event_batch_view* events) {
   map_observer* observer = user_data;
-  // #region drain
+  // #region receive
   const mln_event_batch_view view = *events;
   for (size_t index = 0; index < view.event_count; index++) {
     const mln_runtime_event* event =
@@ -60,7 +60,7 @@ void receive_events(void* user_data, const mln_event_batch_view* events) {
         break;
     }
   }
-  // #endregion drain
+  // #endregion receive
 }
 
 mln_status observe_events(

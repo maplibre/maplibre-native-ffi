@@ -22,9 +22,9 @@ reference states its threading rules.
 
 Hosts that run code only on their own event loop, such as Dart isolates and
 JavaScript engines, give a registration a
-[delivery queue](/maplibre-native-ffi/reference/c/delivery_8h.html) in place of
-its callback. Native code copies each payload into the queue and wakes the host,
-which drains the copies on its own event loop.
+[delivery queue](/maplibre-native-ffi/reference/c/delivery_8h.html) beside its
+callback. Native code copies each call's arguments into the queue and wakes the
+host, which dispatches the queue to run the calls on its own event loop.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
 runtime options and shutdown. The

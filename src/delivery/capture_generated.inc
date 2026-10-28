@@ -333,11 +333,15 @@ constexpr auto element_owns_handles(const mln_texture_readback_result*) noexcept
   -> bool {
   return false;
 }
+// The copied arguments of one mln_camera_transition_end_callback call.
+struct CameraTransitionEndArguments {
+  const mln_camera_transition_end* end;
+};
 template <bool Writing>
 auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena,
-  const mln_camera_transition_end_delivery& source
-) -> mln_camera_transition_end_delivery {
+  const CameraTransitionEndArguments& source
+) -> CameraTransitionEndArguments {
   auto result = source;
   result.end = span(
     arena, source.end, 1, [&]([[maybe_unused]] auto& arena, auto element_1) {
@@ -348,123 +352,128 @@ auto capture_element(
   return result;
 }
 inline auto discard_element(
-  [[maybe_unused]] const mln_camera_transition_end_delivery& value
+  [[maybe_unused]] const CameraTransitionEndArguments& value
 ) noexcept -> void {}
 constexpr auto element_owns_handles(
-  const mln_camera_transition_end_delivery*
+  const CameraTransitionEndArguments*
 ) noexcept -> bool {
   return false;
 }
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END> {
-  using Record = mln_camera_transition_end_delivery;
+struct Delivered<CameraTransitionEndArguments> {
   using Callback = mln_camera_transition_end_callback;
-  static constexpr auto member = &mln_delivery_payload::camera_transition_end;
+  static constexpr std::size_t index = 0;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data,
+    const CameraTransitionEndArguments& record
   ) noexcept -> void {
     static_cast<void>(callback(user_data, record.end));
   }
 };
+// The copied arguments of one mln_custom_source_cancel_tile_callback call.
+struct CustomSourceCancelTileArguments {
+  mln_canonical_tile_id tile_id;
+};
 template <bool Writing>
 auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena,
-  const mln_custom_source_tile_delivery& source
-) -> mln_custom_source_tile_delivery {
+  const CustomSourceCancelTileArguments& source
+) -> CustomSourceCancelTileArguments {
   auto result = source;
   return result;
 }
 inline auto discard_element(
-  [[maybe_unused]] const mln_custom_source_tile_delivery& value
+  [[maybe_unused]] const CustomSourceCancelTileArguments& value
 ) noexcept -> void {}
 constexpr auto element_owns_handles(
-  const mln_custom_source_tile_delivery*
+  const CustomSourceCancelTileArguments*
 ) noexcept -> bool {
   return false;
 }
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE> {
-  using Record = mln_custom_source_tile_delivery;
+struct Delivered<CustomSourceCancelTileArguments> {
   using Callback = mln_custom_source_cancel_tile_callback;
-  static constexpr auto member =
-    &mln_delivery_payload::custom_source_cancel_tile;
+  static constexpr std::size_t index = 1;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data,
+    const CustomSourceCancelTileArguments& record
   ) noexcept -> void {
     static_cast<void>(callback(user_data, record.tile_id));
   }
 };
-template <>
-struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE> {
-  using Record = mln_custom_source_tile_delivery;
-  using Callback = mln_custom_source_fetch_tile_callback;
-  static constexpr auto member =
-    &mln_delivery_payload::custom_source_fetch_tile;
-  static auto invoke(
-    Callback callback, void* user_data, const Record& record
-  ) noexcept -> void {
-    static_cast<void>(callback(user_data, record.tile_id));
-  }
+// The copied arguments of one mln_custom_source_fetch_tile_callback call.
+struct CustomSourceFetchTileArguments {
+  mln_canonical_tile_id tile_id;
 };
 template <bool Writing>
 auto capture_element(
-  [[maybe_unused]] Arena<Writing>& arena, const mln_log_delivery& source
-) -> mln_log_delivery {
+  [[maybe_unused]] Arena<Writing>& arena,
+  const CustomSourceFetchTileArguments& source
+) -> CustomSourceFetchTileArguments {
+  auto result = source;
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const CustomSourceFetchTileArguments& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(
+  const CustomSourceFetchTileArguments*
+) noexcept -> bool {
+  return false;
+}
+template <>
+struct Delivered<CustomSourceFetchTileArguments> {
+  using Callback = mln_custom_source_fetch_tile_callback;
+  static constexpr std::size_t index = 2;
+  static auto invoke(
+    Callback callback, void* user_data,
+    const CustomSourceFetchTileArguments& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.tile_id));
+  }
+};
+// The copied arguments of one mln_log_callback call.
+struct LogArguments {
+  mln_log_severity severity;
+  mln_log_event event;
+  int64_t code;
+  mln_buffer_view message;
+};
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena, const LogArguments& source
+) -> LogArguments {
   auto result = source;
   result.message = buffer(arena, source.message);
   return result;
 }
-inline auto discard_element(
-  [[maybe_unused]] const mln_log_delivery& value
-) noexcept -> void {}
-constexpr auto element_owns_handles(const mln_log_delivery*) noexcept -> bool {
+inline auto discard_element([[maybe_unused]] const LogArguments& value) noexcept
+  -> void {}
+constexpr auto element_owns_handles(const LogArguments*) noexcept -> bool {
   return false;
 }
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_LOG_RECORD> {
-  using Record = mln_log_delivery;
+struct Delivered<LogArguments> {
   using Callback = mln_log_callback;
-  static constexpr auto member = &mln_delivery_payload::log_record;
+  static constexpr std::size_t index = 3;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data, const LogArguments& record
   ) noexcept -> void {
     static_cast<void>(callback(
       user_data, record.severity, record.event, record.code, record.message
     ));
   }
 };
-template <bool Writing>
-auto capture_element(
-  [[maybe_unused]] Arena<Writing>& arena,
-  const mln_resource_request_cancel_delivery& source
-) -> mln_resource_request_cancel_delivery {
-  auto result = source;
-  return result;
-}
-inline auto discard_element(
-  [[maybe_unused]] const mln_resource_request_cancel_delivery& value
-) noexcept -> void {}
-constexpr auto element_owns_handles(
-  const mln_resource_request_cancel_delivery*
-) noexcept -> bool {
-  return false;
-}
-template <>
-struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL> {
-  using Record = mln_resource_request_cancel_delivery;
-  using Callback = mln_resource_request_cancel_callback;
-  static constexpr auto member = &mln_delivery_payload::resource_request_cancel;
-  static auto invoke(
-    Callback callback, void* user_data, const Record& record
-  ) noexcept -> void {
-    static_cast<void>(callback(user_data, record.handle));
-  }
+// The copied arguments of one mln_resource_provider_callback call.
+struct ResourceProviderArguments {
+  const mln_resource_request_info* request;
+  mln_resource_request handle;
 };
 template <bool Writing>
 auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena,
-  const mln_resource_request_delivery& source
-) -> mln_resource_request_delivery {
+  const ResourceProviderArguments& source
+) -> ResourceProviderArguments {
   auto result = source;
   result.request = span(
     arena, source.request, 1,
@@ -493,70 +502,107 @@ auto capture_element(
   return result;
 }
 inline auto discard_element(
-  [[maybe_unused]] const mln_resource_request_delivery& value
+  [[maybe_unused]] const ResourceProviderArguments& value
 ) noexcept -> void {
   static_cast<void>(
     dispose_owner(mln::core::HandleKind::ResourceRequest, value.handle)
   );
 }
-constexpr auto element_owns_handles(
-  const mln_resource_request_delivery*
-) noexcept -> bool {
+constexpr auto element_owns_handles(const ResourceProviderArguments*) noexcept
+  -> bool {
   return true;
 }
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST> {
-  using Record = mln_resource_request_delivery;
+struct Delivered<ResourceProviderArguments> {
   using Callback = mln_resource_provider_callback;
-  static constexpr auto member = &mln_delivery_payload::resource_request;
+  static constexpr std::size_t index = 4;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data, const ResourceProviderArguments& record
   ) noexcept -> void {
     static_cast<void>(callback(user_data, record.request, record.handle));
   }
 };
+// The copied arguments of one mln_resource_request_cancel_callback call.
+struct ResourceRequestCancelArguments {
+  mln_resource_request handle;
+};
 template <bool Writing>
 auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena,
-  const mln_resource_transform_delivery& source
-) -> mln_resource_transform_delivery {
+  const ResourceRequestCancelArguments& source
+) -> ResourceRequestCancelArguments {
+  auto result = source;
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const ResourceRequestCancelArguments& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(
+  const ResourceRequestCancelArguments*
+) noexcept -> bool {
+  return false;
+}
+template <>
+struct Delivered<ResourceRequestCancelArguments> {
+  using Callback = mln_resource_request_cancel_callback;
+  static constexpr std::size_t index = 5;
+  static auto invoke(
+    Callback callback, void* user_data,
+    const ResourceRequestCancelArguments& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.handle));
+  }
+};
+// The copied arguments of one mln_resource_transform_callback call.
+struct ResourceTransformArguments {
+  mln_resource_kind kind;
+  mln_buffer_view url;
+  mln_resource_transform_request request;
+};
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const ResourceTransformArguments& source
+) -> ResourceTransformArguments {
   auto result = source;
   result.url = buffer(arena, source.url);
   return result;
 }
 inline auto discard_element(
-  [[maybe_unused]] const mln_resource_transform_delivery& value
+  [[maybe_unused]] const ResourceTransformArguments& value
 ) noexcept -> void {
   static_cast<void>(dispose_owner(
     mln::core::HandleKind::ResourceTransformRequest, value.request
   ));
 }
-constexpr auto element_owns_handles(
-  const mln_resource_transform_delivery*
-) noexcept -> bool {
+constexpr auto element_owns_handles(const ResourceTransformArguments*) noexcept
+  -> bool {
   return true;
 }
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM> {
-  using Record = mln_resource_transform_delivery;
+struct Delivered<ResourceTransformArguments> {
   using Callback = mln_resource_transform_callback;
-  static constexpr auto member = &mln_delivery_payload::resource_transform;
+  static constexpr std::size_t index = 6;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data, const ResourceTransformArguments& record
   ) noexcept -> void {
     static_cast<void>(
       callback(user_data, record.kind, record.url, record.request)
     );
   }
 };
+// The copied arguments of one mln_runtime_event_callback call.
+struct RuntimeEventArguments {
+  const mln_event_batch_view* events;
+};
 template <>
-struct Delivered<MLN_DELIVERY_TYPE_RUNTIME_EVENTS> {
-  using Record = mln_runtime_event_delivery;
+struct Delivered<RuntimeEventArguments> {
   using Callback = mln_runtime_event_callback;
-  static constexpr auto member = &mln_delivery_payload::runtime_events;
+  static constexpr std::size_t index = 7;
   static auto invoke(
-    Callback callback, void* user_data, const Record& record
+    Callback callback, void* user_data, const RuntimeEventArguments& record
   ) noexcept -> void {
     static_cast<void>(callback(user_data, record.events));
   }
 };
+inline constexpr std::size_t delivered_call_count = 8;

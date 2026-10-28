@@ -460,9 +460,7 @@ class CameraTransitionEnd final {
     void* registration, const mln_camera_transition_end* end
   ) noexcept -> void {
     static_cast<mln::delivery::QueuedRegistration*>(registration)
-      ->push_reserved<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
-        mln_camera_transition_end_delivery{.end = end}
-      );
+      ->push_reserved(mln::delivery::CameraTransitionEndArguments{.end = end});
   }
 
  private:
@@ -1549,8 +1547,7 @@ auto validate_animation_options(const mln_animation_options* animation)
   }
   const auto& end_handler = animation->end_handler;
   if (
-    end_handler.callback == nullptr && end_handler.queue == MLN_HANDLE_NULL &&
-    end_handler.release_user_data != nullptr
+    end_handler.callback == nullptr && end_handler.release_user_data != nullptr
   ) {
     mln::core::set_thread_error(
       "a disabled camera transition handler must not retain user data"
@@ -2215,7 +2212,7 @@ auto camera_transition_end(
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
   const auto queue_status = mln::delivery::resolve_registration_queue(
     "camera transition handler", handler.queue, handler.callback != nullptr,
-    handler.release_user_data != nullptr, queue
+    queue
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
   auto copied = handler;
@@ -2224,14 +2221,14 @@ auto camera_transition_end(
     registration = std::make_unique<Registration>(
       std::move(queue), handler.user_data, handler.release_user_data,
       std::initializer_list<Registration::Callback>{
-        Registration::callback<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
+        Registration::callback<mln::delivery::CameraTransitionEndArguments>(
           handler.callback
         )
       }
     );
     const auto end = mln_camera_transition_end{};
-    registration->reserve<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
-      mln_camera_transition_end_delivery{.end = &end}
+    registration->reserve(
+      mln::delivery::CameraTransitionEndArguments{.end = &end}
     );
     copied.callback = &mln::core::CameraTransitionEnd::queue_end;
     copied.user_data = registration.get();

@@ -94,23 +94,6 @@ typedef unsigned long long mln_delivery_queue BIND(
 void mln_delivery_queue_release(mln_delivery_queue queue);
 #endif
 
-#ifdef MLN_PROTOCOL_QUEUE
-// The delivery batch and payload kinds that the registrations below use.
-typedef unsigned long long mln_delivery_batch BIND(
-  "kind=handle;release=mln_delivery_batch_release;"
-  "dispose=mln_delivery_batch_release"
-);
-typedef enum mln_delivery_type : uint32_t {
-  MLN_DELIVERY_TYPE_NOTICE = 1,
-  MLN_DELIVERY_TYPE_TICKET = 2,
-  MLN_DELIVERY_TYPE_RETIRED = 3,
-  MLN_DELIVERY_TYPE_SAMPLE = 4,
-  MLN_DELIVERY_TYPE_QUERY = 5,
-  MLN_DELIVERY_TYPE_READING = 6,
-  MLN_DELIVERY_TYPE_TICKET_CANCEL = 7,
-} mln_delivery_type;
-#endif
-
 #ifdef MLN_PROTOCOL_COMPLETION_RUNTIME
 // The completion types as the C API declares them, for a probe that compiles
 // a binding's handwritten completion runtime.
@@ -510,7 +493,6 @@ typedef struct mln_sample_point {
   unsigned int x;
   unsigned int y;
 } mln_sample_point;
-BIND("delivery=MLN_DELIVERY_TYPE_SAMPLE")
 typedef void (*mln_sample_notification)(void* context, mln_sample_point point);
 typedef void (*mln_sample_release)(void* context);
 typedef struct mln_sample_options {
@@ -525,9 +507,6 @@ mln_status mln_map_observe_sample(
   mln_map map, const mln_sample_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
-typedef struct mln_sample_delivery {
-  mln_sample_point point;
-} mln_sample_delivery;
 #endif
 
 #ifdef MLN_PROTOCOL_OWNED_ARGUMENT
@@ -537,7 +516,7 @@ typedef unsigned long long mln_query
   BIND("kind=handle;release=mln_query_release;dispose=mln_query_release");
 typedef void (*mln_query_callback)(
   void* context, const char* text, mln_query query BIND("ownership=owned")
-) BIND("delivery=MLN_DELIVERY_TYPE_QUERY");
+);
 typedef void (*mln_query_release_context)(void* context);
 typedef struct mln_query_handler {
   unsigned int size;
@@ -555,10 +534,6 @@ mln_status mln_query_answer(
   mln_query query, mln_buffer_view text, mln_diagnostic* out_diagnostic
 );
 void mln_query_release(mln_query query);
-typedef struct mln_query_delivery {
-  const char* text BIND("lifetime=owner");
-  mln_query query BIND("ownership=owned");
-} mln_query_delivery;
 #endif
 
 #ifdef MLN_PROTOCOL_RECORD_NOTIFICATION
@@ -569,9 +544,7 @@ typedef struct mln_reading {
   uint32_t level;
   uint64_t stamp;
 } mln_reading;
-typedef void (*mln_reading_callback)(
-  void* context, const mln_reading* reading
-) BIND("delivery=MLN_DELIVERY_TYPE_READING");
+typedef void (*mln_reading_callback)(void* context, const mln_reading* reading);
 typedef void (*mln_reading_release)(void* context);
 typedef struct mln_reading_handler {
   mln_reading_callback callback BIND("nullable=true");
@@ -589,9 +562,6 @@ mln_status mln_map_request_reading(
   mln_map map, const mln_reading_request* request,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
-typedef struct mln_reading_delivery {
-  const mln_reading* reading BIND("lifetime=owner");
-} mln_reading_delivery;
 #endif
 
 #ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
@@ -601,7 +571,7 @@ typedef unsigned long long mln_ticket
   BIND("kind=handle;release=mln_ticket_release");
 typedef void (*mln_ticket_release_context)(void* context);
 typedef void (*mln_ticket_cancel)(void* context, mln_ticket ticket) BIND(
-  "delivery=MLN_DELIVERY_TYPE_TICKET_CANCEL;borrowed_owner=ticket"
+  "borrowed_owner=ticket"
 );
 typedef struct mln_ticket_cancel_handler {
   unsigned int size;
@@ -616,18 +586,15 @@ mln_status mln_ticket_on_cancel(
   mln_ticket ticket, const mln_ticket_cancel_handler* handler,
   bool* cancelled BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
-typedef struct mln_ticket_cancel_delivery {
-  mln_ticket ticket;
-} mln_ticket_cancel_delivery;
 #endif
 
 #ifdef MLN_PROTOCOL_DELIVERY
 // A queue registration outside any command, whose callback returns a result
-// that native code supplies in queue mode.
+// that native code supplies for a queued call.
 typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
   void* context, int code, const char* text
-) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1");
+) BIND("failure=0;queue_result=1");
 // Its release must not call back into the API.
 typedef struct mln_notice_handler {
   unsigned int size;
@@ -639,58 +606,15 @@ typedef struct mln_notice_handler {
 mln_status mln_notice_set_callback(
   const mln_notice_handler* handler, mln_diagnostic* out_diagnostic
 );
-typedef struct mln_notice_delivery {
-  int code;
-  const char* text BIND("lifetime=owner");
-} mln_notice_delivery;
 #endif
 
 #ifdef MLN_PROTOCOL_QUEUE
-// Queue delivery: a registration names a delivery queue in place of its
-// callback, and native code queues a copy of each call's arguments for the
-// host to drain. Each enabled group adds the payload variant that carries its
-// copies.
-typedef union mln_delivery_payload {
-#ifdef MLN_PROTOCOL_RETAINED_REGISTRATION
-  mln_sample_delivery sample BIND("variant=MLN_DELIVERY_TYPE_SAMPLE");
-#endif
-#ifdef MLN_PROTOCOL_OWNED_ARGUMENT
-  mln_query_delivery query BIND("variant=MLN_DELIVERY_TYPE_QUERY");
-#endif
-#ifdef MLN_PROTOCOL_RECORD_NOTIFICATION
-  mln_reading_delivery reading BIND("variant=MLN_DELIVERY_TYPE_READING");
-#endif
-#ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
-  mln_ticket_cancel_delivery ticket_cancel
-    BIND("variant=MLN_DELIVERY_TYPE_TICKET_CANCEL");
-#endif
-#ifdef MLN_PROTOCOL_DELIVERY
-  mln_notice_delivery notice BIND("variant=MLN_DELIVERY_TYPE_NOTICE");
-#endif
-} mln_delivery_payload;
-typedef struct mln_delivery {
-  mln_delivery_type type;
-  uint32_t reserved BIND("kind=reserved");
-  void* user_data BIND("kind=context");
-  mln_delivery_payload payload
-    BIND("tag=type;empty_variant=MLN_DELIVERY_TYPE_RETIRED");
-} mln_delivery;
-typedef struct mln_delivery_batch_view {
-  uint32_t size;
-  uint32_t delivery_size;
-  const mln_delivery* deliveries
-    BIND("length=delivery_count;stride=delivery_size");
-  size_t delivery_count;
-} mln_delivery_batch_view;
-mln_status mln_delivery_queue_drain(
-  mln_delivery_queue queue, mln_delivery_batch* out_batch BIND("direction=out"),
-  mln_delivery_batch_view* out_view BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
+// Queue delivery: a registration names a delivery queue beside its callback,
+// and native code queues a copy of each call's arguments for the host to
+// dispatch.
+mln_status mln_delivery_queue_dispatch(
+  mln_delivery_queue queue, mln_diagnostic* out_diagnostic
 );
-mln_status mln_delivery_batch_take(
-  mln_delivery_batch batch, size_t index, mln_diagnostic* out_diagnostic
-);
-void mln_delivery_batch_release(mln_delivery_batch batch);
 #endif
 
 // Outputs that a failure status reports as absent: each call first finds

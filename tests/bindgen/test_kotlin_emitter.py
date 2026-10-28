@@ -386,14 +386,15 @@ class KotlinLayoutTests(unittest.TestCase):
         )
         self.assertFalse((registrations | {response}) & set(bodies))
         # Only the threaded forms answer native from their callbacks, and every
-        # other queue-form site has a delivery, so a queue carries its calls.
+        # other queue-form site's callback is queued, so a queue carries its
+        # calls.
         for site in kotlin_callbacks.sites(values).values():
             with self.subTest(site=site.name):
                 if site.split == kotlin_callbacks.THREADED:
                     self.assertEqual(site.form, "direct")
                 elif site.form == "queue":
                     callback = values.bound.callbacks[site.callback]
-                    self.assertIsNotNone(callback.delivery)
+                    self.assertTrue(callback.queued)
 
     def test_callback_results_answer_native_in_their_c_types(self):
         outputs = emitted(kotlin, real_api())

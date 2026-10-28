@@ -73,7 +73,7 @@ class NativeCaptureTests(unittest.TestCase):
     def test_compiled_capture_copies_completion_values_deeply(self):
         compile_and_run(self, generate(self.api), CAPTURE_TEST)
 
-    def test_delivered_callback_copies_outlive_their_call_and_release_handles(
+    def test_queued_call_copies_outlive_their_call_and_release_handles(
         self,
     ):
         compile_and_run(self, generate(self.api), DELIVERY_TEST)
@@ -138,10 +138,10 @@ auto copy(const T& source, Capture capture) -> T {
 
 int main() {
   char message[] = "borrowed";
-  const mln_log_delivery log{
+  const mln::delivery::LogArguments log{
     MLN_LOG_SEVERITY_INFO, MLN_LOG_EVENT_SHADER, 3, {message, sizeof(message) - 1}
   };
-  const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {
+  const auto copied = copy(log, [](auto& arena, const mln::delivery::LogArguments& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(message, 0, sizeof(message));
@@ -152,23 +152,25 @@ int main() {
   char url[] = "custom://style.json";
   mln_resource_request_info request{};
   request.requested_url = {url, sizeof(url) - 1};
-  const mln_resource_request_delivery provided{&request, 9};
-  const auto arguments = copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
+  const mln::delivery::ResourceProviderArguments provided{&request, 9};
+  const auto arguments = copy(provided, [](auto& arena, const mln::delivery::ResourceProviderArguments& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(url, 0, sizeof(url));
   assert(arguments.handle == 9 && arguments.request != &request);
   assert(std::strcmp(static_cast<const char*>(arguments.request->requested_url.data), "custom://style.json") == 0);
-  // An untaken request only releases its handle; native fails the request.
+  // A request that no call received only releases its handle; native fails
+  // the request.
   mln::delivery::discard_element(arguments);
   assert(releases == 1);
-  static_assert(mln::delivery::element_owns_handles(static_cast<const mln_resource_request_delivery*>(nullptr)));
-  static_assert(!mln::delivery::element_owns_handles(static_cast<const mln_log_delivery*>(nullptr)));
-  static_assert(std::is_same_v<mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::Record, mln_log_delivery>);
+  static_assert(mln::delivery::element_owns_handles(static_cast<const mln::delivery::ResourceProviderArguments*>(nullptr)));
+  static_assert(!mln::delivery::element_owns_handles(static_cast<const mln::delivery::LogArguments*>(nullptr)));
+  static_assert(std::is_same_v<mln::delivery::Delivered<mln::delivery::LogArguments>::Callback, mln_log_callback>);
+  static_assert(mln::delivery::Delivered<mln::delivery::LogArguments>::index < mln::delivery::delivered_call_count);
 
   // A dispatched call passes the copy back as the callback's arguments.
   static int invoked = 0;
-  mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::invoke(
+  mln::delivery::Delivered<mln::delivery::LogArguments>::invoke(
     [](void* user_data, mln_log_severity severity, mln_log_event event, int64_t code, mln_buffer_view text) {
       assert(user_data == &invoked && severity == MLN_LOG_SEVERITY_INFO);
       assert(event == MLN_LOG_EVENT_SHADER && code == 3);
@@ -180,12 +182,12 @@ int main() {
   );
   assert(invoked == 1);
 
-  // An owned handle field of a delivered record is released with it.
+  // An owned handle field of a queued call's record is released with it.
   char transformed[] = "custom://tile.pbf";
-  const mln_resource_transform_delivery transform{
+  const mln::delivery::ResourceTransformArguments transform{
     MLN_RESOURCE_KIND_TILE, {transformed, sizeof(transformed) - 1}, 11
   };
-  const auto transform_copy = copy(transform, [](auto& arena, const mln_resource_transform_delivery& value) {
+  const auto transform_copy = copy(transform, [](auto& arena, const mln::delivery::ResourceTransformArguments& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(transformed, 0, sizeof(transformed));
@@ -196,7 +198,7 @@ int main() {
   // A request whose byte count names no bytes cannot be copied.
   request.prior_data_size = 1;
   bool invalid = false;
-  try { static_cast<void>(copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
+  try { static_cast<void>(copy(provided, [](auto& arena, const mln::delivery::ResourceProviderArguments& value) {
     return mln::delivery::capture_element(arena, value);
   })); }
   catch (const std::invalid_argument&) { invalid = true; }

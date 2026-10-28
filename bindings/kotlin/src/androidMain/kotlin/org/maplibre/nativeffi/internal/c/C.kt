@@ -74,11 +74,6 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_c_version(): Int
 
-  @JvmStatic actual external fun mln_delivery_batch_release(batch: Long): Unit
-
-  @JvmStatic
-  actual external fun mln_delivery_batch_take(batch: Long, index: Long, outDiagnostic: Long): Int
-
   @JvmStatic
   actual external fun mln_delivery_queue_create(
     options: Long,
@@ -87,14 +82,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int
-
-  @JvmStatic
-  actual external fun mln_delivery_queue_drain(
-    queue: Long,
-    outBatch: Long,
-    outView: Long,
-    outDiagnostic: Long,
-  ): Int
 
   @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
 

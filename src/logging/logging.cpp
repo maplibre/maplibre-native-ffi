@@ -74,14 +74,14 @@ auto queue_log_record(
   void* registration, mln_log_severity severity, mln_log_event event,
   std::int64_t code, mln_buffer_view message
 ) noexcept -> bool {
-  const auto record = mln_log_delivery{
+  const auto record = mln::delivery::LogArguments{
     .severity = severity,
     .event = event,
     .code = code,
     .message = message,
   };
   return static_cast<const mln::delivery::QueuedRegistration*>(registration)
-    ->push<MLN_DELIVERY_TYPE_LOG_RECORD>(record);
+    ->push(record);
 }
 
 auto set_severity_async(
@@ -105,8 +105,7 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
   const auto queue_status = mln::delivery::resolve_registration_queue(
-    "log handler", handler->queue, handler->callback != nullptr,
-    handler->release_user_data != nullptr, queue
+    "log handler", handler->queue, handler->callback != nullptr, queue
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
 
@@ -120,7 +119,7 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
     auto registration = std::make_unique<Registration>(
       std::move(queue), handler->user_data, handler->release_user_data,
       std::initializer_list<Registration::Callback>{
-        Registration::callback<MLN_DELIVERY_TYPE_LOG_RECORD>(handler->callback)
+        Registration::callback<mln::delivery::LogArguments>(handler->callback)
       }
     );
     auto observer = std::make_unique<CallbackLogObserver>(

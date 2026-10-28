@@ -22,13 +22,8 @@ COMPLETION_VALUE_COUNT = "value_count"
 COMPLETION_VALUE_SIZE = "value_size"
 BUFFER_VIEW = "mln_buffer_view"
 NOT_READY = "MLN_STATUS_NOT_READY"
-# Queue delivery: the queue and batch handles, one drained delivery, its payload
-# union, and the batch view that a runtime walks by the delivery stride.
+# The queue handle whose dispatch runs queued callback calls.
 DELIVERY_QUEUE = "mln_delivery_queue"
-DELIVERY_BATCH = "mln_delivery_batch"
-DELIVERY = "mln_delivery"
-DELIVERY_PAYLOAD = "mln_delivery_payload"
-DELIVERY_BATCH_VIEW = "mln_delivery_batch_view"
 # The query of the C ABI version, which every runtime's version check calls, so
 # calling it skips the check.
 ABI_VERSION = "mln_c_version"

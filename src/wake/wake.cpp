@@ -19,13 +19,12 @@ auto make_wake_call(
 ) -> delivery::ItemPtr {
   auto call = std::make_unique<WakeCall>();
   call->pending = std::move(pending);
-  call->view.user_data = user_data;
-  call->dispatched = true;
+  call->user_data = user_data;
   call->callback = reinterpret_cast<delivery::HostFunction>(callback);
   call->invoke = [](delivery::DeliveryItem& item) noexcept {
     // A notify from inside the callback queues the next call.
     static_cast<WakeCall&>(item).pending->store(false);
-    reinterpret_cast<mln_wake_callback>(item.callback)(item.view.user_data);
+    reinterpret_cast<mln_wake_callback>(item.callback)(item.user_data);
   };
   call->destroy = [](delivery::DeliveryItem* item) noexcept {
     delete static_cast<WakeCall*>(item);

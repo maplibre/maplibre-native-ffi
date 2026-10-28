@@ -61,26 +61,11 @@ internal actual object C {
 
   actual fun mln_c_version(): Int = mln_kw_mln_c_version()
 
-  actual fun mln_delivery_batch_release(batch: Long) {
-    mln_kw_mln_delivery_batch_release(batch)
-  }
-
-  actual fun mln_delivery_batch_take(batch: Long, index: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_delivery_batch_take(batch, word(index), word(outDiagnostic))
-
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     mln_kw_mln_delivery_queue_create(word(options), word(outQueue), word(outDiagnostic))
 
   actual fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int =
     mln_kw_mln_delivery_queue_dispatch(queue, word(outDiagnostic))
-
-  actual fun mln_delivery_queue_drain(
-    queue: Long,
-    outBatch: Long,
-    outView: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_delivery_queue_drain(queue, word(outBatch), word(outView), word(outDiagnostic))
 
   actual fun mln_delivery_queue_release(queue: Long) {
     mln_kw_mln_delivery_queue_release(queue)
@@ -1979,14 +1964,6 @@ private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
 private fun mln_kw_mln_c_version(): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_c_version()")
 
-private fun mln_kw_mln_delivery_batch_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_batch_release(p0)")
-
-private fun mln_kw_mln_delivery_batch_take(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_batch_take(p0, p1, p2)",
-  )
-
 private fun mln_kw_mln_delivery_queue_create(p0: Int, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_create(p0, p1, p2)",
@@ -1995,11 +1972,6 @@ private fun mln_kw_mln_delivery_queue_create(p0: Int, p1: Int, p2: Int): Int =
 private fun mln_kw_mln_delivery_queue_dispatch(p0: Long, p1: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_dispatch(p0, p1)",
-  )
-
-private fun mln_kw_mln_delivery_queue_drain(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_drain(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =

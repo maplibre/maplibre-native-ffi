@@ -171,7 +171,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
             generated["Base/MaplibreNative.Operations.g.cs"],
         )
 
-    def test_dart_generates_callback_registrations_only_with_queue_delivery(
+    def test_dart_generates_callback_registrations_only_with_a_queue(
         self,
     ):
         text = protocol_header(groups=("delivery", "owned_argument"))
@@ -183,7 +183,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
         synchronous = parse_sources(
             {
                 "api.h": text.replace(
-                    ' BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1")',
+                    ' BIND("failure=0;queue_result=1")',
                     ' BIND("failure=0")',
                 ).replace(
                     '  mln_delivery_queue queue BIND("kind=delivery_queue");\n} mln_notice_handler',

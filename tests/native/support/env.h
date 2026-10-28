@@ -148,20 +148,21 @@ void mln_test_thread_join(mln_test_thread* thread);
 // Installs a queue before event producers start; the test teardown owns it.
 void mln_test_configure_events(mln_runtime runtime, mln_wake wake);
 mln_delivery_queue mln_test_event_queue(mln_runtime runtime);
-mln_status mln_test_drain_event_delivery(
-  mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
-  mln_diagnostic* diagnostic
+
+// Receives one queued runtime event in mln_test_dispatch_events(). The event
+// and what it points to are borrowed for the call.
+typedef void (*mln_test_event_visit)(
+  const mln_runtime_event* event, void* context
 );
-// Drains runtime event deliveries; an empty queue returns MLN_STATUS_OK with
-// no events, and a message without its NUL terminator returns
-// MLN_STATUS_NATIVE_ERROR. The view stays alive until the next drain or destroy
-// helper on this thread releases its batch.
-mln_status mln_test_drain_events(
-  mln_runtime runtime, mln_event_batch_view* out_batch
+
+// Dispatches the runtime's event queue on this thread and passes each queued
+// event to `visit`, which may be null. Returns the dispatch status, or
+// MLN_STATUS_NATIVE_ERROR, with a diagnostic, when an event's message lacks
+// its NUL terminator.
+mln_status mln_test_dispatch_events(
+  mln_runtime runtime, mln_test_event_visit visit, void* context
 );
-// Releases the batch the latest drain on this thread kept alive.
-void mln_test_release_drained_batch(void);
-// Drains until a batch reports no events, and returns how many it discarded.
+// Dispatches until no event is queued, and returns how many it discarded.
 size_t mln_test_drain_all(mln_runtime runtime);
 
 // The same, counting the events whose type matches.
@@ -172,22 +173,22 @@ typedef bool (*mln_test_event_match)(
   const mln_runtime_event* event, void* context
 );
 
-// Drains until `match` accepts an event, blocking on the event handler's
-// delivery queue wake between drains, and discards the rest. Returns false at
-// the deadline or when a drain fails.
+// Dispatches until `match` accepts an event, blocking on the event handler's
+// delivery queue wake between dispatches, and discards the rest. Returns false
+// at the deadline or when a dispatch fails.
 bool mln_test_await_event_matching(
   mln_runtime runtime, mln_test_event_match match, void* context,
   mln_test_deadline deadline
 );
 
-// Drains until a batch reports no events, and returns how many events `match`
+// Dispatches until no event is queued, and returns how many events `match`
 // accepted. Here `match` counts an event instead of ending a wait.
 size_t mln_test_drain_counting_matching(
   mln_runtime runtime, mln_test_event_match match, void* context
 );
 
 // Blocks until an event of `type` from `source` arrives, within the default
-// deadline, copies it and its message out of the batch, and discards the rest
+// deadline, copies it and its message out of the call, and discards the rest
 // of the queue. Pass MLN_HANDLE_NULL as `source` to match any source. The
 // message is written null-terminated and truncated to message_capacity.
 bool mln_test_await_event(

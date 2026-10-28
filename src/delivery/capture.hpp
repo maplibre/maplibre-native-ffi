@@ -113,16 +113,16 @@ auto byte_buffer(Arena<Writing>& arena, mln_buffer_view value)
   return value;
 }
 
-// The record that each delivery type copies from a delivered callback's
-// arguments, and the mln_delivery_payload member that holds it.
-template <mln_delivery_type Type>
+// The callback that receives each queued call's argument record, its index
+// among the queued calls, and the invoke() that passes a copy to it.
+template <class Record>
 struct Delivered;
 
 // The generated copies: capture_element(), discard_element(), and
-// element_owns_handles() for each completion value type and each delivered
-// callback's record, and a Delivered specialization for each delivered
-// callback. A value type without an overload fails to compile where it is
-// delivered.
+// element_owns_handles() for each completion value type and each queued
+// callback's argument record, that record, and a Delivered specialization for
+// each queued callback. A value type without an overload fails to compile
+// where it is delivered.
 #include "delivery/capture_generated.inc"
 
 }  // namespace mln::delivery

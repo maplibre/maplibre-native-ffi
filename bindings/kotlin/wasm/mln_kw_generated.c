@@ -103,18 +103,6 @@ int32_t mln_kw_mln_android_init(
 
 int32_t mln_kw_mln_c_version(void) { return (int32_t)mln_c_version(); }
 
-void mln_kw_mln_delivery_batch_release(int64_t batch) {
-  mln_delivery_batch_release((mln_delivery_batch)batch);
-}
-
-int32_t mln_kw_mln_delivery_batch_take(
-  int64_t batch, uint32_t index, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_delivery_batch_take(
-    (mln_delivery_batch)batch, (size_t)index, (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_delivery_queue_create(
   uintptr_t options, uintptr_t out_queue, uintptr_t out_diagnostic
 ) {
@@ -129,16 +117,6 @@ int32_t mln_kw_mln_delivery_queue_dispatch(
 ) {
   return (int32_t)mln_delivery_queue_dispatch(
     (mln_delivery_queue)queue, (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_delivery_queue_drain(
-  int64_t queue, uintptr_t out_batch, uintptr_t out_view,
-  uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_delivery_queue_drain(
-    (mln_delivery_queue)queue, (mln_delivery_batch*)out_batch,
-    (mln_delivery_batch_view*)out_view, (mln_diagnostic*)out_diagnostic
   );
 }
 

@@ -306,7 +306,6 @@ mln_status mln_test_render_fixture_start_attach(
 }
 
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
-  mln_test_release_drained_batch();
   if (fixture == NULL) {
     return;
   }

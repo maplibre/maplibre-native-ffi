@@ -71,17 +71,6 @@ pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: mln_custom_geometry_source_opt
 pub type mln_custom_vector_source_option_field = u32;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_vector_source_option_field = 1;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_vector_source_option_field = 2;
-pub type mln_delivery_type = u32;
-pub const MLN_DELIVERY_TYPE_COMPLETION: mln_delivery_type = 1;
-pub const MLN_DELIVERY_TYPE_LOG_RECORD: mln_delivery_type = 2;
-pub const MLN_DELIVERY_TYPE_RESOURCE_REQUEST: mln_delivery_type = 3;
-pub const MLN_DELIVERY_TYPE_RETIRED: mln_delivery_type = 4;
-pub const MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: mln_delivery_type = 5;
-pub const MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: mln_delivery_type = 6;
-pub const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE: mln_delivery_type = 7;
-pub const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE: mln_delivery_type = 8;
-pub const MLN_DELIVERY_TYPE_RUNTIME_EVENTS: mln_delivery_type = 9;
-pub const MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM: mln_delivery_type = 10;
 pub type mln_feature_state_selector_field = u32;
 pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
@@ -563,11 +552,6 @@ pub struct mln_camera_transition_end {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_camera_transition_end_delivery {
-    pub end: *const mln_camera_transition_end,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_camera_transition_handler {
     pub callback: mln_camera_transition_end_callback,
     pub user_data: *mut std::ffi::c_void,
@@ -633,11 +617,6 @@ pub struct mln_custom_geometry_source_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_custom_source_tile_delivery {
-    pub tile_id: mln_canonical_tile_id,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_custom_vector_source_options {
     pub size: u32,
     pub fields: mln_custom_vector_source_option_fields,
@@ -648,35 +627,6 @@ pub struct mln_custom_vector_source_options {
     pub max_zoom: f64,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct mln_delivery {
-    pub type_: mln_delivery_type,
-    pub reserved: u32,
-    pub user_data: *mut std::ffi::c_void,
-    pub payload: mln_delivery_payload,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_delivery_batch_view {
-    pub size: u32,
-    pub delivery_size: u32,
-    pub deliveries: *const mln_delivery,
-    pub delivery_count: usize,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union mln_delivery_payload {
-    pub completion: mln_completion_result,
-    pub log_record: mln_log_delivery,
-    pub resource_request: mln_resource_request_delivery,
-    pub resource_request_cancel: mln_resource_request_cancel_delivery,
-    pub camera_transition_end: mln_camera_transition_end_delivery,
-    pub custom_source_fetch_tile: mln_custom_source_tile_delivery,
-    pub custom_source_cancel_tile: mln_custom_source_tile_delivery,
-    pub runtime_events: mln_runtime_event_delivery,
-    pub resource_transform: mln_resource_transform_delivery,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -834,14 +784,6 @@ pub struct mln_lat_lng {
 pub struct mln_lat_lng_bounds {
     pub southwest: mln_lat_lng,
     pub northeast: mln_lat_lng,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_log_delivery {
-    pub severity: mln_log_severity,
-    pub event: mln_log_event,
-    pub code: i64,
-    pub message: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1244,23 +1186,12 @@ pub struct mln_resource_range {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_resource_request_cancel_delivery {
-    pub handle: mln_resource_request,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_request_cancel_handler {
     pub size: u32,
     pub callback: mln_resource_request_cancel_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_resource_request_delivery {
-    pub request: *const mln_resource_request_info,
-    pub handle: mln_resource_request,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1315,13 +1246,6 @@ pub struct mln_resource_transform {
     pub queue: mln_delivery_queue,
 }
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_resource_transform_delivery {
-    pub kind: mln_resource_kind,
-    pub url: mln_buffer_view,
-    pub request: mln_resource_transform_request,
-}
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_runtime_event {
     pub type_: mln_runtime_event_type,
@@ -1332,11 +1256,6 @@ pub struct mln_runtime_event {
     pub payload_type: mln_runtime_event_payload_type,
     pub message: mln_buffer_view,
     pub payload: mln_runtime_event_payload,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_delivery {
-    pub events: *const mln_event_batch_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1765,9 +1684,6 @@ pub type mln_custom_source_fetch_tile_callback =
 pub type mln_custom_vector_source_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_delivery_batch(pub u64);
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_delivery_queue(pub u64);
 pub type mln_feature_state_selector_fields = u32;
 pub type mln_frame_demand_flags = u32;
@@ -1870,7 +1786,6 @@ pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
-    mln_delivery_batch,
     mln_delivery_queue,
     mln_geo_json_source_data,
     mln_graphics_device,
@@ -1950,12 +1865,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_c_version() -> u32;
-    pub fn mln_delivery_batch_release(batch: mln_delivery_batch);
-    pub fn mln_delivery_batch_take(
-        batch: mln_delivery_batch,
-        index: usize,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_delivery_queue_create(
         options: *const mln_delivery_queue_options,
         out_queue: *mut mln_delivery_queue,
@@ -1963,12 +1872,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_delivery_queue_dispatch(
         queue: mln_delivery_queue,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_delivery_queue_drain(
-        queue: mln_delivery_queue,
-        out_batch: *mut mln_delivery_batch,
-        out_view: *mut mln_delivery_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
