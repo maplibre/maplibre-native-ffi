@@ -204,9 +204,9 @@ class AbandonHold final {
 
 // Holds user_data until the registration's last call is queued. A
 // registration holds from construction, before its owning call accepts it,
-// because a transferred registration may retire before that call returns. A
-// queue released while a call that names it is still running may therefore
-// report the user_data of a registration that the call then rejects.
+// because a transferred registration may retire before that call returns,
+// which is why delivery.h forbids releasing a queue with a hook while such a
+// call runs.
 auto hold_user_data(
   const std::shared_ptr<DeliveryQueueState>& queue, void* user_data
 ) -> AbandonHold;
