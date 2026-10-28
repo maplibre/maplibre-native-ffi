@@ -63,28 +63,20 @@ reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on
 link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[entry]]
-bindings = ["dart"]
-platforms = ["linux-gnu"]
-archs = ["loongarch64"]
-status = "blocked"
-reason = "The Dart SDK runs on RISC-V but has no LoongArch build."
-link = "https://dart.dev/get-dart"
-
-[[entry]]
 bindings = ["dotnet"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "blocked"
-reason = "Microsoft builds .NET for Linux on x64, Arm64, and Arm32 alone."
-link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
+reason = ".NET builds RISC-V and LoongArch as community architectures, but no one publishes them for the binding's `net10.0`. Microsoft ships no packs for them, and the community builds stop at .NET 9."
+link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/building/coreclr/cross-building.md"
 
 [[entry]]
 bindings = ["swift"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64", "loongarch64"]
+platforms = ["linux-gnu"]
+archs = ["riscv64"]
 status = "blocked"
-reason = "Swift.org ships Linux toolchains and SDKs for x86_64 and aarch64 alone."
-link = "https://www.swift.org/install/linux/"
+reason = "Swift's build lists RISC-V as a Linux target, but its standard library does not compile for it, and Swift.org ships no RISC-V toolchain."
+link = "https://github.com/swiftlang/swift/issues/78349"
 
 # Cells with a known path that no one has started.
 
@@ -249,11 +241,26 @@ reason = "The Dart SDK runs on RISC-V. Run the suite with it under QEMU's user-m
 link = "https://dart.dev/get-dart"
 
 [[entry]]
-bindings = ["kotlin-jvm", "python", "typescript"]
+bindings = ["dart"]
+platforms = ["linux-gnu"]
+archs = ["loongarch64"]
+status = "path-known"
+reason = "Dart's maintainers do not plan to support LoongArch, but a community fork publishes Dart SDKs for it. Run the suite with one under QEMU's user-mode emulator."
+link = "https://github.com/Flutter-Dart-loong64/flutter-loong64-releases"
+
+[[entry]]
+bindings = ["kotlin-jvm", "python"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["riscv64", "loongarch64"]
+status = "path-known"
+reason = "Debian and Alpine package OpenJDK and Python for both architectures. Package the binding's native part for them, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
+
+[[entry]]
+bindings = ["typescript"]
 platforms = ["linux-gnu"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
-reason = "Debian packages OpenJDK, Python, and Node.js for both architectures. Package the binding's native part for them, and run the suite with Debian's runtime under QEMU's user-mode emulator."
+reason = "Debian packages Node.js for both architectures. Build the addon for them, and run the Node.js suite with Debian's Node.js under QEMU's user-mode emulator."
 
 # Cells that the binding's toolchain does not target.
 
@@ -320,6 +327,22 @@ archs = ["riscv64", "loongarch64"]
 status = "not-applicable"
 reason = "Kotlin/Native has no target for these architectures."
 link = "https://kotlinlang.org/docs/native-target-support.html"
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["loongarch64"]
+status = "not-applicable"
+reason = "Swift has no LoongArch target, and no community toolchain adds one."
+link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/swift_build_support/targets.py"
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["linux-musl"]
+archs = ["riscv64"]
+status = "not-applicable"
+reason = "Swift's static Linux SDK, its only musl target, covers x86_64 and aarch64 alone."
+link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/swift_build_support/targets.py"
 
 [[entry]]
 bindings = ["swift"]
