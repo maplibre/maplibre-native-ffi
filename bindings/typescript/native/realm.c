@@ -56,7 +56,10 @@ typedef struct mln_ts_shim {
  * which reaches its host value only while the owner lives.
  */
 typedef struct mln_ts_host {
-  napi_env env;
+  mln_ts_realm* realm;
+  // In the realm's list of hosts, which its teardown frees.
+  struct mln_ts_host* previous;
+  struct mln_ts_host* next;
   napi_ref reference;
   mln_ts_decoder decoder;
 } mln_ts_host;
@@ -99,6 +102,9 @@ struct mln_ts_realm {
   // reads them from another thread, so they are guarded.
   pthread_mutex_t owners_lock;
   mln_ts_owner* owners;
+  // The hosts that native code has not yet freed through a call or release.
+  // Only the realm's own thread touches them.
+  mln_ts_host* hosts;
   mln_ts_realm* next_realm;
 };
 
@@ -396,7 +402,11 @@ static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
 
 static void host_free(void* user_data) {
   mln_ts_host* host = user_data;
-  napi_delete_reference(host->env, host->reference);
+  *(host->previous ? &host->previous->next : &host->realm->hosts) = host->next;
+  if (host->next != NULL) {
+    host->next->previous = host->previous;
+  }
+  napi_delete_reference(host->realm->env, host->reference);
   free(host);
 }
 
@@ -416,8 +426,13 @@ static mln_ts_host* host_create(
     napi_throw_error(call->env, NULL, "registration allocation failed");
     return NULL;
   }
-  host->env = call->env;
+  host->realm = call->realm;
   host->decoder = decoder;
+  host->next = call->realm->hosts;
+  if (host->next != NULL) {
+    host->next->previous = host;
+  }
+  call->realm->hosts = host;
   return mln_ts_reject_later(call, host_free, host) ? host : NULL;
 }
 
@@ -427,14 +442,11 @@ static mln_ts_host* host_create(
  */
 static void host_release(void* user_data) {
   mln_ts_host* host = user_data;
-  napi_env env = host->env;
+  napi_env env = host->realm->env;
   napi_handle_scope scope;
   if (napi_open_handle_scope(env, &scope) == napi_ok) {
     napi_value root = reference_value(env, host->reference);
-    if (
-      root == NULL ||
-      !call_realm(env, mln_ts_realm_of(env)->retire, 1, &root, NULL)
-    ) {
+    if (root == NULL || !call_realm(env, host->realm->retire, 1, &root, NULL)) {
       surface_exception(env);
     }
     napi_close_handle_scope(env, scope);
@@ -461,7 +473,7 @@ bool mln_ts_read_registration(
 }
 
 napi_env mln_ts_upcall_begin(void* user_data, napi_handle_scope* scope) {
-  napi_env env = ((mln_ts_host*)user_data)->env;
+  napi_env env = ((mln_ts_host*)user_data)->realm->env;
   return napi_open_handle_scope(env, scope) == napi_ok ? env : NULL;
 }
 
@@ -470,7 +482,7 @@ bool mln_ts_upcall_end(
   const napi_value* argv
 ) {
   mln_ts_host* host = user_data;
-  napi_env env = host->env;
+  napi_env env = host->realm->env;
   napi_value values[MLN_TS_MAX_ARGUMENTS + 3];
   values[0] = mln_ts_number(env, callback);
   values[1] = reference_value(env, host->reference);
@@ -489,9 +501,7 @@ bool mln_ts_upcall_end(
   }
   napi_value result;
   bool received = false;
-  if (
-    call_realm(env, mln_ts_realm_of(env)->invoke, argc + 3, values, &result)
-  ) {
+  if (call_realm(env, host->realm->invoke, argc + 3, values, &result)) {
     napi_get_value_bool(env, result, &received);
   } else {
     surface_exception(env);
@@ -605,7 +615,7 @@ static napi_value completion_header(
  */
 static void complete(void* user_data, const mln_completion_result* result) {
   mln_ts_host* host = user_data;
-  napi_env env = host->env;
+  napi_env env = host->realm->env;
   napi_handle_scope scope;
   if (napi_open_handle_scope(env, &scope) == napi_ok) {
     napi_value argv[3] = {
@@ -828,11 +838,17 @@ static void realm_cleanup(void* data) {
     napi_release_threadsafe_function(function, napi_tsfn_abort);
   }
   // Releasing the queue abandons every pending call and the user data of
-  // every registration, whose references the environment's teardown frees,
-  // fails every undelivered request, and refuses later pushes.
+  // every registration, fails every undelivered request, and refuses later
+  // pushes, so nothing frees the remaining hosts but this. Their references
+  // die with the environment.
   if (realm->queue != MLN_HANDLE_NULL) {
     mln_delivery_queue_release(realm->queue);
     realm->queue = MLN_HANDLE_NULL;
+  }
+  while (realm->hosts != NULL) {
+    mln_ts_host* host = realm->hosts;
+    realm->hosts = host->next;
+    free(host);
   }
   realm_abandon_sessions(realm);
   pthread_mutex_lock(&realm->owners_lock);
