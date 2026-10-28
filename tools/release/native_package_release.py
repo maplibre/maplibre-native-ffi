@@ -11,6 +11,7 @@ import os
 import pathlib
 import plistlib
 import re
+import subprocess
 import tarfile
 import tempfile
 import urllib.request
@@ -287,28 +288,49 @@ def compare_url(previous_tag: str, tag: str) -> str:
     return f"{server_url}/{repository}/compare/{previous_tag}...{tag}"
 
 
+def tag_notes(repository: pathlib.Path, tag: str) -> str:
+    """Returns the notes of an annotated release tag: its message below the
+    title line, without the signature. A lightweight tag has none."""
+    fields = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "for-each-ref",
+            "--format=%(objecttype)%00%(contents:body)",
+            f"refs/tags/{tag}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    object_type, _, body = fields.partition("\0")
+    return body.strip() if object_type == "tag" else ""
+
+
 def write_notes(
-    release_dir: pathlib.Path, channel: str, sha: str, version: str
+    release_dir: pathlib.Path,
+    channel: str,
+    sha: str,
+    version: str,
+    repository: pathlib.Path,
 ) -> None:
+    links = [
+        f"[Commit]({commit_url(sha)})",
+        f"[CI run]({required_env('CI_RUN_URL')})",
+        f"[Publishing run]({workflow_url()})",
+    ]
     if channel == "snapshot":
         published = required_env("PUBLISH_TIMESTAMP")
-        lines = [f"Unstable native package snapshot, published {published}."]
+        notes = f"Unstable native package snapshot, published {published}."
     else:
-        lines = [f"MapLibre Native FFI {version}."]
-    lines += [
-        "",
-        f"Commit: {commit_url(sha)}",
-        f"CI run: {required_env('CI_RUN_URL')}",
-        f"Publishing run: {workflow_url()}",
-    ]
-    if channel == "release":
+        tag = required_env("PUBLISH_TAG")
+        notes = tag_notes(repository, tag) or f"MapLibre Native FFI {version}."
         previous_tag = required_env("PUBLISH_PREVIOUS_TAG")
-        lines += [
-            "",
-            f"Full changelog: {compare_url(previous_tag, required_env('PUBLISH_TAG'))}",
-        ]
-    lines.append("")
-    (release_dir / RELEASE_NOTES_NAME).write_text("\n".join(lines), encoding="utf-8")
+        links.insert(0, f"[Full changelog]({compare_url(previous_tag, tag)})")
+    (release_dir / RELEASE_NOTES_NAME).write_text(
+        f"{notes}\n\n{' · '.join(links)}\n", encoding="utf-8"
+    )
 
 
 def prepare_assets(
@@ -345,7 +367,7 @@ def prepare_assets(
             for archive in archives
         },
     )
-    write_notes(release_dir, channel, sha, version)
+    write_notes(release_dir, channel, sha, version, root)
     write_checksums(release_dir, [*archives, xcframework, zig_package, artifacts_path])
 
 

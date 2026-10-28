@@ -96,6 +96,13 @@ jobs:
           run-id: ${{ inputs.run_id }}
           name: native-xcframework-${{ env.PUBLISH_SHA }}
           path: build/packages/native/release
+      # The release notes are the tag's message, so the tag object must be
+      # local, not only the commit it names.
+      - name: Fetch the release tag
+        if: ${{ inputs.release }}
+        run: >-
+          git fetch --quiet --force origin
+          "refs/tags/${PUBLISH_TAG}:refs/tags/${PUBLISH_TAG}"
       - name: Record the publish time
         id: publish
         run:

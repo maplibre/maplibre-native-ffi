@@ -23,7 +23,9 @@ or a binding increments it.
 ## Release tags
 
 A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main`.
-`mise run ci:release-version --next` prints the next one.
+`mise run ci:release-version --next` prints the next one. The tag is signed and
+annotated, and its message below the title line becomes the release notes. The
+`release` agent skill drafts them.
 
 pub.dev, crates.io, and npm enable automated publishing only for a package that
 exists, so publish the first version of each package by hand, from a clean
