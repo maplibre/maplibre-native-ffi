@@ -288,7 +288,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     gl.viewport.setDirty();
     // DrawableGL::draw compares the program with getCurrentValue(), which
     // ignores the dirty flag, so only a program that no drawable uses makes
-    // it call glUseProgram again.
+    // it call glUseProgram again, until maplibre/maplibre-native#4866 lands.
     gl.program = 0;
   }
 #endif
