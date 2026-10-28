@@ -210,15 +210,41 @@ auto make_release_call(void* user_data, mln_user_data_release release)
 
 namespace {
 
+auto unlink_held(HeldUserData*& head, HeldUserData& node) noexcept -> void {
+  if (node.previous != nullptr) {
+    node.previous->next = node.next;
+  } else {
+    head = node.next;
+  }
+  if (node.next != nullptr) node.next->previous = node.previous;
+}
+
+auto report_abandoned(mln_user_data_release abandon, void* user_data) noexcept
+  -> void {
+  try {
+    abandon(user_data);
+  } catch (...) {
+    // Host release callbacks must not unwind through the C boundary.
+  }
+}
+
 // Destroys items that will never be delivered, disposing what they own
-// unless the process is exiting.
-auto abandon_items(DeliveryItem* items) noexcept -> void {
+// unless the process is exiting. A non-null abandon receives the user_data of
+// each last call after its item is gone.
+auto abandon_items(
+  DeliveryItem* items, mln_user_data_release abandon = nullptr
+) noexcept -> void {
   while (items != nullptr) {
     auto* next = items->next;
+    auto* const user_data = items->user_data;
+    const auto last_call = items->last_call;
     if (core::process_exiting()) {
       forget_item(ItemPtr{items});
     } else {
       static_cast<void>(ItemPtr{items});
+      if (last_call && abandon != nullptr) {
+        report_abandoned(abandon, user_data);
+      }
     }
     items = next;
   }
@@ -241,20 +267,93 @@ auto run_call(DeliveryItem& item) noexcept -> void {
 
 }  // namespace
 
-DeliveryQueueState::DeliveryQueueState(std::shared_ptr<core::Wake> wake)
-    : wake_(std::move(wake)) {}
+AbandonHold::AbandonHold(AbandonHold&& other) noexcept
+    : queue_(std::move(other.queue_)),
+      node_(std::exchange(other.node_, nullptr)) {}
+
+auto AbandonHold::operator=(AbandonHold&& other) noexcept -> AbandonHold& {
+  if (this != &other) {
+    reset();
+    queue_ = std::move(other.queue_);
+    node_ = std::exchange(other.node_, nullptr);
+  }
+  return *this;
+}
+
+AbandonHold::~AbandonHold() { reset(); }
+
+auto AbandonHold::reset() noexcept -> void {
+  if (node_ != nullptr) queue_->withdraw(std::exchange(node_, nullptr));
+  queue_.reset();
+}
+
+auto hold_user_data(
+  const std::shared_ptr<DeliveryQueueState>& queue, void* user_data
+) -> AbandonHold {
+  auto hold = AbandonHold{};
+  if (queue == nullptr || queue->abandon_ == nullptr) return hold;
+  auto node = std::make_unique<HeldUserData>();
+  node->user_data = user_data;
+  {
+    const auto lock = std::scoped_lock{queue->mutex_};
+    if (queue->closed_) return hold;
+    node->next = queue->held_;
+    if (queue->held_ != nullptr) queue->held_->previous = node.get();
+    queue->held_ = node.get();
+  }
+  hold.queue_ = queue;
+  hold.node_ = node.release();
+  return hold;
+}
+
+DeliveryQueueState::DeliveryQueueState(
+  std::shared_ptr<core::Wake> wake, mln_user_data_release abandon
+)
+    : abandon_(abandon), wake_(std::move(wake)) {}
 
 DeliveryQueueState::~DeliveryQueueState() { close(); }
+
+auto DeliveryQueueState::withdraw(HeldUserData* node) noexcept -> void {
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    // close() took and freed every node that it found.
+    if (closed_) return;
+    unlink_held(held_, *node);
+  }
+  delete node;
+}
 
 auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
   if (core::process_exiting()) {
     forget_item(std::move(item));
     return true;
   }
+  return append(item, nullptr);
+}
+
+auto DeliveryQueueState::push(ItemPtr& item, AbandonHold& hold) noexcept
+  -> bool {
+  if (core::process_exiting()) {
+    forget_item(std::move(item));
+    hold.reset();
+    return true;
+  }
+  auto* const node = std::exchange(hold.node_, nullptr);
+  hold.queue_.reset();
+  return append(item, node);
+}
+
+auto DeliveryQueueState::append(ItemPtr& item, HeldUserData* settled) noexcept
+  -> bool {
   auto wake = std::shared_ptr<core::Wake>{};
   {
     const auto lock = std::scoped_lock{mutex_};
+    // A closed queue already took and reported the settled node.
     if (closed_) return false;
+    if (settled != nullptr) {
+      unlink_held(held_, *settled);
+      item->last_call = true;
+    }
     auto* raw = item.release();
     raw->next = nullptr;
     if (tail_ == nullptr) {
@@ -267,6 +366,7 @@ auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
     }
     tail_ = raw;
   }
+  delete settled;
   if (wake != nullptr) wake->notify();
   return true;
 }
@@ -326,45 +426,60 @@ auto DeliveryQueueState::dispatch() noexcept -> DispatchResult {
 
 auto DeliveryQueueState::run_calls() noexcept -> bool {
   if (core::process_exiting()) return false;
-  auto* calls = static_cast<DeliveryItem*>(nullptr);
   {
     const auto lock = std::scoped_lock{mutex_};
     if (closed_) return false;
-    calls = std::exchange(head_, nullptr);
+    running_ = std::exchange(head_, nullptr);
     tail_ = nullptr;
   }
   auto ran = false;
-  while (calls != nullptr) {
+  auto* exiting = static_cast<DeliveryItem*>(nullptr);
+  while (true) {
+    auto call = ItemPtr{};
     {
-      // A call may release the queue, which abandons the rest.
+      // A call may release the queue, which takes the rest.
       const auto lock = std::scoped_lock{mutex_};
-      if (closed_) break;
+      if (closed_ || running_ == nullptr) break;
+      if (core::process_exiting()) {
+        exiting = std::exchange(running_, nullptr);
+        break;
+      }
+      call = ItemPtr{running_};
+      running_ = std::exchange(call->next, nullptr);
     }
-    if (core::process_exiting()) break;
-    auto call = ItemPtr{calls};
-    calls = std::exchange(call->next, nullptr);
     run_call(*call);
     ran = true;
   }
-  abandon_items(calls);
+  abandon_items(exiting);
   return ran;
 }
 
 auto DeliveryQueueState::close() noexcept -> void {
+  auto running = static_cast<DeliveryItem*>(nullptr);
   auto calls = static_cast<DeliveryItem*>(nullptr);
+  auto* held = static_cast<HeldUserData*>(nullptr);
   auto wake = std::shared_ptr<core::Wake>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     closed_ = true;
+    running = std::exchange(running_, nullptr);
     calls = std::exchange(head_, nullptr);
     tail_ = nullptr;
+    held = std::exchange(held_, nullptr);
     wake = std::move(wake_);
   }
   if (wake != nullptr) wake->close();
   // The wake's user data is released when its last reference drops: here, or
   // in a push whose notify is still running.
   wake.reset();
-  abandon_items(calls);
+  const auto abandon = core::process_exiting() ? nullptr : abandon_;
+  abandon_items(running, abandon);
+  abandon_items(calls, abandon);
+  while (held != nullptr) {
+    const auto node = std::unique_ptr<HeldUserData>{held};
+    held = node->next;
+    if (abandon != nullptr) report_abandoned(abandon, node->user_data);
+  }
 }
 
 auto resolve_delivery_queue(mln_delivery_queue queue)
@@ -401,7 +516,9 @@ auto create_delivery_queue(
   try {
     wake = std::make_shared<core::Wake>(options->wake, nullptr);
     auto object = std::make_shared<DeliveryQueueObject>();
-    object->state = std::make_shared<DeliveryQueueState>(wake);
+    object->state = std::make_shared<DeliveryQueueState>(
+      wake, options->release_abandoned_user_data
+    );
     *out_queue = handle_table<DeliveryQueueObject>().insert(std::move(object));
   } catch (...) {
     // A rejected wake never releases the caller's user data.

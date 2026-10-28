@@ -46,6 +46,7 @@ class Wake final {
   std::shared_ptr<std::atomic_bool> call_pending_;
   // Preallocated, so a queued wake releases its user data without allocating.
   delivery::ItemPtr release_call_;
+  delivery::AbandonHold held_;
   std::size_t in_flight_ = 0;
   bool accepted_ = false;
   bool closing_ = false;

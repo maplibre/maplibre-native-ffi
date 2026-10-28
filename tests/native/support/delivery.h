@@ -37,23 +37,33 @@ static inline void mln_test_delivery_count_wake_release(void* user_data) {
   mln_test_pulse();
 }
 
-// Creates a queue whose wake counts into queue, which must outlive it.
-static inline void mln_test_delivery_queue_create(
-  mln_test_delivery_queue* queue
+// Creates a queue whose wake counts into queue, which must outlive it, and
+// whose release passes the user_data it abandons to abandon.
+static inline void mln_test_delivery_queue_create_abandoning(
+  mln_test_delivery_queue* queue, mln_user_data_release abandon
 ) {
   atomic_store(&queue->wakes, 0);
   atomic_store(&queue->wake_releases, 0);
   queue->handle = MLN_HANDLE_NULL;
   const mln_delivery_queue_options options = {
     .size = sizeof(mln_delivery_queue_options),
-    .wake = {
-      .callback = mln_test_delivery_count_wake,
-      .user_data = queue,
-      .release_user_data = mln_test_delivery_count_wake_release,
-    },
+    .wake =
+      {
+        .callback = mln_test_delivery_count_wake,
+        .user_data = queue,
+        .release_user_data = mln_test_delivery_count_wake_release,
+      },
+    .release_abandoned_user_data = abandon,
   };
   MLN_TEST_OK(mln_delivery_queue_create(&options, &queue->handle, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, queue->handle);
+}
+
+// Creates a queue whose release passes on none of the user_data it abandons.
+static inline void mln_test_delivery_queue_create(
+  mln_test_delivery_queue* queue
+) {
+  mln_test_delivery_queue_create_abandoning(queue, NULL);
 }
 
 // Releases the queue and waits for its wake's release. A push that is still

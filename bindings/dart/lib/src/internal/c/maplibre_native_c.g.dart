@@ -330,6 +330,7 @@ final class mln_delivery_queue_options extends Struct {
   @Uint32()
   external int size;
   external mln_wake wake;
+  external mln_user_data_release release_abandoned_user_data;
 }
 
 final class mln_diagnostic extends Struct {

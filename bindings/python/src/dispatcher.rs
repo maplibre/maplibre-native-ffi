@@ -97,6 +97,7 @@ fn generated_dispatch_queue() -> PyResult<sys::mln_delivery_queue> {
             release_user_data: None,
             queue: sys::mln_delivery_queue(0),
         },
+        release_abandoned_user_data: None,
     };
     let mut queue = sys::mln_delivery_queue(0);
     // SAFETY: options and queue are valid for the call, and the wake's

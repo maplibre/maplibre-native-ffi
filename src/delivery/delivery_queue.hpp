@@ -55,6 +55,9 @@ struct DeliveryItem {
   // Null for a call that owns nothing.
   void (*discard)(DeliveryItem& item) noexcept = nullptr;
   bool taken = false;
+  // The last call of a registration that the queue reports to its abandon
+  // hook, if the queue abandons the call.
+  bool last_call = false;
   // Event spans own vectors and a message arena instead of an inline copy.
   void (*destroy)(DeliveryItem*) noexcept = nullptr;
   void (*invoke)(DeliveryItem& item) noexcept = nullptr;
@@ -163,6 +166,51 @@ auto make_release_call(void* user_data, mln_user_data_release release)
 
 enum class DispatchResult : std::uint8_t { Ran, Empty, Busy };
 
+class DeliveryQueueState;
+
+// The user_data of a registration that the queue reports to its abandon hook
+// if it closes before the registration's last call is queued. The queue owns
+// the node while it is open and frees it when it closes.
+struct HeldUserData {
+  HeldUserData* previous = nullptr;
+  HeldUserData* next = nullptr;
+  void* user_data = nullptr;
+};
+
+// A registration's claim on its queue's abandon hook. Queueing the
+// registration's last call through it settles the claim, and destroying it
+// unsettled withdraws the claim, as a rejected registration must. Empty when
+// the queue has no hook.
+class AbandonHold final {
+ public:
+  AbandonHold() noexcept = default;
+  AbandonHold(const AbandonHold&) = delete;
+  AbandonHold(AbandonHold&& other) noexcept;
+  auto operator=(const AbandonHold&) -> AbandonHold& = delete;
+  auto operator=(AbandonHold&& other) noexcept -> AbandonHold&;
+  ~AbandonHold();
+
+ private:
+  friend class DeliveryQueueState;
+  friend auto hold_user_data(
+    const std::shared_ptr<DeliveryQueueState>& queue, void* user_data
+  ) -> AbandonHold;
+
+  auto reset() noexcept -> void;
+
+  std::shared_ptr<DeliveryQueueState> queue_;
+  HeldUserData* node_ = nullptr;
+};
+
+// Holds user_data until the registration's last call is queued. A
+// registration holds from construction, before its owning call accepts it,
+// because a transferred registration may retire before that call returns. A
+// queue released while a call that names it is still running may therefore
+// report the user_data of a registration that the call then rejects.
+auto hold_user_data(
+  const std::shared_ptr<DeliveryQueueState>& queue, void* user_data
+) -> AbandonHold;
+
 // The queue behind one mln_delivery_queue handle. Registrations hold it, so a
 // released queue stays alive, closed, until the last of them retires.
 //
@@ -170,7 +218,9 @@ enum class DispatchResult : std::uint8_t { Ran, Empty, Busy };
 // empty to nonempty.
 class DeliveryQueueState final {
  public:
-  explicit DeliveryQueueState(std::shared_ptr<core::Wake> wake);
+  explicit DeliveryQueueState(
+    std::shared_ptr<core::Wake> wake, mln_user_data_release abandon = nullptr
+  );
   DeliveryQueueState(const DeliveryQueueState&) = delete;
   DeliveryQueueState(DeliveryQueueState&&) = delete;
   auto operator=(const DeliveryQueueState&) -> DeliveryQueueState& = delete;
@@ -182,6 +232,9 @@ class DeliveryQueueState final {
   // During process exit the item is dropped without disposal and this reports
   // true.
   [[nodiscard]] auto push(ItemPtr& item) noexcept -> bool;
+  // Pushes a registration's last call and settles its hold, as one step
+  // against close(). A refused push leaves the item with the caller.
+  [[nodiscard]] auto push(ItemPtr& item, AbandonHold& hold) noexcept -> bool;
 
   // Appends to a tail event span of the same registration, or starts one
   // after another call. Events share contiguous record and message storage,
@@ -197,17 +250,32 @@ class DeliveryQueueState final {
   // returns Busy, and the running one also runs what was queued by then.
   auto dispatch() noexcept -> DispatchResult;
 
-  // Refuses later pushes, stops the wake, and discards queued calls.
+  // Refuses later pushes, stops the wake, discards queued calls, and reports
+  // the user_data of each held registration and abandoned last call.
   auto close() noexcept -> void;
 
  private:
+  friend class AbandonHold;
+  friend auto hold_user_data(
+    const std::shared_ptr<DeliveryQueueState>& queue, void* user_data
+  ) -> AbandonHold;
+
   // Runs the calls queued now. Returns whether it ran any.
   auto run_calls() noexcept -> bool;
+  // Appends under the lock, unlinking settled from the held registrations.
+  auto append(ItemPtr& item, HeldUserData* settled) noexcept -> bool;
+  // Unlinks and frees a hold unless close() already took it.
+  auto withdraw(HeldUserData* node) noexcept -> void;
 
   std::mutex mutex_;
   DeliveryItem* head_ = nullptr;
   DeliveryItem* tail_ = nullptr;
+  // The calls that a dispatch took and has not yet run, which close() takes
+  // when a call releases the queue.
+  DeliveryItem* running_ = nullptr;
+  HeldUserData* held_ = nullptr;
   bool closed_ = false;
+  const mln_user_data_release abandon_;
   // Set while a dispatch runs calls. A dispatch that finds one running sets
   // dispatch_requested_, which makes the running one take the calls again.
   std::atomic_bool dispatching_ = false;

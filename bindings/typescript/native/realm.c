@@ -57,9 +57,6 @@ typedef struct mln_ts_shim {
  */
 typedef struct mln_ts_host {
   mln_ts_realm* realm;
-  // In the realm's list of hosts, which its teardown frees.
-  struct mln_ts_host* previous;
-  struct mln_ts_host* next;
   napi_ref reference;
   mln_ts_decoder decoder;
 } mln_ts_host;
@@ -102,9 +99,6 @@ struct mln_ts_realm {
   // reads them from another thread, so they are guarded.
   pthread_mutex_t owners_lock;
   mln_ts_owner* owners;
-  // The hosts that native code has not yet freed through a call or release.
-  // Only the realm's own thread touches them.
-  mln_ts_host* hosts;
   mln_ts_realm* next_realm;
 };
 
@@ -385,6 +379,9 @@ static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
     options.wake.callback = queue_wake;
     options.wake.user_data = shim_retain(realm->shim);
     options.wake.release_user_data = queue_wake_release;
+    // The references of the hosts that release abandons die with the
+    // environment.
+    options.release_abandoned_user_data = free;
     mln_diagnostic diagnostic = {.size = sizeof diagnostic};
     mln_delivery_queue queue = MLN_HANDLE_NULL;
     mln_status status =
@@ -402,10 +399,6 @@ static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
 
 static void host_free(void* user_data) {
   mln_ts_host* host = user_data;
-  *(host->previous ? &host->previous->next : &host->realm->hosts) = host->next;
-  if (host->next != NULL) {
-    host->next->previous = host->previous;
-  }
   napi_delete_reference(host->realm->env, host->reference);
   free(host);
 }
@@ -428,11 +421,6 @@ static mln_ts_host* host_create(
   }
   host->realm = call->realm;
   host->decoder = decoder;
-  host->next = call->realm->hosts;
-  if (host->next != NULL) {
-    host->next->previous = host;
-  }
-  call->realm->hosts = host;
   return mln_ts_reject_later(call, host_free, host) ? host : NULL;
 }
 
@@ -837,18 +825,11 @@ static void realm_cleanup(void* data) {
   if (function != NULL) {
     napi_release_threadsafe_function(function, napi_tsfn_abort);
   }
-  // Releasing the queue abandons every pending call and the user data of
-  // every registration, fails every undelivered request, and refuses later
-  // pushes, so nothing frees the remaining hosts but this. Their references
-  // die with the environment.
+  // Releasing the queue frees the hosts it abandons, fails every undelivered
+  // request, and refuses later pushes.
   if (realm->queue != MLN_HANDLE_NULL) {
     mln_delivery_queue_release(realm->queue);
     realm->queue = MLN_HANDLE_NULL;
-  }
-  while (realm->hosts != NULL) {
-    mln_ts_host* host = realm->hosts;
-    realm->hosts = host->next;
-    free(host);
   }
   realm_abandon_sessions(realm);
   pthread_mutex_lock(&realm->owners_lock);

@@ -633,6 +633,7 @@ pub struct mln_custom_vector_source_options {
 pub struct mln_delivery_queue_options {
     pub size: u32,
     pub wake: mln_wake,
+    pub release_abandoned_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

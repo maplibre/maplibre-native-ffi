@@ -55,6 +55,7 @@ class QueuedRegistration final {
     }
     if (release != nullptr) {
       retired_ = make_release_call(user_data, release);
+      held_ = hold_user_data(queue_, user_data);
     }
   }
 
@@ -135,7 +136,7 @@ class QueuedRegistration final {
       static_cast<QueuedRegistration*>(registration)
     };
     if (owned->retired_ == nullptr) return;
-    static_cast<void>(owned->queue_->push(owned->retired_));
+    static_cast<void>(owned->queue_->push(owned->retired_, owned->held_));
   }
 
  private:
@@ -146,6 +147,7 @@ class QueuedRegistration final {
   // Preallocated, so retirement reaches a live queue without allocating.
   // Null without release_user_data.
   ItemPtr retired_;
+  AbandonHold held_;
   ItemPtr reserved_;
   std::size_t reserved_size_ = 0;
 };

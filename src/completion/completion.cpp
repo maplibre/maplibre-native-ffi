@@ -162,7 +162,7 @@ auto CompletionSink::deliver_queued(
     };
   }
   // A released queue refuses the item.
-  if (!queue_->push(item)) item.reset();
+  if (!queue_->push(item, held_)) item.reset();
 }
 
 auto ErasedCompletionValue::deliver(
@@ -307,6 +307,8 @@ auto make_completion_sink(
         .capacity = size,
       };
       fallback->arguments = place_result(arena);
+      sink.held_ =
+        delivery::hold_user_data(sink.queue_, sink.descriptor_.user_data);
     }
   } catch (...) {
     set_thread_error("asynchronous completion state could not be allocated");

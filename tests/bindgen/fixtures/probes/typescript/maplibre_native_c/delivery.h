@@ -19,6 +19,7 @@ typedef struct mln_wake {
 typedef struct mln_delivery_queue_options {
   uint32_t size;
   mln_wake wake;
+  mln_user_data_release release_abandoned_user_data;
 } mln_delivery_queue_options;
 
 mln_status mln_delivery_queue_create(

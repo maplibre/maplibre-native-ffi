@@ -18,6 +18,7 @@ typedef struct probe_call {
 
 typedef struct probe_queue {
   mln_wake wake;
+  mln_user_data_release release_abandoned_user_data;
   probe_call* items;
   size_t count;
 } probe_queue;
@@ -30,6 +31,7 @@ mln_status mln_delivery_queue_create(
   probe_queue* queue = calloc(1, sizeof *queue);
   if (queue == NULL) return MLN_STATUS_NATIVE_ERROR;
   queue->wake = options->wake;
+  queue->release_abandoned_user_data = options->release_abandoned_user_data;
   *out_queue = (mln_delivery_queue)(uintptr_t)queue;
   return MLN_STATUS_OK;
 }
@@ -39,6 +41,11 @@ void mln_delivery_queue_release(mln_delivery_queue handle) {
   if (queue == NULL) return;
   if (queue->wake.release_user_data != NULL) {
     queue->wake.release_user_data(queue->wake.user_data);
+  }
+  if (queue->release_abandoned_user_data != NULL) {
+    for (size_t index = 0; index < queue->count; index++) {
+      queue->release_abandoned_user_data(queue->items[index].user_data);
+    }
   }
   free(queue->items);
   free(queue);

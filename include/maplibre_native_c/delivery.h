@@ -59,6 +59,14 @@ typedef struct mln_delivery_queue_options {
    * queue.
    */
   mln_wake wake;
+  /**
+   * Optional. Receives the user_data of each registration whose
+   * release_user_data, or whose completion callback,
+   * mln_delivery_queue_release() abandons. The release calls it once for each
+   * such registration, on the releasing thread, before it returns. It must not
+   * call into the host's runtime or into this queue.
+   */
+  mln_user_data_release release_abandoned_user_data;
 } mln_delivery_queue_options;
 
 /**
@@ -88,8 +96,9 @@ MLN_API mln_status mln_delivery_queue_create(
  * The call consumes the handle, closes the queue, and returns without blocking.
  * It abandons what is pending without running it: no queued call runs, and
  * the release_user_data of a registration that still names the queue never
- * runs. A queued provider request is released, which fails it, and a queued
- * transform request is released, which keeps its URL.
+ * runs. The queue's release_abandoned_user_data receives its user_data
+ * instead. A queued provider request is released, which fails it, and a
+ * queued transform request is released, which keeps its URL.
  *
  * Registrations that still name the queue keep working, but the queue refuses
  * their later pushes: a completion is discarded, a log record goes to the

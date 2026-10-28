@@ -45,6 +45,7 @@ Wake::Wake(
     release_call_ = delivery::make_release_call(
       descriptor_.user_data, descriptor_.release_user_data
     );
+    held_ = delivery::hold_user_data(queue_, descriptor_.user_data);
   }
 }
 
@@ -66,7 +67,7 @@ Wake::~Wake() {
   }
   if (queue_ != nullptr) {
     // A released queue abandons the user data.
-    static_cast<void>(queue_->push(release_call_));
+    static_cast<void>(queue_->push(release_call_, held_));
     return;
   }
   try {

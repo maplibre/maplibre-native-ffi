@@ -75,6 +75,8 @@ class CompletionSink final {
   // in place of the callback, as a call when callback is set.
   mln_completion descriptor_{};
   std::shared_ptr<delivery::DeliveryQueueState> queue_;
+  // Settled by the one push of the result.
+  mutable delivery::AbandonHold held_;
   Completion* owner_ = nullptr;
 };
 
