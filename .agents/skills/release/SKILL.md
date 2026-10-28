@@ -8,62 +8,50 @@ description:
 
 # Release
 
-The notes travel in the release's signed, annotated tag. The publish run copies
-the tag's message, below its title line, into the GitHub release body and
-appends the links footer.
+A release runs from the previous `v[0-9]*` tag to a `main` commit whose CI
+passed; `mise run ci:release-version --next` names it.
 
-## Find the range
+## Find what changed
 
-- A new release covers the previous release tag to a `main` commit whose CI
-  passed: `git describe --tags --abbrev=0 --match 'v[0-9]*' <commit>` finds the
-  previous tag, and `mise run ci:release-version --next` prints the version.
-- A published release covers its previous release tag, found by the same command
-  on `<tag>^`, to its own tag.
+Work from the code at the two endpoints, not from PR titles or descriptions. PRs
+only point to where to look, and a description can be stale.
 
-## Learn what changed
+- The C API: diff `include/maplibre_native_c/`, and read the implementation
+  where a header doesn't say how behavior changed.
+- Each binding: diff its public API and its package manifest, generated and
+  handwritten.
+- Packaging and platforms: diff the release workflows and `tools/release/`,
+  `CMakePresets.json`, and the support matrix that
+  `docs/scripts/generate-support-matrix.py` prints at each endpoint.
+- The engine: the `third_party/maplibre-native` pin and
+  `patches/maplibre-native/`.
 
-- List the squash merges with
-  `git log --first-parent --format='%h %s' <previous>..<target>`, and read a
-  PR's description with `gh pr view` when its title doesn't say what a user
-  sees. Don't filter by the title's type: a `ci:` or `refactor:` merge can
-  change what users get.
-- Judge each change by the difference between the two endpoints, with
-  `git diff <previous> <target> -- <paths>`. Something added and then reworked
-  or reverted inside the range appears only as its final state, or not at all.
-  Where a PR's description disagrees with the diff, trust the diff.
-- For a published release, check its publish run and cover only the artifacts it
-  published.
+Report the net change: something added and reworked within the range appears
+only in its final form, or not at all. Cover only the artifacts that the release
+publishes.
 
-## Write the draft
+## Write
 
-- Include only what a user of the library or a binding can observe: API,
-  behavior, platforms, packaging, and performance. Leave out tests, CI,
-  refactors, maintainer tooling, and other internal changes.
-- Organize by what changed, not by PR. Merge related PRs into one item, and
-  don't link PRs.
-- Open with one or two sentences that state the release's theme. Below them,
-  choose section headers that fit this release's changes.
-- For a breaking change, say what a host must change. When a release breaks
-  much, name each kind of change with one example rather than every rename.
-- Keep it short and plain, one line per change where possible. Write no title
-  line and no links footer.
+- Only what users observe. No tests, CI, refactors, or maintainer tooling.
+- Organize by what changed, not by PR, and link no PRs.
+- Open with one or two sentences on the release's theme, then use whatever
+  sections this release needs.
+- For a breaking change, say what a host must change. When much breaks, give
+  each kind of change one example instead of listing every rename.
+- One line per change where possible. No title line and no links footer; CI
+  appends the footer.
 
-## Review with the maintainer
-
-Show the draft and revise it until the maintainer approves it. Don't tag, push,
-or edit a release until they do.
+Revise the draft with the maintainer until they approve it.
 
 ## Publish
 
-For a new release, write the tag message to a file: the title line
-`MapLibre Native FFI <version>`, a blank line, then the notes. Create the tag,
-show it, and push it only when the maintainer says to:
+Notes travel in the signed tag. Its message is `MapLibre Native FFI <version>`,
+a blank line, then the notes, and the publish run copies everything below the
+title into the release body:
 
 ```sh
 git tag -s --cleanup=verbatim -F <file> v<version> <commit>
-git push origin v<version>
 ```
 
-For a published release, keep the links footer that its body ends with, and
-replace the text above it with `gh release edit <tag> --notes-file <file>`. The
-tag stays as it is.
+Push it only when the maintainer says to. For a release that is already
+published, replace the body above its links footer instead, and leave the tag.
