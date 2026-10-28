@@ -19,9 +19,8 @@ public sealed record GraphicsDeviceOptions
     public uint? AdapterIndex { get; init; }
 
     /// <summary>
-    /// Renders every texture session of the device in one graphics context, one
-    /// session at a time, instead of in a context of each session's own. Absent
-    /// selects false.
+    /// Whether the device's texture sessions take turns rendering in one EGL
+    /// context instead of each creating its own. Absent selects false.
     /// </summary>
     public bool? SingleContext { get; init; }
 }

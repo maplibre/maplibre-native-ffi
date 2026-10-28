@@ -178,7 +178,6 @@ pub const MLN_OPEN_GL_CLIENT_API_GLES: mln_open_gl_client_api = 2;
 pub type mln_open_gl_context_ownership = u32;
 pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED: mln_open_gl_context_ownership = 0;
 pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED: mln_open_gl_context_ownership = 1;
-pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED: mln_open_gl_context_ownership = 2;
 pub type mln_open_gl_context_platform = u32;
 pub const MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED: mln_open_gl_context_platform = 0;
 pub const MLN_OPEN_GL_CONTEXT_PLATFORM_WGL: mln_open_gl_context_platform = 1;

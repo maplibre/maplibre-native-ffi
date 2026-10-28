@@ -51,17 +51,13 @@ typedef struct mln_graphics_device_options {
   uint32_t adapter_index
     MLN_BINDING("mask=fields;bit=MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX");
   /**
-   * Renders every texture session of the device in one graphics context, one
-   * session at a time, instead of in a context of each session's own. Absent
-   * selects false.
+   * Whether the device's texture sessions take turns rendering in one EGL
+   * context instead of each creating its own. Absent selects false.
    *
-   * This saves the memory of a context per session. The sessions of such a
-   * device never render at the same time, so a host that renders on several
-   * threads at once creates a device for each thread.
-   *
-   * EGL creates the context with the device. Metal and Vulkan sessions share
-   * the device's one device and queue regardless, so those backends ignore
-   * this. WGL does not support it.
+   * A context per session costs memory, most under a software renderer such
+   * as llvmpipe. Sessions that take turns never render at the same time, so a
+   * host that renders on several threads at once creates a device for each.
+   * Other backends ignore this.
    */
   bool single_context
     MLN_BINDING("mask=fields;bit=MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT");
@@ -94,7 +90,7 @@ typedef struct mln_graphics_device_texture_descriptor {
  * - MLN_STATUS_INVALID_ARGUMENT when options is undersized or carries unknown
  *   fields, or out_device is null or *out_device is not MLN_HANDLE_NULL.
  * - MLN_STATUS_UNSUPPORTED when this build's backend cannot create a device:
- *   WebGPU, and OpenGL on WebGL; or options set single_context on WGL.
+ *   WebGPU, and OpenGL on WebGL.
  * - MLN_STATUS_NATIVE_ERROR when the graphics API is unavailable, has no
  *   adapter at adapter_index, or fails to create the device or its single
  *   context.

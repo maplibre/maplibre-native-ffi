@@ -1,6 +1,5 @@
-// Owned textures that take turns rendering in one host EGL context.
+// Texture sessions that take turns rendering in a single-context EGL device.
 
-#include "mln_test_graphics.h"
 #include "support/frames.h"
 #include "support/test_support.h"
 
@@ -26,55 +25,36 @@ static const char fill_style_json[] =
   "{\"id\":\"square\",\"type\":\"fill\",\"source\":\"square\","
   "\"paint\":{\"fill-color\":\"#0080ff\"}}]}";
 
-typedef struct host_context {
-  mln_test_graphics* graphics;
-  mln_test_graphics_context handles;
-} host_context;
-
-// The context the host owns and keeps current on no thread.
-static host_context create_host_context(void) {
-  host_context host = {
-    .graphics = mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_EGL)
+static mln_graphics_device create_device(bool single_context) {
+  mln_graphics_device_options options = {
+    .size = sizeof(mln_graphics_device_options)
   };
-  TEST_ASSERT_NOT_NULL_MESSAGE(host.graphics, mln_test_graphics_last_error());
-  TEST_ASSERT_TRUE(mln_test_graphics_get_context(host.graphics, &host.handles));
-  return host;
+  options.fields = MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
+  options.single_context = single_context;
+  mln_graphics_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(
+    mln_graphics_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+  );
+  return device;
 }
 
-static mln_open_gl_context_descriptor pooled_context(const host_context* host) {
-  return (mln_open_gl_context_descriptor){
-    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
-    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED,
-    .data = {
-      .egl = {
-        .display = host->handles.egl_display,
-        .config = host->handles.egl_config,
-        .share_context = host->handles.egl_context,
-        .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
-        .get_proc_address = NULL,
-      },
-    },
-  };
-}
-
-static mln_test_render_fixture attach_pooled_texture(
-  mln_map map, const host_context* host
+static mln_test_render_fixture attach_device_texture(
+  mln_map map, mln_graphics_device device
 ) {
   mln_test_render_fixture fixture = {.driver = MLN_RENDER_DRIVER_CORE_WORKER};
-  mln_open_gl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_owned_texture_descriptor)
+  mln_graphics_device_texture_descriptor descriptor = {
+    .size = sizeof(mln_graphics_device_texture_descriptor)
   };
   descriptor.extent = (mln_logical_extent){
     .width = extent, .height = extent, .scale_factor = 1.0
   };
-  descriptor.context = pooled_context(host);
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = fixture.driver;
   mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_attach_open_gl_owned_texture(
-    map, &descriptor, &options, &fixture.session, &attach.descriptor,
+  MLN_TEST_OK(mln_map_attach_graphics_device_texture(
+    map, device, &descriptor, &options, &fixture.session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
@@ -82,7 +62,7 @@ static mln_test_render_fixture attach_pooled_texture(
   return fixture;
 }
 
-static void detach_pooled_texture(mln_test_render_fixture* fixture) {
+static void detach_device_texture(mln_test_render_fixture* fixture) {
   mln_test_completion detach = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_detach(
     fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
@@ -125,20 +105,23 @@ static void render_again(
   read_pixels(fixture, pixels);
 }
 
-static void render_dedicated(
+// Renders on a device of its own, which gives the session a context of its
+// own.
+static void render_alone(
   mln_runtime runtime, mln_buffer_view style, uint8_t* pixels
 ) {
+  mln_graphics_device device = create_device(false);
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_dedicated_texture_create(map, &fixture));
+  mln_test_render_fixture fixture = attach_device_texture(map, device);
   render_style(runtime, map, &fixture, style, pixels);
-  mln_test_dedicated_texture_destroy(&fixture);
+  detach_device_texture(&fixture);
   mln_test_destroy_map(map);
+  mln_graphics_device_release(device);
 }
 
-// Each session keeps its own framebuffer and GL objects in the shared context,
+// Each session keeps its own framebuffer and GL objects in the single context,
 // so two maps that take turns render what a context of their own renders.
-static void pooled_textures_render_as_dedicated_ones_do(void) {
+static void sessions_that_take_turns_render_as_alone(void) {
   static uint8_t expected[2][pixel_bytes];
   static uint8_t actual[pixel_bytes];
   const mln_buffer_view styles[2] = {
@@ -147,28 +130,17 @@ static void pooled_textures_render_as_dedicated_ones_do(void) {
   };
   mln_runtime runtime = mln_test_create_runtime();
   for (size_t index = 0; index < 2; index += 1) {
-    render_dedicated(runtime, styles[index], expected[index]);
+    render_alone(runtime, styles[index], expected[index]);
   }
   TEST_ASSERT_NOT_EQUAL_INT(0, memcmp(expected[0], expected[1], pixel_bytes));
 
-  host_context host = create_host_context();
+  mln_graphics_device device = create_device(true);
   mln_map maps[2];
   mln_test_render_fixture fixtures[2];
   for (size_t index = 0; index < 2; index += 1) {
     maps[index] = mln_test_create_map(runtime);
-    fixtures[index] = attach_pooled_texture(maps[index], &host);
+    fixtures[index] = attach_device_texture(maps[index], device);
   }
-  mln_render_session_capabilities capabilities = {
-    .size = sizeof(mln_render_session_capabilities)
-  };
-  MLN_TEST_OK(mln_render_session_get_capabilities(
-    fixtures[0].session, &capabilities, NULL
-  ));
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, capabilities.driver);
-  TEST_ASSERT_EQUAL_UINT32(1, capabilities.texture_ring_depth);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_CAPABILITY_READBACK, capabilities.flags
-  );
 
   for (size_t index = 0; index < 2; index += 1) {
     render_style(runtime, maps[index], &fixtures[index], styles[index], actual);
@@ -183,25 +155,26 @@ static void pooled_textures_render_as_dedicated_ones_do(void) {
   }
 
   for (size_t index = 0; index < 2; index += 1) {
-    detach_pooled_texture(&fixtures[index]);
+    detach_device_texture(&fixtures[index]);
     mln_test_destroy_map(maps[index]);
   }
-  mln_test_graphics_destroy(host.graphics);
+  mln_graphics_device_release(device);
   mln_test_destroy_runtime(runtime);
 }
 
 // A detached session hands the context to the rest, a session that attaches
-// later renders as the first one did, and the host's context outlives them.
-static void pooled_textures_detach_while_others_render(void) {
+// later renders as the first one did, and the context outlives the device
+// handle.
+static void sessions_detach_while_others_render(void) {
   static uint8_t circle[pixel_bytes];
   static uint8_t fill[pixel_bytes];
   static uint8_t actual[pixel_bytes];
   mln_runtime runtime = mln_test_create_runtime();
-  host_context host = create_host_context();
+  mln_graphics_device device = create_device(true);
   mln_map first_map = mln_test_create_map(runtime);
   mln_map second_map = mln_test_create_map(runtime);
-  mln_test_render_fixture first = attach_pooled_texture(first_map, &host);
-  mln_test_render_fixture second = attach_pooled_texture(second_map, &host);
+  mln_test_render_fixture first = attach_device_texture(first_map, device);
+  mln_test_render_fixture second = attach_device_texture(second_map, device);
   render_style(
     runtime, first_map, &first, MLN_BUFFER_LITERAL(circle_style_json), circle
   );
@@ -209,13 +182,14 @@ static void pooled_textures_detach_while_others_render(void) {
     runtime, second_map, &second, MLN_BUFFER_LITERAL(fill_style_json), fill
   );
 
-  detach_pooled_texture(&first);
+  detach_device_texture(&first);
   mln_test_destroy_map(first_map);
   render_again(&second, 31, actual);
   TEST_ASSERT_EQUAL_MEMORY(fill, actual, pixel_bytes);
 
   mln_map third_map = mln_test_create_map(runtime);
-  mln_test_render_fixture third = attach_pooled_texture(third_map, &host);
+  mln_test_render_fixture third = attach_device_texture(third_map, device);
+  mln_graphics_device_release(device);
   render_style(
     runtime, third_map, &third, MLN_BUFFER_LITERAL(circle_style_json), actual
   );
@@ -223,19 +197,14 @@ static void pooled_textures_detach_while_others_render(void) {
   render_again(&second, 32, actual);
   TEST_ASSERT_EQUAL_MEMORY(fill, actual, pixel_bytes);
 
-  detach_pooled_texture(&second);
-  detach_pooled_texture(&third);
+  detach_device_texture(&second);
+  detach_device_texture(&third);
   mln_test_destroy_map(third_map);
   mln_test_destroy_map(second_map);
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_graphics_make_current(host.graphics),
-    mln_test_graphics_last_error()
-  );
-  mln_test_graphics_destroy(host.graphics);
   mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(pooled_textures_render_as_dedicated_ones_do);
-  RUN_TEST(pooled_textures_detach_while_others_render);
+  RUN_TEST(sessions_that_take_turns_render_as_alone);
+  RUN_TEST(sessions_detach_while_others_render);
 }

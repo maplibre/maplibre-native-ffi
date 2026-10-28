@@ -12,9 +12,8 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
   /// own list of adapters, from zero. Without it, the backend picks its default
   /// adapter.
   public var adapterIndex: UInt32?
-  /// Renders every texture session of the device in one graphics context, one
-  /// session at a time, instead of in a context of each session's own. Absent
-  /// selects false.
+  /// Whether the device's texture sessions take turns rendering in one EGL
+  /// context instead of each creating its own. Absent selects false.
   public var singleContext: Bool?
   public init(adapterIndex: UInt32? = nil, singleContext: Bool? = nil) {
     self.adapterIndex = adapterIndex

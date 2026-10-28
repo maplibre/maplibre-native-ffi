@@ -296,10 +296,9 @@ static void the_first_named_adapter_renders(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_OPENGL_WGL)
-// The sessions of a single-context device take turns in its context, and keep
-// it after the host releases the device.
-static void sessions_take_turns_on_a_single_context_device(void) {
+// The sessions of a single-context device render, and keep rendering after the
+// host releases the device. Only EGL takes turns; the others ignore the option.
+static void sessions_render_on_a_single_context_device(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)
   };
@@ -331,21 +330,6 @@ static void sessions_take_turns_on_a_single_context_device(void) {
   mln_test_destroy_map(first_map);
   mln_test_destroy_runtime(runtime);
 }
-#else
-static void create_rejects_a_single_context(void) {
-  mln_graphics_device_options options = {
-    .size = sizeof(mln_graphics_device_options)
-  };
-  options.fields = MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
-  options.single_context = true;
-  mln_graphics_device device = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_UNSUPPORTED,
-    mln_graphics_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
-}
-#endif
 
 static void create_reports_a_missing_adapter(void) {
   mln_graphics_device_options options = {
@@ -371,11 +355,7 @@ MLN_TEST_GROUP {
   RUN_TEST(attach_rejects_what_a_device_texture_cannot_take);
   RUN_TEST(the_first_named_adapter_renders);
   RUN_TEST(create_reports_a_missing_adapter);
-#if !defined(MLN_FFI_TEST_OPENGL_WGL)
-  RUN_TEST(sessions_take_turns_on_a_single_context_device);
-#else
-  RUN_TEST(create_rejects_a_single_context);
-#endif
+  RUN_TEST(sessions_render_on_a_single_context_device);
 #else
   RUN_TEST(create_reports_an_unsupported_backend);
 #endif

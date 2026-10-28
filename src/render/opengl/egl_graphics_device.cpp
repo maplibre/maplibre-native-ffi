@@ -13,6 +13,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 #include "render/graphics_device.hpp"
+#include "render/opengl/egl_context.hpp"
 #include "render/opengl/opengl_texture_session.hpp"
 #include "render/render_session_common.hpp"
 
@@ -197,63 +198,43 @@ auto default_display() -> DisplayChoice {
   return choose(eglGetDisplay(EGL_DEFAULT_DISPLAY), "default");
 }
 
-// The single context a device's sessions take turns in. Nothing makes it
-// current but those sessions, and the device outlives them, so it is destroyed
-// with the device.
-class SingleContext {
- public:
-  SingleContext() = default;
-  SingleContext(const SingleContext&) = delete;
-  auto operator=(const SingleContext&) -> SingleContext& = delete;
-  SingleContext(SingleContext&&) = delete;
-  auto operator=(SingleContext&&) -> SingleContext& = delete;
-  ~SingleContext() {
-    if (context_ != EGL_NO_CONTEXT) eglDestroyContext(display_, context_);
+// Binding an API is per thread, so the calling thread keeps the one it had.
+auto create_single_context(
+  const DisplayChoice& choice,
+  std::shared_ptr<opengl::EglSingleContext>& out_single
+) -> mln_status {
+  const auto previous_api = eglQueryAPI();
+  if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
+    set_thread_error("binding the EGL OpenGL ES API failed");
+    return MLN_STATUS_NATIVE_ERROR;
   }
-
-  // Binding an API is per thread, so the calling thread keeps the one it had.
-  auto create(const DisplayChoice& choice) -> mln_status {
-    const auto previous_api = eglQueryAPI();
-    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
-      set_thread_error("binding the EGL OpenGL ES API failed");
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    const auto attributes =
-      std::array<EGLint, 3>{EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
-    context_ = eglCreateContext(
-      choice.display, choice.config, EGL_NO_CONTEXT, attributes.data()
-    );
-    const auto error = eglGetError();
-    eglBindAPI(previous_api);
-    if (context_ == EGL_NO_CONTEXT) {
-      const auto message =
-        "creating the single EGL context failed (EGL error " +
-        std::to_string(error) + ")";
-      set_thread_error(message.c_str());
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    display_ = choice.display;
-    return MLN_STATUS_OK;
+  const auto attributes =
+    std::array<EGLint, 3>{EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
+  auto* const context = eglCreateContext(
+    choice.display, choice.config, EGL_NO_CONTEXT, attributes.data()
+  );
+  const auto error = eglGetError();
+  eglBindAPI(previous_api);
+  if (context == EGL_NO_CONTEXT) {
+    const auto message = "creating the single EGL context failed (EGL error " +
+                         std::to_string(error) + ")";
+    set_thread_error(message.c_str());
+    return MLN_STATUS_NATIVE_ERROR;
   }
-
-  [[nodiscard]] auto context() const -> EGLContext { return context_; }
-
- private:
-  EGLDisplay display_ = EGL_NO_DISPLAY;
-  EGLContext context_ = EGL_NO_CONTEXT;
-};
+  out_single =
+    std::make_shared<opengl::EglSingleContext>(choice.display, context);
+  return MLN_STATUS_OK;
+}
 
 // A display stays initialized for the rest of the process. EGL returns one
 // display for every request with the same platform and device, so the host's
 // own code, or a later device, may be using it: terminating it would end their
 // contexts too.
-//
-// A device with a single context hands its sessions a pooled descriptor, so
-// they render in that context one at a time.
 class EglGraphicsDevice final : public GraphicsDevice {
  public:
   EglGraphicsDevice(
-    const DisplayChoice& choice, std::unique_ptr<SingleContext> single
+    const DisplayChoice& choice,
+    std::shared_ptr<opengl::EglSingleContext> single
   )
       : single_(std::move(single)),
         descriptor_{
@@ -261,15 +242,12 @@ class EglGraphicsDevice final : public GraphicsDevice {
           .extent = {},
           .context = {
             .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
-            .ownership = single_ != nullptr
-                           ? MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED
-                           : MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
+            .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
             .data = {
               .egl = {
                 .display = choice.display,
                 .config = choice.config,
-                .share_context =
-                  single_ != nullptr ? single_->context() : nullptr,
+                .share_context = nullptr,
                 .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
                 .get_proc_address = nullptr,
               },
@@ -281,12 +259,12 @@ class EglGraphicsDevice final : public GraphicsDevice {
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
   ) -> mln_status override {
     return create_opengl_owned_texture_backend(
-      descriptor_, size, 1, out_backend
+      descriptor_, size, 1, out_backend, single_
     );
   }
 
  private:
-  std::unique_ptr<SingleContext> single_;
+  std::shared_ptr<opengl::EglSingleContext> single_;
   mln_open_gl_owned_texture_descriptor descriptor_;
 };
 
@@ -329,10 +307,9 @@ auto create_backend_graphics_device(
     }
 #endif
   }
-  auto single = std::unique_ptr<SingleContext>{};
+  auto single = std::shared_ptr<opengl::EglSingleContext>{};
   if (options.single_context) {
-    single = std::make_unique<SingleContext>();
-    const auto status = single->create(choice);
+    const auto status = create_single_context(choice, single);
     if (status != MLN_STATUS_OK) {
       return status;
     }

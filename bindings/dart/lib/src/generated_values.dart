@@ -391,7 +391,7 @@ final class OfflineRegionDownloadState extends _Enum {
   };
 }
 
-/// OpenGL client API that a dedicated or pooled EGL session renders with.
+/// OpenGL client API a dedicated EGL session creates its context for.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -428,14 +428,10 @@ final class OpenGlContextOwnership extends _Enum {
 
   /// The session keeps its own OpenGL context current on its thread.
   static const dedicated = OpenGlContextOwnership.fromRawValue(1);
-
-  /// The session takes turns rendering in a host EGL context.
-  static const pooled = OpenGlContextOwnership.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
     0 => 'OpenGlContextOwnership.shared',
     1 => 'OpenGlContextOwnership.dedicated',
-    2 => 'OpenGlContextOwnership.pooled',
     _ => 'OpenGlContextOwnership($rawValue)',
   };
 }
@@ -2013,9 +2009,8 @@ final class GraphicsDeviceOptions extends _Value {
   /// adapter.
   final int? adapterIndex;
 
-  /// Renders every texture session of the device in one graphics context, one
-  /// session at a time, instead of in a context of each session's own. Absent
-  /// selects false.
+  /// Whether the device's texture sessions take turns rendering in one EGL
+  /// context instead of each creating its own. Absent selects false.
   final bool? singleContext;
 
   /// A copy of this value with the given members replaced.
@@ -2867,14 +2862,12 @@ final class EglContextDescriptor extends _Value {
   /// Borrowed EGLContext whose share group the session context joins. Required
   /// under shared ownership, where the session also takes its client API from
   /// this context. A dedicated session joins no share group, so it must be null
-  /// there and names client_api instead. A pooled session renders in this
-  /// context itself, so it is required there and must be created on config.
+  /// there and names client_api instead.
   final NativePointer shareContext;
 
   /// Client API the session creates its context for. Required under dedicated
-  /// and pooled ownership; under pooled ownership it names the API
-  /// share_context was created for. A shared session queries share_context for
-  /// it, so this is ignored there.
+  /// ownership. A shared session queries share_context for it, so this is
+  /// ignored there.
   final OpenGlClientApi clientApi;
 
   /// Optional eglGetProcAddress-compatible function for the host loader.
@@ -2965,8 +2958,7 @@ final class OpenGlContextDescriptor {
 
   /// Whether the session shares its driver thread and graphics objects with the
   /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
-  /// are dedicated to their core worker. Pooled ownership is for EGL owned
-  /// textures only.
+  /// are dedicated to their core worker.
   final OpenGlContextOwnership ownership;
   final OpenGlContextDescriptorData data;
 }
@@ -3100,8 +3092,7 @@ final class OpenGlOwnedTextureDescriptor extends _Value {
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
   /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
   /// transferred WebGL ownership creates a private core-worker context for CPU
-  /// readback. Pooled EGL ownership renders for CPU readback in the host
-  /// context that the descriptor names.
+  /// readback.
   final OpenGlContextDescriptor context;
 
   /// A copy of this value with the given members replaced.

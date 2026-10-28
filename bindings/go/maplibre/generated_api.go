@@ -472,8 +472,8 @@ func (value OfflineRegionDownloadState) String() string {
 	return fmt.Sprintf("OfflineRegionDownloadState(%d)", value)
 }
 
-// OpenGlClientApi corresponds to mln_open_gl_client_api. OpenGL client API that
-// a dedicated or pooled EGL session renders with.
+// OpenGlClientApi corresponds to mln_open_gl_client_api. OpenGL client API a
+// dedicated EGL session creates its context for.
 //
 // See mln_open_gl_client_api in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -513,8 +513,6 @@ const (
 	OpenGlContextOwnershipShared OpenGlContextOwnership = OpenGlContextOwnership(C.MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED)
 	// The session keeps its own OpenGL context current on its thread.
 	OpenGlContextOwnershipDedicated OpenGlContextOwnership = OpenGlContextOwnership(C.MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED)
-	// The session takes turns rendering in a host EGL context.
-	OpenGlContextOwnershipPooled OpenGlContextOwnership = OpenGlContextOwnership(C.MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED)
 )
 
 func (value OpenGlContextOwnership) String() string {
@@ -523,8 +521,6 @@ func (value OpenGlContextOwnership) String() string {
 		return "OpenGlContextOwnershipShared"
 	case 1:
 		return "OpenGlContextOwnershipDedicated"
-	case 2:
-		return "OpenGlContextOwnershipPooled"
 	}
 	return fmt.Sprintf("OpenGlContextOwnership(%d)", value)
 }
@@ -2149,13 +2145,11 @@ type EglContextDescriptor struct {
 	// Borrowed EGLContext whose share group the session context joins. Required
 	// under shared ownership, where the session also takes its client API from this
 	// context. A dedicated session joins no share group, so it must be null there
-	// and names client_api instead. A pooled session renders in this context
-	// itself, so it is required there and must be created on config.
+	// and names client_api instead.
 	ShareContext uintptr
-	// Client API the session creates its context for. Required under dedicated and
-	// pooled ownership; under pooled ownership it names the API share_context was
-	// created for. A shared session queries share_context for it, so this is
-	// ignored there.
+	// Client API the session creates its context for. Required under dedicated
+	// ownership. A shared session queries share_context for it, so this is ignored
+	// there.
 	ClientApi OpenGlClientApi
 	// Optional eglGetProcAddress-compatible function for the host loader.
 	GetProcAddress uintptr
@@ -2340,9 +2334,8 @@ type GraphicsDeviceOptions struct {
 	// list of adapters, from zero. Without it, the backend picks its default
 	// adapter.
 	AdapterIndex *uint32
-	// Renders every texture session of the device in one graphics context, one
-	// session at a time, instead of in a context of each session's own. Absent
-	// selects false.
+	// Whether the device's texture sessions take turns rendering in one EGL context
+	// instead of each creating its own. Absent selects false.
 	SingleContext *bool
 }
 
@@ -3202,8 +3195,7 @@ func nativeOpenGlBorrowedTextureDescriptor(input OpenGlBorrowedTextureDescriptor
 type OpenGlContextDescriptor struct {
 	// Whether the session shares its driver thread and graphics objects with the
 	// host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-	// dedicated to their core worker. Pooled ownership is for EGL owned textures
-	// only.
+	// dedicated to their core worker.
 	Ownership OpenGlContextOwnership
 	Data      OpenGlContextDescriptorData
 }
@@ -3241,8 +3233,6 @@ type OpenGlOwnedTextureDescriptor struct {
 	// Borrowed OpenGL context provider data. Shared ownership creates a context
 	// whose texture frames the host can acquire. Dedicated EGL, WGL, or transferred
 	// WebGL ownership creates a private core-worker context for CPU readback.
-	// Pooled EGL ownership renders for CPU readback in the host context that the
-	// descriptor names.
 	Context OpenGlContextDescriptor
 }
 

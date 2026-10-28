@@ -2,11 +2,9 @@
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 
-#include <atomic>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
-#include <unordered_map>
+#include <utility>
 
 #include <mln/platform/gl_functions.hpp>
 
@@ -14,51 +12,37 @@
 
 namespace mln::core::opengl {
 
-// The turns of the pooled sessions that render in one host context. Each
-// session has its own user number, so the next one to take a turn knows
-// whether the cached GL state it left behind survived.
-struct PooledContext {
-  std::mutex mutex;
-  std::uint64_t last_user = 0;
-};
+EglSingleContext::EglSingleContext(EGLDisplay display, EGLContext context)
+    : display_(display), context_(context) {}
 
-namespace {
+// Nothing makes the context current but its sessions, and each holds this, so
+// the last one has released it by now.
+EglSingleContext::~EglSingleContext() { eglDestroyContext(display_, context_); }
 
-// An entry lives while a session holds it, so a host context destroyed after
-// its last session leaves nothing behind.
-auto pooled_context(EGLContext context) -> std::shared_ptr<PooledContext> {
-  static auto registry_mutex = std::mutex{};
-  static auto registry =
-    std::unordered_map<EGLContext, std::weak_ptr<PooledContext>>{};
-  const auto lock = std::scoped_lock{registry_mutex};
-  std::erase_if(registry, [](const auto& entry) {
-    return entry.second.expired();
-  });
-  auto& entry = registry[context];
-  auto pool = entry.lock();
-  if (pool == nullptr) {
-    pool = std::make_shared<PooledContext>();
-    entry = pool;
-  }
-  return pool;
+auto EglSingleContext::context() const -> EGLContext { return context_; }
+
+auto EglSingleContext::next_user() -> std::uint64_t {
+  return users_.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
-auto next_pool_user() -> std::uint64_t {
-  static auto users = std::atomic<std::uint64_t>{0};
-  return users.fetch_add(1, std::memory_order_relaxed) + 1;
+auto EglSingleContext::lock(std::uint64_t user) -> bool {
+  mutex_.lock();
+  const auto lost = last_user_ != user;
+  last_user_ = user;
+  return lost;
 }
 
-}  // namespace
+void EglSingleContext::unlock() { mutex_.unlock(); }
 
 EglSharedContext::EglSharedContext(
-  mln_egl_context_descriptor descriptor, mln_open_gl_context_ownership ownership
+  mln_egl_context_descriptor descriptor,
+  mln_open_gl_context_ownership ownership,
+  std::shared_ptr<EglSingleContext> single
 )
-    : descriptor_(descriptor), ownership_(ownership) {
-  if (pooled()) {
-    pool_ = pooled_context(share_context());
-    pool_user_ = next_pool_user();
-  }
-}
+    : descriptor_(descriptor),
+      ownership_(ownership),
+      single_(std::move(single)),
+      single_user_(single_ != nullptr ? single_->next_user() : 0) {}
 
 EglSharedContext::~EglSharedContext() { destroy(); }
 
@@ -74,6 +58,12 @@ void EglSharedContext::activate_pbuffer() {
 // A dedicated context stays current between renders, so the thread is left
 // exactly as this session wants to find it next time.
 void EglSharedContext::deactivate() {
+  // Releasing the context flushes it, and hands the turn to the next session.
+  if (single_ != nullptr) {
+    release_current_context();
+    release_turn();
+    return;
+  }
   if (dedicated()) {
     // Releasing a shared context flushes it, but a dedicated one stays
     // current, so its last commands would wait for its next render. ANGLE on
@@ -85,13 +75,6 @@ void EglSharedContext::deactivate() {
     }
     return;
   }
-  // Releasing the context flushes it, and hands the turn to the next pooled
-  // session.
-  if (pooled()) {
-    release_current_context();
-    release_pool();
-    return;
-  }
   release_current_context();
   restore_previous_api();
   restore_previous_context();
@@ -101,36 +84,28 @@ auto EglSharedContext::dedicated() const -> bool {
   return ownership_ == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
 }
 
-auto EglSharedContext::pooled() const -> bool {
-  return ownership_ == MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED;
-}
-
 auto EglSharedContext::take_state_lost() -> bool {
   const auto lost = state_lost_;
   state_lost_ = false;
   return lost;
 }
 
-void EglSharedContext::release_pool() {
-  if (holds_pool_) {
-    holds_pool_ = false;
-    pool_->mutex.unlock();
+void EglSharedContext::release_turn() {
+  if (holds_turn_) {
+    holds_turn_ = false;
+    single_->unlock();
   }
 }
 
-// Another pooled session may hold the host context on its own core worker, so
-// this waits for its turn, then makes the context current with this session's
+// Another session may hold the single context on its own core worker, so this
+// waits for its turn, then makes the context current with this session's
 // pbuffer until deactivate() hands it back.
-void EglSharedContext::activate_pooled(
+void EglSharedContext::activate_single(
   EGLSurface draw_surface, EGLSurface read_surface
 ) {
-  if (!holds_pool_) {
-    pool_->mutex.lock();
-    holds_pool_ = true;
-  }
-  if (pool_->last_user != pool_user_) {
-    pool_->last_user = pool_user_;
-    state_lost_ = true;
+  if (!holds_turn_) {
+    state_lost_ = single_->lock(single_user_) || state_lost_;
+    holds_turn_ = true;
   }
   try {
     const auto api = requested_api();
@@ -139,23 +114,23 @@ void EglSharedContext::activate_pooled(
     }
     active_api_ = api;
     if (
-      eglMakeCurrent(display(), draw_surface, read_surface, share_context()) ==
-      EGL_FALSE
+      eglMakeCurrent(
+        display(), draw_surface, read_surface, single_->context()
+      ) == EGL_FALSE
     ) {
       throw std::runtime_error("Switching OpenGL EGL context failed");
     }
   } catch (...) {
     release_current_context();
-    release_pool();
+    release_turn();
     throw;
   }
 }
 
 // The API to bind before creating a context and making it current. A dedicated
-// context has no share context to ask, and a pooled one renders in the host
-// context, so the descriptor names it for both.
+// context has no share context to ask, so the descriptor names it.
 auto EglSharedContext::requested_api() const -> EGLenum {
-  if (dedicated() || pooled()) {
+  if (dedicated()) {
     return descriptor_.client_api == MLN_OPEN_GL_CLIENT_API_GL
              ? static_cast<EGLenum>(EGL_OPENGL_API)
              : static_cast<EGLenum>(EGL_OPENGL_ES_API);
@@ -211,8 +186,8 @@ auto EglSharedContext::ensure_pbuffer_surface() -> EGLSurface {
 void EglSharedContext::activate(
   EGLSurface draw_surface, EGLSurface read_surface
 ) {
-  if (pooled()) {
-    activate_pooled(draw_surface, read_surface);
+  if (single_ != nullptr) {
+    activate_single(draw_surface, read_surface);
     return;
   }
   if (dedicated()) {
@@ -331,10 +306,11 @@ void EglSharedContext::restore_previous_context() {
 }
 
 void EglSharedContext::destroy() {
-  // The host owns a pooled context, so teardown destroys only the pbuffer.
-  if (pooled() && holds_pool_) {
+  // A session of a single-context device creates no context, so teardown hands
+  // back its turn and destroys only its pbuffer.
+  if (holds_turn_) {
     release_current_context();
-    release_pool();
+    release_turn();
   }
   // Teardown runs GL deletes with a dedicated context current, and EGL only
   // retires a context once nothing holds it. Release it, but leave alone a

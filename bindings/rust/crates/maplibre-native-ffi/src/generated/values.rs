@@ -876,14 +876,11 @@ pub struct EglContextDescriptor {
     /// Borrowed EGLContext whose share group the session context joins.
     /// Required under shared ownership, where the session also takes its client
     /// API from this context. A dedicated session joins no share group, so it
-    /// must be null there and names client_api instead. A pooled session
-    /// renders in this context itself, so it is required there and must be
-    /// created on config.
+    /// must be null there and names client_api instead.
     pub share_context: *mut std::ffi::c_void,
     /// Client API the session creates its context for. Required under dedicated
-    /// and pooled ownership; under pooled ownership it names the API
-    /// share_context was created for. A shared session queries share_context
-    /// for it, so this is ignored there.
+    /// ownership. A shared session queries share_context for it, so this is
+    /// ignored there.
     pub client_api: OpenGlClientApi,
     /// Optional eglGetProcAddress-compatible function for the host loader.
     pub get_proc_address: *mut std::ffi::c_void,
@@ -1222,9 +1219,8 @@ pub struct GraphicsDeviceOptions {
     /// own list of adapters, from zero. Without it, the backend picks its
     /// default adapter.
     pub adapter_index: Option<u32>,
-    /// Renders every texture session of the device in one graphics context, one
-    /// session at a time, instead of in a context of each session's own. Absent
-    /// selects false.
+    /// Whether the device's texture sessions take turns rendering in one EGL
+    /// context instead of each creating its own. Absent selects false.
     pub single_context: Option<bool>,
 }
 impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
@@ -2587,7 +2583,7 @@ impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
 }
 
 native_enum! {
-/// OpenGL client API that a dedicated or pooled EGL session renders with.
+/// OpenGL client API a dedicated EGL session creates its context for.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2614,8 +2610,7 @@ impl Default for OpenGlClientApi {
 pub struct OpenGlContextDescriptor<'a> {
     /// Whether the session shares its driver thread and graphics objects with
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
-    /// canvas are dedicated to their core worker. Pooled ownership is for EGL
-    /// owned textures only.
+    /// canvas are dedicated to their core worker.
     pub ownership: OpenGlContextOwnership,
     pub data: OpenGlContextDescriptorData<'a>,
 }
@@ -2671,8 +2666,6 @@ pub enum OpenGlContextOwnership: u32 {
     Shared = 0,
     /// The session keeps its own OpenGL context current on its thread.
     Dedicated = 1,
-    /// The session takes turns rendering in a host EGL context.
-    Pooled = 2,
 } Unknown
 }
 impl Default for OpenGlContextOwnership {
@@ -2706,8 +2699,7 @@ pub struct OpenGlOwnedTextureDescriptor<'a> {
     /// Borrowed OpenGL context provider data. Shared ownership creates a
     /// context whose texture frames the host can acquire. Dedicated EGL, WGL,
     /// or transferred WebGL ownership creates a private core-worker context for
-    /// CPU readback. Pooled EGL ownership renders for CPU readback in the host
-    /// context that the descriptor names.
+    /// CPU readback.
     pub context: OpenGlContextDescriptor<'a>,
 }
 impl<'a> OpenGlOwnedTextureDescriptor<'a> {

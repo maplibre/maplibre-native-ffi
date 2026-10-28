@@ -390,14 +390,12 @@ export interface EglContextDescriptor {
    * Borrowed EGLContext whose share group the session context joins. Required
    * under shared ownership, where the session also takes its client API from
    * this context. A dedicated session joins no share group, so it must be null
-   * there and names client_api instead. A pooled session renders in this
-   * context itself, so it is required there and must be created on config.
+   * there and names client_api instead.
    */
   shareContext?: bigint;
   /**
    * Client API the session creates its context for. Required under dedicated
-   * and pooled ownership; under pooled ownership it names the API share_context
-   * was created for. A shared session queries share_context for it, so this is
+   * ownership. A shared session queries share_context for it, so this is
    * ignored there.
    */
   clientApi?: OpenGlClientApi;
@@ -646,9 +644,8 @@ export interface GraphicsDeviceOptions {
    */
   adapterIndex?: number;
   /**
-   * Renders every texture session of the device in one graphics context, one
-   * session at a time, instead of in a context of each session's own. Absent
-   * selects false.
+   * Whether the device's texture sessions take turns rendering in one EGL
+   * context instead of each creating its own. Absent selects false.
    */
   singleContext?: boolean;
 }
@@ -1364,7 +1361,7 @@ export interface OpenGlBorrowedTextureDescriptor {
 }
 
 /**
- * OpenGL client API that a dedicated or pooled EGL session renders with.
+ * OpenGL client API a dedicated EGL session creates its context for.
  *
  * See `mln_open_gl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1398,8 +1395,7 @@ export interface OpenGlContextDescriptor {
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-   * dedicated to their core worker. Pooled ownership is for EGL owned textures
-   * only.
+   * dedicated to their core worker.
    */
   ownership?: OpenGlContextOwnership;
   data: OpenGlContextDescriptorData;
@@ -1432,10 +1428,6 @@ export const OpenGlContextOwnership = {
    * The session keeps its own OpenGL context current on its thread.
    */
   dedicated: 1,
-  /**
-   * The session takes turns rendering in a host EGL context.
-   */
-  pooled: 2,
 } as const;
 /** One of the OpenGlContextOwnership values, or a value this binding does not know. */
 export type OpenGlContextOwnership =
@@ -1475,8 +1467,7 @@ export interface OpenGlOwnedTextureDescriptor {
    * Borrowed OpenGL context provider data. Shared ownership creates a context
    * whose texture frames the host can acquire. Dedicated EGL, WGL, or
    * transferred WebGL ownership creates a private core-worker context for CPU
-   * readback. Pooled EGL ownership renders for CPU readback in the host context
-   * that the descriptor names.
+   * readback.
    */
   context: OpenGlContextDescriptor;
 }

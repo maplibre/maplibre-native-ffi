@@ -24,8 +24,7 @@ public readonly partial record struct OpenGlContextDescriptor
     /// <summary>
     /// Whether the session shares its driver thread and graphics objects with
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
-    /// canvas are dedicated to their core worker. Pooled ownership is for EGL
-    /// owned textures only.
+    /// canvas are dedicated to their core worker.
     /// </summary>
     public OpenGlContextOwnership Ownership { get; init; }
     public required OpenGlContextDescriptor.DataValue Data { get; init; }
