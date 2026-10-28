@@ -5,13 +5,14 @@ native code returns, and Python runs it only on its binding's dispatcher
 thread. Such a host gives each registration one of five forms:
 
 - `queue`: the registration names a delivery queue, and every callback has a
-  queue delivery. Native code answers each call itself and queues it. Dart and
-  TypeScript set the queue and a token in place of the callbacks, drain copies
-  on their own thread, and dispatch them by the token. Python keeps the
-  callbacks, which the dispatcher thread runs when it dispatches the queue.
+  queue delivery. Native code answers each call itself and queues it. Dart
+  sets the queue and a token in place of the callbacks, drains copies on its
+  own thread, and dispatches them by the token. TypeScript and Python keep the
+  callbacks, which run when the realm's event loop or the dispatcher thread
+  dispatches the queue.
 - `wake`: the registration's one callback only asks to be called again. Dart
-  and TypeScript supply a wake that posts to their thread and leave the queue
-  unset; Python names its queue, so the dispatcher thread runs the callback.
+  supplies a wake that posts to its thread and leaves the queue unset;
+  TypeScript and Python name their queue, so dispatch runs the callback.
 - `rules`: every callback must answer on its native thread and has no queue
   delivery. The host leaves them unset, so the native rules that the
   registration carries answer each call.
@@ -20,8 +21,8 @@ thread. Such a host gives each registration one of five forms:
   registration, whose function pointers and context native code supplies, and
   a record with a native default keeps such a field at its disabled default.
 
-A wake also accepts a native registration, which skips the post to the host's
-thread. Kotlin, .NET, and Go accept one for the same registrations: each of
+A wake also accepts a native registration, which native code calls on its own
+thread rather than the host's. Kotlin, .NET, and Go accept one for the same registrations: each of
 their callbacks enters the language runtime on the native thread by a
 garbage-collector transition, which a native function never needs.
 

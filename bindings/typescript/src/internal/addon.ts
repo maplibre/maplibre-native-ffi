@@ -2,21 +2,9 @@
 
 import { MLN_C_VERSION, type NativeOperations } from "../generated_native.ts";
 import { AbiVersionMismatchError } from "./errors.ts";
+import type { Root } from "./realm.ts";
 
-/**
- * One drained delivery: its type, its token, its payload, and the error that
- * converting the payload threw, if any. A completion's payload is its
- * {@link CompletionHeader}; a retirement has none; another delivery's is its
- * copied arguments, and its type is its `mln_delivery_type` value.
- */
-export type DrainedEntry = [
-  type: "completion" | "retired" | number,
-  token: number,
-  payload: unknown,
-  error?: unknown,
-];
-
-/** The terminal status of a drained completion, without its value. */
+/** The terminal status of a completion, without its value. */
 export interface CompletionHeader {
   readonly status: number;
   readonly generation: bigint;
@@ -24,35 +12,46 @@ export interface CompletionHeader {
   readonly diagnostic: string;
 }
 
+/**
+ * What the addon calls once when the realm dispatches a completion: its
+ * header and the value that its export's decoder converted, or the error that
+ * converting them threw.
+ */
+export type NativeCompletion = (
+  header: CompletionHeader,
+  value: unknown,
+  error: unknown,
+) => void;
+
+/** What the addon calls with the outcome of a call on a thread of its own. */
+export type NativeThreadStart = (
+  status: number,
+  handle: bigint,
+  diagnostic: string,
+) => void;
+
 /** The runtime exports of the addon, beside the generated operations. */
 export interface Addon extends NativeOperations {
   install(
-    receive: (kind: number, ...values: unknown[]) => void,
-    register: (value: unknown) => number,
+    register: (value: unknown) => Root,
+    invoke: (
+      callback: number,
+      root: Root,
+      error: unknown,
+      ...args: unknown[]
+    ) => boolean,
+    retire: (root: Root) => void,
     makeError: (status: number, diagnostic: string) => Error,
     takeNative: (
       value: unknown,
       kind: string,
       path: string,
     ) => readonly bigint[] | undefined,
+    reportLeak: (name: string, handle: bigint) => void,
   ): void;
   setReferenced(referenced: boolean): void;
   ownerTokenCreate(handle: bigint, name: string, session: boolean): object;
   shutdownAtExit(): void;
-  /**
-   * Drains the realm's queue into a batch that the realm holds until
-   * {@link Addon.batchRelease}. Returns undefined when nothing is queued, and
-   * null when the batch could not be allocated.
-   */
-  drain(): DrainedEntry[] | undefined | null;
-  /**
-   * Converts a drained completion's value through the decoder that the
-   * operation's export recorded.
-   */
-  completionValue(index: number): unknown;
-  /** Takes the owned handles of a drained delivery from the batch. */
-  deliveryTake(index: number): void;
-  batchRelease(): void;
 }
 
 /** How an entry point connects the runtime to its host. */

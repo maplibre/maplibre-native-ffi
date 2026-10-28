@@ -1,92 +1,54 @@
-// What the addon delivers to this realm, and what keeps the realm's event loop
-// alive while it waits.
+// What the addon's dispatch reaches in this realm, and what keeps the realm's
+// event loop alive while it waits.
 //
-// Every completion and queued callback of this realm names the realm's
-// delivery queue and a token. The addon's wake shim posts to this realm when
-// the queue becomes nonempty, and receive() drains it on the JavaScript
-// thread, after the native callback that queued each delivery has returned,
-// then dispatches each delivery by its token. A wake registration posts its
-// own token the same way. Callback registrations reach their host values
-// through a table of weak references, so a callback that captures its owner
-// leaves the owner collectable.
+// Every completion, registration, and wake of this realm names the realm's
+// delivery queue. The addon dispatches the queue on the JavaScript thread when
+// its wake posts to this realm, after the native callback that queued each
+// call has returned. A completion's call settles its Promise directly. A
+// registration's call reaches its host value through a root that the
+// registration's owner keeps, so a callback that captures its owner leaves the
+// owner collectable, and a generated adapter calls the host value with the
+// call's arguments.
 
-import {
-  type Addon,
-  type CompletionHeader,
-  type DrainedEntry,
-  hooks,
-  native,
-} from "./addon.ts";
+import { type Addon, hooks, native } from "./addon.ts";
 import { MaplibreError } from "./errors.ts";
 import { takeNativeRegistration } from "./native_registrations.ts";
 
-// The kinds of message that the addon's wake shim posts.
-const WAKE = 1;
-const RELEASE = 2;
-const LEAK = 3;
-const THREAD = 4;
-
-// The token that the queue's own wake posts.
-const QUEUE = 0;
-// The addon packs a token into 24 bits, beside a message kind or a decoder.
-const MAX_TOKEN = 0xffffff;
+/**
+ * The root of one registration, which the addon references until native code
+ * releases the registration. It reaches the registration's host value through
+ * its holder, which it does not keep reachable.
+ */
+export interface Root {
+  holder?: WeakRef<RootHolder>;
+}
 
 /** The callback roots of one owner, or of the realm for global calls. */
 export interface RootHolder {
-  readonly roots: Map<number, unknown>;
+  readonly roots: Map<Root, unknown>;
 }
 
-const registrations = new Map<number, WeakRef<RootHolder>>();
 const realmRoots: RootHolder = { roots: new Map() };
 let transaction: Registrations | undefined;
-
-export interface PendingCompletion {
-  /** Settles from a drained completion, which index names in its batch. */
-  settle(index: number, header: CompletionHeader): void;
-  /** Rejects with the error that converting the completion threw. */
-  fail(error: unknown): void;
-}
-
-/** Settles from the outcome of a call that ran on a thread of its own. */
-export type PendingThreadStart = (
-  status: number,
-  handle: bigint,
-  diagnostic: string,
-) => void;
-
-const completions = new Map<number, PendingCompletion>();
-const threadStarts = new Map<number, PendingThreadStart>();
-let nextToken = 1;
-
-/** A token that no pending entry or rooted registration holds. */
-function allocateToken(): number {
-  while (
-    registrations.has(nextToken) ||
-    completions.has(nextToken) ||
-    threadStarts.has(nextToken)
-  ) {
-    nextToken = nextToken === MAX_TOKEN ? 1 : nextToken + 1;
-  }
-  const token = nextToken;
-  nextToken = nextToken === MAX_TOKEN ? 1 : nextToken + 1;
-  return token;
-}
+// The roots that a holder took and native code has not released.
+let liveCount = 0;
 
 /** The host values that one call registers with native code. */
 export class Registrations {
-  readonly #entries: [number, unknown][] = [];
+  readonly #entries: [Root, unknown][] = [];
 
-  add(value: unknown): number {
-    const token = allocateToken();
-    this.#entries.push([token, value]);
-    return token;
+  add(value: unknown): Root {
+    const root: Root = {};
+    this.#entries.push([root, value]);
+    return root;
   }
 
   /** Roots the accepted values in `holder`, or in the realm. */
   commit(holder: RootHolder = realmRoots): void {
-    for (const [token, value] of this.#entries) {
-      holder.roots.set(token, value);
-      registrations.set(token, new WeakRef(holder));
+    for (const [root, value] of this.#entries) {
+      holder.roots.set(root, value);
+      root.holder = new WeakRef(holder);
+      liveCount++;
     }
     this.#entries.length = 0;
   }
@@ -110,50 +72,47 @@ export function withRegistrations<T>(
   }
 }
 
-function register(value: unknown): number {
+function register(value: unknown): Root {
   if (transaction === undefined) {
     throw new Error("a callback was converted outside a registering call");
   }
   return transaction.add(value);
 }
 
-function rooted(token: number): unknown {
-  return registrations.get(token)?.deref()?.roots.get(token);
-}
-
 /** Runs after each root release, for the suite's waits on one. */
 export const rootReleaseListeners = new Set<() => void>();
 
-function retire(token: number): void {
-  registrations.get(token)?.deref()?.roots.delete(token);
-  if (registrations.delete(token)) {
-    for (const listener of rootReleaseListeners) {
-      listener();
-    }
+function retire(root: Root): void {
+  const holder = root.holder;
+  if (holder === undefined) {
+    return;
+  }
+  root.holder = undefined;
+  holder.deref()?.roots.delete(root);
+  liveCount--;
+  for (const listener of rootReleaseListeners) {
+    listener();
   }
 }
 
 /**
- * How a drained delivery reaches the host value of its registration, by
- * delivery type. Generated code defines the table.
+ * How a dispatched call reaches the host value of its registration, by the
+ * callback type that the addon's trampoline numbers. Generated code defines
+ * the adapters.
  */
-export type DeliveryHandler = (
-  target: unknown,
-  payload: Readonly<Record<string, unknown>>,
-  index: number,
-) => void;
+export type CallbackAdapter = (target: unknown, args: unknown[]) => void;
 
-let deliveries: Readonly<Record<number, DeliveryHandler>> = {};
+let adapters: readonly CallbackAdapter[] = [];
 
-export function defineDeliveries(
-  table: Readonly<Record<number, DeliveryHandler>>,
-): void {
-  deliveries = table;
+export function defineCallbacks(table: readonly CallbackAdapter[]): void {
+  adapters = table;
 }
 
 // Pending binding Promises hold the event loop through the addon's
 // threadsafe function. Nothing else does.
 let pending = 0;
+// The completions and thread starts that wait for native code.
+let outstanding = 0;
 
 /** Holds the event loop open until the matching unhold(). */
 export function hold(): void {
@@ -171,93 +130,65 @@ export function unhold(): void {
   }
 }
 
-/** Registers a pending completion and returns its token. */
-export function addCompletion(completion: PendingCompletion): number {
-  const token = allocateToken();
+/**
+ * Holds the event loop for one completion or thread start, and returns what
+ * ends the hold, which only its first call does.
+ */
+export function awaitNative(): () => void {
   hold();
-  completions.set(token, completion);
-  return token;
-}
-
-/** Forgets a completion whose submission native code rejected. */
-export function removeCompletion(token: number): void {
-  if (completions.delete(token)) {
-    unhold();
-  }
-}
-
-/** Registers a pending thread start and returns its token. */
-export function addThreadStart(settle: PendingThreadStart): number {
-  const token = allocateToken();
-  hold();
-  threadStarts.set(token, settle);
-  return token;
-}
-
-/** Forgets a thread start whose thread did not start. */
-export function removeThreadStart(token: number): void {
-  if (threadStarts.delete(token)) {
-    unhold();
-  }
+  outstanding++;
+  let held = true;
+  return () => {
+    if (held) {
+      held = false;
+      outstanding--;
+      unhold();
+    }
+  };
 }
 
 /**
- * The completions and thread starts that wait for delivery, for the suite's
- * leak checks.
+ * The completions and thread starts that wait for native code, for the
+ * suite's leak checks.
  */
 export function pendingCompletions(): number {
-  return completions.size + threadStarts.size;
+  return outstanding;
 }
 
 /**
- * The callback roots that native code may still deliver to, for the suite's
- * leak checks. Each root leaves when native code retires it.
+ * The callback roots that native code may still call through, for the
+ * suite's leak checks. Each root leaves when native code releases it.
  */
 export function liveRoots(): number {
-  return registrations.size;
+  return liveCount;
 }
 
-function dispatch(entry: DrainedEntry, index: number): void {
-  const [type, token, payload, error] = entry as [
-    DrainedEntry[0],
-    number,
-    Readonly<Record<string, unknown>>,
-    unknown,
-  ];
-  if (type === "completion") {
-    const completion = completions.get(token);
-    if (completion === undefined) {
-      return;
-    }
-    completions.delete(token);
-    unhold();
-    if (error !== undefined) {
-      completion.fail(error);
-    } else {
-      completion.settle(index, payload as unknown as CompletionHeader);
-    }
-    return;
-  }
-  if (type === "retired") {
-    retire(token);
-    return;
-  }
-  // A delivery for a registration this realm no longer holds is released
-  // unread with its batch.
-  const target = rooted(token);
-  const handler = deliveries[type];
-  if (target === undefined || handler === undefined) {
-    return;
+/**
+ * Calls the host value of a registration with the arguments that the addon's
+ * trampoline converted, or reports the error that converting them threw.
+ * Returns whether a host value received the arguments: none does once the
+ * collector reclaims the registration's owner.
+ */
+function invoke(
+  callback: number,
+  root: Root,
+  error: unknown,
+  ...args: unknown[]
+): boolean {
+  const target = root.holder?.deref()?.roots.get(root);
+  if (target === undefined) {
+    return false;
   }
   if (error !== undefined) {
     reportError(error);
-    return;
+    return false;
   }
   try {
-    handler(target, payload, index);
+    adapters[callback]!(target, args);
   } catch (thrown) {
     reportError(thrown);
   }
+  return true;
 }
 
 /**
@@ -275,78 +206,15 @@ function reportError(error: unknown): void {
   }
 }
 
-/**
- * Drains the realm's queue until it is empty and dispatches each delivery in
- * push order. A batch that could not be allocated leaves its deliveries
- * queued, and the realm drains again shortly, since a pending completion may
- * get no later push to wake the queue.
- */
-function drain(): void {
-  for (;;) {
-    let entries;
-    try {
-      entries = native.drain();
-    } catch (error) {
-      reportError(error);
-      return;
-    }
-    if (entries === undefined) {
-      return;
-    }
-    if (entries === null) {
-      setTimeout(drain, 50);
-      return;
-    }
-    try {
-      entries.forEach(dispatch);
-    } finally {
-      native.batchRelease();
-    }
-  }
-}
-
-function receive(kind: number, ...values: unknown[]): void {
+function reportLeak(name: string, handle: bigint): void {
+  const message = `${name} 0x${handle.toString(
+    16,
+  )} was collected while open, so its handle was disposed; close it explicitly`;
   try {
-    switch (kind) {
-      case WAKE: {
-        const token = values[0] as number;
-        if (token === QUEUE) {
-          drain();
-        } else {
-          (rooted(token) as (() => void) | undefined)?.();
-        }
-        return;
-      }
-      case RELEASE:
-        retire(values[0] as number);
-        return;
-      case THREAD: {
-        const [token, status, handle, diagnostic] = values as [
-          number,
-          number,
-          bigint,
-          string,
-        ];
-        const settle = threadStarts.get(token);
-        if (settle !== undefined) {
-          threadStarts.delete(token);
-          unhold();
-          settle(status, handle, diagnostic);
-        }
-        return;
-      }
-      case LEAK: {
-        const handle = values[1] as bigint;
-        const message = `${String(values[0])} 0x${handle.toString(
-          16,
-        )} was collected while open, so its handle was disposed; close it explicitly`;
-        if (hooks.warnLeak) {
-          hooks.warnLeak(message);
-        } else {
-          console.warn(`MapLibre Native: ${message}`);
-        }
-        return;
-      }
+    if (hooks.warnLeak) {
+      hooks.warnLeak(message);
+    } else {
+      console.warn(`MapLibre Native: ${message}`);
     }
   } catch (error) {
     reportError(error);
@@ -354,14 +222,16 @@ function receive(kind: number, ...values: unknown[]): void {
 }
 
 /**
- * Gives the addon this realm's receiver, registration, error factory, and
- * native registration taker.
+ * Gives the addon this realm's registration, callback, release, error
+ * factory, native registration taker, and leak report.
  */
 export function installRealm(addon: Addon): void {
   addon.install(
-    receive,
     register,
+    invoke,
+    retire,
     (status, diagnostic) => new MaplibreError(status, diagnostic),
     takeNativeRegistration,
+    reportLeak,
   );
 }

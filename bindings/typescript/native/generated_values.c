@@ -385,50 +385,171 @@ napi_value mln_ts_decode_texture_readback_result(
   );
 }
 
-napi_value mln_ts_delivery_payload(napi_env env, const mln_delivery* delivery) {
-  switch (delivery->type) {
-    case MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END:
-      return mln_ts_read_camera_transition_end_delivery(
-        env, &delivery->payload.camera_transition_end,
-        sizeof delivery->payload.camera_transition_end
-      );
-    case MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
-      return mln_ts_read_custom_source_tile_delivery(
-        env, &delivery->payload.custom_source_cancel_tile,
-        sizeof delivery->payload.custom_source_cancel_tile
-      );
-    case MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-      return mln_ts_read_custom_source_tile_delivery(
-        env, &delivery->payload.custom_source_fetch_tile,
-        sizeof delivery->payload.custom_source_fetch_tile
-      );
-    case MLN_DELIVERY_TYPE_LOG_RECORD:
-      return mln_ts_read_log_delivery(
-        env, &delivery->payload.log_record, sizeof delivery->payload.log_record
-      );
-    case MLN_DELIVERY_TYPE_RESOURCE_REQUEST:
-      return mln_ts_read_resource_request_delivery(
-        env, &delivery->payload.resource_request,
-        sizeof delivery->payload.resource_request
-      );
-    case MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL:
-      return mln_ts_read_resource_request_cancel_delivery(
-        env, &delivery->payload.resource_request_cancel,
-        sizeof delivery->payload.resource_request_cancel
-      );
-    case MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM:
-      return mln_ts_read_resource_transform_delivery(
-        env, &delivery->payload.resource_transform,
-        sizeof delivery->payload.resource_transform
-      );
-    case MLN_DELIVERY_TYPE_RUNTIME_EVENTS:
-      return mln_ts_read_runtime_event_delivery(
-        env, &delivery->payload.runtime_events,
-        sizeof delivery->payload.runtime_events
-      );
-    default:
-      return mln_ts_undefined(env);
+void mln_ts_dispatch_camera_transition_end_callback(
+  void* user_data, const mln_camera_transition_end* end
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[1] = {(
+      (end) == NULL ? mln_ts_undefined(env)
+                    : mln_ts_read_camera_transition_end(env, end, sizeof *(end))
+    )};
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_CAMERA_TRANSITION_END_CALLBACK, 1, argv
+    );
   }
+  (void)received;
+}
+
+void mln_ts_dispatch_custom_source_cancel_tile_callback(
+  void* user_data, mln_canonical_tile_id tile_id
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[1] = {
+      mln_ts_read_canonical_tile_id(env, &(tile_id), sizeof(tile_id))
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_CANCEL_TILE_CALLBACK, 1,
+      argv
+    );
+  }
+  (void)received;
+}
+
+void mln_ts_dispatch_custom_source_fetch_tile_callback(
+  void* user_data, mln_canonical_tile_id tile_id
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[1] = {
+      mln_ts_read_canonical_tile_id(env, &(tile_id), sizeof(tile_id))
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_FETCH_TILE_CALLBACK, 1,
+      argv
+    );
+  }
+  (void)received;
+}
+
+bool mln_ts_dispatch_log_callback(
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[4] = {
+      mln_ts_number(env, (double)(severity)),
+      mln_ts_number(env, (double)(event)), mln_ts_i64(env, (int64_t)(code)),
+      mln_ts_text(env, (message).data, (message).size)
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_LOG_CALLBACK, 4, argv
+    );
+  }
+  (void)received;
+  return true;
+}
+
+void mln_ts_dispatch_resource_provider_callback(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[2] = {
+      ((request) == NULL
+         ? mln_ts_undefined(env)
+         : mln_ts_read_resource_request_info(env, request, sizeof *(request))),
+      mln_ts_u64(env, (uint64_t)(handle))
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_RESOURCE_PROVIDER_CALLBACK, 2, argv
+    );
+  }
+  if (!received) {
+    mln_resource_request_release(handle);
+  }
+}
+
+void mln_ts_dispatch_resource_request_cancel_callback(
+  void* user_data, mln_resource_request handle
+) {
+  (void)handle;
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_RESOURCE_REQUEST_CANCEL_CALLBACK, 0,
+      NULL
+    );
+  }
+  (void)received;
+}
+
+void mln_ts_dispatch_resource_transform_callback(
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
+  mln_resource_transform_request request
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[3] = {
+      mln_ts_number(env, (double)(kind)),
+      mln_ts_text(env, (url).data, (url).size),
+      mln_ts_u64(env, (uint64_t)(request))
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_RESOURCE_TRANSFORM_CALLBACK, 3, argv
+    );
+  }
+  if (!received) {
+    mln_resource_transform_request_release(request);
+  }
+}
+
+void mln_ts_dispatch_runtime_event_callback(
+  void* user_data, const mln_event_batch_view* events
+) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    napi_value argv[1] = {
+      ((events) == NULL
+         ? mln_ts_undefined(env)
+         : mln_ts_read_event_batch_view(env, events, sizeof *(events)))
+    };
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_RUNTIME_EVENT_CALLBACK, 1, argv
+    );
+  }
+  (void)received;
+}
+
+void mln_ts_dispatch_wake_callback(void* user_data) {
+  napi_handle_scope scope;
+  napi_env env = mln_ts_upcall_begin(user_data, &scope);
+  bool received = false;
+  if (env != NULL) {
+    received = mln_ts_upcall_end(
+      user_data, scope, MLN_TS_CALLBACK_WAKE_CALLBACK, 0, NULL
+    );
+  }
+  (void)received;
 }
 
 napi_value mln_ts_read_bound_options(
@@ -636,23 +757,6 @@ napi_value mln_ts_read_camera_transition_end(
   return result;
 }
 
-napi_value mln_ts_read_camera_transition_end_delivery(
-  napi_env env, const mln_camera_transition_end_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "end",
-        ((source->end) == NULL ? mln_ts_undefined(env)
-                               : mln_ts_read_camera_transition_end(
-                                   env, source->end, sizeof *(source->end)
-                                 ))
-      ))
-    return NULL;
-  return result;
-}
-
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
 ) {
@@ -664,22 +768,6 @@ napi_value mln_ts_read_canonical_tile_id(
   if (!mln_ts_set(env, result, "x", mln_ts_number(env, (double)(source->x))))
     return NULL;
   if (!mln_ts_set(env, result, "y", mln_ts_number(env, (double)(source->y))))
-    return NULL;
-  return result;
-}
-
-napi_value mln_ts_read_custom_source_tile_delivery(
-  napi_env env, const mln_custom_source_tile_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "tileId",
-        mln_ts_read_canonical_tile_id(
-          env, &(source->tile_id), sizeof(source->tile_id)
-        )
-      ))
     return NULL;
   return result;
 }
@@ -883,32 +971,6 @@ napi_value mln_ts_read_lat_lng_bounds(
         mln_ts_read_lat_lng(
           env, &(source->northeast), sizeof(source->northeast)
         )
-      ))
-    return NULL;
-  return result;
-}
-
-napi_value mln_ts_read_log_delivery(
-  napi_env env, const mln_log_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "severity", mln_ts_number(env, (double)(source->severity))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "event", mln_ts_number(env, (double)(source->event))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "code", mln_ts_i64(env, (int64_t)(source->code))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "message",
-        mln_ts_text(env, (source->message).data, (source->message).size)
       ))
     return NULL;
   return result;
@@ -1746,41 +1808,6 @@ napi_value mln_ts_read_resource_range(
   return result;
 }
 
-napi_value mln_ts_read_resource_request_cancel_delivery(
-  napi_env env, const mln_resource_request_cancel_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "handle", mln_ts_u64(env, (uint64_t)(source->handle))
-      ))
-    return NULL;
-  return result;
-}
-
-napi_value mln_ts_read_resource_request_delivery(
-  napi_env env, const mln_resource_request_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "request",
-        ((source->request) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_read_resource_request_info(
-               env, source->request, sizeof *(source->request)
-             ))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "handle", mln_ts_u64(env, (uint64_t)(source->handle))
-      ))
-    return NULL;
-  return result;
-}
-
 napi_value mln_ts_read_resource_request_info(
   napi_env env, const mln_resource_request_info* source, size_t size
 ) {
@@ -1859,28 +1886,6 @@ napi_value mln_ts_read_resource_request_info(
   return result;
 }
 
-napi_value mln_ts_read_resource_transform_delivery(
-  napi_env env, const mln_resource_transform_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "kind", mln_ts_number(env, (double)(source->kind))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "url",
-        mln_ts_text(env, (source->url).data, (source->url).size)
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "request", mln_ts_u64(env, (uint64_t)(source->request))
-      ))
-    return NULL;
-  return result;
-}
-
 napi_value mln_ts_read_runtime_event(
   napi_env env, const mln_runtime_event* source, size_t size
 ) {
@@ -1917,24 +1922,6 @@ napi_value mln_ts_read_runtime_event(
   if (!mln_ts_set(
         env, result, "payload",
         mln_ts_read_runtime_event_payload(env, source, size)
-      ))
-    return NULL;
-  return result;
-}
-
-napi_value mln_ts_read_runtime_event_delivery(
-  napi_env env, const mln_runtime_event_delivery* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "events",
-        ((source->events) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_read_event_batch_view(
-               env, source->events, sizeof *(source->events)
-             ))
       ))
     return NULL;
   return result;
@@ -2871,10 +2858,11 @@ bool mln_ts_write_animation_options(
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_function(call, member, child)) return false;
     if (!mln_ts_read_registration(
-          call, member, &out->end_handler.user_data, &out->end_handler.queue,
-          child
+          call, member, &out->end_handler.user_data,
+          &out->end_handler.release_user_data, &out->end_handler.queue
         ))
       return false;
+    out->end_handler.callback = mln_ts_dispatch_camera_transition_end_callback;
   }
   return true;
 }
@@ -3329,14 +3317,16 @@ bool mln_ts_write_custom_geometry_source_options(
   if (!mln_ts_read_function(call, member, child)) return false;
   if (!mln_ts_member(call, value, "cancelTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "cancelTile");
-  if (mln_ts_is_absent(call, member)) {
-  } else {
-    if (!mln_ts_read_function(call, member, child)) return false;
-  }
+  bool has_cancel_tile = !mln_ts_is_absent(call, member);
+  if (has_cancel_tile && !mln_ts_read_function(call, member, child))
+    return false;
   if (!mln_ts_read_registration(
-        call, value, &(*out).user_data, &(*out).queue, path
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
       ))
     return false;
+  (*out).fetch_tile = mln_ts_dispatch_custom_source_fetch_tile_callback;
+  if (has_cancel_tile)
+    (*out).cancel_tile = mln_ts_dispatch_custom_source_cancel_tile_callback;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
   if (!mln_ts_is_absent(call, member)) {
@@ -3424,14 +3414,16 @@ bool mln_ts_write_custom_vector_source_options(
   if (!mln_ts_read_function(call, member, child)) return false;
   if (!mln_ts_member(call, value, "cancelTile", &member)) return false;
   mln_ts_path(child, sizeof child, path, "cancelTile");
-  if (mln_ts_is_absent(call, member)) {
-  } else {
-    if (!mln_ts_read_function(call, member, child)) return false;
-  }
+  bool has_cancel_tile = !mln_ts_is_absent(call, member);
+  if (has_cancel_tile && !mln_ts_read_function(call, member, child))
+    return false;
   if (!mln_ts_read_registration(
-        call, value, &(*out).user_data, &(*out).queue, path
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
       ))
     return false;
+  (*out).fetch_tile = mln_ts_dispatch_custom_source_fetch_tile_callback;
+  if (has_cancel_tile)
+    (*out).cancel_tile = mln_ts_dispatch_custom_source_cancel_tile_callback;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
   if (!mln_ts_is_absent(call, member)) {
@@ -5261,13 +5253,14 @@ bool mln_ts_write_render_session_attach_options(
           (mln_user_data_release)(uintptr_t)fields[2];
       }
     } else {
-      if (!mln_ts_read_wake(
-            call, member, (void**)&out->frame_wake.user_data, child
-          ))
-        return false;
-      if (out->frame_wake.user_data != NULL) {
-        out->frame_wake.callback = mln_ts_wake;
-        out->frame_wake.release_user_data = mln_ts_wake_release;
+      if (!mln_ts_is_absent(call, member)) {
+        if (!mln_ts_read_function(call, member, child)) return false;
+        if (!mln_ts_read_registration(
+              call, member, &out->frame_wake.user_data,
+              &out->frame_wake.release_user_data, &out->frame_wake.queue
+            ))
+          return false;
+        out->frame_wake.callback = mln_ts_dispatch_wake_callback;
       }
     }
   }
@@ -5288,13 +5281,15 @@ bool mln_ts_write_render_session_attach_options(
           (mln_user_data_release)(uintptr_t)fields[2];
       }
     } else {
-      if (!mln_ts_read_wake(
-            call, member, (void**)&out->driver_work_wake.user_data, child
-          ))
-        return false;
-      if (out->driver_work_wake.user_data != NULL) {
-        out->driver_work_wake.callback = mln_ts_wake;
-        out->driver_work_wake.release_user_data = mln_ts_wake_release;
+      if (!mln_ts_is_absent(call, member)) {
+        if (!mln_ts_read_function(call, member, child)) return false;
+        if (!mln_ts_read_registration(
+              call, member, &out->driver_work_wake.user_data,
+              &out->driver_work_wake.release_user_data,
+              &out->driver_work_wake.queue
+            ))
+          return false;
+        out->driver_work_wake.callback = mln_ts_dispatch_wake_callback;
       }
     }
   }
@@ -5404,9 +5399,10 @@ bool mln_ts_write_resource_provider(
   mln_ts_path(child, sizeof child, path, "callback");
   if (!mln_ts_read_function(call, member, child)) return false;
   if (!mln_ts_read_registration(
-        call, value, &(*out).user_data, &(*out).queue, path
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
       ))
     return false;
+  (*out).callback = mln_ts_dispatch_resource_provider_callback;
   if (!mln_ts_member(call, value, "routes", &member)) return false;
   mln_ts_path(child, sizeof child, path, "routes");
   if (!mln_ts_is_absent(call, member)) {
@@ -6516,37 +6512,3 @@ bool mln_ts_write_wgl_context_descriptor(
   }
   return true;
 }
-
-const mln_ts_decoder mln_ts_decoders[] = {
-  [MLN_TS_NO_DECODER] = NULL,
-  [MLN_TS_DECODE_BUFFER_VIEW] = mln_ts_decode_buffer_view,
-  [MLN_TS_DECODE_BUFFER_VIEW_JSON] = mln_ts_decode_buffer_view_json,
-  [MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL] =
-    mln_ts_decode_buffer_view_json_optional,
-  [MLN_TS_DECODE_CAMERA_OPTIONS] = mln_ts_decode_camera_options,
-  [MLN_TS_DECODE_CAMERA_QUERY_RESULT] = mln_ts_decode_camera_query_result,
-  [MLN_TS_DECODE_LAT_LNG_BOUNDS] = mln_ts_decode_lat_lng_bounds,
-  [MLN_TS_DECODE_LAT_LNG_LIST] = mln_ts_decode_lat_lng_list,
-  [MLN_TS_DECODE_OFFLINE_REGION_INFO] = mln_ts_decode_offline_region_info,
-  [MLN_TS_DECODE_OFFLINE_REGION_INFO_LIST] =
-    mln_ts_decode_offline_region_info_list,
-  [MLN_TS_DECODE_OFFLINE_REGION_INFO_OPTIONAL] =
-    mln_ts_decode_offline_region_info_optional,
-  [MLN_TS_DECODE_OFFLINE_REGION_STATUS] = mln_ts_decode_offline_region_status,
-  [MLN_TS_DECODE_RENDERED_FEATURE_LIST] = mln_ts_decode_rendered_feature_list,
-  [MLN_TS_DECODE_SOURCE_FEATURE_LIST] = mln_ts_decode_source_feature_list,
-  [MLN_TS_DECODE_STYLE_IMAGE_INFO_OPTIONAL] =
-    mln_ts_decode_style_image_info_optional,
-  [MLN_TS_DECODE_STYLE_LAYER_INFO_LIST] = mln_ts_decode_style_layer_info_list,
-  [MLN_TS_DECODE_STYLE_LAYER_INFO_OPTIONAL] =
-    mln_ts_decode_style_layer_info_optional,
-  [MLN_TS_DECODE_STYLE_SOURCE_INFO_LIST] = mln_ts_decode_style_source_info_list,
-  [MLN_TS_DECODE_STYLE_SOURCE_INFO_OPTIONAL] =
-    mln_ts_decode_style_source_info_optional,
-  [MLN_TS_DECODE_STYLE_TRANSITION_OPTIONS] =
-    mln_ts_decode_style_transition_options,
-  [MLN_TS_DECODE_TEXTURE_READBACK_RESULT] =
-    mln_ts_decode_texture_readback_result,
-};
-const size_t mln_ts_decoder_count =
-  sizeof mln_ts_decoders / sizeof mln_ts_decoders[0];

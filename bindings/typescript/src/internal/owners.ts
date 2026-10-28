@@ -185,20 +185,6 @@ export function adopt<T>(
 }
 
 /**
- * Takes the handle that a drained delivery owns from its batch and gives it
- * an owner, as {@link adopt} does.
- */
-export function takeDelivered<T>(
-  index: number,
-  handle: bigint,
-  construct: (handle: bigint) => T,
-  dispose: (handle: bigint) => void,
-): T {
-  native.deliveryTake(index);
-  return adopt(handle, () => construct(handle), dispose);
-}
-
-/**
  * Defines the explicit resource management methods on an owner class, when
  * the host defines their symbols.
  */

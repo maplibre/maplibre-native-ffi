@@ -61,7 +61,7 @@ class Lowered:
     declined: bool = False
     # The record a borrowed view scopes, for a scoped view result.
     view: str | None = None
-    # The completion decoder that the addon records for the result, if any.
+    # The decoder that converts the completion's value, if any.
     decoder: str | None = None
     # Whether a discarding view of the receiver also calls the command.
     discardable: bool = False
@@ -198,8 +198,8 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{identifier(name)}"
             for name in ("generation", "render_update_generation")
         },
-        # Native queues each call, and the realm drains the queue on its event
-        # loop after the native callback has returned.
+        # Native queues each call, and the realm dispatches the queue on its
+        # event loop after the native callback has returned.
         threads=(
             "The callback runs asynchronously on the JavaScript thread that "
             "registered it, after native queues the call."
@@ -209,15 +209,12 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
 
 def lower(api: Api | BoundApi) -> model.Lowered:
     from .typescript_native import render_native
-    from .typescript_operations import delivered, render_operations, view_scopes
+    from .typescript_operations import render_operations, view_scopes
 
     bound, values, natives, lowered, unsupported = lower_operations(api)
     bound.symbols("typescript", lambda bound: _symbols(bound, values, lowered))
     # The operations name every value, so the value table follows them.
-    outputs = render_operations(bound, values, lowered)
-    natives.payload_reader(
-        [callback for callback, _ in delivered(bound, values).values()]
-    )
+    outputs = render_operations(bound, values, lowered, sorted(natives.callbacks))
     outputs[f"{TS_DIRECTORY}/generated_values.ts"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n\n"
         + values.render()

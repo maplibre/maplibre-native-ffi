@@ -4,9 +4,8 @@ table, and the converters.
 Each export function converts its arguments through the runtime helpers and
 the generated converters, calls its C function directly with a diagnostic of
 its own, and throws a MaplibreError for a failed status. The converters also
-read the deliveries that the realm drains from its queue: each completion's
-value through the decoder that its export recorded, and every other payload by
-its type.
+include the decoder that each completion's export names, and the trampolines
+that the realm's dispatch calls.
 """
 
 from __future__ import annotations
@@ -91,8 +90,7 @@ def render_native(
             )
         )
         + "\n"
-        + natives.decoder_ids()
-        + "\n"
+        + (natives.callback_ids() + "\n" if natives.callbacks else "")
         + "".join(f"{prototype};\n" for prototype, _ in natives.prototypes())
         + "\n#endif\n"
     )

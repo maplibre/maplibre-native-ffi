@@ -1,15 +1,16 @@
 // The handwritten runtime of the Node-API addon.
 //
 // Generated export functions convert their arguments through the helpers here,
-// call the C function directly, and return a JavaScript value. The runtime
-// keeps no per-callback state: every completion and queued callback names the
-// realm's delivery queue and a token, which the realm drains on its event loop
-// and dispatches in TypeScript. The wake shim in realm.c is the one path from a
-// native thread to a realm: the queue's wake and each wake registration post a
-// token to the realm's threadsafe function. A native registration instead
-// carries function pointers from native code in the host, which the runtime
-// copies into the C descriptor unchanged. The runtime also keeps the owner
-// tokens that finalizers dispose through, and the realm's teardown.
+// call the C function directly, and return a JavaScript value. Every
+// completion, registration, and wake that JavaScript supplies names the realm's
+// delivery queue, with a generated trampoline as its callback and a reference
+// to its JavaScript value as its user data. The realm dispatches the queue on
+// its event loop when the queue's wake posts to the realm's threadsafe
+// function, so each trampoline runs on the JavaScript thread. A native
+// registration instead carries function pointers from native code in the host,
+// which the runtime copies into the C descriptor unchanged. The runtime also
+// keeps the owner tokens that finalizers dispose through, and the realm's
+// teardown.
 
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_RUNTIME_H
 #define MAPLIBRE_NATIVE_FFI_NODE_RUNTIME_H
@@ -30,27 +31,13 @@ typedef struct mln_ts_allocation mln_ts_allocation;
 typedef struct mln_ts_rejection mln_ts_rejection;
 typedef struct mln_ts_owner mln_ts_owner;
 
-/** Converts a drained completion's value; NULL means an exception. */
+/**
+ * Converts the value of a successful completion, as the export that submits it
+ * names; NULL means an exception.
+ */
 typedef napi_value (*mln_ts_decoder)(
   napi_env env, const mln_completion_result* result
 );
-
-/** The decoders that a completion's user data can name, beside its token. */
-#define MLN_TS_MAX_DECODERS 256
-
-/**
- * The generated completion decoders, by the constant that an export records
- * in its completion. An operation without a value has a NULL entry.
- */
-extern const mln_ts_decoder mln_ts_decoders[];
-extern const size_t mln_ts_decoder_count;
-
-/**
- * Converts the copied arguments of one drained delivery other than a
- * completion, by its type: undefined for a type that no generated
- * registration receives, and NULL after an exception.
- */
-napi_value mln_ts_delivery_payload(napi_env env, const mln_delivery* delivery);
 
 typedef struct mln_ts_export {
   const char* name;
@@ -81,11 +68,11 @@ bool mln_ts_begin(
   mln_ts_call* call, napi_env env, napi_callback_info info, size_t arguments
 );
 /**
- * Ends a call: releases the wakes that native code did not accept, and frees
- * the call's memory.
+ * Ends a call: frees the registrations and completions that native code did
+ * not accept, and the call's memory.
  */
 napi_value mln_ts_end(mln_ts_call* call);
-/** Native code accepted the call's registrations. */
+/** Native code accepted the call's registrations and completion. */
 void mln_ts_accept(mln_ts_call* call);
 /**
  * Reads the owner token of the handle that the call releases, or undefined
@@ -184,25 +171,35 @@ int mln_ts_read_kind(
   const char* path
 );
 
-// Deliveries. A queued registration or a completion names the realm's queue
-// and a token; the realm's TypeScript half roots the host value by the token
-// until native code retires it.
+// Registrations and completions. Each one names the realm's queue, so its
+// trampoline runs while the realm dispatches the queue on its event loop.
 
 /**
- * Registers a host value with the realm's current call, and names the realm's
- * queue and the value's token in place of the registration's callbacks.
+ * Registers a host value with the realm's current call, and writes the user
+ * data, release, and queue that the registration's trampolines receive. The
+ * call frees the user data unless native code accepts it.
  */
 bool mln_ts_read_registration(
   mln_ts_call* call, napi_value value, void** out_user_data,
-  mln_delivery_queue* out_queue, const char* path
+  mln_user_data_release* out_release, mln_delivery_queue* out_queue
 );
 /**
- * Registers a wake function with the realm's current call, and writes the
- * wake context that mln_ts_wake posts through, or NULL for an absent value.
- * The call frees the context unless native code accepts it.
+ * Opens the handle scope of one dispatched call of the registration that
+ * user_data names, and returns its environment, or NULL when the scope could
+ * not open.
  */
-bool mln_ts_read_wake(
-  mln_ts_call* call, napi_value value, void** out_user_data, const char* path
+napi_env mln_ts_upcall_begin(void* user_data, napi_handle_scope* scope);
+/**
+ * Passes argc converted arguments to the host value of the registration
+ * through the generated callback adapter that callback numbers, which reports
+ * what the value throws, and closes the scope. Returns false when nothing
+ * received the arguments: the collector reclaimed the value's owner, or an
+ * argument failed to convert, which it reports. The trampoline then releases
+ * what the call owns.
+ */
+bool mln_ts_upcall_end(
+  void* user_data, napi_handle_scope scope, uint32_t callback, size_t argc,
+  const napi_value* argv
 );
 /**
  * Takes a native registration of kind, which the realm's TypeScript half
@@ -215,19 +212,16 @@ bool mln_ts_read_native_registration(
   mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
   uint64_t* out, const char* path
 );
-/** Posts the wake's token to its realm. */
-void mln_ts_wake(void* user_data);
-/** Posts the wake's release to its realm, which drops its root. */
-void mln_ts_wake_release(void* user_data);
 /**
- * A completion for the pending entry that token names, which the realm's
- * queue delivers and whose value completionValue() reads through the decoder
- * named by its constant. A discardable command takes an undefined token as no
- * completion, and *out stays NULL.
+ * A completion that calls the function settle with the completion's status,
+ * generations, and diagnostic, and the value that decoder converts, or the
+ * error that converting it threw. A NULL decoder converts no value. A
+ * discardable command takes an undefined settle as no completion, and *out
+ * stays NULL. The call frees the completion unless native code accepts it.
  */
 bool mln_ts_read_completion(
-  mln_ts_call* call, napi_value token, bool discardable, uint32_t decoder,
-  mln_completion* storage, const mln_completion** out
+  mln_ts_call* call, napi_value settle, bool discardable,
+  mln_ts_decoder decoder, mln_completion* storage, const mln_completion** out
 );
 
 /** Runs a call that waits for a thread to start, and writes its new handle. */
@@ -237,13 +231,13 @@ typedef mln_status (*mln_ts_thread_run)(
 /**
  * Starts run with a copy of the size bytes at arguments on a detached thread,
  * and returns at once. The thread takes the call's memory, which the copied
- * arguments point into. When run returns, the realm receives its status, its
- * handle, and its diagnostic for the pending entry that token names. When the
- * realm has ended by then, the thread disposes a created handle with dispose.
- * Returns false with a throw when the thread could not start.
+ * arguments point into. When run returns, the realm calls the function settle
+ * with its status, its handle, and its diagnostic. When the realm has ended by
+ * then, the thread disposes a created handle with dispose. Returns false with
+ * a throw when the thread could not start.
  */
 bool mln_ts_start_thread(
-  mln_ts_call* call, napi_value token, mln_ts_thread_run run,
+  mln_ts_call* call, napi_value settle, mln_ts_thread_run run,
   void (*dispose)(uint64_t handle), const void* arguments, size_t size
 );
 

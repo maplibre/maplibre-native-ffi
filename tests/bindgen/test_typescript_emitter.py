@@ -1,5 +1,6 @@
 """Check the TypeScript binding plan and run the generated addon under Node."""
 
+import re
 import shutil
 import sys
 import unittest
@@ -93,9 +94,9 @@ class TypeScriptEmitterTests(unittest.TestCase):
     def test_registrations_reach_the_realm_through_the_shared_async_host_plan(
         self,
     ):
-        # Every registration names the realm's delivery queue or posts a wake,
-        # or leaves native rules to answer, as the Dart binding's do. No
-        # registration needs a callback on a native thread.
+        # Every registration and wake names the realm's delivery queue, or
+        # leaves native rules to answer. No registration needs a callback on a
+        # native thread.
         forms = {
             value.native: async_hosts.form(self.bound, value)
             for value in self.values.used.values()
@@ -116,6 +117,31 @@ class TypeScriptEmitterTests(unittest.TestCase):
                 "mln_runtime_event_handler": "queue",
                 "mln_wake": "wake",
             },
+        )
+
+    def test_each_queued_callback_runs_through_a_trampoline_and_its_adapter(self):
+        # The addon numbers each callback type's adapter, and the TypeScript
+        # table lists the adapters in the same order. A trampoline whose call
+        # reaches no host value releases the handle that the call owns.
+        generated = emitted(typescript, self.api)
+        header = generated["bindings/typescript/native/generated_addon.h"]
+        operations = generated["bindings/typescript/src/generated_operations.ts"]
+        constants = re.findall(r"MLN_TS_CALLBACK_(\w+) = (\d+),", header)
+        self.assertEqual(
+            [int(number) for _, number in constants], list(range(len(constants)))
+        )
+        table = operations[operations.index("defineCallbacks([") :]
+        self.assertEqual(
+            [f"MLN_{name}" for name, _ in constants],
+            [name.upper() for name in re.findall(r"  // (mln_\w+)\n", table)],
+        )
+        values = generated["bindings/typescript/native/generated_values.c"]
+        trampoline = values[
+            values.index("void mln_ts_dispatch_resource_provider_callback(") :
+        ]
+        self.assertIn(
+            "if (!received) {\n    mln_resource_request_release(handle);\n  }",
+            trampoline[: trampoline.index("\n}\n")],
         )
 
     def test_native_registrations_carry_each_callback_then_the_context(self):

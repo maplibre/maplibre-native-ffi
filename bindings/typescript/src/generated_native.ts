@@ -76,6 +76,7 @@ import type {
   WebGpuSurfaceDescriptor,
   WebGpuTextureFrame,
 } from "./generated_values.ts";
+import type { NativeCompletion, NativeThreadStart } from "./internal/addon.ts";
 
 /** The addon function of each generated operation, by C function name. */
 export interface NativeOperations {
@@ -116,250 +117,265 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     options: CustomGeometrySourceOptions,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_custom_vector_source(
     map: bigint,
     sourceId: string,
     options: CustomVectorSourceOptions,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_geo_json_source_data(
     map: bigint,
     sourceId: string,
     data: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_geo_json_source_url(
     map: bigint,
     sourceId: string,
     url: string,
     options: GeoJsonSourceOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_image_source_image(
     map: bigint,
     sourceId: string,
     coordinates: readonly LatLng[],
     image: PremultipliedRgba8Image,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_image_source_url(
     map: bigint,
     sourceId: string,
     coordinates: readonly LatLng[],
     url: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_style_layer_json(
     map: bigint,
     layerJson: unknown,
     beforeLayerId: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_style_source_json(
     map: bigint,
     sourceId: string,
     sourceJson: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_apply_camera_delta(
     map: bigint,
     delta: CameraDelta | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_attach_graphics_device_texture(
     map: bigint,
     device: bigint,
     descriptor: GraphicsDeviceTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_metal_borrowed_texture(
     map: bigint,
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_metal_owned_texture(
     map: bigint,
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_metal_surface(
     map: bigint,
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_open_gl_borrowed_texture(
     map: bigint,
     descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_open_gl_owned_texture(
     map: bigint,
     descriptor: OpenGlOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_open_gl_surface(
     map: bigint,
     descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_vulkan_borrowed_texture(
     map: bigint,
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_vulkan_owned_texture(
     map: bigint,
     descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_vulkan_surface(
     map: bigint,
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_web_gpu_borrowed_texture(
     map: bigint,
     descriptor: WebGpuBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_web_gpu_owned_texture(
     map: bigint,
     descriptor: WebGpuOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_attach_web_gpu_surface(
     map: bigint,
     descriptor: WebGpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_map_begin_command_group(
     map: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_camera_for_geometry(
     map: bigint,
     geometry: unknown,
     fitOptions: CameraFitOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_camera_for_lat_lng_bounds(
     map: bigint,
     bounds: LatLngBounds | undefined,
     fitOptions: CameraFitOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_camera_for_lat_lngs(
     map: bigint,
     coordinates: readonly LatLng[],
     fitOptions: CameraFitOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_cancel_camera_transition(
     map: bigint,
     transitionId: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
-  mln_map_cancel_transitions(map: bigint, completion: number | undefined): void;
+  mln_map_cancel_transitions(
+    map: bigint,
+    completion: NativeCompletion | undefined,
+  ): void;
   mln_map_dispose(map: bigint, token: object | undefined): void;
-  mln_map_dump_debug_logs(map: bigint, completion: number | undefined): void;
-  mln_map_end_command_group(map: bigint, completion: number | undefined): void;
-  mln_map_get_camera(map: bigint, completion: number): void;
+  mln_map_dump_debug_logs(
+    map: bigint,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_end_command_group(
+    map: bigint,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_get_camera(map: bigint, completion: NativeCompletion): void;
   mln_map_get_feature_state(
     map: bigint,
     selector: FeatureStateSelector,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_map_get_global_state(map: bigint, completion: number): void;
+  mln_map_get_global_state(map: bigint, completion: NativeCompletion): void;
   mln_map_get_image_source_coordinates(
     map: bigint,
     sourceId: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_map_get_loaded_style_json(map: bigint, completion: number): void;
+  mln_map_get_loaded_style_json(
+    map: bigint,
+    completion: NativeCompletion,
+  ): void;
   mln_map_get_snapshot(map: bigint): MapSnapshot;
   mln_map_get_style_image(
     map: bigint,
     imageId: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_get_style_layer(
     map: bigint,
     layerId: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_get_style_layer_json(
     map: bigint,
     layerId: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_get_style_layer_property(
     map: bigint,
     layerId: string,
     propertyName: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_get_style_light_property(
     map: bigint,
     propertyName: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_get_style_source(
     map: bigint,
     sourceId: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_map_get_style_transition_options(map: bigint, completion: number): void;
-  mln_map_get_style_url(map: bigint, completion: number): void;
+  mln_map_get_style_transition_options(
+    map: bigint,
+    completion: NativeCompletion,
+  ): void;
+  mln_map_get_style_url(map: bigint, completion: NativeCompletion): void;
   mln_map_invalidate_custom_geometry_source_region(
     map: bigint,
     sourceId: string,
     bounds: LatLngBounds | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_invalidate_custom_geometry_source_tile(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_invalidate_custom_vector_source_tile(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_lat_lng_bounds_for_camera(
     map: bigint,
     camera: CameraOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_lat_lng_bounds_for_camera_unwrapped(
     map: bigint,
     camera: CameraOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_map_list_style_layers(map: bigint, completion: number): void;
-  mln_map_list_style_sources(map: bigint, completion: number): void;
+  mln_map_list_style_layers(map: bigint, completion: NativeCompletion): void;
+  mln_map_list_style_sources(map: bigint, completion: NativeCompletion): void;
   mln_map_move_style_layer(
     map: bigint,
     layerId: string,
     beforeLayerId: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_projection_create(view: MapView | undefined): bigint;
   mln_map_projection_get_camera(projection: bigint): CameraOptions;
@@ -402,53 +418,56 @@ export interface NativeOperations {
   mln_map_release(
     map: bigint,
     token: object | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_map_remove_feature_state(
     map: bigint,
     selector: FeatureStateSelector,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_remove_style_image(
     map: bigint,
     imageId: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_remove_style_layer(
     map: bigint,
     layerId: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_remove_style_source(
     map: bigint,
     sourceId: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
-  mln_map_request_repaint(map: bigint, completion: number | undefined): void;
-  mln_map_request_still_image(map: bigint, completion: number): void;
+  mln_map_request_repaint(
+    map: bigint,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_request_still_image(map: bigint, completion: NativeCompletion): void;
   mln_map_resize(
     map: bigint,
     extent: LogicalExtent | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_bounds(
     map: bigint,
     options: BoundOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_geometry_source_tile_data(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
     data: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_geometry_source_tile_error(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
     message: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_vector_source_tile_data(
     map: bigint,
@@ -456,148 +475,148 @@ export interface NativeOperations {
     tileId: CanonicalTileId | undefined,
     encoding: StyleVectorTileEncoding,
     data: Uint8Array,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_vector_source_tile_error(
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
     message: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_debug_options(
     map: bigint,
     options: MapDebugFlag,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_event_mask(
     map: bigint,
     mask: RuntimeEventFlag,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_feature_state(
     map: bigint,
     selector: FeatureStateSelector,
     state: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_free_camera_options(
     map: bigint,
     options: FreeCameraOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_geo_json_source_data(
     map: bigint,
     sourceId: string,
     data: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_geo_json_source_synchronous_tiling(
     map: bigint,
     sourceId: string,
     enabled: boolean,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_geo_json_source_url(
     map: bigint,
     sourceId: string,
     url: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_global_state_property(
     map: bigint,
     propertyName: string,
     value: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_image_source_coordinates(
     map: bigint,
     sourceId: string,
     coordinates: readonly LatLng[],
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_image_source_image(
     map: bigint,
     sourceId: string,
     image: PremultipliedRgba8Image,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_image_source_url(
     map: bigint,
     sourceId: string,
     url: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_projection_mode(
     map: bigint,
     mode: ProjectionMode | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_rendering_stats_view_enabled(
     map: bigint,
     enabled: boolean,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_image(
     map: bigint,
     imageId: string,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_json(
     map: bigint,
     json: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_layer_property(
     map: bigint,
     layerId: string,
     propertyName: string,
     value: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_light_json(
     map: bigint,
     lightJson: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_light_property(
     map: bigint,
     propertyName: string,
     value: unknown,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_source_volatile(
     map: bigint,
     sourceId: string,
     isVolatile: boolean,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_transition_options(
     map: bigint,
     options: StyleTransitionOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_url(
     map: bigint,
     url: string,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_tile_options(
     map: bigint,
     options: MapTileOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_viewport_options(
     map: bigint,
     options: MapViewportOptions | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_map_update_camera(
     map: bigint,
     update: CameraUpdate | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
@@ -608,18 +627,30 @@ export interface NativeOperations {
   ): ProjectedMeters;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
   mln_render_session_acquire_frame(session: bigint): bigint | undefined;
-  mln_render_session_barrier(session: bigint, completion: number): void;
-  mln_render_session_clear_data(session: bigint, completion: number): void;
-  mln_render_session_detach(session: bigint, completion: number): void;
+  mln_render_session_barrier(
+    session: bigint,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_clear_data(
+    session: bigint,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_detach(
+    session: bigint,
+    completion: NativeCompletion,
+  ): void;
   mln_render_session_dispose(
     session: bigint,
     token: object | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_drain_frame_results(
     session: bigint,
   ): readonly RenderFrameResult[] | undefined;
-  mln_render_session_dump_debug_logs(session: bigint, completion: number): void;
+  mln_render_session_dump_debug_logs(
+    session: bigint,
+    completion: NativeCompletion,
+  ): void;
   mln_render_session_get_capabilities(
     session: bigint,
   ): RenderSessionCapabilities;
@@ -631,24 +662,27 @@ export interface NativeOperations {
     extension: string,
     extensionField: string,
     argumentsValue: unknown,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_query_rendered_features(
     session: bigint,
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_query_source_features(
     session: bigint,
     sourceId: string,
     options: SourceFeatureQueryOptions | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_render_session_read_texture(session: bigint, completion: number): void;
+  mln_render_session_read_texture(
+    session: bigint,
+    completion: NativeCompletion,
+  ): void;
   mln_render_session_reduce_memory_use(
     session: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_request_frame(
     session: bigint,
@@ -657,48 +691,48 @@ export interface NativeOperations {
   mln_render_session_resize(
     session: bigint,
     extent: LogicalExtent | undefined,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
   mln_render_session_set_metal_borrowed_texture_target(
     session: bigint,
     descriptor: MetalBorrowedTextureDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_metal_surface_target(
     session: bigint,
     descriptor: MetalSurfaceDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_open_gl_borrowed_texture_target(
     session: bigint,
     descriptor: OpenGlBorrowedTextureDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_open_gl_surface_target(
     session: bigint,
     descriptor: OpenGlSurfaceDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_vulkan_borrowed_texture_target(
     session: bigint,
     descriptor: VulkanBorrowedTextureDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_vulkan_surface_target(
     session: bigint,
     descriptor: VulkanSurfaceDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_web_gpu_borrowed_texture_target(
     session: bigint,
     descriptor: WebGpuBorrowedTextureDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_render_session_set_web_gpu_surface_target(
     session: bigint,
     descriptor: WebGpuSurfaceDescriptor,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_resource_request_complete(
     handle: bigint,
@@ -726,113 +760,119 @@ export interface NativeOperations {
   ): void;
   mln_runtime_clear_event_handler(
     runtime: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_clear_http_header_transform(
     runtime: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_clear_resource_provider(
     runtime: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_clear_resource_transform(
     runtime: bigint,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
-  mln_runtime_create(options: RuntimeOptions | undefined, start: number): void;
+  mln_runtime_create(
+    options: RuntimeOptions | undefined,
+    start: NativeThreadStart,
+  ): void;
   mln_runtime_create_map(
     runtime: bigint,
     options: MapOptions,
-    completion: number,
+    completion: NativeCompletion,
   ): bigint;
   mln_runtime_create_offline_region(
     runtime: bigint,
     definition: OfflineRegionDefinition,
     metadata: Uint8Array,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_delete_offline_region(
     runtime: bigint,
     regionId: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_dispose(runtime: bigint, token: object | undefined): void;
   mln_runtime_get_event_mask(runtime: bigint): RuntimeEventFlag;
   mln_runtime_get_offline_region(
     runtime: bigint,
     regionId: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_get_offline_region_status(
     runtime: bigint,
     regionId: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_invalidate_offline_region(
     runtime: bigint,
     regionId: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
-  mln_runtime_list_offline_regions(runtime: bigint, completion: number): void;
+  mln_runtime_list_offline_regions(
+    runtime: bigint,
+    completion: NativeCompletion,
+  ): void;
   mln_runtime_merge_offline_regions(
     runtime: bigint,
     sideDatabasePath: string,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_release(
     runtime: bigint,
     token: object | undefined,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_run_ambient_cache_operation(
     runtime: bigint,
     operation: AmbientCacheOperation,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_set_event_handler(
     runtime: bigint,
     handler: RuntimeEventHandler,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventFlag): void;
   mln_runtime_set_http_header_transform(
     runtime: bigint,
     transform: HttpHeaderTransform,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_set_maximum_ambient_cache_size(
     runtime: bigint,
     size: bigint,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_set_offline_region_download_state(
     runtime: bigint,
     regionId: bigint,
     state: OfflineRegionDownloadState,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_set_offline_region_observed(
     runtime: bigint,
     regionId: bigint,
     observed: boolean,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_runtime_set_resource_provider(
     runtime: bigint,
     provider: ResourceProvider,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_set_resource_transform(
     runtime: bigint,
     transform: ResourceTransform,
-    completion: number | undefined,
+    completion: NativeCompletion | undefined,
   ): void;
   mln_runtime_update_offline_region_metadata(
     runtime: bigint,
     regionId: bigint,
     metadata: Uint8Array,
-    completion: number,
+    completion: NativeCompletion,
   ): void;
   mln_style_expression_create(
     expression: unknown,

@@ -19,36 +19,19 @@
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-/** The completion decoders, by the constant that an export records in
- * its completion. */
+/** The realm's callback adapters, by the callback type that each
+ * serves. */
 enum {
-  MLN_TS_NO_DECODER,
-  MLN_TS_DECODE_BUFFER_VIEW,
-  MLN_TS_DECODE_BUFFER_VIEW_JSON,
-  MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
-  MLN_TS_DECODE_CAMERA_OPTIONS,
-  MLN_TS_DECODE_CAMERA_QUERY_RESULT,
-  MLN_TS_DECODE_LAT_LNG_BOUNDS,
-  MLN_TS_DECODE_LAT_LNG_LIST,
-  MLN_TS_DECODE_OFFLINE_REGION_INFO,
-  MLN_TS_DECODE_OFFLINE_REGION_INFO_LIST,
-  MLN_TS_DECODE_OFFLINE_REGION_INFO_OPTIONAL,
-  MLN_TS_DECODE_OFFLINE_REGION_STATUS,
-  MLN_TS_DECODE_RENDERED_FEATURE_LIST,
-  MLN_TS_DECODE_SOURCE_FEATURE_LIST,
-  MLN_TS_DECODE_STYLE_IMAGE_INFO_OPTIONAL,
-  MLN_TS_DECODE_STYLE_LAYER_INFO_LIST,
-  MLN_TS_DECODE_STYLE_LAYER_INFO_OPTIONAL,
-  MLN_TS_DECODE_STYLE_SOURCE_INFO_LIST,
-  MLN_TS_DECODE_STYLE_SOURCE_INFO_OPTIONAL,
-  MLN_TS_DECODE_STYLE_TRANSITION_OPTIONS,
-  MLN_TS_DECODE_TEXTURE_READBACK_RESULT,
-  MLN_TS_DECODER_END,
+  MLN_TS_CALLBACK_CAMERA_TRANSITION_END_CALLBACK = 0,
+  MLN_TS_CALLBACK_CUSTOM_SOURCE_CANCEL_TILE_CALLBACK = 1,
+  MLN_TS_CALLBACK_CUSTOM_SOURCE_FETCH_TILE_CALLBACK = 2,
+  MLN_TS_CALLBACK_LOG_CALLBACK = 3,
+  MLN_TS_CALLBACK_RESOURCE_PROVIDER_CALLBACK = 4,
+  MLN_TS_CALLBACK_RESOURCE_REQUEST_CANCEL_CALLBACK = 5,
+  MLN_TS_CALLBACK_RESOURCE_TRANSFORM_CALLBACK = 6,
+  MLN_TS_CALLBACK_RUNTIME_EVENT_CALLBACK = 7,
+  MLN_TS_CALLBACK_WAKE_CALLBACK = 8,
 };
-_Static_assert(
-  MLN_TS_DECODER_END <= MLN_TS_MAX_DECODERS,
-  "a completion names each decoder beside its token"
-);
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
@@ -110,7 +93,34 @@ napi_value mln_ts_decode_style_transition_options(
 napi_value mln_ts_decode_texture_readback_result(
   napi_env env, const mln_completion_result* result
 );
-napi_value mln_ts_delivery_payload(napi_env env, const mln_delivery* delivery);
+void mln_ts_dispatch_camera_transition_end_callback(
+  void* user_data, const mln_camera_transition_end* end
+);
+void mln_ts_dispatch_custom_source_cancel_tile_callback(
+  void* user_data, mln_canonical_tile_id tile_id
+);
+void mln_ts_dispatch_custom_source_fetch_tile_callback(
+  void* user_data, mln_canonical_tile_id tile_id
+);
+bool mln_ts_dispatch_log_callback(
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
+);
+void mln_ts_dispatch_resource_provider_callback(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+);
+void mln_ts_dispatch_resource_request_cancel_callback(
+  void* user_data, mln_resource_request handle
+);
+void mln_ts_dispatch_resource_transform_callback(
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
+  mln_resource_transform_request request
+);
+void mln_ts_dispatch_runtime_event_callback(
+  void* user_data, const mln_event_batch_view* events
+);
+void mln_ts_dispatch_wake_callback(void* user_data);
 napi_value mln_ts_read_bound_options(
   napi_env env, const mln_bound_options* source, size_t size
 );
@@ -126,14 +136,8 @@ napi_value mln_ts_read_camera_query_result(
 napi_value mln_ts_read_camera_transition_end(
   napi_env env, const mln_camera_transition_end* source, size_t size
 );
-napi_value mln_ts_read_camera_transition_end_delivery(
-  napi_env env, const mln_camera_transition_end_delivery* source, size_t size
-);
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
-);
-napi_value mln_ts_read_custom_source_tile_delivery(
-  napi_env env, const mln_custom_source_tile_delivery* source, size_t size
 );
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
@@ -167,9 +171,6 @@ napi_value mln_ts_read_lat_lng(
 );
 napi_value mln_ts_read_lat_lng_bounds(
   napi_env env, const mln_lat_lng_bounds* source, size_t size
-);
-napi_value mln_ts_read_log_delivery(
-  napi_env env, const mln_log_delivery* source, size_t size
 );
 napi_value mln_ts_read_logical_extent(
   napi_env env, const mln_logical_extent* source, size_t size
@@ -248,23 +249,11 @@ napi_value mln_ts_read_rendering_stats(
 napi_value mln_ts_read_resource_range(
   napi_env env, const mln_resource_range* source, size_t size
 );
-napi_value mln_ts_read_resource_request_cancel_delivery(
-  napi_env env, const mln_resource_request_cancel_delivery* source, size_t size
-);
-napi_value mln_ts_read_resource_request_delivery(
-  napi_env env, const mln_resource_request_delivery* source, size_t size
-);
 napi_value mln_ts_read_resource_request_info(
   napi_env env, const mln_resource_request_info* source, size_t size
 );
-napi_value mln_ts_read_resource_transform_delivery(
-  napi_env env, const mln_resource_transform_delivery* source, size_t size
-);
 napi_value mln_ts_read_runtime_event(
   napi_env env, const mln_runtime_event* source, size_t size
-);
-napi_value mln_ts_read_runtime_event_delivery(
-  napi_env env, const mln_runtime_event_delivery* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_glyphs(
   napi_env env, const mln_runtime_event_glyphs* source, size_t size

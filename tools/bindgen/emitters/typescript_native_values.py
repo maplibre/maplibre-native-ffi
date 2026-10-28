@@ -4,17 +4,18 @@ A writer reads one JavaScript object into a C record that the caller already
 zeroed, with its sizes set, so a member that the object leaves out keeps its
 zero default. A reader builds a
 JavaScript object from a borrowed C record. A completion decoder reads the
-value of a drained completion, and the payload reader converts the copied
-arguments of each other drained delivery. Converters check only the shape that
-the binding owns: the JavaScript type, the integer range, and NUL termination.
+value of a successful completion. Converters check only the shape that the
+binding owns: the JavaScript type, the integer range, and NUL termination.
 A JSON value converts through the realm's `JSON.stringify` and `JSON.parse`,
 with `undefined` for an empty view.
 
-A registration that a delivery queue carries names the realm's queue and a
-token in place of its callbacks; a wake posts its token to the realm through
-the addon's wake shim. A native registration, which a wake takes as an object
-in place of its function, fills the descriptor with the function pointers,
-context, and release of native code in the host.
+A registration or a wake that JavaScript supplies names the realm's queue, and
+each of its callbacks is a trampoline that runs while the realm dispatches the
+queue. The trampoline converts the callback's arguments and passes them to the
+realm's callback adapter that its constant numbers, which calls the host
+value. A native registration, which a wake takes as an object in place of its
+function, fills the descriptor with the function pointers, context, and
+release of native code in the host.
 """
 
 from __future__ import annotations
@@ -45,12 +46,12 @@ class NativeValues:
         self.values = values
         self.bound = values.bound
         self.functions: dict[str, tuple[str, str]] = {}
-        # The completion decoders that the decoder table lists.
-        self.decoders: set[str] = set()
+        # The callback types whose trampolines the realm's adapters serve.
+        self.callbacks: set[str] = set()
 
     def merge(self, other: NativeValues) -> None:
         self.functions.update(other.functions)
-        self.decoders |= other.decoders
+        self.callbacks |= other.callbacks
 
     # -- Initialization -----------------------------------------------------
 
@@ -120,16 +121,14 @@ class NativeValues:
             return self.read(value.unwrapped, js, target, path, fail)
         if value.kind == "record" and value.registration:
             entry = self.values.registration(value)
-            plan = value.registration
             if entry.form == "native":
                 return self.read_native(value, entry, js, target, path, fail)
             if entry.form == "wake":
-                field = entry.callbacks[0]
                 lines = [
-                    f"if (!mln_ts_read_wake(call, {js}, (void**)&{target}.{plan.user_data}, {path})) {fail};",
-                    f"if ({target}.{plan.user_data} != NULL) {{",
-                    f"  {target}.{field.name} = mln_ts_wake;",
-                    f"  {target}.{plan.release} = mln_ts_wake_release;",
+                    f"if (!mln_ts_is_absent(call, {js})) {{",
+                    f"  if (!mln_ts_read_function(call, {js}, {path})) {fail};",
+                    *(f"  {line}" for line in self.register(value, js, target, fail)),
+                    f"  {self.assign(entry.callbacks[0], target)}",
                     "}",
                 ]
                 if not entry.native:
@@ -145,7 +144,8 @@ class NativeValues:
             if entry.form == "queue" and entry.function:
                 return [
                     f"if (!mln_ts_read_function(call, {js}, {path})) {fail};",
-                    *self.register(value, js, target, path, fail),
+                    *self.register(value, js, target, fail),
+                    self.assign(entry.callbacks[0], target),
                 ]
         if value.kind == "record":
             return [
@@ -344,52 +344,128 @@ class NativeValues:
         self.functions[name] = (prototype, "\n".join(lines))
         return name
 
-    def register(
-        self, value: ValuePlan, js: str, target: str, path: str, fail: str
-    ) -> list[str]:
-        """Registers a host value with the realm and names its queue in place
-        of the registration's callbacks."""
+    def register(self, value: ValuePlan, js: str, target: str, fail: str) -> list[str]:
+        """Registers a host value with the realm, and names the realm's queue
+        and the value's user data and release in the registration."""
         plan = value.registration
         assert plan is not None
         return [
-            f"if (!mln_ts_read_registration(call, {js}, &{target}.{plan.user_data}, &{target}.{plan.queue}, {path})) {fail};",
+            f"if (!mln_ts_read_registration(call, {js}, &{target}.{plan.user_data}, &{target}.{plan.release}, &{target}.{plan.queue})) {fail};",
         ]
 
-    def registration_callbacks(self, value: ValuePlan, entry) -> list[str]:
-        """Checks an object's callbacks and registers it when the primary one
-        is present.
+    def assign(self, field: FieldPlan, target: str) -> str:
+        """Sets a callback field to the trampoline of its callback type."""
+        callback = self.bound.callbacks[field.value.native]
+        return f"{target}.{field.name} = {self.trampoline(callback)};"
 
-        A queue replaces the primary callback, so its absence leaves the queue
-        unset for native validation. Another absent callback drops the
-        deliveries that would reach it.
+    def registration_callbacks(self, value: ValuePlan, entry) -> list[str]:
+        """Checks an object's callbacks, registers it when the primary one is
+        present, and sets the trampoline of each present callback.
+
+        An absent primary callback leaves the registration unset for native
+        validation.
         """
-        primary = entry.callbacks[0].value.nullable
-        lines = ["  bool present = true;"] if primary else []
-        for index, field in enumerate(entry.callbacks):
+        lines = []
+        present = {}
+        for field in entry.callbacks:
             key = identifier(field.name)
             lines += [
                 f"  if (!mln_ts_member(call, value, {c_string(key)}, &member)) return false;",
                 f"  mln_ts_path(child, sizeof child, path, {c_string(key)});",
             ]
-            check = "if (!mln_ts_read_function(call, member, child)) return false;"
             if not field.value.nullable:
-                lines.append(f"  {check}")
+                lines.append(
+                    "  if (!mln_ts_read_function(call, member, child)) return false;"
+                )
                 continue
+            flag = present[field.name] = f"has_{field.name}"
             lines += [
-                "  if (mln_ts_is_absent(call, member)) {",
-                *(["    present = false;"] if index == 0 else []),
-                "  } else {",
-                f"    {check}",
-                "  }",
+                f"  bool {flag} = !mln_ts_is_absent(call, member);",
+                f"  if ({flag} && !mln_ts_read_function(call, member, child)) return false;",
             ]
-        register = self.register(value, "value", "(*out)", "path", "return false")
-        if not primary:
-            return lines + [f"  {line}" for line in register]
+        body = self.register(value, "value", "(*out)", "return false")
+        for field in entry.callbacks:
+            assign = self.assign(field, "(*out)")
+            flag = present.get(field.name)
+            body.append(f"if ({flag}) {assign}" if flag else assign)
+        primary = present.get(entry.callbacks[0].name)
+        if primary is None:
+            return lines + [f"  {line}" for line in body]
         return lines + [
-            "  if (present) {",
-            *(f"    {line}" for line in register),
+            f"  if ({primary}) {{",
+            *(f"    {line}" for line in body),
             "  }",
         ]
+
+    def trampoline(self, callback) -> str:
+        """The function that native code calls during dispatch for one
+        callback type: it converts the arguments and passes them to the realm's
+        adapter for the type. A handle that the call owns and no host value
+        received is released, so native code never waits on it."""
+        name = f"mln_ts_dispatch_{stem(callback.native)}"
+        if name in self.functions:
+            return name
+        self.callbacks.add(callback.native)
+        context = callback.context
+        assert context is not None
+        returns = callback.result.ctype.spelling
+        parameters = ", ".join(
+            f"{p.value.ctype.spelling} {p.name}" for p in callback.parameters
+        )
+        prototype = f"{returns} {name}({parameters})"
+        self.functions[name] = (prototype, "")
+        arguments = callback.arguments
+        owned = [
+            p
+            for p in arguments
+            if p.value.kind == "handle" and p.value.ownership == "owned"
+        ]
+        lines = [
+            *(
+                f"  (void){p.name};"
+                for p in callback.parameters
+                if p.name == callback.borrowed_owner
+            ),
+            "  napi_handle_scope scope;",
+            f"  napi_env env = mln_ts_upcall_begin({context}, &scope);",
+            "  bool received = false;",
+            "  if (env != NULL) {",
+        ]
+        constant = self.callback_id(callback.native)
+        if arguments:
+            converted = ", ".join(self.to_js(p.value, p.name) for p in arguments)
+            lines += [
+                f"    napi_value argv[{len(arguments)}] = {{{converted}}};",
+                f"    received = mln_ts_upcall_end({context}, scope, {constant}, {len(arguments)}, argv);",
+            ]
+        else:
+            lines.append(
+                f"    received = mln_ts_upcall_end({context}, scope, {constant}, 0, NULL);"
+            )
+        lines.append("  }")
+        if owned:
+            lines.append("  if (!received) {")
+            for parameter in owned:
+                handle = self.values.argument_handle(parameter)
+                cleanup = self.bound.source.functions_by_name[handle.cleanup]
+                extra = len(cleanup.parameters) - 1 + bool(cleanup.diagnostic)
+                release = ", ".join([parameter.name, *["NULL"] * extra])
+                lines.append(f"    {cleanup.name}({release});")
+            lines.append("  }")
+        else:
+            lines.append("  (void)received;")
+        if callback.result.native != "void":
+            # Native code answers a dispatched call itself and ignores what
+            # the trampoline returns.
+            if not callback.queue_result:
+                raise Unsupported(f"{callback.native}: a result needs a queue result")
+            lines.append(f"  return {callback.queue_result};")
+        self.functions[name] = (prototype, "\n".join(lines))
+        return name
+
+    def callback_id(self, native: str) -> str:
+        """The constant that names a callback type's adapter."""
+        return f"MLN_TS_CALLBACK_{stem(native).upper()}"
 
     def union_writer(
         self, record: ValuePlan, field: FieldPlan, js: str, path: str
@@ -651,7 +727,6 @@ class NativeValues:
         )
         if result.nullable:
             name += "_optional"
-        self.decoders.add(name)
         if name in self.functions:
             return name
         prototype = (
@@ -699,69 +774,26 @@ class NativeValues:
         self.functions[name] = (prototype, "\n".join(lines))
         return name
 
-    def decoder_id(self, name: str | None) -> str:
-        """The constant that names a completion decoder, or no decoder, in the
-        user data of a completion that an export submits."""
-        return "MLN_TS_NO_DECODER" if name is None else name.upper()
-
-    # -- Deliveries ---------------------------------------------------------
-
-    def payload_reader(self, callbacks) -> str:
-        """Converts the copied arguments of each drained delivery other than
-        a completion, by its type, or returns undefined for a type that no
-        registration of this binding receives."""
-        name = "mln_ts_delivery_payload"
-        prototype = f"napi_value {name}(napi_env env, const mln_delivery* delivery)"
-        lines = ["  switch (delivery->type) {"]
-        seen = set()
-        for callback in sorted(callbacks, key=lambda c: c.delivery.constant):
-            delivery = callback.delivery
-            if delivery.constant in seen:
-                continue
-            seen.add(delivery.constant)
-            record = self.bound.values[delivery.record]
-            lines += [
-                f"    case {delivery.constant}:",
-                f"      return {self.reader(record)}(env, &delivery->payload.{delivery.payload_member}, sizeof delivery->payload.{delivery.payload_member});",
-            ]
-        lines += ["    default:", "      return mln_ts_undefined(env);", "  }"]
-        self.functions[name] = (prototype, "\n".join(lines))
-        return name
-
-    def decoder_ids(self) -> str:
-        """The constants that name the completion decoders. A name keys each
-        decoder, so a new one leaves the others as they are."""
+    def callback_ids(self) -> str:
+        """The constants that name the callback adapters of the realm, which
+        the TypeScript half numbers alike."""
+        if not self.callbacks:
+            return ""
         return (
-            "/** The completion decoders, by the constant that an export records in\n"
-            " * its completion. */\n"
-            "enum {\n  MLN_TS_NO_DECODER,\n"
-            + "".join(f"  {self.decoder_id(name)},\n" for name in sorted(self.decoders))
-            + "  MLN_TS_DECODER_END,\n};\n"
-            + "_Static_assert(\n  MLN_TS_DECODER_END <= MLN_TS_MAX_DECODERS,\n"
-            + '  "a completion names each decoder beside its token"\n);\n'
-        )
-
-    def decoder_table(self) -> str:
-        return (
-            "const mln_ts_decoder mln_ts_decoders[] = {\n"
-            + "  [MLN_TS_NO_DECODER] = NULL,\n"
+            "/** The realm's callback adapters, by the callback type that each\n"
+            " * serves. */\n"
+            "enum {\n"
             + "".join(
-                f"  [{self.decoder_id(name)}] = {name},\n"
-                for name in sorted(self.decoders)
+                f"  {self.callback_id(native)} = {index},\n"
+                for index, native in enumerate(sorted(self.callbacks))
             )
             + "};\n"
-            + "const size_t mln_ts_decoder_count =\n"
-            + "  sizeof mln_ts_decoders / sizeof mln_ts_decoders[0];\n"
         )
 
     def prototypes(self) -> list[tuple[str, str]]:
         return [self.functions[name] for name in sorted(self.functions)]
 
     def render_bodies(self) -> str:
-        return (
-            "".join(
-                f"{prototype} {{\n{body}\n}}\n\n"
-                for prototype, body in self.prototypes()
-            )
-            + self.decoder_table()
+        return "".join(
+            f"{prototype} {{\n{body}\n}}\n\n" for prototype, body in self.prototypes()
         )

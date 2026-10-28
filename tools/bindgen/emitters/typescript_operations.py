@@ -11,9 +11,9 @@ consumes its receiver, `adopt` for a handle that native
 code transfers to a new owner, and `ViewScope` for a borrowed view. A call
 passes the raw handle ID, and native code reports a released one.
 
-The delivery table tells the realm how each drained delivery reaches the host
-value that a registration rooted: which callback runs, with which copied
-arguments, and which handle the host takes from the batch first.
+The callback adapters tell the realm how a dispatched call reaches the host
+value that a registration rooted: which callback runs, with the arguments
+that the addon's trampoline converted, and which handle an owner adopts first.
 """
 
 from __future__ import annotations
@@ -548,8 +548,8 @@ def lower_command(call: Call, values: Values, natives: NativeValues) -> Lowered:
 
 
 def lower_query(call: Call, values: Values, natives: NativeValues) -> Lowered:
-    """A completion that delivers a result, which the decoder that the addon
-    records converts."""
+    """A completion that delivers a result, which the decoder that its export
+    names converts."""
     lowered = call.lowered
     result = lowered.plan.result
     assert result is not None
@@ -629,15 +629,18 @@ def submit(
         values.check(result, "out")
         lowered.decoder = natives.decoder(result)
     local = f"arg_{completion.parameter}"
-    token = f"call->argv[{call.index}]"
+    settle = f"call->argv[{call.index}]"
     nullable = completion.discardable or completion.optional
     lowered.native_parameters.append(
-        ("completion", "number | undefined" if nullable else "number")
+        (
+            "completion",
+            "NativeCompletion | undefined" if nullable else "NativeCompletion",
+        )
     )
     lowered.discardable = completion.discardable and lowered.owner is not None
-    decoder = natives.decoder_id(lowered.decoder)
+    decoder = lowered.decoder or "NULL"
     lowered.c_body.append(
-        f"if (!mln_ts_read_completion(call, {token}, {'true' if nullable else 'false'}, {decoder}, &{local}, &present_{completion.parameter})) goto done;"
+        f"if (!mln_ts_read_completion(call, {settle}, {'true' if nullable else 'false'}, {decoder}, &{local}, &present_{completion.parameter})) goto done;"
     )
 
 
@@ -706,7 +709,7 @@ def invoke(call: Call, values: Values) -> ValuePlan | None:
         locals_.append(f"{function.return_type.spelling} result;")
         body.append(f"result = {function.name}({call_arguments});")
         result_value = plan.result
-    if status and plan.registrations:
+    if status and (plan.registrations or plan.completion):
         accepted = "status == MLN_STATUS_OK"
         if lowered.declined:
             accepted += f" && !arg_{call.declined}"
@@ -857,7 +860,7 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
             f"mln_ts_dispose_{name}, &arguments, sizeof arguments);"
         ),
     ]
-    lowered.native_parameters.append(("start", "number"))
+    lowered.native_parameters.append(("start", "NativeThreadStart"))
     lowered.shape = "thread_start"
     lowered.returns = f"Promise<{owner_class(owned.handle)}>"
     return lowered
@@ -1216,69 +1219,49 @@ def render_views(bound, values: Values, lowered: list[Lowered]) -> list[str]:
     return [chunks[name] for name in sorted(chunks)]
 
 
-def delivered(bound, values: Values):
-    """Each queue-delivered callback that a generated registration names, with
-    the registrations and fields that name it, by delivery constant."""
-    result = {}
-    for value in values.used.values():
-        if value.kind != "record" or not value.registration:
-            continue
-        entry = registration(bound, value)
-        if entry.form != "queue":
-            continue
-        for field in entry.callbacks:
-            callback = bound.callbacks[field.value.native]
-            result.setdefault(callback.delivery.constant, (callback, []))[1].append(
-                (entry, field)
-            )
-    return result
-
-
-def render_delivery(bound, values: Values, callback, uses) -> str:
-    """One entry of the delivery table: the host callback of a rooted
-    registration, run with the delivery's copied arguments."""
+def render_adapter(bound, values: Values, callback, uses) -> str:
+    """The adapter of one callback type: the host callback of a rooted
+    registration, run with the arguments that the trampoline converted."""
     forms = {(entry.function, field.name) for entry, field in uses}
     if len(forms) != 1:
         raise Unsupported(f"{callback.native}: registrations name it differently")
     entry, field = uses[0]
     public = public_name(entry.value.native)
     if entry.function:
-        function_type = public
-        target = f"target as {public}"
+        # A registration that also takes a native one is a union with it.
+        function_type = (
+            f"({values.callback_type(callback)})" if entry.native else public
+        )
+        target = f"target as {function_type}"
     else:
         member = identifier(field.name)
         function_type = f'NonNullable<{public}["{member}"]>'
         target = f"(target as {public}).{member}"
+        if field.value.nullable:
+            # The addon names a trampoline only for a callback that the
+            # registration held.
+            target += f" as {function_type}"
     names = [parameter_name(p.name) for p in callback.arguments]
     owned = [
         (p, name)
         for p, name in zip(callback.arguments, names)
-        if values.delivered_owner(callback, p)
+        if values.owned_argument(callback, p)
     ]
     lines = [f"const callback = {target};"]
-    if field.value.nullable and not entry.function:
-        # An unset callback drops its deliveries, and the batch releases what
-        # they own.
-        lines.append("if (callback === undefined) return;")
-    decoded = []
-    for parameter, name in zip(callback.arguments, names):
-        key = identifier(parameter.name)
-        decoded.append(f"payload.{key}")
-    lines.append(
-        f"const [{', '.join(names)}] = [{', '.join(decoded)}] as Parameters<{function_type}>;"
-        if names
-        else ""
-    )
+    if names:
+        lines.append(
+            f"const [{', '.join(names)}] = args as Parameters<{function_type}>;"
+        )
     if owned:
         if len(owned) != 1:
-            raise Unsupported(f"{callback.native}: one delivered owner at most")
+            raise Unsupported(f"{callback.native}: one owned argument at most")
         parameter, name = owned[0]
-        handle = values.delivered_handle(parameter)
-        # The owner takes the handle from the batch before the callback runs,
-        # so closing it after a failure releases an unanswered request, which
-        # native code then settles.
+        handle = values.argument_handle(parameter)
+        # The owner adopts the handle before the callback runs, so closing it
+        # after a failure releases an unanswered request, which native code
+        # then settles.
         lines += [
-            f"const owner = takeDelivered(index, {name} as unknown as bigint, (handle) => new {owner_class(handle)}(ADOPT, handle), {disposer(handle)});",
+            f"const owner = adopt({name} as unknown as bigint, () => new {owner_class(handle)}(ADOPT, {name} as unknown as bigint), {disposer(handle)});",
             "try {",
             f"  callback({', '.join('owner' if n == name else n for n in names)});",
             "} catch (error) {",
@@ -1288,31 +1271,37 @@ def render_delivery(bound, values: Values, callback, uses) -> str:
         ]
     else:
         lines.append(f"callback({', '.join(names)});")
-    lines = [line for line in lines if line]
-    uses_index = any("index" in line for line in lines)
-    payload = "payload" if names else "_payload"
-    head = f"[{bound.enum_number(callback.delivery.constant)}]: (target, {payload}{', index' if uses_index else ''}) => {{"
-    return (
-        f"  // {callback.delivery.constant}\n  {head}\n"
-        + "".join(f"    {line}\n" for line in lines)
-        + "  },\n"
+    head = f"(target, {'args' if names else '_args'}) => {{"
+    return f"  // {callback.native}\n  {head}\n" + "".join(
+        f"    {line}\n" for line in lines
     )
 
 
-def render_deliveries(bound, values: Values) -> str:
-    deliveries = delivered(bound, values)
+def render_adapters(bound, values: Values, callbacks: list[str]) -> str:
+    """The callback adapters, in the order of the addon's constants."""
+    uses = {}
+    for value in values.used.values():
+        if value.kind != "record" or not value.registration:
+            continue
+        entry = registration(bound, value)
+        if entry.form not in {"queue", "wake"}:
+            continue
+        for field in entry.callbacks:
+            uses.setdefault(field.value.native, []).append((entry, field))
+    if set(uses) != set(callbacks):
+        raise Unsupported("the addon's trampolines and the adapters disagree")
+    if not callbacks:
+        return ""
     entries = "".join(
-        render_delivery(bound, values, callback, uses)
-        for _, (callback, uses) in sorted(
-            deliveries.items(), key=lambda item: bound.enum_number(item[0])
-        )
+        render_adapter(bound, values, bound.callbacks[native], uses[native]) + "  },\n"
+        for native in callbacks
     )
     return (
-        "// How each drained delivery reaches the host value that its registration\n"
-        "// rooted, by delivery type.\n"
-        "defineDeliveries({\n"
+        "// How a dispatched call reaches the host value that its registration\n"
+        "// rooted, by the callback type that the addon's trampoline numbers.\n"
+        "defineCallbacks([\n"
         + "".join(f"{line}\n" for line in entries.splitlines())
-        + "});\n"
+        + "]);\n"
     )
 
 
@@ -1353,11 +1342,10 @@ def runtime_imports(text: str) -> str:
             "closeSync",
             "defineDisposers",
             "rootsOf",
-            "takeDelivered",
         ],
         "./internal/realm.ts": [
             "type Registrations",
-            "defineDeliveries",
+            "defineCallbacks",
             "withRegistrations",
         ],
     }
@@ -1373,7 +1361,9 @@ def runtime_imports(text: str) -> str:
     return "".join(lines)
 
 
-def render_operations(bound, values: Values, lowered: list[Lowered]):
+def render_operations(
+    bound, values: Values, lowered: list[Lowered], callbacks: list[str]
+):
     by_owner: dict[str | None, list[Lowered]] = {}
     for entry in lowered:
         # A factory is a static method of the handle that it creates.
@@ -1387,8 +1377,8 @@ def render_operations(bound, values: Values, lowered: list[Lowered]):
         )
     chunks += render_attachments(bound, lowered)
     chunks += render_views(bound, values, lowered)
-    chunks.append(render_deliveries(bound, values))
-    body = "\n".join(chunks)
+    chunks.append(render_adapters(bound, values, callbacks))
+    body = "\n".join(chunk for chunk in chunks if chunk)
     operations = (
         HEADER
         + "\n"
@@ -1405,9 +1395,19 @@ def render_operations(bound, values: Values, lowered: list[Lowered]):
         interface.append(f"  {begin}(handle: bigint): bigint;\n")
         interface.append(f"  {end}(scope: bigint): void;\n")
     interface_text = "".join(interface)
+    runtime_types = [
+        name
+        for name in ("NativeCompletion", "NativeThreadStart")
+        if re.search(rf"\b{name}\b", interface_text)
+    ]
     native = (
         HEADER
         + "\n"
+        + (
+            f'import type {{ {", ".join(runtime_types)} }} from "./internal/addon.ts";\n'
+            if runtime_types
+            else ""
+        )
         + value_imports(values, interface_text)
         + "\n"
         + "/** The addon function of each generated operation, by C function name. */\n"

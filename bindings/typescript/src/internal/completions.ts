@@ -1,18 +1,16 @@
 // Promises for asynchronous native operations.
 //
-// Each submission registers a pending entry whose token the generated addon
-// function passes as the completion's user data, with the realm's delivery
-// queue. The entry settles when the realm drains the completion, never inside
-// the submitting call.
+// Each submission passes the generated addon function a function that settles
+// its Promise, which the addon calls when the realm dispatches the completion,
+// never inside the submitting call.
 
-import { type CompletionHeader, native } from "./addon.ts";
+import type {
+  CompletionHeader,
+  NativeCompletion,
+  NativeThreadStart,
+} from "./addon.ts";
 import { MaplibreError } from "./errors.ts";
-import {
-  addCompletion,
-  addThreadStart,
-  removeCompletion,
-  removeThreadStart,
-} from "./realm.ts";
+import { awaitNative } from "./realm.ts";
 
 /**
  * The generations that a committed command published. A failed or cancelled
@@ -31,7 +29,7 @@ export interface CommandCompletion {
   readonly renderUpdateGeneration: bigint;
 }
 
-type Start = (completion: number) => void;
+type Start = (completion: NativeCompletion) => void;
 
 /**
  * Submits an operation and returns its Promise. Throws when native code
@@ -39,7 +37,7 @@ type Start = (completion: number) => void;
  */
 function submit<T>(
   start: Start,
-  settle: (index: number, header: CompletionHeader) => T,
+  settle: (header: CompletionHeader, value: unknown) => T,
 ): Promise<T> {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -47,20 +45,23 @@ function submit<T>(
     resolve = fulfil;
     reject = fail;
   });
-  const token = addCompletion({
-    fail: reject,
-    settle(index, header) {
-      try {
-        resolve(settle(index, header));
-      } catch (error) {
-        reject(error);
-      }
-    },
-  });
+  const done = awaitNative();
+  const complete: NativeCompletion = (header, value, error) => {
+    done();
+    if (error !== undefined) {
+      reject(error);
+      return;
+    }
+    try {
+      resolve(settle(header, value));
+    } catch (thrown) {
+      reject(thrown);
+    }
+  };
   try {
-    start(token);
+    start(complete);
   } catch (error) {
-    removeCompletion(token);
+    done();
     throw error;
   }
   return promise;
@@ -74,7 +75,7 @@ function check(header: CompletionHeader): void {
 
 /** Like {@link run}, but throws when native code rejects the submission. */
 export function submitRun(start: Start): Promise<void> {
-  return submit(start, (_index, header) => check(header));
+  return submit(start, (header) => check(header));
 }
 
 function rejected<T>(body: () => Promise<T>): Promise<T> {
@@ -96,7 +97,7 @@ export function run(start: Start): Promise<void> {
  */
 export function command(start: Start): Promise<CommandCompletion> {
   return rejected(() =>
-    submit(start, (_index, header) => {
+    submit(start, (header) => {
       if (header.status !== 0) {
         throw new MaplibreError(
           header.status,
@@ -114,14 +115,13 @@ export function command(start: Start): Promise<CommandCompletion> {
 
 /**
  * An operation whose value the addon converts through the decoder that its
- * export recorded. A value that fails to convert rejects the Promise, and the
- * batch disposes it.
+ * export names. A value that fails to convert rejects the Promise.
  */
 export function query<T>(start: Start): Promise<T> {
   return rejected(() =>
-    submit(start, (index, header) => {
+    submit(start, (header, value) => {
       check(header);
-      return native.completionValue(index) as T;
+      return value as T;
     }),
   );
 }
@@ -133,26 +133,27 @@ export function query<T>(start: Start): Promise<T> {
  * failed status.
  */
 export function threadStart<T>(
-  start: Start,
+  start: (settle: NativeThreadStart) => void,
   adopt: (handle: bigint) => T,
 ): Promise<T> {
   // A submission that throws rejects the Promise, as the executor's throw.
   return new Promise<T>((resolve, reject) => {
-    const token = addThreadStart((status, handle, diagnostic) => {
-      if (status !== 0) {
-        reject(new MaplibreError(status, diagnostic));
-        return;
-      }
-      try {
-        resolve(adopt(handle));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const done = awaitNative();
     try {
-      start(token);
+      start((status, handle, diagnostic) => {
+        done();
+        if (status !== 0) {
+          reject(new MaplibreError(status, diagnostic));
+          return;
+        }
+        try {
+          resolve(adopt(handle));
+        } catch (error) {
+          reject(error);
+        }
+      });
     } catch (error) {
-      removeThreadStart(token);
+      done();
       throw error;
     }
   });
@@ -164,7 +165,7 @@ export function threadStart<T>(
  * readiness keeps the owner reachable until it settles.
  */
 export function attach<T>(
-  start: (completion: number) => bigint,
+  start: (completion: NativeCompletion) => bigint,
   adopt: (handle: bigint) => T,
 ): [T, Promise<void>] {
   let handle = 0n;

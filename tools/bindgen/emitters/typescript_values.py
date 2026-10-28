@@ -422,25 +422,25 @@ class Values:
             return
         raise Unsupported(f"{value.native}: {value.kind} needs a TypeScript rule")
 
-    def delivered_owner(self, callback, parameter) -> bool:
-        """Whether a delivered argument is a handle that the host takes from
-        the batch: one the callback owns."""
+    def owned_argument(self, callback, parameter) -> bool:
+        """Whether a callback argument is a handle that the callback owns,
+        which an owner adopts."""
         return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
-    def delivered_handle(self, parameter):
+    def argument_handle(self, parameter):
         return parameter.value.handle or self.bound.handles[parameter.value.native]
 
     def check_callback(self, value: ValuePlan) -> None:
-        """Accept a callback that a queue delivers or a wake posts, whose
-        copied arguments this binding can decode."""
+        """Accept a callback that native code can queue or a wake, whose
+        arguments this binding can convert."""
         callback = self.bound.callbacks[value.native]
         if not callback.delivery and not async_hosts.wake_callback(callback):
             raise Unsupported(
                 "callback must answer on its native thread, which TypeScript cannot run"
             )
         for parameter in callback.arguments:
-            if self.delivered_owner(callback, parameter):
-                handle = self.delivered_handle(parameter)
+            if self.owned_argument(callback, parameter):
+                handle = self.argument_handle(parameter)
                 if handle.native not in self.bound.public_handles:
                     raise Unsupported("delivered handle requires a generated owner")
                 self.owners.add(owner_class(handle))
@@ -498,8 +498,8 @@ class Values:
         """The function type of a host callback."""
         parameters = []
         for parameter in callback.arguments:
-            if self.delivered_owner(callback, parameter):
-                ts = owner_class(self.delivered_handle(parameter))
+            if self.owned_argument(callback, parameter):
+                ts = owner_class(self.argument_handle(parameter))
             else:
                 ts = self.ts(parameter.value)
                 if parameter.value.nullable:

@@ -108,11 +108,10 @@ import {
   closeSync,
   defineDisposers,
   rootsOf,
-  takeDelivered,
 } from "./internal/owners.ts";
 import {
   type Registrations,
-  defineDeliveries,
+  defineCallbacks,
   withRegistrations,
 } from "./internal/realm.ts";
 
@@ -4761,31 +4760,47 @@ export class ScopedWebGpuTextureFrame {
   }
 }
 
-// How each drained delivery reaches the host value that its registration
-// rooted, by delivery type.
-defineDeliveries({
-  // MLN_DELIVERY_TYPE_LOG_RECORD
-  [2]: (target, payload) => {
+// How a dispatched call reaches the host value that its registration
+// rooted, by the callback type that the addon's trampoline numbers.
+defineCallbacks([
+  // mln_camera_transition_end_callback
+  (target, args) => {
+    const callback = target as CameraTransitionHandler;
+    const [end] = args as Parameters<CameraTransitionHandler>;
+    callback(end);
+  },
+  // mln_custom_source_cancel_tile_callback
+  (target, args) => {
+    const callback = (target as CustomGeometrySourceOptions)
+      .cancelTile as NonNullable<CustomGeometrySourceOptions["cancelTile"]>;
+    const [tileId] = args as Parameters<
+      NonNullable<CustomGeometrySourceOptions["cancelTile"]>
+    >;
+    callback(tileId);
+  },
+  // mln_custom_source_fetch_tile_callback
+  (target, args) => {
+    const callback = (target as CustomGeometrySourceOptions).fetchTile;
+    const [tileId] = args as Parameters<
+      NonNullable<CustomGeometrySourceOptions["fetchTile"]>
+    >;
+    callback(tileId);
+  },
+  // mln_log_callback
+  (target, args) => {
     const callback = target as LogHandler;
-    const [severity, event, code, message] = [
-      payload.severity,
-      payload.event,
-      payload.code,
-      payload.message,
-    ] as Parameters<LogHandler>;
+    const [severity, event, code, message] = args as Parameters<LogHandler>;
     callback(severity, event, code, message);
   },
-  // MLN_DELIVERY_TYPE_RESOURCE_REQUEST
-  [3]: (target, payload, index) => {
+  // mln_resource_provider_callback
+  (target, args) => {
     const callback = (target as ResourceProvider).callback;
-    const [request, handleValue] = [
-      payload.request,
-      payload.handle,
-    ] as Parameters<NonNullable<ResourceProvider["callback"]>>;
-    const owner = takeDelivered(
-      index,
+    const [request, handleValue] = args as Parameters<
+      NonNullable<ResourceProvider["callback"]>
+    >;
+    const owner = adopt(
       handleValue as unknown as bigint,
-      (handle) => new ResourceRequestHandle(ADOPT, handle),
+      () => new ResourceRequestHandle(ADOPT, handleValue as unknown as bigint),
       (disposed) => native.mln_resource_request_release(disposed, undefined),
     );
     try {
@@ -4795,52 +4810,19 @@ defineDeliveries({
       throw error;
     }
   },
-  // MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL
-  [5]: (target, _payload) => {
+  // mln_resource_request_cancel_callback
+  (target, _args) => {
     const callback = target as ResourceRequestCancelHandler;
     callback();
   },
-  // MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END
-  [6]: (target, payload) => {
-    const callback = target as CameraTransitionHandler;
-    const [end] = [payload.end] as Parameters<CameraTransitionHandler>;
-    callback(end);
-  },
-  // MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE
-  [7]: (target, payload) => {
-    const callback = (target as CustomGeometrySourceOptions).fetchTile;
-    const [tileId] = [payload.tileId] as Parameters<
-      NonNullable<CustomGeometrySourceOptions["fetchTile"]>
-    >;
-    callback(tileId);
-  },
-  // MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE
-  [8]: (target, payload) => {
-    const callback = (target as CustomGeometrySourceOptions).cancelTile;
-    if (callback === undefined) return;
-    const [tileId] = [payload.tileId] as Parameters<
-      NonNullable<CustomGeometrySourceOptions["cancelTile"]>
-    >;
-    callback(tileId);
-  },
-  // MLN_DELIVERY_TYPE_RUNTIME_EVENTS
-  [9]: (target, payload) => {
-    const callback = target as RuntimeEventHandler;
-    const [events] = [payload.events] as Parameters<RuntimeEventHandler>;
-    callback(events);
-  },
-  // MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM
-  [10]: (target, payload, index) => {
+  // mln_resource_transform_callback
+  (target, args) => {
     const callback = target as ResourceTransform;
-    const [kind, url, request] = [
-      payload.kind,
-      payload.url,
-      payload.request,
-    ] as Parameters<ResourceTransform>;
-    const owner = takeDelivered(
-      index,
+    const [kind, url, request] = args as Parameters<ResourceTransform>;
+    const owner = adopt(
       request as unknown as bigint,
-      (handle) => new ResourceTransformRequestHandle(ADOPT, handle),
+      () =>
+        new ResourceTransformRequestHandle(ADOPT, request as unknown as bigint),
       (disposed) =>
         native.mln_resource_transform_request_release(disposed, undefined),
     );
@@ -4851,4 +4833,15 @@ defineDeliveries({
       throw error;
     }
   },
-});
+  // mln_runtime_event_callback
+  (target, args) => {
+    const callback = target as RuntimeEventHandler;
+    const [events] = args as Parameters<RuntimeEventHandler>;
+    callback(events);
+  },
+  // mln_wake_callback
+  (target, _args) => {
+    const callback = target as () => void;
+    callback();
+  },
+]);

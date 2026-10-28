@@ -1,4 +1,4 @@
-// Completions: delivery through the realm's queue, conversion failures,
+// Completions: dispatch through the realm's queue, conversion failures,
 // rejected submissions, failed commands, discarded commands, and waits that
 // give up.
 
@@ -12,7 +12,7 @@ import {
   Status,
 } from "../src/index.ts";
 import { native } from "../src/internal/addon.ts";
-import { query, run } from "../src/internal/completions.ts";
+import { run } from "../src/internal/completions.ts";
 import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, test } from "./support/harness.ts";
 import { pendingCompletions } from "./support/internals.ts";
@@ -20,19 +20,26 @@ import { emptyStyle } from "./support/styles.ts";
 
 test("a completion delivers once and reports a value that fails to convert", async () => {
   const fixture = await openRuntime();
+  const map = await fixture.openStyledMap();
   const pending = pendingCompletions();
-  // A runtime command records no decoder, so reading its completion as a
-  // value fails to convert it.
-  const conversion = query((completion) =>
-    native.mln_runtime_clear_resource_transform(fixture.runtime.id, completion),
-  );
-  await assert.rejects(
-    bounded(conversion, "the conversion"),
-    /the operation completes without a value/,
-  );
-  // The delivery settled its entry once and left none behind.
+  // The addon converts a JSON value through the realm's JSON.parse, so a
+  // parse that throws fails the conversion.
+  const parse = JSON.parse;
+  const failure = new Error("the conversion failed");
+  JSON.parse = () => {
+    throw failure;
+  };
+  try {
+    await assert.rejects(
+      bounded(map.getGlobalState(), "the conversion"),
+      (error) => error === failure,
+    );
+  } finally {
+    JSON.parse = parse;
+  }
+  // The completion settled its Promise once and left nothing pending.
   assert.equal(pendingCompletions(), pending);
-  await bounded(fixture.runtime.clearResourceTransform(), "a later call");
+  await bounded(map.getGlobalState(), "a later call");
   assert.equal(pendingCompletions(), pending);
 });
 

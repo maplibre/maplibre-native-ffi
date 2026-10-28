@@ -1,15 +1,13 @@
-// The realm of one Node-API environment: its wake shim, its delivery queue, the
-// batch that it dispatches, its owner tokens, and its teardown.
+// The realm of one Node-API environment: its wake shim, its delivery queue, its
+// owner tokens, and its teardown.
 //
 // Native threads reach a realm only through its wake shim, which holds the
-// realm's threadsafe function. The delivery queue's wake posts token 0, which
-// asks the realm to drain the queue; a wake registration posts its own token,
-// and its release posts the token once more so the realm drops the root. The
-// realm drains on its event loop, after the native callback that queued each
-// delivery has returned, and its TypeScript half dispatches each delivery by
-// its token and type. Native code copies every payload, answers every
-// synchronous decision itself, and retires each registration with
-// MLN_DELIVERY_TYPE_RETIRED, so the addon keeps nothing per callback.
+// realm's threadsafe function. The delivery queue's wake posts to the shim,
+// and the realm dispatches the queue on its event loop, after the native
+// callback that queued each call has returned. Every completion, registration,
+// and wake of the realm names the queue, so its trampoline runs there and
+// calls the JavaScript value that its user data references. Native code copies
+// every argument and answers every synchronous decision itself.
 
 // dladdr is a Darwin extension.
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
@@ -28,35 +26,13 @@
 #include <dlfcn.h>
 #endif
 
-// What the threadsafe function's data carries: a token shifted left by two
-// with the message kind in the low bits, or a pointer whose low bits say what
-// it points to: clear for a leak report, and MLN_TS_MESSAGE_THREAD for a
-// finished thread start. The TypeScript half's receive() takes the token
-// kinds, and the MLN_TS_RECEIVE kinds for the pointers.
+// What the threadsafe function's data carries: NULL asks the realm to dispatch
+// its queue, and a pointer is a leak report, or, with MLN_TS_MESSAGE_THREAD
+// set, a finished thread start.
 enum {
-  MLN_TS_MESSAGE_WAKE = 1,
-  MLN_TS_MESSAGE_RELEASE = 2,
-  MLN_TS_MESSAGE_THREAD = 3,
-  MLN_TS_MESSAGE_MASK = 3,
+  MLN_TS_MESSAGE_THREAD = 1,
+  MLN_TS_MESSAGE_MASK = 1,
 };
-enum {
-  MLN_TS_RECEIVE_LEAK = 3,
-  MLN_TS_RECEIVE_THREAD = 4,
-};
-
-// Tokens fit 24 bits, so a shifted token fits the data of a 32-bit pointer,
-// as on wasm32. The TypeScript half allocates them below the same limit.
-#define MLN_TS_MAX_TOKEN 0xffffff
-
-// A completion's user data carries its token in the low 24 bits and, above
-// them, the decoder that its export recorded, so the addon alone chooses how
-// to read a completion's value.
-#define MLN_TS_DECODER_SHIFT 24
-_Static_assert(
-  MLN_TS_DECODER_SHIFT + 8 <= sizeof(uintptr_t) * 8 &&
-    MLN_TS_MAX_DECODERS <= 256,
-  "a completion's user data holds a decoder above its token"
-);
 
 /**
  * What native threads reach of a realm. A poster calls the threadsafe function
@@ -72,11 +48,18 @@ typedef struct mln_ts_shim {
   atomic_uint references;
 } mln_ts_shim;
 
-/** The user_data of one wake: its realm's shim and its token. */
-typedef struct mln_ts_wake_context {
-  mln_ts_shim* shim;
-  uint32_t token;
-} mln_ts_wake_context;
+/**
+ * The user data of one registration or completion: its realm's environment,
+ * where its trampoline runs, and a reference to its JavaScript value. A
+ * completion's value is the function that settles its Promise, which it
+ * decodes its result for. A registration's is the root that its owner keeps,
+ * which reaches its host value only while the owner lives.
+ */
+typedef struct mln_ts_host {
+  napi_env env;
+  napi_ref reference;
+  mln_ts_decoder decoder;
+} mln_ts_host;
 
 /** An owner that the collector reclaimed while open. */
 typedef struct mln_ts_leak {
@@ -87,7 +70,8 @@ typedef struct mln_ts_leak {
 /** A call on a thread of its own, and its outcome once it returns. */
 typedef struct mln_ts_thread_start {
   mln_ts_shim* shim;
-  uint32_t token;
+  // The function that settles the call's Promise.
+  napi_ref settle;
   mln_ts_thread_run run;
   void (*dispose)(uint64_t handle);
   // The call memory that the copied arguments point into.
@@ -101,15 +85,14 @@ typedef struct mln_ts_thread_start {
 struct mln_ts_realm {
   napi_env env;
   mln_ts_shim* shim;
-  // Created by the first completion or queued registration.
+  // Created by the first completion or registration.
   mln_delivery_queue queue;
-  // The batch whose deliveries the realm dispatches now, or zero.
-  mln_delivery_batch batch;
-  mln_delivery_batch_view view;
-  napi_ref receive;
   napi_ref register_value;
+  napi_ref invoke;
+  napi_ref retire;
   napi_ref make_error;
   napi_ref take_native;
+  napi_ref report_leak;
   bool referenced;
   bool cleaned;
   // The owners whose tokens this realm's teardown finalizes. The exit path
@@ -211,42 +194,18 @@ static napi_threadsafe_function shim_close(mln_ts_shim* shim) {
   return function;
 }
 
-static void* message(uint32_t token, uintptr_t kind) {
-  return (void*)(((uintptr_t)token << 2) | kind);
-}
+/** The queue's wake: asks the realm to dispatch the queue. */
+static void queue_wake(void* user_data) { shim_post(user_data, NULL); }
 
-static mln_ts_wake_context* wake_context_create(
-  mln_ts_shim* shim, uint32_t token
-) {
-  mln_ts_wake_context* context = malloc(sizeof *context);
-  if (context != NULL) {
-    context->shim = shim_retain(shim);
-    context->token = token;
-  }
-  return context;
-}
-
-static void wake_context_free(void* user_data) {
-  mln_ts_wake_context* context = user_data;
-  shim_release(context->shim);
-  free(context);
-}
-
-void mln_ts_wake(void* user_data) {
-  mln_ts_wake_context* context = user_data;
-  shim_post(context->shim, message(context->token, MLN_TS_MESSAGE_WAKE));
-}
-
-void mln_ts_wake_release(void* user_data) {
-  mln_ts_wake_context* context = user_data;
-  shim_post(context->shim, message(context->token, MLN_TS_MESSAGE_RELEASE));
-  wake_context_free(context);
-}
+static void queue_wake_release(void* user_data) { shim_release(user_data); }
 
 // ---------------------------------------------------------------------------
 // Thread starts
 
-/** Disposes what a thread start created for a realm that cannot take it. */
+/**
+ * Disposes what a thread start created for a realm that cannot take it. The
+ * realm's environment is gone, and its settle reference with it.
+ */
 static void thread_start_abandon(mln_ts_thread_start* start) {
   if (start->status == MLN_STATUS_OK && start->handle != 0) {
     start->dispose(start->handle);
@@ -272,21 +231,23 @@ static void* thread_start_main(void* argument) {
 }
 
 bool mln_ts_start_thread(
-  mln_ts_call* call, napi_value token, mln_ts_thread_run run,
+  mln_ts_call* call, napi_value settle, mln_ts_thread_run run,
   void (*dispose)(uint64_t handle), const void* arguments, size_t size
 ) {
-  int64_t number = 0;
-  if (!mln_ts_read_int(call, token, 1, MLN_TS_MAX_TOKEN, &number, "start")) {
+  if (!mln_ts_read_function(call, settle, "start")) {
     return false;
   }
   mln_ts_thread_start* start = calloc(1, sizeof *start + size);
-  if (start == NULL) {
+  if (
+    start == NULL ||
+    napi_create_reference(call->env, settle, 1, &start->settle) != napi_ok
+  ) {
+    free(start);
     napi_throw_error(call->env, NULL, "thread start allocation failed");
     return false;
   }
   memcpy(start->arguments, arguments, size);
   start->shim = shim_retain(call->realm->shim);
-  start->token = (uint32_t)number;
   start->run = run;
   start->dispose = dispose;
   start->allocations = call->allocations;
@@ -302,6 +263,7 @@ bool mln_ts_start_thread(
   if (result != 0) {
     call->allocations = start->allocations;
     shim_release(start->shim);
+    napi_delete_reference(call->env, start->settle);
     free(start);
     mln_ts_throw_status(
       call->env, MLN_STATUS_NATIVE_ERROR, "the call's thread did not start"
@@ -311,7 +273,7 @@ bool mln_ts_start_thread(
   return true;
 }
 
-/** Reports an exception that a delivery left pending, as an uncaught one. */
+/** Reports an exception that a call left pending, as an uncaught one. */
 static void surface_exception(napi_env env) {
   bool pending = false;
   if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
@@ -321,64 +283,80 @@ static void surface_exception(napi_env env) {
   }
 }
 
+/** Calls a function of the realm's TypeScript half with the global receiver. */
+static bool call_realm(
+  napi_env env, napi_ref function, size_t argc, const napi_value* argv,
+  napi_value* result
+) {
+  napi_value target = reference_value(env, function);
+  napi_value global;
+  return target != NULL && napi_get_global(env, &global) == napi_ok &&
+         napi_call_function(env, global, target, argc, argv, result) == napi_ok;
+}
+
+/** Settles a finished thread start's Promise, and frees the start. */
+static void thread_start_settle(napi_env env, mln_ts_thread_start* start) {
+  napi_value settle = reference_value(env, start->settle);
+  napi_value global;
+  napi_value argv[3] = {
+    mln_ts_number(env, start->status), mln_ts_u64(env, start->handle),
+    mln_ts_text(
+      env, start->diagnostic.message, strlen(start->diagnostic.message)
+    )
+  };
+  napi_delete_reference(env, start->settle);
+  // The TypeScript half owns the handle from here.
+  free(start);
+  if (
+    settle == NULL || napi_get_global(env, &global) != napi_ok ||
+    napi_call_function(env, global, settle, 3, argv, NULL) != napi_ok
+  ) {
+    surface_exception(env);
+  }
+}
+
 /**
- * Receives one message on the realm's JavaScript thread and passes it to the
- * TypeScript half, which catches every error of its own. A host that tears the
- * function down passes no environment: a leak report is then only freed, and
- * a thread start disposes what it created.
+ * Receives one message on the realm's JavaScript thread. A host that tears the
+ * function down passes no environment: the realm then dispatches nothing, a
+ * leak report is only freed, and a thread start disposes what it created.
  */
 static void receive(
   napi_env env, napi_value callback, void* context, void* data
 ) {
   (void)callback;
+  mln_ts_realm* realm = context;
   uintptr_t bits = (uintptr_t)data;
-  uintptr_t kind = bits & MLN_TS_MESSAGE_MASK;
-  mln_ts_leak* leak = kind == 0 ? data : NULL;
   mln_ts_thread_start* start =
-    kind == MLN_TS_MESSAGE_THREAD
+    (bits & MLN_TS_MESSAGE_MASK) == MLN_TS_MESSAGE_THREAD
       ? (mln_ts_thread_start*)(bits & ~(uintptr_t)MLN_TS_MESSAGE_MASK)
       : NULL;
-  mln_ts_realm* realm = context;
-  napi_value target = env != NULL ? reference_value(env, realm->receive) : NULL;
-  napi_value global;
-  if (target != NULL && napi_get_global(env, &global) == napi_ok) {
-    napi_handle_scope scope;
-    if (napi_open_handle_scope(env, &scope) == napi_ok) {
-      napi_value argv[5];
-      size_t argc = 2;
-      if (leak != NULL) {
-        argv[0] = mln_ts_number(env, MLN_TS_RECEIVE_LEAK);
-        argv[1] = mln_ts_text(env, leak->name, strlen(leak->name));
-        argv[2] = mln_ts_u64(env, leak->handle);
-        argc = 3;
-      } else if (start != NULL) {
-        argv[0] = mln_ts_number(env, MLN_TS_RECEIVE_THREAD);
-        argv[1] = mln_ts_number(env, start->token);
-        argv[2] = mln_ts_number(env, start->status);
-        argv[3] = mln_ts_u64(env, start->handle);
-        argv[4] = mln_ts_text(
-          env, start->diagnostic.message, strlen(start->diagnostic.message)
-        );
-        argc = 5;
-        // The TypeScript half owns the handle from here.
-        free(start);
-        start = NULL;
-      } else {
-        argv[0] = mln_ts_number(env, (double)(bits & MLN_TS_MESSAGE_MASK));
-        argv[1] = mln_ts_number(env, (double)(bits >> 2));
-      }
-      if (
-        napi_call_function(env, global, target, argc, argv, NULL) != napi_ok
-      ) {
-        surface_exception(env);
-      }
-      napi_close_handle_scope(env, scope);
+  mln_ts_leak* leak = data != NULL && start == NULL ? data : NULL;
+  napi_handle_scope scope;
+  if (env == NULL || napi_open_handle_scope(env, &scope) != napi_ok) {
+    free(leak);
+    if (start != NULL) {
+      thread_start_abandon(start);
     }
+    return;
   }
-  free(leak);
-  if (start != NULL) {
-    thread_start_abandon(start);
+  if (data == NULL) {
+    // Each call opens a scope of its own, and the TypeScript half catches
+    // what a host value throws. Calls that arrive meanwhile wake again.
+    mln_diagnostic diagnostic = {.size = sizeof diagnostic};
+    mln_delivery_queue_dispatch(realm->queue, &diagnostic);
+  } else if (start != NULL) {
+    thread_start_settle(env, start);
+  } else {
+    napi_value argv[2] = {
+      mln_ts_text(env, leak->name, strlen(leak->name)),
+      mln_ts_u64(env, leak->handle)
+    };
+    if (!call_realm(env, realm->report_leak, 2, argv, NULL)) {
+      surface_exception(env);
+    }
+    free(leak);
   }
+  napi_close_handle_scope(env, scope);
 }
 
 static void function_finalize(napi_env env, void* data, void* hint) {
@@ -397,23 +375,17 @@ static void function_finalize(napi_env env, void* data, void* hint) {
 static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
   mln_ts_realm* realm = call->realm;
   if (realm->queue == MLN_HANDLE_NULL) {
-    mln_ts_wake_context* context = wake_context_create(realm->shim, 0);
-    if (context == NULL) {
-      napi_throw_error(call->env, NULL, "delivery queue allocation failed");
-      return false;
-    }
     mln_delivery_queue_options options = {.size = sizeof options};
-    options.wake.callback = mln_ts_wake;
-    options.wake.user_data = context;
-    // The queue's own release needs no message: the realm releases it.
-    options.wake.release_user_data = wake_context_free;
+    options.wake.callback = queue_wake;
+    options.wake.user_data = shim_retain(realm->shim);
+    options.wake.release_user_data = queue_wake_release;
     mln_diagnostic diagnostic = {.size = sizeof diagnostic};
     mln_delivery_queue queue = MLN_HANDLE_NULL;
     mln_status status =
       mln_delivery_queue_create(&options, &queue, &diagnostic);
     if (status != MLN_STATUS_OK) {
       // A rejected wake stays with the caller.
-      wake_context_free(context);
+      shim_release(realm->shim);
       return mln_ts_check(call, status, &diagnostic);
     }
     realm->queue = queue;
@@ -422,65 +394,110 @@ static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
   return true;
 }
 
-/** Registers a host value with the TypeScript half's current call. */
-static bool register_value(
-  mln_ts_call* call, napi_value value, uint32_t* out_token, const char* path
+static void host_free(void* user_data) {
+  mln_ts_host* host = user_data;
+  napi_delete_reference(host->env, host->reference);
+  free(host);
+}
+
+/**
+ * The user data that references value for the call's realm, which the call
+ * frees unless native code accepts it.
+ */
+static mln_ts_host* host_create(
+  mln_ts_call* call, napi_value value, mln_ts_decoder decoder
 ) {
-  napi_value target = reference_value(call->env, call->realm->register_value);
-  napi_value global;
-  napi_value token;
+  mln_ts_host* host = calloc(1, sizeof *host);
   if (
-    target == NULL || napi_get_global(call->env, &global) != napi_ok ||
-    napi_call_function(call->env, global, target, 1, &value, &token) != napi_ok
+    host == NULL ||
+    napi_create_reference(call->env, value, 1, &host->reference) != napi_ok
   ) {
-    return false;
+    free(host);
+    napi_throw_error(call->env, NULL, "registration allocation failed");
+    return NULL;
   }
-  int64_t number = 0;
-  if (!mln_ts_read_int(call, token, 1, MLN_TS_MAX_TOKEN, &number, path)) {
-    return false;
+  host->env = call->env;
+  host->decoder = decoder;
+  return mln_ts_reject_later(call, host_free, host) ? host : NULL;
+}
+
+/**
+ * A registration's release, which runs during dispatch after its last call:
+ * drops the root that the realm's TypeScript half keeps.
+ */
+static void host_release(void* user_data) {
+  mln_ts_host* host = user_data;
+  napi_env env = host->env;
+  napi_handle_scope scope;
+  if (napi_open_handle_scope(env, &scope) == napi_ok) {
+    napi_value root = reference_value(env, host->reference);
+    if (
+      root == NULL ||
+      !call_realm(env, mln_ts_realm_of(env)->retire, 1, &root, NULL)
+    ) {
+      surface_exception(env);
+    }
+    napi_close_handle_scope(env, scope);
   }
-  *out_token = (uint32_t)number;
-  return true;
+  host_free(host);
 }
 
 bool mln_ts_read_registration(
   mln_ts_call* call, napi_value value, void** out_user_data,
-  mln_delivery_queue* out_queue, const char* path
+  mln_user_data_release* out_release, mln_delivery_queue* out_queue
 ) {
-  uint32_t token = 0;
+  napi_value root;
+  mln_ts_host* host = NULL;
   if (
-    !register_value(call, value, &token, path) || !realm_queue(call, out_queue)
+    !call_realm(call->env, call->realm->register_value, 1, &value, &root) ||
+    !realm_queue(call, out_queue) ||
+    (host = host_create(call, root, NULL)) == NULL
   ) {
     return false;
   }
-  *out_user_data = (void*)(uintptr_t)token;
+  *out_user_data = host;
+  *out_release = host_release;
   return true;
 }
 
-bool mln_ts_read_wake(
-  mln_ts_call* call, napi_value value, void** out_user_data, const char* path
+napi_env mln_ts_upcall_begin(void* user_data, napi_handle_scope* scope) {
+  napi_env env = ((mln_ts_host*)user_data)->env;
+  return napi_open_handle_scope(env, scope) == napi_ok ? env : NULL;
+}
+
+bool mln_ts_upcall_end(
+  void* user_data, napi_handle_scope scope, uint32_t callback, size_t argc,
+  const napi_value* argv
 ) {
-  *out_user_data = NULL;
-  if (mln_ts_is_absent(call, value)) {
-    return true;
+  mln_ts_host* host = user_data;
+  napi_env env = host->env;
+  napi_value values[MLN_TS_MAX_ARGUMENTS + 3];
+  values[0] = mln_ts_number(env, callback);
+  values[1] = reference_value(env, host->reference);
+  values[2] = mln_ts_undefined(env);
+  if (argc > MLN_TS_MAX_ARGUMENTS) {
+    argc = MLN_TS_MAX_ARGUMENTS;
   }
-  uint32_t token = 0;
+  for (size_t index = 0; index < argc; index++) {
+    values[index + 3] = argv[index];
+    if (argv[index] == NULL) {
+      // A failed conversion leaves its error pending, which the TypeScript
+      // half reports in place of the call.
+      napi_get_and_clear_last_exception(env, &values[2]);
+      values[index + 3] = mln_ts_undefined(env);
+    }
+  }
+  napi_value result;
+  bool received = false;
   if (
-    !mln_ts_read_function(call, value, path) ||
-    !register_value(call, value, &token, path)
+    call_realm(env, mln_ts_realm_of(env)->invoke, argc + 3, values, &result)
   ) {
-    return false;
+    napi_get_value_bool(env, result, &received);
+  } else {
+    surface_exception(env);
   }
-  mln_ts_wake_context* context = wake_context_create(call->realm->shim, token);
-  if (context == NULL) {
-    napi_throw_error(call->env, NULL, "wake allocation failed");
-    return false;
-  }
-  if (!mln_ts_reject_later(call, wake_context_free, context)) {
-    return false;
-  }
-  *out_user_data = context;
-  return true;
+  napi_close_handle_scope(env, scope);
+  return received;
 }
 
 /** The release that a call runs for a native registration it does not pass
@@ -500,17 +517,14 @@ bool mln_ts_read_native_registration(
   uint64_t* out, const char* path
 ) {
   napi_env env = call->env;
-  napi_value target = reference_value(env, call->realm->take_native);
-  napi_value global;
   napi_value fields;
   napi_value argv[3] = {
     value, mln_ts_text(env, kind, strlen(kind)),
     mln_ts_text(env, path, strlen(path))
   };
   if (
-    target == NULL || argv[1] == NULL || argv[2] == NULL ||
-    napi_get_global(env, &global) != napi_ok ||
-    napi_call_function(env, global, target, 3, argv, &fields) != napi_ok
+    argv[1] == NULL || argv[2] == NULL ||
+    !call_realm(env, call->realm->take_native, 3, argv, &fields)
   ) {
     return false;
   }
@@ -561,32 +575,6 @@ bool mln_ts_read_native_registration(
   return mln_ts_reject_later(call, native_release, entry);
 }
 
-bool mln_ts_read_completion(
-  mln_ts_call* call, napi_value token, bool discardable, uint32_t decoder,
-  mln_completion* storage, const mln_completion** out
-) {
-  *out = NULL;
-  if (discardable && mln_ts_is_absent(call, token)) {
-    return true;
-  }
-  int64_t number = 0;
-  mln_delivery_queue queue = MLN_HANDLE_NULL;
-  if (
-    !mln_ts_read_int(call, token, 1, MLN_TS_MAX_TOKEN, &number, "completion") ||
-    !realm_queue(call, &queue)
-  ) {
-    return false;
-  }
-  // A rejected submission queues nothing, so the completion needs no cleanup.
-  memset(storage, 0, sizeof *storage);
-  storage->size = sizeof *storage;
-  storage->user_data =
-    (void*)((uintptr_t)decoder << MLN_TS_DECODER_SHIFT | (uintptr_t)number);
-  storage->queue = queue;
-  *out = storage;
-  return true;
-}
-
 static napi_value completion_header(
   napi_env env, const mln_completion_result* result
 ) {
@@ -611,173 +599,66 @@ static napi_value completion_header(
 }
 
 /**
- * drain() moves every queued delivery into a batch that the realm keeps until
- * batchRelease(), and returns one [type, token, payload, error] entry per
- * delivery: a completion's status, generations, and diagnostic,
- * or another delivery's copied arguments, or the error that converting them
- * threw. It returns undefined when nothing is queued, and null when the batch
- * could not be allocated, in which case the deliveries stay queued.
+ * A completion's callback, which runs once during dispatch: settles its
+ * Promise with the header and the decoded value of a successful result, or
+ * with the error that converting them threw.
  */
-static napi_value drain(napi_env env, napi_callback_info info) {
-  mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 0)) {
-    return NULL;
-  }
-  mln_ts_realm* realm = call.realm;
-  if (realm->batch != MLN_HANDLE_NULL) {
-    napi_throw_error(env, NULL, "the realm already holds a drained batch");
-    return mln_ts_end(&call);
-  }
-  if (realm->queue == MLN_HANDLE_NULL) {
-    return mln_ts_end(&call);
-  }
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_delivery_batch_view view = {.size = sizeof view};
-  mln_diagnostic diagnostic = {.size = sizeof diagnostic};
-  mln_status status =
-    mln_delivery_queue_drain(realm->queue, &batch, &view, &diagnostic);
-  if (status == MLN_STATUS_NOT_READY) {
-    return mln_ts_end(&call);
-  }
-  if (status == MLN_STATUS_NATIVE_ERROR) {
-    napi_get_null(env, &call.result);
-    return mln_ts_end(&call);
-  }
-  if (!mln_ts_check(&call, status, &diagnostic)) {
-    return mln_ts_end(&call);
-  }
-  if (view.delivery_size < sizeof(mln_delivery)) {
-    mln_delivery_batch_release(batch);
-    napi_throw_range_error(env, NULL, "native delivery stride is too small");
-    return mln_ts_end(&call);
-  }
-  realm->batch = batch;
-  realm->view = view;
-  napi_value entries = mln_ts_array(env, view.delivery_count);
-  for (size_t index = 0; entries != NULL && index < view.delivery_count;
-       index++) {
-    const mln_delivery* delivery =
-      (const mln_delivery*)((const char*)view.deliveries +
-                            index * view.delivery_size);
-    // The TypeScript half names the two protocol types, which carry no
-    // callback's arguments, and dispatches the rest by number.
-    napi_value type = mln_ts_number(env, delivery->type);
-    napi_value payload = mln_ts_undefined(env);
-    if (delivery->type == MLN_DELIVERY_TYPE_COMPLETION) {
-      type = mln_ts_text(env, "completion", strlen("completion"));
-      payload = completion_header(env, &delivery->payload.completion);
-    } else if (delivery->type == MLN_DELIVERY_TYPE_RETIRED) {
-      type = mln_ts_text(env, "retired", strlen("retired"));
-    } else {
-      payload = mln_ts_delivery_payload(env, delivery);
-    }
-    napi_value entry = mln_ts_array(env, 4);
-    if (payload == NULL) {
-      napi_value error;
-      napi_get_and_clear_last_exception(env, &error);
-      mln_ts_set_index(env, entry, 3, error);
-      payload = mln_ts_undefined(env);
-    }
+static void complete(void* user_data, const mln_completion_result* result) {
+  mln_ts_host* host = user_data;
+  napi_env env = host->env;
+  napi_handle_scope scope;
+  if (napi_open_handle_scope(env, &scope) == napi_ok) {
+    napi_value argv[3] = {
+      completion_header(env, result), mln_ts_undefined(env),
+      mln_ts_undefined(env)
+    };
     if (
-      !mln_ts_set_index(env, entry, 0, type) ||
-      !mln_ts_set_index(
-        env, entry, 1,
-        mln_ts_number(
-          env, (uint32_t)((uintptr_t)delivery->user_data & MLN_TS_MAX_TOKEN)
-        )
-      ) ||
-      !mln_ts_set_index(env, entry, 2, payload) ||
-      !mln_ts_set_index(env, entries, (uint32_t)index, entry)
+      argv[0] != NULL && result->status == MLN_STATUS_OK &&
+      host->decoder != NULL
     ) {
-      entries = NULL;
+      argv[1] = host->decoder(env, result);
     }
-  }
-  call.result = entries;
-  return mln_ts_end(&call);
-}
-
-/** The drained delivery at the call's first argument. */
-static const mln_delivery* delivery_at(mln_ts_call* call, size_t* out_index) {
-  mln_ts_realm* realm = call->realm;
-  int64_t index = 0;
-  if (realm->batch == MLN_HANDLE_NULL || realm->view.delivery_count == 0) {
-    napi_throw_error(call->env, NULL, "the realm holds no drained batch");
-    return NULL;
-  }
-  if (!mln_ts_read_int(
-        call, call->argv[0], 0, (int64_t)realm->view.delivery_count - 1, &index,
-        "index"
-      )) {
-    return NULL;
-  }
-  *out_index = (size_t)index;
-  return (const mln_delivery*)((const char*)realm->view.deliveries +
-                               (size_t)index * realm->view.delivery_size);
-}
-
-static bool take(mln_ts_call* call, size_t index) {
-  mln_diagnostic diagnostic = {.size = sizeof diagnostic};
-  return mln_ts_check(
-    call, mln_delivery_batch_take(call->realm->batch, index, &diagnostic),
-    &diagnostic
-  );
-}
-
-/**
- * completionValue(index) converts a drained completion's value through the
- * decoder that its export recorded.
- */
-static napi_value completion_value(napi_env env, napi_callback_info info) {
-  mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 1)) {
-    return NULL;
-  }
-  size_t index = 0;
-  const mln_delivery* delivery = delivery_at(&call, &index);
-  if (delivery != NULL) {
-    uintptr_t decoder = (uintptr_t)delivery->user_data >> MLN_TS_DECODER_SHIFT;
-    if (delivery->type != MLN_DELIVERY_TYPE_COMPLETION) {
-      napi_throw_error(env, NULL, "the delivery is not a completion");
-    } else if (
-      decoder >= mln_ts_decoder_count || mln_ts_decoders[decoder] == NULL
+    if (argv[0] == NULL || argv[1] == NULL) {
+      napi_get_and_clear_last_exception(env, &argv[2]);
+      argv[0] = argv[1] = mln_ts_undefined(env);
+    }
+    napi_value settle = reference_value(env, host->reference);
+    napi_value global;
+    if (
+      settle == NULL || napi_get_global(env, &global) != napi_ok ||
+      napi_call_function(env, global, settle, 3, argv, NULL) != napi_ok
     ) {
-      napi_throw_error(env, NULL, "the operation completes without a value");
-    } else {
-      napi_value value =
-        mln_ts_decoders[decoder](env, &delivery->payload.completion);
-      if (value != NULL) {
-        call.result = value;
-      }
+      surface_exception(env);
     }
+    napi_close_handle_scope(env, scope);
   }
-  return mln_ts_end(&call);
+  host_free(host);
 }
 
-/** deliveryTake(index) takes a drained delivery's owned handles. */
-static napi_value delivery_take(napi_env env, napi_callback_info info) {
-  mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 1)) {
-    return NULL;
+bool mln_ts_read_completion(
+  mln_ts_call* call, napi_value settle, bool discardable,
+  mln_ts_decoder decoder, mln_completion* storage, const mln_completion** out
+) {
+  *out = NULL;
+  if (discardable && mln_ts_is_absent(call, settle)) {
+    return true;
   }
-  size_t index = 0;
-  if (delivery_at(&call, &index) != NULL) {
-    take(&call, index);
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  mln_ts_host* host = NULL;
+  if (
+    !mln_ts_read_function(call, settle, "completion") ||
+    !realm_queue(call, &queue) ||
+    (host = host_create(call, settle, decoder)) == NULL
+  ) {
+    return false;
   }
-  return mln_ts_end(&call);
-}
-
-/**
- * batchRelease() releases the drained batch, which disposes what the realm
- * did not take: a request, which then fails or keeps its URL.
- */
-static napi_value batch_release(napi_env env, napi_callback_info info) {
-  (void)info;
-  mln_ts_realm* realm = mln_ts_realm_of(env);
-  if (realm != NULL && realm->batch != MLN_HANDLE_NULL) {
-    mln_delivery_batch_release(realm->batch);
-    realm->batch = MLN_HANDLE_NULL;
-  }
-  return mln_ts_undefined(env);
+  memset(storage, 0, sizeof *storage);
+  storage->size = sizeof *storage;
+  storage->callback = complete;
+  storage->user_data = host;
+  storage->queue = queue;
+  *out = storage;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -946,12 +827,9 @@ static void realm_cleanup(void* data) {
   if (function != NULL) {
     napi_release_threadsafe_function(function, napi_tsfn_abort);
   }
-  // Releasing the queue disposes every undelivered owned value and fails
-  // every undelivered request, and later pushes are refused.
-  if (realm->batch != MLN_HANDLE_NULL) {
-    mln_delivery_batch_release(realm->batch);
-    realm->batch = MLN_HANDLE_NULL;
-  }
+  // Releasing the queue abandons every pending call and the user data of
+  // every registration, whose references the environment's teardown frees,
+  // fails every undelivered request, and refuses later pushes.
   if (realm->queue != MLN_HANDLE_NULL) {
     mln_delivery_queue_release(realm->queue);
     realm->queue = MLN_HANDLE_NULL;
@@ -970,12 +848,15 @@ static void realm_cleanup(void* data) {
   pthread_mutex_unlock(&realm->owners_lock);
   // OpenHarmony runs instance-data finalizers after it disposed the realm's
   // VM, where deleting a reference crashes, so the hook deletes them.
-  napi_delete_reference(realm->env, realm->receive);
-  napi_delete_reference(realm->env, realm->register_value);
-  napi_delete_reference(realm->env, realm->make_error);
-  napi_delete_reference(realm->env, realm->take_native);
-  realm->receive = realm->register_value = realm->make_error = NULL;
-  realm->take_native = NULL;
+  napi_ref* references[] = {
+    &realm->register_value, &realm->invoke,      &realm->retire,
+    &realm->make_error,     &realm->take_native, &realm->report_leak,
+  };
+  for (size_t index = 0; index < sizeof references / sizeof *references;
+       index++) {
+    napi_delete_reference(realm->env, *references[index]);
+    *references[index] = NULL;
+  }
 }
 
 static void realm_finalize(napi_env env, void* data, void* hint) {
@@ -1013,15 +894,15 @@ static napi_value shutdown_at_exit(napi_env env, napi_callback_info info) {
 // ---------------------------------------------------------------------------
 // Runtime exports
 
-// install(receive, register, makeError, takeNative)
+// install(register, invoke, retire, makeError, takeNative, reportLeak)
 static napi_value install(napi_env env, napi_callback_info info) {
   mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 4)) {
+  if (!mln_ts_begin(&call, env, info, 6)) {
     return NULL;
   }
-  // A second copy of the binding in this realm would number its tokens from
-  // the same start, and the copies would receive each other's deliveries.
-  if (call.realm->receive != NULL) {
+  // A second copy of the binding in this realm would install a second set of
+  // callback adapters and roots, and the copies would share one queue.
+  if (call.realm->register_value != NULL) {
     napi_throw_error(
       env, NULL,
       "another copy of the binding already uses the addon in this realm; "
@@ -1029,11 +910,12 @@ static napi_value install(napi_env env, napi_callback_info info) {
     );
     return mln_ts_end(&call);
   }
-  napi_ref* targets[4] = {
-    &call.realm->receive, &call.realm->register_value, &call.realm->make_error,
-    &call.realm->take_native
+  napi_ref* targets[6] = {
+    &call.realm->register_value, &call.realm->invoke,
+    &call.realm->retire,         &call.realm->make_error,
+    &call.realm->take_native,    &call.realm->report_leak,
   };
-  for (size_t index = 0; index < 4; index++) {
+  for (size_t index = 0; index < 6; index++) {
     napi_create_reference(env, call.argv[index], 1, targets[index]);
   }
   return mln_ts_end(&call);
@@ -1126,8 +1008,8 @@ napi_value mln_ts_module_init(
     return NULL;
   }
   shim->open = true;
-  // A wake or a registration keeps nothing alive; pending Promises reference
-  // the function through setReferenced().
+  // A registration keeps nothing alive; pending Promises reference the
+  // function through setReferenced().
   napi_unref_threadsafe_function(env, shim->function);
   if (napi_set_instance_data(env, realm, realm_finalize, NULL) != napi_ok) {
     return NULL;
@@ -1144,10 +1026,6 @@ napi_value mln_ts_module_init(
     {"setReferenced", set_referenced},
     {"ownerTokenCreate", owner_token_create},
     {"shutdownAtExit", shutdown_at_exit},
-    {"drain", drain},
-    {"completionValue", completion_value},
-    {"deliveryTake", delivery_take},
-    {"batchRelease", batch_release},
   };
   define(
     env, exports, runtime_exports,

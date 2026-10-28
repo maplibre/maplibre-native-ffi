@@ -448,10 +448,11 @@ static napi_value mln_ts_export_mln_log_set_callback(
   arg_handler.size = sizeof arg_handler;
   if (!mln_ts_read_function(call, call->argv[0], "handler")) goto done;
   if (!mln_ts_read_registration(
-        call, call->argv[0], &arg_handler.user_data, &arg_handler.queue,
-        "handler"
+        call, call->argv[0], &arg_handler.user_data,
+        &arg_handler.release_user_data, &arg_handler.queue
       ))
     goto done;
+  arg_handler.callback = mln_ts_dispatch_log_callback;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_log_set_callback(&arg_handler, &diagnostic);
@@ -530,8 +531,7 @@ static napi_value mln_ts_export_mln_map_add_custom_geometry_source(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -573,8 +573,7 @@ static napi_value mln_ts_export_mln_map_add_custom_vector_source(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -610,8 +609,7 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
     goto done;
   if (!mln_ts_read_u64(call, call->argv[2], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -619,6 +617,7 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
   status = mln_map_add_geo_json_source_data(
     arg_map, arg_source_id, arg_data, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -658,8 +657,7 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_url(
     present_options = &arg_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -668,6 +666,7 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_url(
     arg_map, arg_source_id, arg_url, present_options, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -713,8 +712,7 @@ static napi_value mln_ts_export_mln_map_add_image_source_image(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -723,6 +721,7 @@ static napi_value mln_ts_export_mln_map_add_image_source_image(
     arg_map, arg_source_id, arg_coordinates, (size_t)count_coordinates,
     &arg_image, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -762,8 +761,7 @@ static napi_value mln_ts_export_mln_map_add_image_source_url(
   }
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_url, "url")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -772,6 +770,7 @@ static napi_value mln_ts_export_mln_map_add_image_source_url(
     arg_map, arg_source_id, arg_coordinates, (size_t)count_coordinates, arg_url,
     present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -802,8 +801,7 @@ static napi_value mln_ts_export_mln_map_add_style_layer_json(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -812,6 +810,7 @@ static napi_value mln_ts_export_mln_map_add_style_layer_json(
     arg_map, arg_layer_json, arg_before_layer_id, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -842,8 +841,7 @@ static napi_value mln_ts_export_mln_map_add_style_source_json(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -851,6 +849,7 @@ static napi_value mln_ts_export_mln_map_add_style_source_json(
   status = mln_map_add_style_source_json(
     arg_map, arg_source_id, arg_source_json, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -879,8 +878,7 @@ static napi_value mln_ts_export_mln_map_apply_camera_delta(
   if (!mln_ts_write_camera_delta(call, call->argv[1], &arg_delta, "delta"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -930,8 +928,7 @@ static napi_value mln_ts_export_mln_map_attach_graphics_device_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -981,8 +978,7 @@ static napi_value mln_ts_export_mln_map_attach_metal_borrowed_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1032,8 +1028,7 @@ static napi_value mln_ts_export_mln_map_attach_metal_owned_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1083,8 +1078,7 @@ static napi_value mln_ts_export_mln_map_attach_metal_surface(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1134,8 +1128,7 @@ static napi_value mln_ts_export_mln_map_attach_open_gl_borrowed_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1185,8 +1178,7 @@ static napi_value mln_ts_export_mln_map_attach_open_gl_owned_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1236,8 +1228,7 @@ static napi_value mln_ts_export_mln_map_attach_open_gl_surface(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1287,8 +1278,7 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_borrowed_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1338,8 +1328,7 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_owned_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1389,8 +1378,7 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_surface(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1440,8 +1428,7 @@ static napi_value mln_ts_export_mln_map_attach_web_gpu_borrowed_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1491,8 +1478,7 @@ static napi_value mln_ts_export_mln_map_attach_web_gpu_owned_texture(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1542,8 +1528,7 @@ static napi_value mln_ts_export_mln_map_attach_web_gpu_surface(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1576,14 +1561,14 @@ static napi_value mln_ts_export_mln_map_begin_command_group(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_begin_command_group(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1621,7 +1606,7 @@ static napi_value mln_ts_export_mln_map_camera_for_geometry(
     present_fit_options = &arg_fit_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_CAMERA_OPTIONS,
+        call, call->argv[3], false, mln_ts_decode_camera_options,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -1630,6 +1615,7 @@ static napi_value mln_ts_export_mln_map_camera_for_geometry(
   status = mln_map_camera_for_geometry(
     arg_map, arg_geometry, present_fit_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1673,7 +1659,7 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lng_bounds(
     present_fit_options = &arg_fit_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_CAMERA_OPTIONS,
+        call, call->argv[3], false, mln_ts_decode_camera_options,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -1682,6 +1668,7 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lng_bounds(
   status = mln_map_camera_for_lat_lng_bounds(
     arg_map, arg_bounds, present_fit_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1728,7 +1715,7 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lngs(
     present_fit_options = &arg_fit_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_CAMERA_OPTIONS,
+        call, call->argv[3], false, mln_ts_decode_camera_options,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -1738,6 +1725,7 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lngs(
     arg_map, arg_coordinates, (size_t)count_coordinates, present_fit_options,
     present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1768,8 +1756,7 @@ static napi_value mln_ts_export_mln_map_cancel_camera_transition(
     arg_transition_id = (uint64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1777,6 +1764,7 @@ static napi_value mln_ts_export_mln_map_cancel_camera_transition(
   status = mln_map_cancel_camera_transition(
     arg_map, arg_transition_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1799,13 +1787,13 @@ static napi_value mln_ts_export_mln_map_cancel_transitions(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_cancel_transitions(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1852,13 +1840,13 @@ static napi_value mln_ts_export_mln_map_dump_debug_logs(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_dump_debug_logs(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1881,13 +1869,13 @@ static napi_value mln_ts_export_mln_map_end_command_group(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_end_command_group(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1910,13 +1898,14 @@ static napi_value mln_ts_export_mln_map_get_camera(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_CAMERA_QUERY_RESULT,
+        call, call->argv[1], false, mln_ts_decode_camera_query_result,
         &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_get_camera(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1947,7 +1936,7 @@ static napi_value mln_ts_export_mln_map_get_feature_state(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        call, call->argv[2], false, mln_ts_decode_buffer_view_json,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -1956,6 +1945,7 @@ static napi_value mln_ts_export_mln_map_get_feature_state(
   status = mln_map_get_feature_state(
     arg_map, &arg_selector, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -1978,13 +1968,14 @@ static napi_value mln_ts_export_mln_map_get_global_state(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        call, call->argv[1], false, mln_ts_decode_buffer_view_json,
         &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_get_global_state(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2010,7 +2001,7 @@ static napi_value mln_ts_export_mln_map_get_image_source_coordinates(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_LAT_LNG_LIST, &arg_completion,
+        call, call->argv[2], false, mln_ts_decode_lat_lng_list, &arg_completion,
         &present_completion
       ))
     goto done;
@@ -2019,6 +2010,7 @@ static napi_value mln_ts_export_mln_map_get_image_source_coordinates(
   status = mln_map_get_image_source_coordinates(
     arg_map, arg_source_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2041,7 +2033,7 @@ static napi_value mln_ts_export_mln_map_get_loaded_style_json(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        call, call->argv[1], false, mln_ts_decode_buffer_view_json,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2049,6 +2041,7 @@ static napi_value mln_ts_export_mln_map_get_loaded_style_json(
   diagnostic.message[0] = '\0';
   status =
     mln_map_get_loaded_style_json(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2109,7 +2102,7 @@ static napi_value mln_ts_export_mln_map_get_style_image(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_image_id, "imageId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_STYLE_IMAGE_INFO_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_style_image_info_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2118,6 +2111,7 @@ static napi_value mln_ts_export_mln_map_get_style_image(
   status = mln_map_get_style_image(
     arg_map, arg_image_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2143,7 +2137,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_STYLE_LAYER_INFO_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_style_layer_info_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2152,6 +2146,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer(
   status = mln_map_get_style_layer(
     arg_map, arg_layer_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2177,7 +2172,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_json(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_buffer_view_json_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2186,6 +2181,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_json(
   status = mln_map_get_style_layer_json(
     arg_map, arg_layer_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2216,7 +2212,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_property(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
+        call, call->argv[3], false, mln_ts_decode_buffer_view_json_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2225,6 +2221,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_property(
   status = mln_map_get_style_layer_property(
     arg_map, arg_layer_id, arg_property_name, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2252,7 +2249,7 @@ static napi_value mln_ts_export_mln_map_get_style_light_property(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_buffer_view_json_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2261,6 +2258,7 @@ static napi_value mln_ts_export_mln_map_get_style_light_property(
   status = mln_map_get_style_light_property(
     arg_map, arg_property_name, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2286,7 +2284,7 @@ static napi_value mln_ts_export_mln_map_get_style_source(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_STYLE_SOURCE_INFO_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_style_source_info_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2295,6 +2293,7 @@ static napi_value mln_ts_export_mln_map_get_style_source(
   status = mln_map_get_style_source(
     arg_map, arg_source_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2317,7 +2316,7 @@ static napi_value mln_ts_export_mln_map_get_style_transition_options(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_STYLE_TRANSITION_OPTIONS,
+        call, call->argv[1], false, mln_ts_decode_style_transition_options,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2326,6 +2325,7 @@ static napi_value mln_ts_export_mln_map_get_style_transition_options(
   status = mln_map_get_style_transition_options(
     arg_map, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2348,13 +2348,14 @@ static napi_value mln_ts_export_mln_map_get_style_url(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
+        call, call->argv[1], false, mln_ts_decode_buffer_view, &arg_completion,
         &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_get_style_url(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2390,8 +2391,7 @@ mln_ts_export_mln_map_invalidate_custom_geometry_source_region(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2399,6 +2399,7 @@ mln_ts_export_mln_map_invalidate_custom_geometry_source_region(
   status = mln_map_invalidate_custom_geometry_source_region(
     arg_map, arg_source_id, arg_bounds, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2433,8 +2434,7 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_geometry_source_tile(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2442,6 +2442,7 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_geometry_source_tile(
   status = mln_map_invalidate_custom_geometry_source_tile(
     arg_map, arg_source_id, arg_tile_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2476,8 +2477,7 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_tile(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2485,6 +2485,7 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_tile(
   status = mln_map_invalidate_custom_vector_source_tile(
     arg_map, arg_source_id, arg_tile_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2513,7 +2514,7 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera(
   if (!mln_ts_write_camera_options(call, call->argv[1], &arg_camera, "camera"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_LAT_LNG_BOUNDS,
+        call, call->argv[2], false, mln_ts_decode_lat_lng_bounds,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2522,6 +2523,7 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera(
   status = mln_map_lat_lng_bounds_for_camera(
     arg_map, &arg_camera, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2550,7 +2552,7 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera_unwrapped(
   if (!mln_ts_write_camera_options(call, call->argv[1], &arg_camera, "camera"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_LAT_LNG_BOUNDS,
+        call, call->argv[2], false, mln_ts_decode_lat_lng_bounds,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2559,6 +2561,7 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera_unwrapped(
   status = mln_map_lat_lng_bounds_for_camera_unwrapped(
     arg_map, &arg_camera, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2581,13 +2584,14 @@ static napi_value mln_ts_export_mln_map_list_style_layers(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_STYLE_LAYER_INFO_LIST,
+        call, call->argv[1], false, mln_ts_decode_style_layer_info_list,
         &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_list_style_layers(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2610,13 +2614,14 @@ static napi_value mln_ts_export_mln_map_list_style_sources(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_STYLE_SOURCE_INFO_LIST,
+        call, call->argv[1], false, mln_ts_decode_style_source_info_list,
         &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_list_style_sources(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -2647,8 +2652,7 @@ static napi_value mln_ts_export_mln_map_move_style_layer(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2656,6 +2660,7 @@ static napi_value mln_ts_export_mln_map_move_style_layer(
   status = mln_map_move_style_layer(
     arg_map, arg_layer_id, arg_before_layer_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3053,13 +3058,13 @@ static napi_value mln_ts_export_mln_map_release(
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_release(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -3091,8 +3096,7 @@ static napi_value mln_ts_export_mln_map_remove_feature_state(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3100,6 +3104,7 @@ static napi_value mln_ts_export_mln_map_remove_feature_state(
   status = mln_map_remove_feature_state(
     arg_map, &arg_selector, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3125,8 +3130,7 @@ static napi_value mln_ts_export_mln_map_remove_style_image(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_image_id, "imageId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3134,6 +3138,7 @@ static napi_value mln_ts_export_mln_map_remove_style_image(
   status = mln_map_remove_style_image(
     arg_map, arg_image_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3159,8 +3164,7 @@ static napi_value mln_ts_export_mln_map_remove_style_layer(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3168,6 +3172,7 @@ static napi_value mln_ts_export_mln_map_remove_style_layer(
   status = mln_map_remove_style_layer(
     arg_map, arg_layer_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3193,8 +3198,7 @@ static napi_value mln_ts_export_mln_map_remove_style_source(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3202,6 +3206,7 @@ static napi_value mln_ts_export_mln_map_remove_style_source(
   status = mln_map_remove_style_source(
     arg_map, arg_source_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3224,13 +3229,13 @@ static napi_value mln_ts_export_mln_map_request_repaint(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_request_repaint(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3253,14 +3258,14 @@ static napi_value mln_ts_export_mln_map_request_still_image(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_request_still_image(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3292,13 +3297,13 @@ static napi_value mln_ts_export_mln_map_resize(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_resize(arg_map, arg_extent, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3327,14 +3332,14 @@ static napi_value mln_ts_export_mln_map_set_bounds(
   if (!mln_ts_write_bound_options(call, call->argv[1], &arg_options, "options"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_set_bounds(arg_map, &arg_options, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3371,8 +3376,7 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_data(
   }
   if (!mln_ts_read_json_view(call, call->argv[3], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3381,6 +3385,7 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_data(
     arg_map, arg_source_id, arg_tile_id, arg_data, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3418,8 +3423,7 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_error(
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_message, "message"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3428,6 +3432,7 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_error(
     arg_map, arg_source_id, arg_tile_id, arg_message, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3475,8 +3480,7 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_data(
   if (!mln_ts_read_bytes_view(call, call->argv[4], &arg_data, "data"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[5], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[5], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3485,6 +3489,7 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_data(
     arg_map, arg_source_id, arg_tile_id, arg_encoding, arg_data,
     present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3522,8 +3527,7 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_error(
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_message, "message"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3532,6 +3536,7 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_error(
     arg_map, arg_source_id, arg_tile_id, arg_message, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3564,8 +3569,7 @@ static napi_value mln_ts_export_mln_map_set_debug_options(
     arg_options = (mln_map_debug_flags)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3573,6 +3577,7 @@ static napi_value mln_ts_export_mln_map_set_debug_options(
   status = mln_map_set_debug_options(
     arg_map, arg_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3602,14 +3607,14 @@ static napi_value mln_ts_export_mln_map_set_event_mask(
     arg_mask = (mln_runtime_event_flags)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_set_event_mask(arg_map, arg_mask, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3643,8 +3648,7 @@ static napi_value mln_ts_export_mln_map_set_feature_state(
   if (!mln_ts_read_json_view(call, call->argv[2], &arg_state, "state"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3652,6 +3656,7 @@ static napi_value mln_ts_export_mln_map_set_feature_state(
   status = mln_map_set_feature_state(
     arg_map, &arg_selector, arg_state, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3682,8 +3687,7 @@ static napi_value mln_ts_export_mln_map_set_free_camera_options(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3691,6 +3695,7 @@ static napi_value mln_ts_export_mln_map_set_free_camera_options(
   status = mln_map_set_free_camera_options(
     arg_map, &arg_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3718,8 +3723,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_data(
     goto done;
   if (!mln_ts_read_u64(call, call->argv[2], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3727,6 +3731,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_data(
   status = mln_map_set_geo_json_source_data(
     arg_map, arg_source_id, arg_data, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3759,8 +3764,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_synchronous_tiling(
     arg_enabled = flag;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3768,6 +3772,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_synchronous_tiling(
   status = mln_map_set_geo_json_source_synchronous_tiling(
     arg_map, arg_source_id, arg_enabled, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3795,8 +3800,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_url(
     goto done;
   if (!mln_ts_read_text_view(call, call->argv[2], &arg_url, "url")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3804,6 +3808,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_url(
   status = mln_map_set_geo_json_source_url(
     arg_map, arg_source_id, arg_url, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3834,8 +3839,7 @@ static napi_value mln_ts_export_mln_map_set_global_state_property(
   if (!mln_ts_read_json_view(call, call->argv[2], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3843,6 +3847,7 @@ static napi_value mln_ts_export_mln_map_set_global_state_property(
   status = mln_map_set_global_state_property(
     arg_map, arg_property_name, arg_value, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3880,8 +3885,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_coordinates(
     count_coordinates = (size_t)count;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3890,6 +3894,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_coordinates(
     arg_map, arg_source_id, arg_coordinates, (size_t)count_coordinates,
     present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3923,8 +3928,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_image(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3932,6 +3936,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_image(
   status = mln_map_set_image_source_image(
     arg_map, arg_source_id, &arg_image, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3959,8 +3964,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_url(
     goto done;
   if (!mln_ts_read_text_view(call, call->argv[2], &arg_url, "url")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -3968,6 +3972,7 @@ static napi_value mln_ts_export_mln_map_set_image_source_url(
   status = mln_map_set_image_source_url(
     arg_map, arg_source_id, arg_url, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -3996,8 +4001,7 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
   if (!mln_ts_write_projection_mode(call, call->argv[1], &arg_mode, "mode"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4005,6 +4009,7 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
   status = mln_map_set_projection_mode(
     arg_map, &arg_mode, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4034,8 +4039,7 @@ static napi_value mln_ts_export_mln_map_set_rendering_stats_view_enabled(
     arg_enabled = flag;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4043,6 +4047,7 @@ static napi_value mln_ts_export_mln_map_set_rendering_stats_view_enabled(
   status = mln_map_set_rendering_stats_view_enabled(
     arg_map, arg_enabled, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4088,8 +4093,7 @@ static napi_value mln_ts_export_mln_map_set_style_image(
     present_options = &arg_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4098,6 +4102,7 @@ static napi_value mln_ts_export_mln_map_set_style_image(
     arg_map, arg_image_id, &arg_image, present_options, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4122,14 +4127,14 @@ static napi_value mln_ts_export_mln_map_set_style_json(
   }
   if (!mln_ts_read_json_view(call, call->argv[1], &arg_json, "json")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_set_style_json(arg_map, arg_json, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4163,8 +4168,7 @@ static napi_value mln_ts_export_mln_map_set_style_layer_property(
   if (!mln_ts_read_json_view(call, call->argv[3], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4173,6 +4177,7 @@ static napi_value mln_ts_export_mln_map_set_style_layer_property(
     arg_map, arg_layer_id, arg_property_name, arg_value, present_completion,
     &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4198,8 +4203,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_json(
   if (!mln_ts_read_json_view(call, call->argv[1], &arg_light_json, "lightJson"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4207,6 +4211,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_json(
   status = mln_map_set_style_light_json(
     arg_map, arg_light_json, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4237,8 +4242,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_property(
   if (!mln_ts_read_json_view(call, call->argv[2], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4246,6 +4250,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_property(
   status = mln_map_set_style_light_property(
     arg_map, arg_property_name, arg_value, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4278,8 +4283,7 @@ static napi_value mln_ts_export_mln_map_set_style_source_volatile(
     arg_is_volatile = flag;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4287,6 +4291,7 @@ static napi_value mln_ts_export_mln_map_set_style_source_volatile(
   status = mln_map_set_style_source_volatile(
     arg_map, arg_source_id, arg_is_volatile, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4317,8 +4322,7 @@ static napi_value mln_ts_export_mln_map_set_style_transition_options(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4326,6 +4330,7 @@ static napi_value mln_ts_export_mln_map_set_style_transition_options(
   status = mln_map_set_style_transition_options(
     arg_map, &arg_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4350,14 +4355,14 @@ static napi_value mln_ts_export_mln_map_set_style_url(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_url, "url")) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_map_set_style_url(arg_map, arg_url, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4388,8 +4393,7 @@ static napi_value mln_ts_export_mln_map_set_tile_options(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4397,6 +4401,7 @@ static napi_value mln_ts_export_mln_map_set_tile_options(
   status = mln_map_set_tile_options(
     arg_map, &arg_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4427,8 +4432,7 @@ static napi_value mln_ts_export_mln_map_set_viewport_options(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4436,6 +4440,7 @@ static napi_value mln_ts_export_mln_map_set_viewport_options(
   status = mln_map_set_viewport_options(
     arg_map, &arg_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4465,8 +4470,7 @@ static napi_value mln_ts_export_mln_map_update_camera(
   if (!mln_ts_write_camera_update(call, call->argv[1], &arg_update, "update"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4653,14 +4657,14 @@ static napi_value mln_ts_export_mln_render_session_barrier(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_render_session_barrier(arg_session, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4683,14 +4687,14 @@ static napi_value mln_ts_export_mln_render_session_clear_data(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_render_session_clear_data(arg_session, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4713,14 +4717,14 @@ static napi_value mln_ts_export_mln_render_session_detach(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_render_session_detach(arg_session, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4744,14 +4748,14 @@ static napi_value mln_ts_export_mln_render_session_dispose(
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_render_session_dispose(arg_session, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -4808,8 +4812,7 @@ static napi_value mln_ts_export_mln_render_session_dump_debug_logs(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -4817,6 +4820,7 @@ static napi_value mln_ts_export_mln_render_session_dump_debug_logs(
   status = mln_render_session_dump_debug_logs(
     arg_session, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4918,7 +4922,7 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[6], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        call, call->argv[6], false, mln_ts_decode_buffer_view_json,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -4928,6 +4932,7 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
     arg_session, arg_source_id, arg_feature, arg_extension, arg_extension_field,
     arg_arguments, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -4970,7 +4975,7 @@ static napi_value mln_ts_export_mln_render_session_query_rendered_features(
     present_options = &arg_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_RENDERED_FEATURE_LIST,
+        call, call->argv[3], false, mln_ts_decode_rendered_feature_list,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -4979,6 +4984,7 @@ static napi_value mln_ts_export_mln_render_session_query_rendered_features(
   status = mln_render_session_query_rendered_features(
     arg_session, &arg_geometry, present_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5016,7 +5022,7 @@ static napi_value mln_ts_export_mln_render_session_query_source_features(
     present_options = &arg_options;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_SOURCE_FEATURE_LIST,
+        call, call->argv[3], false, mln_ts_decode_source_feature_list,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -5025,6 +5031,7 @@ static napi_value mln_ts_export_mln_render_session_query_source_features(
   status = mln_render_session_query_source_features(
     arg_session, arg_source_id, present_options, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5047,7 +5054,7 @@ static napi_value mln_ts_export_mln_render_session_read_texture(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_TEXTURE_READBACK_RESULT,
+        call, call->argv[1], false, mln_ts_decode_texture_readback_result,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -5056,6 +5063,7 @@ static napi_value mln_ts_export_mln_render_session_read_texture(
   status = mln_render_session_read_texture(
     arg_session, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5078,8 +5086,7 @@ static napi_value mln_ts_export_mln_render_session_reduce_memory_use(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5087,6 +5094,7 @@ static napi_value mln_ts_export_mln_render_session_reduce_memory_use(
   status = mln_render_session_reduce_memory_use(
     arg_session, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5147,8 +5155,7 @@ static napi_value mln_ts_export_mln_render_session_resize(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5156,6 +5163,7 @@ static napi_value mln_ts_export_mln_render_session_resize(
   status = mln_render_session_resize(
     arg_session, arg_extent, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5209,8 +5217,7 @@ mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5218,6 +5225,7 @@ mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
   status = mln_render_session_set_metal_borrowed_texture_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5248,8 +5256,7 @@ static napi_value mln_ts_export_mln_render_session_set_metal_surface_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5257,6 +5264,7 @@ static napi_value mln_ts_export_mln_render_session_set_metal_surface_target(
   status = mln_render_session_set_metal_surface_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5288,8 +5296,7 @@ mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5297,6 +5304,7 @@ mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target(
   status = mln_render_session_set_open_gl_borrowed_texture_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5327,8 +5335,7 @@ static napi_value mln_ts_export_mln_render_session_set_open_gl_surface_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5336,6 +5343,7 @@ static napi_value mln_ts_export_mln_render_session_set_open_gl_surface_target(
   status = mln_render_session_set_open_gl_surface_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5367,8 +5375,7 @@ mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5376,6 +5383,7 @@ mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target(
   status = mln_render_session_set_vulkan_borrowed_texture_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5406,8 +5414,7 @@ static napi_value mln_ts_export_mln_render_session_set_vulkan_surface_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5415,6 +5422,7 @@ static napi_value mln_ts_export_mln_render_session_set_vulkan_surface_target(
   status = mln_render_session_set_vulkan_surface_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5446,8 +5454,7 @@ mln_ts_export_mln_render_session_set_web_gpu_borrowed_texture_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5455,6 +5462,7 @@ mln_ts_export_mln_render_session_set_web_gpu_borrowed_texture_target(
   status = mln_render_session_set_web_gpu_borrowed_texture_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5485,8 +5493,7 @@ static napi_value mln_ts_export_mln_render_session_set_web_gpu_surface_target(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5494,6 +5501,7 @@ static napi_value mln_ts_export_mln_render_session_set_web_gpu_surface_target(
   status = mln_render_session_set_web_gpu_surface_target(
     arg_session, &arg_descriptor, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5622,10 +5630,11 @@ static napi_value mln_ts_export_mln_resource_request_set_cancel_callback(
   arg_handler.size = sizeof arg_handler;
   if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
   if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_handler.user_data, &arg_handler.queue,
-        "handler"
+        call, call->argv[1], &arg_handler.user_data,
+        &arg_handler.release_user_data, &arg_handler.queue
       ))
     goto done;
+  arg_handler.callback = mln_ts_dispatch_resource_request_cancel_callback;
   memset(&arg_out_cancelled, 0, sizeof arg_out_cancelled);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -5702,8 +5711,7 @@ static napi_value mln_ts_export_mln_runtime_clear_event_handler(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5711,6 +5719,7 @@ static napi_value mln_ts_export_mln_runtime_clear_event_handler(
   status = mln_runtime_clear_event_handler(
     arg_runtime, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5733,8 +5742,7 @@ static napi_value mln_ts_export_mln_runtime_clear_http_header_transform(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5742,6 +5750,7 @@ static napi_value mln_ts_export_mln_runtime_clear_http_header_transform(
   status = mln_runtime_clear_http_header_transform(
     arg_runtime, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5764,8 +5773,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_provider(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5773,6 +5781,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_provider(
   status = mln_runtime_clear_resource_provider(
     arg_runtime, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5795,8 +5804,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_transform(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5804,6 +5812,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_transform(
   status = mln_runtime_clear_resource_transform(
     arg_runtime, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5876,8 +5885,7 @@ static napi_value mln_ts_export_mln_runtime_create_map(
   if (!mln_ts_write_map_options(call, call->argv[1], &arg_options, "options"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5885,6 +5893,7 @@ static napi_value mln_ts_export_mln_runtime_create_map(
   status = mln_runtime_create_map(
     arg_runtime, &arg_options, &arg_out_map, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result = mln_ts_u64(env, (uint64_t)arg_out_map);
 done:
@@ -5928,7 +5937,7 @@ static napi_value mln_ts_export_mln_runtime_create_offline_region(
     count_metadata = (size_t)size;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_OFFLINE_REGION_INFO,
+        call, call->argv[3], false, mln_ts_decode_offline_region_info,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -5938,6 +5947,7 @@ static napi_value mln_ts_export_mln_runtime_create_offline_region(
     arg_runtime, &arg_definition, (const uint8_t*)arg_metadata,
     (size_t)count_metadata, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5967,8 +5977,7 @@ static napi_value mln_ts_export_mln_runtime_delete_offline_region(
     arg_region_id = (int64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5976,6 +5985,7 @@ static napi_value mln_ts_export_mln_runtime_delete_offline_region(
   status = mln_runtime_delete_offline_region(
     arg_runtime, arg_region_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6054,7 +6064,7 @@ static napi_value mln_ts_export_mln_runtime_get_offline_region(
     arg_region_id = (int64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_OFFLINE_REGION_INFO_OPTIONAL,
+        call, call->argv[2], false, mln_ts_decode_offline_region_info_optional,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -6063,6 +6073,7 @@ static napi_value mln_ts_export_mln_runtime_get_offline_region(
   status = mln_runtime_get_offline_region(
     arg_runtime, arg_region_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6092,7 +6103,7 @@ static napi_value mln_ts_export_mln_runtime_get_offline_region_status(
     arg_region_id = (int64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_OFFLINE_REGION_STATUS,
+        call, call->argv[2], false, mln_ts_decode_offline_region_status,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -6101,6 +6112,7 @@ static napi_value mln_ts_export_mln_runtime_get_offline_region_status(
   status = mln_runtime_get_offline_region_status(
     arg_runtime, arg_region_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6130,8 +6142,7 @@ static napi_value mln_ts_export_mln_runtime_invalidate_offline_region(
     arg_region_id = (int64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6139,6 +6150,7 @@ static napi_value mln_ts_export_mln_runtime_invalidate_offline_region(
   status = mln_runtime_invalidate_offline_region(
     arg_runtime, arg_region_id, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6161,7 +6173,7 @@ static napi_value mln_ts_export_mln_runtime_list_offline_regions(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_OFFLINE_REGION_INFO_LIST,
+        call, call->argv[1], false, mln_ts_decode_offline_region_info_list,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -6170,6 +6182,7 @@ static napi_value mln_ts_export_mln_runtime_list_offline_regions(
   status = mln_runtime_list_offline_regions(
     arg_runtime, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6197,7 +6210,7 @@ static napi_value mln_ts_export_mln_runtime_merge_offline_regions(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_OFFLINE_REGION_INFO_LIST,
+        call, call->argv[2], false, mln_ts_decode_offline_region_info_list,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -6206,6 +6219,7 @@ static napi_value mln_ts_export_mln_runtime_merge_offline_regions(
   status = mln_runtime_merge_offline_regions(
     arg_runtime, arg_side_database_path, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6229,13 +6243,13 @@ static napi_value mln_ts_export_mln_runtime_release(
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_runtime_release(arg_runtime, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -6269,8 +6283,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
     arg_operation = (mln_ambient_cache_operation)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6278,6 +6291,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
   status = mln_runtime_run_ambient_cache_operation(
     arg_runtime, arg_operation, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6304,13 +6318,13 @@ static napi_value mln_ts_export_mln_runtime_set_event_handler(
   arg_handler.size = sizeof arg_handler;
   if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
   if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_handler.user_data, &arg_handler.queue,
-        "handler"
+        call, call->argv[1], &arg_handler.user_data,
+        &arg_handler.release_user_data, &arg_handler.queue
       ))
     goto done;
+  arg_handler.callback = mln_ts_dispatch_runtime_event_callback;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6378,8 +6392,7 @@ static napi_value mln_ts_export_mln_runtime_set_http_header_transform(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6417,8 +6430,7 @@ static napi_value mln_ts_export_mln_runtime_set_maximum_ambient_cache_size(
     arg_size = (uint64_t)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6426,6 +6438,7 @@ static napi_value mln_ts_export_mln_runtime_set_maximum_ambient_cache_size(
   status = mln_runtime_set_maximum_ambient_cache_size(
     arg_runtime, arg_size, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6465,8 +6478,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_download_state(
     arg_state = (mln_offline_region_download_state)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6474,6 +6486,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_download_state(
   status = mln_runtime_set_offline_region_download_state(
     arg_runtime, arg_region_id, arg_state, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6510,8 +6523,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_observed(
     arg_observed = flag;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[3], false, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6519,6 +6531,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_observed(
   status = mln_runtime_set_offline_region_observed(
     arg_runtime, arg_region_id, arg_observed, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6549,8 +6562,7 @@ static napi_value mln_ts_export_mln_runtime_set_resource_provider(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6585,13 +6597,13 @@ static napi_value mln_ts_export_mln_runtime_set_resource_transform(
   arg_transform.size = sizeof arg_transform;
   if (!mln_ts_read_function(call, call->argv[1], "transform")) goto done;
   if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_transform.user_data, &arg_transform.queue,
-        "transform"
+        call, call->argv[1], &arg_transform.user_data,
+        &arg_transform.release_user_data, &arg_transform.queue
       ))
     goto done;
+  arg_transform.callback = mln_ts_dispatch_resource_transform_callback;
   if (!mln_ts_read_completion(
-        call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
-        &present_completion
+        call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6641,7 +6653,7 @@ static napi_value mln_ts_export_mln_runtime_update_offline_region_metadata(
     count_metadata = (size_t)size;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_OFFLINE_REGION_INFO,
+        call, call->argv[3], false, mln_ts_decode_offline_region_info,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -6651,6 +6663,7 @@ static napi_value mln_ts_export_mln_runtime_update_offline_region_metadata(
     arg_runtime, arg_region_id, (const uint8_t*)arg_metadata,
     (size_t)count_metadata, present_completion, &diagnostic
   );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
