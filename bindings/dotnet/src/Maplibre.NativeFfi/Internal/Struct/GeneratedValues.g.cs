@@ -619,6 +619,7 @@ internal static unsafe class GeneratedValues
             ref native.adapter_index,
             MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
         );
+        native.single_context = (byte)(value.SingleContext ? 1 : 0);
         return native;
     }
 

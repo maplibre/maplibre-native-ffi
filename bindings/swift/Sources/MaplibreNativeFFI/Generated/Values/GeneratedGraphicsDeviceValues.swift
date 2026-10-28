@@ -12,13 +12,18 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
   /// own list of adapters, from zero. Without it, the backend picks its default
   /// adapter.
   public var adapterIndex: UInt32?
-  public init(adapterIndex: UInt32? = nil) {
+  /// Renders every texture session of the device in one graphics context, one
+  /// session at a time, instead of in a context of each session's own.
+  public var singleContext: Bool
+  public init(adapterIndex: UInt32? = nil, singleContext: Bool = false) {
     self.adapterIndex = adapterIndex
+    self.singleContext = singleContext
   }
 
   init(raw: mln_graphics_device_options) {
     adapterIndex = raw.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
       .rawValue != 0 ? raw.adapter_index : nil
+    singleContext = raw.single_context
   }
 
   func nativeValue() -> mln_graphics_device_options {
@@ -29,6 +34,7 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX.rawValue; raw
         .adapter_index = item
     }
+    raw.single_context = singleContext
     return raw
   }
 }

@@ -139,6 +139,10 @@ auto create_backend_graphics_device(
   const mln_graphics_device_options& options,
   std::shared_ptr<GraphicsDevice>& out_device
 ) -> mln_status {
+  if (options.single_context) {
+    set_thread_error("a WGL graphics device has no single context");
+    return MLN_STATUS_UNSUPPORTED;
+  }
   if (
     (options.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX) != 0U &&
     options.adapter_index != 0

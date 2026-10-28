@@ -287,6 +287,7 @@ internal unsafe struct mln_graphics_device_options
     public uint size;
     public mln_graphics_device_option_field fields;
     public uint adapter_index;
+    public byte single_context;
 }
 
 internal unsafe struct mln_graphics_device_texture_descriptor

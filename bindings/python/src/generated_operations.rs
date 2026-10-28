@@ -2021,6 +2021,7 @@ fn generated_input_mln_graphics_device_options<'py>(
         raw.adapter_index = field.extract::<u32>()?;
         raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
     }
+    raw.single_context = value.getattr("single_context")?.extract::<bool>()?;
     Ok(raw)
 }
 

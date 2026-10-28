@@ -1505,9 +1505,16 @@ class GraphicsDeviceOptions:
     default adapter.
     """
 
+    single_context: bool = False
+    """Renders every texture session of the device in one graphics context, one
+    session at a time, instead of in a context of each session's own.
+    """
+
     @classmethod
     def _from_native(cls, raw):
-        return cls(adapter_index=raw["adapter_index"])
+        return cls(
+            adapter_index=raw["adapter_index"], single_context=raw["single_context"]
+        )
 
 
 @dataclass(frozen=True, slots=True)

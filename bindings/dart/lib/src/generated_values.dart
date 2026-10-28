@@ -2006,22 +2006,31 @@ final class GeoJsonSourceOptions extends _Value {
 /// See `mln_graphics_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
 final class GraphicsDeviceOptions extends _Value {
-  const GraphicsDeviceOptions({this.adapterIndex});
+  const GraphicsDeviceOptions({this.adapterIndex, this.singleContext = false});
 
   /// The adapter to create the device on, as a position in the graphics API's
   /// own list of adapters, from zero. Without it, the backend picks its default
   /// adapter.
   final int? adapterIndex;
 
+  /// Renders every texture session of the device in one graphics context, one
+  /// session at a time, instead of in a context of each session's own.
+  final bool singleContext;
+
   /// A copy of this value with the given members replaced.
-  GraphicsDeviceOptions copyWith({int? adapterIndex}) =>
-      GraphicsDeviceOptions(adapterIndex: adapterIndex ?? this.adapterIndex);
+  GraphicsDeviceOptions copyWith({int? adapterIndex, bool? singleContext}) =>
+      GraphicsDeviceOptions(
+        adapterIndex: adapterIndex ?? this.adapterIndex,
+        singleContext: singleContext ?? this.singleContext,
+      );
 
   @override
-  List<Object?> get _members => [adapterIndex];
+  List<Object?> get _members => [adapterIndex, singleContext];
   @override
-  String toString() =>
-      _describe('GraphicsDeviceOptions', const ['adapterIndex']);
+  String toString() => _describe('GraphicsDeviceOptions', const [
+    'adapterIndex',
+    'singleContext',
+  ]);
 }
 
 /// Lower-level Spherical Mercator projected-meter coordinate.

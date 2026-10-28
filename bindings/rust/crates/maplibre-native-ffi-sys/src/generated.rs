@@ -721,6 +721,7 @@ pub struct mln_graphics_device_options {
     pub size: u32,
     pub fields: mln_graphics_device_option_fields,
     pub adapter_index: u32,
+    pub single_context: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

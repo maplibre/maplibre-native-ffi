@@ -339,6 +339,7 @@ Pointer<raw.mln_graphics_device_options> _writeGraphicsDeviceOptions(
       4294967295,
     );
   }
+  result.ref.single_context = value.singleContext;
   return result;
 }
 

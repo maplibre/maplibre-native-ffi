@@ -2673,16 +2673,21 @@ pub const GraphicsDeviceOptions = struct {
     /// own list of adapters, from zero. Without it, the backend picks its
     /// default adapter.
     adapter_index: ?u32 = null,
+    /// Renders every texture session of the device in one graphics context, one
+    /// session at a time, instead of in a context of each session's own.
+    single_context: bool = false,
     pub fn toNative(self: GraphicsDeviceOptions) c.mln_graphics_device_options {
         var raw = std.mem.zeroes(c.mln_graphics_device_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_graphics_device_options);
         marshal.present(&raw.fields, c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
+        raw.single_context = self.single_context;
         return raw;
     }
     pub fn fromNative(raw: c.mln_graphics_device_options) GraphicsDeviceOptions {
         return .{
             .adapter_index = if (raw.fields & c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
+            .single_context = raw.single_context,
         };
     }
 };

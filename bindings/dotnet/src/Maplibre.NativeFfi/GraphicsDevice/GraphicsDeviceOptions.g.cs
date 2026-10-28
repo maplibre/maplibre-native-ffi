@@ -17,4 +17,10 @@ public sealed record GraphicsDeviceOptions
     /// default adapter.
     /// </summary>
     public uint? AdapterIndex { get; init; }
+
+    /// <summary>
+    /// Renders every texture session of the device in one graphics context, one
+    /// session at a time, instead of in a context of each session's own.
+    /// </summary>
+    public bool SingleContext { get; init; }
 }

@@ -23,7 +23,10 @@ auto effective_graphics_device_options(
   mln_graphics_device_options& out_options
 ) -> mln_status {
   out_options = mln_graphics_device_options{
-    .size = sizeof(mln_graphics_device_options), .fields = 0, .adapter_index = 0
+    .size = sizeof(mln_graphics_device_options),
+    .fields = 0,
+    .adapter_index = 0,
+    .single_context = false,
   };
   if (options == nullptr) {
     return MLN_STATUS_OK;
@@ -40,6 +43,7 @@ auto effective_graphics_device_options(
   }
   out_options.fields = options->fields;
   out_options.adapter_index = options->adapter_index;
+  out_options.single_context = options->single_context;
   return MLN_STATUS_OK;
 }
 

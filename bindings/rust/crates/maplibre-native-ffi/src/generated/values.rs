@@ -1222,6 +1222,9 @@ pub struct GraphicsDeviceOptions {
     /// own list of adapters, from zero. Without it, the backend picks its
     /// default adapter.
     pub adapter_index: Option<u32>,
+    /// Renders every texture session of the device in one graphics context, one
+    /// session at a time, instead of in a context of each session's own.
+    pub single_context: bool,
 }
 impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_graphics_device_options> {
@@ -1232,6 +1235,7 @@ impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
             raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
             raw.adapter_index = *item;
         }
+        raw.single_context = self.single_context;
         Ok(raw)
     }
 }

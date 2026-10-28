@@ -442,6 +442,8 @@ final class mln_graphics_device_options extends Struct {
   external int fields;
   @Uint32()
   external int adapter_index;
+  @Bool()
+  external bool single_context;
 }
 
 final class mln_graphics_device_texture_descriptor extends Struct {

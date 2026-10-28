@@ -2014,6 +2014,11 @@ public data class GraphicsDeviceOptions(
    * from zero. Without it, the backend picks its default adapter.
    */
   public val adapterIndex: UInt? = null,
+  /**
+   * Renders every texture session of the device in one graphics context, one session at a time,
+   * instead of in a context of each session's own.
+   */
+  public val singleContext: Boolean = false,
 )
 
 /**

@@ -67,17 +67,18 @@ internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions):
   allocate(w(64, 72), 8).also { putGeoJsonSourceOptions(it, value) }
 
 internal fun NativeArena.putGraphicsDeviceOptions(target: Long, value: GraphicsDeviceOptions) {
-  writeU32(target, 12.toUInt())
+  writeU32(target, 16.toUInt())
   var fields = 0u
   value.adapterIndex?.let {
     fields = fields or 1u
     writeU32(target + 8, it)
   }
+  writeBool(target + 12, value.singleContext)
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeGraphicsDeviceOptions(value: GraphicsDeviceOptions): Long =
-  allocate(12, 4).also { putGraphicsDeviceOptions(it, value) }
+  allocate(16, 4).also { putGraphicsDeviceOptions(it, value) }
 
 internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)

@@ -3795,6 +3795,15 @@ bool mln_ts_write_graphics_device_options(
     }
     out->fields |= MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
   }
+  if (!mln_ts_member(call, value, "singleContext", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "singleContext");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->single_context = flag;
+    }
+  }
   return true;
 }
 

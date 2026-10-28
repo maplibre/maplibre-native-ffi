@@ -296,6 +296,55 @@ static void the_first_named_adapter_renders(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#if !defined(MLN_FFI_TEST_OPENGL_WGL)
+// The sessions of a single-context device take turns in its context, and keep
+// it after the host releases the device.
+static void sessions_take_turns_on_a_single_context_device(void) {
+  mln_graphics_device_options options = {
+    .size = sizeof(mln_graphics_device_options)
+  };
+  options.single_context = true;
+  mln_graphics_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(
+    mln_graphics_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map first_map = mln_test_create_map(runtime);
+  mln_map second_map = mln_test_create_map(runtime);
+  mln_test_render_fixture first = attach_device_texture(first_map, device);
+  mln_test_render_fixture second = attach_device_texture(second_map, device);
+  mln_graphics_device_release(device);
+
+  for (uint64_t turn = 0; turn < 2; turn += 1) {
+    render_red_frame(first_map, &first, 31 + turn);
+    expect_red_pixels(&first);
+    render_red_frame(second_map, &second, 41 + turn);
+    expect_red_pixels(&second);
+  }
+  detach_device_texture(&first);
+  render_red_frame(second_map, &second, 51);
+  expect_red_pixels(&second);
+
+  detach_device_texture(&second);
+  mln_test_destroy_map(second_map);
+  mln_test_destroy_map(first_map);
+  mln_test_destroy_runtime(runtime);
+}
+#else
+static void create_rejects_a_single_context(void) {
+  mln_graphics_device_options options = {
+    .size = sizeof(mln_graphics_device_options)
+  };
+  options.single_context = true;
+  mln_graphics_device device = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED,
+    mln_graphics_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
+}
+#endif
+
 static void create_reports_a_missing_adapter(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)
@@ -320,6 +369,11 @@ MLN_TEST_GROUP {
   RUN_TEST(attach_rejects_what_a_device_texture_cannot_take);
   RUN_TEST(the_first_named_adapter_renders);
   RUN_TEST(create_reports_a_missing_adapter);
+#if !defined(MLN_FFI_TEST_OPENGL_WGL)
+  RUN_TEST(sessions_take_turns_on_a_single_context_device);
+#else
+  RUN_TEST(create_rejects_a_single_context);
+#endif
 #else
   RUN_TEST(create_reports_an_unsupported_backend);
 #endif
