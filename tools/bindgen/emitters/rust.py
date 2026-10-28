@@ -396,6 +396,24 @@ def lower(api: Api | BoundApi) -> Lowered:
             files[f"{root}/{module}.rs"] += rust_owners.view_guard(bound, handle, views)
         if queued := chunks.pop(f"queued:{module}", []):
             files[f"{root}/{module}.rs"] += rust_owners.queued_view(handle, queued)
+        # Only a command that carries a registration a queue can hold needs
+        # a queued form without a completion.
+        if delivers and (
+            queued_commands := [
+                p
+                for p in commands
+                if any(
+                    r.descriptor in value_types.queue_generic for r in p.registrations
+                )
+            ]
+        ):
+            files[f"{root}/{module}.rs"] += rust_owners.queued_discarding_view(
+                handle,
+                [
+                    gated(p, operation(p, value_types, discard=True, queued=True)[1])
+                    for p in queued_commands
+                ],
+            )
         if commands:
             owner = rust_owners.owner_name(native)
             view = f"{owner}Discarding"

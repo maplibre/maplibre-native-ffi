@@ -3255,6 +3255,12 @@ impl FromNative<sys::mln_quaternion> for Quaternion {
 pub struct QueueLock {
     pub lock: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
     pub unlock: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
+    native: Option<
+        callback::NativeRegistration<(
+            unsafe extern "C" fn(*mut std::ffi::c_void),
+            unsafe extern "C" fn(*mut std::ffi::c_void),
+        )>,
+    >,
 }
 impl std::fmt::Debug for QueueLock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -3282,6 +3288,30 @@ impl QueueLock {
         self.unlock = Some(std::sync::Arc::new(callback));
         self
     }
+    /// A registration whose callbacks native code supplies, called with
+    /// `user_data`. The first submission that takes the record, or a copy
+    /// of it, owns the context: native releases it after accepting the
+    /// record, and a refused submission releases it before it returns. A
+    /// later submission fails with `Status::InvalidState`. A record that
+    /// no submission takes releases it when its last copy drops.
+    ///
+    /// # Safety
+    /// The callbacks and `release` must meet the C contract with
+    /// `user_data` on any thread, and `release` must free it once.
+    pub unsafe fn native(
+        lock: unsafe extern "C" fn(*mut std::ffi::c_void),
+        unlock: unsafe extern "C" fn(*mut std::ffi::c_void),
+        user_data: *mut std::ffi::c_void,
+        release: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
+    ) -> Self {
+        // SAFETY: the caller vouches for the callbacks and the release.
+        let native =
+            unsafe { callback::NativeRegistration::new((lock, unlock), user_data, release) };
+        Self {
+            native: Some(native),
+            ..Self::default()
+        }
+    }
     unsafe extern "C" fn lock_trampoline(user_data: *mut std::ffi::c_void) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
@@ -3306,6 +3336,19 @@ impl ToNative<sys::mln_queue_lock> for QueueLock {
         let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
         raw.lock = self.lock.as_ref().map(|_| Self::lock_trampoline as _);
         raw.unlock = self.unlock.as_ref().map(|_| Self::unlock_trampoline as _);
+        if let Some(native) = &self.native {
+            if !(raw.lock.is_none() && raw.unlock.is_none()) {
+                return Err(Error::invalid_argument(
+                    "a native registration takes no host callbacks",
+                ));
+            }
+            let ((lock, unlock), user_data, release) = native.take(arena)?;
+            raw.lock = Some(lock);
+            raw.unlock = Some(unlock);
+            raw.user_data = user_data;
+            raw.release_user_data = release;
+            return Ok(raw);
+        }
         if !(raw.lock.is_none() && raw.unlock.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -5990,6 +6033,7 @@ impl FromNative<sys::mln_vulkan_texture_frame> for VulkanTextureFrame {
 #[derive(Clone, Default)]
 pub struct Wake {
     pub callback: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
+    native: Option<callback::NativeRegistration<(unsafe extern "C" fn(*mut std::ffi::c_void),)>>,
 }
 impl std::fmt::Debug for Wake {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -6010,6 +6054,28 @@ impl Wake {
     {
         Self::default().with_callback(callback)
     }
+    /// A registration whose callbacks native code supplies, called with
+    /// `user_data`. The first submission that takes the record, or a copy
+    /// of it, owns the context: native releases it after accepting the
+    /// record, and a refused submission releases it before it returns. A
+    /// later submission fails with `Status::InvalidState`. A record that
+    /// no submission takes releases it when its last copy drops.
+    ///
+    /// # Safety
+    /// The callbacks and `release` must meet the C contract with
+    /// `user_data` on any thread, and `release` must free it once.
+    pub unsafe fn native(
+        callback: unsafe extern "C" fn(*mut std::ffi::c_void),
+        user_data: *mut std::ffi::c_void,
+        release: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
+    ) -> Self {
+        // SAFETY: the caller vouches for the callbacks and the release.
+        let native = unsafe { callback::NativeRegistration::new((callback,), user_data, release) };
+        Self {
+            native: Some(native),
+            ..Self::default()
+        }
+    }
     unsafe extern "C" fn callback_trampoline(user_data: *mut std::ffi::c_void) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
@@ -6027,6 +6093,18 @@ impl ToNative<sys::mln_wake> for Wake {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
+        if let Some(native) = &self.native {
+            if !(raw.callback.is_none()) {
+                return Err(Error::invalid_argument(
+                    "a native registration takes no host callbacks",
+                ));
+            }
+            let ((callback,), user_data, release) = native.take(arena)?;
+            raw.callback = Some(callback);
+            raw.user_data = user_data;
+            raw.release_user_data = release;
+            return Ok(raw);
+        }
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };

@@ -4179,6 +4179,93 @@ impl<K: QueueKind> MapHandleQueued<'_, K> {
     }
 }
 
+/// Submits [`MapHandle`] commands in queue mode without a completion. The
+/// queue holds the handlers of the registrations that each call carries,
+/// and a call fails with `Status::InvalidState` once the queue is closed.
+pub struct MapHandleQueuedDiscarding<'a, K: QueueKind>(&'a MapHandle, &'a DeliveryQueue<K>);
+impl<'a, K: QueueKind> MapHandleQueued<'a, K> {
+    pub fn discarding(&self) -> MapHandleQueuedDiscarding<'a, K> {
+        MapHandleQueuedDiscarding(self.0, self.1)
+    }
+}
+impl<K: QueueKind> MapHandleQueuedDiscarding<'_, K> {
+    /// Adds a custom geometry source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
+    ///
+    /// See `mln_map_add_custom_geometry_source` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn add_custom_geometry_source(
+        &self,
+        source_id: &str,
+        options: CustomGeometrySourceOptions<K>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let source_id = call.input(&source_id)?;
+        let options = call.reference(&options)?;
+        self.1
+            .discard(call, |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_add_custom_geometry_source(
+                    map,
+                    source_id,
+                    options,
+                    completion,
+                    out_diagnostic,
+                )
+            })
+    }
+
+    /// Adds a custom vector source. The callback may run on any native worker
+    /// thread, concurrently with runtime and map calls.
+    ///
+    /// See `mln_map_add_custom_vector_source` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn add_custom_vector_source(
+        &self,
+        source_id: &str,
+        options: CustomVectorSourceOptions<K>,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let source_id = call.input(&source_id)?;
+        let options = call.reference(&options)?;
+        self.1
+            .discard(call, |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_add_custom_vector_source(
+                    map,
+                    source_id,
+                    options,
+                    completion,
+                    out_diagnostic,
+                )
+            })
+    }
+
+    /// Submits one atomic relative camera update.
+    ///
+    /// See `mln_map_apply_camera_delta` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn apply_camera_delta(&self, delta: &CameraDelta<K>) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let delta = call.reference(&delta)?;
+        self.1
+            .discard(call, |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_apply_camera_delta(map, delta, completion, out_diagnostic)
+            })
+    }
+
+    /// Submits one atomic camera update.
+    ///
+    /// See `mln_map_update_camera` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn update_camera(&self, update: &CameraUpdate<K>) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let update = call.reference(&update)?;
+        self.1
+            .discard(call, |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_update_camera(map, update, completion, out_diagnostic)
+            })
+    }
+}
+
 /// Submits [`MapHandle`] commands without a completion. Each call returns
 /// the same acceptance status as its completing form, and native logs a
 /// command that later fails as a warning through the log handler.

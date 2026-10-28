@@ -129,6 +129,25 @@ def queued_view(handle: HandlePlan, methods: list[str]) -> str:
     )
 
 
+def queued_discarding_view(handle: HandlePlan, methods: list[str]) -> str:
+    """The view that submits a handle's commands in queue mode without a
+    completion: its queue holds only the registrations' handlers."""
+    owner = owner_name(handle.native)
+    queued = f"{owner}Queued"
+    view = f"{owner}QueuedDiscarding"
+    return (
+        f"\n/// Submits [`{owner}`] commands in queue mode without a completion. The\n"
+        "/// queue holds the handlers of the registrations that each call carries,\n"
+        "/// and a call fails with `Status::InvalidState` once the queue is closed.\n"
+        f"pub struct {view}<'a, K: QueueKind>(&'a {owner}, &'a DeliveryQueue<K>);\n"
+        f"impl<'a, K: QueueKind> {queued}<'a, K> {{\n"
+        f"    pub fn discarding(&self) -> {view}<'a, K> {{\n"
+        f"        {view}(self.0, self.1)\n"
+        "    }\n}\n"
+        f"impl<K: QueueKind> {view}<'_, K> {{\n" + "\n".join(methods) + "}\n"
+    )
+
+
 def module_index(
     owners: dict[str, HandlePlan], modules: list[str], *, delivers: bool
 ) -> str:

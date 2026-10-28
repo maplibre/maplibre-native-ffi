@@ -710,6 +710,20 @@ impl<K: QueueKind> DeliveryQueue<K> {
         Ok(())
     }
 
+    /// Submits one queue-mode command without a completion. Only its
+    /// registrations name this queue, and it fails once the queue is closed,
+    /// as a completing call does.
+    pub(crate) fn discard<H: sys::NativeHandle>(
+        &self,
+        call: Call<'_, H>,
+        submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
+    ) -> Result<()> {
+        if lock(&self.registry).closed {
+            return Err(closed());
+        }
+        call.discard(submit)
+    }
+
     /// Stores a handler for a call about to enter native.
     fn hold(&self, entry: Entry<K>) -> Result<usize> {
         let mut registry = lock(&self.registry);
@@ -1751,6 +1765,86 @@ mod tests {
         );
         arena.accept_registrations();
         assert!(dropped(&dropped_probe));
+    }
+
+    /// A command submitted on `queue` without a completion, carrying a camera
+    /// end handler that holds `probe` when there is one. Its native side runs
+    /// `native` with the handler's token before it returns `status`.
+    fn discard_command<K: QueueKind>(
+        queue: &DeliveryQueue<K>,
+        probe: Option<DropProbe>,
+        status: sys::mln_status,
+        native: impl FnOnce(*mut c_void),
+    ) -> Result<()> {
+        let mut call = Call::global().queue(queue);
+        let token = match probe {
+            Some(probe) => {
+                let handler = crate::CameraTransitionHandler::new(move |_| {
+                    let _ = &probe;
+                });
+                let raw: sys::mln_camera_transition_handler = call.input(&handler)?;
+                assert_eq!(raw.queue, queue.raw);
+                raw.user_data
+            }
+            None => std::ptr::null_mut(),
+        };
+        queue.discard(call, |_, completion, _| {
+            assert!(
+                completion.is_null(),
+                "a discarded command has no completion"
+            );
+            native(token);
+            status
+        })
+    }
+
+    #[test]
+    fn a_rejected_queued_discard_drops_its_registration_handlers_unrun() {
+        let queue = scripted::<Shared>();
+        let (probe, dropped_probe) = probe();
+        let error = discard_command(
+            &queue,
+            Some(probe),
+            sys::MLN_STATUS_INVALID_ARGUMENT,
+            |_| {},
+        )
+        .unwrap_err();
+        assert_eq!(error.status(), Status::InvalidArgument);
+        assert!(dropped(&dropped_probe));
+        assert!(lock(&queue.registry).entries.is_empty());
+    }
+
+    #[test]
+    fn an_accepted_queued_discard_keeps_its_registration_handlers_until_retired() {
+        let queue = scripted::<Shared>();
+        let (probe, dropped_probe) = probe();
+        let mut token = std::ptr::null_mut();
+        discard_command(&queue, Some(probe), sys::MLN_STATUS_OK, |held| token = held).unwrap();
+        assert!(!dropped(&dropped_probe));
+        assert_eq!(lock(&queue.registry).entries.len(), 1);
+        dispatch(&queue);
+        assert!(!dropped(&dropped_probe));
+
+        retire(queue.raw, token);
+        dispatch(&queue);
+        assert!(dropped(&dropped_probe));
+        assert!(lock(&queue.registry).entries.is_empty());
+    }
+
+    #[test]
+    fn a_closed_queue_rejects_a_queued_discard_with_or_without_registrations() {
+        let queue = scripted::<Shared>();
+        queue.close();
+        let unreached = |_| panic!("a closed queue's discard reached native");
+        let error = discard_command(&queue, None, sys::MLN_STATUS_OK, unreached).unwrap_err();
+        assert_eq!(error.status(), Status::InvalidState);
+
+        let (probe, dropped_probe) = probe();
+        let error =
+            discard_command(&queue, Some(probe), sys::MLN_STATUS_OK, unreached).unwrap_err();
+        assert_eq!(error.status(), Status::InvalidState);
+        assert!(dropped(&dropped_probe));
+        assert!(lock(&queue.registry).entries.is_empty());
     }
 
     #[test]

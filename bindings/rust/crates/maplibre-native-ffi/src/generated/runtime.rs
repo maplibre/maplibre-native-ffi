@@ -1027,6 +1027,70 @@ impl<K: QueueKind> RuntimeHandleQueued<'_, K> {
     }
 }
 
+/// Submits [`RuntimeHandle`] commands in queue mode without a completion. The
+/// queue holds the handlers of the registrations that each call carries,
+/// and a call fails with `Status::InvalidState` once the queue is closed.
+pub struct RuntimeHandleQueuedDiscarding<'a, K: QueueKind>(&'a RuntimeHandle, &'a DeliveryQueue<K>);
+impl<'a, K: QueueKind> RuntimeHandleQueued<'a, K> {
+    pub fn discarding(&self) -> RuntimeHandleQueuedDiscarding<'a, K> {
+        RuntimeHandleQueuedDiscarding(self.0, self.1)
+    }
+}
+impl<K: QueueKind> RuntimeHandleQueuedDiscarding<'_, K> {
+    /// Selects how runtime and map events reach the host. Map events arrive on
+    /// the runtime's native scheduler thread, and offline events may arrive on
+    /// a MapLibre worker thread.
+    ///
+    /// See `mln_runtime_set_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_event_handler(&self, handler: RuntimeEventHandler<K>) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let handler = call.reference(&handler)?;
+        self.1
+            .discard(call, |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
+            })
+    }
+
+    /// Registers or replaces a runtime-scoped network resource provider. The
+    /// callback runs synchronously on a MapLibre thread.
+    ///
+    /// See `mln_runtime_set_resource_provider` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_provider(&self, provider: ResourceProvider<K>) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let provider = call.reference(&provider)?;
+        self.1
+            .discard(call, |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_resource_provider(
+                    runtime,
+                    provider,
+                    completion,
+                    out_diagnostic,
+                )
+            })
+    }
+
+    /// Registers or updates a runtime-scoped URL transform for network
+    /// resources. The callback runs on a MapLibre network thread.
+    ///
+    /// See `mln_runtime_set_resource_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_transform(&self, transform: ResourceTransform<K>) -> Result<()> {
+        let mut call = self.0.inner.call().queue(self.1);
+        let transform = call.reference(&transform)?;
+        self.1
+            .discard(call, |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_resource_transform(
+                    runtime,
+                    transform,
+                    completion,
+                    out_diagnostic,
+                )
+            })
+    }
+}
+
 /// Submits [`RuntimeHandle`] commands without a completion. Each call returns
 /// the same acceptance status as its completing form, and native logs a
 /// command that later fails as a warning through the log handler.

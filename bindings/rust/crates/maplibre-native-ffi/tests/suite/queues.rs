@@ -380,6 +380,99 @@ fn a_queued_camera_end_handler_inside_a_command_runs_once_and_retires() {
 }
 
 #[test]
+fn a_queued_discarded_command_keeps_its_end_handler_until_it_retires() {
+    let fixture = Fixture::new();
+    let dispatcher = LocalDispatcher::new().unwrap();
+    let (probe, released) = release_probe();
+    let (sender, ends) = mpsc::channel();
+    let update = CameraUpdate {
+        mode: CameraUpdateMode::Ease,
+        camera: CameraOptions {
+            zoom: Some(4.0),
+            ..Default::default()
+        },
+        animation: AnimationOptions {
+            duration_ms: Some(60_000.0),
+            transition_id: Some(u64::MAX - 1),
+            end_handler: CameraTransitionHandler::local(move |end| {
+                let _ = &probe;
+                sender.send(end.outcome).unwrap();
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    fixture
+        .map()
+        .queued(dispatcher.queue())
+        .discarding()
+        .update_camera(&update)
+        .unwrap();
+    drop(update);
+    wait_for(fixture.map().cancel_camera_transition(u64::MAX - 1));
+    dispatch_until(
+        &dispatcher,
+        "the camera end",
+        || {},
+        || ends.try_recv() == Ok(CameraTransitionOutcome::Cancelled),
+    );
+    await_queued_release(&dispatcher, &released);
+}
+
+/// A native wake's context: the signal its callback raises, and how often
+/// native released it.
+#[derive(Default)]
+struct WakeContext {
+    woken: Signal,
+    released: std::sync::atomic::AtomicUsize,
+}
+
+unsafe extern "C" fn raise_wake(user_data: *mut std::ffi::c_void) {
+    // SAFETY: the test keeps its context alive past the queue's release.
+    unsafe { &*user_data.cast::<WakeContext>() }.woken.raise();
+}
+
+unsafe extern "C" fn release_wake(user_data: *mut std::ffi::c_void) {
+    // SAFETY: as above.
+    let context = unsafe { &*user_data.cast::<WakeContext>() };
+    context
+        .released
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn a_native_wake_runs_in_native_and_its_queue_releases_it_once() {
+    use std::sync::atomic::Ordering::SeqCst;
+    let fixture = Fixture::new();
+    let context = Arc::new(WakeContext::default());
+    let user_data = Arc::as_ptr(&context).cast_mut().cast();
+    // SAFETY: the context outlives the queue, which releases it once.
+    let wake = unsafe { Wake::native(raise_wake, user_data, Some(release_wake)) };
+    let queue = DeliveryQueue::<Shared>::new(Some(wake.clone())).unwrap();
+    // The queue took the context, so a copy of its wake is refused.
+    let error = DeliveryQueue::<Shared>::new(Some(wake)).unwrap_err();
+    assert_eq!(error.status(), Status::InvalidState);
+    assert_eq!(context.released.load(SeqCst), 0);
+
+    let seen = context.woken.seen();
+    let (sender, results) = mpsc::channel();
+    fixture
+        .map()
+        .queued(&queue)
+        .get_style_url(move |url| sender.send(url.map(|_| ())).unwrap())
+        .unwrap();
+    context
+        .woken
+        .wait_past(seen, Instant::now() + timeout(), "the native wake");
+    while let Some(batch) = queue.drain().unwrap() {
+        batch.dispatch();
+    }
+    received(&results).unwrap();
+    drop(queue);
+    assert_eq!(context.released.load(SeqCst), 1);
+}
+
+#[test]
 fn queued_custom_sources_fetch_tiles_and_retire_when_removed() {
     let graphics = Graphics::new();
     let extent = LogicalExtent::new(64, 64, 1.0);

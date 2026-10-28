@@ -488,9 +488,23 @@ impl<'q> InputArena<'q> {
         release: unsafe extern "C" fn(*mut c_void),
     ) -> *mut c_void {
         let pointer = Box::into_raw(Box::new(state)).cast();
+        // SAFETY: the caller's release reclaims the box once.
+        unsafe { self.track(pointer, release) };
+        pointer
+    }
+
+    /// Holds an existing context until native accepts its registration, and
+    /// releases it through `release` otherwise.
+    ///
+    /// # Safety
+    /// `release` must free `pointer` exactly once without unwinding.
+    pub(crate) unsafe fn track(
+        &mut self,
+        pointer: *mut c_void,
+        release: unsafe extern "C" fn(*mut c_void),
+    ) {
         self.registrations
             .push(PendingRegistration::Callback { pointer, release });
-        pointer
     }
 
     /// Transfers pending callback roots after native accepts their registration.

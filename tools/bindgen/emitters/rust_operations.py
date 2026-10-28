@@ -162,7 +162,7 @@ def _operation(plan: OperationPlan, value_types, *, discard, queued) -> tuple[st
         raise Unsupported("method name is reserved by the handle runtime")
     method = method_name(plan) if method == plan.member else identifier(method)
     closure, native = native_closure(plan, body)
-    if queued and plan.completion:
+    if queued and plan.completion and not discard:
         public, ending = queued_completion(plan, value_types, body, closure, native)
         return module, method_code(
             plan, value_types, body, method, public, ending, queued=True
@@ -184,7 +184,7 @@ def _operation(plan: OperationPlan, value_types, *, discard, queued) -> tuple[st
             public, ending = pending(
                 body,
                 *(
-                    discarded(body, closure, native)
+                    discarded(body, closure, native, queued=queued)
                     if discard
                     else commanded(plan, body, closure, native)
                 ),
@@ -658,8 +658,13 @@ def viewed(
     return f"Lent<'_, {public}>", [*lines, f"Ok(Lent::new({returned}))"]
 
 
-def discarded(body: Body, closure: str, native: str) -> tuple[str, str]:
-    """A completing call that passes no completion."""
+def discarded(
+    body: Body, closure: str, native: str, *, queued: bool = False
+) -> tuple[str, str]:
+    """A completing call that passes no completion. A queued one goes through
+    its view's queue, which refuses it once closed."""
+    if queued:
+        return "()", f"self.1.discard({body.call}, {closure} {native})"
     return "()", f"{body.call}.discard({closure} {native})"
 
 

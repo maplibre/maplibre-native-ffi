@@ -8,8 +8,11 @@
 
 use std::ffi::c_void;
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::{Arc, Mutex};
 
+use crate::convert::InputArena;
 use crate::finalize::CallbackScope;
+use crate::handle::lock;
 use crate::report::{Report, report};
 use maplibre_native_ffi_sys as sys;
 
@@ -132,10 +135,229 @@ pub(crate) unsafe extern "C" fn release<S>(user_data: *mut c_void) {
     }
 }
 
+/// A registration that native code supplies: its callbacks `C`, the context
+/// they take, and the release that frees it. Copies share it, and one
+/// submission takes it, so the context is released once: by native after it
+/// accepts the registration, by the submission's arena when it doesn't, or
+/// here when no submission takes it before the last copy drops.
+#[derive(Clone)]
+pub(crate) struct NativeRegistration<C>(Arc<Mutex<Option<Supplied<C>>>>);
+
+struct Supplied<C> {
+    callbacks: C,
+    user_data: *mut c_void,
+    release: Option<unsafe extern "C" fn(*mut c_void)>,
+}
+
+// SAFETY: the host that supplies a registration vouches that its callbacks and
+// release take its context on any thread.
+unsafe impl<C: Send> Send for Supplied<C> {}
+
+impl<C> Drop for Supplied<C> {
+    fn drop(&mut self) {
+        if let Some(release) = self.release.take() {
+            // SAFETY: no submission took the context, so it is released once.
+            unsafe { release(self.user_data) };
+        }
+    }
+}
+
+impl<C: Copy> NativeRegistration<C> {
+    /// # Safety
+    ///
+    /// The callbacks and the release must follow the registration's C contract
+    /// with `user_data` on any thread, and `release` must free it exactly once
+    /// without unwinding.
+    pub(crate) unsafe fn new(
+        callbacks: C,
+        user_data: *mut c_void,
+        release: Option<unsafe extern "C" fn(*mut c_void)>,
+    ) -> Self {
+        Self(Arc::new(Mutex::new(Some(Supplied {
+            callbacks,
+            user_data,
+            release,
+        }))))
+    }
+
+    /// Moves the registration into `arena`, which releases the context unless
+    /// native accepts it. A registration that a submission already took fails
+    /// with `Status::InvalidState`.
+    pub(crate) fn take(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<(C, *mut c_void, Option<unsafe extern "C" fn(*mut c_void)>)> {
+        let mut supplied = lock(&self.0).take().ok_or_else(|| {
+            Error::new(
+                crate::Status::InvalidState,
+                "a native registration was already submitted",
+            )
+        })?;
+        let release = supplied.release.take();
+        if let Some(release) = release {
+            // SAFETY: the host's release frees the context once.
+            unsafe { arena.track(supplied.user_data, release) };
+        }
+        Ok((supplied.callbacks, supplied.user_data, release))
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use crate::Status;
+    use crate::convert::to_native;
+
+    /// A native registration's context, which counts its callbacks and its
+    /// releases.
+    #[derive(Default)]
+    struct Context {
+        calls: AtomicUsize,
+        releases: AtomicUsize,
+    }
+
+    impl Context {
+        fn pointer(&self) -> *mut c_void {
+            std::ptr::from_ref(self).cast_mut().cast()
+        }
+        fn calls(&self) -> usize {
+            self.calls.load(Ordering::SeqCst)
+        }
+        fn releases(&self) -> usize {
+            self.releases.load(Ordering::SeqCst)
+        }
+        /// A wake whose callback and release count on this context.
+        fn wake(&self) -> crate::Wake {
+            // SAFETY: the context outlives every call through the wake.
+            unsafe { crate::Wake::native(call, self.pointer(), Some(release)) }
+        }
+    }
+
+    unsafe extern "C" fn call(user_data: *mut c_void) {
+        // SAFETY: each registration's context is a live `Context`.
+        unsafe { &*user_data.cast::<Context>() }
+            .calls
+            .fetch_add(1, Ordering::SeqCst);
+    }
+
+    unsafe extern "C" fn release(user_data: *mut c_void) {
+        // SAFETY: as above.
+        unsafe { &*user_data.cast::<Context>() }
+            .releases
+            .fetch_add(1, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn a_native_wake_reaches_native_unchanged_and_native_releases_an_accepted_one() {
+        let context = Context::default();
+        let host = context.wake();
+        let mut arena = InputArena::default();
+        let raw: sys::mln_wake = to_native(&host, &mut arena).unwrap();
+        assert_eq!(raw.user_data, context.pointer());
+        arena.accept_registrations();
+        drop((arena, host));
+        assert_eq!(context.releases(), 0, "native owns an accepted context");
+        // SAFETY: native calls the accepted wake, then releases it once.
+        unsafe {
+            raw.callback.unwrap()(raw.user_data);
+            raw.release_user_data.unwrap()(raw.user_data);
+        }
+        assert_eq!((context.calls(), context.releases()), (1, 1));
+    }
+
+    #[test]
+    fn a_native_queue_lock_reaches_native_unchanged_and_a_refused_one_is_released() {
+        let context = Context::default();
+        // SAFETY: the context outlives every call through the lock.
+        let host =
+            unsafe { crate::QueueLock::native(call, call, context.pointer(), Some(release)) };
+        let mut arena = InputArena::default();
+        let raw: sys::mln_queue_lock = to_native(&host, &mut arena).unwrap();
+        assert_eq!(raw.user_data, context.pointer());
+        // SAFETY: the context is live, and these are the host's callbacks.
+        unsafe {
+            raw.lock.unwrap()(raw.user_data);
+            raw.unlock.unwrap()(raw.user_data);
+        }
+        assert_eq!(context.calls(), 2);
+        // Native refused it, so the arena releases the context.
+        drop(arena);
+        assert_eq!(context.releases(), 1);
+        drop(host);
+        assert_eq!(context.releases(), 1);
+    }
+
+    #[test]
+    fn a_native_wake_releases_its_context_once_when_refused_unused_or_reused() {
+        // Refused: the submission's arena drops without native accepting it.
+        let context = Context::default();
+        let host = context.wake();
+        let _: sys::mln_wake = to_native(&host, &mut InputArena::default()).unwrap();
+        assert_eq!(context.releases(), 1);
+        drop(host);
+        assert_eq!(context.releases(), 1);
+
+        // Unused: no submission takes it before its last copy drops.
+        let context = Context::default();
+        let host = context.wake();
+        let copy = host.clone();
+        drop(host);
+        assert_eq!(context.releases(), 0);
+        drop(copy);
+        assert_eq!(context.releases(), 1);
+
+        // Reused: a copy submitted after the first submission took the context
+        // fails before native sees it.
+        let context = Context::default();
+        let host = context.wake();
+        let copy = host.clone();
+        let mut first = InputArena::default();
+        let raw: sys::mln_wake = to_native(&host, &mut first).unwrap();
+        first.accept_registrations();
+        let error = to_native::<sys::mln_wake, _>(&copy, &mut InputArena::default()).unwrap_err();
+        assert_eq!(error.status(), Status::InvalidState);
+        drop((host, copy, first));
+        assert_eq!(
+            context.releases(),
+            0,
+            "native owns the first submission's context"
+        );
+        // SAFETY: native releases the accepted context once.
+        unsafe { raw.release_user_data.unwrap()(raw.user_data) };
+        assert_eq!(context.releases(), 1);
+
+        // A call whose later input fails to convert drops its arena, which
+        // releases the wake that converted before it.
+        let context = Context::default();
+        let host = context.wake();
+        let mut arena = InputArena::default();
+        let _: sys::mln_wake = to_native(&host, &mut arena).unwrap();
+        let _ = arena.c_string("nul\0inside").unwrap_err();
+        drop(arena);
+        assert_eq!(context.releases(), 1);
+    }
+
+    #[test]
+    fn a_native_wake_without_a_release_releases_nothing_and_takes_no_host_callback() {
+        let context = Context::default();
+        // SAFETY: the context outlives every call through the wake.
+        let host = unsafe { crate::Wake::native(call, context.pointer(), None) };
+        let raw: sys::mln_wake = to_native(&host, &mut InputArena::default()).unwrap();
+        assert!(raw.release_user_data.is_none());
+        drop(host);
+        // SAFETY: as above.
+        unsafe { raw.callback.unwrap()(raw.user_data) };
+        assert_eq!((context.calls(), context.releases()), (1, 0));
+
+        let context = Context::default();
+        let mixed = context.wake().with_callback(|| {});
+        let error = to_native::<sys::mln_wake, _>(&mixed, &mut InputArena::default()).unwrap_err();
+        assert_eq!(error.status(), Status::InvalidArgument);
+        drop(mixed);
+        assert_eq!(context.releases(), 1);
+    }
 
     // A status that host code fails with on purpose reaches native; any other
     // failure answers the callback's failure. The suite checks which reach

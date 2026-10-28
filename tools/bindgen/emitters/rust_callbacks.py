@@ -232,6 +232,74 @@ def callback_function(values, callback, *, local=False):
     return f"Fn({signature}){returns}{threads} + 'static"
 
 
+def native_function(values, callback):
+    """The plain C function type of a callback that native code supplies."""
+    arguments = ", ".join(
+        native_type(values, p.value.ctype) for p in callback.parameters
+    )
+    result = callback.result.ctype
+    returns = "" if result.kind == "void" else f" -> {native_type(values, result)}"
+    return f'unsafe extern "C" fn({arguments}){returns}'
+
+
+def native_registration(values, value):
+    """The private field, constructor, and conversion of a registration that
+    also takes native callbacks, a context, and its release, or None."""
+    from .. import async_hosts
+
+    if not async_hosts.accepts_native(values.bound, value):
+        return None
+    if value.native in values.queue_generic:
+        raise Unsupported(f"{value.native}: a queued native registration")
+    members = callbacks(values, value)
+    names = [identifier(field.name) for field, _ in members]
+    types = [native_function(values, callback) for _, callback in members]
+    user_data = native_identifier(value.registration.user_data)
+    release = native_identifier(value.registration.release)
+    tuple_type = "(" + "".join(f"{typ}, " for typ in types) + ")"
+    tuple_names = "(" + "".join(f"{name}, " for name in names) + ")"
+    field = f"    native: Option<callback::NativeRegistration<{tuple_type}>>,"
+    constructor = (
+        "    /// A registration whose callbacks native code supplies, called with\n"
+        "    /// `user_data`. The first submission that takes the record, or a copy\n"
+        "    /// of it, owns the context: native releases it after accepting the\n"
+        "    /// record, and a refused submission releases it before it returns. A\n"
+        "    /// later submission fails with `Status::InvalidState`. A record that\n"
+        "    /// no submission takes releases it when its last copy drops.\n"
+        "    ///\n"
+        "    /// # Safety\n"
+        "    /// The callbacks and `release` must meet the C contract with\n"
+        "    /// `user_data` on any thread, and `release` must free it once.\n"
+        "    pub unsafe fn native("
+        + "".join(f"{name}: {typ}, " for name, typ in zip(names, types, strict=True))
+        + "user_data: *mut std::ffi::c_void, "
+        'release: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>) -> Self {\n'
+        "        // SAFETY: the caller vouches for the callbacks and the release.\n"
+        f"        let native = unsafe {{ callback::NativeRegistration::new({tuple_names}, user_data, release) }};\n"
+        "        Self { native: Some(native), ..Self::default() }\n"
+        "    }\n"
+    )
+    empty = " && ".join(
+        f"raw.{native_identifier(field.name)}.is_none()" for field, _ in members
+    )
+    conversion = (
+        "        if let Some(native) = &self.native {\n"
+        f"            if !({empty}) {{\n"
+        '                return Err(Error::invalid_argument("a native registration takes no host callbacks"));\n'
+        "            }\n"
+        f"            let ({tuple_names}, user_data, release) = native.take(arena)?;\n"
+        + "".join(
+            f"            raw.{native_identifier(field.name)} = Some({name});\n"
+            for (field, _), name in zip(members, names, strict=True)
+        )
+        + f"            raw.{user_data} = user_data;\n"
+        f"            raw.{release} = release;\n"
+        "            return Ok(raw);\n"
+        "        }\n"
+    )
+    return field, constructor, conversion
+
+
 def queued_registrations(bound) -> frozenset[str]:
     """The registrations that a delivery queue can carry, whose callbacks
     each have a delivery."""
@@ -466,6 +534,10 @@ def declaration(values, value):
         kind.append(
             f"pub fn {built}<{generics}>({arguments}) -> Self where {bounds} {{ {body} }}"
         )
+    supplied = native_registration(values, value)
+    if supplied:
+        fields.append(supplied[0])
+        copies.append("native: None,")
     user_data = native_identifier(value.registration.user_data)
     release = native_identifier(value.registration.release)
     returned = value.native in values.bound.returned
@@ -528,7 +600,9 @@ def declaration(values, value):
             + "}\n"
             + f"impl<K: QueueKind> {name}<K> {{\n"
             if queued
-            else f"impl {name} {{\n" + "".join(f"    {line}\n" for line in constructors)
+            else f"impl {name} {{\n"
+            + "".join(f"    {line}\n" for line in constructors)
+            + (supplied[1] if supplied else "")
         )
         + "\n".join(trampolines)
         + (deliver or "")
@@ -545,6 +619,7 @@ def declaration(values, value):
         + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
         + held
+        + (supplied[2] if supplied else "")
         + f"        if !({empty}) {{\n"
         + "            // SAFETY: the release reclaims exactly this state.\n"
         + f"            raw.{user_data} = unsafe {{ arena.registration(self.clone(), callback::release::<Self>) }};\n"
