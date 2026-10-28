@@ -18,11 +18,14 @@
  * geometry and custom vector source options. A queued call keeps the
  * callback's contract except for its thread: its arguments are borrowed for
  * the call, owned handles pass to the callback, and release_user_data runs in
- * dispatch after the registration's last call. A registration that sets a
- * queue without a callback drains instead: each call becomes a delivery record
- * in an owned batch that mln_delivery_queue_drain() returns, and
- * MLN_DELIVERY_TYPE_RETIRED takes the place of release_user_data. Drained
- * records and dispatched calls queue apart.
+ * dispatch after the registration's last call. Calls queued before the
+ * registration is replaced, cleared, or released still run, so its callback
+ * and user_data stay in use until release_user_data runs or, without one,
+ * until the queue is released. A registration that sets a queue without a
+ * callback drains instead: each call becomes a delivery record in an owned
+ * batch that mln_delivery_queue_drain() returns, and MLN_DELIVERY_TYPE_RETIRED
+ * takes the place of release_user_data. Drained records and dispatched calls
+ * queue apart.
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. Events and completions that select

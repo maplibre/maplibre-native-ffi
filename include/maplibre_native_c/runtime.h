@@ -1236,8 +1236,9 @@ MLN_API mln_status mln_runtime_create(
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. With a null release_user_data, the caller
  * keeps user_data valid until a committed replacement or clear command, or
- * until native runtime teardown finishes. Requests that the previous provider
- * already handled retain their request handles.
+ * until native runtime teardown finishes, or, with a queue, until the queue is
+ * released. Requests that the previous provider already handled retain their
+ * request handles.
  *
  * A URL with an unrecognized scheme, such as jar:file:, reaches this callback
  * and completes as an HTTP error when the provider passes it through.
@@ -1385,9 +1386,10 @@ MLN_API mln_status mln_resource_request_is_cancelled(
  * caller then keeps user_data, and neither callback runs. Any other request
  * reports false. This function never invokes either callback.
  *
- * mln_resource_request_release() waits for a cancel callback running on another
- * thread to return, so the callback and user_data are unused once release
- * returns. Called from inside the callback, release returns without waiting.
+ * Without a queue, mln_resource_request_release() waits for a cancel callback
+ * running on another thread to return, so the callback and user_data are
+ * unused once release returns. Called from inside the callback, release
+ * returns without waiting.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1438,7 +1440,8 @@ MLN_API void mln_resource_request_release(
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. With a null release_user_data, the caller
  * keeps user_data valid until a committed replacement or clear command, or
- * until native runtime teardown finishes.
+ * until native runtime teardown finishes, or, with a queue, until the queue is
+ * released.
  *
  * With a queue, no host code runs on a MapLibre thread: each request reaches
  * the transform's queue, and the host answers its handle after dispatching or

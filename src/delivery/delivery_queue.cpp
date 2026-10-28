@@ -402,7 +402,9 @@ auto DeliveryQueueState::dispatch() noexcept -> DispatchResult {
     while (dispatch_requested_.exchange(false, std::memory_order_acq_rel)) {
       if (run_calls()) ran = true;
     }
-    dispatching_.store(false, std::memory_order_release);
+    // An exchange, not a store, so a BUSY dispatch that saw this one running
+    // has its request visible to the check below.
+    dispatching_.exchange(false, std::memory_order_acq_rel);
     if (!dispatch_requested_.load(std::memory_order_acquire)) break;
   }
   if (ran) return DispatchResult::Ran;

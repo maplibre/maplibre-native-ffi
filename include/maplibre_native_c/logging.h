@@ -127,8 +127,9 @@ typedef struct mln_log_handler {
  * callback, user_data, and release_user_data to the C API. The handler struct
  * itself is borrowed for the call. With a null release_user_data, the caller
  * keeps responsibility for user_data and must keep it valid until the handler
- * is replaced or cleared. A rejected call leaves the current handler in place
- * and invokes no release. mln_log_clear_callback() clears the handler.
+ * is replaced or cleared, or, with a queue, until the queue is released. A
+ * rejected call leaves the current handler in place and invokes no release.
+ * mln_log_clear_callback() clears the handler.
  *
  * The callback may run on any thread, according to the async severity mask. It
  * must be thread-safe, return promptly, and not call this C API: each
