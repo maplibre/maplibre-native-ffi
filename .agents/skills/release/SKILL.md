@@ -1,9 +1,8 @@
 ---
 name: release
 description:
-  Draft the notes for a MapLibre Native FFI release, revise them with the
-  maintainer, then tag the release or update a published one. Use when asked to
-  prepare or tag a release, or to write or rewrite its notes.
+  Use when asked to prepare or tag a release, or to write or rewrite a release's
+  notes.
 ---
 
 # Release
