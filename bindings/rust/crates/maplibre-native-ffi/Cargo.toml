@@ -27,7 +27,7 @@ webgpu = ["maplibre-native-ffi-sys/webgpu"]
 browser-fixtures = ["dep:bindgen"]
 
 [build-dependencies]
-bindgen = { version = "0.72.1", optional = true }
+bindgen = { version = "0.73.2", optional = true }
 
 [dev-dependencies]
 static_assertions = "1.1.0"
