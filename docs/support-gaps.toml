@@ -213,7 +213,8 @@ link = "https://codeberg.org/ziglang/zig/pulls/37063"
 binding = "c"
 platform = "windows-mingw"
 status = "path-known"
-reason = "Build with llvm-mingw and a static libc++, link the Rust platform crate for `*-pc-windows-gnullvm`, and run the suite on the Windows runners. MapLibre Native needs no change."
+reason = "A DLL built with Zig's `windows-gnu` target passes the C suites under Wine, after the build changes that the issue lists. A static archive has to hide its bundled C++ runtime without `ld -r`, which lld lacks for COFF, by renaming that runtime's symbols with `llvm-objcopy`."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[gap]]
 binding = "dotnet"
@@ -238,6 +239,7 @@ binding = "go"
 platform = "windows-mingw"
 status = "path-known"
 reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[gap]]
 binding = "go"
@@ -249,7 +251,8 @@ reason = "Add a cgo or gomobile build, package it in an app or framework, and ru
 binding = "kotlin-native"
 platform = "windows-mingw"
 status = "path-known"
-reason = "Once the C library builds with MinGW, declare `mingwX64`, Kotlin/Native's only Windows target, and run the native suite on the Windows runners."
+reason = "Kotlin/Native links `mingwX64` against GCC 9's `libstdc++` and `msvcrt.dll`. Its runtime KLIB needs a static archive built for msvcrt, as llvm-mingw can, with the bundled C++ runtime's symbols renamed so that they cannot collide with `libstdc++`."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[gap]]
 binding = "python"
@@ -269,6 +272,7 @@ binding = "rust"
 platform = "windows-mingw"
 status = "path-known"
 reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[gap]]
 binding = "swift"
