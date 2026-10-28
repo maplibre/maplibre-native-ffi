@@ -428,23 +428,24 @@ struct WakeContext {
 }
 
 unsafe extern "C" fn raise_wake(user_data: *mut std::ffi::c_void) {
-    // SAFETY: the test keeps its context alive past the queue's release.
+    // SAFETY: native holds a reference to the context until its release.
     unsafe { &*user_data.cast::<WakeContext>() }.woken.raise();
 }
 
 unsafe extern "C" fn release_wake(user_data: *mut std::ffi::c_void) {
-    // SAFETY: as above.
-    unsafe { &*user_data.cast::<WakeContext>() }
-        .released
-        .raise();
+    // SAFETY: native releases the reference the test gave it, once.
+    let context = unsafe { Arc::from_raw(user_data.cast::<WakeContext>()) };
+    context.released.raise();
 }
 
 #[test]
 fn a_native_wake_runs_in_native_and_its_queue_releases_it_once() {
     let fixture = Fixture::new();
     let context = Arc::new(WakeContext::default());
-    let user_data = Arc::as_ptr(&context).cast_mut().cast();
-    // SAFETY: the context outlives the queue and the wake's delayed release.
+    // Native owns a reference, so the release callback can still use the
+    // context after the test sees its signal and drops its own.
+    let user_data = Arc::into_raw(Arc::clone(&context)).cast_mut().cast();
+    // SAFETY: the queue releases native's reference once.
     let wake = unsafe { Wake::native(raise_wake, user_data, Some(release_wake)) };
     let queue = DeliveryQueue::<Shared>::new(Some(wake.clone())).unwrap();
     // The queue took the context, so a copy of its wake is refused.
