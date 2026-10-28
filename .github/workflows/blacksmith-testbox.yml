@@ -20,7 +20,7 @@ jobs:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
-      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
+      - uses: useblacksmith/begin-testbox@22ff2ea5697369864347140857d218e42815b33c # v2
         with:
           testbox_id: ${{ inputs.testbox_id }}
       # Matches the linux-gnu-x64-egl target job, including source/submodule
@@ -59,4 +59,4 @@ jobs:
             export -p
           ) > ~/.testbox-env
           sed -i '1i [ -f ~/.testbox-env ] && . ~/.testbox-env' ~/.bashrc
-      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
+      - uses: useblacksmith/run-testbox@9b976c32aa3bcbffb348889673585a5deee1b2f3 # v2
