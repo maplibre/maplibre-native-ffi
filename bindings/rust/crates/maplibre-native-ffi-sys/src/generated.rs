@@ -1671,6 +1671,7 @@ pub struct mln_wake {
     pub callback: mln_wake_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1958,6 +1959,10 @@ unsafe extern "C" {
     pub fn mln_delivery_queue_create(
         options: *const mln_delivery_queue_options,
         out_queue: *mut mln_delivery_queue,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_delivery_queue_dispatch(
+        queue: mln_delivery_queue,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_delivery_queue_drain(

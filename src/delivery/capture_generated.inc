@@ -358,7 +358,13 @@ constexpr auto element_owns_handles(
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END> {
   using Record = mln_camera_transition_end_delivery;
+  using Callback = mln_camera_transition_end_callback;
   static constexpr auto member = &mln_delivery_payload::camera_transition_end;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.end));
+  }
 };
 template <bool Writing>
 auto capture_element(
@@ -379,14 +385,26 @@ constexpr auto element_owns_handles(
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE> {
   using Record = mln_custom_source_tile_delivery;
+  using Callback = mln_custom_source_cancel_tile_callback;
   static constexpr auto member =
     &mln_delivery_payload::custom_source_cancel_tile;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.tile_id));
+  }
 };
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE> {
   using Record = mln_custom_source_tile_delivery;
+  using Callback = mln_custom_source_fetch_tile_callback;
   static constexpr auto member =
     &mln_delivery_payload::custom_source_fetch_tile;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.tile_id));
+  }
 };
 template <bool Writing>
 auto capture_element(
@@ -405,7 +423,15 @@ constexpr auto element_owns_handles(const mln_log_delivery*) noexcept -> bool {
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_LOG_RECORD> {
   using Record = mln_log_delivery;
+  using Callback = mln_log_callback;
   static constexpr auto member = &mln_delivery_payload::log_record;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(
+      user_data, record.severity, record.event, record.code, record.message
+    ));
+  }
 };
 template <bool Writing>
 auto capture_element(
@@ -426,7 +452,13 @@ constexpr auto element_owns_handles(
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL> {
   using Record = mln_resource_request_cancel_delivery;
+  using Callback = mln_resource_request_cancel_callback;
   static constexpr auto member = &mln_delivery_payload::resource_request_cancel;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.handle));
+  }
 };
 template <bool Writing>
 auto capture_element(
@@ -475,7 +507,13 @@ constexpr auto element_owns_handles(
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST> {
   using Record = mln_resource_request_delivery;
+  using Callback = mln_resource_provider_callback;
   static constexpr auto member = &mln_delivery_payload::resource_request;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.request, record.handle));
+  }
 };
 template <bool Writing>
 auto capture_element(
@@ -501,5 +539,24 @@ constexpr auto element_owns_handles(
 template <>
 struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM> {
   using Record = mln_resource_transform_delivery;
+  using Callback = mln_resource_transform_callback;
   static constexpr auto member = &mln_delivery_payload::resource_transform;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(
+      callback(user_data, record.kind, record.url, record.request)
+    );
+  }
+};
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_RUNTIME_EVENTS> {
+  using Record = mln_runtime_event_delivery;
+  using Callback = mln_runtime_event_callback;
+  static constexpr auto member = &mln_delivery_payload::runtime_events;
+  static auto invoke(
+    Callback callback, void* user_data, const Record& record
+  ) noexcept -> void {
+    static_cast<void>(callback(user_data, record.events));
+  }
 };

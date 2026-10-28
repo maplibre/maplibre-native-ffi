@@ -86,6 +86,8 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
+  @JvmStatic actual external fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int
+
   @JvmStatic
   actual external fun mln_delivery_queue_drain(
     queue: Long,

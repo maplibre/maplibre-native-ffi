@@ -278,17 +278,17 @@ internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
   value: RenderSessionAttachOptions,
 ) {
-  writeU32(target, w(56, 96).toUInt())
+  writeU32(target, w(80, 112).toUInt())
   writeU32(target + 4, value.driver.rawValue)
   writeU32(target + 8, value.requestedTextureRingDepth)
   writeU32(target + 12, value.producerSyncKind.rawValue)
   putWake(target + 16, value.frameWake)
-  putWake(target + w(28, 40), value.driverWorkWake)
-  putQueueLock(target + w(40, 64), value.queueLock)
+  putWake(target + w(40, 48), value.driverWorkWake)
+  putQueueLock(target + w(64, 80), value.queueLock)
 }
 
 internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(56, 96), w(4, 8)).also { putRenderSessionAttachOptions(it, value) }
+  allocate(w(80, 112), 8).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
@@ -1380,7 +1380,7 @@ internal fun NativeCall.putWake(target: Long, value: Wake) {
 }
 
 internal fun NativeCall.writeWake(value: Wake): Long =
-  allocate(w(12, 24), w(4, 8)).also { putWake(it, value) }
+  allocate(w(24, 32), 8).also { putWake(it, value) }
 
 internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
   val native = value.bindingNative

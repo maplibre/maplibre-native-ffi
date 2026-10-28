@@ -1553,9 +1553,13 @@ auto start_attach_render_session(
     set_thread_error("map has no live runtime");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto frame_wake_status = validate_wake(&options->frame_wake);
+  auto frame_wake_queue = std::shared_ptr<delivery::DeliveryQueueState>{};
+  const auto frame_wake_status =
+    resolve_wake(&options->frame_wake, frame_wake_queue);
   if (frame_wake_status != MLN_STATUS_OK) return frame_wake_status;
-  const auto driver_wake_status = validate_wake(&options->driver_work_wake);
+  auto driver_wake_queue = std::shared_ptr<delivery::DeliveryQueueState>{};
+  const auto driver_wake_status =
+    resolve_wake(&options->driver_work_wake, driver_wake_queue);
   if (driver_wake_status != MLN_STATUS_OK) return driver_wake_status;
   const auto queue_lock_status = validate_queue_lock(&options->queue_lock);
   if (queue_lock_status != MLN_STATUS_OK) return queue_lock_status;
@@ -1563,8 +1567,11 @@ auto start_attach_render_session(
     set_thread_error("this render target does not take a queue lock");
     return MLN_STATUS_UNSUPPORTED;
   }
-  auto frame_wake = std::make_shared<Wake>(options->frame_wake);
-  auto driver_wake = std::make_shared<Wake>(options->driver_work_wake);
+  auto frame_wake =
+    std::make_shared<Wake>(options->frame_wake, std::move(frame_wake_queue));
+  auto driver_wake = std::make_shared<Wake>(
+    options->driver_work_wake, std::move(driver_wake_queue)
+  );
   auto queue_lock = options->queue_lock.lock == nullptr
                       ? std::shared_ptr<QueueLock>{}
                       : std::make_shared<QueueLock>(options->queue_lock);

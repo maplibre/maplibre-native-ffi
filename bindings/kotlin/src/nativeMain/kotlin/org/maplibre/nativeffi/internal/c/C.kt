@@ -127,6 +127,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_dispatch(
+      queue.toULong(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_delivery_queue_drain(
     queue: Long,
     outBatch: Long,

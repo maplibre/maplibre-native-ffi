@@ -46,9 +46,15 @@ typedef void (*mln_wake_callback)(void* user_data);
  * returned. It may run on any thread that invoked callback and must not wait
  * for another thread.
  *
+ * A wake that names a queue runs neither callback nor release_user_data on a
+ * native thread: mln_delivery_queue_dispatch() runs them, as it runs any
+ * queued call, and the rules above for native threads do not apply. Wakes
+ * that arrive while one call is queued join it.
+ *
  * A descriptor whose callback is null disables waking, and a disabled wake
- * must not carry release_user_data. When the owning API permits a disabled
- * wake, the receiver services its queue or driver on its own schedule instead.
+ * must not carry release_user_data or a queue. When the owning API permits a
+ * disabled wake, the receiver services its queue or driver on its own
+ * schedule instead.
  */
 typedef struct mln_wake {
   mln_wake_callback callback MLN_BINDING("nullable=true");
@@ -58,6 +64,13 @@ typedef struct mln_wake {
    * A disabled wake leaves it null.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Runs callback and release_user_data in
+   * mln_delivery_queue_dispatch(); see delivery.h. The owning call rejects an
+   * invalid queue handle with MLN_STATUS_INVALID_ARGUMENT and a released queue
+   * with MLN_STATUS_INVALID_STATE.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_wake MLN_BINDING("kind=callback_registration;release=release_user_data");
 
 #ifdef __cplusplus

@@ -47,6 +47,8 @@ internal actual object C {
     Ffm.downcall("mln_delivery_batch_take", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_create =
     Ffm.downcall("mln_delivery_queue_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_delivery_queue_dispatch =
+    Ffm.downcall("mln_delivery_queue_dispatch", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_drain =
     Ffm.downcall("mln_delivery_queue_drain", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
@@ -1340,6 +1342,9 @@ internal actual object C {
 
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     mln_delivery_queue_create.invokeExact(options, outQueue, outDiagnostic) as Int
+
+  actual fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int =
+    mln_delivery_queue_dispatch.invokeExact(queue, outDiagnostic) as Int
 
   actual fun mln_delivery_queue_drain(
     queue: Long,

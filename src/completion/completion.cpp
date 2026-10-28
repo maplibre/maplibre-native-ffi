@@ -21,6 +21,24 @@ namespace {
 // Small results and diagnostics share the storage reserved for fallback.
 constexpr auto reserved_result_bytes = std::size_t{256};
 
+// Marks a queue item as the completion's delivery, or as a call to its
+// callback and release when the completion has a callback.
+auto set_completion_item(
+  delivery::DeliveryItem& item, const mln_completion& descriptor
+) noexcept -> void {
+  item.view.type = MLN_DELIVERY_TYPE_COMPLETION;
+  item.view.user_data = descriptor.user_data;
+  if (descriptor.callback == nullptr) return;
+  item.dispatched = true;
+  item.callback = reinterpret_cast<delivery::HostFunction>(descriptor.callback);
+  item.release = descriptor.release_user_data;
+  item.invoke = [](delivery::DeliveryItem& call) noexcept {
+    reinterpret_cast<mln_completion_callback>(call.callback)(
+      call.view.user_data, &call.view.payload.completion
+    );
+  };
+}
+
 // Static storage keeps fallback delivery independent of allocation.
 constexpr char uncopyable_result[] =
   "the completion result could not be copied into its delivery queue";
@@ -107,8 +125,7 @@ auto CompletionSink::deliver_queued(
     } else {
       item = delivery::ItemPtr{delivery::detail::allocate_item(measure.offset)};
     }
-    item->view.type = MLN_DELIVERY_TYPE_COMPLETION;
-    item->view.user_data = user_data_;
+    set_completion_item(*item, descriptor_);
     auto arena = delivery::Arena<true>{
       .storage = reinterpret_cast<std::byte*>(item.get()),
       .offset = header,
@@ -235,7 +252,7 @@ auto Completion::release() noexcept -> void {
     auto sink = std::move(sink_);
     sink_ = CompletionSink{};
     fallback_.reset();
-    // A queue completion owns nothing of the host's to release.
+    // A queued completion's release runs in dispatch, or is abandoned.
     const auto release_user_data =
       sink.queue_ == nullptr ? sink.descriptor_.release_user_data : nullptr;
     const auto user_data = sink.descriptor_.user_data;
@@ -269,16 +286,14 @@ auto make_completion_sink(
   );
   if (status != MLN_STATUS_OK) return status;
   try {
+    sink.descriptor_ = *completion;
+    sink.descriptor_.queue = MLN_HANDLE_NULL;
     if (queue != nullptr) {
       sink.queue_ = std::move(queue);
-      sink.user_data_ = completion->user_data;
       fallback = delivery::ItemPtr{delivery::detail::allocate_item(
         sizeof(delivery::DeliveryItem) + reserved_result_bytes
       )};
-      fallback->view.type = MLN_DELIVERY_TYPE_COMPLETION;
-      fallback->view.user_data = completion->user_data;
-    } else {
-      sink.descriptor_ = *completion;
+      set_completion_item(*fallback, sink.descriptor_);
     }
   } catch (...) {
     set_thread_error("asynchronous completion state could not be allocated");

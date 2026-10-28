@@ -116,8 +116,12 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
     // retirement's wake follows the log callback restrictions, as does the
     // wake's release when the observer holds the last share of a released
     // queue.
-    auto registration = std::make_unique<mln::delivery::QueuedRegistration>(
-      std::move(queue), handler->user_data
+    using Registration = mln::delivery::QueuedRegistration;
+    auto registration = std::make_unique<Registration>(
+      std::move(queue), handler->user_data, handler->release_user_data,
+      std::initializer_list<Registration::Callback>{
+        Registration::callback<MLN_DELIVERY_TYPE_LOG_RECORD>(handler->callback)
+      }
     );
     auto observer = std::make_unique<CallbackLogObserver>(
       &queue_log_record, registration.get(),

@@ -405,8 +405,7 @@ typedef struct mln_canonical_tile_id {
 /**
  * Requests one tile of a custom geometry or custom vector source.
  *
- * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
- * instead.
+ * A source that names a queue queues a copy of the call instead.
  *
  * Threads:
  * The callback may run on any native worker thread, concurrently with runtime
@@ -421,8 +420,7 @@ typedef void (*mln_custom_source_fetch_tile_callback)(
  * Cancels a request for one tile of a custom geometry or custom vector
  * source, best effort.
  *
- * A source in queue mode queues a copy as an mln_custom_source_tile_delivery
- * instead.
+ * A source that names a queue queues a copy of the call instead.
  *
  * Threads:
  * The callback may run on any native worker thread, concurrently with runtime
@@ -440,19 +438,19 @@ typedef struct mln_custom_geometry_source_options {
   /**
    * Tile fetch callback.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_custom_source_fetch_tile_callback fetch_tile;
   /**
    * Optional best-effort tile cancel callback.
    *
-   * Null in queue mode.
+   * Null when queue drains.
    */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /**
    * Caller-owned callback context retained by pointer, or an opaque host token
-   * in queue mode.
+   * when queue drains.
    */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -483,17 +481,18 @@ typedef struct mln_custom_geometry_source_options {
    *
    * Free callback state and return promptly. The callback may call the C API,
    * but must not wait for runtime work that only its own thread can advance.
-   * Null in queue mode.
+   * Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery in place of fetch_tile and cancel_tile: each
-   * fetch and each cancel is copied into one
+   * Optional. With fetch_tile, the callbacks and release_user_data run in
+   * mln_delivery_queue_dispatch(). Without it, the queue drains: each fetch
+   * and each cancel is copied into one
    * MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE or
    * MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE delivery carrying user_data,
    * and one MLN_DELIVERY_TYPE_RETIRED delivery follows the last of them where
-   * callback mode runs release_user_data. A command rejects an invalid queue
-   * handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
+   * a callback's release_user_data would run. A command rejects an invalid
+   * queue handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
    * MLN_STATUS_INVALID_STATE.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
@@ -508,19 +507,19 @@ typedef struct mln_custom_vector_source_options {
   /**
    * Tile fetch callback.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_custom_source_fetch_tile_callback fetch_tile;
   /**
    * Optional best-effort tile cancel callback.
    *
-   * Null in queue mode.
+   * Null when queue drains.
    */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /**
    * Caller-owned callback context retained by pointer, or an opaque host token
-   * in queue mode.
+   * when queue drains.
    */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -541,17 +540,18 @@ typedef struct mln_custom_vector_source_options {
    *
    * Free callback state and return promptly. The callback may call the C API,
    * but must not wait for runtime work that only its own thread can advance.
-   * Null in queue mode.
+   * Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery in place of fetch_tile and cancel_tile: each
-   * fetch and each cancel is copied into one
+   * Optional. With fetch_tile, the callbacks and release_user_data run in
+   * mln_delivery_queue_dispatch(). Without it, the queue drains: each fetch
+   * and each cancel is copied into one
    * MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE or
    * MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE delivery carrying user_data,
    * and one MLN_DELIVERY_TYPE_RETIRED delivery follows the last of them where
-   * callback mode runs release_user_data. A command rejects an invalid queue
-   * handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
+   * a callback's release_user_data would run. A command rejects an invalid
+   * queue handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
    * MLN_STATUS_INVALID_STATE.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
@@ -1044,8 +1044,8 @@ MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, options is null or invalid, or options sets neither or
- *   both of fetch_tile and queue.
+ *   invalid or empty, options is null or invalid, or options sets neither
+ *   fetch_tile nor queue.
  * - MLN_STATUS_INVALID_STATE when map or options->queue has been released, or
  *   the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
@@ -1195,8 +1195,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, options is null or invalid, or options sets neither or
- *   both of fetch_tile and queue.
+ *   invalid or empty, options is null or invalid, or options sets neither
+ *   fetch_tile nor queue.
  * - MLN_STATUS_INVALID_STATE when map or options->queue has been released, or
  *   the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.

@@ -28,6 +28,14 @@ auto mln_delivery_queue_drain(
   });
 }
 
+auto mln_delivery_queue_dispatch(
+  mln_delivery_queue queue, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::delivery::dispatch_delivery_queue(queue);
+  });
+}
+
 auto mln_delivery_batch_take(
   mln_delivery_batch batch, std::size_t index, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

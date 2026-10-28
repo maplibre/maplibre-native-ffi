@@ -71,6 +71,9 @@ internal actual object C {
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     mln_kw_mln_delivery_queue_create(word(options), word(outQueue), word(outDiagnostic))
 
+  actual fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_delivery_queue_dispatch(queue, word(outDiagnostic))
+
   actual fun mln_delivery_queue_drain(
     queue: Long,
     outBatch: Long,
@@ -1987,6 +1990,11 @@ private fun mln_kw_mln_delivery_batch_take(p0: Long, p1: Int, p2: Int): Int =
 private fun mln_kw_mln_delivery_queue_create(p0: Int, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_create(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_delivery_queue_dispatch(p0: Long, p1: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_dispatch(p0, p1)",
   )
 
 private fun mln_kw_mln_delivery_queue_drain(p0: Long, p1: Int, p2: Int, p3: Int): Int =

@@ -1497,9 +1497,12 @@ def callback_result_errors(
 def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
     """Check a registration's queue field.
 
-    A registration may name one delivery queue in place of its callback, and
-    native code then queues what the callback would receive. Only the protocol
-    completion and a callback that declares its delivery have such a copy.
+    A registration may name one delivery queue, and native code then queues
+    each call for mln_delivery_queue_dispatch(). A queue without a callback
+    drains a copy of what the callback would receive instead, which only the
+    protocol completion and a callback that declares its delivery have. A
+    registration whose callbacks declare no delivery only dispatches, so its
+    callbacks declare a delivery all or none.
     """
     if record is None:
         return []
@@ -1517,6 +1520,7 @@ def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
     if record.name == COMPLETION:
         return errors
     release = typedef.metadata.get("release")
+    delivered = {}
     for field in record.fields:
         callback = api.typedefs_by_name.get(field.type.declaration or "")
         signature = callback.type.pointee if callback else None
@@ -1525,11 +1529,14 @@ def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
             or callback is None
             or signature is None
             or signature.kind != "function"
-            or "delivery" in callback.metadata
         ):
             continue
-        errors.append(
-            f"{context}: a queue registration's callback {field.name} requires delivery="
+        delivered[field.name] = "delivery" in callback.metadata
+    if any(delivered.values()):
+        errors.extend(
+            f"{context}: a queue registration's callback {name} requires delivery="
+            for name, has_delivery in delivered.items()
+            if not has_delivery
         )
     return errors
 

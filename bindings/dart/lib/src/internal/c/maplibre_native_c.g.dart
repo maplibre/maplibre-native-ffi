@@ -1604,6 +1604,8 @@ final class mln_wake extends Struct {
   external mln_wake_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_web_gl_context_descriptor extends Struct {
@@ -2396,6 +2398,12 @@ external int mln_delivery_batch_take(
 external int mln_delivery_queue_create(
   Pointer<mln_delivery_queue_options> options,
   Pointer<mln_delivery_queue> out_queue,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Int32 Function(mln_delivery_queue, Pointer<mln_diagnostic>)>()
+external int mln_delivery_queue_dispatch(
+  int queue,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

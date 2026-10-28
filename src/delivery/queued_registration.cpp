@@ -12,17 +12,15 @@ auto resolve_registration_queue(
   bool has_release, std::shared_ptr<DeliveryQueueState>& out_queue
 ) -> mln_status {
   const auto queued = queue != MLN_HANDLE_NULL;
-  if (has_callback == queued) {
-    core::set_thread_error(
-      (std::string{registration} +
-       " requires exactly one of a callback and a delivery queue")
-        .c_str()
-    );
+  if (!has_callback && !queued) {
+    core::set_thread_error((std::string{registration} +
+                            " requires a callback or a delivery queue")
+                             .c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!queued) return MLN_STATUS_OK;
-  if (has_release) {
-    core::set_thread_error((std::string{"a queue "} + registration +
+  if (!has_callback && has_release) {
+    core::set_thread_error((std::string{"a drained "} + registration +
                             " must not carry release_user_data")
                              .c_str());
     return MLN_STATUS_INVALID_ARGUMENT;

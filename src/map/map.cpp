@@ -2220,8 +2220,14 @@ auto camera_transition_end(
   if (queue_status != MLN_STATUS_OK) return queue_status;
   auto copied = handler;
   if (queue != nullptr) {
-    registration = std::make_unique<mln::delivery::QueuedRegistration>(
-      std::move(queue), handler.user_data
+    using Registration = mln::delivery::QueuedRegistration;
+    registration = std::make_unique<Registration>(
+      std::move(queue), handler.user_data, handler.release_user_data,
+      std::initializer_list<Registration::Callback>{
+        Registration::callback<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
+          handler.callback
+        )
+      }
     );
     const auto end = mln_camera_transition_end{};
     registration->reserve<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(

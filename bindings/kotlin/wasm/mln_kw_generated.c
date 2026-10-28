@@ -123,6 +123,14 @@ int32_t mln_kw_mln_delivery_queue_create(
   );
 }
 
+int32_t mln_kw_mln_delivery_queue_dispatch(
+  int64_t queue, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_delivery_queue_dispatch(
+    (mln_delivery_queue)queue, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_delivery_queue_drain(
   int64_t queue, uintptr_t out_batch, uintptr_t out_view,
   uintptr_t out_diagnostic

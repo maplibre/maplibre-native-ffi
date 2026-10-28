@@ -166,6 +166,20 @@ int main() {
   static_assert(!mln::delivery::element_owns_handles(static_cast<const mln_log_delivery*>(nullptr)));
   static_assert(std::is_same_v<mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::Record, mln_log_delivery>);
 
+  // A dispatched call passes the copy back as the callback's arguments.
+  static int invoked = 0;
+  mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::invoke(
+    [](void* user_data, mln_log_severity severity, mln_log_event event, int64_t code, mln_buffer_view text) {
+      assert(user_data == &invoked && severity == MLN_LOG_SEVERITY_INFO);
+      assert(event == MLN_LOG_EVENT_SHADER && code == 3);
+      assert(std::strcmp(static_cast<const char*>(text.data), "borrowed") == 0);
+      ++invoked;
+      return true;
+    },
+    &invoked, copied
+  );
+  assert(invoked == 1);
+
   // An owned handle field of a delivered record is released with it.
   char transformed[] = "custom://tile.pbf";
   const mln_resource_transform_delivery transform{

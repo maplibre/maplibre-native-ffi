@@ -102,8 +102,17 @@ struct OwnedCallbackSourceOptions {
   )
       : value(options) {
     if (queue == nullptr) return;
-    registration = std::make_unique<mln::delivery::QueuedRegistration>(
-      std::move(queue), options.user_data
+    using Registration = mln::delivery::QueuedRegistration;
+    registration = std::make_unique<Registration>(
+      std::move(queue), options.user_data, options.release_user_data,
+      std::initializer_list<Registration::Callback>{
+        Registration::callback<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE>(
+          options.fetch_tile
+        ),
+        Registration::callback<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE>(
+          options.cancel_tile
+        ),
+      }
     );
     value.fetch_tile = &queue_tile_fetch;
     value.cancel_tile = &queue_tile_cancel;
@@ -182,8 +191,11 @@ auto add_callback_source(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
-  if (options->queue != MLN_HANDLE_NULL && options->cancel_tile != nullptr) {
-    mln::core::set_thread_error("a queue source must not carry cancel_tile");
+  if (
+    options->queue != MLN_HANDLE_NULL && options->fetch_tile == nullptr &&
+    options->cancel_tile != nullptr
+  ) {
+    mln::core::set_thread_error("a drained source must not carry cancel_tile");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto queue_status = mln::delivery::resolve_registration_queue(

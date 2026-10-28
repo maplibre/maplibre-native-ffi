@@ -730,10 +730,16 @@ auto set_resource_request_cancel_callback(
   if (live == nullptr) return recorded_handle_fault_status();
   // A queue handler's registration stands in for user_data. One the request
   // does not store is freed without retiring.
-  auto registration = std::unique_ptr<mln::delivery::QueuedRegistration>{};
+  using Registration = mln::delivery::QueuedRegistration;
+  auto registration = std::unique_ptr<Registration>{};
   if (queue != nullptr) {
-    registration = std::make_unique<mln::delivery::QueuedRegistration>(
-      std::move(queue), handler->user_data
+    registration = std::make_unique<Registration>(
+      std::move(queue), handler->user_data, handler->release_user_data,
+      std::initializer_list<Registration::Callback>{
+        Registration::callback<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
+          handler->callback
+        )
+      }
     );
     registration->reserve<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
       mln_resource_request_cancel_delivery{.handle = handle}

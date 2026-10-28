@@ -137,6 +137,14 @@ static jint mln_delivery_queue_create_jni(
   );
 }
 
+static jint mln_delivery_queue_dispatch_jni(
+  JNIEnv* env, jclass type, jlong queue, jlong out_diagnostic
+) {
+  return (jint)mln_delivery_queue_dispatch(
+    (mln_delivery_queue)queue, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_delivery_queue_drain_jni(
   JNIEnv* env, jclass type, jlong queue, jlong out_batch, jlong out_view,
   jlong out_diagnostic
@@ -2190,6 +2198,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
   {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_dispatch", "(JJ)I",
+   (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",
@@ -2551,6 +2561,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
   {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_dispatch", "(JJ)I",
+   (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",

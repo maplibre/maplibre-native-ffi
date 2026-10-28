@@ -63,8 +63,8 @@ typedef enum mln_log_event : uint32_t {
  * its bytes. Returning true consumes the record. Returning false lets MapLibre
  * Native's platform logger handle it.
  *
- * A handler in queue mode consumes each record without a callback and queues
- * a copy as an mln_log_delivery.
+ * A handler that names a queue consumes each record and queues a copy, so the
+ * callback's result is ignored.
  *
  * Threads:
  * The callback runs synchronously on the thread that emits the record, or on a
@@ -82,36 +82,38 @@ typedef bool (*mln_log_callback)(
 /**
  * Process-global log callback.
  *
- * In queue mode, a queue takes the callback's place: exactly one of callback
- * and queue is set. The struct itself is borrowed for mln_log_set_callback().
+ * The handler sets callback, queue, or both. The struct itself is borrowed
+ * for mln_log_set_callback().
  */
 typedef struct mln_log_handler {
   uint32_t size;
   /**
    * Receives each record.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_log_callback callback;
-  /** Opaque host token in queue mode; native code never dereferences it. */
+  /** Opaque host token when queue drains; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data after the final callback returns, when the
    * handler is replaced or cleared.
    *
    * It runs on the thread that replaces or clears the handler, under the
-   * same restrictions as the callback. Null in queue mode.
+   * same restrictions as the callback. Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery: native code consumes each record and queues a
-   * copy as an MLN_DELIVERY_TYPE_LOG_RECORD delivery carrying user_data. A
+   * Optional. Native code consumes each record and queues a copy. With
+   * callback, the callback and release_user_data run in
+   * mln_delivery_queue_dispatch(), where they may call the C API. Without one,
+   * the queue drains: each copy is an MLN_DELIVERY_TYPE_LOG_RECORD delivery
+   * carrying user_data, and replacing or clearing the handler queues one
+   * MLN_DELIVERY_TYPE_RETIRED delivery after the handler's final record. A
    * record the queue refuses, because the queue was released or the copy
-   * could not be allocated, goes to the platform logger instead. Replacing or
-   * clearing the handler queues one MLN_DELIVERY_TYPE_RETIRED delivery carrying
-   * user_data after the handler's final record. The queue's wake and wake
-   * release run inline on the logging thread, under the same restrictions as
-   * the log callback.
+   * could not be allocated, goes to the platform logger instead. The queue's
+   * wake and wake release run inline on the logging thread, under the same
+   * restrictions as the log callback.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
@@ -133,14 +135,14 @@ typedef struct mln_log_handler {
  * status-returning function returns MLN_STATUS_INVALID_STATE when the callback
  * calls it.
  *
- * In queue mode the handler's records reach the queue and its wake runs inline
- * on the logging thread. The wake follows the same restrictions.
+ * A handler that names a queue lifts these restrictions from its callback
+ * and release, which run in dispatch, but not from the queue's wake.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when handler is null, handler->size is too
- *   small, neither or both of callback and queue are set, release_user_data
- *   is set in queue mode, or queue is an invalid handle.
+ *   small, neither callback nor queue is set, release_user_data is set
+ *   without a callback, or queue is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
@@ -151,8 +153,8 @@ MLN_API mln_status mln_log_set_callback(
 /**
  * Clears the process-global log callback.
  *
- * The C API invokes the cleared handler's release_user_data, if any, or queues
- * its MLN_DELIVERY_TYPE_RETIRED delivery, before returning.
+ * The C API invokes or queues the cleared handler's release_user_data, if any,
+ * or queues its MLN_DELIVERY_TYPE_RETIRED delivery, before returning.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -11,12 +11,15 @@ namespace {
 
 void a_failed_event_append_keeps_the_published_events_readable() {
   auto wakes = std::atomic_int{0};
-  auto wake = std::make_shared<mln::core::Wake>(mln_wake{
-    .callback = [](
-                  void* context
-                ) { static_cast<std::atomic_int*>(context)->fetch_add(1); },
-    .user_data = &wakes,
-  });
+  auto wake = std::make_shared<mln::core::Wake>(
+    mln_wake{
+      .callback = [](
+                    void* context
+                  ) { static_cast<std::atomic_int*>(context)->fetch_add(1); },
+      .user_data = &wakes,
+    },
+    nullptr
+  );
   wake->accept();
   auto queue = mln::delivery::DeliveryQueueState{wake};
   const auto event =

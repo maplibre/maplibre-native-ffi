@@ -7,9 +7,8 @@ native code returns. Such a host gives each registration one of five forms:
   queue delivery. The host sets its queue and a token in place of the
   callbacks; native code answers each call itself and queues a copy, which the
   host drains on its own thread and dispatches by the token.
-- `wake`: the registration's one callback only asks to be called again, and the
-  registration carries no queue. The host supplies a wake that posts to its
-  thread.
+- `wake`: the registration's one callback only asks to be called again. The
+  host supplies a wake that posts to its thread and leaves the queue unset.
 - `rules`: every callback must answer on its native thread and has no queue
   delivery. The host leaves them unset, so the native rules that the
   registration carries answer each call.
@@ -55,9 +54,9 @@ def wake_callback(callback: CallbackPlan) -> bool:
 
 
 def is_wake(bound: BoundApi, value: ValuePlan) -> bool:
-    """Whether a registration is a wake: its one callback is a wake callback,
-    and it carries no queue."""
-    if not value.registration or value.registration.queue:
+    """Whether a registration is a wake: its one callback is a wake callback.
+    The host leaves the wake's queue unset."""
+    if not value.registration:
         return False
     callbacks = callback_fields(value)
     return len(callbacks) == 1 and wake_callback(

@@ -982,6 +982,36 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                     require_complete=True,
                 )
 
+    def test_a_queue_registration_without_deliveries_only_dispatches(self):
+        # A callback without a delivery has no record to drain, so its
+        # registration names a queue only for dispatch. A registration whose
+        # other callback drains must give every callback a delivery.
+        source = """
+typedef void (*mln_ping_callback)(void* context);
+typedef struct mln_ping_handler {
+  unsigned int size;
+  mln_ping_callback callback;
+  void* context BIND("kind=context");
+  mln_notice_release release;
+  mln_delivery_queue queue BIND("kind=delivery_queue");
+} mln_ping_handler BIND("kind=callback_registration;release=release");
+mln_status mln_ping_set_callback(
+  const mln_ping_handler* handler, mln_diagnostic* out_diagnostic
+);
+"""
+        text = protocol_header(source, groups=("delivery",))
+        model = bind(parse_sources({"api.h": text}), require_complete=True)
+        self.assertEqual(
+            model.operations_by_name["mln_ping_set_callback"].registrations[0].queue,
+            "queue",
+        )
+        mixed = text.replace(
+            "  mln_ping_callback callback;\n",
+            "  mln_ping_callback callback;\n  mln_notice_callback notice;\n",
+        )
+        with self.assertRaisesRegex(ModelError, "callback callback requires delivery="):
+            bind(parse_sources({"api.h": mixed}), require_complete=True)
+
     def test_synchronous_callbacks_run_on_their_thread(self):
         source = """
 BIND("synchronous=true") typedef void (*gate)(void *context);

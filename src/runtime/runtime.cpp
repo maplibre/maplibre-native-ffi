@@ -1057,11 +1057,18 @@ auto set_resource_transform(
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
 
-  auto queued = queue == nullptr
-                  ? std::unique_ptr<mln::delivery::QueuedRegistration>{}
-                  : std::make_unique<mln::delivery::QueuedRegistration>(
-                      std::move(queue), transform->user_data
-                    );
+  using Registration = mln::delivery::QueuedRegistration;
+  auto queued =
+    queue == nullptr
+      ? std::unique_ptr<Registration>{}
+      : std::make_unique<Registration>(
+          std::move(queue), transform->user_data, transform->release_user_data,
+          std::initializer_list<Registration::Callback>{
+            Registration::callback<MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM>(
+              transform->callback
+            )
+          }
+        );
   const auto context =
     queued != nullptr
       ? std::make_shared<RuntimeCallbackContext>(
@@ -2261,10 +2268,16 @@ auto set_resource_provider(
     copy_routes(provider->routes, provider->route_count, *routes);
   if (routes_status != MLN_STATUS_OK) return routes_status;
 
-  auto registration = std::unique_ptr<mln::delivery::QueuedRegistration>{};
+  using Registration = mln::delivery::QueuedRegistration;
+  auto registration = std::unique_ptr<Registration>{};
   if (queue != nullptr) {
-    registration = std::make_unique<mln::delivery::QueuedRegistration>(
-      std::move(queue), provider->user_data
+    registration = std::make_unique<Registration>(
+      std::move(queue), provider->user_data, provider->release_user_data,
+      std::initializer_list<Registration::Callback>{
+        Registration::callback<MLN_DELIVERY_TYPE_RESOURCE_REQUEST>(
+          provider->callback
+        )
+      }
     );
   }
   const auto context =
@@ -2466,11 +2479,18 @@ auto set_runtime_event_handler(
     handler->release_user_data != nullptr, queue
   );
   if (validated != MLN_STATUS_OK) return validated;
-  auto queued = queue == nullptr
-                  ? std::unique_ptr<delivery::QueuedRegistration>{}
-                  : std::make_unique<delivery::QueuedRegistration>(
-                      queue, handler->user_data
-                    );
+  using Registration = delivery::QueuedRegistration;
+  auto queued =
+    queue == nullptr
+      ? std::unique_ptr<Registration>{}
+      : std::make_unique<Registration>(
+          queue, handler->user_data, handler->release_user_data,
+          std::initializer_list<Registration::Callback>{
+            Registration::callback<MLN_DELIVERY_TYPE_RUNTIME_EVENTS>(
+              handler->callback
+            )
+          }
+        );
   auto context = std::make_shared<RuntimeCallbackContext>(
     queued != nullptr ? queued.get() : handler->user_data,
     queued != nullptr ? &delivery::QueuedRegistration::retire

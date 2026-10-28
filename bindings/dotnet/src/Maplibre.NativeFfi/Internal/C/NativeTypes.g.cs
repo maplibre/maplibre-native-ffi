@@ -1211,6 +1211,7 @@ internal unsafe struct mln_wake
     public delegate* unmanaged[Cdecl]<void*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_web_gl_context_descriptor

@@ -89,9 +89,10 @@ static void a_rejected_submission_queues_nothing(void) {
     mln_runtime_clear_resource_transform(MLN_HANDLE_NULL, &completion, NULL)
   );
 
-  // Both a callback and a queue, or neither.
+  // A drained completion with a release, or neither a callback nor a queue.
   mln_test_completion callback = mln_test_completion_default(0);
   completion = callback.descriptor;
+  completion.callback = NULL;
   completion.queue = queue.handle;
   MLN_TEST_INVALID(
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)

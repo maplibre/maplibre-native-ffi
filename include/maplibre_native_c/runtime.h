@@ -623,8 +623,8 @@ typedef struct mln_runtime_event {
  * A borrowed span of runtime events in one delivery.
  *
  * Step through events by event_size. The event and message pointers remain
- * valid during the callback, or until the delivery batch is released in queue
- * mode.
+ * valid during the callback, or until the delivery batch is released when a
+ * queue drains.
  */
 typedef struct mln_event_batch_view {
   uint32_t size;
@@ -663,19 +663,20 @@ typedef void (*mln_runtime_event_callback)(
 /**
  * Runtime and map event callback.
  *
- * In queue mode, a queue takes the callback's place: exactly one of callback
- * and queue is set. Callback mode borrows the events for the call and releases
- * user_data after replacement, clear, or runtime teardown. Queue mode copies
- * events into MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying user_data,
- * followed by MLN_DELIVERY_TYPE_RETIRED when the registration retires. Queue
- * mode requires release_user_data to be null.
+ * The handler sets callback, queue, or both. The callback borrows the events
+ * for the call, and user_data is released after replacement, clear, or
+ * runtime teardown. With a queue, the callback and release run in
+ * mln_delivery_queue_dispatch(). A queue without a callback drains: events
+ * are copied into MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying
+ * user_data, followed by MLN_DELIVERY_TYPE_RETIRED when the registration
+ * retires, and release_user_data must be null.
  */
 typedef struct mln_runtime_event_handler {
   uint32_t size;
   /**
    * Receives each event batch.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_runtime_event_callback callback;
   void* user_data MLN_BINDING("kind=context");
@@ -808,8 +809,7 @@ typedef struct mln_http_header_rule {
  * its bytes. The C API invokes release_user_data after the final callback
  * returns.
  *
- * A transform in queue mode queues a copy as an
- * mln_resource_transform_delivery instead.
+ * A transform that names a queue queues a copy of each call instead.
  *
  * Threads:
  * The callback runs on a MapLibre network thread.
@@ -823,15 +823,15 @@ typedef void (*mln_resource_transform_callback)(
 /**
  * Resource transform state.
  *
- * The struct itself is borrowed for the registering call. Exactly one of
- * callback and queue is set.
+ * The struct itself is borrowed for the registering call. It sets callback,
+ * queue, or both.
  */
 typedef struct mln_resource_transform {
   uint32_t size;
   /**
    * Asks for the URL of each network resource request.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
@@ -842,16 +842,17 @@ typedef struct mln_resource_transform {
    * received keep their handles.
    *
    * Its threads and its handoff follow
-   * mln_resource_provider.release_user_data. Null in queue mode.
+   * mln_resource_provider.release_user_data. Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery: each request is copied with its handle into an
-   * MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM delivery carrying user_data. A
-   * request the queue refuses keeps its URL. After replacement, clear, or
-   * runtime teardown retires the registration, the queue receives one
-   * MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data, after the
-   * registration's last request.
+   * Optional. Each request is copied with its handle into the queue. With
+   * callback, the callback and release_user_data run in
+   * mln_delivery_queue_dispatch(). Without one, the queue drains: each copy is
+   * an MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM delivery carrying user_data, and
+   * after replacement, clear, or runtime teardown retires the registration,
+   * one MLN_DELIVERY_TYPE_RETIRED delivery follows the registration's last
+   * request. A request the queue refuses keeps its URL.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_transform MLN_BINDING(
@@ -1067,8 +1068,8 @@ typedef struct mln_resource_response {
  * but must not wait for runtime work that only its own thread can advance. The
  * C API invokes release_user_data after the final callback returns.
  *
- * A provider in queue mode queues a copy of the request with its handle as an
- * mln_resource_request_delivery, for the host to answer later.
+ * A provider that names a queue queues a copy of the request with its handle,
+ * for the host to answer later.
  *
  * Threads:
  * The callback runs synchronously on a MapLibre thread.
@@ -1090,8 +1091,7 @@ typedef void (*mln_resource_provider_callback)(
  * handle is the cancelled request, borrowed for the callback; the provider's
  * own reference to it is unchanged.
  *
- * A handler in queue mode queues a copy as an
- * mln_resource_request_cancel_delivery instead.
+ * A handler that names a queue queues a copy of the call instead.
  *
  * Threads:
  * The callback runs on the thread that discards the request, never a host
@@ -1110,35 +1110,36 @@ typedef void (*mln_resource_request_cancel_callback)(
 /**
  * Cancel callback for one handled resource request.
  *
- * In queue mode, a queue takes the callback's place. The struct itself is
- * borrowed for the registering call. Exactly one of callback and queue is set.
+ * The struct itself is borrowed for the registering call. It sets callback,
+ * queue, or both.
  */
 typedef struct mln_resource_request_cancel_handler {
   uint32_t size;
   /**
    * Reports the request's cancellation.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_resource_request_cancel_callback callback;
-  /** Opaque host token in queue mode; native code never dereferences it. */
+  /** Opaque host token when queue drains; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data exactly once for an accepted registration,
    * after the callback can no longer run: when the callback returns, on the
    * thread that ran it, or when the request is released without the callback
    * having run, on the releasing thread. It never runs for a rejected
-   * registration or for a request that was already cancelled. Null in queue
-   * mode.
+   * registration or for a request that was already cancelled. Null when
+   * queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery in place of callback: a cancel is copied into one
-   * MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL delivery carrying user_data, and
-   * one MLN_DELIVERY_TYPE_RETIRED delivery follows where callback mode runs
-   * release_user_data. The registration rejects an invalid queue handle with
-   * MLN_STATUS_INVALID_ARGUMENT and a released queue with
-   * MLN_STATUS_INVALID_STATE.
+   * Optional. With callback, the callback and release_user_data run in
+   * mln_delivery_queue_dispatch(). Without one, the queue drains: a cancel is
+   * copied into one MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL delivery
+   * carrying user_data, and one MLN_DELIVERY_TYPE_RETIRED delivery follows
+   * where a callback's release_user_data would run. The registration rejects
+   * an invalid queue handle with MLN_STATUS_INVALID_ARGUMENT and a released
+   * queue with MLN_STATUS_INVALID_STATE.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_request_cancel_handler MLN_BINDING(
@@ -1149,17 +1150,17 @@ typedef struct mln_resource_request_cancel_handler {
  * Resource provider state.
  *
  * The struct itself is borrowed for the registering call, which copies every
- * route and string before it returns. Exactly one of callback and queue is
- * set. Routes apply in both modes: with routes, a request that matches none
- * passes through to native loading without reaching the provider. Without
- * routes, every network request reaches the provider.
+ * route and string before it returns. It sets callback, queue, or both. With
+ * routes, a request that matches none passes through to native loading without
+ * reaching the provider. Without routes, every network request reaches the
+ * provider.
  */
 typedef struct mln_resource_provider {
   uint32_t size;
   /**
    * Answers each request that the routes leave to the provider.
    *
-   * Required in callback mode; null in queue mode.
+   * Required unless queue drains.
    */
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
@@ -1172,18 +1173,19 @@ typedef struct mln_resource_provider {
    * for a rejected registration. Another thread may retire an accepted
    * registration before its registration function returns, so the caller
    * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected. Null in queue mode.
+   * when the registration is rejected. Null when queue drains.
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery: native code queues a copy of each request with
-   * its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
-   * user_data. A request the queue refuses, because the queue was released or
+   * Optional. Native code queues a copy of each request with its handle. With
+   * callback, the callback and release_user_data run in
+   * mln_delivery_queue_dispatch(). Without one, the queue drains: each copy is
+   * an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying user_data, and
+   * after replacement, clear, or runtime teardown retires the registration,
+   * one MLN_DELIVERY_TYPE_RETIRED delivery follows the registration's last
+   * request. A request the queue refuses, because the queue was released or
    * the copy could not be allocated, fails without native loading, except
-   * during process exit, which passes it through. After replacement, clear, or
-   * runtime teardown retires the registration, the queue receives one
-   * MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data, after the
-   * registration's last request delivery.
+   * during process exit, which passes it through.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
   /** The requests that reach the provider; empty to claim every request. */
@@ -1240,15 +1242,15 @@ MLN_API mln_status mln_runtime_create(
  * A URL with an unrecognized scheme, such as jar:file:, reaches this callback
  * and completes as an HTTP error when the provider passes it through.
  *
- * In queue mode, no host code runs on the requesting thread: each request
+ * With a queue, no host code runs on the requesting thread: each request
  * reaches the provider's queue, and the host completes it or passes it through
- * after draining.
+ * after dispatching or draining.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, provider is
- *   null, provider->size is too small, neither or both of callback and queue
- *   are set, release_user_data is set in queue mode, queue is an invalid
+ *   null, provider->size is too small, neither callback nor queue is set,
+ *   release_user_data is set without a callback, queue is an invalid
  *   handle, a route is invalid, or completion is invalid. A route is invalid
  *   when routes is null with a nonzero route_count, its size is too small, its
  *   url is null, its kinds hold an unknown bit, or its flags hold an unknown
@@ -1391,8 +1393,8 @@ MLN_API mln_status mln_resource_request_is_cancelled(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, when handler
  *   or out_cancelled is null, when handler->size is too small, when handler
- *   sets neither or both of callback and queue, or when handler->queue is an
- *   invalid handle.
+ *   sets neither callback nor queue, or sets release_user_data without a
+ *   callback, or when handler->queue is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when handle or handler->queue has been released,
  *   or the request already has a cancel callback.
  */
@@ -1438,14 +1440,15 @@ MLN_API void mln_resource_request_release(
  * keeps user_data valid until a committed replacement or clear command, or
  * until native runtime teardown finishes.
  *
- * In queue mode, no host code runs on a MapLibre thread: each request reaches
- * the transform's queue, and the host answers its handle after draining.
+ * With a queue, no host code runs on a MapLibre thread: each request reaches
+ * the transform's queue, and the host answers its handle after dispatching or
+ * draining.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, neither or both of callback and queue
- *   are set, release_user_data is set in queue mode, queue is an invalid
+ *   null, transform->size is too small, neither callback nor queue is set,
+ *   release_user_data is set without a callback, queue is an invalid
  *   handle, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
  *   runtime is closing.

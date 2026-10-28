@@ -1,8 +1,8 @@
 // Queue-mode callback registrations beyond completions, logs, and providers:
 // a camera command's end handler, a custom source's tile fetches and cancels,
 // and a resource request's cancel handler. Each delivers a copy of every call
-// for its host token and then retires once, and a queue registration that
-// also carries a callback is rejected.
+// for its host token and then retires once, and a drained registration that
+// carries a release is rejected.
 
 #include "support/delivery.h"
 #include "support/style.h"
@@ -63,21 +63,13 @@ static void await_type(
   ));
 }
 
-// Callbacks that a rejected queue registration carries, which never run.
-static void unused_end(void* user_data, const mln_camera_transition_end* end) {
-  (void)user_data;
-  (void)end;
-}
-
+// Callbacks that a rejected drained registration carries, which never run.
 static void unused_tile(void* user_data, mln_canonical_tile_id tile_id) {
   (void)user_data;
   (void)tile_id;
 }
 
-static void unused_cancel(void* user_data, mln_resource_request handle) {
-  (void)user_data;
-  (void)handle;
-}
+static void unused_release(void* user_data) { (void)user_data; }
 
 static mln_camera_update queued_ease(mln_delivery_queue queue, void* token) {
   mln_camera_update update = {
@@ -125,9 +117,9 @@ static void a_camera_end_handler_delivers_its_end_then_retires(void) {
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(0, seen.ends[0].generation);
 
-  update.animation.end_handler.callback = unused_end;
+  update.animation.end_handler.release_user_data = unused_release;
   MLN_TEST_INVALID(mln_map_update_camera(map, &update, NULL, NULL));
-  update.animation.end_handler.callback = NULL;
+  update.animation.end_handler.release_user_data = NULL;
 
   mln_test_delivery_queue_release(&queue);
   update.animation.end_handler.queue = queue.handle;
@@ -220,12 +212,12 @@ static void a_custom_source_delivers_its_fetches_and_cancels_then_retires(
     MLN_DELIVERY_TYPE_RETIRED, seen.types[seen.count - 1]
   );
 
-  // A queue source carries no callbacks.
-  options.fetch_tile = unused_tile;
+  // A drained source carries no callbacks and no release.
+  options.release_user_data = unused_release;
   MLN_TEST_INVALID(mln_map_add_custom_geometry_source(
     map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
   ));
-  options.fetch_tile = NULL;
+  options.release_user_data = NULL;
   options.cancel_tile = unused_tile;
   MLN_TEST_INVALID(mln_map_add_custom_geometry_source(
     map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
@@ -277,12 +269,12 @@ static void a_request_cancel_handler_delivers_its_request_then_retires(void) {
     .user_data = &token,
     .queue = queue.handle,
   };
-  handler.callback = unused_cancel;
+  handler.release_user_data = unused_release;
   bool cancelled = false;
   MLN_TEST_INVALID(
     mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
   );
-  handler.callback = NULL;
+  handler.release_user_data = NULL;
   MLN_TEST_OK(
     mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
   );

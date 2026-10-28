@@ -37,6 +37,8 @@ internal expect object C {
 
   fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int
 
+  fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int
+
   fun mln_delivery_queue_drain(queue: Long, outBatch: Long, outView: Long, outDiagnostic: Long): Int
 
   fun mln_delivery_queue_release(queue: Long): Unit

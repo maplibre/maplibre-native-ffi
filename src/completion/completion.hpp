@@ -26,8 +26,9 @@ struct CommandGenerations {
 };
 
 // Where one completion's terminal result goes: the host's callback, or a
-// delivery queue. make_completion() makes the only sinks that deliver, so a
-// submission that does not pass through it cannot construct a Completion.
+// delivery queue that dispatches it to that callback or drains it.
+// make_completion() makes the only sinks that deliver, so a submission that
+// does not pass through it cannot construct a Completion.
 class CompletionSink final {
  public:
   CompletionSink(const CompletionSink&) = delete;
@@ -70,11 +71,10 @@ class CompletionSink final {
     std::shared_ptr<const void> owner
   ) const noexcept -> void;
 
-  // Callback mode.
+  // The host's callback, user_data, and release. A queue takes the result
+  // in place of the callback, as a call when callback is set.
   mln_completion descriptor_{};
-  // Queue mode.
   std::shared_ptr<delivery::DeliveryQueueState> queue_;
-  void* user_data_ = nullptr;
   Completion* owner_ = nullptr;
 };
 

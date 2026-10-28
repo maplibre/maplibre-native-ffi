@@ -1,5 +1,6 @@
 // Queue-mode log handlers: copied records, retirement on replace and clear,
-// and records that a released queue refuses. Every case changes the
+// records that a released queue refuses, and dispatched records that may call
+// the C API. Every case changes the
 // process-global handler, so each runs inside restoring_log_state().
 
 #include <string.h>
@@ -160,27 +161,12 @@ LOG_STATE_CASE(replace_and_clear_retire_a_queue_handler_once) {
   mln_test_delivery_queue_release(&queue);
 }
 
-static bool ignore_log_record(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  mln_buffer_view message
-) {
-  (void)user_data;
-  (void)severity;
-  (void)event;
-  (void)code;
-  (void)message;
-  return false;
-}
-
 LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {
   static mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   int tag = 0;
 
-  mln_log_handler handler = queue_handler(queue.handle, &tag);
-  handler.callback = ignore_log_record;
-  MLN_TEST_INVALID(mln_log_set_callback(&handler, NULL));
-  handler = queue_handler(MLN_HANDLE_NULL, &tag);
+  mln_log_handler handler = queue_handler(MLN_HANDLE_NULL, &tag);
   MLN_TEST_INVALID(mln_log_set_callback(&handler, NULL));
   handler = queue_handler(queue.handle, &tag);
   handler.release_user_data = mln_test_delivery_count_wake_release;
@@ -207,9 +193,85 @@ LOG_STATE_CASE(a_handler_on_a_released_queue_refuses_its_records) {
   MLN_TEST_OK(mln_log_clear_callback(NULL));
 }
 
+// What a dispatched log handler saw. It runs on the dispatching thread, so
+// plain fields suffice; a record that reaches another thread counts there.
+typedef struct dispatched_log {
+  atomic_int off_thread;
+  size_t records;
+  size_t refused_calls;
+  size_t releases;
+  size_t records_at_release;
+} dispatched_log;
+
+static MLN_TEST_THREAD_LOCAL bool dispatching_logs;
+
+// Calls a status-returning function, which a log callback on a native thread
+// may not, and asks for the platform logger, which a queued handler ignores.
+static bool record_dispatched_log(
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
+) {
+  (void)severity;
+  (void)event;
+  (void)code;
+  dispatched_log* log = user_data;
+  if (!dispatching_logs) {
+    atomic_fetch_add(&log->off_thread, 1);
+    return false;
+  }
+  if (!is_dump_record(message.data)) return false;
+  log->records += 1;
+  if (
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL) !=
+    MLN_STATUS_OK
+  ) {
+    log->refused_calls += 1;
+  }
+  return false;
+}
+
+static void release_dispatched_log(void* user_data) {
+  dispatched_log* log = user_data;
+  if (!dispatching_logs) {
+    atomic_fetch_add(&log->off_thread, 1);
+    return;
+  }
+  log->releases += 1;
+  log->records_at_release = log->records;
+}
+
+LOG_STATE_CASE(a_dispatched_handler_may_call_the_c_api) {
+  MLN_TEST_OK(
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL)
+  );
+  dispatching_logs = true;
+  static mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  static dispatched_log log;
+  memset(&log, 0, sizeof(log));
+  mln_log_handler handler = queue_handler(queue.handle, &log);
+  handler.callback = record_dispatched_log;
+  handler.release_user_data = release_dispatched_log;
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+
+  dump_debug_logs();
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
+  TEST_ASSERT_EQUAL_size_t(0, log.records);
+  TEST_ASSERT_EQUAL_size_t(0, log.releases);
+  // Clearing queued the release after the handler's last record.
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
+  TEST_ASSERT_EQUAL_size_t(3, log.records);
+  TEST_ASSERT_EQUAL_size_t(0, log.refused_calls);
+  TEST_ASSERT_EQUAL_size_t(1, log.releases);
+  TEST_ASSERT_EQUAL_size_t(3, log.records_at_release);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&log.off_thread));
+  mln_test_delivery_queue_release(&queue);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_queue_handler_copies_each_record);
   RUN_TEST(replace_and_clear_retire_a_queue_handler_once);
   RUN_TEST(a_queue_handler_rejects_an_invalid_shape);
   RUN_TEST(a_handler_on_a_released_queue_refuses_its_records);
+  RUN_TEST(a_dispatched_handler_may_call_the_c_api);
 }

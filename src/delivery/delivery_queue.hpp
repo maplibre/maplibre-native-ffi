@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -13,7 +14,10 @@
 
 #include "delivery/capture.hpp"
 #include "maplibre_native_c.h"
-#include "wake/wake.hpp"
+
+namespace mln::core {
+class Wake;
+}  // namespace mln::core
 
 namespace mln::delivery {
 
@@ -35,8 +39,15 @@ auto bind_event_strings(
   std::vector<mln_buffer_view>& views
 ) -> void;
 
+// A host function pointer of any type, which a call's invoke casts back.
+using HostFunction = void (*)();
+
 // One queued delivery and the copy it owns, in a single allocation: this
 // header, then the arena storage that the view's pointers reach.
+//
+// A dispatched item is a call that dispatch() runs instead of a record that
+// drain() returns: invoke passes the copy to callback, then release receives
+// view.user_data. Either may be null.
 struct DeliveryItem {
   DeliveryItem* next = nullptr;
   mln_delivery view{};
@@ -44,11 +55,24 @@ struct DeliveryItem {
   // Null for a delivery that owns nothing.
   void (*discard)(DeliveryItem& item) noexcept = nullptr;
   bool taken = false;
+  bool dispatched = false;
   // Event spans own vectors and a message arena instead of an inline copy.
   void (*destroy)(DeliveryItem*) noexcept = nullptr;
+  void (*invoke)(DeliveryItem& item) noexcept = nullptr;
+  HostFunction callback = nullptr;
+  mln_user_data_release release = nullptr;
 };
 
 static_assert(std::is_trivially_destructible_v<DeliveryItem>);
+
+// Passes one copied record to the host callback of a dispatched call.
+template <mln_delivery_type Type>
+auto invoke_delivered(DeliveryItem& item) noexcept -> void {
+  Delivered<Type>::invoke(
+    reinterpret_cast<typename Delivered<Type>::Callback>(item.callback),
+    item.view.user_data, item.view.payload.*Delivered<Type>::member
+  );
+}
 
 // Destroying an item discards what the host did not take.
 struct ItemDeleter {
@@ -136,8 +160,18 @@ inline constexpr auto completion_capture = CompletionCapture{
 // A delivery with no copied payload, such as MLN_DELIVERY_TYPE_RETIRED.
 auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr;
 
+// A dispatched call that only releases user_data.
+auto make_release_call(void* user_data, mln_user_data_release release)
+  -> ItemPtr;
+
+enum class DispatchResult : std::uint8_t { Ran, Empty, Busy };
+
 // The queue behind one mln_delivery_queue handle. Registrations hold it, so a
 // released queue stays alive, closed, until the last of them retires.
+//
+// Records that drain() returns and calls that dispatch() runs queue apart,
+// each in push order, and each wakes the receiver when it goes from empty to
+// nonempty.
 class DeliveryQueueState final {
  public:
   explicit DeliveryQueueState(std::shared_ptr<core::Wake> wake);
@@ -147,7 +181,7 @@ class DeliveryQueueState final {
   auto operator=(DeliveryQueueState&&) -> DeliveryQueueState& = delete;
   ~DeliveryQueueState();
 
-  // Appends an item and wakes the receiver when the queue was empty or the
+  // Appends an item and wakes the receiver when its list was empty or the
   // last drain failed. Returns false and leaves the item with the caller when
   // the queue is closed. During process exit the item is dropped without
   // disposal and this reports true.
@@ -155,32 +189,50 @@ class DeliveryQueueState final {
 
   // Appends to a tail event span, or starts one after another delivery kind.
   // Events share contiguous record and message storage, without a capture or
-  // allocation for each event. A failed append leaves the queue unchanged.
+  // allocation for each event. A non-null callback makes the span a call to
+  // it. A failed append leaves the queue unchanged.
   auto push_event(
     mln_runtime_event event, std::string_view message, void* user_data,
-    std::vector<std::string> strings = {}
+    std::vector<std::string> strings = {}, HostFunction callback = nullptr
   ) -> void;
 
-  // Moves every queued item, in push order, into a new owned batch, writes
+  // Moves every queued record, in push order, into a new owned batch, writes
   // its view, and returns its handle; or returns the null handle when nothing
   // is queued. Allocation failure throws and returns every item to an open
   // queue in order, making the next push wake the receiver. A closed queue
   // discards the items.
   auto drain(mln_delivery_batch_view& view) -> mln_delivery_batch;
 
+  // Runs every queued call in push order on the calling thread. A call that
+  // closes the queue abandons the rest. While one dispatch runs, another
+  // returns Busy, and the running one also runs what was queued by then.
+  auto dispatch() noexcept -> DispatchResult;
+
   // Refuses later pushes, stops the wake, and discards queued items.
   auto close() noexcept -> void;
 
  private:
+  struct ItemList {
+    DeliveryItem* head = nullptr;
+    DeliveryItem* tail = nullptr;
+    std::size_t count = 0;
+  };
+
+  // Runs the calls queued now. Returns whether it ran any.
+  auto run_calls() noexcept -> bool;
+
   // Serializes drains, so a failed drain returns its items to the head of
   // the queue ahead of any later push.
   std::mutex drain_mutex_;
   std::mutex mutex_;
-  DeliveryItem* head_ = nullptr;
-  DeliveryItem* tail_ = nullptr;
-  std::size_t count_ = 0;
+  ItemList records_;
+  ItemList calls_;
   bool wake_on_push_ = false;
   bool closed_ = false;
+  // Set while a dispatch runs calls. A dispatch that finds one running sets
+  // dispatch_requested_, which makes the running one take the calls again.
+  std::atomic_bool dispatching_ = false;
+  std::atomic_bool dispatch_requested_ = false;
   std::shared_ptr<core::Wake> wake_;
 };
 
@@ -197,6 +249,7 @@ auto drain_delivery_queue(
   mln_delivery_queue queue, mln_delivery_batch* out_batch,
   mln_delivery_batch_view* out_view
 ) -> mln_status;
+auto dispatch_delivery_queue(mln_delivery_queue queue) -> mln_status;
 auto take_delivery(mln_delivery_batch batch, std::size_t index) -> mln_status;
 auto release_delivery_batch(mln_delivery_batch batch) noexcept -> void;
 
