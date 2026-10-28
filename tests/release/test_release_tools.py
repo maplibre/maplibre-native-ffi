@@ -188,6 +188,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.repository = pathlib.Path(self.temporary_directory.name)
+        initialize_repository(self.repository)
         self.release_dir = self.repository / "release"
         self.release_dir.mkdir()
         self.preset = "linux-gnu-x64-vulkan"
@@ -343,6 +344,28 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
 
         self.assertIn(f"/compare/v0.202607.0...v{self.version}", notes)
+
+    def test_release_notes_are_the_tag_message_below_its_title(self) -> None:
+        message = (
+            f"MapLibre Native FFI {self.version}\n\nA theme.\n\n## Fixes\n\n- A fix.\n"
+        )
+        run_git(
+            self.repository,
+            "tag",
+            "-a",
+            "--cleanup=verbatim",
+            "-m",
+            message,
+            f"v{self.version}",
+        )
+
+        notes = self.assert_assets(
+            "release",
+            self.version,
+            "A theme.\n\n## Fixes\n\n- A fix.\n\n[Full changelog]",
+        )
+
+        self.assertNotIn(f"MapLibre Native FFI {self.version}", notes)
 
     def test_snapshot_assets_include_version_provenance_and_checksums(self) -> None:
         notes = self.assert_assets(
