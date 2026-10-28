@@ -136,9 +136,12 @@ function runtimeCommand(script: string, args: readonly string[]) {
       ],
     };
   }
+  // A Bun script outside any node_modules installs a package it cannot
+  // resolve from the registry, which would find the published backends.
+  const flags = host === "node" ? ["--expose-gc"] : ["--no-install"];
   return {
     command: process.execPath,
-    args: [...(host === "node" ? ["--expose-gc"] : []), script, ...args],
+    args: [...flags, script, ...args],
   };
 }
 
