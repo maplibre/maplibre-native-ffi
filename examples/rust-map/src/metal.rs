@@ -3,7 +3,8 @@ use objc2::ClassType;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_app_kit::NSView;
-use objc2_foundation::{CGSize, ns_string};
+use objc2_core_foundation::CGSize;
+use objc2_foundation::ns_string;
 use objc2_metal::{
     MTLClearColor, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue,
     MTLCreateSystemDefaultDevice, MTLDevice, MTLDrawable, MTLLibrary, MTLLoadAction,
@@ -44,19 +45,14 @@ impl MetalContext {
         // SAFETY: winit returns the live NSView that backs this window.
         let view = unsafe { Retained::retain(handle.ns_view.as_ptr().cast::<NSView>()) }
             .ok_or("AppKit window handle did not contain an NSView")?;
-        // SAFETY: MTLCreateSystemDefaultDevice returns a retained-compatible Objective-C object.
-        let device = unsafe { Retained::retain(MTLCreateSystemDefaultDevice()) }
-            .ok_or("MTLCreateSystemDefaultDevice returned nil")?;
-        // SAFETY: CAMetalLayer::layer constructs a retained layer object.
-        let layer = unsafe { CAMetalLayer::layer() };
+        let device =
+            MTLCreateSystemDefaultDevice().ok_or("MTLCreateSystemDefaultDevice returned nil")?;
+        let layer = CAMetalLayer::layer();
 
-        // SAFETY: device and layer are live Objective-C objects, and NSView accepts CALayer.
-        unsafe {
-            layer.setDevice(Some(&device));
-            layer.setPixelFormat(MTLPixelFormat::BGRA8Unorm);
-            view.setWantsLayer(true);
-            view.setLayer(Some(layer.as_super()));
-        }
+        layer.setDevice(Some(&device));
+        layer.setPixelFormat(MTLPixelFormat::BGRA8Unorm);
+        view.setWantsLayer(true);
+        view.setLayer(Some(layer.as_super()));
 
         Ok(Self {
             _view: view,
@@ -77,8 +73,7 @@ impl MetalContext {
     }
 
     pub fn resize(&self, viewport: Viewport) {
-        // SAFETY: The layer is live and accepts physical drawable dimensions.
-        unsafe { self.layer.setDrawableSize(drawable_size(viewport)) };
+        self.layer.setDrawableSize(drawable_size(viewport));
     }
 
     pub fn wait_idle(&self) {}
