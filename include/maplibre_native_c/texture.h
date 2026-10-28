@@ -238,7 +238,8 @@ typedef struct mln_open_gl_owned_texture_descriptor {
    * Borrowed OpenGL context provider data. Shared ownership creates a context
    * whose texture frames the host can acquire. Dedicated EGL, WGL, or
    * transferred WebGL ownership creates a private core-worker context for CPU
-   * readback.
+   * readback. Pooled EGL ownership renders for CPU readback in the host
+   * context that the descriptor names.
    */
   mln_open_gl_context_descriptor context;
 } mln_open_gl_owned_texture_descriptor;
@@ -615,8 +616,8 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  *
  * Shared WGL, EGL, and existing WebGL contexts require the caller driver and
  * grant frame acquisition, readback, and consumer synchronization. Dedicated
- * EGL, dedicated WGL, and transferred WebGL contexts require the core-worker
- * driver and grant readback only with a ring depth of one.
+ * EGL, dedicated WGL, pooled EGL, and transferred WebGL contexts require the
+ * core-worker driver and grant readback only with a ring depth of one.
  *
  * The host keeps every descriptor-named backend handle valid through completed
  * detach. In particular, it keeps an EGLDisplay initialized while its session
@@ -626,7 +627,8 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   null; descriptor->context names pooled ownership on a platform other than
+ *   EGL; descriptor->extent has a zero width or height, a scale_factor that
  *   is not finite and positive, or a scaled dimension past UINT32_MAX;
  *   out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown, or options carry a malformed wake or

@@ -108,13 +108,19 @@ auto validate_opengl_context(
 ) -> mln_status {
   if (
     context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED &&
-    context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED
+    context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED &&
+    context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED
   ) {
     set_thread_error("mln_open_gl_context_descriptor.ownership is unknown");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto dedicated =
     context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+  const auto pooled = context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED;
+  if (pooled && context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_EGL) {
+    set_thread_error("only an EGL context can be pooled");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
 
   if (context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WGL) {
     if (
@@ -159,6 +165,20 @@ auto validate_opengl_context(
     ) {
       set_thread_error("EGL display and config must not be null");
       return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (pooled) {
+      if (
+        context.data.egl.share_context == nullptr ||
+        (context.data.egl.client_api != MLN_OPEN_GL_CLIENT_API_GL &&
+         context.data.egl.client_api != MLN_OPEN_GL_CLIENT_API_GLES)
+      ) {
+        set_thread_error(
+          "a pooled EGL session renders in share_context with the API that "
+          "client_api names, so both are required"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      return MLN_STATUS_OK;
     }
     if (dedicated) {
       if (context.data.egl.share_context != nullptr) {
@@ -275,12 +295,12 @@ auto opengl_context_matches(
       // A dedicated context names no share context, so its identity rests on
       // the display, the config, and the API it was created for. A shared
       // context takes its API from the share context, which leaves client_api
-      // ignored there and so outside its identity.
+      // ignored there and so outside its identity. A pooled session names both.
       if (lhs.ownership != rhs.ownership) {
         return false;
       }
       if (
-        lhs.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED &&
+        lhs.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED &&
         lhs.data.egl.client_api != rhs.data.egl.client_api
       ) {
         return false;

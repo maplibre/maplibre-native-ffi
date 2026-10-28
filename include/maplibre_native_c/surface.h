@@ -167,17 +167,18 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
  *
  * WGL, EGL, and existing WebGL contexts require
  * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. A transferred WebGL canvas requires
- * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent.
+ * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent, but
+ * a surface takes no pooled context.
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
- *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
+ *   null; descriptor->context names pooled ownership; descriptor->extent has
+ *   a zero width or height, a scale_factor that is not finite and positive, or
+ *   a scaled dimension past UINT32_MAX; out_session is null or does not
+ *   point to the null handle; or the requested driver kind is unknown, or
+ *   options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
  *   not succeeded.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its

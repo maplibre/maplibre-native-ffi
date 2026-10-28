@@ -2384,11 +2384,14 @@ pub const EglContextDescriptor = struct {
     /// Borrowed EGLContext whose share group the session context joins.
     /// Required under shared ownership, where the session also takes its client
     /// API from this context. A dedicated session joins no share group, so it
-    /// must be null there and names client_api instead.
+    /// must be null there and names client_api instead. A pooled session
+    /// renders in this context itself, so it is required there and must be
+    /// created on config.
     share_context: ?*anyopaque = null,
     /// Client API the session creates its context for. Required under dedicated
-    /// ownership. A shared session queries share_context for it, so this is
-    /// ignored there.
+    /// and pooled ownership; under pooled ownership it names the API
+    /// share_context was created for. A shared session queries share_context
+    /// for it, so this is ignored there.
     client_api: OpenGlClientApi = .unspecified,
     /// Optional eglGetProcAddress-compatible function for the host loader.
     get_proc_address: ?*anyopaque = null,
@@ -3750,7 +3753,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
     }
 };
 
-/// OpenGL client API a dedicated EGL session creates its context for.
+/// OpenGL client API that a dedicated or pooled EGL session renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -3773,7 +3776,8 @@ pub const OpenGlClientApi = enum(u32) {
 pub const OpenGlContextDescriptor = struct {
     /// Whether the session shares its driver thread and graphics objects with
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
-    /// canvas are dedicated to their core worker.
+    /// canvas are dedicated to their core worker. Pooled ownership is for EGL
+    /// owned textures only.
     ownership: OpenGlContextOwnership = .shared,
     data: OpenGlContextDescriptorData,
     pub fn toNative(self: OpenGlContextDescriptor) status.Error!c.mln_open_gl_context_descriptor {
@@ -3829,6 +3833,8 @@ pub const OpenGlContextOwnership = enum(u32) {
     shared = 0,
     /// The session keeps its own OpenGL context current on its thread.
     dedicated = 1,
+    /// The session takes turns rendering in a host EGL context.
+    pooled = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3861,7 +3867,8 @@ pub const OpenGlOwnedTextureDescriptor = struct {
     /// Borrowed OpenGL context provider data. Shared ownership creates a
     /// context whose texture frames the host can acquire. Dedicated EGL, WGL,
     /// or transferred WebGL ownership creates a private core-worker context for
-    /// CPU readback.
+    /// CPU readback. Pooled EGL ownership renders for CPU readback in the host
+    /// context that the descriptor names.
     context: OpenGlContextDescriptor,
     pub fn toNative(self: OpenGlOwnedTextureDescriptor) status.Error!c.mln_open_gl_owned_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_open_gl_owned_texture_descriptor);

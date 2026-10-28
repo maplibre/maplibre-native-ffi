@@ -119,6 +119,33 @@ static void owned_without_egl_display(void* call) {
   owned_of(call)->context.data.egl.display = NULL;
 }
 #endif
+// A pooled EGL context whose handles only validation reads.
+static void pool_context(mln_open_gl_context_descriptor* context) {
+  *context = fake_context(MLN_OPEN_GL_CONTEXT_PLATFORM_EGL);
+  context->ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED;
+  context->data.egl.client_api = MLN_OPEN_GL_CLIENT_API_GLES;
+}
+static void pooled_owned(void* call) { pool_context(&owned_of(call)->context); }
+static void pooled_owned_on_wgl(void* call) {
+  mln_open_gl_context_descriptor* context = &owned_of(call)->context;
+  *context = fake_context(MLN_OPEN_GL_CONTEXT_PLATFORM_WGL);
+  context->ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED;
+}
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+// A pooled session renders in the context it names, with the API it names.
+static void pooled_owned_without_its_context(void* call) {
+  pool_context(&owned_of(call)->context);
+  owned_of(call)->context.data.egl.share_context = NULL;
+}
+static void pooled_owned_without_client_api(void* call) {
+  pool_context(&owned_of(call)->context);
+  owned_of(call)->context.data.egl.client_api =
+    MLN_OPEN_GL_CLIENT_API_UNSPECIFIED;
+}
+static void pooled_surface(void* call) {
+  pool_context(&surface_of(call)->context);
+}
+#endif
 static void borrowed_without_target(void* call) {
   borrowed_of(call)->target = 0;
 }
@@ -224,6 +251,10 @@ static void opengl_attach_rejects_malformed_calls(void) {
      dedicated_surface_with_share_context, MLN_STATUS_INVALID_ARGUMENT,
      "joins no share group"},
 #endif
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+    {"a pooled context", pooled_surface, MLN_STATUS_INVALID_ARGUMENT,
+     "renders only owned textures"},
+#endif
 #if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
@@ -244,6 +275,17 @@ static void opengl_attach_rejects_malformed_calls(void) {
     {"no EGL display", owned_without_egl_display, MLN_STATUS_INVALID_ARGUMENT,
      "EGL display and config must not be null"},
 #endif
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+    {"a pooled context without its context", pooled_owned_without_its_context,
+     MLN_STATUS_INVALID_ARGUMENT, "both are required"},
+    {"a pooled context without a client API", pooled_owned_without_client_api,
+     MLN_STATUS_INVALID_ARGUMENT, "both are required"},
+#endif
+    {"a pooled WGL context", pooled_owned_on_wgl, MLN_STATUS_INVALID_ARGUMENT,
+     "only an EGL context can be pooled"},
+    // A pooled session renders on its own core worker.
+    {"a pooled context on the caller thread", pooled_owned,
+     MLN_STATUS_UNSUPPORTED, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},

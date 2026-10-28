@@ -1557,6 +1557,7 @@ internal enum mln_open_gl_context_ownership : uint
 {
     MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0,
     MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1,
+    MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED = 2,
 }
 
 internal enum mln_open_gl_context_platform : uint

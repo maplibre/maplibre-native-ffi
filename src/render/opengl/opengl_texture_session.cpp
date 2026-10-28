@@ -276,6 +276,22 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     );
   }
 
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  // Runs when another pooled session rendered in this context since this one
+  // did and left its own GL state behind. A new gl::Context needs none of it,
+  // since it starts with every state dirty. The renderbuffer binding is private, but MapLibre unbinds every
+  // renderbuffer it creates before it returns, so it is still zero.
+  static void forget_gl_state(mln::gl::Context& gl) {
+    gl.setDirtyState();
+    gl.bindFramebuffer.setDirty();
+    gl.viewport.setDirty();
+    // DrawableGL::draw compares the program with getCurrentValue(), which
+    // ignores the dirty flag, so only a program that no drawable uses makes
+    // it call glUseProgram again.
+    gl.program = 0;
+  }
+#endif
+
   auto texture() -> uint32_t {
     auto& renderable =
       getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
@@ -435,6 +451,9 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
       egl_context_.emplace(context_.data.egl, context_.ownership);
     }
     egl_context_->activate_pbuffer();
+    if (egl_context_->take_state_lost() && context) {
+      forget_gl_state(static_cast<mln::gl::Context&>(*context));
+    }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
     previous_webgl_context_ = emscripten_webgl_get_current_context();
     if (
@@ -804,7 +823,7 @@ auto opengl_owned_texture_attach_start(
   }
   auto copied = *descriptor;
   const auto private_target =
-    copied.context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+    copied.context.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED;
   const auto transferred = opengl::is_transferred_webgl_canvas(copied.context);
   auto selector =
     transferred ? opengl::webgl_canvas_selector(copied.context) : std::string{};

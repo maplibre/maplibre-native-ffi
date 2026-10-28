@@ -46,14 +46,17 @@ public readonly partial record struct EglContextDescriptor
     /// Borrowed EGLContext whose share group the session context joins.
     /// Required under shared ownership, where the session also takes its client
     /// API from this context. A dedicated session joins no share group, so it
-    /// must be null there and names client_api instead.
+    /// must be null there and names client_api instead. A pooled session
+    /// renders in this context itself, so it is required there and must be
+    /// created on config.
     /// </summary>
     public NativePointer ShareContext { get; init; }
 
     /// <summary>
     /// Client API the session creates its context for. Required under dedicated
-    /// ownership. A shared session queries share_context for it, so this is
-    /// ignored there.
+    /// and pooled ownership; under pooled ownership it names the API
+    /// share_context was created for. A shared session queries share_context
+    /// for it, so this is ignored there.
     /// </summary>
     public OpenGlClientApi ClientApi { get; init; }
 

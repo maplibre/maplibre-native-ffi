@@ -20,4 +20,9 @@ public enum OpenGlContextOwnership : uint
     /// The session keeps its own OpenGL context current on its thread.
     /// </summary>
     Dedicated = 1,
+
+    /// <summary>
+    /// The session takes turns rendering in a host EGL context.
+    /// </summary>
+    Pooled = 2,
 }

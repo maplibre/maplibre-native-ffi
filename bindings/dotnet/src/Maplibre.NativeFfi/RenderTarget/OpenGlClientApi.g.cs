@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL client API a dedicated EGL session creates its context for.
+/// OpenGL client API that a dedicated or pooled EGL session renders with.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_client_api</c> in the <see

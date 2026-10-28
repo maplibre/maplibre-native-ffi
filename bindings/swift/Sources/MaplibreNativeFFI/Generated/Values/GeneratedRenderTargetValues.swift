@@ -20,11 +20,13 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed EGLContext whose share group the session context joins. Required
   /// under shared ownership, where the session also takes its client API from
   /// this context. A dedicated session joins no share group, so it must be null
-  /// there and names client_api instead.
+  /// there and names client_api instead. A pooled session renders in this
+  /// context itself, so it is required there and must be created on config.
   public var shareContext: NativePointer
   /// Client API the session creates its context for. Required under dedicated
-  /// ownership. A shared session queries share_context for it, so this is
-  /// ignored there.
+  /// and pooled ownership; under pooled ownership it names the API
+  /// share_context was created for. A shared session queries share_context for
+  /// it, so this is ignored there.
   public var clientApi: OpenGlClientApi
   /// Optional eglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
@@ -147,7 +149,7 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL client API a dedicated EGL session creates its context for.
+/// OpenGL client API that a dedicated or pooled EGL session renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -182,7 +184,8 @@ public struct OpenGlClientApi: RawRepresentable, CustomStringConvertible,
 public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
   /// Whether the session shares its driver thread and graphics objects with the
   /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
-  /// are dedicated to their core worker.
+  /// are dedicated to their core worker. Pooled ownership is for EGL owned
+  /// textures only.
   public var ownership: OpenGlContextOwnership
   public var data: OpenGlContextDescriptorData
   public init(
@@ -260,10 +263,13 @@ public struct OpenGlContextOwnership: RawRepresentable, CustomStringConvertible,
   public static let shared: OpenGlContextOwnership = .init(rawValue: 0)
   /// The session keeps its own OpenGL context current on its thread.
   public static let dedicated: OpenGlContextOwnership = .init(rawValue: 1)
+  /// The session takes turns rendering in a host EGL context.
+  public static let pooled: OpenGlContextOwnership = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
     case 0: return "shared"
     case 1: return "dedicated"
+    case 2: return "pooled"
     default: return "OpenGlContextOwnership(\(rawValue))"
     }
   }

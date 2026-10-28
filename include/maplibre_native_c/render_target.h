@@ -308,15 +308,26 @@ typedef enum mln_open_gl_context_platform : uint32_t {
  * dedicated sessions can share one thread, and the host can use its own
  * context between renders. Teardown releases the session context from the
  * thread and restores nothing.
+ *
+ * A pooled session creates no context: it renders in the host's EGLContext
+ * that the descriptor names, with a pbuffer and framebuffer of its own. Any
+ * number of pooled sessions may name one context, and they take turns: each
+ * render makes the context current on the session's core worker and releases
+ * it afterwards, so pooled sessions of one context never render at the same
+ * time. While any of them is live, the host keeps the context current on no
+ * thread, and it destroys the context only after the last one tears down. A
+ * host that renders several maps at once gives each thread its own context.
  */
 typedef enum mln_open_gl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
   MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0u,
   /** The session keeps its own OpenGL context current on its thread. */
   MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
+  /** The session takes turns rendering in a host EGL context. */
+  MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED = 2u,
 } mln_open_gl_context_ownership;
 
-/** OpenGL client API a dedicated EGL session creates its context for. */
+/** OpenGL client API that a dedicated or pooled EGL session renders with. */
 typedef enum mln_open_gl_client_api : uint32_t {
   /** No client API is named. */
   MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0u,
@@ -363,13 +374,15 @@ typedef struct mln_egl_context_descriptor {
    * Borrowed EGLContext whose share group the session context joins. Required
    * under shared ownership, where the session also takes its client API from
    * this context. A dedicated session joins no share group, so it must be null
-   * there and names client_api instead.
+   * there and names client_api instead. A pooled session renders in this
+   * context itself, so it is required there and must be created on config.
    */
   void* share_context;
   /**
    * Client API the session creates its context for. Required under dedicated
-   * ownership. A shared session queries share_context for it, so this is
-   * ignored there.
+   * and pooled ownership; under pooled ownership it names the API
+   * share_context was created for. A shared session queries share_context for
+   * it, so this is ignored there.
    */
   mln_open_gl_client_api client_api;
   /** Optional eglGetProcAddress-compatible function for the host loader. */
@@ -418,7 +431,8 @@ typedef struct mln_open_gl_context_descriptor {
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-   * dedicated to their core worker.
+   * dedicated to their core worker. Pooled ownership is for EGL owned textures
+   * only.
    */
   mln_open_gl_context_ownership ownership;
   mln_open_gl_context_descriptor_data data MLN_BINDING("tag=platform");

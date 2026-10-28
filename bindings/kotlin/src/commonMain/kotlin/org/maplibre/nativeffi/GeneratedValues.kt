@@ -500,7 +500,7 @@ public value class OfflineRegionDownloadState(public val rawValue: UInt) {
 }
 
 /**
- * OpenGL client API a dedicated EGL session creates its context for.
+ * OpenGL client API that a dedicated or pooled EGL session renders with.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -541,6 +541,7 @@ public value class OpenGlContextOwnership(public val rawValue: UInt) {
     when (rawValue) {
       0u -> "SHARED"
       1u -> "DEDICATED"
+      2u -> "POOLED"
       else -> "OpenGlContextOwnership($rawValue)"
     }
 
@@ -549,6 +550,8 @@ public value class OpenGlContextOwnership(public val rawValue: UInt) {
     public val SHARED: OpenGlContextOwnership = OpenGlContextOwnership(0u)
     /** The session keeps its own OpenGL context current on its thread. */
     public val DEDICATED: OpenGlContextOwnership = OpenGlContextOwnership(1u)
+    /** The session takes turns rendering in a host EGL context. */
+    public val POOLED: OpenGlContextOwnership = OpenGlContextOwnership(2u)
   }
 }
 
@@ -2374,12 +2377,14 @@ public data class EglContextDescriptor(
   /**
    * Borrowed EGLContext whose share group the session context joins. Required under shared
    * ownership, where the session also takes its client API from this context. A dedicated session
-   * joins no share group, so it must be null there and names client_api instead.
+   * joins no share group, so it must be null there and names client_api instead. A pooled session
+   * renders in this context itself, so it is required there and must be created on config.
    */
   public val shareContext: NativePointer,
   /**
-   * Client API the session creates its context for. Required under dedicated ownership. A shared
-   * session queries share_context for it, so this is ignored there.
+   * Client API the session creates its context for. Required under dedicated and pooled ownership;
+   * under pooled ownership it names the API share_context was created for. A shared session queries
+   * share_context for it, so this is ignored there.
    */
   public val clientApi: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED,
   /** Optional eglGetProcAddress-compatible function for the host loader. */
@@ -2426,7 +2431,8 @@ public sealed interface OpenGlContextDescriptorData {
 public data class OpenGlContextDescriptor(
   /**
    * Whether the session shares its driver thread and graphics objects with the host. A private EGL
-   * or WGL owned texture and a transferred WebGL canvas are dedicated to their core worker.
+   * or WGL owned texture and a transferred WebGL canvas are dedicated to their core worker. Pooled
+   * ownership is for EGL owned textures only.
    */
   public val ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED,
   public val data: OpenGlContextDescriptorData,
@@ -2485,7 +2491,8 @@ public data class OpenGlOwnedTextureDescriptor(
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context whose texture frames
    * the host can acquire. Dedicated EGL, WGL, or transferred WebGL ownership creates a private
-   * core-worker context for CPU readback.
+   * core-worker context for CPU readback. Pooled EGL ownership renders for CPU readback in the host
+   * context that the descriptor names.
    */
   public val context: OpenGlContextDescriptor,
 )

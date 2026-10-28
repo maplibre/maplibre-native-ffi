@@ -121,6 +121,10 @@ auto validate_opengl_surface_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
+  if (descriptor->context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_POOLED) {
+    set_thread_error("a pooled OpenGL context renders only owned textures");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   // WGL and EGL need a surface to make a context current, so they carry one
   // alongside the context. A WebGL context already names its canvas, so the
   // field is rejected rather than ignored.
