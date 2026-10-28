@@ -46,7 +46,8 @@ Revise the draft with the maintainer until they approve it.
 
 Notes travel in the signed tag. Its message is `MapLibre Native FFI <version>`,
 a blank line, then the notes, and the publish run copies everything below the
-title into the release body:
+title into the release body. End the file with a newline, or the signature fuses
+onto the last line:
 
 ```sh
 git tag -s --cleanup=verbatim -F <file> v<version> <commit>
