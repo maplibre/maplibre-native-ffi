@@ -160,9 +160,8 @@ library, and the sections that need an installed prefix say so.
 
 ### Kotlin
 
-Add Maven Central, the binding, and the runtime for your backend. The runtime
-carries the native library for every ABI. On the JVM, the binding needs JDK 25
-or later.
+Add Maven Central, the binding, and the runtime for your backend. On the JVM,
+the binding needs JDK 25 or later.
 
 ```kotlin title="build.gradle.kts"
 repositories {
@@ -180,6 +179,22 @@ Take one runtime module:
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
+
+On the JVM, the runtime's native library comes in a separate JAR for each
+platform. Add the JAR of each platform the application runs on, by its
+classifier:
+
+```kotlin title="build.gradle.kts"
+dependencies {
+  runtimeOnly("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-jvm:{{version}}:natives-linux-x64")
+}
+```
+
+The classifiers are `natives-linux-x64`, `natives-linux-arm64`,
+`natives-linux-musl-x64`, `natives-linux-musl-arm64`, `natives-freebsd-x64`,
+`natives-macos-arm64`, `natives-windows-x64`, and `natives-windows-arm64`. The
+Metal runtime has only `natives-macos-arm64`. Android and Kotlin/Native targets
+need no classifier.
 
 On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.
