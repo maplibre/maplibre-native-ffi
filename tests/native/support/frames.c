@@ -167,6 +167,7 @@ mln_render_frame_result mln_test_render_batch_result(
 
 typedef struct idle_wait {
   mln_runtime runtime;
+  mln_map map;
   const mln_test_render_fixture* fixture;
   bool idle;
   bool has_stats;
@@ -174,10 +175,18 @@ typedef struct idle_wait {
 } idle_wait;
 
 // Idle ends the wait. Each finished frame's statistics replace the ones before.
+// The runtime's other maps report their own frames, which say nothing of this
+// one.
 static bool record_idle_or_stats(
   const mln_runtime_event* event, void* context
 ) {
   idle_wait* wait = context;
+  if (
+    event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
+    event->source != wait->map
+  ) {
+    return false;
+  }
   if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
     wait->idle = true;
   } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
@@ -187,8 +196,15 @@ static bool record_idle_or_stats(
   return false;
 }
 
+// A frame's finished and idle events reach the queue from the map's run loop
+// after the session publishes the frame's result, so a drain right away would
+// see them only on a later turn of the wait. A fence on the map waits them
+// out, but it can join a burst of runtime work scheduled ahead of the frame's
+// message; a second fence then runs behind it.
 static void drain_idle_events(idle_wait* wait) {
   (void)mln_test_render_fixture_service(wait->fixture);
+  MLN_TEST_OK(mln_test_map_fence(wait->map));
+  MLN_TEST_OK(mln_test_map_fence(wait->map));
   (void)mln_test_drain_counting_matching(
     wait->runtime, record_idle_or_stats, wait
   );
@@ -199,7 +215,7 @@ bool mln_test_render_until_idle(
   mln_rendering_stats* latest_stats
 ) {
   MLN_TEST_OK(mln_test_map_fence(map));
-  idle_wait wait = {.runtime = runtime, .fixture = fixture};
+  idle_wait wait = {.runtime = runtime, .map = map, .fixture = fixture};
   const mln_test_deadline deadline = mln_test_deadline_default();
   for (;;) {
     if (wait.idle) {
