@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Runs a test executable built for the native install that MLN_FFI_DEVICE_INSTALL
 # names, on whatever runs that install's target: a simulator, an Android or
-# OpenHarmony emulator, an Alpine container, a FreeBSD virtual machine, or Wine.
-# An executable for any other target runs directly.
+# OpenHarmony emulator, an Alpine container, a FreeBSD virtual machine, QEMU's
+# user-mode emulator, or Wine. An executable for any other target runs
+# directly.
 #
 #   tools/devices/run <executable> [argument ...]
 #   tools/devices/run --boot
@@ -49,6 +50,10 @@ if [[ "$1" == --boot ]]; then
     android-*) "$devices/android-serial" "$(field androidAbi)" ${android_api[@]+"${android_api[@]}"} >/dev/null ;;
     ohos-*) "$devices/ohos-key" >/dev/null ;;
     freebsd-*) "$devices/freebsd-host" >/dev/null ;;
+    linux-*-riscv64 | linux-*-loongarch64)
+      libc=${target_platform#linux-}
+      "$devices/linux-root" "${libc%%-*}" "${target_platform##*-}" >/dev/null
+      ;;
     *-simulator-*) devices-cli get "${target_platform%%-*}" >/dev/null ;;
   esac
   exit 0
@@ -83,6 +88,9 @@ case "$target_platform" in
   *-simulator-*)
     export MLN_FFI_SIMULATOR_RUNTIME=${target_platform%%-*}
     exec "$scripts/run-ios-simulator-test.sh" "$executable" "$timeout_seconds" -- "$@"
+    ;;
+  linux-*-riscv64 | linux-*-loongarch64)
+    exec "$scripts/run-qemu-test.sh" "$artifact" "$executable" "$@"
     ;;
   linux-musl-*) exec "$scripts/run-musl-test.sh" "$artifact" "$executable" "$@" ;;
   freebsd-*) exec "$scripts/run-freebsd-test.sh" "$artifact" "$executable" "$@" ;;

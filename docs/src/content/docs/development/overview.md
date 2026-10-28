@@ -66,6 +66,9 @@ snapshot, so what it installs goes away when `devices-cli release` stops it.
 The Linux RISC-V and LoongArch presets cross-compile on any Linux host. Their
 test harness links Debian's graphics loaders for the target architecture, which
 the first configure downloads into `build/sysroot` with Docker or Podman.
+`mise run test` runs their suites under QEMU's user-mode emulator, against a
+root of Debian or Alpine packages that it lays out in `build/roots`. Ubuntu and
+Fedora package the emulator as `qemu-user`.
 
 ## Windows on Linux
 

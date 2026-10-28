@@ -163,6 +163,16 @@ class VendorTest(unittest.TestCase):
                 "android-x64-vulkan": ("Android emulator", android),
                 # Only x64 EGL runs on the OpenHarmony emulator.
                 "ohos-x64-egl": ("OpenHarmony emulator", "tools/devices/ohos-key"),
+                # Each emulated libc and architecture has a root of its own.
+                **{
+                    f"linux-{libc}-{arch}-{backend}": (
+                        "QEMU user mode",
+                        f"tools/devices/linux-root {libc} {arch}",
+                    )
+                    for libc in ("gnu", "musl")
+                    for arch in ("riscv64", "loongarch64")
+                    for backend in ("egl", "vulkan")
+                },
             },
         )
 

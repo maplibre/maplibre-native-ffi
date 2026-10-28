@@ -229,29 +229,35 @@ ci:
     linux-riscv64:
       covers: >-
         Linux RISC-V 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
-        Cross-compiles the native library on an x64 runner against Debian's
-        RISC-V graphics loaders and checks its libc ABI. Catches architecture
-        conditionals in the engine and its vendored code, and problems in the
-        Zig toolchain's cross builds or the Rust platform crate on RISC-V. Code
-        that Linux x64 and ARM64 build alike doesn't need it.
+        Cross-compiles the native library on an x64 runner, checks its libc ABI,
+        and runs the C tests under QEMU's user-mode emulator. Catches
+        architecture conditionals in the engine and its vendored code, and
+        problems in the Zig toolchain's cross builds, the Rust platform crate,
+        or the emulated test roots on RISC-V. Code that Linux x64 and ARM64
+        build alike doesn't need it.
       rules:
         - if:
             files:
+              - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
+              - tools/devices/linux-root
               - third_party/maplibre-native
           then: apply
     linux-loongarch64:
       covers: >-
         Linux LoongArch 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
-        Cross-compiles the native library on an x64 runner against Debian's
-        LoongArch graphics loaders and checks its libc ABI. Catches architecture
-        conditionals in the engine and its vendored code, and problems in the
-        Zig toolchain's cross builds or the Rust platform crate on LoongArch.
-        Code that Linux x64 and ARM64 build alike doesn't need it.
+        Cross-compiles the native library on an x64 runner, checks its libc ABI,
+        and runs the C tests under QEMU's user-mode emulator. Catches
+        architecture conditionals in the engine and its vendored code, and
+        problems in the Zig toolchain's cross builds, the Rust platform crate,
+        or the emulated test roots on LoongArch. Code that Linux x64 and ARM64
+        build alike doesn't need it.
       rules:
         - if:
             files:
+              - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
+              - tools/devices/linux-root
               - third_party/maplibre-native
           then: apply
     freebsd:

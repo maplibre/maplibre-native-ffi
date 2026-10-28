@@ -540,9 +540,10 @@ function(mln_native_add_internal_suite out_sources)
 endfunction()
 
 # Whether this target's executables run off the host: on a simulator, an
-# Android or OpenHarmony emulator, in Alpine, in a FreeBSD virtual machine, or
-# under Wine. Mac Catalyst runs on the host. Each of these targets sets
-# CMAKE_SYSTEM_NAME, so a Windows host never runs a test through the dispatcher.
+# Android or OpenHarmony emulator, in Alpine, in a FreeBSD virtual machine,
+# under QEMU's user-mode emulator, or under Wine. Mac Catalyst runs on the host.
+# Each of these targets sets CMAKE_SYSTEM_NAME, so a Windows host never runs a
+# test through the dispatcher.
 function(mln_native_runs_off_host out_var)
   mln_ffi_apple_is_maccatalyst(maccatalyst)
   set(off_host FALSE)
@@ -550,7 +551,8 @@ function(mln_native_runs_off_host out_var)
     set(off_host TRUE)
   elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS|FreeBSD)$")
     set(off_host TRUE)
-  elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+  elseif(MLN_FFI_ZIG_LIBC STREQUAL "musl"
+         OR MLN_FFI_TARGET_ARCHITECTURE MATCHES "^(riscv64|loongarch64)$")
     set(off_host TRUE)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_HOST_WIN32)
     set(off_host TRUE)
@@ -561,8 +563,8 @@ endfunction()
 # Bounds a test by its timeout. Off the host, CMake runs the target through
 # tools/devices/run, its emulator, which reads this build's install to find the
 # device. The dispatcher ends the executable 30 seconds before the timeout, so
-# its runner reports and cleans up before CTest stops it. A simulator runs the
-# suites side by side; any other device runs one test at a time.
+# its runner reports and cleans up before CTest stops it. A simulator and QEMU
+# run the suites side by side; any other device runs one test at a time.
 function(mln_native_bound_test test_name target timeout)
   set_tests_properties(${test_name} PROPERTIES TIMEOUT ${timeout})
   mln_native_runs_off_host(off_host)
@@ -581,7 +583,8 @@ function(mln_native_bound_test test_name target timeout)
     list(APPEND environment
          "MLN_FFI_DEVICE_LIBRARIES=$<TARGET_FILE:mln_native_test_plugin>")
   endif()
-  if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$"
+     AND NOT MLN_FFI_TARGET_ARCHITECTURE MATCHES "^(riscv64|loongarch64)$")
     set_tests_properties(${test_name} PROPERTIES RESOURCE_LOCK device)
   endif()
   set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT ${environment})

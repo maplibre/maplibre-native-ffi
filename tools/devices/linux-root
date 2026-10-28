@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Prints the root file system that QEMU's user-mode emulator runs a Linux test
+# executable against, for an architecture that the host cannot run, after
+# laying it out once. The root holds the libc and the software graphics drivers
+# that the suites draw with: Debian's for glibc and Alpine's for musl.
+#
+#   tools/devices/linux-root <gnu|musl> <riscv64|loongarch64>
+#
+# A container of the host's own architecture installs the packages without
+# running them, so laying out the root needs no emulation, and streams the
+# result to the host, which unpacks it as its own user.
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+  echo "usage: ${0##*/} <gnu|musl> <riscv64|loongarch64>" >&2
+  exit 2
+fi
+libc=$1
+architecture=$2
+case "$architecture" in
+  riscv64) debian_architecture=riscv64 ;;
+  loongarch64) debian_architecture=loong64 ;;
+  *)
+    echo "Unsupported root architecture: $architecture" >&2
+    exit 2
+    ;;
+esac
+
+repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+root="$repository/build/roots/linux-$libc-$architecture"
+if [[ -f "$root/.complete" ]]; then
+  printf '%s\n' "$root"
+  exit 0
+fi
+
+if command -v docker >/dev/null; then
+  container_engine=docker
+elif command -v podman >/dev/null; then
+  container_engine=podman
+else
+  echo "The $architecture root requires Docker or Podman to download its packages." >&2
+  exit 2
+fi
+
+staging="$root.partial"
+rm -rf "$staging"
+mkdir -p "$staging"
+trap 'rm -rf "$staging"' EXIT
+
+# Each package manager unpacks without running maintainer scripts, which are
+# target binaries. Debian's testing suite carries both architectures; no stable
+# release carries loong64 yet.
+# shellcheck disable=SC2016
+case "$libc" in
+  gnu)
+    "$container_engine" run --rm debian:forky sh -euc '
+      dpkg --add-architecture "$1"
+      apt-get update -qq >&2
+      packages=$(apt-cache depends --recurse --no-recommends --no-suggests \
+        --no-conflicts --no-breaks --no-replaces --no-enhances \
+        "base-files:$1" "libc6:$1" "libvulkan1:$1" "mesa-vulkan-drivers:$1" \
+        "libegl1:$1" "libegl-mesa0:$1" "libgles2:$1" |
+        grep -E "^[a-z0-9][^ ]*:$1\$" | sort -u)
+      cd /tmp
+      # shellcheck disable=SC2086
+      apt-get download -qq $packages >&2
+      for package in ./*.deb; do
+        dpkg-deb --fsys-tarfile "$package"
+      done
+    ' sh "$debian_architecture" |
+      tar --extract --ignore-zeros --directory "$staging"
+    ;;
+  musl)
+    "$container_engine" run --rm alpine:3.22 sh -euc '
+      apk --arch "$1" --root /target --initdb --no-scripts --quiet \
+        --keys-dir "/usr/share/apk/keys/$1" \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/main \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
+        add alpine-baselayout musl mesa-vulkan-swrast vulkan-loader \
+        mesa-dri-gallium mesa-egl mesa-gles >&2
+      # The emulator falls back to a host file wherever the root lacks one, so
+      # musl searches a single directory, which links every library in /lib.
+      for library in /target/lib/*.so*; do
+        name=${library##*/}
+        [ -e "/target/usr/lib/$name" ] || ln -s "../../lib/$name" "/target/usr/lib/$name"
+      done
+      echo /usr/lib > "/target/etc/ld-musl-$1.path"
+      # A root container makes device nodes in /dev, which the host cannot
+      # unpack as its own user and the emulator never reads from the root.
+      tar -C /target --exclude=./dev -c .
+    ' sh "$architecture" |
+      tar --extract --directory "$staging"
+    ;;
+  *)
+    echo "Unsupported root libc: $libc" >&2
+    exit 2
+    ;;
+esac
+
+# The emulator also falls back to the host's devices. An empty /dev/dri hides
+# the host's GPUs, which the root has no drivers for, so the suites see only
+# the software renderers, as they do in a container.
+mkdir -p "$staging/dev/dri"
+touch "$staging/.complete"
+rm -rf "$root"
+mv "$staging" "$root"
+printf '%s\n' "$root"

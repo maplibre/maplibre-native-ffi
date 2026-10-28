@@ -101,7 +101,10 @@
         "maplibre-native-ffi": {
           "unit": "linux-riscv64",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "ctest": false
+          "device": {
+            "name": "QEMU user mode",
+            "command": "tools/devices/linux-root gnu riscv64"
+          }
         }
       }
     },
@@ -114,6 +117,14 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-musl-riscv64",
         "MLN_FFI_ZIG_TARGET": "riscv64-linux-musl",
         "MLN_FFI_RUST_TARGET": "riscv64gc-unknown-linux-musl"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "QEMU user mode",
+            "command": "tools/devices/linux-root musl riscv64"
+          }
+        }
       }
     },
     {
@@ -133,7 +144,10 @@
         "maplibre-native-ffi": {
           "unit": "linux-loongarch64",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "ctest": false
+          "device": {
+            "name": "QEMU user mode",
+            "command": "tools/devices/linux-root gnu loongarch64"
+          }
         }
       }
     },
@@ -146,6 +160,14 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-musl-loongarch64",
         "MLN_FFI_ZIG_TARGET": "loongarch64-linux-musl",
         "MLN_FFI_RUST_TARGET": "loongarch64-unknown-linux-musl"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "QEMU user mode",
+            "command": "tools/devices/linux-root musl loongarch64"
+          }
+        }
       }
     },
     {
