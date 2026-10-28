@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sourced by Zig binding tasks with a native preset as $1. Android presets add
-# the NDK sysroot and the installed libc metadata. Host presets need no extra
-# arguments.
+# the NDK sysroot and the installed libc metadata, and macOS x64 presets run
+# their tests under Rosetta. Other host presets need no extra arguments.
 # shellcheck shell=bash
 
 zig_cross_args=()
@@ -65,5 +65,8 @@ case "$1" in
       -Dsystem-root="$ndk_sysroot"
       -Dtarget-libc="$zig_libc"
     )
+    ;;
+  macos-x64-*)
+    zig_cross_args=(-frosetta)
     ;;
 esac

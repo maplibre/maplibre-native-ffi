@@ -1,7 +1,8 @@
 # Sourced by the Go binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, Android, and OpenHarmony presets to GOOS/GOARCH and
-# exports the cross C toolchain from the native build's Zig wrappers, the
-# Android NDK, or the OpenHarmony SDK. Leaves `goos` empty for host presets. OpenHarmony has no
+# $1. Maps musl, FreeBSD, Android, macOS x64, and OpenHarmony presets to
+# GOOS/GOARCH and exports the cross C toolchain from the native build's Zig
+# wrappers, the Android NDK, Apple Clang, or the OpenHarmony SDK. Leaves `goos`
+# empty for presets that run on the host, which macOS x64 does under Rosetta. OpenHarmony has no
 # Go port, so its presets build GOOS=linux binaries against the OHOS sysroot;
 # the Oniro emulator runs them.
 # shellcheck shell=bash
@@ -55,6 +56,10 @@ case "$1" in
     # dynamically, so the test binary can load Alpine's graphics drivers.
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$compiler" CXX="$compiler_cxx"
+    ;;
+  macos-x64-*)
+    export GOARCH=amd64 CGO_ENABLED=1
+    export CC="clang -arch x86_64" CXX="clang++ -arch x86_64"
     ;;
   ohos-arm64-* | ohos-x64-*)
     goos=linux

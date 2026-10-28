@@ -94,6 +94,16 @@ runs:
       shell: bash
       run: echo "MVK_CONFIG_USE_MTLHEAP=0" >> "$GITHUB_ENV"
 
+    # The arm64 runners run the macOS x64 suites under Rosetta, which a runner
+    # image may not include.
+    - name: Install Rosetta
+      if: ${{ runner.os == 'macOS' }}
+      shell: bash
+      run: |
+        if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+          sudo softwareupdate --install-rosetta --agree-to-license
+        fi
+
     # Each job asks for the SDK its target builds with, and every other job installs
     # none. No Windows target cross-compiles. Android reuses the SDK the runner image
     # already points ANDROID_HOME at. Repository build tasks install missing Android

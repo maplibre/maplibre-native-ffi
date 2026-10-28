@@ -27,6 +27,7 @@ PLATFORMS = {
     "linux-gnu-x64": "linux-x64",
     "linux-gnu-arm64": "linux-arm64",
     "macos-arm64": "osx-arm64",
+    "macos-x64": "osx-x64",
     "windows-x64": "windows-x64",
     "windows-arm64": "windows-arm64",
     "freebsd-x64": "freebsd-x64",
@@ -82,7 +83,7 @@ file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage"
 """
 USAGE = """\
 Select exactly one feature: opengl, metal, or vulkan. Available archives cover
-Linux (glibc), macOS arm64, Windows, FreeBSD x64, and Android. An unsupported
+Linux (glibc), macOS, Windows, FreeBSD x64, and Android. An unsupported
 platform, architecture, or renderer combination fails during installation.
 Both shared and static targets use the release's Release binaries:
 
@@ -155,7 +156,7 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
             "description": "MapLibre Native C API (prebuilt release)",
             "homepage": "https://maplibre.org/maplibre-native-ffi/",
             "license": "BSD-2-Clause",
-            "supports": "(linux & (x64 | arm64)) | (osx & arm64) | (windows & !mingw & !uwp & (x64 | arm64)) | (freebsd & x64) | (android & (arm | arm64 | x64))",
+            "supports": "(linux & (x64 | arm64)) | (osx & (x64 | arm64)) | (windows & !mingw & !uwp & (x64 | arm64)) | (freebsd & x64) | (android & (arm | arm64 | x64))",
             "features": {
                 name: {"description": description}
                 for name, description in FEATURES.items()

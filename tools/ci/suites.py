@@ -11,6 +11,11 @@ if TYPE_CHECKING:
 
 DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
 
+# The macOS x64 presets run under Rosetta on arm64 runners. The Rust, Zig, and
+# Go binding suites build x86_64 executables of their own. The other suites and
+# the examples need x86_64 runtimes or dependencies that the runners lack.
+MACOS_X64 = ["macos-x64-metal"]
+
 # Desktop suites run in the matching native target job and reuse its build tree.
 #
 # Every example's `smoke` task renders one frame and exits. A command marked
@@ -28,10 +33,13 @@ SUITES: list[dict] = [
                 "args": ["release"],
                 "include": ["linux-gnu-x64-vulkan"],
             },
-            {"task": "//examples/rust-map:check", "exclude": ["macos-arm64-egl"]},
+            {
+                "task": "//examples/rust-map:check",
+                "exclude": ["macos-arm64-egl", *MACOS_X64],
+            },
             {
                 "task": "//examples/rust-map:smoke",
-                "exclude": ["macos-arm64-egl"],
+                "exclude": ["macos-arm64-egl", *MACOS_X64],
                 "display": True,
             },
         ],
@@ -73,18 +81,24 @@ SUITES: list[dict] = [
         "exclude": ["windows-arm64-wgl", "windows-arm64-vulkan"],
         "commands": [
             {"task": "//bindings/zig:test"},
-            {"task": "//examples/zig-map:smoke", "display": True},
-            {"task": "//examples/zig-readback:smoke"},
+            {
+                "task": "//examples/zig-map:smoke",
+                "exclude": MACOS_X64,
+                "display": True,
+            },
+            {"task": "//examples/zig-readback:smoke", "exclude": MACOS_X64},
         ],
     },
     # A JDK in Alpine or the FreeBSD virtual machine runs the musl and FreeBSD
     # suites, which Gradle compiles on the Linux runner.
     {
         "platforms": ["linux-gnu", "linux-musl", "macos", "windows", "freebsd"],
+        "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/kotlin:test"}],
     },
     {
         "platforms": ["linux-gnu", "macos"],
+        "exclude": MACOS_X64,
         "commands": [
             {"task": "//bindings/swift:test", "exclude": ["linux-gnu-x64-vulkan"]},
             {
@@ -97,6 +111,7 @@ SUITES: list[dict] = [
     },
     {
         "platforms": ["linux-gnu", "macos", "windows"],
+        "exclude": MACOS_X64,
         "commands": [
             {"task": "//bindings/dotnet:test"},
             {"task": "//examples/dotnet-map:smoke", "display": True},
@@ -125,11 +140,13 @@ SUITES: list[dict] = [
     },
     {
         "platforms": ["linux-gnu", "macos"],
+        "exclude": MACOS_X64,
         "commands": [{"task": "//examples/c-map:smoke", "display": True}],
     },
     # One target runs the suite again on the oldest supported Python.
     {
         "platforms": ["linux-gnu", "macos", "windows"],
+        "exclude": MACOS_X64,
         "commands": [
             {"task": "//bindings/python:test"},
             {
@@ -140,6 +157,7 @@ SUITES: list[dict] = [
     },
     {
         "platforms": ["linux-gnu", "macos", "windows"],
+        "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/dart:test"}],
     },
     # The TypeScript suite runs under Node, Bun, and Deno in turn, and loads the
@@ -148,6 +166,7 @@ SUITES: list[dict] = [
     # heap address, for a reason that is unknown.
     {
         "platforms": ["linux-gnu", "macos"],
+        "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/typescript:test"}],
     },
     # The browser suites run against the Emscripten build in headless Chromium. The

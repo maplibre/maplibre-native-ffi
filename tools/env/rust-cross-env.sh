@@ -1,11 +1,11 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, Android, iOS, tvOS, visionOS, Mac Catalyst, and
-# OpenHarmony presets to their Cargo target. Exports the cross-compilation
-# environment (CC/CXX, linker) from the Zig and Rust toolchains, Android NDK, or
-# OpenHarmony SDK, and for targets that run off the host, tools/devices/run as
-# Cargo's runner, which it also names in `cargo_runner`. Leaves `cargo_target`
-# and `cargo_runner` empty for host presets, where Cargo picks its own target
-# and toolchain.
+# $1. Maps musl, FreeBSD, Android, iOS, tvOS, visionOS, Mac Catalyst, macOS
+# x64, and OpenHarmony presets to their Cargo target. Exports the
+# cross-compilation environment (CC/CXX, linker) from the Zig and Rust
+# toolchains, Android NDK, or OpenHarmony SDK, and for targets that run off the
+# host, tools/devices/run as Cargo's runner, which it also names in
+# `cargo_runner`. Leaves `cargo_target` and `cargo_runner` empty for host
+# presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -22,6 +22,7 @@ case "$1" in
   ios-arm64-*) cargo_target=aarch64-apple-ios ;;
   ios-maccatalyst-arm64-*) cargo_target=aarch64-apple-ios-macabi ;;
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
+  macos-x64-*) cargo_target=x86_64-apple-darwin ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
   freebsd-x64-*) cargo_target=x86_64-unknown-freebsd ;;

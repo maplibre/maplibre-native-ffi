@@ -207,6 +207,9 @@ class PresetTest(unittest.TestCase):
             # Windows ARM64 has no Zig toolchain.
             if name.startswith("windows-arm64-"):
                 packages = "skip"
+            # macOS x64 runs the Zig binding suite without the examples.
+            if name.startswith("macos-x64-"):
+                packages = "fetch"
             expected[name] = (mise_env, target.backend if gpu else "", packages)
         matrix = plan.plan(self.presets, True, [])["matrix"]
         self.assertEqual(

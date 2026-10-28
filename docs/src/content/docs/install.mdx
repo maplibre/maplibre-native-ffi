@@ -198,7 +198,7 @@ dart pub add maplibre_native_ffi
 ```
 
 The package downloads the C library for each target when it builds. Releases
-include macOS for arm64 alone.
+include macOS x64 for Metal alone.
 
 To build against your own copy of the [C library](#build-against-a-prefix), name
 it in your application's pubspec. Name an install prefix, or a directory holding
@@ -354,7 +354,7 @@ cargo add maplibre-native-ffi
 ```
 
 The build script downloads the C library for the target. Releases include macOS
-for arm64 alone. A browser build also needs a standard library built with
+x64 for Metal alone. A browser build also needs a standard library built with
 atomics and the C library's link options, which the `maplibre-native-ffi-sys`
 documentation lists.
 
@@ -526,12 +526,12 @@ const maplibre = b.dependency("maplibre_native_ffi", .{
 exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_native_ffi"));
 ```
 
-The build downloads the C library for the target. Releases include macOS for
-arm64 alone, so an Intel Mac targets `aarch64-macos` or uses a local build. Each
-target uses Metal on macOS and Mac Catalyst, OpenGL on Android, and Vulkan
-elsewhere. Pass `.backend` as `.opengl`, `.metal`, or `.vulkan` to choose
-another. Windows needs the `msvc` ABI, which Zig doesn't choose by default, so
-build with `-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`.
+The build downloads the C library for the target. Releases include macOS x64 for
+Metal alone. Each target uses Metal on macOS and Mac Catalyst, OpenGL on
+Android, and Vulkan elsewhere. Pass `.backend` as `.opengl`, `.metal`, or
+`.vulkan` to choose another. Windows needs the `msvc` ABI, which Zig doesn't
+choose by default, so build with `-Dtarget=x86_64-windows-msvc` or
+`-Dtarget=aarch64-windows-msvc`.
 
 On Linux, macOS, Mac Catalyst, and Android, an executable that `zig build run`
 runs finds the library in Zig's package directory. An installed executable finds
@@ -589,9 +589,10 @@ provider.
 ### macOS
 
 macOS runs the Metal, Vulkan, and OpenGL backends, with EGL as the OpenGL
-context provider. Apple provides neither Vulkan nor EGL, so a host that chooses
-one of those backends loads [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
-or [ANGLE](https://chromium.googlesource.com/angle/angle) itself.
+context provider. On x64, releases include Metal alone. Apple provides neither
+Vulkan nor EGL, so a host that chooses one of those backends loads
+[MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
+[ANGLE](https://chromium.googlesource.com/angle/angle) itself.
 
 ### Windows
 
