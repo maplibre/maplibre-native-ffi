@@ -304,11 +304,13 @@ def apple_commands(target: Target) -> list[str]:
         return [
             f"mise run //bindings/kotlin:ios-build {preset}",
             f"mise run //bindings/swift:build {preset}",
+            f"mise run //bindings/rust:build {preset}",
         ]
     if target_platform == "tvos-simulator":
         return [
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/swift:test {preset}",
+            f"mise run //bindings/rust:test {preset}",
         ]
     if target_platform in {"visionos", "visionos-simulator"}:
         action = "test" if target_platform == "visionos-simulator" else "build"

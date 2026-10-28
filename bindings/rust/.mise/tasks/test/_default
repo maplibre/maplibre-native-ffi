@@ -29,9 +29,9 @@ case "$usage_preset" in
   emscripten-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
     ;;
-  ios-maccatalyst-* | ios-simulator-* | visionos-simulator-*) ;;
-  ios-* | visionos-*)
-    echo "The Rust binding tests need a runnable target; test an ios-simulator, visionos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
+  ios-maccatalyst-* | ios-simulator-* | tvos-simulator-* | visionos-simulator-*) ;;
+  ios-* | tvos-* | visionos-*)
+    echo "The Rust binding tests need a runnable target; test an ios-simulator, tvos-simulator, visionos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

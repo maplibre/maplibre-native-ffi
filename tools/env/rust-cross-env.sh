@@ -1,11 +1,11 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, Android, iOS, visionOS, Mac Catalyst, and OpenHarmony
-# presets to their Cargo target. Exports the cross-compilation environment
-# (CC/CXX, linker) from the Zig and Rust toolchains, Android NDK, or OpenHarmony
-# SDK, and for targets that run off the host, tools/devices/run as Cargo's
-# runner, which it also names in `cargo_runner`. Leaves `cargo_target` and
-# `cargo_runner` empty for host presets, where Cargo picks its own target and
-# toolchain.
+# $1. Maps musl, FreeBSD, Android, iOS, tvOS, visionOS, Mac Catalyst, and
+# OpenHarmony presets to their Cargo target. Exports the cross-compilation
+# environment (CC/CXX, linker) from the Zig and Rust toolchains, Android NDK, or
+# OpenHarmony SDK, and for targets that run off the host, tools/devices/run as
+# Cargo's runner, which it also names in `cargo_runner`. Leaves `cargo_target`
+# and `cargo_runner` empty for host presets, where Cargo picks its own target
+# and toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -15,6 +15,8 @@ case "$1" in
   android-arm-*) cargo_target=armv7-linux-androideabi ;;
   android-arm64-*) cargo_target=aarch64-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
+  tvos-arm64-*) cargo_target=aarch64-apple-tvos ;;
+  tvos-simulator-arm64-*) cargo_target=aarch64-apple-tvos-sim ;;
   visionos-arm64-*) cargo_target=aarch64-apple-visionos ;;
   visionos-simulator-arm64-*) cargo_target=aarch64-apple-visionos-sim ;;
   ios-arm64-*) cargo_target=aarch64-apple-ios ;;
@@ -137,6 +139,9 @@ case "$1" in
     # linker sees one iOS version.
     export IPHONEOS_DEPLOYMENT_TARGET=15.0
     ;;
+  tvos-arm64-* | tvos-simulator-arm64-*)
+    export TVOS_DEPLOYMENT_TARGET=15.0
+    ;;
   ohos-*64-*)
     # The OHOS SDK clang target drops the `-unknown` vendor from the cargo target.
     compiler_target="${cargo_target/-unknown/}"
@@ -154,7 +159,7 @@ esac
 # Cargo hands each executable it runs for these targets to tools/devices/run,
 # which finds the device from the preset's install.
 case "$1" in
-  android-* | ohos-*64-* | ios-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-* | freebsd-x64-*)
+  android-* | ohos-*64-* | ios-simulator-arm64-* | tvos-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-* | freebsd-x64-*)
     cargo_runner="$MISE_MONOREPO_ROOT/tools/devices/run"
     target_env_upper="$(printf '%s' "${cargo_target//-/_}" | tr '[:lower:]' '[:upper:]')"
     export "CARGO_TARGET_${target_env_upper}_RUNNER=$cargo_runner"
