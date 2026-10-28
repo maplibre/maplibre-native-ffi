@@ -87,9 +87,9 @@ def write_package(
 ) -> None:
     """Writes the Zig package to `destination`.
 
-    `pin` is the content of the release pin. `archives` maps each native preset
-    to its archive's release URL and local copy, which yields the hash that the
-    dependency on it declares.
+    `pin` is the content of the release pin. `archives` maps each native
+    archive's name, which names the dependency on it, to its release URL and
+    local copy, which yields the hash that the dependency declares.
     """
     manifest = (repository / MANIFEST).read_text(encoding="utf-8")
     paths = package_paths(manifest)

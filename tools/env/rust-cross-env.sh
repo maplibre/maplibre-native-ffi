@@ -114,12 +114,10 @@ case "$1" in
       return 2
     fi
     descriptor="$MISE_MONOREPO_ROOT/build/$1/install/share/maplibre-native-c/artifact.json"
-    zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
-    if [[ ! "$zig_target" =~ ^((aarch64|x86_64|arm)-linux-android)\.([0-9]+)$ ]]; then
-      echo "The Android native artifact has an invalid Zig target: $zig_target" >&2
+    if ! android_api=$(jq -er .platform.android.api "$descriptor"); then
+      echo "The Android native artifact records no API level: $descriptor" >&2
       return 2
     fi
-    android_api=${BASH_REMATCH[3]}
     compiler_target="$cargo_target"
     if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
       compiler_target=armv7a-linux-androideabi

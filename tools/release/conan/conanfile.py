@@ -155,12 +155,12 @@ class MaplibreNativeC(ConanFile):
                 ),
             )
         )
-        self.cpp_info.system_libs = descriptor["staticLinkLibraries"]
+        self.cpp_info.system_libs = descriptor["link"]["libraries"]
         # The Rust platform archive unwinds through libgcc_s on glibc, which a
         # C consumer's compiler driver need not link.
         if self.settings.os == "Linux" and self.options.libc == "gnu":
             self.cpp_info.system_libs.append("gcc_s")
-        self.cpp_info.frameworks = descriptor["staticLinkFrameworks"]
+        self.cpp_info.frameworks = descriptor["link"]["frameworks"]
         # The archive's pkg-config file carries Emscripten's compile flags;
         # its installed header directory is supplied by Conan instead.
         if self.settings.os == "Emscripten":

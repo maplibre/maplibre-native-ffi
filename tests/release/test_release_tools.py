@@ -72,7 +72,28 @@ def create_xcframework(path: pathlib.Path) -> None:
         add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", "Versions/Current/Headers")
 
 
-def create_archive(path: pathlib.Path, preset: str) -> None:
+PLATFORM = {
+    "id": "linux-gnu-x64",
+    "rustTarget": "x86_64-unknown-linux-gnu",
+    "zigTarget": "x86_64-linux-gnu",
+    "android": None,
+    "defaultBackend": "vulkan",
+}
+
+
+def descriptor(preset: str, backend: str = "vulkan") -> dict:
+    return {
+        "schemaVersion": 0,
+        "name": preset,
+        "version": "0.1.0",
+        "commit": None,
+        "platform": PLATFORM,
+        "backend": backend,
+        "link": {"libraries": ["m"], "frameworks": []},
+    }
+
+
+def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
         add_bytes(
@@ -88,7 +109,7 @@ def create_archive(path: pathlib.Path, preset: str) -> None:
         add_bytes(
             archive,
             f"{root}/share/maplibre-native-c/artifact.json",
-            json.dumps({"targetPlatform": "linux-gnu-x64"}).encode(),
+            json.dumps(descriptor(preset, backend)).encode(),
         )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
 
@@ -215,9 +236,12 @@ class NativePackageReleaseTest(unittest.TestCase):
             json.dumps({"configurePresets": configure})
         )
 
-    def archive(self) -> pathlib.Path:
-        archive = self.release_dir / f"maplibre-native-c-{self.preset}.tar.gz"
-        create_archive(archive, self.preset)
+    def archive(
+        self, preset: str | None = None, backend: str = "vulkan"
+    ) -> pathlib.Path:
+        preset = preset or self.preset
+        archive = self.release_dir / f"maplibre-native-c-{preset}.tar.gz"
+        create_archive(archive, preset, backend)
         return archive
 
     def prepare(self, channel: str, version: str | None = None) -> None:
@@ -243,7 +267,7 @@ class NativePackageReleaseTest(unittest.TestCase):
             pkg_config = package.extractfile(
                 f"maplibre-native-c-{self.preset}/share/pkgconfig/maplibre-native-c.pc"
             ).read()
-            descriptor = json.load(
+            stamped = json.load(
                 package.extractfile(
                     f"maplibre-native-c-{self.preset}/share/maplibre-native-c/artifact.json"
                 )
@@ -256,8 +280,8 @@ class NativePackageReleaseTest(unittest.TestCase):
 
         self.assertIn(f"Version: {version}".encode(), pkg_config)
         self.assertEqual(
-            descriptor,
-            {"targetPlatform": "linux-gnu-x64", "gitSha": self.sha, "version": version},
+            stamped,
+            descriptor(self.preset) | {"version": version, "commit": self.sha},
         )
         self.assertEqual(
             checksums,
@@ -273,13 +297,21 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
         self.assertEqual(
             json.loads((self.release_dir / ARTIFACTS_NAME).read_text()),
-            [
-                {
-                    "archive": archive.name,
-                    "sha256": checksums[archive.name],
-                    **descriptor,
-                }
-            ],
+            {
+                "schemaVersion": 0,
+                "tag": f"v{self.version}",
+                "version": version,
+                "commit": self.sha,
+                "platforms": [PLATFORM],
+                "artifacts": [
+                    {
+                        "platform": "linux-gnu-x64",
+                        "backend": "vulkan",
+                        "archive": archive.name,
+                        "sha256": checksums[archive.name],
+                    }
+                ],
+            },
         )
         self.assertIn(title, notes)
         self.assertIn(f"/commit/{self.sha}", notes)
@@ -304,6 +336,14 @@ class NativePackageReleaseTest(unittest.TestCase):
                 f"maplibre-native-c-{self.preset}/lib/libmaplibre-native-c.so"
             ).read()
         self.assertEqual(library, b"binary")
+
+    def test_refuses_a_platform_without_its_default_backend(self) -> None:
+        self.preset = "linux-gnu-x64-egl"
+        self.write_presets(self.preset)
+        self.archive(backend="opengl")
+
+        with self.assertRaisesRegex(SystemExit, "default backend, vulkan"):
+            self.prepare("release")
 
     def test_refuses_a_release_without_the_xcframework(self) -> None:
         self.archive()
@@ -380,11 +420,12 @@ class NativePackageReleaseTest(unittest.TestCase):
                 "maplibre-native-ffi-zig/build.zig.zon",
             ],
         )
-        artifacts = json.loads((self.release_dir / ARTIFACTS_NAME).read_text())
-        self.assertEqual(pin, {"tag": f"v{self.version}", "artifacts": artifacts})
+        self.assertEqual(
+            pin, json.loads((self.release_dir / ARTIFACTS_NAME).read_text())
+        )
         self.assertIn(f'.version = "{self.version}",', manifest)
         self.assertIn(
-            f'        .@"{self.preset}" = .{{\n'
+            f'        .@"{archive.name}" = .{{\n'
             '            .url = "https://github.com/maplibre/maplibre-native-ffi/'
             f'releases/download/v{self.version}/{archive.name}",\n'
             f'            .hash = "{zig_hash(archive)}",\n'

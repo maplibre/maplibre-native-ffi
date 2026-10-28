@@ -27,17 +27,17 @@ if [[ ! -f "$descriptor" ]]; then
   exit 2
 fi
 field() {
-  sed -n "s/^[[:space:]]*\"$1\":[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$descriptor"
+  jq -er "$1" "$descriptor"
 }
-artifact=$(field artifact)
-target_platform=$(field targetPlatform)
+artifact=$(field .name)
+target_platform=$(field .platform.id)
 devices="$MISE_MONOREPO_ROOT/tools/devices"
 scripts="$MISE_MONOREPO_ROOT/scripts"
 
 # The x64 OpenGL suites run on API 26, the oldest release the library
 # supports; the other Android targets run on the default API level.
 android_api=()
-if [[ "$target_platform" == android-x64 && "$(field renderBackend)" == opengl ]]; then
+if [[ "$target_platform" == android-x64 && "$(field .backend)" == opengl ]]; then
   android_api=(--api 26)
 fi
 
@@ -47,7 +47,7 @@ if [[ "$1" == --boot ]]; then
     exit 2
   fi
   case "$target_platform" in
-    android-*) "$devices/android-serial" "$(field androidAbi)" ${android_api[@]+"${android_api[@]}"} >/dev/null ;;
+    android-*) "$devices/android-serial" "$(field .platform.android.abi)" ${android_api[@]+"${android_api[@]}"} >/dev/null ;;
     ohos-*) "$devices/ohos-key" >/dev/null ;;
     freebsd-*) "$devices/freebsd-host" >/dev/null ;;
     linux-*-riscv64 | linux-*-loongarch64)
@@ -75,14 +75,14 @@ done
 
 case "$target_platform" in
   android-*)
-    exec "$scripts/run-android-emulator-test.sh" "$timeout_seconds" "$(field androidAbi)" \
+    exec "$scripts/run-android-emulator-test.sh" "$timeout_seconds" "$(field .platform.android.abi)" \
       "$install/lib/libmaplibre-native-c.so" ${android_api[@]+"${android_api[@]}"} \
       ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
     ;;
   ohos-*)
     exec "$scripts/run-ohos-emulator-test.sh" "$timeout_seconds" \
       "$install/lib/libmaplibre-native-c.so" \
-      "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must point at the OpenHarmony SDK}/llvm/lib/$(field zigTarget)/libc++_shared.so" \
+      "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must point at the OpenHarmony SDK}/llvm/lib/$(field .platform.zigTarget)/libc++_shared.so" \
       ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
     ;;
   *-simulator-*)

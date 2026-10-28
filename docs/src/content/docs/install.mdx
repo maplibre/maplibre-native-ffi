@@ -27,8 +27,8 @@ provider in place of the backend: `egl`, `wgl`, or `webgl`.
 Download `maplibre-native-c-<preset>.tar.gz` and unpack it. The directory it
 holds, `maplibre-native-c-<preset>`, is the install prefix. The prefix's
 `share/maplibre-native-c/artifact.json` records the release `version` and the
-commit it was built from as `gitSha`, which matches a snapshot archive to its
-source after the snapshot moves on.
+`commit` it was built from, which matches a snapshot archive to its source after
+the snapshot moves on.
 
 With CMake, set `maplibre-native-c_DIR` to the prefix's package config directory
 and link the imported target. This also works with cross-compilation toolchains

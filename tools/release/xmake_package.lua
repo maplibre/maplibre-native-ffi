@@ -98,7 +98,7 @@ package("maplibre-native-c")
             linkdirs = {path.join(prefix, "lib")},
             links = {"maplibre-native-c", "mln_ffi_platform"},
             defines = {"MLN_STATIC"},
-            syslinks = artifact.staticLinkLibraries,
+            syslinks = artifact.link.libraries,
             cxflags = os.argv(cflags),
             ldflags = io.readfile(path.join(prefix, "share/maplibre-native-c/emscripten-link-flags.txt")):split("\n", {plain = true, trim = true})
         }

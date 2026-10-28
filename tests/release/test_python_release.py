@@ -41,7 +41,7 @@ class PythonReleaseTest(unittest.TestCase):
 
     def describe(self, backend: str) -> None:
         (self.prefix / "share/maplibre-native-c/artifact.json").write_text(
-            json.dumps({"targetPlatform": "macos-arm64", "renderBackend": backend})
+            json.dumps({"platform": {"id": "macos-arm64"}, "backend": backend})
         )
 
     def test_every_distribution_takes_the_version_and_every_runtime_pins_the_api(

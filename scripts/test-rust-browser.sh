@@ -86,8 +86,7 @@ cargo_binding_test --lib -- --test-threads=1
 # in its cfg compiles only for that backend. The names come from the source:
 # the first function after each `#[test]`, kept when its cfg matches.
 browser_tests="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/tests/suite/browser/mod.rs"
-render_backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
-  "$native_install_dir/share/maplibre-native-c/artifact.json")
+render_backend=$(jq -r .backend "$native_install_dir/share/maplibre-native-c/artifact.json")
 declared=$(grep -c $'^#\[test\]' "$browser_tests")
 enumerated=0
 test_names=()

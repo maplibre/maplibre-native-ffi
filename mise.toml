@@ -83,6 +83,7 @@ sdl3_version = "3.4"
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
 "github:jdx/jactionlint" = "2.3.0" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by jactionlint)
+"aqua:jqlang/jq" = "1.8.2" # Reads JSON in shell tasks, such as artifact descriptors
 "aqua:Kitware/CMake" = "4.4.4"
 ninja = "1.13.2"
 "github:EmbarkStudios/cargo-about" = "0.9.2" # Rust dependency notices

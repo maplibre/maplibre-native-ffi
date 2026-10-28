@@ -1,10 +1,18 @@
 {
-  "artifact": "@MLN_FFI_ARTIFACT_NAME@",
-  "renderBackend": "@MLN_FFI_RENDER_BACKEND@",
-  "defaultBackend": "@MLN_FFI_DEFAULT_RENDER_BACKEND@",
-  "targetPlatform": "@MLN_FFI_TARGET_PLATFORM@",
-  "rustTarget": "@MLN_FFI_RUST_TARGET@",
-  "zigTarget": "@MLN_FFI_ZIG_TARGET@",@MLN_FFI_ANDROID_ABI_ENTRY@
-  "staticLinkLibraries": [@MLN_FFI_STATIC_LINK_LIBRARIES_JSON@],
-  "staticLinkFrameworks": [@MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON@]
+  "schemaVersion": @MLN_FFI_SCHEMA_VERSION@,
+  "name": "@MLN_FFI_ARTIFACT_NAME@",
+  "version": "@PROJECT_VERSION@",
+  "commit": null,
+  "platform": {
+    "id": "@MLN_FFI_TARGET_PLATFORM@",
+    "rustTarget": "@MLN_FFI_RUST_TARGET@",
+    "zigTarget": "@MLN_FFI_ZIG_TARGET@",
+    "android": @MLN_FFI_ANDROID_JSON@,
+    "defaultBackend": "@MLN_FFI_DEFAULT_RENDER_BACKEND@"
+  },
+  "backend": "@MLN_FFI_RENDER_BACKEND@",
+  "link": {
+    "libraries": [@MLN_FFI_STATIC_LINK_LIBRARIES_JSON@],
+    "frameworks": [@MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON@]
+  }
 }

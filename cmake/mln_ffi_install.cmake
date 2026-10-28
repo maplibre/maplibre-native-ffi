@@ -110,6 +110,19 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
   set(${frameworks_var} ${MLN_FFI_STATIC_FRAMEWORKS} PARENT_SCOPE)
 endfunction()
 
+# The C ABI contract version that the headers declare, which the artifact
+# descriptor's schema version follows.
+function(mln_ffi_c_version out_var)
+  file(
+    STRINGS "${PROJECT_SOURCE_DIR}/include/maplibre_native_c/base.h" define
+    REGEX "^#define MLN_C_VERSION [0-9]+u$"
+  )
+  if(NOT define MATCHES "^#define MLN_C_VERSION ([0-9]+)u$")
+    message(FATAL_ERROR "base.h does not define MLN_C_VERSION")
+  endif()
+  set(${out_var} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_json_string_array out_var)
   set(MLN_FFI_QUOTED "")
   foreach(MLN_FFI_ITEM IN LISTS ARGN)
@@ -261,9 +274,12 @@ function(mln_ffi_install_c_api_library target)
   if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
   endif()
-  set(MLN_FFI_ANDROID_ABI_ENTRY "")
+  mln_ffi_c_version(MLN_FFI_SCHEMA_VERSION)
+  set(MLN_FFI_ANDROID_JSON null)
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-    set(MLN_FFI_ANDROID_ABI_ENTRY "\n  \"androidAbi\": \"${ANDROID_ABI}\",")
+    string(REGEX REPLACE "^android-" "" android_api "${ANDROID_PLATFORM}")
+    set(MLN_FFI_ANDROID_JSON
+        "{ \"abi\": \"${ANDROID_ABI}\", \"api\": ${android_api} }")
   endif()
   mln_ffi_install_emscripten_options()
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
@@ -281,8 +297,24 @@ function(mln_ffi_install_c_api_library target)
     "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"
     @ONLY)
   configure_file(
-    "${PROJECT_SOURCE_DIR}/cmake/artifact.json.in" "${artifact_file}"
+    "${PROJECT_SOURCE_DIR}/cmake/artifact.json.in" "${artifact_file}.in"
     @ONLY)
+  # The commit is read at build time, so that a build after a new commit
+  # records it without a reconfigure.
+  find_package(Git QUIET)
+  add_custom_target(
+    ${target}_artifact_descriptor
+    COMMAND
+      "${CMAKE_COMMAND}"
+      "-DGIT=${GIT_EXECUTABLE}"
+      "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}"
+      "-DINPUT=${artifact_file}.in"
+      "-DOUTPUT=${artifact_file}"
+      -P
+      "${PROJECT_SOURCE_DIR}/cmake/mln_ffi_artifact_commit.cmake"
+    BYPRODUCTS "${artifact_file}"
+    VERBATIM)
+  add_dependencies(${target} ${target}_artifact_descriptor)
 
   if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
     mln_ffi_install_c_api_complete_static_archive(${target})

@@ -84,30 +84,22 @@ def native_archives(
     return [release_dir / name for name in sorted(expected)]
 
 
-def pin(tag: str, artifacts: list[dict]) -> str:
-    """The pin by which a published package downloads its native library.
+def write_pin(path: pathlib.Path, tag: str, index: pathlib.Path | None = None) -> None:
+    """Writes the pin of release `tag` to `path`: the release's artifact index.
 
-    The pin holds the release tag and the release's artifact index.
+    It reads the index from `index` if given, and otherwise downloads it from
+    the release.
     """
-    content = {"tag": tag, "artifacts": artifacts}
-    return json.dumps(content, indent=2) + "\n"
-
-
-def write_pin(
-    path: pathlib.Path, tag: str, artifacts: pathlib.Path | None = None
-) -> None:
-    """Writes the pin of release `tag` to `path`.
-
-    It reads the release's artifact index from `artifacts` if given, and
-    otherwise downloads it from the release.
-    """
-    if artifacts is None:
+    if index is None:
         url = f"{RELEASE_DOWNLOAD_URL}/{tag}/{ARTIFACTS_NAME}"
         with urllib.request.urlopen(url) as response:
-            index = json.loads(response.read())
+            content = response.read().decode()
     else:
-        index = json.loads(artifacts.read_text(encoding="utf-8"))
-    path.write_text(pin(tag, index), encoding="utf-8")
+        content = index.read_text(encoding="utf-8")
+    found = json.loads(content)["tag"]
+    if found != tag:
+        raise SystemExit(f"the artifact index of {tag} names the release {found}")
+    path.write_text(content, encoding="utf-8")
 
 
 def pkg_config_bytes(content: bytes, archive: pathlib.Path, version: str) -> bytes:
@@ -142,15 +134,10 @@ def framework_plist_bytes(content: bytes, version: str) -> bytes:
 
 
 def descriptor_bytes(content: bytes, version: str, sha: str) -> bytes:
-    """The artifact descriptor with the published version and source commit.
-
-    Nothing in this repository reads `gitSha` or `version`. They are there for
-    consumers who unpack an archive, such as one from the rolling snapshot
-    release, and need to match it to the commit it was built from.
-    """
+    """The artifact descriptor with the published version and source commit."""
     descriptor = json.loads(content)
-    descriptor["gitSha"] = sha
     descriptor["version"] = version
+    descriptor["commit"] = sha
     return (json.dumps(descriptor, indent=2) + "\n").encode()
 
 
@@ -249,19 +236,61 @@ def archive_descriptor(archive: pathlib.Path) -> dict:
         )
 
 
-def write_artifacts(path: pathlib.Path, archives: list[pathlib.Path]) -> list[dict]:
-    """Writes the artifact index: each archive's name and digest, with its descriptor.
+def artifact_index(tag: str, archives: list[pathlib.Path]) -> dict:
+    """The artifact index of release `tag`, which holds `archives`.
 
-    A published package reads the index from its pin to choose an archive by
-    the descriptor's fields, before it has downloaded any.
+    A published package pins the index to choose an archive for its target
+    and backend before it has downloaded any. Each descriptor's release fields
+    and platform appear once.
     """
-    artifacts = [
-        {"archive": archive.name, "sha256": sha256(archive)}
-        | archive_descriptor(archive)
-        for archive in archives
-    ]
-    path.write_text(json.dumps(artifacts, indent=2) + "\n", encoding="utf-8")
-    return artifacts
+    index = None
+    platforms: dict[str, dict] = {}
+    artifacts: dict[tuple[str, str], dict] = {}
+    for archive in archives:
+        descriptor = archive_descriptor(archive)
+        release = {
+            "schemaVersion": descriptor["schemaVersion"],
+            "tag": tag,
+            "version": descriptor["version"],
+            "commit": descriptor["commit"],
+        }
+        if index is None:
+            index = release
+        elif release != index:
+            raise SystemExit(f"{archive.name} is from another build than the rest")
+        platform = descriptor["platform"]
+        if platforms.setdefault(platform["id"], platform) != platform:
+            raise SystemExit(
+                f"{archive.name} describes {platform['id']} unlike another archive"
+            )
+        key = (platform["id"], descriptor["backend"])
+        if key in artifacts:
+            raise SystemExit(f"{archive.name} duplicates {' '.join(key)}")
+        artifacts[key] = {
+            "platform": key[0],
+            "backend": key[1],
+            "archive": archive.name,
+            "sha256": sha256(archive),
+        }
+    if index is None:
+        raise SystemExit("an artifact index needs at least one archive")
+    for platform in platforms.values():
+        if (platform["id"], platform["defaultBackend"]) not in artifacts:
+            raise SystemExit(
+                f"no archive has {platform['id']}'s default backend, "
+                f"{platform['defaultBackend']}"
+            )
+    return index | {
+        "platforms": [platforms[name] for name in sorted(platforms)],
+        "artifacts": list(artifacts.values()),
+    }
+
+
+def write_artifacts(path: pathlib.Path, tag: str, archives: list[pathlib.Path]) -> str:
+    """Writes the artifact index of release `tag` to `path`, and returns it."""
+    content = json.dumps(artifact_index(tag, archives), indent=2) + "\n"
+    path.write_text(content, encoding="utf-8")
+    return content
 
 
 def write_checksums(release_dir: pathlib.Path, files: list[pathlib.Path]) -> None:
@@ -330,18 +359,15 @@ def prepare_assets(
     rewrite_xcframework(xcframework, version)
     tag = required_env("PUBLISH_TAG")
     artifacts_path = release_dir / ARTIFACTS_NAME
-    artifacts = write_artifacts(artifacts_path, archives)
+    index = write_artifacts(artifacts_path, tag, archives)
     zig_package = release_dir / ZIG_PACKAGE_NAME
     write_zig_package(
         zig_package,
         root,
         version,
-        pin(tag, artifacts),
+        index,
         {
-            archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(ARCHIVE_SUFFIX): (
-                f"{RELEASE_DOWNLOAD_URL}/{tag}/{archive.name}",
-                archive,
-            )
+            archive.name: (f"{RELEASE_DOWNLOAD_URL}/{tag}/{archive.name}", archive)
             for archive in archives
         },
     )

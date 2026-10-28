@@ -85,15 +85,15 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): N
     // instead. Only a selected backend can conflict; without one, the prefix's own backend serves.
     val descriptor = readDescriptor(root)
     return if (
-      descriptor["targetPlatform"] == targetPlatform &&
-        (backend == null || descriptor["renderBackend"] == backend)
+      descriptor.platform["id"] == targetPlatform &&
+        (backend == null || descriptor["backend"] == backend)
     ) {
       NativeInstall(root, null)
     } else {
       NativeInstall(
         null,
         "$LOCAL_BUILD_PROPERTY names an install prefix built for " +
-          "${descriptor["targetPlatform"]} ${descriptor["renderBackend"]}, which cannot serve $request",
+          "${descriptor.platform["id"]} ${descriptor["backend"]}, which cannot serve $request",
       )
     }
   }
@@ -109,10 +109,8 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): N
       .filter { prefix ->
         prefix.resolve(NATIVE_DESCRIPTOR_PATH).isFile &&
           readDescriptor(prefix).let {
-            val wanted = backend ?: it["defaultBackend"]
-            wanted != null &&
-              it["targetPlatform"] == targetPlatform &&
-              it["renderBackend"] == wanted
+            it.platform["id"] == targetPlatform &&
+              it["backend"] == (backend ?: it.platform["defaultBackend"])
           }
       }
       .sorted()
@@ -136,6 +134,9 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): N
 private fun readDescriptor(prefix: File): Map<*, *> =
   JsonSlurper().parseText(prefix.resolve(NATIVE_DESCRIPTOR_PATH).readText()) as? Map<*, *>
     ?: emptyMap<Any, Any>()
+
+private val Map<*, *>.platform: Map<*, *>
+  get() = this["platform"] as? Map<*, *> ?: emptyMap<Any, Any>()
 
 /** The native target platform of a Kotlin/Native target. */
 fun kotlinNativeTargetPlatform(kotlinTarget: String): String =

@@ -13,13 +13,28 @@ pub const RenderBackend = enum {
     vulkan,
 };
 
-/// The fields of a native artifact descriptor that select an install, which
-/// a release pin's artifact index repeats for each archive.
-const ArtifactDescriptor = struct {
-    artifact: []const u8,
-    renderBackend: []const u8,
-    defaultBackend: []const u8,
+/// The platform that a native artifact is built for, as its descriptor and a
+/// release pin both describe it.
+const Platform = struct {
+    id: []const u8,
     zigTarget: []const u8,
+    android: ?struct { api: u32 },
+    defaultBackend: []const u8,
+};
+
+/// The fields of a native artifact descriptor that select an install.
+const ArtifactDescriptor = struct {
+    name: []const u8,
+    platform: Platform,
+    backend: []const u8,
+};
+
+/// A release pin's entry for one native archive, which the published package
+/// declares as a lazy dependency named by the archive.
+const PinnedArtifact = struct {
+    platform: []const u8,
+    backend: []const u8,
+    archive: []const u8,
 };
 
 const descriptor_sub_path = "share/maplibre-native-c/artifact.json";
@@ -78,28 +93,24 @@ fn localInstall(b: *std.Build, prefix: []const u8) Install {
     return .{ .prefix = prefix, .descriptor = parsed.value };
 }
 
-/// The target that an artifact's Zig target names. An Android API level
-/// suffix does not count.
-fn artifactQuery(descriptor: ArtifactDescriptor) std.Target.Query {
-    const query = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
-        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
+/// The target that a platform's Zig target names, at its Android API level if
+/// it has one.
+fn platformQuery(b: *std.Build, platform: Platform) std.Target.Query {
+    const arch_os_abi = if (platform.android) |android| b.fmt("{s}.{d}", .{ platform.zigTarget, android.api }) else platform.zigTarget;
+    const query = std.Target.Query.parse(.{ .arch_os_abi = arch_os_abi }) catch
+        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{arch_os_abi});
     if (query.cpu_arch == null or query.os_tag == null) {
-        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
+        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{arch_os_abi});
     }
     return query;
 }
 
-fn servesTarget(descriptor: ArtifactDescriptor, target: std.Target) bool {
-    const query = artifactQuery(descriptor);
+/// Whether a platform builds for the target. An Android API level does not
+/// count.
+fn servesTarget(b: *std.Build, platform: Platform, target: std.Target) bool {
+    const query = platformQuery(b, platform);
     const abi = query.abi orelse std.Target.Abi.default(query.cpu_arch.?, query.os_tag.?);
     return query.cpu_arch.? == target.cpu.arch and query.os_tag.? == target.os.tag and abi == target.abi;
-}
-
-/// Whether an artifact has the selected backend, or with none selected, its
-/// platform's default backend.
-fn servesBackend(descriptor: ArtifactDescriptor, backend: ?RenderBackend) bool {
-    const wanted = if (backend) |selected| @tagName(selected) else descriptor.defaultBackend;
-    return std.mem.eql(u8, descriptor.renderBackend, wanted);
 }
 
 fn requestName(b: *std.Build, target: std.Target, backend: ?RenderBackend) []const u8 {
@@ -115,7 +126,7 @@ fn requestName(b: *std.Build, target: std.Target, backend: ?RenderBackend) []con
 /// artifact when it differs from the host.
 fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.ResolvedTarget {
     const artifact = descriptor orelse return b.standardTargetOptions(.{});
-    const artifact_query = artifactQuery(artifact);
+    const artifact_query = platformQuery(b, artifact.platform);
     const artifact_target = b.resolveTargetQuery(artifact_query).result;
     const host = b.graph.host.result;
     const native_host = artifact_target.cpu.arch == host.cpu.arch and
@@ -125,9 +136,9 @@ fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.Resolv
 }
 
 /// The release archive for the request, which the published package declares
-/// as a lazy dependency named by the archive's artifact. Zig fetches it when a
-/// build first asks for it.
-fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) struct { std.Build.LazyPath, ArtifactDescriptor } {
+/// as a lazy dependency named by the archive, and its backend. Zig fetches it
+/// when a build first asks for it.
+fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) struct { std.Build.LazyPath, []const u8 } {
     const pin_path = b.path(pin_sub_path);
     const pin_file = configurePath(b, pin_path);
     const contents = std.Io.Dir.cwd().readFileAlloc(b.graph.io, pin_file, b.allocator, .unlimited) catch |err| switch (err) {
@@ -137,20 +148,23 @@ fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) s
     b.dependOnFileContents(pin_path);
     const pin = std.json.parseFromSlice(struct {
         tag: []const u8,
-        artifacts: []const ArtifactDescriptor,
+        platforms: []const Platform,
+        artifacts: []const PinnedArtifact,
     }, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch
         std.debug.panic("invalid native release pin: {s}", .{pin_file});
-    var chosen: ?ArtifactDescriptor = null;
-    for (pin.value.artifacts) |entry| {
-        if (!servesTarget(entry, target) or !servesBackend(entry, backend)) continue;
-        if (chosen != null) std.debug.panic("the native release pin lists several archives for {s}", .{requestName(b, target, backend)});
-        chosen = entry;
+    var chosen: ?PinnedArtifact = null;
+    for (pin.value.platforms) |platform| {
+        if (!servesTarget(b, platform, target)) continue;
+        const wanted = if (backend) |selected| @tagName(selected) else platform.defaultBackend;
+        for (pin.value.artifacts) |artifact| {
+            if (std.mem.eql(u8, artifact.platform, platform.id) and std.mem.eql(u8, artifact.backend, wanted)) chosen = artifact;
+        }
     }
-    const entry = chosen orelse std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
+    const artifact = chosen orelse std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
         pin.value.tag,
         requestName(b, target, backend),
     });
-    return .{ b.dependency(entry.artifact, .{}).path(""), entry };
+    return .{ b.dependency(artifact.archive, .{}).path(""), artifact.backend };
 }
 
 /// Declares the -Dtarget, -Dbackend, and -Dlocal-build options and resolves
@@ -170,22 +184,23 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
         "Render backend. Defaults to the target's default, which the native artifact names.",
     );
 
-    const prefix: std.Build.LazyPath, const descriptor = if (local) |install| local: {
+    const prefix: std.Build.LazyPath, const backend = if (local) |install| local: {
         // A prefix serves one target, with its own backend unless one is
         // selected.
         const descriptor = install.descriptor;
-        if (!servesTarget(descriptor, target.result) or (selected_backend != null and !servesBackend(descriptor, selected_backend))) {
+        const other_backend = if (selected_backend) |selected| !std.mem.eql(u8, descriptor.backend, @tagName(selected)) else false;
+        if (!servesTarget(b, descriptor.platform, target.result) or other_backend) {
             std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
-                descriptor.artifact,
+                descriptor.name,
                 requestName(b, target.result, selected_backend),
             });
         }
-        break :local .{ .{ .cwd_relative = install.prefix }, descriptor };
+        break :local .{ .{ .cwd_relative = install.prefix }, descriptor.backend };
     } else publishedNative(b, target.result, selected_backend);
     return .{
         .prefix = prefix,
         .target = target,
-        .backend = parseRenderBackend(descriptor.renderBackend),
+        .backend = parseRenderBackend(backend),
     };
 }
 

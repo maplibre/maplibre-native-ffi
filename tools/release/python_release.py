@@ -60,7 +60,7 @@ def prepare(
         return
 
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
-    backend = descriptor["renderBackend"]
+    backend = descriptor["backend"]
     if backend not in BACKENDS:
         raise SystemExit(f"no Python runtime serves the {backend} backend")
     # The wheel embeds the native library, so it carries the notices of the

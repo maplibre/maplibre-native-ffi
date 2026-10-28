@@ -9,8 +9,7 @@ set -euo pipefail
 # against the glibc in cmake/toolchains/zig.cmake, and the host's linker
 # would bind its libm references to the build machine's glibc instead.
 install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
-  "$install_dir/share/maplibre-native-c/artifact.json")
+backend=$(jq -r .backend "$install_dir/share/maplibre-native-c/artifact.json")
 if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
   echo "No Python runtime serves the backend of $usage_preset." >&2
   exit 2

@@ -24,7 +24,7 @@ git ls-files -z --cached --others --exclude-standard -- \
   tar -c --null -T - | tar -x -C "$workspace"
 PYTHONPATH=tools/release python3 -c 'import pathlib, sys
 from native_package_release import write_artifacts
-write_artifacts(pathlib.Path(sys.argv[1]), [pathlib.Path(sys.argv[2])])' "$scratch/artifacts.json" "$archive"
+write_artifacts(pathlib.Path(sys.argv[1]), sys.argv[2], [pathlib.Path(sys.argv[3])])' "$scratch/artifacts.json" "$tag" "$archive"
 python3 tools/release/rust_release.py "$workspace" "$tag" --artifacts "$scratch/artifacts.json"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \

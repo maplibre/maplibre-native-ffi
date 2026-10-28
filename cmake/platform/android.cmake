@@ -1,14 +1,6 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic log z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
-  # The preset names the API level twice: for the NDK, and as the Zig target's
-  # version suffix.
-  string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
-  if(NOT MLN_FFI_ZIG_TARGET MATCHES "\\.${android_api_level}$")
-    message(
-      FATAL_ERROR
-        "Android preset targets API ${android_api_level}, but its Zig target is ${MLN_FFI_ZIG_TARGET}")
-  endif()
   # Both emulator architectures run the suite through the Android task runner.
   if(ANDROID_ABI MATCHES "^(x86_64|arm64-v8a)$")
     set(android_test_supported TRUE)

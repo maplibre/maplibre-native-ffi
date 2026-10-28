@@ -63,7 +63,7 @@ list(JOIN MLN_FFI_EMNAPI_EXPORTS "," MLN_FFI_EMNAPI_EXPORTS)
 # module's tables.
 file(READ "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/artifact.json"
      MLN_FFI_ARTIFACT)
-string(JSON MLN_FFI_RENDER_BACKEND GET "${MLN_FFI_ARTIFACT}" renderBackend)
+string(JSON MLN_FFI_RENDER_BACKEND GET "${MLN_FFI_ARTIFACT}" backend)
 if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
   set(MLN_FFI_GRAPHICS_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/mln_ts_webgpu.js")
   set(MLN_FFI_GRAPHICS_OBJECT mlnTsWebGpu)

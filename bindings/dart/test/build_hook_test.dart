@@ -180,6 +180,7 @@ void main() {
     /// backend, in the release [tag] and pins them in the package. An archive
     /// is pinned under [digest] when given and its own digest otherwise.
     void release(String tag, List<(String, String)> presets, {String? digest}) {
+      final platforms = <String, Map<String, Object?>>{};
       final artifacts = <Map<String, Object?>>[];
       for (final (platform, backend) in presets) {
         final root = 'maplibre-native-c-$platform-$backend';
@@ -192,13 +193,12 @@ void main() {
           );
         final bytes = GZipEncoder().encode(TarEncoder().encode(archive));
         served['/$tag/$root.tar.gz'] = bytes;
+        platforms[platform] = {'id': platform, 'defaultBackend': 'opengl'};
         artifacts.add({
+          'platform': platform,
+          'backend': backend,
           'archive': '$root.tar.gz',
           'sha256': digest ?? sha256.convert(bytes).toString(),
-          'artifact': '$platform-$backend',
-          'targetPlatform': platform,
-          'renderBackend': backend,
-          'defaultBackend': 'opengl',
         });
       }
       File.fromUri(temporary.uri.resolve('package/hook/native_release.json'))
@@ -206,9 +206,7 @@ void main() {
         ..writeAsStringSync(
           jsonEncode({
             'tag': tag,
-            // The archive-keyed map that older readers used. This hook reads
-            // only the artifacts.
-            'sha256': {'unrelated.tar.gz': '0' * 64},
+            'platforms': platforms.values.toList(),
             'artifacts': artifacts,
           }),
         );
@@ -260,9 +258,8 @@ List<File> _writePrefix(
     write(
       'share/maplibre-native-c/artifact.json',
       jsonEncode({
-        'targetPlatform': 'android-arm64',
-        'renderBackend': backend,
-        'defaultBackend': 'opengl',
+        'platform': {'id': 'android-arm64', 'defaultBackend': 'opengl'},
+        'backend': backend,
       }),
     ),
     for (final library in libraries)

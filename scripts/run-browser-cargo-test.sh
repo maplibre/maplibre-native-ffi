@@ -20,7 +20,7 @@ done
 backend_args=()
 descriptor="${MAPLIBRE_NATIVE_FFI_LOCAL_BUILD:-}/share/maplibre-native-c/artifact.json"
 if [[ -f "$descriptor" ]]; then
-  backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' "$descriptor")
+  backend=$(jq -r .backend "$descriptor")
   if [[ -n "$backend" ]]; then
     backend_args=(--render-backend "$backend")
   fi

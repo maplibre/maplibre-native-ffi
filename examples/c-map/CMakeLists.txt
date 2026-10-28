@@ -17,7 +17,7 @@ endif()
 
 file(READ "${MLN_NATIVE_INSTALL_DIR}/share/maplibre-native-c/artifact.json"
      mln_artifact_json)
-string(JSON MLN_RENDER_BACKEND GET "${mln_artifact_json}" renderBackend)
+string(JSON MLN_RENDER_BACKEND GET "${mln_artifact_json}" backend)
 
 list(PREPEND CMAKE_PREFIX_PATH "${MLN_NATIVE_INSTALL_DIR}")
 find_package(maplibre-native-c CONFIG REQUIRED)

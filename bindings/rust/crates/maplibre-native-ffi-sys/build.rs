@@ -21,9 +21,8 @@ const DEFAULT_RELEASE_URL: &str =
 const DESCRIPTOR_PATH: &str = "share/maplibre-native-c/artifact.json";
 const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 
-/// The release that a published crate downloads, with the SHA-256 digest of
-/// each archive in it. The release workflow writes this file, and git ignores
-/// it.
+/// The artifact index of the release that a published crate downloads. The
+/// release workflow writes this file, and git ignores it.
 const PIN_PATH: &str = "native_release.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -78,10 +77,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The `links` key passes these to the crates that depend on this one as
     // DEP_MAPLIBRE_NATIVE_C_PREFIX and DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND.
     println!("cargo:prefix={}", install_dir.display());
-    println!("cargo:render-backend={}", descriptor.render_backend);
+    println!("cargo:render-backend={}", descriptor.backend);
     // The archive merges in every dependency it can. What is left is the
     // platform and render backend's system libraries, which CMake records.
-    for library in &descriptor.static_link_libraries {
+    for library in &descriptor.link.libraries {
         // Rust's self-contained musl sysroot includes these interfaces in libc
         // and provides no separate alias archives for them.
         if target_env == "musl" && matches!(library.as_str(), "m" | "dl" | "pthread" | "rt") {
@@ -89,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         println!("cargo:rustc-link-lib={library}");
     }
-    for framework in &descriptor.static_link_frameworks {
+    for framework in &descriptor.link.frameworks {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
     Ok(())
@@ -143,14 +142,14 @@ fn local_prefix(
         .into());
     }
     let descriptor = read_descriptor(prefix)?;
-    if descriptor.rust_target != target
-        || backend.is_some_and(|backend| backend != descriptor.render_backend)
+    if descriptor.platform.rust_target != target
+        || backend.is_some_and(|backend| backend != descriptor.backend)
     {
         return Err(format!(
             "{LOCAL_BUILD_ENV} names an install prefix built for {} with the {} backend, which \
              cannot serve {}",
-            descriptor.rust_target,
-            descriptor.render_backend,
+            descriptor.platform.rust_target,
+            descriptor.backend,
             request(target, backend)
         )
         .into());
@@ -166,32 +165,27 @@ fn request(target: &str, backend: Option<&str>) -> String {
     }
 }
 
-/// The descriptor fields that choose an install, which a release pin's
-/// artifact index repeats for each archive.
+/// The platform that an artifact is built for, as its descriptor and a
+/// release's artifact index both describe it.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Identity {
+struct Platform {
+    id: String,
     rust_target: String,
-    render_backend: String,
     default_backend: String,
 }
 
-impl Identity {
-    /// Whether this serves `target` with the `backend` selected for it, or
-    /// without one, with the target's default backend.
-    fn serves(&self, target: &str, backend: Option<&str>) -> bool {
-        self.rust_target == target
-            && self.render_backend == backend.unwrap_or(&self.default_backend)
-    }
+#[derive(Deserialize)]
+struct ArtifactDescriptor {
+    platform: Platform,
+    backend: String,
+    link: Link,
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ArtifactDescriptor {
-    rust_target: String,
-    render_backend: String,
-    static_link_libraries: Vec<String>,
-    static_link_frameworks: Vec<String>,
+struct Link {
+    libraries: Vec<String>,
+    frameworks: Vec<String>,
 }
 
 fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> {
@@ -276,22 +270,21 @@ fn print_rerun_if_changed(path: &Path) {
 mod download {
     use super::*;
 
-    /// The pinned release, with an entry in `artifacts` for each archive. Its
-    /// legacy `sha256` map goes unread.
+    /// The pinned release's artifact index.
     #[derive(Deserialize)]
     struct Pin {
         tag: String,
+        platforms: Vec<Platform>,
         artifacts: Vec<Artifact>,
     }
 
-    /// An archive of the release, with its digest and the fields of its
-    /// artifact descriptor that choose it.
+    /// An archive of the release, with its digest.
     #[derive(Deserialize)]
     struct Artifact {
+        platform: String,
+        backend: String,
         archive: String,
         sha256: String,
-        #[serde(flatten)]
-        identity: Identity,
     }
 
     /// Downloads and unpacks the pinned release's archive for `target` and
@@ -314,10 +307,17 @@ mod download {
         println!("cargo:rerun-if-changed={}", pin_path.display());
         let pin: Pin = serde_json::from_str(&fs::read_to_string(&pin_path)?)
             .map_err(|error| format!("invalid {}: {error}", pin_path.display()))?;
-        let artifact = pin
-            .artifacts
+        let platform = pin
+            .platforms
             .iter()
-            .find(|artifact| artifact.identity.serves(target, backend))
+            .find(|platform| platform.rust_target == target);
+        let artifact = platform
+            .and_then(|platform| {
+                let backend = backend.unwrap_or(&platform.default_backend);
+                pin.artifacts.iter().find(|artifact| {
+                    artifact.platform == platform.id && artifact.backend == backend
+                })
+            })
             .ok_or_else(|| {
                 format!(
                     "{} publishes no archive for {}",

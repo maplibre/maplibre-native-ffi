@@ -23,13 +23,15 @@ case "$1" in
       exit 2
     fi
 
-    zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
-    if [[ ! "$zig_target" =~ ^((aarch64|x86_64|arm)-linux-android)\.([0-9]+)$ ]]; then
-      echo "The Android native artifact has an invalid Zig target: $zig_target" >&2
+    zig_target_triple=$(jq -r .platform.zigTarget "$descriptor")
+    if [[ ! "$zig_target_triple" =~ ^(aarch64|x86_64|arm)-linux-android$ ]]; then
+      echo "The Android native artifact has an invalid Zig target: $zig_target_triple" >&2
       exit 2
     fi
-    zig_target_triple=${BASH_REMATCH[1]}
-    zig_api_level=${BASH_REMATCH[3]}
+    if ! zig_api_level=$(jq -er .platform.android.api "$descriptor"); then
+      echo "The Android native artifact records no API level: $descriptor" >&2
+      exit 2
+    fi
     ndk_target_triple=$zig_target_triple
     if [[ "$zig_target_triple" == arm-linux-android ]]; then
       ndk_target_triple=arm-linux-androideabi

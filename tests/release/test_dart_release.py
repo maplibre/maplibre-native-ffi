@@ -11,18 +11,21 @@ CHANGELOG = """# Changelog
 
 Each version is a release of MapLibre Native FFI.
 """
-ARTIFACTS = [
-    {
-        "archive": "maplibre-native-c-android-arm64-egl.tar.gz",
-        "sha256": "aaa",
-        "targetPlatform": "android-arm64",
-    },
-    {
-        "archive": "maplibre-native-c-macos-arm64-metal.tar.gz",
-        "sha256": "bbb",
-        "targetPlatform": "macos-arm64",
-    },
-]
+INDEX = {
+    "schemaVersion": 0,
+    "tag": "v0.202610.2",
+    "version": "0.202610.2",
+    "commit": "a" * 40,
+    "platforms": [{"id": "android-arm64", "defaultBackend": "opengl"}],
+    "artifacts": [
+        {
+            "platform": "android-arm64",
+            "backend": "opengl",
+            "archive": "maplibre-native-c-android-arm64-egl.tar.gz",
+            "sha256": "aaa",
+        }
+    ],
+}
 
 
 class DartReleaseTest(unittest.TestCase):
@@ -36,18 +39,22 @@ class DartReleaseTest(unittest.TestCase):
         )
         (self.package / "CHANGELOG.md").write_text(CHANGELOG)
         self.artifacts = self.package / "maplibre-native-c-artifacts.json"
-        self.artifacts.write_text(json.dumps(ARTIFACTS))
+        self.artifacts.write_text(json.dumps(INDEX))
 
     def test_pins_the_native_archives_and_stamps_the_version(self) -> None:
         prepare(self.package, "v0.202610.2", self.artifacts)
 
         self.assertEqual(
             json.loads((self.package / "hook/native_release.json").read_text()),
-            {"tag": "v0.202610.2", "artifacts": ARTIFACTS},
+            INDEX,
         )
         self.assertIn(
             "version: 0.202610.2\n", (self.package / "pubspec.yaml").read_text()
         )
+
+    def test_refuses_the_index_of_another_release(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "names the release v0.202610.2"):
+            prepare(self.package, "v0.202610.3", self.artifacts)
 
     def test_the_changelog_names_the_version_above_earlier_ones(self) -> None:
         (self.package / "CHANGELOG.md").write_text(

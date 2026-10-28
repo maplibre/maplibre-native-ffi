@@ -16,9 +16,8 @@ const String _defines = 'hooks.user_defines.maplibre_native_ffi';
 const String _defaultReleaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
-/// The release that a published package downloads, with its artifact index:
-/// each archive's name, SHA-256 digest, and descriptor. The release workflow
-/// writes this file, and git ignores it.
+/// The artifact index of the release that a published package downloads. The
+/// release workflow writes this file, and git ignores it.
 const String _pinPath = 'hook/native_release.json';
 
 Future<void> main(List<String> arguments) async {
@@ -135,11 +134,12 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
     // directory of installs instead. Only a selected backend can conflict;
     // without one, the prefix's own backend serves.
     final descriptor = _readDescriptor(directory);
-    if (descriptor['targetPlatform'] != platform ||
-        (backend != null && descriptor['renderBackend'] != backend)) {
+    final built = _platform(descriptor);
+    if (built['id'] != platform ||
+        (backend != null && descriptor['backend'] != backend)) {
       throw StateError(
         '$_defines.local_build names an install prefix built for '
-        '${descriptor['targetPlatform']} ${descriptor['renderBackend']}, '
+        '${built['id']} ${descriptor['backend']}, '
         'which cannot serve $request.',
       );
     }
@@ -188,11 +188,13 @@ bool _serves(
   String platform,
   String? backend,
 ) {
-  final wanted = backend ?? descriptor['defaultBackend'];
-  return wanted != null &&
-      descriptor['targetPlatform'] == platform &&
-      descriptor['renderBackend'] == wanted;
+  final built = _platform(descriptor);
+  return built['id'] == platform &&
+      descriptor['backend'] == (backend ?? built['defaultBackend']);
 }
+
+Map<String, Object?> _platform(Map<String, Object?> descriptor) =>
+    descriptor['platform']! as Map<String, Object?>;
 
 Map<String, Object?> _readDescriptor(Uri prefix) =>
     jsonDecode(_descriptor(prefix).readAsStringSync()) as Map<String, Object?>;
@@ -219,10 +221,16 @@ Future<Uri> _download(
   output.dependencies.add(pinFile.absolute.uri);
   final pin = jsonDecode(pinFile.readAsStringSync()) as Map<String, Object?>;
   final tag = pin['tag']! as String;
+  final published = (pin['platforms']! as List<Object?>)
+      .cast<Map<String, Object?>>()
+      .where((entry) => entry['id'] == platform)
+      .firstOrNull;
+  final wanted = backend ?? published?['defaultBackend'];
   final entries = [
-    for (final entry
-        in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
-      if (_serves(entry, platform, backend)) entry,
+    if (published != null)
+      for (final entry
+          in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
+        if (entry['platform'] == platform && entry['backend'] == wanted) entry,
   ];
   if (entries.length != 1) {
     throw UnsupportedError(
