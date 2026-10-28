@@ -279,8 +279,9 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   // Runs when another pooled session rendered in this context since this one
   // did and left its own GL state behind. A new gl::Context needs none of it,
-  // since it starts with every state dirty. The renderbuffer binding is private, but MapLibre unbinds every
-  // renderbuffer it creates before it returns, so it is still zero.
+  // since it starts with every state dirty. The renderbuffer binding is
+  // private, but MapLibre unbinds every renderbuffer it creates before it
+  // returns, so it is still zero.
   static void forget_gl_state(mln::gl::Context& gl) {
     gl.setDirtyState();
     gl.bindFramebuffer.setDirty();
