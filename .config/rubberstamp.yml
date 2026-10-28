@@ -430,6 +430,7 @@ ci:
             files:
               - .mise/tasks/kotlin/publish
               - .mise/tasks/kotlin/verify-staging
+              - tests/distribution/kotlin/**
           then: apply
     nuget:
       covers: >-

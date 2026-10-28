@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # [MISE] description="Verify staged Kotlin Maven payloads."
 # [MISE] shell="python"
+# [MISE] tools={java="{{vars.java_version}}"}
 
 import json
+import os
 import pathlib
+import platform
+import subprocess
 import sys
 import xml.etree.ElementTree as element_tree
 import zipfile
@@ -96,6 +100,10 @@ JVM_CLASSIFIERS = {
     "natives-windows-arm64",
 }
 
+ROOT = pathlib.Path(
+    os.environ.get("MISE_MONOREPO_ROOT") or pathlib.Path(__file__).resolve().parents[3]
+)
+
 COMMON_NATIVE_LICENSES = {
     "icu.txt",
     "maplibre-native.md",
@@ -104,6 +112,10 @@ COMMON_NATIVE_LICENSES = {
 }
 
 POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
+
+
+def jvm_classifiers(backend: str) -> set[str]:
+    return {"natives-macos-arm64"} if backend == "metal" else JVM_CLASSIFIERS
 
 
 def native_licenses(backend: str, target: str) -> set[str]:
@@ -385,12 +397,9 @@ def verify_android_runtime_independence(root: pathlib.Path) -> None:
 
 def verify_jvm(root: pathlib.Path) -> None:
     for backend in RUNTIME_MODULES:
-        classifiers = (
-            {"natives-macos-arm64"} if backend == "metal" else JVM_CLASSIFIERS
-        )
         module = f"maplibre-native-ffi-runtime-{backend}-jvm"
         jars = module_files(root, module, ".jar")
-        for classifier in classifiers:
+        for classifier in jvm_classifiers(backend):
             runtime = one(
                 [path for path in jars if f"-{classifier}.jar" in path.name],
                 f"{backend} {classifier} JVM runtime JAR",
@@ -412,6 +421,59 @@ def verify_jvm(root: pathlib.Path) -> None:
                         raise SystemExit(
                             f"{runtime} is missing {license_prefix}{license_name}"
                         )
+
+
+def host_jvm_classifier() -> str:
+    system = platform.system()
+    os_name = {
+        "Darwin": "macos",
+        "FreeBSD": "freebsd",
+        "Linux": "linux" if platform.libc_ver()[0] == "glibc" else "linux-musl",
+        "Windows": "windows",
+    }.get(system)
+    arch = {
+        "aarch64": "arm64",
+        "amd64": "x64",
+        "arm64": "arm64",
+        "x86_64": "x64",
+    }.get(platform.machine().lower())
+    classifier = f"natives-{os_name}-{arch}"
+    if classifier not in JVM_CLASSIFIERS:
+        raise SystemExit(f"no JVM runtime classifier for {system}/{platform.machine()}")
+    return classifier
+
+
+def verify_jvm_consumer(root: pathlib.Path) -> None:
+    """Resolves the repository from a Gradle JVM consumer and loads the native
+    library, once for each runtime that ships the host's classifier."""
+    pom = one(
+        module_files(root, "maplibre-native-ffi", ".pom"), "maplibre-native-ffi POM"
+    )
+    version = required_pom_text(pom, element_tree.parse(pom).getroot(), "m:version")
+    classifier = host_jvm_classifier()
+    gradlew = ROOT / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    for backend in RUNTIME_MODULES:
+        if classifier not in jvm_classifiers(backend):
+            continue
+        result = subprocess.run(
+            [
+                gradlew,
+                "--quiet",
+                "--project-dir",
+                ROOT / "tests" / "distribution" / "kotlin",
+                "run",
+                f"-Pmaplibre.repository={root.resolve().as_uri()}",
+                f"-Pmaplibre.version={version}",
+                f"-Pmaplibre.backend={backend}",
+                f"-Pmaplibre.classifier={classifier}",
+            ],
+            check=False,
+        )
+        if result.returncode != 0:
+            raise SystemExit(
+                f"a Gradle JVM consumer of the {backend} runtime with {classifier} "
+                "failed to resolve the repository or load the native library"
+            )
 
 
 def verify_native(root: pathlib.Path) -> None:
@@ -463,6 +525,7 @@ def main() -> int:
     verify_android(root)
     verify_android_runtime_independence(root)
     verify_jvm(root)
+    verify_jvm_consumer(root)
     verify_native(root)
     return 0
 
