@@ -20,7 +20,8 @@ public sealed record GraphicsDeviceOptions
 
     /// <summary>
     /// Renders every texture session of the device in one graphics context, one
-    /// session at a time, instead of in a context of each session's own.
+    /// session at a time, instead of in a context of each session's own. Absent
+    /// selects false.
     /// </summary>
-    public bool SingleContext { get; init; }
+    public bool? SingleContext { get; init; }
 }

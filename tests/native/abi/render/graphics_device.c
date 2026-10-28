@@ -303,6 +303,7 @@ static void sessions_take_turns_on_a_single_context_device(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)
   };
+  options.fields = MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
   options.single_context = true;
   mln_graphics_device device = MLN_HANDLE_NULL;
   MLN_TEST_OK(
@@ -335,6 +336,7 @@ static void create_rejects_a_single_context(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)
   };
+  options.fields = MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
   options.single_context = true;
   mln_graphics_device device = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(

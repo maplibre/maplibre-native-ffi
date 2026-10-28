@@ -1223,8 +1223,9 @@ pub struct GraphicsDeviceOptions {
     /// default adapter.
     pub adapter_index: Option<u32>,
     /// Renders every texture session of the device in one graphics context, one
-    /// session at a time, instead of in a context of each session's own.
-    pub single_context: bool,
+    /// session at a time, instead of in a context of each session's own. Absent
+    /// selects false.
+    pub single_context: Option<bool>,
 }
 impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_graphics_device_options> {
@@ -1235,7 +1236,10 @@ impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
             raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
             raw.adapter_index = *item;
         }
-        raw.single_context = self.single_context;
+        if let Some(item) = &self.single_context {
+            raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
+            raw.single_context = *item;
+        }
         Ok(raw)
     }
 }

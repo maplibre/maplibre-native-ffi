@@ -1736,6 +1736,7 @@ const MLN_GPU_SYNC_OPEN_GL_FENCE = 1;
 
 // mln_graphics_device_option_field
 const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1;
+const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT = 2;
 
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;

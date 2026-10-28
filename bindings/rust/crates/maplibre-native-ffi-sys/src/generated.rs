@@ -102,6 +102,7 @@ pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
 pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
 pub type mln_graphics_device_option_field = u32;
 pub const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX: mln_graphics_device_option_field = 1;
+pub const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT: mln_graphics_device_option_field = 2;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;

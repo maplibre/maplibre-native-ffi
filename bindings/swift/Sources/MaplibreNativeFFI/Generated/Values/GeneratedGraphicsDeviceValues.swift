@@ -13,9 +13,10 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
   /// adapter.
   public var adapterIndex: UInt32?
   /// Renders every texture session of the device in one graphics context, one
-  /// session at a time, instead of in a context of each session's own.
-  public var singleContext: Bool
-  public init(adapterIndex: UInt32? = nil, singleContext: Bool = false) {
+  /// session at a time, instead of in a context of each session's own. Absent
+  /// selects false.
+  public var singleContext: Bool?
+  public init(adapterIndex: UInt32? = nil, singleContext: Bool? = nil) {
     self.adapterIndex = adapterIndex
     self.singleContext = singleContext
   }
@@ -23,7 +24,8 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
   init(raw: mln_graphics_device_options) {
     adapterIndex = raw.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
       .rawValue != 0 ? raw.adapter_index : nil
-    singleContext = raw.single_context
+    singleContext = raw.fields & MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT
+      .rawValue != 0 ? raw.single_context : nil
   }
 
   func nativeValue() -> mln_graphics_device_options {
@@ -34,7 +36,10 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX.rawValue; raw
         .adapter_index = item
     }
-    raw.single_context = singleContext
+    if let item = singleContext {
+      raw.fields |= MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT.rawValue; raw
+        .single_context = item
+    }
     return raw
   }
 }

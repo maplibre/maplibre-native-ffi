@@ -3803,6 +3803,7 @@ bool mln_ts_write_graphics_device_options(
       if (!mln_ts_read_bool(call, member, &flag, child)) return false;
       out->single_context = flag;
     }
+    out->fields |= MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
   }
   return true;
 }

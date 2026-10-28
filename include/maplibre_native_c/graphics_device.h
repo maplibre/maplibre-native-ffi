@@ -23,6 +23,8 @@ typedef enum MLN_BINDING(
 ) mln_graphics_device_option_field : uint32_t {
   /** adapter_index is set. */
   MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1U << 0U,
+  /** single_context is set. */
+  MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT = 1U << 1U,
 } mln_graphics_device_option_field;
 
 /** A set of mln_graphics_device_option_field bits. */
@@ -50,7 +52,8 @@ typedef struct mln_graphics_device_options {
     MLN_BINDING("mask=fields;bit=MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX");
   /**
    * Renders every texture session of the device in one graphics context, one
-   * session at a time, instead of in a context of each session's own.
+   * session at a time, instead of in a context of each session's own. Absent
+   * selects false.
    *
    * This saves the memory of a context per session. The sessions of such a
    * device never render at the same time, so a host that renders on several
@@ -60,7 +63,8 @@ typedef struct mln_graphics_device_options {
    * the device's one device and queue regardless, so those backends ignore
    * this. WGL does not support it.
    */
-  bool single_context;
+  bool single_context
+    MLN_BINDING("mask=fields;bit=MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT");
 } mln_graphics_device_options;
 
 /** Attachment options for a graphics device texture target. */

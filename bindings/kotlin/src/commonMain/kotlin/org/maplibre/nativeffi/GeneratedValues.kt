@@ -2016,9 +2016,9 @@ public data class GraphicsDeviceOptions(
   public val adapterIndex: UInt? = null,
   /**
    * Renders every texture session of the device in one graphics context, one session at a time,
-   * instead of in a context of each session's own.
+   * instead of in a context of each session's own. Absent selects false.
    */
-  public val singleContext: Boolean = false,
+  public val singleContext: Boolean? = null,
 )
 
 /**

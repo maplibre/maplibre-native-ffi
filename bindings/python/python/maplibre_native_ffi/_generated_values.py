@@ -1505,9 +1505,10 @@ class GraphicsDeviceOptions:
     default adapter.
     """
 
-    single_context: bool = False
+    single_context: bool | None = None
     """Renders every texture session of the device in one graphics context, one
-    session at a time, instead of in a context of each session's own.
+    session at a time, instead of in a context of each session's own. Absent
+    selects false.
     """
 
     @classmethod

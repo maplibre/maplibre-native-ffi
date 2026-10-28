@@ -647,7 +647,8 @@ export interface GraphicsDeviceOptions {
   adapterIndex?: number;
   /**
    * Renders every texture session of the device in one graphics context, one
-   * session at a time, instead of in a context of each session's own.
+   * session at a time, instead of in a context of each session's own. Absent
+   * selects false.
    */
   singleContext?: boolean;
 }

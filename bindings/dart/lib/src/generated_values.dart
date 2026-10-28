@@ -2006,7 +2006,7 @@ final class GeoJsonSourceOptions extends _Value {
 /// See `mln_graphics_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
 final class GraphicsDeviceOptions extends _Value {
-  const GraphicsDeviceOptions({this.adapterIndex, this.singleContext = false});
+  const GraphicsDeviceOptions({this.adapterIndex, this.singleContext});
 
   /// The adapter to create the device on, as a position in the graphics API's
   /// own list of adapters, from zero. Without it, the backend picks its default
@@ -2014,8 +2014,9 @@ final class GraphicsDeviceOptions extends _Value {
   final int? adapterIndex;
 
   /// Renders every texture session of the device in one graphics context, one
-  /// session at a time, instead of in a context of each session's own.
-  final bool singleContext;
+  /// session at a time, instead of in a context of each session's own. Absent
+  /// selects false.
+  final bool? singleContext;
 
   /// A copy of this value with the given members replaced.
   GraphicsDeviceOptions copyWith({int? adapterIndex, bool? singleContext}) =>

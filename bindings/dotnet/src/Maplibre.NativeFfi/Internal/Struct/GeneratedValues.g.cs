@@ -619,7 +619,12 @@ internal static unsafe class GeneratedValues
             ref native.adapter_index,
             MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
         );
-        native.single_context = (byte)(value.SingleContext ? 1 : 0);
+        native.fields |= Put(
+            value.SingleContext,
+            ref native.single_context,
+            MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT,
+            static present => (byte)(present ? 1 : 0)
+        );
         return native;
     }
 

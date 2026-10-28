@@ -73,7 +73,10 @@ internal fun NativeArena.putGraphicsDeviceOptions(target: Long, value: GraphicsD
     fields = fields or 1u
     writeU32(target + 8, it)
   }
-  writeBool(target + 12, value.singleContext)
+  value.singleContext?.let {
+    fields = fields or 2u
+    writeBool(target + 12, it)
+  }
   writeU32(target + 4, fields)
 }
 

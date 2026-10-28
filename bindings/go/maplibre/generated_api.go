@@ -2341,8 +2341,9 @@ type GraphicsDeviceOptions struct {
 	// adapter.
 	AdapterIndex *uint32
 	// Renders every texture session of the device in one graphics context, one
-	// session at a time, instead of in a context of each session's own.
-	SingleContext bool
+	// session at a time, instead of in a context of each session's own. Absent
+	// selects false.
+	SingleContext *bool
 }
 
 func nativeGraphicsDeviceOptions(input GraphicsDeviceOptions, arena *bindingArena) C.mln_graphics_device_options {
@@ -2350,7 +2351,7 @@ func nativeGraphicsDeviceOptions(input GraphicsDeviceOptions, arena *bindingAren
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
-	raw.single_context = C.bool(input.SingleContext)
+	bindingMasked(&raw.fields, C.MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, input.SingleContext, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
