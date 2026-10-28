@@ -197,7 +197,7 @@ link = "https://gitcode.com/openharmony-sig/flutter_flutter"
 bindings = ["kotlin-native"]
 platforms = ["ohos"]
 status = "path-known"
-reason = "Community forks of Kotlin/Native add an `ohosArm64` target. Build the KLIB with one, and run the suite on an arm64 device."
+reason = "Community forks of Kotlin/Native add an arm64 OpenHarmony target. Build the KLIB with one, and run the suite on an arm64 device."
 link = "https://github.com/zxystd/Kotlin-OHOS"
 
 [[entry]]
