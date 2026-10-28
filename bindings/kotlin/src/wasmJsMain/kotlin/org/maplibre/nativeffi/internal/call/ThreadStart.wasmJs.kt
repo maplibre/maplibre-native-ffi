@@ -14,7 +14,7 @@ import org.maplibre.nativeffi.internal.status.checkStatus
  * start: a thread starts only after the page yields.
  *
  * [run] stages a thread start that the generated wrapper copies the call's arguments into, and
- * suspends until the wake shim posts the call's status. The wait does not cancel, because the call
+ * suspends until the page shim posts the call's status. The wait does not cancel, because the call
  * writes to memory that the caller's arena holds until the call returns.
  */
 internal actual object ThreadStart {

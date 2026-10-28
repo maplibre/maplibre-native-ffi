@@ -173,16 +173,13 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
   }
   writeU32(target + 4, fields)
   writeAddress(target + w(16, 24), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(64, 80), queue)
-  else {
-    writeAddress(target + 8, UpcallStubs.customGeometrySourceOptionsFetchTile)
-    writeAddress(
-      target + w(12, 16),
-      if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
-    )
-    writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + 8, UpcallStubs.customGeometrySourceOptionsFetchTile)
+  writeAddress(
+    target + w(12, 16),
+    if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
+  )
+  writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
+  writeI64(target + w(64, 80), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
@@ -204,16 +201,13 @@ internal fun NativeCall.putCustomVectorSourceOptions(
   }
   writeU32(target + 4, fields)
   writeAddress(target + w(16, 24), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(48, 56), queue)
-  else {
-    writeAddress(target + 8, UpcallStubs.customVectorSourceOptionsFetchTile)
-    writeAddress(
-      target + w(12, 16),
-      if (value.cancelTile == null) 0L else UpcallStubs.customVectorSourceOptionsCancelTile,
-    )
-    writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + 8, UpcallStubs.customVectorSourceOptionsFetchTile)
+  writeAddress(
+    target + w(12, 16),
+    if (value.cancelTile == null) 0L else UpcallStubs.customVectorSourceOptionsCancelTile,
+  )
+  writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
+  writeI64(target + w(48, 56), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeCustomVectorSourceOptions(value: CustomVectorSourceOptions): Long =
@@ -887,12 +881,9 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 ) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(16, 32), queue)
-  else {
-    writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
-    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 32), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeResourceRequestCancelHandler(
@@ -937,12 +928,9 @@ internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefini
 internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEventHandler) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(16, 32), queue)
-  else {
-    writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
-    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 32), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
@@ -956,12 +944,9 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(16, 32), queue)
-  else {
-    writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
-    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 32), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
@@ -970,12 +955,9 @@ internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(16, 32), queue)
-  else {
-    writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
-    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 32), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
@@ -1377,6 +1359,7 @@ internal fun NativeCall.putWake(target: Long, value: Wake) {
   writeAddress(target + w(4, 8), registrations.register(value))
   writeAddress(target, UpcallStubs.wakeCallback)
   writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 24), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeWake(value: Wake): Long =
@@ -1748,12 +1731,9 @@ internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long =
 internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
   if (value.callback == null) return
   writeAddress(target + w(4, 8), registrations.register(value))
-  val queue = HostDelivery.queue
-  if (queue != 0L) writeI64(target + w(16, 24), queue)
-  else {
-    writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
-    writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
-  }
+  writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
+  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 24), HostDelivery.queue)
 }
 
 internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =

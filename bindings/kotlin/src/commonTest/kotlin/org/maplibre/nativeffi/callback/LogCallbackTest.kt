@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setTestLogCallback
 import org.maplibre.nativeffi.withMap
 
-/** The process-global log callback. This is the only test that sets it. */
+/** The process-global log callback. */
 class LogCallbackTest {
   @Test
   fun replacingTheLogCallbackReleasesThePreviousRegistration() = runSuspendTest {

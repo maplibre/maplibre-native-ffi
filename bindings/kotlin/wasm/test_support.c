@@ -1,8 +1,8 @@
 // Fixtures of the Kotlin/Wasm suite, which only the test module links.
 //
-// Each fixture calls the C functions behind a wake registration that Kotlin
-// wrote, as native would, from the page or from a thread of its own, so a test
-// can watch what the binding's wake shim delivers.
+// Each fixture plays native for a test: it calls the C functions that Kotlin
+// wrote into a descriptor, or makes native queue a call for the page, from the
+// page or from a thread of its own.
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 #include <emscripten/proxying.h>
@@ -24,16 +24,37 @@ static int start_detached(void* (*run)(void*), void* argument) {
   return result;
 }
 
-/** Calls [wake]'s callback on the calling thread. */
-EMSCRIPTEN_KEEPALIVE void mln_kw_test_wake(const mln_wake* wake) {
-  wake->callback(wake->user_data);
+/** Calls [callback] with [user_data] and [result] on the calling thread. */
+EMSCRIPTEN_KEEPALIVE void mln_kw_test_call_completion(
+  mln_completion_callback callback, void* user_data,
+  const mln_completion_result* result
+) {
+  callback(user_data, result);
 }
 
-/** Releases [wake]'s user_data on the calling thread, as native's final call.
- */
-EMSCRIPTEN_KEEPALIVE void mln_kw_test_release(const mln_wake* wake) {
-  wake->release_user_data(wake->user_data);
+/** Calls [release] with [user_data] on the calling thread. */
+EMSCRIPTEN_KEEPALIVE void mln_kw_test_call_release(
+  mln_user_data_release release, void* user_data
+) {
+  release(user_data);
 }
+
+// From binding_support.h, which the install prefix does not ship. The archive
+// exports both.
+void* mln_binding_owner_token_create(uint64_t handle);
+void mln_binding_owner_finalize(void* token);
+
+/**
+ * Emits an error log record on the calling thread. Native finalizes an owner
+ * token for the null handle, whose disposal fails, and logs the failure as an
+ * error, which reaches the log callback on the thread that emits it.
+ */
+static void log_error(void) {
+  mln_binding_owner_finalize(mln_binding_owner_token_create(0));
+}
+
+/** Emits an error log record on the page. */
+EMSCRIPTEN_KEEPALIVE void mln_kw_test_log_error(void) { log_error(); }
 
 // ---------------------------------------------------------------------------
 // Contention probe
@@ -41,22 +62,19 @@ EMSCRIPTEN_KEEPALIVE void mln_kw_test_release(const mln_wake* wake) {
 // A holder thread takes a mutex, and the page then calls an export that
 // contends it. The page waits for the mutex in a futex spin, which runs the
 // system proxying queue, so a task that the holder posts to that queue runs
-// inside the export and proves that the export spun. The holder wakes a
-// registration during the spin, and releases both registrations and then the
-// mutex once the probe task ran. The holder gives up each wait after its
-// deadline and still releases everything, so a page that never spins makes the
-// export return 0 rather than block the page forever.
+// inside the export and proves that the export spun. The holder emits a log
+// record during the spin, and releases the mutex once the probe task ran. The
+// holder gives up each wait after its deadline and still releases the mutex,
+// so a page that never spins makes the export return 0 rather than block the
+// page forever.
 
 static pthread_mutex_t contended = PTHREAD_MUTEX_INITIALIZER;
+// Set by the holder once it holds the mutex.
+static volatile uint32_t holding;
 // Set by the page just before it contends the mutex, and cleared after.
 static volatile uint32_t contending;
 // Set by the system-queue task that runs while the page contends.
 static volatile uint32_t spun;
-
-typedef struct holder {
-  mln_wake held;
-  mln_wake during;
-} holder;
 
 static void note_spin(void* unused) {
   (void)unused;
@@ -73,7 +91,7 @@ static void wait_until_set(volatile uint32_t* flag) {
 }
 
 // How long the holder waits for the page to contend, which is longer than the
-// test's wait for the held wake, and then for the probe task.
+// test's wait for the holder, and then for the probe task.
 #define CONTEND_WAIT_MS 30000.0
 #define SPIN_WAIT_MS 2000.0
 
@@ -90,12 +108,13 @@ static int wait_until_set_within(volatile uint32_t* flag, double ms) {
   return 1;
 }
 
-static void* hold(void* argument) {
-  holder* wakes = argument;
+static void* hold(void* unused) {
+  (void)unused;
   pthread_mutex_lock(&contended);
-  wakes->held.callback(wakes->held.user_data);
+  __atomic_store_n(&holding, 1, __ATOMIC_SEQ_CST);
+  emscripten_futex_wake(&holding, 1);
   if (wait_until_set_within(&contending, CONTEND_WAIT_MS)) {
-    wakes->during.callback(wakes->during.user_data);
+    log_error();
     emscripten_proxy_async(
       emscripten_proxy_get_system_queue(), emscripten_main_runtime_thread_id(),
       note_spin, NULL
@@ -104,42 +123,29 @@ static void* hold(void* argument) {
     // contending, so it leaves spun at 0.
     wait_until_set_within(&spun, SPIN_WAIT_MS);
   }
-  // Release both wakes before the mutex, so their releases are posted before
-  // the page's contended call returns and before any wake the page posts next.
-  wakes->held.release_user_data(wakes->held.user_data);
-  wakes->during.release_user_data(wakes->during.user_data);
-  free(wakes);
   pthread_mutex_unlock(&contended);
   return NULL;
 }
 
 /**
- * Starts the holder thread, which takes the mutex and then wakes [held].
- * Once the page contends the mutex, the holder wakes [during], and it
- * releases both wakes before it releases the mutex. Returns 0 when the thread
- * started.
+ * Starts the holder thread on a Worker of the pool and waits until it takes
+ * the mutex. Once the page contends the mutex, the holder emits a log record
+ * and then releases the mutex. Returns 0 when the holder took the mutex.
  */
-EMSCRIPTEN_KEEPALIVE int32_t
-mln_kw_test_contention_hold(const mln_wake* held, const mln_wake* during) {
-  holder* wakes = malloc(sizeof *wakes);
-  if (wakes == NULL) {
-    return -1;
-  }
-  *wakes = (holder){.held = *held, .during = *during};
+EMSCRIPTEN_KEEPALIVE int32_t mln_kw_test_contention_hold(void) {
+  __atomic_store_n(&holding, 0, __ATOMIC_SEQ_CST);
   __atomic_store_n(&contending, 0, __ATOMIC_SEQ_CST);
   __atomic_store_n(&spun, 0, __ATOMIC_SEQ_CST);
-  int result = start_detached(hold, wakes);
-  if (result != 0) {
-    free(wakes);
+  if (start_detached(hold, NULL) != 0) {
+    return -1;
   }
-  return result;
+  return wait_until_set_within(&holding, CONTEND_WAIT_MS) ? 0 : -1;
 }
 
 /**
  * Contends the holder's mutex from the page, and returns whether the probe
- * task ran inside this call, so the call spun. Call it after the holder has
- * woken its held registration. Returns 0 when the holder gave up waiting for
- * the probe task.
+ * task ran inside this call, so the call spun. Call it once the holder holds
+ * the mutex. Returns 0 when the holder gave up waiting for the probe task.
  */
 EMSCRIPTEN_KEEPALIVE int32_t mln_kw_test_contention_contend(void) {
   __atomic_store_n(&contending, 1, __ATOMIC_SEQ_CST);

@@ -248,7 +248,7 @@
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/GeneratedWasmCallbacks.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/GeneratedWasmJsOperations.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",
-    "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/Deliveries.kt",
+    "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/DispatchedUpcalls.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt",
     "bindings/kotlin/wasm/mln_kw_exports.txt",

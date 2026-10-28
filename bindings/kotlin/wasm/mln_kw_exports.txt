@@ -197,3 +197,4 @@ _mln_kw_mln_style_expression_evaluate
 _mln_kw_mln_style_expression_get_info
 _mln_kw_mln_style_expression_release
 _mln_kw_mln_supported_render_backend_mask
+_mln_kw_upcall_function

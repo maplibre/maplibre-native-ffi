@@ -1,15 +1,36 @@
-// The JavaScript import of the Kotlin/Wasm binding's wake shim. See
+// The JavaScript imports of the Kotlin/Wasm binding's page shim. See
 // mln_kw_runtime.c.
+//
+// Each runs on the page and calls a function that Maplibre.loadModule
+// installs before it makes any call that wakes. Kotlin contains each
+// callback's failure, and the page reports anything else that escapes. An
+// exception that unwound a page task would leave the page queue marked as
+// running, which stops every later wake, and one that unwound a dispatch would
+// leave the delivery queue busy.
 addToLibrary({
-  // Runs on the page, from a task of the shim's page queue, once for each
-  // wake. Kotlin installs the function before it makes any call that wakes.
-  //
-  // Kotlin contains each callback's failure, and the page reports anything
-  // else that escapes. An exception that unwound the task would leave the page
-  // queue marked as running, which stops every later wake.
-  mln_kw_js_deliver: (kind, token, status) => {
+  // Once for each wake of the delivery queue, from a task of the page queue.
+  mln_kw_js_dispatch: () => {
     try {
-      Module["mlnKwDeliver"](kind, token, status);
+      Module["mlnKwDispatch"]();
+    } catch (error) {
+      globalThis.reportError(error);
+    }
+  },
+
+  // Once for each call that ran on a thread of its own, from a task of the
+  // page queue.
+  mln_kw_js_thread_end: (token, status) => {
+    try {
+      Module["mlnKwThreadEnd"](token, status);
+    } catch (error) {
+      globalThis.reportError(error);
+    }
+  },
+
+  // Once for each call that the delivery queue's dispatch runs.
+  mln_kw_js_upcall: (site, args) => {
+    try {
+      Module["mlnKwUpcall"](site, args);
     } catch (error) {
       globalThis.reportError(error);
     }

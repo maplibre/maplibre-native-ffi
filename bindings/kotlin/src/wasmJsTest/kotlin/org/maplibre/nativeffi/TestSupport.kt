@@ -3,25 +3,26 @@
 package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.internal.c.word
-import org.maplibre.nativeffi.internal.call.NativeCall
-import org.maplibre.nativeffi.internal.callback.CallbackOwner
 
 /** The fixtures of `bindings/kotlin/wasm/test_support.c`, which the test module exports. */
 internal object TestSupport {
-  /** Calls the callback of the `mln_wake` at [wake] on the page. */
-  fun wake(wake: Long) = mln_kw_test_wake(word(wake))
+  /** Calls the `mln_completion_callback` at [callback] on the page. */
+  fun callCompletion(callback: Long, userData: Long, result: Long) =
+    mln_kw_test_call_completion(word(callback), word(userData), word(result))
 
-  /** Releases the `mln_wake` at [wake] on the page, as native's final call. */
-  fun release(wake: Long) = mln_kw_test_release(word(wake))
+  /** Calls the `mln_user_data_release` at [release] on the page. */
+  fun callRelease(release: Long, userData: Long) =
+    mln_kw_test_call_release(word(release), word(userData))
+
+  /** Makes native emit an error log record on the page. */
+  fun logError() = mln_kw_test_log_error()
 
   /**
-   * Starts a thread that holds a mutex and wakes [held], then wakes [during] once the page contends
-   * the mutex in [contend].
+   * Starts a thread that holds a mutex, and once the page contends the mutex in [contend], emits an
+   * error log record before it lets go. Returns once the thread holds the mutex.
    */
-  fun holdContention(held: Long, during: Long) {
-    check(mln_kw_test_contention_hold(word(held), word(during)) == 0) {
-      "the holder thread did not start"
-    }
+  fun holdContention() {
+    check(mln_kw_test_contention_hold() == 0) { "the holder thread did not take the mutex" }
   }
 
   /** Contends the holder's mutex, and returns whether the call spun until the holder let go. */
@@ -46,28 +47,21 @@ internal object TestSupport {
     }
 }
 
-/**
- * A wake registration that a fixture calls in native's place, rooted in [owner] until its release
- * reaches Kotlin. [close] frees the descriptor at [address].
- */
-internal class TestWake(callback: () -> Unit) : AutoCloseable {
-  private val call = NativeCall(0L)
-  val owner = CallbackOwner()
-  val address: Long = call.writeWake(Wake { callback() }).also { call.accept(owner) }
-
-  override fun close() = call.close()
-}
-
-private fun mln_kw_test_wake(wake: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_wake(wake)")
-
-private fun mln_kw_test_release(wake: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_release(wake)")
-
-private fun mln_kw_test_contention_hold(held: Int, during: Int): Int =
+private fun mln_kw_test_call_completion(callback: Int, userData: Int, result: Int): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_contention_hold(held, during)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_call_completion(callback, userData, result)",
   )
+
+private fun mln_kw_test_call_release(release: Int, userData: Int): Unit =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_call_release(release, userData)",
+  )
+
+private fun mln_kw_test_log_error(): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_log_error()")
+
+private fun mln_kw_test_contention_hold(): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_contention_hold()")
 
 private fun mln_kw_test_contention_contend(): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_test_contention_contend()")

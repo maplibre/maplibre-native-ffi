@@ -3852,7 +3852,7 @@ public data class CustomGeometrySourceOptions(
  * Requests one tile of a custom geometry or custom vector source.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -3867,7 +3867,7 @@ public fun interface CustomSourceFetchTileCallback {
  * Cancels a request for one tile of a custom geometry or custom vector source, best effort.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -3909,7 +3909,7 @@ public data class CameraTransitionHandler(
  * Receives the end of one camera command's transitions.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -3947,7 +3947,7 @@ internal constructor(
  * Schedules service by the receiver that owns a queue or driver.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -4020,7 +4020,7 @@ public data class ResourceRequestCancelHandler(
  * Reports that MapLibre cancelled a C API resource provider request.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -4047,7 +4047,7 @@ public data class RuntimeEventHandler(
  * Receives selected events after their snapshots have been published.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -4075,7 +4075,7 @@ public data class ResourceProvider(
  * Intercepts a network resource request.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -4101,7 +4101,7 @@ public data class ResourceTransform(
  * Asks the host for the URL of one network resource request.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *

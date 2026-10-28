@@ -6,8 +6,8 @@ import org.maplibre.nativeffi.internal.callback.upcall
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * The Kotlin side of each Kotlin/Wasm form's delivery, which the page runs as it drains the
- * delivery.
+ * The Kotlin side of each Kotlin/Wasm form's C function pointer, which the page runs as it
+ * dispatches the binding's delivery queue.
  */
 internal object WasmUpcalls {
   fun queuedLogHandlerCallback(

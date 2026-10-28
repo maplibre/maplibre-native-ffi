@@ -34,6 +34,6 @@ internal expect fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
 /**
  * Waits until native's releases and deliveries so far have reached Kotlin. A threaded target runs
  * each one inside native's call, so this returns at once. On wasm, native queues each one, and the
- * page drains them in order on later tasks.
+ * page dispatches them in order on later tasks.
  */
 internal expect suspend fun awaitDeliveries()

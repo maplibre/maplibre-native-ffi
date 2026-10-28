@@ -248,7 +248,7 @@
 /kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/GeneratedWasmCallbacks.kt linguist-generated=true
 /kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/GeneratedWasmJsOperations.kt linguist-generated=true
 /kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
-/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/Deliveries.kt linguist-generated=true
+/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/DispatchedUpcalls.kt linguist-generated=true
 /kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
 /kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt linguist-generated=true
 /kotlin/wasm/mln_kw_exports.txt linguist-generated=true

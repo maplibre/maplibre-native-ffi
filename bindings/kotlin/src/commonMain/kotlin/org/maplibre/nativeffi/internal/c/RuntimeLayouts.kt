@@ -42,21 +42,3 @@ internal object RenderAbandonResultLayout {
   val QUARANTINED_RESOURCE_COUNT: Int = 8
   val RESERVED: Int = 12
 }
-
-internal object DeliveryLayout {
-  val SIZEOF: Int = w(64, 80)
-  val ALIGNOF: Int = 8
-  val TYPE: Int = 0
-  val RESERVED: Int = 4
-  val USER_DATA: Int = 8
-  val PAYLOAD: Int = 16
-}
-
-internal object DeliveryBatchViewLayout {
-  val SIZEOF: Int = w(16, 24)
-  val ALIGNOF: Int = w(4, 8)
-  val SIZE: Int = 0
-  val DELIVERY_SIZE: Int = 4
-  val DELIVERIES: Int = 8
-  val DELIVERY_COUNT: Int = w(12, 16)
-}

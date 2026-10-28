@@ -25,11 +25,11 @@ import org.maplibre.nativeffi.internal.memory.writeU32
  * Bridges one native completion into an eager Kotlin [Deferred].
  *
  * Each submission builds an `mln_completion` whose `user_data` roots its state until native
- * releases it, or on a target with a [HostDelivery] queue, until the page delivers the result. A
- * conversion reads the `mln_completion_result` at the address it receives, which stays valid only
- * while the conversion runs. Each submission call throws the mapped status error when native
- * rejects it synchronously. A result with a status other than OK, including a failed or cancelled
- * command, completes the [Deferred] exceptionally with [MaplibreException].
+ * releases it. On a target with a [HostDelivery] queue, the page runs both calls as it dispatches
+ * the queue. A conversion reads the `mln_completion_result` at the address it receives, which stays
+ * valid only while the conversion runs. Each submission call throws the mapped status error when
+ * native rejects it synchronously. A result with a status other than OK, including a failed or
+ * cancelled command, completes the [Deferred] exceptionally with [MaplibreException].
  */
 internal object CompletionBridge {
   private class State<T>(private val convert: (Long) -> T) {
@@ -62,14 +62,9 @@ internal object CompletionBridge {
       val completion = arena.allocate(CompletionLayout.SIZEOF)
       writeU32(completion + CompletionLayout.SIZE, CompletionLayout.SIZEOF.toUInt())
       writeAddress(completion + CompletionLayout.USER_DATA, token)
-      val queue = HostDelivery.queue
-      if (queue != 0L) {
-        // The page drains the result into [complete] and then [release].
-        writeI64(completion + CompletionLayout.QUEUE, queue)
-      } else {
-        writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
-        writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
-      }
+      writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
+      writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
+      writeI64(completion + CompletionLayout.QUEUE, HostDelivery.queue)
       call(completion)
     } catch (failure: Throwable) {
       // A throw from [call] means native rejected the submission, which then never takes the

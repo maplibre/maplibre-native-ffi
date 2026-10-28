@@ -10,6 +10,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.await
 import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.DispatchedUpcalls
+import org.maplibre.nativeffi.internal.c.unsignedWord
+import org.maplibre.nativeffi.internal.call.ThreadStart
+import org.maplibre.nativeffi.internal.callback.contain
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /**
@@ -54,7 +58,14 @@ internal object ModuleLoader {
   private suspend fun loadOnce(url: String, poolSize: Int?) {
     try {
       val module = instantiate(url, poolSize ?: 0).await<JsAny>()
-      install(module) { kind, token, status -> HostDelivery.deliver(kind, token, status) }
+      install(
+        module,
+        dispatch = { HostDelivery.wake() },
+        threadEnd = { token, status ->
+          contain("mln_wake_callback", Unit) { ThreadStart.deliver(token.toLong(), status) }
+        },
+        upcall = { site, arguments -> DispatchedUpcalls.run(site, unsignedWord(arguments)) },
+      )
       checkAbiVersion(C.mln_c_version().toUInt().toLong())
       HostDelivery.install()
       loaded = true
@@ -97,11 +108,18 @@ private fun instantiate(url: String, poolSize: Int): Promise<JsAny> =
   js("import(/* webpackIgnore: true */ url).then((m) => m.default({ mlnPoolSize: poolSize }))")
 
 // Scalars go through one DataView over the module's fixed heap, which never grows.
-private fun install(module: JsAny, deliver: (Int, Int, Int) -> Unit): Unit =
+private fun install(
+  module: JsAny,
+  dispatch: () -> Unit,
+  threadEnd: (Int, Int) -> Unit,
+  upcall: (Int, Int) -> Unit,
+): Unit =
   js(
     """{
       module.mlnKwView = new DataView(module.HEAPU8.buffer);
-      module.mlnKwDeliver = deliver;
+      module.mlnKwDispatch = dispatch;
+      module.mlnKwThreadEnd = threadEnd;
+      module.mlnKwUpcall = upcall;
       globalThis[Symbol.for('org.maplibre.nativeffi.c')] = module;
     }""",
   )

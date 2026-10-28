@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
@@ -26,7 +27,7 @@ public data class QueuedLogHandler(
  * Receives a MapLibre Native log record. The page receives the call after native has answered it,
  * so the callback returns nothing, and native answers `true` as it does for a queue.
  *
- * The page calls it when it drains the binding's delivery queue.
+ * The page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -53,6 +54,8 @@ public data class HttpHeaderTransformRules(
 internal fun NativeCall.putQueuedLogHandler(target: Long, value: QueuedLogHandler) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.queuedLogHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
 

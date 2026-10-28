@@ -2,7 +2,6 @@
 
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestResult
@@ -71,22 +70,14 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
   return { restoreReportError(previous) }
 }
 
-// Native consumes each record and queues it, and the page runs the callback as it drains.
+// Native consumes each record and queues it, and the page runs the callback as it dispatches.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
 }
 
-// The page drains what native has queued so far, then waits for a marker wake that the shim posts
-// behind every wake and release posted before it.
+// The page runs what native has queued so far, as the queue's next wake would.
 internal actual suspend fun awaitDeliveries() {
-  HostDelivery.drainForTesting()
-  val delivered = CompletableDeferred<Unit>()
-  TestWake { delivered.complete(Unit) }
-    .use { marker ->
-      TestSupport.wake(marker.address)
-      TestSupport.release(marker.address)
-      delivered.awaitWithin("the wakes that native posted before")
-    }
+  HostDelivery.dispatch()
 }
 
 private fun replaceReportError(sink: (JsReference<Throwable>) -> Boolean): JsAny =

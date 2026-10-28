@@ -5,64 +5,78 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.LogSeverity
+import org.maplibre.nativeffi.QueuedLogHandler
 import org.maplibre.nativeffi.TestSupport
-import org.maplibre.nativeffi.TestWake
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.clearLogCallback
+import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.setLogCallback
 
 /**
- * The browser module's wake shim, which carries each wake and its release to the page. The fixtures
- * in test_support.c call a wake registration's C functions as native would, from a thread of their
- * own or from the page.
+ * The browser module's page shim, which wakes the page to dispatch the binding's delivery queue.
+ * The fixtures in test_support.c make native queue a log record, from the page or from a thread of
+ * their own.
  */
 class DeliveryTest {
   @Test
-  fun eachWakeRunsOnALaterPageTaskBeforeItsRelease() = runSuspendTest {
+  fun aQueuedCallRunsOnALaterPageTaskBeforeItsRelease() = runSuspendTest {
+    val roots = CallbackOwner.global
+    val base = roots.rootCountForTesting()
     val calls = mutableListOf<String>()
     val second = CompletableDeferred<Unit>()
-    lateinit var wake: TestWake
-    wake = TestWake {
-      calls += "wake rooted=${wake.owner.rootCountForTesting()}"
-      if (calls.size == 2) second.complete(Unit)
+    try {
+      setLogCallback(
+        QueuedLogHandler { severity, _, _, message ->
+          if (severity == LogSeverity.ERROR && FAILURE in message) {
+            calls += "record rooted=${roots.rootCountForTesting() - base}"
+            if (calls.size == 2) second.complete(Unit)
+          }
+        },
+      )
+      TestSupport.logError()
+      TestSupport.logError()
+    } finally {
+      // Native queues the registration's release behind its records.
+      clearLogCallback()
     }
-    wake.use {
-      TestSupport.wake(wake.address)
-      TestSupport.wake(wake.address)
-      TestSupport.release(wake.address)
-      assertEquals(emptyList(), calls, "a wake ran inside the call that posted it")
-      second.awaitWithin("the second wake")
-      awaitDeliveries()
-      assertEquals(listOf("wake rooted=1", "wake rooted=1"), calls)
-      assertEquals(0, wake.owner.rootCountForTesting())
-    }
+    assertEquals(emptyList(), calls, "a record ran inside the call that queued it")
+    second.awaitWithin("the second record")
+    assertEquals(listOf("record rooted=1", "record rooted=1"), calls)
+    assertEquals(base, roots.rootCountForTesting())
   }
 
   @Test
-  fun aDeliveryNeverRunsInsideANativeCallThatSpins() = runSuspendTest {
-    val held = CompletableDeferred<Unit>()
+  fun aQueuedCallNeverRunsInsideANativeCallThatSpins() = runSuspendTest {
     var during = false
-    val deliveredDuring = CompletableDeferred<Unit>()
-    TestWake { held.complete(Unit) }
-      .use { holding ->
-        TestWake {
-          during = true
-          deliveredDuring.complete(Unit)
-        }
-          .use { spinning ->
-            TestSupport.holdContention(holding.address, spinning.address)
-            held.awaitWithin("the holder to take the mutex")
-
-            // The holder posts a wake while the page spins on the mutex, and a probe task on the
-            // system queue, which the spin runs. A holder whose probe task never runs gives up
-            // after a deadline, and the call then reports that it did not spin.
-            assertTrue(TestSupport.contend(), "the contended call did not spin")
-            assertFalse(during, "a delivery ran inside the spinning call")
-            deliveredDuring.awaitWithin("the wake posted during the spin")
-            awaitDeliveries()
-            assertEquals(0, holding.owner.rootCountForTesting())
-            assertEquals(0, spinning.owner.rootCountForTesting())
+    val logged = CompletableDeferred<Unit>()
+    try {
+      setLogCallback(
+        QueuedLogHandler { _, _, _, message ->
+          if (FAILURE in message) {
+            during = true
+            logged.complete(Unit)
           }
-      }
+        },
+      )
+      TestSupport.holdContention()
+
+      // The holder logs while the page spins on the mutex, and posts a probe task to the system
+      // queue, which the spin runs. A holder whose probe task never runs gives up after a deadline,
+      // and the call then reports that it did not spin.
+      assertTrue(TestSupport.contend(), "the contended call did not spin")
+      assertFalse(during, "a queued call ran inside the spinning call")
+      logged.awaitWithin("the record logged during the spin")
+    } finally {
+      clearLogCallback()
+    }
+    awaitDeliveries()
+  }
+
+  private companion object {
+    // What the record that the fixtures make native log says.
+    const val FAILURE = "owner finalization failed"
   }
 }

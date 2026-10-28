@@ -386,7 +386,7 @@ class KotlinLayoutTests(unittest.TestCase):
         )
         self.assertFalse((registrations | {response}) & set(bodies))
         # Only the threaded forms answer native from their callbacks, and every
-        # other queue-form site has a delivery that the page drains into it.
+        # other queue-form site has a delivery, so a queue carries its calls.
         for site in kotlin_callbacks.sites(values).values():
             with self.subTest(site=site.name):
                 if site.split == kotlin_callbacks.THREADED:
@@ -422,6 +422,43 @@ class KotlinLayoutTests(unittest.TestCase):
             "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt"
         ]
         self.assertIn("readViewString(message)); true }; true }", wasm)
+
+    def test_each_queued_site_has_a_wasm_trampoline_that_runs_it(self):
+        outputs = emitted(kotlin, real_api())
+        glue = outputs[kotlin.WASM_GLUE]
+        base = "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c"
+        dispatched = outputs[f"{base}/DispatchedUpcalls.kt"]
+        stubs = outputs[f"{base}/UpcallStubs.kt"]
+        table = glue[glue.index("functions[])(void) = {") :]
+        names = [
+            line.split("mln_kw_upcall_")[1].rstrip(",")
+            for line in table.splitlines()
+            if "(void (*)(void))mln_kw_upcall_" in line
+        ]
+        self.assertIn("completion", names)
+        self.assertIn("releaseRoot", names)
+        self.assertIn("wakeCallback", names)
+        self.assertIn("queuedLogHandlerCallback", names)
+        # A site that native calls on its own thread has no trampoline.
+        self.assertNotIn("queueLockLock", names)
+        self.assertNotIn("logHandlerCallback", names)
+        # Each trampoline passes its number, which runs its own site and is the
+        # function pointer that its registration writes.
+        for number, site in enumerate(names):
+            with self.subTest(site=site):
+                trampoline = glue[glue.index(f" mln_kw_upcall_{site}(") :]
+                trampoline = trampoline[: trampoline.index("\n}")]
+                self.assertIn(f"mln_kw_js_upcall({number}, arguments);", trampoline)
+                branch = dispatched[dispatched.index(f"      {number} ->") :]
+                self.assertIn(f".{site}(", branch[: branch.index("\n      ", 8)])
+                self.assertIn(
+                    f"val {site}: Long\n    get() = upcallFunction({number})", stubs
+                )
+        # A record argument crosses as the address of the trampoline's copy, and
+        # a queued callback answers native's queue result.
+        self.assertIn("const mln_buffer_view* message_address = &message;", glue)
+        log = glue[glue.index(" mln_kw_upcall_queuedLogHandlerCallback(") :]
+        self.assertIn("  return true;\n}", log[: log.index("\n}") + 2])
 
     def test_native_registrations_mirror_their_c_records(self):
         _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(
