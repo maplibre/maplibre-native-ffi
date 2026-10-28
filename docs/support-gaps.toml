@@ -63,14 +63,6 @@ reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on
 link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[entry]]
-bindings = ["dotnet"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64", "loongarch64"]
-status = "blocked"
-reason = ".NET builds RISC-V and LoongArch as community architectures, but no one publishes them for the binding's `net10.0`. Microsoft ships no packs for them, and the community builds stop at .NET 9."
-link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/building/coreclr/cross-building.md"
-
-[[entry]]
 bindings = ["swift"]
 platforms = ["linux-gnu"]
 archs = ["riscv64"]
@@ -239,6 +231,22 @@ archs = ["riscv64"]
 status = "path-known"
 reason = "The Dart SDK runs on RISC-V. Run the suite with it under QEMU's user-mode emulator."
 link = "https://dart.dev/get-dart"
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["riscv64"]
+status = "path-known"
+reason = "Microsoft publishes no .NET for RISC-V, a community architecture of .NET, but a community build of the .NET 10 SDK covers both libcs. Run the suite with it under QEMU's user-mode emulator."
+link = "https://github.com/filipnavara/dotnet-riscv/releases"
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["loongarch64"]
+status = "path-known"
+reason = "Microsoft publishes no .NET for LoongArch, a community architecture of .NET, but a community build of the .NET 10 SDK covers both libcs. Run the suite with it under QEMU's user-mode emulator."
+link = "https://github.com/chenguohui/dotnet-loongarch/releases"
 
 [[entry]]
 bindings = ["dart"]
