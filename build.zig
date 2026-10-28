@@ -236,6 +236,11 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         // Zig's C translator needs the API level from the resolved Android target.
         translator.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{options.target.result.os.version_range.linux.android}));
     }
+    if (options.target.result.cpu.arch == .loongarch64) {
+        // Zig 0.17.0's C translator predefines no LoongArch macros, and glibc's
+        // headers reject a LoongArch target without its register width.
+        translator.defineCMacro("__loongarch_grlen", "64");
+    }
     for (options.c_macros) |c_macro| {
         translator.defineCMacro(c_macro.name, c_macro.value);
     }
@@ -475,10 +480,13 @@ fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Buil
     if (target.abi == .android and target.cpu.arch == .arm) {
         const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
         test_step.dependOn(&unsupported.step);
-    } else if (target.abi == .android or target.abi == .musl or target.os.tag == .freebsd) {
+    } else if (target.abi == .android or target.abi == .musl or target.os.tag == .freebsd or
+        target.cpu.arch == .riscv64 or target.cpu.arch == .loongarch64)
+    {
         // Android executables run on an emulator, musl executables load
         // Alpine's graphics stack through musl's dynamic loader in an Alpine
-        // container, and FreeBSD executables run in a FreeBSD virtual machine.
+        // container, FreeBSD executables run in a FreeBSD virtual machine, and
+        // RISC-V and LoongArch executables run under QEMU's user-mode emulator.
         addDeviceTestRunSteps(b, test_step, &test_compiles, options.native);
     } else {
         for (test_compiles) |tests| {

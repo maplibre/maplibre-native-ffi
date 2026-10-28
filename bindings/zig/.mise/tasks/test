@@ -4,9 +4,9 @@
 #MISE shell="bash"
 set -euo pipefail
 
-# Android presets use their matching emulator, musl presets run in Alpine,
-# FreeBSD presets run in the worktree's FreeBSD virtual machine, and other host
-# presets run in process. Each test gets 30 seconds times
+# Android presets use their matching emulator, RISC-V and LoongArch presets
+# run under QEMU, other musl presets run in Alpine, FreeBSD presets run in the
+# worktree's FreeBSD virtual machine, and other host presets run in process. Each test gets 30 seconds times
 # MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in the software
 # renderers of Alpine and the virtual machine, and to 1 on the host; the fixture
 # scales its waits by the same value.

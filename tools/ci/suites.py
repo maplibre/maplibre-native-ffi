@@ -56,7 +56,10 @@ SUITES: list[dict] = [
             {"task": "//bindings/rust:test"},
             {"task": "//bindings/dotnet:test"},
             {"task": "//bindings/go:test"},
-            {"task": "//bindings/zig:test"},
+            {
+                "task": "//bindings/zig:test",
+                "architectures": ["riscv64", "loongarch64"],
+            },
             {"task": "//bindings/python:test"},
         ],
     },
@@ -84,7 +87,10 @@ SUITES: list[dict] = [
         "platforms": ["linux-gnu", "macos", "windows"],
         "exclude": ["windows-arm64-wgl", "windows-arm64-vulkan"],
         "commands": [
-            {"task": "//bindings/zig:test"},
+            {
+                "task": "//bindings/zig:test",
+                "architectures": ["riscv64", "loongarch64"],
+            },
             {
                 "task": "//examples/zig-map:smoke",
                 "exclude": MACOS_X64,

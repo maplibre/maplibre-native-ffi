@@ -230,11 +230,11 @@ ci:
       covers: >-
         Linux RISC-V 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
-        and runs the C tests under QEMU's user-mode emulator. Catches
-        architecture conditionals in the engine and its vendored code, and
-        problems in the Zig toolchain's cross builds, the Rust platform crate,
-        or the emulated test roots on RISC-V. Code that Linux x64 and ARM64
-        build alike doesn't need it.
+        and runs the C tests and the Zig suite under QEMU's user-mode emulator.
+        Catches architecture conditionals in the engine and its vendored code,
+        and problems in the Zig toolchain's cross builds, the Rust platform
+        crate, or the emulated test roots on RISC-V. Code that Linux x64 and
+        ARM64 build alike doesn't need it.
       rules:
         - if:
             files:
@@ -247,11 +247,11 @@ ci:
       covers: >-
         Linux LoongArch 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
-        and runs the C tests under QEMU's user-mode emulator. Catches
-        architecture conditionals in the engine and its vendored code, and
-        problems in the Zig toolchain's cross builds, the Rust platform crate,
-        or the emulated test roots on LoongArch. Code that Linux x64 and ARM64
-        build alike doesn't need it.
+        and runs the C tests and the Zig suite under QEMU's user-mode emulator.
+        Catches architecture conditionals in the engine and its vendored code,
+        and problems in the Zig toolchain's cross builds, the Rust platform
+        crate, or the emulated test roots on LoongArch. Code that Linux x64 and
+        ARM64 build alike doesn't need it.
       rules:
         - if:
             files:
