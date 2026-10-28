@@ -15,10 +15,13 @@ _logger = logging.getLogger(__name__)
 
 
 class NativeFuture[T](Future[T]):
-    """A native result whose user callbacks run away from the native worker.
+    """A native result that the binding's dispatcher thread resolves.
 
-    Callbacks for one future run in registration order, and a callback can wait
-    for another binding future.
+    Done callbacks for one future run in registration order on host worker
+    threads, so a callback can wait for another binding future. Waiting for a
+    pending future on the dispatcher thread, from a registered callback, raises
+    ``RuntimeError``, since its completion runs on that thread only after the
+    callback returns.
     """
 
     def __init__(self) -> None:
@@ -53,6 +56,23 @@ class NativeFuture[T](Future[T]):
                 callback(self)
             except BaseException:
                 _logger.exception("exception in native future callback")
+
+    def result(self, timeout: float | None = None) -> T:
+        self._check_wait()
+        return super().result(timeout)
+
+    def exception(self, timeout: float | None = None) -> BaseException | None:
+        self._check_wait()
+        return super().exception(timeout)
+
+    def _check_wait(self) -> None:
+        from . import _native
+
+        if not self.done() and _native._on_dispatcher_thread():
+            raise RuntimeError(
+                "a callback cannot wait for a pending binding future, which "
+                "resolves on the dispatcher thread after the callback returns"
+            )
 
     def _add_internal_callback(self, fn: Callable[[Future[T]], object]) -> None:
         super().add_done_callback(fn)

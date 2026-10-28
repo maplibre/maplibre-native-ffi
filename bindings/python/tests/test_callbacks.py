@@ -5,10 +5,11 @@ import sys
 import threading
 import typing
 import weakref
-from collections.abc import Callable
+from concurrent.futures import Future
 
 import maplibre_native_ffi as mln
 import pytest
+from maplibre_native_ffi import _native
 from support import (
     EMPTY_STYLE,
     TIMEOUT,
@@ -210,101 +211,6 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
         handle.complete(ok_response())
 
 
-def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
-    harness: Harness, map_handle: mln.MapHandle
-) -> None:
-    # The URL names a loopback port that nothing serves, so the request fails
-    # after the header transform without leaving the machine.
-    style = "http://127.0.0.1:1/style.json"
-    scopes: list[mln.HttpHeaderTransformResponseScope] = []
-    passed_through: list[mln.ResourceRequestHandle] = []
-    refusals: list[str] = []
-
-    def refused(use: Callable[[], object]) -> None:
-        try:
-            use()
-        except mln.MaplibreError as error:
-            assert error.status == mln.Status.INVALID_STATE
-            refusals.append(error.diagnostic)
-
-    def transform(
-        kind: mln.ResourceKind,
-        url: str,
-        response: mln.HttpHeaderTransformResponseScope,
-    ) -> None:
-        if url != style:
-            return
-        worker = threading.Thread(
-            target=refused, args=(lambda: response.set_header("X-Test", "other"),)
-        )
-        worker.start()
-        worker.join(TIMEOUT)
-        response.set_header("X-Test", "inside")
-        scopes.append(response)
-
-    def pass_through(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> None:
-        passed_through.append(handle)
-        handle.pass_through()
-
-    harness.routes[style] = pass_through
-    result(
-        harness.runtime.set_http_header_transform(
-            mln.HttpHeaderTransform(callback=transform)
-        )
-    )
-    map_handle.set_style_url(style)
-    harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
-    refused(lambda: scopes[0].set_header("X-Test", "late"))
-    result(harness.runtime.clear_http_header_transform())
-
-    assert refusals == [
-        "response belongs to its callback thread",
-        "response callback has returned",
-    ]
-    # Passing a request through consumed its handle.
-    assert len(passed_through) == 1
-    assert passed_through[0].is_closed
-
-
-def test_a_header_transform_fails_deliberately_with_a_status_and_reports_a_bug(
-    harness: Harness, map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # The URLs name a loopback port that nothing serves, so each request fails
-    # after the header transform without leaving the machine.
-    refused = mln.MaplibreError(mln.Status.INVALID_ARGUMENT, "the transform refused")
-    broken = mln.MaplibreError(mln.Status.OK, "the transform failed without a status")
-    raised = {
-        "http://127.0.0.1:1/refused.json": refused,
-        "http://127.0.0.1:1/broken.json": broken,
-    }
-    reports: list[typing.Any] = []
-    monkeypatch.setattr(sys, "unraisablehook", reports.append)
-
-    def transform(
-        kind: mln.ResourceKind,
-        url: str,
-        response: mln.HttpHeaderTransformResponseScope,
-    ) -> None:
-        if url in raised:
-            raise raised[url]
-
-    result(
-        harness.runtime.set_http_header_transform(
-            mln.HttpHeaderTransform(callback=transform)
-        )
-    )
-    for url in raised:
-        harness.routes[url] = lambda request, handle: handle.pass_through()
-        map_handle.set_style_url(url)
-        harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
-    result(harness.runtime.clear_http_header_transform())
-
-    # A failure status is deliberate, so only the error without one is reported.
-    assert [report.exc_value for report in reports] == [broken]
-
-
 def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
@@ -370,30 +276,6 @@ def test_replacing_the_log_callback_releases_the_previous_one(
         mln.clear_log_callback()
     del second
     assert second_retired.wait(TIMEOUT)
-
-
-def test_a_log_handler_that_returns_none_leaves_records_unconsumed(
-    map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    reports: list[object] = []
-    monkeypatch.setattr(sys, "unraisablehook", reports.append)
-
-    class Unconsuming(_Retiring):
-        def __call__(self, *_: object) -> None:
-            self.called.set()
-
-    handler = Unconsuming()
-    logged, retired = handler.called, handler.retired
-    try:
-        mln.set_log_callback(mln.LogHandler(handler))
-        del handler
-        map_handle.set_style_json([])
-        assert logged.wait(TIMEOUT)
-    finally:
-        mln.clear_log_callback()
-    # Once native releases the handler, no call of it is in flight.
-    assert retired.wait(TIMEOUT)
-    assert reports == []
 
 
 def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> None:
@@ -486,3 +368,98 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     assert sprites_seen.wait(TIMEOUT)
     assert seen[0] == (mln.ResourceKind.STYLE, "custom://routed/style.json")
     assert all(url.startswith("custom://routed/") for _, url in seen)
+
+
+def test_callbacks_and_completions_run_on_the_dispatcher_thread(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    threads: dict[str, tuple[int, bool]] = {}
+    submitted: list[Future[mln.CommandCompletion]] = []
+    logged = threading.Event()
+
+    def record(kind: str) -> None:
+        threads.setdefault(
+            kind, (threading.get_ident(), _native._on_dispatcher_thread())
+        )
+
+    def provide(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
+        record("provider")
+        # The dispatcher runs this call, so the completion cannot run before
+        # the callback that observes it is added.
+        repainted = map_handle.request_repaint()
+        repainted._add_internal_callback(lambda _: record("completion"))
+        submitted.append(repainted)
+        handle.complete(ok_response())
+
+    def log(*_: object) -> None:
+        record("log")
+        logged.set()
+
+    harness.routes["custom://dispatched.json"] = provide
+    try:
+        mln.set_log_callback(mln.LogHandler(log))
+        map_handle.set_style_url("custom://dispatched.json")
+        harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+        result(submitted[0])
+        map_handle.set_style_json([])
+        assert logged.wait(TIMEOUT)
+    finally:
+        mln.clear_log_callback()
+
+    assert set(threads) == {"provider", "log", "completion"}
+    ((ident, dispatcher),) = set(threads.values())
+    assert dispatcher
+    assert ident != threading.get_ident()
+    assert not _native._on_dispatcher_thread()
+
+
+def test_waiting_for_a_pending_future_in_a_callback_raises(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    settled = map_handle.request_repaint()
+    result(settled)
+    outcomes: list[object] = []
+    answered = threading.Event()
+
+    def provide(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
+        try:
+            # A resolved future reads as usual.
+            outcomes.append(settled.result())
+            pending = map_handle.get_camera()
+            for wait in (pending.result, pending.exception):
+                try:
+                    wait(TIMEOUT)
+                except RuntimeError as error:
+                    outcomes.append(error)
+            outcomes.append(pending)
+        finally:
+            handle.complete(denied_response())
+            answered.set()
+
+    harness.routes["custom://waits.json"] = provide
+    map_handle.set_style_url("custom://waits.json")
+    assert answered.wait(TIMEOUT)
+
+    completed, result_error, exception_error, pending = outcomes
+    assert isinstance(completed, mln.CommandCompletion)
+    assert isinstance(result_error, RuntimeError)
+    assert isinstance(exception_error, RuntimeError)
+    # The future resolves once the callback has returned.
+    assert result(typing.cast(typing.Any, pending)).generation > 0
+
+
+def test_a_header_transform_takes_native_rules_alone(harness: Harness) -> None:
+    assert list(mln.HttpHeaderTransform.__dataclass_fields__) == ["rules"]
+    rule = mln.HttpHeaderRule(
+        flags=mln.UrlMatchFlag.GLOB,
+        url="http://127.0.0.1:1/**",
+        headers=[mln.HttpHeader(name="X-Test", value="rules")],
+    )
+    result(
+        harness.runtime.set_http_header_transform(mln.HttpHeaderTransform(rules=[rule]))
+    )
+    result(harness.runtime.clear_http_header_transform())

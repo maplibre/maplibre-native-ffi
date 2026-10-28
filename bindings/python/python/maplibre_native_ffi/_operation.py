@@ -37,9 +37,3 @@ def _adopt_value(raw, owner, parent=None):
 def _view(owner, read, convert):
     with owner._native._read_scope():
         yield convert(read())
-
-
-def _wrap_response(raw, name):
-    from . import _generated_owners
-
-    return getattr(_generated_owners, name)._from_native(raw)

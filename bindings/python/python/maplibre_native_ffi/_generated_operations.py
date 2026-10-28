@@ -304,27 +304,14 @@ class _GraphicsDeviceHandleOperations(GeneratedOperations):
         return self._native.close()
 
 
-class _HttpHeaderTransformResponseScopeOperations(GeneratedOperations):
-    _native: _native._HttpHeaderTransformResponseScope
-
-    def set_header(self, name: str, value: str) -> None:
-        """Sets one outgoing HTTP request header for the current transform
-        invocation.
-
-        See `mln_http_header_transform_response_set_header` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.set_header(name, value)
-
-
 class _MapHandleOperations(GeneratedOperations):
     _native: _native._MapHandle
 
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom geometry source. The callback may run on any native
-        worker thread, concurrently with runtime and map calls.
+        """Adds a custom geometry source. The callback runs on the binding's
+        dispatcher thread, after native queues the call.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -334,8 +321,8 @@ class _MapHandleOperations(GeneratedOperations):
     def add_custom_vector_source(
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom vector source. The callback may run on any native
-        worker thread, concurrently with runtime and map calls.
+        """Adds a custom vector source. The callback runs on the binding's
+        dispatcher thread, after native queues the call.
 
         See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1665,10 +1652,8 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
 
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
         """Registers a callback that runs when MapLibre cancels a C API resource
-        provider request. The callback runs on the thread that discards the
-        request, never a host thread: the runtime's native scheduler thread
-        when a committed map or runtime command discards it, such as a style
-        change or map destruction, and a MapLibre worker thread otherwise.
+        provider request. The callback runs on the binding's dispatcher
+        thread, after native queues the call.
 
         See `mln_resource_request_set_cancel_callback` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1860,9 +1845,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_event_handler(
         self, handler: RuntimeEventHandler
     ) -> Future[CommandCompletion]:
-        """Selects how runtime and map events reach the host. Map events arrive
-        on the runtime's native scheduler thread, and offline events may
-        arrive on a MapLibre worker thread.
+        """Selects how runtime and map events reach the host. The callback runs
+        on the binding's dispatcher thread, after native queues the call.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1881,8 +1865,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
         self, transform: HttpHeaderTransform
     ) -> Future[CommandCompletion]:
         """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform. The callback runs synchronously on a MapLibre worker or
-        network thread.
+        transform. The callback runs on the binding's dispatcher thread,
+        after native queues the call.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1921,7 +1905,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
         self, provider: ResourceProvider
     ) -> Future[CommandCompletion]:
         """Registers or replaces a runtime-scoped network resource provider. The
-        callback runs synchronously on a MapLibre thread.
+        callback runs on the binding's dispatcher thread, after native queues
+        the call.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1932,7 +1917,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
         self, transform: ResourceTransform
     ) -> Future[CommandCompletion]:
         """Registers or updates a runtime-scoped URL transform for network
-        resources. The callback runs on a MapLibre network thread.
+        resources. The callback runs on the binding's dispatcher thread,
+        after native queues the call.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2050,9 +2036,8 @@ def set_log_async_severity_mask(mask: LogSeverityFlag) -> None:
 
 def set_log_callback(handler: LogHandler) -> None:
     """Installs a process-global MapLibre Native log callback. The callback
-    runs synchronously on the thread that emits the record, or on a
-    MapLibre background thread for a severity that
-    `set_log_async_severity_mask()` dispatches asynchronously.
+    runs on the binding's dispatcher thread, after native queues the
+    call.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2139,8 +2124,8 @@ class MapHandleDiscarding:
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> None:
-        """Adds a custom geometry source. The callback may run on any native
-        worker thread, concurrently with runtime and map calls.
+        """Adds a custom geometry source. The callback runs on the binding's
+        dispatcher thread, after native queues the call.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2150,8 +2135,8 @@ class MapHandleDiscarding:
     def add_custom_vector_source(
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> None:
-        """Adds a custom vector source. The callback may run on any native
-        worker thread, concurrently with runtime and map calls.
+        """Adds a custom vector source. The callback runs on the binding's
+        dispatcher thread, after native queues the call.
 
         See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2706,9 +2691,8 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_resource_transform()
 
     def set_event_handler(self, handler: RuntimeEventHandler) -> None:
-        """Selects how runtime and map events reach the host. Map events arrive
-        on the runtime's native scheduler thread, and offline events may
-        arrive on a MapLibre worker thread.
+        """Selects how runtime and map events reach the host. The callback runs
+        on the binding's dispatcher thread, after native queues the call.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2717,8 +2701,8 @@ class RuntimeHandleDiscarding:
 
     def set_http_header_transform(self, transform: HttpHeaderTransform) -> None:
         """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform. The callback runs synchronously on a MapLibre worker or
-        network thread.
+        transform. The callback runs on the binding's dispatcher thread,
+        after native queues the call.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2727,7 +2711,8 @@ class RuntimeHandleDiscarding:
 
     def set_resource_provider(self, provider: ResourceProvider) -> None:
         """Registers or replaces a runtime-scoped network resource provider. The
-        callback runs synchronously on a MapLibre thread.
+        callback runs on the binding's dispatcher thread, after native queues
+        the call.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2736,7 +2721,8 @@ class RuntimeHandleDiscarding:
 
     def set_resource_transform(self, transform: ResourceTransform) -> None:
         """Registers or updates a runtime-scoped URL transform for network
-        resources. The callback runs on a MapLibre network thread.
+        resources. The callback runs on the binding's dispatcher thread,
+        after native queues the call.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

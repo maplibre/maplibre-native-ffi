@@ -24,12 +24,19 @@ cluster properties, where JSON null means nothing. A value that ``json.dumps``
 rejects raises its error before the call reaches native. Returned JSON is the
 value that ``json.loads`` reads, and absent JSON is ``None``, as JSON null is.
 
-Event, log, wake, transform, and provider callbacks run on native threads,
-with the interpreter attached, while native waits for them to return. Hand
-work that touches thread-bound state, such as an asyncio loop or a Tk or Qt
-widget, to its thread, for example with ``loop.call_soon_threadsafe``. A
-callback must not wait for a binding future, since native may deliver its
-completion on the thread that the callback holds.
+Every callback that Python supplies, and every completion, runs on one
+dispatcher thread that the binding owns, after native queues the call, so a
+callback that blocks delays every other one. Waiting for a pending binding
+future in a callback raises ``RuntimeError``, since that future resolves on the
+same thread. Hand work that touches thread-bound state, such as an asyncio loop
+or a Tk or Qt widget, to its thread, for example with
+``loop.call_soon_threadsafe``. Native code answers what a call decides itself,
+so a log record is always consumed. HTTP header transforms take native header
+rules, and queue locks take only native registrations, since native code
+waits for both on its own threads.
+
+Interpreter shutdown stops the dispatcher, after the call it is running
+returns, and drops every call that is still queued.
 """
 
 from ._completion import CommandCompletion

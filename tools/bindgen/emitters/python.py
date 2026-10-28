@@ -10,11 +10,7 @@ from textwrap import dedent
 
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters.rust import (
-    RUST_KEYWORDS,
-    counted_owner,
-    native_call,
-)
+from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
 from tools.bindgen.model import Api, CType, Function, Lowered, Record, Unsupported
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
@@ -36,7 +32,6 @@ from .python_values import (
     public_name,
     rust_field,
     scalar_type,
-    scope_name,
     variant_name,
 )
 
@@ -181,9 +176,9 @@ def owned_native(value, expression, callbacks=False):
 
 
 def receiver_input(plan: OperationPlan) -> tuple[ParameterPlan | None, bool]:
-    """The input that an operation is a method of, with the handle or response
-    that a pointer refers to as its value, and whether it is a pointer."""
-    name = plan.receiver or plan.scoped_receiver
+    """The input that an operation is a method of, with the handle that a
+    pointer refers to as its value, and whether it is a pointer."""
+    name = plan.receiver
     receiver = next((p for p in plan.inputs if p.name == name), None)
     pointer = receiver is not None and receiver.value.kind == "reference"
     if pointer and receiver.value.element:
@@ -222,12 +217,12 @@ def symbols(bound: BoundApi) -> docs.Symbol:
 
 
 def _symbols(bound: BoundApi) -> docs.Symbol:
-    from .python_callbacks import callback_types
+    from .python_callbacks import callback_types, hosted
 
     owners = {
         native: owner_name(handle) for native, handle in bound.public_handles.items()
     }
-    protocols = callback_types(bound.public_values.values())
+    protocols = callback_types(bound, bound.public_values.values())
     # A record that holds only a union presents the union under its own name.
     holders = {
         member.value.native: value
@@ -258,15 +253,15 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             or value.kind not in {"record", "enum"}
         ):
             return None
-        return scope_name(value.native) if value.response else public_name(value.native)
+        return None if value.response else public_name(value.native)
 
     def operation(plan: OperationPlan) -> str | None:
         if plan.name in bound.unsupported:
             return None
         receiver, _ = receiver_input(plan)
         if plan.scoped_receiver:
-            owner = scope_name(receiver.value.native)
-        elif receiver or plan.factory:
+            return None
+        if receiver or plan.factory:
             owner = owners.get(receiver.value.native if receiver else plan.factory)
             if owner is None:
                 return None
@@ -291,6 +286,14 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             and member.name in {registration.user_data, registration.release}
         ):
             return None
+        # A callback that native rules or a native registration answer in
+        # Python's place has no field.
+        if (
+            registration
+            and member.name in registration.callbacks
+            and member not in hosted(bound, value)
+        ):
+            return None
         return f"{typ}.{field_name(member.name)}"
 
     def flag(value, mask_flag) -> str | None:
@@ -307,6 +310,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{name}"
             for name in ("generation", "render_update_generation")
         },
+        # Native queues each call, and the binding's one dispatcher thread
+        # runs it.
+        threads=(
+            "The callback runs on the binding's dispatcher thread, after native "
+            "queues the call."
+        ),
     )
 
 
@@ -325,22 +334,17 @@ def operation(
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
         )
+    if plan.scoped_receiver:
+        raise unsupported(
+            function, "a callback response needs a synchronous Python callback"
+        )
     receiver, receiver_pointer = receiver_input(plan)
-    scoped = plan.scoped_receiver is not None
-    if receiver is not None and receiver.value.native not in OWNERS and not scoped:
+    if receiver is not None and receiver.value.native not in OWNERS:
         raise unsupported(function, "receiver needs a supported handle owner")
     if plan.factory and plan.factory not in OWNERS:
         raise unsupported(function, "factory needs a supported handle owner")
     native_owner = receiver.value.native if receiver else plan.factory or "mln"
-    owner = (
-        scope_name(native_owner)
-        if scoped
-        else OWNERS[native_owner]
-        if receiver or plan.factory
-        else ""
-    )
-    if scoped:
-        values.supported(receiver.value)
+    owner = OWNERS[native_owner] if receiver or plan.factory else ""
     release = releases(plan)
     name = method_name(plan)
     if not safe_identifier(name):
@@ -477,11 +481,7 @@ def operation(
         and receiver.value.handle
         and plan.name == receiver.value.handle.abandon
     )
-    if scoped:
-        setup.append(
-            f"        let handle = self.scope.pointer(self.native)? as *mut sys::{native_owner};"
-        )
-    elif plan.consumes or abandon:
+    if plan.consumes or abandon:
         # A synchronous release is idempotent; an answer that consumes its
         # receiver, like an asynchronous release, reaches native again.
         idempotent = (
@@ -506,18 +506,13 @@ def operation(
             if not output.sized_by and not output.result_length
         )
     ):
-        setup += [
-            "        let read = self.read()?;",
-            "        let handle = read.native;",
-        ]
+        raise unsupported(function, "borrowed output needs a view scope")
     elif receiver:
         setup += [
             "        let handle = self.input();",
         ]
     if receiver:
-        arguments[receiver.name] = (
-            "&mut handle" if receiver_pointer and not scoped else "handle"
-        )
+        arguments[receiver.name] = "&mut handle" if receiver_pointer else "handle"
     outputs = []
     product = None
     for output in plan.outputs:
@@ -965,10 +960,9 @@ def compact(body: list[str]) -> list[str]:
     return result
 
 
-def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
+def state_owner(owner: str, handle: HandlePlan) -> str:
     """Declare the PyO3 class for a handle whose ownership NativeHandleState tracks."""
     native = handle.native
-    counted = counted_owner(bound, native)
     read_scope = (
         f", |py, owner| GeneratedReadScope::with_native::<sys::{native}>(py, Arc::clone(&owner.state), sys::{handle.view_begin}, sys::{handle.view_end})"
         if handle.view_begin
@@ -979,21 +973,7 @@ def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
         if handle.cleanup and handle.cleanup not in RUNTIME_EXPORTS
         else "None"
     )
-    exit_release = "None"
-    if handle.observable_root_release:
-        exit_release = f"Some(generated_exit_release_{native})"
-        call = native_call(
-            bound.source.functions_by_name[handle.release],
-            ["handle", "completion"],
-            diagnostic="std::ptr::null_mut()",
-        )
-        definitions = f'unsafe extern "C" fn generated_exit_release_{native}(handle: sys::{native}, completion: *const sys::mln_completion) -> sys::mln_status {{ unsafe {{ {call} }} }}\n'
-    else:
-        definitions = ""
-    return (
-        definitions
-        + f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {exit_release}, {str(counted).lower()}{read_scope});\n'
-    )
+    return f'generated_owner!({owner}, "_{owner}", {native}, {dispose}{read_scope});\n'
 
 
 def lower(api: Api | BoundApi) -> Lowered:
@@ -1020,8 +1000,16 @@ def lower(api: Api | BoundApi) -> Lowered:
         for handle in bound.handles.values()
         if handle.native in OWNERS
     }
+    # Native rules answer in place of a callback that must answer on its
+    # native thread, so the operations that only such a callback calls have
+    # no caller.
+    rule_answered = async_hosts.rule_answered_operations(
+        bound, [value for value in bound.values.values() if value.registration]
+    )
     for plan in bound.operations:
         function = plan.function
+        if plan.name in rule_answered:
+            continue
         if plan.name in exits:
             owner, native, _, stub, _ = operation(plan, values, exit=True)
             rust[owner].append(native)
@@ -1090,13 +1078,8 @@ def lower(api: Api | BoundApi) -> Lowered:
     )
     for native_owner, owner in OWNERS.items():
         files["src/generated_operations.rs"] += state_owner(
-            owner, bound.handles[native_owner], bound
+            owner, bound.handles[native_owner]
         )
-    scope_owners = {
-        name: scope_name(name)
-        for name, value in values.records.items()
-        if value.response
-    }
     global_native = "\n".join(rust.get("", []))
     global_names = [
         plan.member
@@ -1110,10 +1093,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         global_native
         + "\nfn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {\n"
         + "    module.add_class::<GeneratedReadScope>()?;\n"
-        + "\n".join(
-            f"    module.add_class::<{owner}>()?;"
-            for owner in [*OWNERS.values(), *scope_owners.values()]
-        )
+        + "\n".join(f"    module.add_class::<{owner}>()?;" for owner in OWNERS.values())
         + "\n".join(
             f"    module.add_function(wrap_pyfunction!({name}, module)?)?;"
             for name in global_names
@@ -1129,6 +1109,10 @@ def lower(api: Api | BoundApi) -> Lowered:
         )
     )
     files["python/maplibre_native_ffi/_native.pyi"] += "\n".join(stubs.get("", []))
+    # The runtime's own function, which reports where a future cannot wait.
+    files["python/maplibre_native_ffi/_native.pyi"] += (
+        "\ndef _on_dispatcher_thread() -> bool: ...\n"
+    )
     if any(
         value.registration and async_hosts.accepts_native(bound, value)
         for value in values.records.values()
@@ -1145,11 +1129,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         facade[owner].append(
             f"    @property\n    def discarding(self) -> {owner}Discarding:\n        return {owner}Discarding(self)\n"
         )
-    imported = {
-        public_name(record)
-        for record in values.records | values.enums
-        if not values.records.get(record, values.enums.get(record)).response
-    }
+    imported = {public_name(record) for record in values.records | values.enums}
     # A result that is a record of only a union copies into its variants.
     imported.update(
         values.variant_name(value.union_member.value, variant)
@@ -1161,7 +1141,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         f"from ._generated_values import {name}" for name in sorted(imported)
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _copy_variant, _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _copy_variant, _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join(OWNERS.values()) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"
@@ -1179,32 +1159,16 @@ def lower(api: Api | BoundApi) -> Lowered:
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
         f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Any, Protocol\nfrom ._enum import UnknownIntEnum\n'
+        # A callback receives an owned handle in its owner.
         + (
-            "from ._operation import _wrap_response\n"
-            if any(value.response for value in values.records.values())
+            "from ._operation import _adopt_value\n"
+            if "_adopt_value(" in public_values
             else ""
         )
-        + f"\nif TYPE_CHECKING:\n    from ._generated_owners import {', '.join([*OWNERS.values(), *scope_owners.values()]) or '__name__'}\n\n"
+        + f"\nif TYPE_CHECKING:\n    from ._generated_owners import {', '.join(OWNERS.values()) or '__name__'}\n\n"
         + public_values
     )
-    for owner in scope_owners.values():
-        files["src/generated_operations.rs"] += f"""\n#[pyclass(name = "_{owner}")]
-struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
-"""
     owner_classes = []
-    for owner in scope_owners.values():
-        owner_classes.append(f"""class {owner}(_{owner}Operations):
-    __module__ = "maplibre_native_ffi"
-
-    def __init__(self):
-        raise TypeError("response scopes are supplied during callbacks")
-
-    @classmethod
-    def _from_native(cls, native):
-        value = cls.__new__(cls)
-        value._native = native
-        return value
-""")
     for native, owner in OWNERS.items():
         handle = bound.handles[native]
         # A handle without scoped cleanup, such as a frame, has no `with` block.
@@ -1252,7 +1216,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         f'"""{notice}"""\nfrom ._lifecycle import NativeHandleMixin, ScopedHandleMixin\n'
         + "\n".join(
             f"from ._generated_operations import _{owner}Operations"
-            for owner in [*OWNERS.values(), *scope_owners.values()]
+            for owner in OWNERS.values()
         )
         + "\n\n"
         + "\n".join(owner_classes)
@@ -1271,15 +1235,8 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         and plan.factory is None
     )
     public_globals.extend(f"{owner}Discarding" for owner in discards)
-    public_owners = {
-        "_generated_owners": list(OWNERS.values()) + list(scope_owners.values())
-    }
-    exports = (
-        public_values_names
-        + public_globals
-        + list(OWNERS.values())
-        + list(scope_owners.values())
-    )
+    public_owners = {"_generated_owners": list(OWNERS.values())}
+    exports = public_values_names + public_globals + list(OWNERS.values())
     files["python/maplibre_native_ffi/api.py"] = (
         f'"""{notice}"""\n'
         + "\n".join(

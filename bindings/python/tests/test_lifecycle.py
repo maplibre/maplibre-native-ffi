@@ -117,7 +117,7 @@ def test_a_refused_close_leaves_the_handle_usable(
         harness.runtime.get_event_mask()
 
 
-def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
+def test_a_handle_abandoned_in_a_callback_is_reported_and_disposed(
     harness: Harness,
 ) -> None:
     handles: list[mln.ResourceRequestHandle] = []
@@ -130,8 +130,8 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
     ) -> None:
         handles.append(handle)
         handle.set_cancel_callback(mln.ResourceRequestCancelHandler(cancelled.set))
-        # The last reference goes on the provider's stack, where the map
-        # cannot be disposed without reentering native.
+        # The last reference goes on the dispatcher thread, inside the
+        # provider, which disposes the map there.
         assert submitted.wait(TIMEOUT)
         owners.clear()
 

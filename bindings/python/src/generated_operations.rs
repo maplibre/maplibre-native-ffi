@@ -316,42 +316,6 @@ fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyR
     Ok(dict.into_any().unbind())
 }
 
-unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
-    user_data: *mut std::ffi::c_void,
-    kind: sys::mln_resource_kind,
-    url: sys::mln_buffer_view,
-    out_response: *mut sys::mln_http_header_transform_response,
-) -> sys::mln_status {
-    let outcome = generated_invoke(
-        || sys::MLN_STATUS_NATIVE_ERROR,
-        |py| {
-            let callback_scope = GeneratedCallbackGuard::new();
-            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(sys::MLN_STATUS_NATIVE_ERROR);
-            };
-            match callback.bind(py).call1((
-                generated_value(py, kind)?,
-                generated_text(py, url)?,
-                Py::new(
-                    py,
-                    HttpHeaderTransformResponseScope {
-                        native: out_response as usize,
-                        scope: callback_scope.scope(),
-                    },
-                )?,
-            )) {
-                Ok(_) => Ok(sys::MLN_STATUS_OK),
-                Err(error) => Ok(generated_callback_status(
-                    py,
-                    error,
-                    sys::MLN_STATUS_NATIVE_ERROR,
-                )),
-            }
-        },
-    );
-    outcome
-}
-
 fn generated_copy_mln_image_content(
     py: Python<'_>,
     value: &sys::mln_image_content,
@@ -405,22 +369,18 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     message: sys::mln_buffer_view,
 ) -> bool {
     let outcome = generated_invoke(
-        || false,
+        || true,
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(false);
+                return Ok(true);
             };
-            let result = callback.bind(py).call1((
+            let _result = callback.bind(py).call1((
                 generated_value(py, severity)?,
                 generated_value(py, event)?,
                 generated_value(py, code)?,
                 generated_text(py, message)?,
             ))?;
-            if result.is_none() {
-                Ok(false)
-            } else {
-                result.extract::<bool>()
-            }
+            Ok(true)
         },
     );
     outcome
@@ -799,34 +759,6 @@ fn generated_copy_mln_quaternion(
     dict.set_item("z", generated_value(py, value.z)?)?;
     dict.set_item("w", generated_value(py, value.w)?)?;
     Ok(dict.into_any().unbind())
-}
-
-unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std::ffi::c_void) {
-    let outcome = generated_invoke(
-        || (),
-        |py| {
-            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(());
-            };
-            let _result = callback.bind(py).call1(())?;
-            Ok(())
-        },
-    );
-    outcome
-}
-
-unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut std::ffi::c_void) {
-    let outcome = generated_invoke(
-        || (),
-        |py| {
-            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
-                return Ok(());
-            };
-            let _result = callback.bind(py).call1(())?;
-            Ok(())
-        },
-    );
-    outcome
 }
 
 fn generated_copy_mln_render_abandon_result(
@@ -1788,6 +1720,7 @@ fn generated_input_mln_camera_transition_handler<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_camera_transition_handler_callback)
         } else {
@@ -1870,6 +1803,7 @@ fn generated_input_mln_custom_geometry_source_options<'py>(
             value.getattr("_invoke_cancel_tile")?.unbind(),
         ]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.fetch_tile = if fetch_tile_enabled {
             Some(generated_callback_mln_custom_geometry_source_options_fetch_tile)
         } else {
@@ -1907,6 +1841,7 @@ fn generated_input_mln_custom_vector_source_options<'py>(
             value.getattr("_invoke_cancel_tile")?.unbind(),
         ]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.fetch_tile = if fetch_tile_enabled {
             Some(generated_callback_mln_custom_vector_source_options_fetch_tile)
         } else {
@@ -2145,17 +2080,6 @@ fn generated_input_mln_http_header_transform<'py>(
         raw.rule_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
-    let callback_enabled = !value.getattr("callback")?.is_none();
-    if callback_enabled {
-        raw.user_data =
-            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
-        raw.callback = if callback_enabled {
-            Some(generated_callback_mln_http_header_transform_callback)
-        } else {
-            None
-        };
-    }
     Ok(raw)
 }
 
@@ -2215,6 +2139,7 @@ fn generated_input_mln_log_handler<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_log_handler_callback)
         } else {
@@ -2617,25 +2542,6 @@ fn generated_input_mln_queue_lock<'py>(
         raw.unlock = unsafe { std::mem::transmute::<usize, _>(native.callbacks[1]) };
         return Ok(raw);
     }
-    let lock_enabled = !value.getattr("lock")?.is_none();
-    let unlock_enabled = !value.getattr("unlock")?.is_none();
-    if lock_enabled || unlock_enabled {
-        raw.user_data = storage.register_callbacks(vec![
-            value.getattr("_invoke_lock")?.unbind(),
-            value.getattr("_invoke_unlock")?.unbind(),
-        ]);
-        raw.release_user_data = Some(generated_release_callbacks);
-        raw.lock = if lock_enabled {
-            Some(generated_callback_mln_queue_lock_lock)
-        } else {
-            None
-        };
-        raw.unlock = if unlock_enabled {
-            Some(generated_callback_mln_queue_lock_unlock)
-        } else {
-            None
-        };
-    }
     Ok(raw)
 }
 
@@ -2725,6 +2631,7 @@ fn generated_input_mln_resource_provider<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_provider_callback)
         } else {
@@ -2745,6 +2652,7 @@ fn generated_input_mln_resource_request_cancel_handler<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_request_cancel_handler_callback)
         } else {
@@ -2817,6 +2725,7 @@ fn generated_input_mln_resource_transform<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_transform_callback)
         } else {
@@ -2837,6 +2746,7 @@ fn generated_input_mln_runtime_event_handler<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_runtime_event_handler_callback)
         } else {
@@ -3191,6 +3101,7 @@ fn generated_input_mln_wake<'py>(
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
         raw.release_user_data = Some(generated_release_callbacks);
+        raw.queue = generated_dispatch_queue()?;
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_wake_callback)
         } else {
@@ -3499,35 +3410,6 @@ impl GraphicsDeviceHandle {
         let handle = reservation.handle();
         unsafe { call.run(|| sys::mln_graphics_device_release(handle)) };
         reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
-impl HttpHeaderTransformResponseScope {
-    #[pyo3(signature = (name, value))]
-    fn set_header(
-        &self,
-        py: Python<'_>,
-        name: &Bound<'_, PyAny>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let name_value = storage.buffer(name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), true)?;
-        let handle =
-            self.scope.pointer(self.native)? as *mut sys::mln_http_header_transform_response;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_http_header_transform_response_set_header(
-                    handle,
-                    name_value,
-                    value_value,
-                    diagnostic,
-                )
-            })
-        }?;
         Ok(py.None())
     }
 }
@@ -8343,8 +8225,6 @@ generated_owner!(
     "_AcquiredFrameHandle",
     mln_acquired_frame,
     Some(generated_dispose_mln_acquired_frame),
-    None,
-    false,
     |py, owner| GeneratedReadScope::with_native::<sys::mln_acquired_frame>(
         py,
         Arc::clone(&owner.state),
@@ -8356,79 +8236,55 @@ generated_owner!(
     GeoJsonSourceDataHandle,
     "_GeoJsonSourceDataHandle",
     mln_geo_json_source_data,
-    Some(generated_dispose_mln_geo_json_source_data),
-    None,
-    false
+    Some(generated_dispose_mln_geo_json_source_data)
 );
 generated_owner!(
     GraphicsDeviceHandle,
     "_GraphicsDeviceHandle",
     mln_graphics_device,
-    Some(generated_dispose_mln_graphics_device),
-    None,
-    false
+    Some(generated_dispose_mln_graphics_device)
 );
 generated_owner!(
     MapHandle,
     "_MapHandle",
     mln_map,
-    Some(generated_dispose_mln_map),
-    None,
-    false
+    Some(generated_dispose_mln_map)
 );
 generated_owner!(
     MapProjectionHandle,
     "_MapProjectionHandle",
     mln_map_projection,
-    Some(generated_dispose_mln_map_projection),
-    None,
-    false
+    Some(generated_dispose_mln_map_projection)
 );
 generated_owner!(
     RenderSessionHandle,
     "_RenderSessionHandle",
     mln_render_session,
-    Some(generated_dispose_mln_render_session),
-    None,
-    false
+    Some(generated_dispose_mln_render_session)
 );
 generated_owner!(
     ResourceRequestHandle,
     "_ResourceRequestHandle",
     mln_resource_request,
-    Some(generated_dispose_mln_resource_request),
-    None,
-    false
+    Some(generated_dispose_mln_resource_request)
 );
 generated_owner!(
     ResourceTransformRequestHandle,
     "_ResourceTransformRequestHandle",
     mln_resource_transform_request,
-    Some(generated_dispose_mln_resource_transform_request),
-    None,
-    false
+    Some(generated_dispose_mln_resource_transform_request)
 );
-unsafe extern "C" fn generated_exit_release_mln_runtime(
-    handle: sys::mln_runtime,
-    completion: *const sys::mln_completion,
-) -> sys::mln_status {
-    unsafe { sys::mln_runtime_release(handle, completion, std::ptr::null_mut()) }
-}
 generated_owner!(
     RuntimeHandle,
     "_RuntimeHandle",
     mln_runtime,
-    Some(generated_dispose_mln_runtime),
-    Some(generated_exit_release_mln_runtime),
-    false
+    Some(generated_dispose_mln_runtime)
 );
 generated_owner!(
     StyleExpressionHandle,
     "_StyleExpressionHandle",
     mln_style_expression,
-    Some(generated_dispose_mln_style_expression),
-    None,
-    false
+    Some(generated_dispose_mln_style_expression)
 );
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
@@ -8597,7 +8453,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResourceTransformRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
-    module.add_class::<HttpHeaderTransformResponseScope>()?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
@@ -8615,10 +8470,4 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
     Ok(())
-}
-
-#[pyclass(name = "_HttpHeaderTransformResponseScope")]
-struct HttpHeaderTransformResponseScope {
-    native: usize,
-    scope: GeneratedCallbackScope,
 }

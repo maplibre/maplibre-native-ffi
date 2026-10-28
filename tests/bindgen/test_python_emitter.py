@@ -424,7 +424,7 @@ mln_status mln_set_level(int32_t state, int32_t status, mln_diagnostic *out_diag
         generated = self.materialize(api)
         owners, values = generated.owners, generated.values
         # The handler hands its callback the received handle's owner.
-        values._wrap_response = lambda native, owner: (owner, native)
+        values._adopt_value = lambda native, owner: (owner, native)
         received = []
         handler = values.QueryHandler(
             callback=lambda text, query: received.append((text, query))

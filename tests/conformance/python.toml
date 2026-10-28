@@ -10,7 +10,7 @@
 "LIFE-01" = "bindings/python/tests/test_lifecycle.py::test_closing_twice_is_safe_and_a_closed_handle_refuses_use"
 "LIFE-02" = "bindings/python/tests/test_lifecycle.py::test_a_refused_close_leaves_the_handle_usable"
 "LIFE-03" = "bindings/python/tests/test_render.py::test_a_borrow_on_another_thread_holds_off_close"
-"LIFE-04" = "bindings/python/tests/test_lifecycle.py::test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed"
+"LIFE-04" = "bindings/python/tests/test_lifecycle.py::test_a_handle_abandoned_in_a_callback_is_reported_and_disposed"
 "LIFE-05" = "bindings/python/tests/test_lifecycle.py::test_a_child_keeps_its_parent_alive"
 "LIFE-06" = "bindings/python/tests/test_lifecycle.py::test_a_handle_id_names_its_events_and_outlives_close"
 "COMP-01" = "bindings/python/tests/test_future.py::test_callbacks_run_once_in_order_and_a_failed_conversion_releases_its_value"
@@ -22,7 +22,7 @@
 "CB-02" = "bindings/python/tests/test_callbacks.py::test_a_registered_callback_does_not_keep_its_receiver_alive"
 "CB-04" = "bindings/python/tests/test_callbacks.py::test_an_exception_in_a_callback_is_reported_and_contained"
 "CB-05" = "bindings/python/tests/test_callbacks.py::test_a_provider_can_answer_a_request_later_from_another_thread"
-"CB-06" = "bindings/python/tests/test_callbacks.py::test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread"
+"CB-06" = { na = "The binding exposes no scoped response object: the header transform is a native rule table, and providers and resource transforms answer through transferable handles (CB-05, CB-11)" }
 "CB-07" = "bindings/python/tests/test_callbacks.py::test_replacing_the_log_callback_releases_the_previous_one"
 "CB-08" = "bindings/python/tests/test_callbacks.py::test_a_registration_reported_as_rejected_is_not_rooted"
 "CB-09" = "bindings/python/tests/test_callbacks.py::test_a_camera_end_handler_is_rooted_until_it_runs"

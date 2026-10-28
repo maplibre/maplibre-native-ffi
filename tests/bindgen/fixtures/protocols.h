@@ -85,7 +85,8 @@ typedef struct mln_buffer_view {
   MLN_PROTOCOL_SIZE size;
 } mln_buffer_view;
 
-#if defined(MLN_PROTOCOL_QUEUE) || defined(MLN_PROTOCOL_COMPLETION_RUNTIME)
+#if defined(MLN_PROTOCOL_QUEUE) || defined(MLN_PROTOCOL_COMPLETION_RUNTIME) || \
+  defined(MLN_PROTOCOL_NESTED_REGISTRATION)
 typedef unsigned long long mln_delivery_queue BIND(
   "kind=handle;release=mln_delivery_queue_release;"
   "dispose=mln_delivery_queue_release"
@@ -236,13 +237,15 @@ mln_status mln_probe_settings_check(
 #endif
 
 #ifdef MLN_PROTOCOL_NESTED_REGISTRATION
-// A record that embeds a callback registration whose callback is nullable.
+// A record that embeds a wake whose callback is nullable, and which may name
+// a queue, as mln_wake does.
 typedef void (*mln_probe_notify)(void* user_data);
 typedef void (*mln_probe_notify_release)(void* user_data);
 typedef struct mln_probe_signal {
   mln_probe_notify callback BIND("nullable=true");
   void* user_data BIND("kind=context");
   mln_probe_notify_release release_user_data;
+  mln_delivery_queue queue BIND("kind=delivery_queue");
 } mln_probe_signal BIND("kind=callback_registration;release=release_user_data");
 typedef struct mln_probe_hooks {
   uint32_t size;

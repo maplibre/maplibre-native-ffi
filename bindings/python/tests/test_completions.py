@@ -14,6 +14,7 @@ from support import (
     EMPTY_STYLE,
     TIMEOUT,
     Harness,
+    denied_response,
     leak_reports,
     map_options,
     result,
@@ -66,7 +67,7 @@ def test_a_rejected_submission_frees_its_future(
     assert made[0]() is None
 
 
-def test_a_done_callback_runs_off_the_native_thread_and_can_wait_on_native(
+def test_a_done_callback_runs_off_the_dispatcher_thread_and_can_wait_on_native(
     map_handle: mln.MapHandle,
 ) -> None:
     finished = threading.Event()
@@ -102,31 +103,21 @@ def test_a_failed_command_raises_its_status_and_generation(
 def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    handles: list[mln.ResourceRequestHandle] = []
     provided = threading.Event()
-    running = threading.Event()
     release = threading.Event()
 
     def hold(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> None:
-        handles.append(handle)
         provided.set()
-
-    def block_retirement() -> None:
-        running.set()
         release.wait(TIMEOUT)
+        handle.complete(denied_response())
 
+    # The provider holds the dispatcher thread, so no completion resolves
+    # until it returns.
     harness.routes["custom://pending.json"] = hold
     map_handle.set_style_url("custom://pending.json")
     assert provided.wait(TIMEOUT)
-    handle = handles.pop()
-    handle.set_cancel_callback(mln.ResourceRequestCancelHandler(block_retirement))
-
-    # Map retirement runs the cancel callback, and the runtime's ordered
-    # submissions hold every later creation behind it.
-    closing = map_handle.close()
-    assert running.wait(TIMEOUT)
     created = harness.runtime.create_map(map_options())
     awaited = harness.runtime.create_map(map_options())
     ready = created.ready
@@ -135,7 +126,7 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
     assert ready.cancel() is True
     with pytest.raises(CancelledError):
         ready.result(timeout=0)
-    # A waiter wakes at once, though native has not reached the creation.
+    # A waiter wakes at once, though the creation has not resolved.
     assert wait([ready], timeout=0).done == {ready}
 
     async def wait_briefly() -> None:
@@ -148,13 +139,11 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
 
     with leak_reports() as reports:
         release.set()
-        assert result(closing) is None
-        handle.close()
         # Native work continues past the abandoned waits. A later runtime
         # command resolves once both creations have finished, and the maps
         # stay with their owner, which closes them.
         result(harness.runtime.clear_resource_transform())
-        for owner in (created.map, awaited.map):
+        for owner in (created.map, awaited.map, map_handle):
             assert owner.get_snapshot() is not None
             assert result(owner.close()) is None
         assert result(harness.runtime.close()) is None

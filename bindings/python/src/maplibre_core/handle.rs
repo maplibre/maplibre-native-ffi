@@ -25,25 +25,14 @@ pub fn report_leak(leak: NativeHandleLeak) {
     );
 }
 
-/// Shared ownership bookkeeping for a generational native id.
-///
-/// Counted owners protect copies from borrowed output that native cannot see.
-/// A release fails with INVALID_STATE during a copy, and new reads fail while
-/// that release runs. Other owners let native serialize calls and releases.
+/// Ownership bookkeeping for a generational native id. Native serializes
+/// calls and releases, so this records only whether ownership has ended.
 #[derive(Debug)]
 pub struct HandleState<T: NativeHandle> {
     raw: u64,
     _typed: std::marker::PhantomData<fn() -> T>,
     type_name: &'static str,
-    tracks_borrowed_output: bool,
-    state: Mutex<Ownership>,
-}
-
-#[derive(Debug, Default)]
-struct Ownership {
-    released: bool,
-    readers: usize,
-    releasing: bool,
+    released: Mutex<bool>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -51,12 +40,8 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl<T: NativeHandle> HandleState<T> {
-    /// Records an owned id and whether copies need a read guard.
-    pub fn new(
-        raw: T,
-        type_name: &'static str,
-        tracks_borrowed_output: bool,
-    ) -> super::Result<Self> {
+    /// Records an owned id.
+    pub fn new(raw: T, type_name: &'static str) -> super::Result<Self> {
         if raw.to_raw() == 0 {
             return Err(super::Error::invalid_argument(
                 "native handle must not be zero",
@@ -66,8 +51,7 @@ impl<T: NativeHandle> HandleState<T> {
             raw: raw.to_raw(),
             _typed: std::marker::PhantomData,
             type_name,
-            tracks_borrowed_output,
-            state: Mutex::new(Ownership::default()),
+            released: Mutex::new(false),
         })
     }
 
@@ -78,67 +62,28 @@ impl<T: NativeHandle> HandleState<T> {
 
     /// Reports whether native accepted a release or another consuming call.
     pub fn is_released(&self) -> bool {
-        lock(&self.state).released
+        *lock(&self.released)
     }
 
-    /// Holds off release until borrowed output has been copied.
-    pub fn read(self: &Arc<Self>) -> super::Result<NativeRead<T>> {
-        let mut state = lock(&self.state);
-        if state.releasing {
-            return Err(Self::in_use());
-        }
-        state.readers += 1;
-        Ok(NativeRead {
-            owner: Arc::clone(self),
-            native: self.raw(),
-        })
-    }
-
-    /// Fails during a borrowed-output copy; counted owners also block new reads
-    /// until the returned guard drops. Native serializes other releases.
-    pub fn reserve(self: &Arc<Self>) -> super::Result<ReleaseReservation<T>> {
-        let mut state = lock(&self.state);
-        self.reserve_locked(&mut state)
-    }
-
-    fn reserve_locked(
-        self: &Arc<Self>,
-        state: &mut Ownership,
-    ) -> super::Result<ReleaseReservation<T>> {
-        if state.readers != 0 || state.releasing {
-            return Err(Self::in_use());
-        }
-        state.releasing = self.tracks_borrowed_output;
-        Ok(ReleaseReservation {
+    /// Starts a consuming call, which ends ownership once committed.
+    pub fn reserve(self: &Arc<Self>) -> ReleaseReservation<T> {
+        ReleaseReservation {
             owner: Arc::clone(self),
             accepted: false,
-        })
-    }
-
-    /// Marks ownership released only when native accepts the consuming call.
-    pub fn close_with<R>(
-        self: &Arc<Self>,
-        close: impl FnOnce(T) -> super::Result<R>,
-    ) -> super::Result<R> {
-        let mut reservation = self.reserve()?;
-        let result = close(self.raw());
-        if result.is_ok() {
-            reservation.commit();
         }
-        result
     }
 
     /// Transfers an unreleased handle to disposal and reports a refused disposal.
-    /// The caller schedules this closure where its host can safely call native.
+    /// The caller runs this closure where its host can safely call native.
     pub fn finalizer(
         &self,
         dispose: impl FnOnce(T) -> super::Result<()> + Send + 'static,
     ) -> Option<impl FnOnce() + Send + 'static> {
-        let mut state = lock(&self.state);
-        if state.released {
+        let mut released = lock(&self.released);
+        if *released {
             return None;
         }
-        state.released = true;
+        *released = true;
         let id = self.raw;
         let type_name = self.type_name;
         Some(move || {
@@ -147,24 +92,9 @@ impl<T: NativeHandle> HandleState<T> {
             }
         })
     }
-
-    fn in_use() -> super::Error {
-        super::Error::new(super::Status::InvalidState, "borrowed output is in use")
-    }
 }
 
-/// A borrowed-output copy in progress; dropping it permits release again.
-pub struct NativeRead<T: NativeHandle> {
-    owner: Arc<HandleState<T>>,
-    pub native: T,
-}
-impl<T: NativeHandle> Drop for NativeRead<T> {
-    fn drop(&mut self) {
-        lock(&self.owner.state).readers -= 1;
-    }
-}
-
-/// A consuming call in progress, with rollback when native refuses it.
+/// A consuming call in progress, which ends ownership once committed.
 pub struct ReleaseReservation<T: NativeHandle> {
     owner: Arc<HandleState<T>>,
     accepted: bool,
@@ -179,8 +109,6 @@ impl<T: NativeHandle> ReleaseReservation<T> {
 }
 impl<T: NativeHandle> Drop for ReleaseReservation<T> {
     fn drop(&mut self) {
-        let mut state = lock(&self.owner.state);
-        state.released |= self.accepted;
-        state.releasing = false;
+        *lock(&self.owner.released) |= self.accepted;
     }
 }

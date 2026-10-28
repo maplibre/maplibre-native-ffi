@@ -1,14 +1,17 @@
 """How a callback registration reaches a host that runs no code on native threads.
 
 Dart isolates and Node-API realms run host code only on their own thread, after
-native code returns. Such a host gives each registration one of five forms:
+native code returns, and Python runs it only on its binding's dispatcher
+thread. Such a host gives each registration one of five forms:
 
 - `queue`: the registration names a delivery queue, and every callback has a
-  queue delivery. The host sets its queue and a token in place of the
-  callbacks; native code answers each call itself and queues a copy, which the
-  host drains on its own thread and dispatches by the token.
-- `wake`: the registration's one callback only asks to be called again. The
-  host supplies a wake that posts to its thread and leaves the queue unset.
+  queue delivery. Native code answers each call itself and queues it. Dart and
+  TypeScript set the queue and a token in place of the callbacks, drain copies
+  on their own thread, and dispatch them by the token. Python keeps the
+  callbacks, which the dispatcher thread runs when it dispatches the queue.
+- `wake`: the registration's one callback only asks to be called again. Dart
+  and TypeScript supply a wake that posts to their thread and leave the queue
+  unset; Python names its queue, so the dispatcher thread runs the callback.
 - `rules`: every callback must answer on its native thread and has no queue
   delivery. The host leaves them unset, so the native rules that the
   registration carries answer each call.
@@ -18,12 +21,11 @@ native code returns. Such a host gives each registration one of five forms:
   a record with a native default keeps such a field at its disabled default.
 
 A wake also accepts a native registration, which skips the post to the host's
-thread. Python, Kotlin, .NET, and Go accept one for the same registrations:
-each of their callbacks enters the language runtime on the native thread, by
-taking the interpreter lock or by a garbage-collector transition, which a
-native function never needs.
+thread. Kotlin, .NET, and Go accept one for the same registrations: each of
+their callbacks enters the language runtime on the native thread by a
+garbage-collector transition, which a native function never needs.
 
-Both the Dart and the TypeScript emitters choose a registration's form here.
+The Dart, TypeScript, and Python emitters choose a registration's form here.
 """
 
 from __future__ import annotations
@@ -54,8 +56,8 @@ def wake_callback(callback: CallbackPlan) -> bool:
 
 
 def is_wake(bound: BoundApi, value: ValuePlan) -> bool:
-    """Whether a registration is a wake: its one callback is a wake callback.
-    The host leaves the wake's queue unset."""
+    """Whether a registration is a wake: its one callback is a wake callback,
+    whatever its queue member."""
     if not value.registration:
         return False
     callbacks = callback_fields(value)

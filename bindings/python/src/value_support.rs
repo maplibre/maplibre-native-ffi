@@ -281,7 +281,6 @@ impl Drop for GeneratedCallbackRootOwner {
 }
 
 unsafe extern "C" fn generated_release_callbacks(user_data: *mut c_void) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
     // SAFETY: native releases the accepted descriptor exactly once at quiescence.
     let root = unsafe { Box::from_raw(user_data.cast::<Arc<GeneratedCallbackRoot>>()) };
     drop(GeneratedCallbackRootOwner(*root));
@@ -377,57 +376,16 @@ impl GeneratedReadScope {
     }
 }
 
-#[derive(Clone)]
-struct GeneratedCallbackScope {
-    alive: Arc<std::sync::atomic::AtomicBool>,
-    thread: std::thread::ThreadId,
-}
-
-impl GeneratedCallbackScope {
-    fn pointer(&self, pointer: usize) -> PyResult<usize> {
-        // A scope expires for every thread when its callback returns, so the
-        // expiry is reported first, wherever the call comes from.
-        if !self.alive.load(Ordering::Acquire) || pointer == 0 {
-            return Err(invalid_state_error("response callback has returned"));
-        }
-        if self.thread != std::thread::current().id() {
-            return Err(invalid_state_error(
-                "response belongs to its callback thread",
-            ));
-        }
-        Ok(pointer)
+/// Runs a native disposal or release where its owner drops, with the
+/// interpreter detached, or as is during interpreter finalization. Python
+/// code runs on no native callback stack but the dispatcher's, where a call
+/// may dispose any owner.
+fn generated_finalize(call: impl FnOnce() + Send) {
+    let mut call = Some(call);
+    Python::try_attach(|py| py.detach(|| (call.take().unwrap())()));
+    if let Some(call) = call {
+        call();
     }
-}
-
-struct GeneratedCallbackGuard(GeneratedCallbackScope);
-
-impl GeneratedCallbackGuard {
-    fn new() -> Self {
-        Self(GeneratedCallbackScope {
-            alive: Arc::new(std::sync::atomic::AtomicBool::new(true)),
-            thread: std::thread::current().id(),
-        })
-    }
-
-    fn scope(&self) -> GeneratedCallbackScope {
-        self.0.clone()
-    }
-}
-
-impl Drop for GeneratedCallbackGuard {
-    fn drop(&mut self) {
-        self.0.alive.store(false, Ordering::Release);
-    }
-}
-
-fn generated_finalize(call: impl FnOnce() + Send + 'static) {
-    maplibre_core::callback::finalize(move || {
-        let mut call = Some(call);
-        Python::try_attach(|py| py.detach(call.take().unwrap()));
-        if let Some(call) = call {
-            call();
-        }
-    });
 }
 
 /// Iterates a native extensible record array while its owner remains reserved.

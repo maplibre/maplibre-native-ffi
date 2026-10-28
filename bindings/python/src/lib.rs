@@ -1,8 +1,5 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
-// A verbatim copy of the former core crate, whose unused items stay until the
-// extension moves onto the safe crate.
-#[allow(dead_code)]
 #[path = "maplibre_core/mod.rs"]
 mod maplibre_core;
 
@@ -19,6 +16,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 include!("value_support.rs");
 include!("call_support.rs");
+include!("dispatcher.rs");
 include!("generated_operations.rs");
 
 include!("generated_errors.rs");
@@ -28,9 +26,6 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     handle: Arc<maplibre_core::handle::HandleState<T>>,
     callback_roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
-    /// The release that interpreter shutdown starts and waits for, for a
-    /// root handle whose release reports retirement through a completion.
-    exit_release: Option<ExitReleaseFn<T>>,
     type_name: &'static str,
 }
 
@@ -42,18 +37,11 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     /// `handle` must be a live handle of the matching native type owned by the
     /// caller, which must later close this state with the matching C API
     /// destroy function.
-    unsafe fn from_handle(
-        handle: T,
-        type_name: &'static str,
-        counted: bool,
-    ) -> Result<Self, Error> {
+    unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self, Error> {
         Ok(Self {
-            handle: Arc::new(maplibre_core::handle::HandleState::new(
-                handle, type_name, counted,
-            )?),
+            handle: Arc::new(maplibre_core::handle::HandleState::new(handle, type_name)?),
             callback_roots: Vec::new(),
             dispose_abandoned: None,
-            exit_release: None,
             type_name,
         })
     }
@@ -103,11 +91,6 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
         self
     }
 
-    fn with_exit_release(mut self, release: ExitReleaseFn<T>) -> Self {
-        self.exit_release = Some(release);
-        self
-    }
-
     fn is_closed(&self) -> bool {
         self.handle.is_released()
     }
@@ -135,69 +118,30 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
     }
 }
 
-/// The longest interpreter shutdown waits for its runtimes to retire.
-const EXIT_RETIREMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// The render sessions that interpreter shutdown abandons. Python owns these
+/// sessions, which core cannot tell from those that other code in the process
+/// owns.
+static GENERATED_SESSIONS: Mutex<
+    Vec<std::sync::Weak<Mutex<NativeHandleState<sys::mln_render_session>>>>,
+> = Mutex::new(Vec::new());
 
-type ExitReleaseFn<T> = unsafe extern "C" fn(T, *const sys::mln_completion) -> sys::mln_status;
-
-/// An owner that interpreter shutdown retires. The interpreter finalizes before
-/// the C runtime's exit handlers run, so native callbacks into it must stop
-/// first, and releasing each root owner and waiting for its completion stops
-/// them.
-trait ExitOwner: Send + Sync {
-    fn releases_at_exit(&self) -> bool;
-    fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status;
-    /// Marks an unreleased owner for shutdown. Borrowed output reads keep
-    /// their owner in place until the copy ends.
-    fn take_at_exit(&self) -> Option<u64>;
-    fn dispose_at_exit(&self, raw: u64);
+/// Shares a new owner's state, and enrolls a render session for abandonment
+/// at interpreter shutdown.
+fn generated_owner_state<T: maplibre_core::handle::NativeHandle>(
+    state: NativeHandleState<T>,
+) -> Arc<Mutex<NativeHandleState<T>>> {
+    let state = Arc::new(Mutex::new(state));
+    let shared: Arc<dyn std::any::Any + Send + Sync> = state.clone();
+    if let Ok(session) = shared.downcast::<Mutex<NativeHandleState<sys::mln_render_session>>>() {
+        let mut sessions = generated_lock(&GENERATED_SESSIONS);
+        sessions.retain(|session| session.strong_count() != 0);
+        sessions.push(Arc::downgrade(&session));
+    }
+    state
 }
 
-impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleState<T>> {
-    fn releases_at_exit(&self) -> bool {
-        self.lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .exit_release
-            .is_some()
-    }
-
-    fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status {
-        let Some(release) = self.lock().unwrap_or_else(|p| p.into_inner()).exit_release else {
-            return sys::MLN_STATUS_INVALID_STATE;
-        };
-        // SAFETY: take_at_exit retained this owner's id for shutdown.
-        unsafe { release(T::from_raw(raw), completion) }
-    }
-
-    fn take_at_exit(&self) -> Option<u64> {
-        let state = self.lock().unwrap_or_else(|p| p.into_inner());
-        if state.handle.is_released() || state.dispose_abandoned.is_none() {
-            return None;
-        }
-        let mut reservation = state.handle.reserve().ok()?;
-        let raw = reservation.handle().to_raw();
-        reservation.commit();
-        Some(raw)
-    }
-
-    fn dispose_at_exit(&self, raw: u64) {
-        let state = self.lock().unwrap_or_else(|p| p.into_inner());
-        let (Some(dispose), type_name) = (state.dispose_abandoned, state.type_name) else {
-            return;
-        };
-        drop(state);
-        end_graphics_at_exit::<T>(raw);
-        // SAFETY: take_at_exit retained this owner's id for shutdown.
-        if unsafe { dispose(T::from_raw(raw)) } != sys::MLN_STATUS_OK {
-            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
-                type_name,
-                id: raw,
-            });
-        }
-    }
-}
-
-/// Ends a render session's graphics calls before shutdown disposes it.
+/// Ends the graphics calls of every render session that Python still owns,
+/// then disposes it.
 ///
 /// Disposal alone would detach an attached session on its worker while the
 /// process exits, and graphics drivers tear down their own state in exit
@@ -208,142 +152,41 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
 /// exits, so the disposal that follows makes no graphics call either. A
 /// session that refuses abandonment, such as one inside a caller-driven call,
 /// is disposed as it is.
-fn end_graphics_at_exit<T: 'static>(raw: u64) {
-    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<sys::mln_render_session>() {
-        return;
-    }
-    let mut result = sys::mln_render_abandon_result {
-        size: std::mem::size_of::<sys::mln_render_abandon_result>() as u32,
-        disposition: 0,
-        quarantined_resource_count: 0,
-        reserved: 0,
-    };
-    // SAFETY: the caller holds sole ownership of the live session, and result
-    // is a writable, correctly sized output.
-    let _ = unsafe {
-        sys::mln_binding_render_session_abandon_at_exit(
-            sys::mln_render_session(raw),
-            &mut result,
-            ptr::null_mut(),
-        )
-    };
-}
-
-struct ExitOwners {
-    owners: Vec<std::sync::Weak<dyn ExitOwner>>,
-    prune_at: usize,
-}
-
-static EXIT_OWNERS: Mutex<ExitOwners> = Mutex::new(ExitOwners {
-    owners: Vec::new(),
-    prune_at: 64,
-});
-
-/// Shares a new owner's state and enrolls it for retirement at interpreter
-/// shutdown. The first owner that shutdown releases registers the hook.
-fn generated_owner_state<T: maplibre_core::handle::NativeHandle>(
-    state: NativeHandleState<T>,
-) -> Arc<Mutex<NativeHandleState<T>>> {
-    let state = Arc::new(Mutex::new(state));
-    let owner: Arc<dyn ExitOwner> = state.clone();
-    if owner.releases_at_exit() {
-        static REGISTERED: std::sync::atomic::AtomicBool =
-            std::sync::atomic::AtomicBool::new(false);
-        if !REGISTERED.swap(true, Ordering::AcqRel) {
-            Python::attach(|py| {
-                let registered = wrap_pyfunction!(retire_owners_at_exit, py)
-                    .and_then(|hook| py.import("atexit")?.call_method1("register", (hook,)));
-                if let Err(error) = registered {
-                    error.write_unraisable(py, None);
-                }
+fn generated_abandon_sessions_at_exit() {
+    let sessions = std::mem::take(&mut *generated_lock(&GENERATED_SESSIONS));
+    for session in sessions.iter().filter_map(std::sync::Weak::upgrade) {
+        let state = generated_lock(&session);
+        let Some(dispose) = state.dispose_abandoned else {
+            continue;
+        };
+        let type_name = state.type_name;
+        if state.handle.is_released() {
+            continue;
+        }
+        let mut reservation = state.handle.reserve();
+        let raw = reservation.handle();
+        reservation.commit();
+        drop(reservation);
+        drop(state);
+        let mut result = sys::mln_render_abandon_result {
+            size: std::mem::size_of::<sys::mln_render_abandon_result>() as u32,
+            disposition: 0,
+            quarantined_resource_count: 0,
+            reserved: 0,
+        };
+        // SAFETY: the committed reservation took sole ownership of the live
+        // session, and result is a writable, correctly sized output.
+        let _ = unsafe {
+            sys::mln_binding_render_session_abandon_at_exit(raw, &mut result, ptr::null_mut())
+        };
+        // SAFETY: the reservation transferred the session to this disposal.
+        if unsafe { dispose(raw) } != sys::MLN_STATUS_OK {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name,
+                id: raw.to_raw(),
             });
         }
     }
-    let mut registry = EXIT_OWNERS.lock().unwrap_or_else(|p| p.into_inner());
-    if registry.owners.len() >= registry.prune_at {
-        registry.owners.retain(|owner| owner.strong_count() != 0);
-        registry.prune_at = (registry.owners.len() * 2).max(64);
-    }
-    registry.owners.push(Arc::downgrade(&owner));
-    state
-}
-
-struct ExitRelease {
-    retired: Mutex<bool>,
-    signal: std::sync::Condvar,
-}
-
-unsafe extern "C" fn complete_exit_release(
-    user_data: *mut c_void,
-    _result: *const sys::mln_completion_result,
-) {
-    // SAFETY: native owns one reference from accepted release until its
-    // release callback.
-    let release = unsafe { &*user_data.cast::<ExitRelease>() };
-    *release.retired.lock().unwrap_or_else(|p| p.into_inner()) = true;
-    release.signal.notify_all();
-}
-
-unsafe extern "C" fn release_exit_release(user_data: *mut c_void) {
-    // SAFETY: native releases accepted completion state exactly once.
-    drop(unsafe { Arc::from_raw(user_data.cast::<ExitRelease>()) });
-}
-
-/// Disposes every owner the interpreter still holds, ending each render
-/// session's graphics calls first, then releases each root owner and waits
-/// for its retirement, so no native thread can call into a finalized
-/// interpreter.
-#[pyfunction]
-fn retire_owners_at_exit(py: Python<'_>) {
-    let owners: Vec<Arc<dyn ExitOwner>> =
-        std::mem::take(&mut EXIT_OWNERS.lock().unwrap_or_else(|p| p.into_inner()).owners)
-            .iter()
-            .filter_map(std::sync::Weak::upgrade)
-            .collect();
-    // Native threads finishing this work may need the GIL to deliver results
-    // and release callbacks.
-    py.detach(move || {
-        for owner in owners.iter().filter(|owner| !owner.releases_at_exit()) {
-            if let Some(raw) = owner.take_at_exit() {
-                owner.dispose_at_exit(raw);
-            }
-        }
-        let mut releases = Vec::new();
-        for owner in owners.iter().filter(|owner| owner.releases_at_exit()) {
-            let Some(raw) = owner.take_at_exit() else {
-                continue;
-            };
-            let release = Arc::new(ExitRelease {
-                retired: Mutex::new(false),
-                signal: std::sync::Condvar::new(),
-            });
-            let completion = sys::mln_completion {
-                size: std::mem::size_of::<sys::mln_completion>() as u32,
-                callback: Some(complete_exit_release),
-                user_data: Arc::into_raw(Arc::clone(&release)).cast_mut().cast(),
-                release_user_data: Some(release_exit_release),
-                queue: sys::mln_delivery_queue(0),
-            };
-            let status = owner.release_at_exit(raw, &completion);
-            if status == sys::MLN_STATUS_OK {
-                releases.push(release);
-            } else {
-                // SAFETY: a rejected release retains no completion state.
-                drop(unsafe { Arc::from_raw(completion.user_data.cast::<ExitRelease>()) });
-                // A pending child keeps release from starting, so retirement
-                // proceeds unobserved.
-                owner.dispose_at_exit(raw);
-            }
-        }
-        let deadline = std::time::Instant::now() + EXIT_RETIREMENT_TIMEOUT;
-        for release in releases {
-            let retired = release.retired.lock().unwrap_or_else(|p| p.into_inner());
-            let timeout = deadline.saturating_duration_since(std::time::Instant::now());
-            let _ = release
-                .signal
-                .wait_timeout_while(retired, timeout, |retired| !*retired);
-        }
-    });
 }
 
 type PyCompletionConverter =
@@ -369,7 +212,6 @@ unsafe extern "C" fn complete_python_future(
     user_data: *mut c_void,
     result: *const sys::mln_completion_result,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
     if user_data.is_null() || result.is_null() {
         return;
     }
@@ -424,7 +266,6 @@ unsafe extern "C" fn complete_python_future(
 }
 
 unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
     if !user_data.is_null() {
         // SAFETY: native releases accepted completion state exactly once.
         let bridge = unsafe { Box::from_raw(user_data.cast::<PyCompletionBridge>()) };
@@ -434,7 +275,8 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
     }
 }
 
-/// Submits a completion-based call and returns the future it resolves.
+/// Submits a completion-based call and returns the future it resolves on the
+/// dispatcher thread.
 ///
 /// `convert` receives only a result whose status is OK.
 fn submit_python_future<S, C>(py: Python<'_>, submit: S, convert: C) -> PyResult<Py<PyAny>>
@@ -442,6 +284,7 @@ where
     S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
+    let queue = generated_dispatch_queue()?;
     let future = new_python_future(py)?.unbind();
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
@@ -453,7 +296,7 @@ where
         callback: Some(complete_python_future),
         user_data: bridge.cast(),
         release_user_data: Some(release_python_future),
-        queue: sys::mln_delivery_queue(0),
+        queue,
     };
     if let Err(error) = maplibre_core::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions retain no callback state.
@@ -526,6 +369,7 @@ fn native_error(diagnostic: impl Into<String>) -> PyErr {
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
     module.add_class::<GeneratedNativeRegistration>()?;
+    module.add_function(wrap_pyfunction!(generated_on_dispatcher_thread, module)?)?;
     register_generated_functions(module)?;
     Ok(())
 }

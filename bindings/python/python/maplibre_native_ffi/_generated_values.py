@@ -8,11 +8,10 @@ from enum import IntFlag
 from typing import TYPE_CHECKING, Any, Protocol
 
 from ._enum import UnknownIntEnum
-from ._operation import _wrap_response
+from ._operation import _adopt_value
 
 if TYPE_CHECKING:
     from ._generated_owners import (
-        HttpHeaderTransformResponseScope,
         ResourceRequestHandle,
         ResourceTransformRequestHandle,
     )
@@ -1135,7 +1134,8 @@ class CameraTransitionEnd:
 @dataclass(frozen=True, slots=True)
 class CameraTransitionHandler:
     """Callback that one camera command copies to report the end of its
-    transitions. The callback runs on the runtime worker.
+    transitions. The callback runs on the binding's dispatcher thread, after
+    native queues the call.
 
     See `mln_camera_transition_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1197,8 +1197,8 @@ class CanonicalTileId:
 
 @dataclass(frozen=True, slots=True)
 class CustomGeometrySourceOptions:
-    """Options for custom geometry sources. The callback may run on any native
-    worker thread, concurrently with runtime and map calls.
+    """Options for custom geometry sources. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_custom_geometry_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1232,8 +1232,8 @@ class CustomGeometrySourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class CustomVectorSourceOptions:
-    """Options for custom vector sources. The callback may run on any native
-    worker thread, concurrently with runtime and map calls.
+    """Options for custom vector sources. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_custom_vector_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1560,9 +1560,7 @@ class HttpHeaderRule:
     """The URL or glob pattern to compare."""
 
     headers: Sequence[HttpHeader] = ()
-    """The headers to set. Registration validates each one as
-    `HttpHeaderTransformResponseScope.set_header()` does.
-    """
+    """The headers to set."""
 
     def __post_init__(self):
         object.__setattr__(self, "headers", _sequence(self.headers))
@@ -1579,28 +1577,17 @@ class HttpHeaderRule:
 
 @dataclass(frozen=True, slots=True)
 class HttpHeaderTransform:
-    """HTTP header transform state: a callback, or native header rules. The
-    callback runs synchronously on a MapLibre worker or network thread.
+    """HTTP header transform state: a callback, or native header rules.
 
     See `mln_http_header_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: HttpHeaderTransformCallback | None = None
     rules: Sequence[HttpHeaderRule] = ()
     """Header rules for a transform without a callback; empty with one."""
 
     def __post_init__(self):
         object.__setattr__(self, "rules", _sequence(self.rules))
-
-    def _invoke_callback(self, kind, url, out_response):
-        callback = self.callback
-        assert callback is not None
-        return callback(
-            ResourceKind(kind),
-            url,
-            _wrap_response(out_response, "HttpHeaderTransformResponseScope"),
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1684,9 +1671,8 @@ class LatLngBounds:
 
 @dataclass(frozen=True, slots=True)
 class LogHandler:
-    """Process-global log callback. The callback runs synchronously on the
-    thread that emits the record, or on a MapLibre background thread for a
-    severity that `set_log_async_severity_mask()` dispatches asynchronously.
+    """Process-global log callback. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_log_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2580,25 +2566,11 @@ class Quaternion:
 @dataclass(frozen=True, slots=True)
 class QueueLock:
     """Host lock on the graphics queue that a session shares with its host,
-    copied by a successful attach. The callback runs on the session's
-    graphics thread or on the thread that abandons the session.
+    copied by a successful attach.
 
     See `mln_queue_lock` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
-
-    lock: QueueLockCallback | None = None
-    unlock: QueueLockCallback | None = None
-
-    def _invoke_lock(self):
-        callback = self.lock
-        assert callback is not None
-        return callback()
-
-    def _invoke_unlock(self):
-        callback = self.unlock
-        assert callback is not None
-        return callback()
 
     @classmethod
     def native(
@@ -2949,8 +2921,8 @@ class RenderingStats:
 
 @dataclass(frozen=True, slots=True)
 class ResourceProvider:
-    """Resource provider state. The callback runs synchronously on a MapLibre
-    thread.
+    """Resource provider state. The callback runs on the binding's dispatcher
+    thread, after native queues the call.
 
     See `mln_resource_provider` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2965,7 +2937,7 @@ class ResourceProvider:
 
     def _invoke_callback(self, request, handle):
         callback = self.callback
-        handle = _wrap_response(handle, "ResourceRequestHandle")
+        handle = _adopt_value(handle, "ResourceRequestHandle")
         try:
             return callback(ResourceRequestInfo._from_native(request), handle)
         except BaseException:
@@ -2995,10 +2967,7 @@ class ResourceRange:
 @dataclass(frozen=True, slots=True)
 class ResourceRequestCancelHandler:
     """Cancel callback for one handled resource request. The callback runs on
-    the thread that discards the request, never a host thread: the runtime's
-    native scheduler thread when a committed map or runtime command discards
-    it, such as a style change or map destruction, and a MapLibre worker
-    thread otherwise.
+    the binding's dispatcher thread, after native queues the call.
 
     See `mln_resource_request_cancel_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3132,7 +3101,8 @@ class ResourceRoute:
 
 @dataclass(frozen=True, slots=True)
 class ResourceTransform:
-    """Resource transform state. The callback runs on a MapLibre network thread.
+    """Resource transform state. The callback runs on the binding's dispatcher
+    thread, after native queues the call.
 
     See `mln_resource_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3142,7 +3112,7 @@ class ResourceTransform:
 
     def _invoke_callback(self, kind, url, request):
         callback = self.callback
-        request = _wrap_response(request, "ResourceTransformRequestHandle")
+        request = _adopt_value(request, "ResourceTransformRequestHandle")
         try:
             return callback(ResourceKind(kind), url, request)
         except BaseException:
@@ -3257,9 +3227,8 @@ class RuntimeEventGlyphs:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventHandler:
-    """Runtime and map event callback. Map events arrive on the runtime's native
-    scheduler thread, and offline events may arrive on a MapLibre worker
-    thread.
+    """Runtime and map event callback. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_runtime_event_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4304,8 +4273,8 @@ class VulkanTextureFrame:
 class Wake:
     """Receiver wake callback copied by a successful owning call. The callback
     schedules service by the receiver and returns without waiting for another
-    thread. Native code may invoke the callback from any thread, and calls
-    may coalesce or overlap.
+    thread. The callback runs on the binding's dispatcher thread, after
+    native queues the call.
 
     See `mln_wake` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -4417,7 +4386,7 @@ class WglContextDescriptor:
 
 class CameraTransitionEndCallback(Protocol):
     """Receives the end of one camera command's transitions. The callback runs
-    on the runtime worker.
+    on the binding's dispatcher thread, after native queues the call.
 
     See `mln_camera_transition_end_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4428,8 +4397,8 @@ class CameraTransitionEndCallback(Protocol):
 
 class CustomSourceCancelTileCallback(Protocol):
     """Cancels a request for one tile of a custom geometry or custom vector
-    source, best effort. The callback may run on any native worker thread,
-    concurrently with runtime and map calls.
+    source, best effort. The callback runs on the binding's dispatcher
+    thread, after native queues the call.
 
     See `mln_custom_source_cancel_tile_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4440,8 +4409,8 @@ class CustomSourceCancelTileCallback(Protocol):
 
 class CustomSourceFetchTileCallback(Protocol):
     """Requests one tile of a custom geometry or custom vector source. The
-    callback may run on any native worker thread, concurrently with runtime
-    and map calls.
+    callback runs on the binding's dispatcher thread, after native queues the
+    call.
 
     See `mln_custom_source_fetch_tile_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4450,61 +4419,22 @@ class CustomSourceFetchTileCallback(Protocol):
     def __call__(self, tile_id: CanonicalTileId, /) -> None: ...
 
 
-class HttpHeaderTransformCallback(Protocol):
-    """Adds end-to-end headers to one outgoing HTTP request attempt. The
-    callback runs synchronously on a MapLibre worker or network thread.
-
-    See `mln_http_header_transform_callback` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-
-    Return to succeed. Raising a `MaplibreError` whose status is not
-    `Status.OK` fails the call with that status. Any other exception fails it
-    with `Status.NATIVE_ERROR` and is reported to `sys.unraisablehook`.
-    """
-
-    def __call__(
-        self,
-        kind: ResourceKind,
-        url: str,
-        out_response: HttpHeaderTransformResponseScope,
-        /,
-    ) -> None: ...
-
-
 class LogCallback(Protocol):
-    """Receives a MapLibre Native log record. The callback runs synchronously on
-    the thread that emits the record, or on a MapLibre background thread for
-    a severity that `set_log_async_severity_mask()` dispatches
-    asynchronously.
+    """Receives a MapLibre Native log record. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_log_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-
-    Returning None answers `False`, as does an exception, which is reported
-    to `sys.unraisablehook`.
     """
 
     def __call__(
         self, severity: LogSeverity, event: LogEvent, code: int, message: str, /
-    ) -> bool | None: ...
-
-
-class QueueLockCallback(Protocol):
-    """Takes or returns the host's lock on the queue that a session shares with
-    it. Native code relies on the lock being held or released when the call
-    returns. The callback runs on the session's graphics thread or on the
-    thread that abandons the session.
-
-    See `mln_queue_lock_callback` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-
-    def __call__(self, /) -> None: ...
+    ) -> None: ...
 
 
 class ResourceProviderCallback(Protocol):
-    """Intercepts a network resource request. The callback runs synchronously on
-    a MapLibre thread.
+    """Intercepts a network resource request. The callback runs on the binding's
+    dispatcher thread, after native queues the call.
 
     See `mln_resource_provider_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4517,10 +4447,8 @@ class ResourceProviderCallback(Protocol):
 
 class ResourceRequestCancelCallback(Protocol):
     """Reports that MapLibre cancelled a C API resource provider request. The
-    callback runs on the thread that discards the request, never a host
-    thread: the runtime's native scheduler thread when a committed map or
-    runtime command discards it, such as a style change or map destruction,
-    and a MapLibre worker thread otherwise.
+    callback runs on the binding's dispatcher thread, after native queues the
+    call.
 
     See `mln_resource_request_cancel_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4531,7 +4459,7 @@ class ResourceRequestCancelCallback(Protocol):
 
 class ResourceTransformCallback(Protocol):
     """Asks the host for the URL of one network resource request. The callback
-    runs on a MapLibre network thread.
+    runs on the binding's dispatcher thread, after native queues the call.
 
     See `mln_resource_transform_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4543,9 +4471,9 @@ class ResourceTransformCallback(Protocol):
 
 
 class RuntimeEventCallback(Protocol):
-    """Receives selected events after their snapshots have been published. Map
-    events arrive on the runtime's native scheduler thread, and offline
-    events may arrive on a MapLibre worker thread.
+    """Receives selected events after their snapshots have been published. The
+    callback runs on the binding's dispatcher thread, after native queues the
+    call.
 
     See `mln_runtime_event_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4555,9 +4483,9 @@ class RuntimeEventCallback(Protocol):
 
 
 class WakeCallback(Protocol):
-    """Schedules service by the receiver that owns a queue or driver. Native
-    code may invoke the callback from any thread, and calls may coalesce or
-    overlap.
+    """Schedules service by the receiver that owns a queue or driver. The
+    callback runs on the binding's dispatcher thread, after native queues the
+    call.
 
     See `mln_wake_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

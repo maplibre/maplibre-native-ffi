@@ -71,12 +71,6 @@ def public_name(native: str) -> str:
     return "".join(x.capitalize() for x in native.removeprefix("mln_").split("_"))
 
 
-def scope_name(native: str) -> str:
-    """The class of a callback response, which is valid only during the
-    callback."""
-    return public_name(native) + "Scope"
-
-
 def enum_member(plan: ValuePlan, key: str) -> str:
     """The Python name of an enum constant."""
     prefix = enum_member_prefix((known for known, _ in plan.enum_values), plan.native)
@@ -138,8 +132,7 @@ class Values:
 
     def supported(self, plan: ValuePlan, *, input: bool = False) -> None:
         if plan.response:
-            self.records[plan.native] = plan
-            return
+            self.fail(plan, "a callback response needs a synchronous Python callback")
         if plan.kind == "handle" and plan.ownership == "owned":
             # A callback adopts an owned handle into its generated owner.
             return
@@ -211,9 +204,7 @@ class Values:
         elif plan.native in self.api.slices:
             return self.type(self.api.slices[plan.native].value, input=input)
         elif plan.kind in {"record", "enum"}:
-            result = (
-                scope_name(plan.native) if plan.response else public_name(plan.native)
-            )
+            result = public_name(plan.native)
             if plan.registration and async_hosts.accepts_native(self.api, plan):
                 result += " | " + native_name(plan)
         elif plan.kind == "native_pointer":
@@ -383,11 +374,7 @@ class Values:
                 return expr
             # A record that presents its union copies through _copy_variant,
             # which takes more than the value, so it can't pass as a callable.
-            if (
-                bare.kind in {"record", "enum"}
-                and not bare.response
-                and not bare.union_member
-            ):
+            if bare.kind in {"record", "enum"} and not bare.union_member:
                 return f"_maybe({copied.removesuffix(f'({expr})')}, {expr})"
             return f"None if {expr} is None else ({copied})"
         if plan.kind == "union":
@@ -396,8 +383,6 @@ class Values:
                 for field in plan.fields
             )
             return f"_copy_variant({expr}, {{{variants}}}, {plan.empty_variant[1] if plan.empty_variant else None!r})"
-        if plan.response:
-            return f"_wrap_response({expr}, {public_name(plan.native) + 'Scope'!r})"
         if plan.native in self.api.slices:
             return self.facade_copy(self.api.slices[plan.native].value, expr)
         if plan.union_member:
@@ -575,8 +560,6 @@ class Values:
                 + f"{body or '    pass'}\n"
             )
         for name, plan in sorted(self.records.items()):
-            if plan.response:
-                continue
             if plan.registration:
                 from . import python_callbacks
 
@@ -649,12 +632,13 @@ class Values:
         copied=True,
         registration=False,
         required=(),
+        doc=None,
     ):
         """The Rust copy and the Python class of one record.
 
         A record that native never returns, `copied=False`, has neither copy.
         A copy holds no callbacks, so the copy of a registration takes its
-        `required` callbacks.
+        `required` callbacks. `doc` replaces the record's own documentation.
         """
         name = plan.native
         if plan.union_member:
@@ -704,9 +688,15 @@ class Values:
             )
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"
-            + docs.docstring(self.api.doc(name), self.symbol, "    ")
-            + "\n".join(sorted(fields, key=lambda line: " = " in line) or ["    pass"])
-            + "\n"
+            + docs.docstring(doc or self.api.doc(name), self.symbol, "    ")
+            # A record whose methods are its only members needs no `pass`.
+            + (
+                "\n".join(sorted(fields, key=lambda line: " = " in line)) + "\n"
+                if fields
+                else ""
+                if extra_methods.strip()
+                else "    pass\n"
+            )
         )
         if normalized:
             python[-1] += "\n    def __post_init__(self):\n" + "".join(

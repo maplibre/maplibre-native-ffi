@@ -4,7 +4,6 @@ from ._generated_operations import (
     _AcquiredFrameHandleOperations,
     _GeoJsonSourceDataHandleOperations,
     _GraphicsDeviceHandleOperations,
-    _HttpHeaderTransformResponseScopeOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
     _RenderSessionHandleOperations,
@@ -14,19 +13,6 @@ from ._generated_operations import (
     _StyleExpressionHandleOperations,
 )
 from ._lifecycle import NativeHandleMixin, ScopedHandleMixin
-
-
-class HttpHeaderTransformResponseScope(_HttpHeaderTransformResponseScopeOperations):
-    __module__ = "maplibre_native_ffi"
-
-    def __init__(self):
-        raise TypeError("response scopes are supplied during callbacks")
-
-    @classmethod
-    def _from_native(cls, native):
-        value = cls.__new__(cls)
-        value._native = native
-        return value
 
 
 class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):

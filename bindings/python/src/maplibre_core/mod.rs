@@ -1,8 +1,5 @@
-//! The ownership, callback, and memory runtime this extension used from the
-//! core crate before the safe crate absorbed it. The extension moves onto the
-//! safe crate's API in a later change.
+//! The ownership, memory, and status runtime that the generated glue uses.
 
-pub mod callback;
 pub mod handle;
 pub mod memory;
 pub mod ptr;
