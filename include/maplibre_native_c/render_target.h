@@ -309,14 +309,14 @@ typedef enum mln_open_gl_context_platform : uint32_t {
  * context between renders. Teardown releases the session context from the
  * thread and restores nothing.
  *
- * A pooled session creates no context: it renders in the host's EGLContext
- * that the descriptor names, with a pbuffer and framebuffer of its own. Any
- * number of pooled sessions may name one context, and they take turns: each
- * render makes the context current on the session's core worker and releases
- * it afterwards, so pooled sessions of one context never render at the same
- * time. While any of them is live, the host keeps the context current on no
- * thread, and it destroys the context only after the last one tears down. A
- * host that renders several maps at once gives each thread its own context.
+ * A pooled session creates no context: it renders in the host's EGLContext that
+ * the descriptor names. Any number of pooled sessions may name one context, and
+ * they take turns: each render makes the context current on the session's core
+ * worker and releases it afterwards, so pooled sessions of one context never
+ * render at the same time. While any of them is live, the host keeps the
+ * context current on no thread, and it destroys the context only after the last
+ * one tears down. A host that renders several maps at once gives each thread
+ * its own context.
  */
 typedef enum mln_open_gl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
