@@ -50,11 +50,17 @@ RegistrationProbe? logRegistrationProbeForTesting() {
       .map((reference) => reference.target)
       .whereType<DeliveryRegistration>()
       .where(
-        (registration) =>
-            registration.handlers.containsKey(raw.MLN_DELIVERY_TYPE_LOG_RECORD),
+        (registration) => registration.callbacks.containsKey(#mln_log_callback),
       );
   return pending.isEmpty ? null : RegistrationProbe(pending.last);
 }
+
+/// The function pointer that runs a dispatched resource provider call.
+raw.mln_resource_provider_callback resourceProviderCallbackForTesting() =>
+    _runtime
+            .getField(_symbol('_deliverResourceProviderCallback', _runtime))
+            .reflectee
+        as raw.mln_resource_provider_callback;
 
 /// The completions this isolate's delivery queue still waits for.
 int pendingCompletionCountForTesting() =>
@@ -90,7 +96,7 @@ T adoptOwnedForTesting<T>(
         ]).reflectee
         as T;
 
-/// Exercises the handwritten wake bridge without a render backend.
+/// Prepares wakes as an owner's call would, without a render backend.
 final class WakeRootsProbe {
   WakeRootsProbe()
     : _roots =
@@ -103,7 +109,10 @@ final class WakeRootsProbe {
   final Object _roots;
 
   WakeProbe register(void Function() callback) => WakeProbe._(
-    reflect(_roots).invoke(_symbol('wake', _runtime), [callback]).reflectee
+    _runtime.invoke(_symbol('_prepareWake', _runtime), [
+          Wake(callback: callback),
+          _roots,
+        ]).reflectee
         as Object,
   );
 }

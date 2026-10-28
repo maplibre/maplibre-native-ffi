@@ -15,14 +15,8 @@ import '../status/status.dart';
 typedef NativeCompletionStart = int Function(Pointer<raw.mln_completion>);
 typedef NativeCompletionDecoder<T> = T Function(raw.mln_completion_result);
 
-/// Handles one drained delivery of the batch it arrived in. A handler that
-/// keeps an owned handle takes it from the batch with
-/// `mln_delivery_batch_take` before the batch is released.
-typedef DeliveryHandler =
-    void Function(int batch, int index, Pointer<raw.mln_delivery> delivery);
-
 abstract interface class _PendingCompletionBase {
-  void finish(int batch, int index, raw.mln_completion_result result);
+  void finish(raw.mln_completion_result result);
   Zone get zone;
 }
 
@@ -36,7 +30,7 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
   final StackTrace submissionStack;
 
   @override
-  void finish(int batch, int index, raw.mln_completion_result result) {
+  void finish(raw.mln_completion_result result) {
     try {
       if (result.status != nativeStatusOk) {
         throw MaplibreException(
@@ -53,25 +47,29 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
   }
 }
 
-/// The handlers of one queued callback registration, which its user data
-/// token names.
+/// The callbacks of one queued registration, which its user data token names.
 ///
 /// The queue holds a registration weakly, and the owner that registered it
 /// holds it strongly until native code retires it, so a callback that captures
-/// its owner leaves the two collectible together. A delivery that arrives once
-/// its owner is gone is released unread.
+/// its owner leaves the two collectible together. A call that arrives once its
+/// owner is gone finds no callback.
 final class DeliveryRegistration {
-  DeliveryRegistration._(this._queue, this.token, this.handlers);
+  DeliveryRegistration._(this._queue, this.token, this.callbacks);
   final DeliveryQueue _queue;
 
   /// The registration's user data.
   final int token;
   final Zone zone = Zone.current;
-  final Map<int, DeliveryHandler> handlers;
+
+  /// The registration's callbacks, by the C callback type that runs each.
+  final Map<Symbol, Function> callbacks;
 
   /// Runs once native code retires the registration, or the binding retires
   /// one that native code refused.
   void Function()? onRetired;
+
+  /// The user data that names this registration.
+  Pointer<Void> get userData => Pointer.fromAddress(token);
 
   /// Retires a registration that native code refused.
   void reject() => _queue._retire(token);
@@ -85,18 +83,59 @@ final NativeFinalizer _queueFinalizer = NativeFinalizer(
   Native.addressOf<NativeFinalizerFunction>(raw.mln_binding_owner_finalize),
 );
 
+/// The function pointer of [callable], which only this isolate's dispatch of
+/// its queue calls, so it leaves the isolate free to finish.
+Pointer<NativeFunction<T>> isolateCallable<T extends Function>(
+  NativeCallable<T> callable,
+) => (callable..keepIsolateAlive = false).nativeFunction;
+
+final _completionCallback = isolateCallable(
+  NativeCallable<raw.mln_completion_callbackFunction>.isolateLocal(_complete),
+);
+
+void _complete(
+  Pointer<Void> userData,
+  Pointer<raw.mln_completion_result> result,
+) {
+  final pending = isolateDeliveryQueue._pendingCompletions.remove(
+    userData.address,
+  );
+  if (pending == null) return;
+  pending.zone.runGuarded(() => pending.finish(result.ref));
+}
+
+/// The release_user_data of every queued registration, which retires it.
+final dispatchedRelease = isolateCallable(
+  NativeCallable<raw.mln_user_data_releaseFunction>.isolateLocal(
+    (Pointer<Void> userData) => isolateDeliveryQueue._retire(userData.address),
+  ),
+);
+
+/// Runs [call] in the zone of the registration that [userData] names, with
+/// its callback for the C callback type [type], or with null when its owner
+/// is gone.
+void runDispatched<C extends Function>(
+  Pointer<Void> userData,
+  Symbol type,
+  void Function(C? callback) call,
+) {
+  final registration =
+      isolateDeliveryQueue._registrations[userData.address]?.target;
+  final callback = registration?.callbacks[type] as C?;
+  (registration?.zone ?? Zone.root).runGuarded(() => call(callback));
+}
+
 /// The delivery queue that every completion and queued callback of this
-/// isolate arrives on.
+/// isolate names.
 ///
-/// Native code copies every completion and queued callback delivery into
-/// the queue and wakes this isolate's port, whose handler drains the
-/// queue and dispatches each delivery by its user data token. The port keeps
-/// the isolate alive while any completion is pending, so an awaited future
-/// resolves before the isolate finishes. Registrations leave the isolate free
-/// to finish.
+/// Native code queues each call and wakes this isolate's port, whose handler
+/// dispatches the queue, which runs the calls on this isolate's thread. The
+/// port keeps the isolate alive while any completion is pending, so an
+/// awaited future resolves before the isolate finishes. Registrations leave
+/// the isolate free to finish.
 ///
-/// When the isolate ends, a finalizer releases the queue, which disposes what
-/// the isolate never drained.
+/// When the isolate ends, a finalizer releases the queue, which abandons what
+/// the isolate never dispatched.
 final class DeliveryQueue implements Finalizable {
   DeliveryQueue._();
 
@@ -116,7 +155,7 @@ final class DeliveryQueue implements Finalizable {
     final port = RawReceivePort()..keepIsolateAlive = false;
     port.handler = (dynamic message) {
       // A message of 1 reports that native code released the wake.
-      if (message == 0) _drain();
+      if (message == 0) _dispatch();
     };
     try {
       _handle = withNativeArena((arena) {
@@ -163,10 +202,10 @@ final class DeliveryQueue implements Finalizable {
     _updateLiveness();
   }
 
-  /// Registers the handlers of one queued callback registration, which its
-  /// owner must keep until it retires.
-  DeliveryRegistration register(Map<int, DeliveryHandler> handlers) {
-    final registration = DeliveryRegistration._(this, _nextToken++, handlers);
+  /// Registers the callbacks of one queued registration, which its owner must
+  /// keep until it retires.
+  DeliveryRegistration register(Map<Symbol, Function> callbacks) {
+    final registration = DeliveryRegistration._(this, _nextToken++, callbacks);
     _registrations[registration.token] = WeakReference(registration);
     return registration;
   }
@@ -189,70 +228,13 @@ final class DeliveryQueue implements Finalizable {
     _port?.keepIsolateAlive = _pendingCompletions.isNotEmpty;
   }
 
-  void _drain() {
+  void _dispatch() {
     try {
-      while (true) {
-        final drained = withNativeArena((arena) {
-          final batch = arena<Uint64>();
-          final view = arena<raw.mln_delivery_batch_view>();
-          view.ref.size = sizeOf<raw.mln_delivery_batch_view>();
-          final status = raw.mln_delivery_queue_drain(
-            _handle,
-            batch,
-            view,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusNativeError) {
-            // The deliveries stay queued. A pending completion may get no
-            // later push to wake the queue. Back off so persistent allocation
-            // failure leaves the isolate free to run other work.
-            Timer(const Duration(milliseconds: 50), _drain);
-            return false;
-          }
-          if (status != nativeStatusOk) return false;
-          try {
-            final stride = view.ref.delivery_size;
-            if (stride < sizeOf<raw.mln_delivery>()) {
-              throw StateError('native delivery stride is too small');
-            }
-            final base = view.ref.deliveries.cast<Uint8>();
-            for (var index = 0; index < view.ref.delivery_count; index++) {
-              _dispatch(
-                batch.value,
-                index,
-                (base + index * stride).cast<raw.mln_delivery>(),
-              );
-            }
-          } finally {
-            raw.mln_delivery_batch_release(batch.value);
-          }
-          return true;
-        });
-        if (!drained) return;
-      }
+      // Only this handler dispatches the queue, and handlers do not nest, so
+      // the call runs what is queued or finds nothing.
+      raw.mln_delivery_queue_dispatch(_handle, nativeDiagnostic);
     } finally {
       _updateLiveness();
-    }
-  }
-
-  void _dispatch(int batch, int index, Pointer<raw.mln_delivery> delivery) {
-    final token = delivery.ref.user_data.address;
-    switch (delivery.ref.type) {
-      case raw.MLN_DELIVERY_TYPE_COMPLETION:
-        final pending = _pendingCompletions.remove(token);
-        if (pending == null) return;
-        pending.zone.runGuarded(
-          () => pending.finish(batch, index, delivery.ref.payload.completion),
-        );
-      case raw.MLN_DELIVERY_TYPE_RETIRED:
-        _retire(token);
-      case final type:
-        // A delivery for a registration this isolate no longer holds is
-        // released unread with its batch.
-        final registration = _registrations[token]?.target;
-        final handler = registration?.handlers[type];
-        if (registration == null || handler == null) return;
-        registration.zone.runGuarded(() => handler(batch, index, delivery));
     }
   }
 }
@@ -288,6 +270,7 @@ Future<T> submitNativeCompletion<T>({
     withNativeArena((arena) {
       final completion = arena<raw.mln_completion>();
       completion.ref.size = sizeOf<raw.mln_completion>();
+      completion.ref.callback = _completionCallback;
       completion.ref.user_data = Pointer.fromAddress(token);
       completion.ref.queue = queue.handle;
       // A rejected submission queues nothing and needs no cleanup.

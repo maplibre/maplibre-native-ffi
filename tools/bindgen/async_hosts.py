@@ -5,14 +5,11 @@ native code returns, and Python runs it only on its binding's dispatcher
 thread. Such a host gives each registration one of five forms:
 
 - `queue`: the registration names a delivery queue, and every callback has a
-  queue delivery. Native code answers each call itself and queues it. Dart
-  sets the queue and a token in place of the callbacks, drains copies on its
-  own thread, and dispatches them by the token. TypeScript and Python keep the
-  callbacks, which run when the realm's event loop or the dispatcher thread
-  dispatches the queue.
-- `wake`: the registration's one callback only asks to be called again. Dart
-  supplies a wake that posts to its thread and leaves the queue unset;
-  TypeScript and Python name their queue, so dispatch runs the callback.
+  queue delivery. Native code answers each call itself and queues it, and the
+  callbacks run when the isolate, the realm's event loop, or the dispatcher
+  thread dispatches the queue.
+- `wake`: the registration's one callback only asks to be called again. The
+  host names its queue, so dispatch runs the callback.
 - `rules`: every callback must answer on its native thread and has no queue
   delivery. The host leaves them unset, so the native rules that the
   registration carries answer each call.

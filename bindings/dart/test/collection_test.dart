@@ -148,7 +148,7 @@ void main() {
 
   for (final identicalCallback in [false, true]) {
     test(
-      'wake ports retain ${identicalCallback ? "identical callbacks" : "equal method tear-offs"} independently',
+      'wake registrations retain ${identicalCallback ? "identical callbacks" : "equal method tear-offs"} independently',
       () async {
         final roots = WakeRootsProbe();
         final receiver = _WakeReceiver();
@@ -166,7 +166,7 @@ void main() {
         second.notify();
         expect(await within(calls.moveNext(), 'the remaining wake'), isTrue);
         second.release();
-        // Keep the owner reachable through both ports' last wakes.
+        // Keep the owner reachable through both registrations' last wakes.
         roots.register(() {}).release();
         await calls.cancel();
         await receiver.calls.close();

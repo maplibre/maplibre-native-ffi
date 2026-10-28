@@ -1017,8 +1017,10 @@ mln_status mln_ping_set_callback(
 BIND("synchronous=true") typedef void (*gate)(void *context);
 typedef void (*notify)(void *context);
 typedef void (*release)(void *context);
+typedef unsigned long long mln_delivery_queue BIND("kind=handle;release=mln_delivery_queue_release;dispose=mln_delivery_queue_release");
+void mln_delivery_queue_release(mln_delivery_queue queue);
 typedef struct gates { gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
-typedef struct signals { notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct signals { notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; mln_delivery_queue queue BIND("kind=delivery_queue"); } signals BIND("kind=callback_registration;release=retire");
 typedef struct settings { unsigned size; signals wake; gates guard; } settings;
 mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
 """

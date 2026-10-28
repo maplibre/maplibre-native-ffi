@@ -356,20 +356,27 @@ Pointer<raw.mln_projected_meters> _writeProjectedMeters(
 ProjectedMeters _readProjectedMeters(raw.mln_projected_meters source) =>
     ProjectedMeters(northing: source.northing, easting: source.easting);
 
-void _deliverLogCallback(
-  LogCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.log_record;
-  callback(
-    LogSeverity.fromRawValue(payload.severity),
-    LogEvent.fromRawValue(payload.event),
-    payload.code,
-    utf8.decode(_copyBufferView(payload.message)),
-  );
-}
+final raw.mln_log_callback _deliverLogCallback = isolateCallable(
+  NativeCallable<raw.mln_log_callbackFunction>.isolateLocal((
+    Pointer<Void> userData,
+    int severity,
+    int event,
+    int code,
+    raw.mln_buffer_view message,
+  ) {
+    runDispatched<LogCallback>(userData, #mln_log_callback, (callback) {
+      if (callback != null) {
+        callback(
+          LogSeverity.fromRawValue(severity),
+          LogEvent.fromRawValue(event),
+          code,
+          utf8.decode(_copyBufferView(message)),
+        );
+      }
+    });
+    return false;
+  }, exceptionalReturn: false),
+);
 
 _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
   LogCallback value,
@@ -381,11 +388,12 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
     final result = arena<raw.mln_log_handler>();
     result.ref.size = sizeOf<raw.mln_log_handler>();
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_LOG_RECORD: (batch, index, delivery) =>
-          _deliverLogCallback(value, batch, index, delivery),
+      #mln_log_callback: value,
     });
+    result.ref.callback = _deliverLogCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -409,25 +417,39 @@ Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
 CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
     CanonicalTileId(z: source.z, x: source.x, y: source.y);
 
-void _deliverCustomSourceFetchTileCallback(
-  CustomSourceFetchTileCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.custom_source_fetch_tile;
-  callback(_readCanonicalTileId(payload.tile_id));
-}
+final raw.mln_custom_source_fetch_tile_callback
+_deliverCustomSourceFetchTileCallback = isolateCallable(
+  NativeCallable<
+    raw.mln_custom_source_fetch_tile_callbackFunction
+  >.isolateLocal((Pointer<Void> userData, raw.mln_canonical_tile_id tileId) {
+    runDispatched<CustomSourceFetchTileCallback>(
+      userData,
+      #mln_custom_source_fetch_tile_callback,
+      (callback) {
+        if (callback != null) {
+          callback(_readCanonicalTileId(tileId));
+        }
+      },
+    );
+  }),
+);
 
-void _deliverCustomSourceCancelTileCallback(
-  CustomSourceCancelTileCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.custom_source_cancel_tile;
-  callback(_readCanonicalTileId(payload.tile_id));
-}
+final raw.mln_custom_source_cancel_tile_callback
+_deliverCustomSourceCancelTileCallback = isolateCallable(
+  NativeCallable<
+    raw.mln_custom_source_cancel_tile_callbackFunction
+  >.isolateLocal((Pointer<Void> userData, raw.mln_canonical_tile_id tileId) {
+    runDispatched<CustomSourceCancelTileCallback>(
+      userData,
+      #mln_custom_source_cancel_tile_callback,
+      (callback) {
+        if (callback != null) {
+          callback(_readCanonicalTileId(tileId));
+        }
+      },
+    );
+  }),
+);
 
 _NativeRegistration<raw.mln_custom_geometry_source_options>
 _prepareCustomGeometrySourceOptions(
@@ -468,24 +490,17 @@ _prepareCustomGeometrySourceOptions(
       result.ref.wrap = value.wrap!;
     }
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile,
-            batch,
-            index,
-            delivery,
-          ),
+      #mln_custom_source_fetch_tile_callback: value.fetchTile,
       if (value.cancelTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
-            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
-              value.cancelTile!,
-              batch,
-              index,
-              delivery,
-            ),
+        #mln_custom_source_cancel_tile_callback: value.cancelTile!,
     });
+    result.ref.fetch_tile = _deliverCustomSourceFetchTileCallback;
+    if (value.cancelTile != null) {
+      result.ref.cancel_tile = _deliverCustomSourceCancelTileCallback;
+    }
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -513,24 +528,17 @@ _prepareCustomVectorSourceOptions(
       result.ref.max_zoom = value.maxZoom!;
     }
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile,
-            batch,
-            index,
-            delivery,
-          ),
+      #mln_custom_source_fetch_tile_callback: value.fetchTile,
       if (value.cancelTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
-            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
-              value.cancelTile!,
-              batch,
-              index,
-              delivery,
-            ),
+        #mln_custom_source_cancel_tile_callback: value.cancelTile!,
     });
+    result.ref.fetch_tile = _deliverCustomSourceFetchTileCallback;
+    if (value.cancelTile != null) {
+      result.ref.cancel_tile = _deliverCustomSourceCancelTileCallback;
+    }
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -589,15 +597,23 @@ CameraTransitionEnd _readCameraTransitionEnd(
   generation: source.generation,
 );
 
-void _deliverCameraTransitionEndCallback(
-  CameraTransitionEndCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.camera_transition_end;
-  callback(_readCameraTransitionEnd(payload.end.ref));
-}
+final raw.mln_camera_transition_end_callback
+_deliverCameraTransitionEndCallback = isolateCallable(
+  NativeCallable<raw.mln_camera_transition_end_callbackFunction>.isolateLocal((
+    Pointer<Void> userData,
+    Pointer<raw.mln_camera_transition_end> end,
+  ) {
+    runDispatched<CameraTransitionEndCallback>(
+      userData,
+      #mln_camera_transition_end_callback,
+      (callback) {
+        if (callback != null) {
+          callback(_readCameraTransitionEnd(end.ref));
+        }
+      },
+    );
+  }),
+);
 
 _NativeRegistration<raw.mln_camera_transition_handler>
 _prepareCameraTransitionHandler(
@@ -612,11 +628,12 @@ _prepareCameraTransitionHandler(
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: (batch, index, delivery) =>
-          _deliverCameraTransitionEndCallback(value, batch, index, delivery),
+      #mln_camera_transition_end_callback: value,
     });
+    result.ref.callback = _deliverCameraTransitionEndCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -714,12 +731,24 @@ _writeGraphicsDeviceTextureDescriptor(
   return result;
 }
 
+final raw.mln_wake_callback _deliverWakeCallback = isolateCallable(
+  NativeCallable<raw.mln_wake_callbackFunction>.isolateLocal((
+    Pointer<Void> userData,
+  ) {
+    runDispatched<WakeCallback>(userData, #mln_wake_callback, (callback) {
+      if (callback != null) {
+        callback();
+      }
+    });
+  }),
+);
+
 _NativeRegistration<raw.mln_wake> _prepareWake(
   Wake value,
   _CallbackRoots roots,
 ) {
   final native = _takeNativeRegistration(value);
-  if (native == null) return roots.wake(value.callback);
+  if (native == null) return _prepareQueuedWake(value, roots);
   final arena = Arena();
   final result = arena<raw.mln_wake>();
   result.ref.callback = Pointer.fromAddress(native.callbacks[0].address);
@@ -728,6 +757,32 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
     native.releaseUserData.address,
   );
   return _NativeRegistration(result, native.release, arena.releaseAll);
+}
+
+_NativeRegistration<raw.mln_wake> _prepareQueuedWake(
+  Wake value,
+  _CallbackRoots roots,
+) {
+  final arena = Arena();
+  DeliveryRegistration? registration;
+  try {
+    final result = arena<raw.mln_wake>();
+    if (value.callback == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    final registered = registration = roots.registerQueued({
+      #mln_wake_callback: value.callback!,
+    });
+    result.ref.callback = _deliverWakeCallback;
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
+  } catch (_) {
+    registration?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
 }
 
 _NativeRegistration<raw.mln_queue_lock> _prepareQueueLock(QueueLock value) {
@@ -1891,14 +1946,22 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
   return result;
 }
 
-void _deliverResourceRequestCancelCallback(
-  ResourceRequestCancelCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  callback();
-}
+final raw.mln_resource_request_cancel_callback
+_deliverResourceRequestCancelCallback = isolateCallable(
+  NativeCallable<raw.mln_resource_request_cancel_callbackFunction>.isolateLocal(
+    (Pointer<Void> userData, int handle) {
+      runDispatched<ResourceRequestCancelCallback>(
+        userData,
+        #mln_resource_request_cancel_callback,
+        (callback) {
+          if (callback != null) {
+            callback();
+          }
+        },
+      );
+    },
+  ),
+);
 
 _NativeRegistration<raw.mln_resource_request_cancel_handler>
 _prepareResourceRequestCancelHandler(
@@ -1911,11 +1974,12 @@ _prepareResourceRequestCancelHandler(
     final result = arena<raw.mln_resource_request_cancel_handler>();
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: (batch, index, delivery) =>
-          _deliverResourceRequestCancelCallback(value, batch, index, delivery),
+      #mln_resource_request_cancel_callback: value,
     });
+    result.ref.callback = _deliverResourceRequestCancelCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -2241,15 +2305,23 @@ List<RuntimeEvent> _readEventBatchView(raw.mln_event_batch_view source) => (() {
   );
 })();
 
-void _deliverRuntimeEventCallback(
-  RuntimeEventCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.runtime_events;
-  callback(_readEventBatchView(payload.events.ref));
-}
+final raw.mln_runtime_event_callback _deliverRuntimeEventCallback =
+    isolateCallable(
+      NativeCallable<raw.mln_runtime_event_callbackFunction>.isolateLocal((
+        Pointer<Void> userData,
+        Pointer<raw.mln_event_batch_view> events,
+      ) {
+        runDispatched<RuntimeEventCallback>(
+          userData,
+          #mln_runtime_event_callback,
+          (callback) {
+            if (callback != null) {
+              callback(_readEventBatchView(events.ref));
+            }
+          },
+        );
+      }),
+    );
 
 _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
   RuntimeEventCallback value,
@@ -2261,11 +2333,12 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
     final result = arena<raw.mln_runtime_event_handler>();
     result.ref.size = sizeOf<raw.mln_runtime_event_handler>();
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
-          _deliverRuntimeEventCallback(value, batch, index, delivery),
+      #mln_runtime_event_callback: value,
     });
+    result.ref.callback = _deliverRuntimeEventCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -2364,25 +2437,34 @@ ResourceRequestInfo _readResourceRequestInfo(
   ),
 );
 
-void _deliverResourceProviderCallback(
-  ResourceProviderCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.resource_request;
-  ResourceRequestHandle? owner;
-  try {
-    _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
-    final adopted = owner = ResourceRequestHandle._(
-      _NativeResourceRequest(payload.handle),
+final raw.mln_resource_provider_callback _deliverResourceProviderCallback =
+    isolateCallable(
+      NativeCallable<raw.mln_resource_provider_callbackFunction>.isolateLocal((
+        Pointer<Void> userData,
+        Pointer<raw.mln_resource_request_info> request,
+        int handle,
+      ) {
+        runDispatched<ResourceProviderCallback>(
+          userData,
+          #mln_resource_provider_callback,
+          (callback) {
+            final owner = ResourceRequestHandle._(
+              _NativeResourceRequest(handle),
+            );
+            if (callback == null) {
+              owner.close();
+              return;
+            }
+            try {
+              callback(_readResourceRequestInfo(request.ref), owner);
+            } catch (_) {
+              owner.close();
+              rethrow;
+            }
+          },
+        );
+      }),
     );
-    callback(_readResourceRequestInfo(payload.request.ref), adopted);
-  } catch (_) {
-    owner?.close();
-    rethrow;
-  }
-}
 
 Pointer<raw.mln_resource_route> _writeResourceRoute(
   ResourceRoute value,
@@ -2418,16 +2500,12 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
       );
     }
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST: (batch, index, delivery) =>
-          _deliverResourceProviderCallback(
-            value.callback,
-            batch,
-            index,
-            delivery,
-          ),
+      #mln_resource_provider_callback: value.callback,
     });
+    result.ref.callback = _deliverResourceProviderCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();
@@ -2436,29 +2514,39 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
   }
 }
 
-void _deliverResourceTransformCallback(
-  ResourceTransformCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.resource_transform;
-  ResourceTransformRequestHandle? owner;
-  try {
-    _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
-    final adopted = owner = ResourceTransformRequestHandle._(
-      _NativeResourceTransformRequest(payload.request),
+final raw.mln_resource_transform_callback _deliverResourceTransformCallback =
+    isolateCallable(
+      NativeCallable<raw.mln_resource_transform_callbackFunction>.isolateLocal((
+        Pointer<Void> userData,
+        int kind,
+        raw.mln_buffer_view url,
+        int request,
+      ) {
+        runDispatched<ResourceTransformCallback>(
+          userData,
+          #mln_resource_transform_callback,
+          (callback) {
+            final owner = ResourceTransformRequestHandle._(
+              _NativeResourceTransformRequest(request),
+            );
+            if (callback == null) {
+              owner.close();
+              return;
+            }
+            try {
+              callback(
+                ResourceKind.fromRawValue(kind),
+                utf8.decode(_copyBufferView(url)),
+                owner,
+              );
+            } catch (_) {
+              owner.close();
+              rethrow;
+            }
+          },
+        );
+      }),
     );
-    callback(
-      ResourceKind.fromRawValue(payload.kind),
-      utf8.decode(_copyBufferView(payload.url)),
-      adopted,
-    );
-  } catch (_) {
-    owner?.close();
-    rethrow;
-  }
-}
 
 _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   ResourceTransformCallback value,
@@ -2470,11 +2558,12 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
     final result = arena<raw.mln_resource_transform>();
     result.ref.size = sizeOf<raw.mln_resource_transform>();
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM: (batch, index, delivery) =>
-          _deliverResourceTransformCallback(value, batch, index, delivery),
+      #mln_resource_transform_callback: value,
     });
+    result.ref.callback = _deliverResourceTransformCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
+    result.ref.user_data = registered.userData;
+    result.ref.release_user_data = dispatchedRelease;
     return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
     registration?.reject();

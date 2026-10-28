@@ -1,6 +1,5 @@
 import 'package:integration_test/integration_test.dart';
 
-import '../../../test/delivery_queue_test.dart' as delivery_queue;
 import '../../../test/lifecycle_test.dart' as lifecycle;
 import '../../../test/native_library_test.dart' as native_library;
 import '../../../test/render_test.dart' as render;
@@ -13,7 +12,6 @@ void main() {
   native_library.main();
   values.main();
   lifecycle.main();
-  delivery_queue.main();
   resource_transform.main();
   render.main();
 }

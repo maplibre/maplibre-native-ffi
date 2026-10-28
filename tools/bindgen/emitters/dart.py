@@ -189,7 +189,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             for name in ("generation", "render_update_generation")
         },
         # Native queues each call, and the isolate that registered the callback
-        # drains the queue through a receive port.
+        # dispatches the queue from a receive port.
         threads=(
             "The callback runs asynchronously in the isolate and zone that "
             "registered it, after native queues the call."
@@ -402,12 +402,12 @@ def lower(api: Api | BoundApi) -> Lowered:
 
 def operations(bound, methods, generated, values, conversions) -> str:
     parts = re.split(
-        r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|List<\w+>|\w+) _(?:write|read|prepare|deliver)\w+\()",
+        r"(?m)(?=^(?:final raw\.\w+ _deliver\w+ =|(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|List<\w+>|\w+) _(?:write|read|prepare|deliver)\w+\())",
         conversions,
     )
     conversion_map = {}
     for part in parts:
-        match = re.search(r"(_(?:write|read|prepare|deliver)\w+)\(", part)
+        match = re.search(r"\s(_(?:write|read|prepare|deliver)\w+)[( ]", part)
         if match:
             conversion_map[match[1]] = part
     descriptors = "".join(

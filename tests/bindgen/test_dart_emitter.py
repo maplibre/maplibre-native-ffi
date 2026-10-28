@@ -109,8 +109,27 @@ class DartEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", values)
         self.assertIn(
-            "callback(_readEventBatchView(payload.events.ref));",
+            "callback(_readEventBatchView(events.ref));",
             dart.lower(real_api()).files[dart.OPERATIONS],
+        )
+
+    def test_a_queued_callback_runs_through_the_pointer_of_its_type(self):
+        operations = dart.lower(real_api()).files[dart.OPERATIONS]
+        # A registration names the isolate's queue beside the pointer, and its
+        # release retires the token.
+        self.assertIn(
+            "result.ref.callback = _deliverResourceProviderCallback;", operations
+        )
+        self.assertIn("result.ref.release_user_data = dispatchedRelease;", operations)
+        # A wake without a native registration runs through the queue too.
+        self.assertIn(
+            "if (native == null) return _prepareQueuedWake(value, roots);", operations
+        )
+        # A call whose owner is gone releases the handle it owns, which fails
+        # the request.
+        self.assertRegex(
+            operations,
+            r"_NativeResourceRequest\(handle\)\);\s*if \(callback == null\) \{\s*owner\.close\(\);",
         )
 
     def test_a_registration_of_one_callback_is_the_callback(self):
