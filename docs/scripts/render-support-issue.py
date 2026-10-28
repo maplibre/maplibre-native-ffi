@@ -14,7 +14,7 @@ ICONS = {
     "build-only": "🔨",
     "path-known": "⬜",
     "blocked": "⛔",
-    "unknown": "❓",
+    "not-investigated": "❓",
     "not-applicable": "➖",
 }
 # A platform shows the furthest status any of its rows reached.
@@ -23,7 +23,7 @@ PRECEDENCE = [
     "build-only",
     "path-known",
     "blocked",
-    "unknown",
+    "not-investigated",
     "not-applicable",
 ]
 
@@ -72,17 +72,13 @@ def binding_grid(matrix: dict[str, Any]) -> list[str]:
 
 
 def gap_list(matrix: dict[str, Any], status: str) -> list[str]:
-    # Gaps that share a binding and reason collapse into one line.
-    grouped: dict[tuple[str, str, str], list[str]] = {}
-    for gap in matrix["gaps"]:
-        if gap["status"] == status:
-            key = (gap["binding"], gap["reason"], gap.get("link", ""))
-            grouped.setdefault(key, []).append(gap["platform"])
     lines = []
-    for (binding, reason, link), platforms in grouped.items():
-        line = f"- **{binding} on {', '.join(platforms)}:** {reason}"
-        if link:
-            line += f" ([{link_label(link)}]({link}))"
+    for gap in matrix["gaps"]:
+        if gap["status"] != status:
+            continue
+        line = f"- **{gap['binding']} on {gap['scope']}:** {gap['reason']}"
+        if "link" in gap:
+            line += f" ([{link_label(gap['link'])}]({gap['link']}))"
         lines.append(line)
     return lines
 

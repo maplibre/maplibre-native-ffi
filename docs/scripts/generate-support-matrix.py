@@ -30,6 +30,7 @@ PLATFORM_LABELS = {
     "visionos": "visionOS",
     "ohos": "OpenHarmony",
     "emscripten": "Web (Emscripten)",
+    "wasi": "WASI",
 }
 PLATFORM_ORDER = list(PLATFORM_LABELS)
 # Apple mobile platforms list device and simulator rows separately.
@@ -47,7 +48,7 @@ STATUS_LABELS = {
     "build-only": "Built only",
     "path-known": "Not started, path known",
     "blocked": "Blocked upstream",
-    "unknown": "Not investigated",
+    "not-investigated": "Not investigated",
     "not-applicable": "Does not apply",
 }
 GAP_STATUSES = {"path-known", "blocked"}
@@ -147,48 +148,128 @@ def language(binding: str) -> str:
     return binding.split("-", 1)[0]
 
 
-def check_cell(key: tuple[str, str], table: str) -> None:
-    if key[0] not in BINDING_LABELS:
-        raise SystemExit(f"error: unknown binding in {GAPS_PATH} {table}: {key}")
-    if key[1] not in PLATFORM_LABELS:
-        raise SystemExit(f"error: unknown platform in {GAPS_PATH} {table}: {key}")
+SELECTORS = {
+    "bindings": BINDING_LABELS,
+    "platforms": PLATFORM_LABELS,
+    "archs": ARCH_ORDER,
+    "backends": BACKEND_LABELS,
+}
+# The statuses an entry may give. CI gives `tested` and `build-only`.
+ENTRY_STATUSES = {*GAP_STATUSES, "not-applicable", "not-investigated"}
+# Every row has a platform, an architecture, and a backend.
+ROW_AXES = ("platforms", "archs", "backends")
 
 
-def load_gaps() -> tuple[
-    int,
-    list[Target],
-    dict[tuple[str, str], dict[str, str]],
-    dict[tuple[str, str], str],
-]:
-    document = tomllib.loads(GAPS_PATH.read_text(encoding="utf-8"))
-    planned = [
-        Target(
-            platform=entry["platform"],
-            arch=entry["arch"],
-            backend=value,
-            simulator=entry.get("simulator", False),
+@dataclass(frozen=True)
+class Entry:
+    """An `[[entry]]`: the cells where its axes intersect, and their status."""
+
+    index: int
+    selectors: dict[str, tuple[str, ...]]
+    status: str
+    reason: str | None
+    link: str | None
+
+    def matches(self, binding: str, target: Target) -> bool:
+        values = {
+            "bindings": binding,
+            "platforms": target.platform,
+            "archs": target.arch,
+            "backends": target.backend,
+        }
+        return all(values[key] in allowed for key, allowed in self.selectors.items())
+
+    def sort_key(self) -> tuple[int, int]:
+        """Orders entries by their bindings, then their platforms."""
+        bindings = self.selectors.get("bindings", ())
+        platforms = self.selectors.get("platforms", ())
+        return (
+            min((list(BINDING_LABELS).index(name) for name in bindings), default=-1),
+            min((PLATFORM_ORDER.index(name) for name in platforms), default=-1),
         )
-        for entry in document.get("planned", [])
-        for value in entry["backends"]
-    ]
-    gaps: dict[tuple[str, str], dict[str, str]] = {}
-    for entry in document.get("gap", []):
-        key = (entry["binding"], entry["platform"])
-        check_cell(key, "gap")
-        if entry["status"] not in GAP_STATUSES:
-            raise SystemExit(f"error: unknown status in {GAPS_PATH}: {key}")
-        if key in gaps:
-            raise SystemExit(f"error: duplicate gap in {GAPS_PATH}: {key}")
-        gaps[key] = entry
-    not_applicable: dict[tuple[str, str], str] = {}
-    for entry in document.get("not-applicable", []):
-        for platform in entry["platforms"]:
-            key = (entry["binding"], platform)
-            check_cell(key, "not-applicable")
-            if key in gaps or key in not_applicable:
-                raise SystemExit(f"error: duplicate cell in {GAPS_PATH}: {key}")
-            not_applicable[key] = entry["reason"]
-    return document["issue"], planned, gaps, not_applicable
+
+    def binding(self) -> str:
+        """Names the columns it selects, as `C#, Dart`."""
+        bindings = self.selectors.get("bindings")
+        if not bindings:
+            return "Every binding"
+        return ", ".join(BINDING_LABELS[name] for name in bindings)
+
+    def rows(self) -> list[Target]:
+        """The targets it names in full, whose cells it gives a status to."""
+        if not all(axis in self.selectors for axis in ROW_AXES):
+            return []
+        return [
+            Target(platform=platform, arch=arch, backend=backend)
+            for platform in self.selectors["platforms"]
+            for arch in self.selectors["archs"]
+            for backend in self.selectors["backends"]
+        ]
+
+    def describe(self) -> str:
+        return f"[[entry]] {self.index + 1} in {GAPS_PATH}"
+
+    def scope(self, targets: list[Target]) -> str:
+        """Names the rows it selects, as `macOS x64 with Metal`.
+
+        An axis that spans every row of its platforms goes unnamed.
+        """
+        platforms = self.selectors.get("platforms")
+        parts: list[str] = [
+            ", ".join(PLATFORM_LABELS[name] for name in platforms)
+            if platforms
+            else "every platform"
+        ]
+        rows = [
+            target
+            for target in targets
+            if not platforms or target.platform in platforms
+        ]
+        archs = self.selectors.get("archs")
+        if archs and not {target.arch for target in rows} <= set(archs):
+            parts.append(", ".join(archs))
+        backends = self.selectors.get("backends")
+        if backends and not {target.backend for target in rows} <= set(backends):
+            parts.append("with " + ", ".join(BACKEND_LABELS[name] for name in backends))
+        return " ".join(parts)
+
+
+def load_gaps() -> tuple[int, list[Entry]]:
+    document = tomllib.loads(GAPS_PATH.read_text(encoding="utf-8"))
+    unknown = document.keys() - {"issue", "entry"}
+    if unknown:
+        raise SystemExit(f"error: unknown tables in {GAPS_PATH}: {sorted(unknown)}")
+    entries = []
+    for index, entry in enumerate(document.get("entry", [])):
+        # A misspelled axis would be left out, which would cover more cells.
+        if entry.keys() - SELECTORS.keys() - {"status", "reason", "link"}:
+            raise SystemExit(f"error: unknown keys in {GAPS_PATH} [[entry]]: {entry}")
+        status = entry.get("status")
+        if status not in ENTRY_STATUSES:
+            raise SystemExit(f"error: unknown status in {GAPS_PATH} [[entry]]: {entry}")
+        if status != "not-investigated" and not entry.get("reason"):
+            raise SystemExit(f"error: {GAPS_PATH} [[entry]] needs a reason: {entry}")
+        selectors = {}
+        for axis in SELECTORS.keys() & entry.keys():
+            values = entry[axis]
+            if not isinstance(values, list) or not values:
+                raise SystemExit(
+                    f"error: {axis} in {GAPS_PATH} [[entry]] must be a non-empty list: {entry}"
+                )
+            unknown = [value for value in values if value not in SELECTORS[axis]]
+            if unknown:
+                raise SystemExit(f"error: unknown {axis} in {GAPS_PATH}: {unknown}")
+            selectors[axis] = tuple(values)
+        entries.append(
+            Entry(
+                index=index,
+                selectors=selectors,
+                status=status,
+                reason=entry.get("reason"),
+                link=entry.get("link"),
+            )
+        )
+    return document["issue"], entries
 
 
 def support_matrix() -> dict[str, Any]:
@@ -211,34 +292,53 @@ def support_matrix() -> dict[str, Any]:
             for binding, status in command_support(command):
                 record(binding, target, status)
 
-    issue, planned, gaps, not_applicable = load_gaps()
+    issue, entries = load_gaps()
     built = {target for (name, target) in coverage if name == "c"}
-    for target in planned:
-        if target in built:
-            raise SystemExit(
-                f"error: CI builds planned target {target}; remove it from {GAPS_PATH}"
-            )
-    covered = {(name, target.platform) for (name, target) in coverage}
-    for key in [*gaps, *not_applicable]:
-        if key in covered:
-            raise SystemExit(f"error: CI covers {key}; remove it from {GAPS_PATH}")
+    named = {target for entry in entries for target in entry.rows()}
+    targets = sorted(built | named, key=Target.sort_key)
+
+    # explained[(binding, target)] holds the entry for a cell CI does not reach.
+    explained: dict[tuple[str, Target], Entry] = {}
+    for entry in entries:
+        cells = [
+            (name, target)
+            for name in BINDING_LABELS
+            for target in targets
+            if entry.matches(name, target)
+        ]
+        if not cells:
+            raise SystemExit(f"error: {entry.describe()} matches no cell")
+        for cell in cells:
+            if cell in coverage:
+                raise SystemExit(
+                    f"error: CI reaches {cell}, which {entry.describe()} "
+                    "explains; narrow or remove the entry"
+                )
+            if cell in explained:
+                raise SystemExit(
+                    f"error: {explained[cell].describe()} and {entry.describe()} "
+                    f"both explain {cell}"
+                )
+            explained[cell] = entry
+
+    def blocked_c(target: Target) -> Entry | None:
+        entry = explained.get(("c", target))
+        return entry if entry and entry.status == "blocked" else None
 
     def cell(name: str, target: Target) -> dict[str, str]:
         if (name, target) in coverage:
             return {"status": coverage[(name, target)]}
-        reason = not_applicable.get((name, target.platform))
-        if reason:
-            return {"status": "not-applicable", "detail": reason}
-        gap = gaps.get((name, target.platform))
-        if gap:
-            # Tooltips show plain text, so code spans drop their backticks.
-            return {"status": gap["status"], "detail": gap["reason"].replace("`", "")}
-        return {"status": "unknown"}
+        # A binding cannot reach a target before the C library does.
+        entry = explained.get((name, target)) or blocked_c(target)
+        if entry is None or entry.reason is None:
+            return {"status": "not-investigated"}
+        # Tooltips show plain text, so code spans drop their backticks.
+        return {"status": entry.status, "detail": entry.reason.replace("`", "")}
 
     platforms: dict[str, dict[tuple[str, str], dict[str, list[dict[str, Any]]]]] = (
         defaultdict(lambda: defaultdict(dict))
     )
-    for target in sorted(built | set(planned), key=Target.sort_key):
+    for target in targets:
         arch = (target.arch, target.arch_label())
         platforms[target.platform][arch][target.backend] = [
             cell(name, target) for name in BINDING_LABELS
@@ -284,13 +384,14 @@ def support_matrix() -> dict[str, Any]:
         ],
         "gaps": [
             {
-                **gaps[(name, platform_name)],
-                "binding": BINDING_LABELS[name],
-                "platform": PLATFORM_LABELS[platform_name],
+                "status": entry.status,
+                "binding": entry.binding(),
+                "scope": entry.scope(targets),
+                "reason": entry.reason or "",
+                **({"link": entry.link} if entry.link else {}),
             }
-            for name in BINDING_LABELS
-            for platform_name in PLATFORM_ORDER
-            if (name, platform_name) in gaps
+            for entry in sorted(entries, key=Entry.sort_key)
+            if entry.status in GAP_STATUSES
         ],
     }
 

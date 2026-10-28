@@ -6,7 +6,7 @@ type Status =
   | "build-only"
   | "path-known"
   | "blocked"
-  | "unknown"
+  | "not-investigated"
   | "not-applicable";
 
 type Cell = {
@@ -19,7 +19,7 @@ const glyphs: Record<Status, string> = {
   "build-only": "◐",
   "path-known": "○",
   blocked: "✕",
-  unknown: "?",
+  "not-investigated": "?",
   "not-applicable": "–",
 };
 
@@ -47,37 +47,21 @@ const rows = supportMatrix.platforms.flatMap((platform) => {
   );
 });
 
-// Gaps that share a binding and reason collapse into one entry, as in the
-// tracking issue.
-function gapGroups(status: string) {
-  const groups = new Map<
-    string,
-    { binding: string; platforms: string[]; reason: string; link?: string }
-  >();
-  for (const gap of supportMatrix.gaps as {
-    binding: string;
-    platform: string;
-    status: string;
-    reason: string;
-    link?: string;
-  }[]) {
-    if (gap.status !== status) {
-      continue;
-    }
-    const key = [gap.binding, gap.reason, gap.link].join("\n");
-    const group = groups.get(key);
-    if (group) {
-      group.platforms.push(gap.platform);
-    } else {
-      groups.set(key, { ...gap, platforms: [gap.platform] });
-    }
-  }
-  return [...groups.values()];
+type Gap = {
+  status: string;
+  binding: string;
+  scope: string;
+  reason: string;
+  link?: string;
+};
+
+function gapsWith(status: string) {
+  return (supportMatrix.gaps as Gap[]).filter((gap) => gap.status === status);
 }
 
 const gapSections = [
-  { title: "Blocked upstream", gaps: gapGroups("blocked") },
-  { title: "Not started, path known", gaps: gapGroups("path-known") },
+  { title: "Blocked upstream", gaps: gapsWith("blocked") },
+  { title: "Not started, path known", gaps: gapsWith("path-known") },
 ];
 
 // Reasons are Markdown whose only markup is code spans.
@@ -163,7 +147,7 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
           {section.gaps.map((gap) => (
             <li>
               <strong>
-                {gap.binding} on {gap.platforms.join(", ")}:
+                {gap.binding} on {gap.scope}:
               </strong>{" "}
               {codeSpans(gap.reason).map(({ part, code }) => (code ? (
                 <code>{part}</code>
@@ -283,7 +267,7 @@ td {
   border-color: var(--sl-color-gray-3);
   color: var(--sl-color-white);
 }
-.unknown {
+.not-investigated {
   background: var(--sl-color-gray-6);
   border-color: var(--sl-color-gray-5);
   color: var(--sl-color-white);

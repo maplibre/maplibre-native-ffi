@@ -1,325 +1,273 @@
-# Support that CI cannot record. CI covers the targets in CMakePresets.json with
-# the suites in tools/ci/suites.py. The support matrix on the docs home page
-# merges these entries with CI coverage, and its generator fails when CI covers
-# an entry, so remove an entry once CI covers it. Each push to main also
-# rewrites the tracking issue's body from this file.
-
 issue = 936
 
-# Native targets that the C library does not build yet.
+# Targets that CI does not build yet.
 
-[[planned]]
-platform = "linux-gnu"
-arch = "riscv64"
+[[entry]]
+bindings = ["c"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["riscv64", "loongarch64"]
 backends = ["vulkan", "opengl"]
+status = "not-investigated"
 
-[[planned]]
-platform = "linux-gnu"
-arch = "loongarch64"
+[[entry]]
+bindings = ["c"]
+platforms = ["freebsd"]
+archs = ["arm64"]
 backends = ["vulkan", "opengl"]
+status = "not-investigated"
 
-[[planned]]
-platform = "linux-musl"
-arch = "riscv64"
-backends = ["vulkan", "opengl"]
+# Cells that wait on an upstream fix or release.
 
-[[planned]]
-platform = "linux-musl"
-arch = "loongarch64"
-backends = ["vulkan", "opengl"]
-
-[[planned]]
-platform = "windows-mingw"
-arch = "x64"
-backends = ["vulkan", "opengl"]
-
-[[planned]]
-platform = "windows-mingw"
-arch = "arm64"
-backends = ["vulkan", "opengl"]
-
-[[planned]]
-platform = "freebsd"
-arch = "arm64"
-backends = ["vulkan", "opengl"]
-
-# Bindings that cannot reach a platform until an upstream project changes.
-# The reason is Markdown and appears in the matrix and the issue; the link
-# points upstream.
-
-[[gap]]
-binding = "dart"
-platform = "emscripten"
+[[entry]]
+bindings = ["c"]
+platforms = ["wasi"]
+archs = ["wasm32"]
+backends = ["webgpu"]
 status = "blocked"
-reason = "dart2wasm forbids user imports of `dart:ffi`, so the browser needs a separate JavaScript backend."
-link = "https://github.com/dart-lang/sdk/blob/3.13.5/CHANGELOG.md"
+reason = "WASI has no graphics API yet. `wasi:webgpu`, which brings WebGPU to WASI, is a Phase 2 proposal."
+link = "https://github.com/WebAssembly/wasi-gfx"
 
-[[gap]]
-binding = "dart"
-platform = "freebsd"
-status = "blocked"
-reason = "The Dart SDK does not support FreeBSD, and only a community port exists."
-link = "https://github.com/dart-lang/sdk/issues/52374"
-
-[[gap]]
-binding = "dart"
-platform = "ios-maccatalyst"
-status = "blocked"
-reason = "Flutter does not target Mac Catalyst, and Dart's build hooks build iOS code only for the device and simulator."
-link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/ios_sdk.dart"
-
-[[gap]]
-binding = "dart"
-platform = "ohos"
-status = "blocked"
-reason = "Neither the Dart SDK nor Flutter targets OpenHarmony, and Dart's build hooks have no OpenHarmony OS."
-link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
-
-[[gap]]
-binding = "dart"
-platform = "tvos"
-status = "blocked"
-reason = "Neither the Dart SDK nor Flutter targets tvOS."
-link = "https://github.com/flutter/flutter/issues/47928"
-
-[[gap]]
-binding = "dart"
-platform = "visionos"
-status = "blocked"
-reason = "Neither Flutter nor Dart's build hooks target visionOS."
-link = "https://github.com/flutter/flutter/issues/142933"
-
-[[gap]]
-binding = "dotnet"
-platform = "freebsd"
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["freebsd"]
 status = "blocked"
 reason = "Microsoft ships no .NET for FreeBSD, and the ports tree carries .NET 9, older than the binding's `net10.0`."
 link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/requirements/freebsd-requirements.md"
 
-[[gap]]
-binding = "dotnet"
-platform = "ohos"
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["ohos"]
 status = "blocked"
 reason = "The .NET port to OpenHarmony is still landing on the runtime's main branch, so no release supports it, including the binding's `net10.0`."
 link = "https://github.com/dotnet/runtime/issues/132866"
 
-[[gap]]
-binding = "dotnet"
-platform = "visionos"
-status = "blocked"
-reason = ".NET's Apple workloads cover iOS, tvOS, Mac Catalyst, and macOS, but not visionOS."
-link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
-
-[[gap]]
-binding = "go"
-platform = "emscripten"
-status = "blocked"
-reason = "Go's `js/wasm` port has no cgo ABI."
-link = "https://github.com/golang/go/issues/55351"
-
-[[gap]]
-binding = "kotlin-native"
-platform = "freebsd"
-status = "blocked"
-reason = "Kotlin/Native has no FreeBSD target."
-link = "https://kotlinlang.org/docs/native-target-support.html"
-
-[[gap]]
-binding = "kotlin-native"
-platform = "linux-musl"
-status = "blocked"
-reason = "Kotlin/Native binaries cannot run on musl."
-link = "https://youtrack.jetbrains.com/issue/KT-38876"
-
-[[gap]]
-binding = "kotlin-native"
-platform = "ios-maccatalyst"
-status = "blocked"
-reason = "Kotlin/Native has no Mac Catalyst target."
-link = "https://youtrack.jetbrains.com/issue/KT-40442"
-
-[[gap]]
-binding = "kotlin-native"
-platform = "ohos"
-status = "blocked"
-reason = "Kotlin/Native has no OpenHarmony target."
-link = "https://youtrack.jetbrains.com/issue/KT-63976"
-
-[[gap]]
-binding = "kotlin-native"
-platform = "visionos"
-status = "blocked"
-reason = "Kotlin/Native has no visionOS target."
-link = "https://youtrack.jetbrains.com/issue/KT-59571"
-
-[[gap]]
-binding = "python"
-platform = "emscripten"
+[[entry]]
+bindings = ["python"]
+platforms = ["emscripten"]
 status = "blocked"
 reason = "PyEmscripten wheels forbid the pthreads that the C library needs."
 link = "https://peps.python.org/pep-0783/#the-pyemscripten-platform"
 
-[[gap]]
-binding = "swift"
-platform = "emscripten"
-status = "blocked"
-reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
-
-[[gap]]
-binding = "swift"
-platform = "ohos"
-status = "blocked"
-reason = "Swift has no OpenHarmony target, and Swift.org ships no OpenHarmony SDK. The only port, a community Swift 6.0.3 toolchain, runs on aarch64 devices alone, so it cannot cross-compile from Linux or macOS or reach the x64 emulator that CI uses, and it does not promise SwiftPM."
-link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
-
-[[gap]]
-binding = "zig"
-platform = "emscripten"
+[[entry]]
+bindings = ["zig"]
+platforms = ["emscripten"]
 status = "blocked"
 reason = "Zig 0.17.0 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
 link = "https://github.com/ziglang/zig/issues/22807"
 
-[[gap]]
-binding = "zig"
-platform = "ios"
+[[entry]]
+bindings = ["zig"]
+platforms = ["ios", "tvos", "visionos"]
 status = "blocked"
 reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
 link = "https://codeberg.org/ziglang/zig/pulls/37063"
 
-[[gap]]
-binding = "zig"
-platform = "ohos"
+[[entry]]
+bindings = ["zig"]
+platforms = ["ohos"]
 status = "blocked"
 reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
 link = "https://codeberg.org/ziglang/zig/issues/31427"
 
-[[gap]]
-binding = "zig"
-platform = "tvos"
-status = "blocked"
-reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
-link = "https://codeberg.org/ziglang/zig/pulls/37063"
+# Cells with a known path that no one has started.
 
-[[gap]]
-binding = "zig"
-platform = "visionos"
-status = "blocked"
-reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
-link = "https://codeberg.org/ziglang/zig/pulls/37063"
-
-# Bindings with a known path to a platform that no one has started.
-
-[[gap]]
-binding = "c"
-platform = "windows-mingw"
+[[entry]]
+bindings = ["c"]
+platforms = ["windows-mingw"]
+archs = ["x64", "arm64"]
+backends = ["vulkan", "opengl"]
 status = "path-known"
 reason = "A DLL built with Zig's `windows-gnu` target passes the C suites under Wine, after the build changes that the issue lists. A static archive has to hide its bundled C++ runtime without `ld -r`, which lld lacks for COFF, by renaming that runtime's symbols with `llvm-objcopy`."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
-[[gap]]
-binding = "dotnet"
-platform = "android"
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["android", "ios"]
 status = "path-known"
-reason = "Add a `net10.0-android` host, package the native assets, initialize Android services, and run an emulator test app."
+reason = "Add a `net10.0-android` or `net10.0-ios` host, package the native assets, and run a test app on the emulator or simulator. Android also needs its platform services initialized."
 
-[[gap]]
-binding = "dotnet"
-platform = "ios"
-status = "path-known"
-reason = "Add a `net10.0-ios` host, package or statically link the native assets, and run a simulator test app."
-
-[[gap]]
-binding = "dotnet"
-platform = "emscripten"
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["emscripten"]
 status = "path-known"
 reason = "Add a browser WebAssembly host that links the native archives through `NativeFileReference` with matching Emscripten flags, and run browser tests."
 
-[[gap]]
-binding = "go"
-platform = "windows-mingw"
+[[entry]]
+bindings = ["go"]
+platforms = ["windows-mingw"]
 status = "path-known"
 reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
-[[gap]]
-binding = "go"
-platform = "ios"
+[[entry]]
+bindings = ["go"]
+platforms = ["ios"]
 status = "path-known"
 reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
 
-[[gap]]
-binding = "kotlin-native"
-platform = "windows-mingw"
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["windows-mingw"]
 status = "path-known"
 reason = "Kotlin/Native links `mingwX64` against GCC 9's `libstdc++` and `msvcrt.dll`. Its runtime KLIB needs a static archive built for msvcrt, as llvm-mingw can, with the bundled C++ runtime's symbols renamed so that they cannot collide with `libstdc++`."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
-[[gap]]
-binding = "python"
-platform = "freebsd"
+[[entry]]
+bindings = ["python"]
+platforms = ["freebsd"]
 status = "path-known"
 reason = "Build and test the extension in the FreeBSD VM. PyPI rejects FreeBSD wheel tags, so the package cannot publish one."
 link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
 
-[[gap]]
-binding = "python"
-platform = "ios"
+[[entry]]
+bindings = ["python"]
+platforms = ["ios"]
 status = "path-known"
 reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
 
-[[gap]]
-binding = "rust"
-platform = "windows-mingw"
+[[entry]]
+bindings = ["rust"]
+platforms = ["windows-mingw"]
 status = "path-known"
 reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
-[[gap]]
-binding = "swift"
-platform = "freebsd"
+[[entry]]
+bindings = ["swift"]
+platforms = ["freebsd"]
 status = "path-known"
 reason = "Swift.org ships a preview toolchain for FreeBSD 14 on x64 only. Run the suite with it in the FreeBSD VM."
 link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
 
-[[gap]]
-binding = "swift"
-platform = "android"
+[[entry]]
+bindings = ["swift"]
+platforms = ["android"]
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
 
-[[gap]]
-binding = "typescript"
-platform = "freebsd"
+[[entry]]
+bindings = ["typescript"]
+platforms = ["freebsd"]
 status = "path-known"
 reason = "Build the addon and run the Node suite in the FreeBSD VM. Node supports FreeBSD x64 as experimental and ships no official binaries."
 
-[[gap]]
-binding = "typescript"
-platform = "android"
+[[entry]]
+bindings = ["typescript"]
+platforms = ["android", "ios"]
 status = "path-known"
-reason = "Add an app host with a Node-API runtime, package the addon, and run emulator tests."
+reason = "Add an app host with a Node-API runtime, package the addon, and run tests on the emulator or simulator."
 
-[[gap]]
-binding = "typescript"
-platform = "ios"
+[[entry]]
+bindings = [
+  "dotnet",
+  "dart",
+  "kotlin-jvm",
+  "kotlin-native",
+  "python",
+  "swift",
+  "typescript",
+]
+platforms = ["macos"]
+archs = ["x64"]
 status = "path-known"
-reason = "Add an app host with a Node-API runtime, package the addon, and run simulator tests."
+reason = "CI builds the x64 library and runs these suites on arm64 alone. Package the binding for x64 where it needs one, and run its suite under an x64 runtime on the arm64 runners, which Rosetta runs."
 
-# Platforms that a binding cannot reach by design, because another binding of
-# its language is the route there. A platform that the language's only route
-# cannot reach yet is a gap instead.
+[[entry]]
+bindings = ["dart"]
+platforms = ["freebsd"]
+status = "path-known"
+reason = "Only a community port of the Dart SDK runs on FreeBSD. Run the suite with it in the FreeBSD VM."
+link = "https://github.com/dart-lang/sdk/issues/52374"
 
-[[not-applicable]]
-binding = "kotlin-jvm"
-platforms = ["ios", "ios-maccatalyst", "tvos", "visionos"]
-reason = "No JVM runs on Apple's mobile platforms. Kotlin/Native is the route there."
-
-[[not-applicable]]
-binding = "kotlin-jvm"
+[[entry]]
+bindings = ["swift"]
 platforms = ["ohos"]
-reason = "No JVM runs on OpenHarmony. Kotlin/Native is the route there."
+status = "path-known"
+reason = "Only a community Swift 6.0.3 toolchain targets OpenHarmony. It runs on aarch64 devices alone, so the suite would run on an arm64 device rather than the x64 emulator that CI uses, and it does not promise SwiftPM."
+link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
 
-[[not-applicable]]
-binding = "kotlin-jvm"
+[[entry]]
+bindings = ["dart"]
+platforms = ["ohos"]
+status = "path-known"
+reason = "A community fork of Flutter targets OpenHarmony and bundles its own Dart SDK. Deliver the native library through it, and run the suite on the emulator."
+link = "https://gitcode.com/openharmony-sig/flutter_flutter"
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["ohos"]
+status = "path-known"
+reason = "Community forks of Kotlin/Native add an `ohosArm64` target. Build the KLIB with one, and run the suite on an arm64 device."
+link = "https://github.com/zxystd/Kotlin-OHOS"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["ohos"]
+status = "path-known"
+reason = "Community builds of CPython target OpenHarmony. Build the extension against one, and run the suite on the emulator."
+link = "https://gitcode.com/ai_model_sig/ohos_python"
+
+# Cells that the binding's toolchain does not target.
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["tvos", "visionos"]
+status = "not-applicable"
+reason = "Dart's build hooks, which deliver the binding's native library, target no such OS."
+link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["ios-maccatalyst"]
+status = "not-applicable"
+reason = "Dart's build hooks build iOS code only for the device and simulator."
+link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/ios_sdk.dart"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["emscripten", "wasi"]
+status = "not-applicable"
+reason = "`dart:ffi` serves the Dart Native platform alone, and dart2wasm forbids user imports of it."
+link = "https://dart.dev/interop/c-interop"
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["visionos"]
+status = "not-applicable"
+reason = ".NET's Apple workloads cover iOS, tvOS, Mac Catalyst, and macOS, but not visionOS."
+link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
+
+[[entry]]
+bindings = ["go"]
+platforms = ["emscripten", "wasi"]
+status = "not-applicable"
+reason = "Go's WebAssembly ports, `js/wasm` and `wasip1/wasm`, have no cgo ABI."
+link = "https://github.com/golang/go/issues/55351"
+
+[[entry]]
+bindings = ["kotlin-jvm"]
+platforms = [
+  "ios",
+  "ios-maccatalyst",
+  "tvos",
+  "visionos",
+  "ohos",
+  "emscripten",
+  "wasi",
+]
+status = "not-applicable"
+reason = "No JVM runs on these platforms."
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["linux-musl", "freebsd", "ios-maccatalyst", "visionos"]
+status = "not-applicable"
+reason = "Kotlin/Native has no target for these platforms."
+link = "https://kotlinlang.org/docs/native-target-support.html"
+
+[[entry]]
+bindings = ["swift"]
 platforms = ["emscripten"]
-reason = "No JVM runs in the browser. Kotlin/Wasm is the route there."
+status = "not-applicable"
+reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
+link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
