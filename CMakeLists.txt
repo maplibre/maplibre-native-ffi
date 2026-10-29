@@ -50,7 +50,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(mln_ffi_options)
 include(mln_ffi_maplibre_native)
 include(mln_ffi_c_api)
-include(mln_ffi_licenses)
+include(mln_ffi_components)
 include(mln_ffi_install)
 
 include(mln_ffi_emscripten)
@@ -64,7 +64,7 @@ include(CTest)
 
 mln_ffi_select_render_backend()
 mln_ffi_add_c_api_library(maplibre_native_c)
-mln_ffi_add_core_licenses(maplibre_native_c)
+mln_ffi_add_core_components(maplibre_native_c)
 mln_ffi_install_c_api_library(maplibre_native_c)
 
 # The namespace is the repository, not the target: `maplibre_native_c` is the C

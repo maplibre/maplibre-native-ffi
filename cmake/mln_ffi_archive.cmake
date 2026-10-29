@@ -47,7 +47,16 @@ function(mln_ffi_bundle_clang_cxx_runtime target notice)
   endforeach()
 
   # The runtime is redistributed inside the artifact, so its notice ships too.
-  mln_ffi_add_license(${target} "${notice}" "cxx-runtime.txt")
+  mln_ffi_add_component(
+    ${target}
+    llvm-cxx-runtime
+    https://github.com/llvm/llvm-project
+    "Apache-2.0 WITH LLVM-exception"
+    VERSION
+    "${CMAKE_CXX_COMPILER_VERSION}"
+    NOTICES
+    "${notice}"
+    cxx-runtime.txt)
   set_target_properties(
     ${target}
     PROPERTIES

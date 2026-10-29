@@ -59,8 +59,15 @@ function(mln_ffi_configure_linux_archive_contents target)
   endif()
   set(zig_library_directory "${CMAKE_MATCH_1}")
   foreach(component libcxx libcxxabi libunwind)
-    mln_ffi_add_license(
-      ${target} "${zig_library_directory}/${component}/LICENSE.TXT"
+    mln_ffi_add_component(
+      ${target}
+      "llvm-${component}"
+      https://github.com/llvm/llvm-project
+      "Apache-2.0 WITH LLVM-exception"
+      VERSION
+      "${CMAKE_CXX_COMPILER_VERSION}"
+      NOTICES
+      "${zig_library_directory}/${component}/LICENSE.TXT"
       "llvm-${component}.txt")
   endforeach()
 
@@ -122,13 +129,28 @@ function(mln_ffi_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_ffi_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-                      "zlib.txt")
-  mln_ffi_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-                      "libuv.txt")
-  mln_ffi_add_license(
-    ${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-    "libuv-extra.txt")
+  mln_ffi_add_component(
+    ${target}
+    zlib
+    https://github.com/madler/zlib
+    Zlib
+    VERSION
+    1.3.1
+    NOTICES
+    "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+    zlib.txt)
+  mln_ffi_add_component(
+    ${target}
+    libuv
+    https://github.com/libuv/libuv
+    MIT
+    VERSION
+    1.48.0
+    NOTICES
+    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+    libuv.txt
+    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+    libuv-extra.txt)
 
   # `m` is here rather than private to the C API target so that it reaches a
   # static consumer, which links the archive without that target's own line.

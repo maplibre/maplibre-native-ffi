@@ -107,7 +107,15 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${resources}"
     COMPONENT "${component}")
-  mln_ffi_install_licenses(${target} "${component}" "${resources}/licenses")
+  get_target_property(components ${target} MLN_FFI_COMPONENT_DIRECTORY)
+  install(
+    DIRECTORY "${components}/licenses/"
+    DESTINATION "${resources}/licenses"
+    COMPONENT "${component}")
+  install(
+    FILES "${components}/sbom.cdx.json"
+    DESTINATION "${resources}"
+    COMPONENT "${component}")
 
   # CMake links only the binary and Resources at a versioned bundle's root.
   if(NOT embedded)

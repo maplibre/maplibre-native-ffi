@@ -22,7 +22,6 @@
     // command that updates it, Dependabot included, so formatting them turns
     // each tool update into a hygiene failure.
     "**/.config/dotnet-tools.json",
-    "../src/platform/rust/about.hbs",
     "gradlew",
     "gradlew.bat",
     // Oxc rejects the declaration-only style attribute in this logo.

@@ -123,24 +123,15 @@ function(mln_ffi_link_rust_platform target)
   set_target_properties(
     mln_ffi_platform_rust
     PROPERTIES IMPORTED_LOCATION "${rust_library}")
-  set(rust_license_file
-      "${CMAKE_CURRENT_BINARY_DIR}/rust-third-party-licenses.md")
+  set(rust_inventory "${CMAKE_CURRENT_BINARY_DIR}/rust-components.json")
   set(rust_license_config "${PROJECT_SOURCE_DIR}/src/platform/rust/about.toml")
-  set(rust_license_template "${PROJECT_SOURCE_DIR}/src/platform/rust/about.hbs")
   set_property(
     DIRECTORY
     APPEND
     PROPERTY
-      # The manifests belong here alongside the lockfile: Cargo.lock does not
-      # record feature selection or target conditions, so a manifest edit can
-      # change the dependency graph without touching it, and the notices would
-      # otherwise stay as generated from the previous graph.
-      CMAKE_CONFIGURE_DEPENDS
-      "${PROJECT_SOURCE_DIR}/Cargo.lock"
-      "${PROJECT_SOURCE_DIR}/Cargo.toml"
-      "${rust_manifest}"
-      "${rust_license_config}"
-      "${rust_license_template}")
+      CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      "${PROJECT_SOURCE_DIR}/Cargo.toml" "${rust_manifest}"
+      "${rust_license_config}")
   execute_process(
     COMMAND
       "${CARGO_ABOUT_EXECUTABLE}"
@@ -153,12 +144,35 @@ function(mln_ffi_link_rust_platform target)
       "${rust_target}"
       --locked
       --fail
+      --format
+      json
       --output-file
-      "${rust_license_file}"
-      "${rust_license_template}"
+      "${rust_inventory}"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND_ERROR_IS_FATAL ANY)
-  mln_ffi_add_license(mln_ffi_platform_rust "${rust_license_file}" "rust.md")
+  set_property(
+    TARGET mln_ffi_platform_rust
+    PROPERTY MLN_FFI_CARGO_ABOUT "${rust_inventory}")
+  find_program(RUSTC_EXECUTABLE rustc REQUIRED)
+  execute_process(
+    COMMAND "${RUSTC_EXECUTABLE}" --print sysroot
+    OUTPUT_VARIABLE rust_sysroot OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(
+    COMMAND "${RUSTC_EXECUTABLE}" --version
+    OUTPUT_VARIABLE rust_version OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  mln_ffi_add_component(
+    mln_ffi_platform_dependencies
+    rust-std
+    https://github.com/rust-lang/rust
+    "MIT OR Apache-2.0"
+    VERSION
+    "${rust_version}"
+    NOTICES
+    "${rust_sysroot}/share/doc/rust/COPYRIGHT-library.html"
+    rust-std.html)
+
   add_dependencies(mln_ffi_platform_rust mln_ffi_platform_rust_build)
 
   target_link_libraries(${target} PRIVATE mln_ffi_platform_rust)

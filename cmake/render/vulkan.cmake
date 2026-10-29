@@ -1,12 +1,35 @@
 function(mln_ffi_configure_render_dependencies target)
-  mln_ffi_add_license(
-    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
-    "vulkan-headers.md")
-  mln_ffi_add_license(
-    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
-    "vulkan-memory-allocator.txt")
-  mln_ffi_add_license(
-    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/glslang/LICENSE.txt" "glslang.txt")
+  mln_ffi_add_component(
+    ${target}
+    Vulkan-Headers
+    https://github.com/KhronosGroup/Vulkan-Headers
+    "Apache-2.0 OR MIT"
+    SOURCE
+    "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers"
+    NOTICES
+    "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
+    vulkan-headers.md)
+  mln_ffi_add_component(
+    ${target}
+    VulkanMemoryAllocator
+    https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+    MIT
+    SOURCE
+    "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator"
+    NOTICES
+    "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
+    vulkan-memory-allocator.txt)
+  # The preprocessor's NVIDIA terms are reproduced in glslang.txt.
+  mln_ffi_add_component(
+    ${target}
+    glslang
+    https://github.com/KhronosGroup/glslang
+    "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND LicenseRef-NVIDIA-glslang"
+    SOURCE
+    "${MLN_FFI_SOURCE_DIR}/vendor/glslang"
+    NOTICES
+    "${MLN_FFI_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
+    glslang.txt)
 
   # glslang builds with the SPIR-V optimizer off, so no separately licensed
   # SPIRV-Tools code reaches the artifacts and the notices above cover the whole

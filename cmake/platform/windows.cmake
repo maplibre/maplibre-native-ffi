@@ -23,13 +23,28 @@ function(mln_ffi_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_ffi_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-                      "zlib.txt")
-  mln_ffi_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-                      "libuv.txt")
-  mln_ffi_add_license(
-    ${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-    "libuv-extra.txt")
+  mln_ffi_add_component(
+    ${target}
+    zlib
+    https://github.com/madler/zlib
+    Zlib
+    VERSION
+    1.3.1
+    NOTICES
+    "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+    zlib.txt)
+  mln_ffi_add_component(
+    ${target}
+    libuv
+    https://github.com/libuv/libuv
+    MIT
+    VERSION
+    1.48.0
+    NOTICES
+    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+    libuv.txt
+    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+    libuv-extra.txt)
 
   target_link_libraries(${target} INTERFACE zlibstatic uv_a ntdll ws2_32)
   set(archive_format coff)

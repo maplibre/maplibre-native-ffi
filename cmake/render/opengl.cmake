@@ -34,7 +34,19 @@ function(mln_ffi_configure_render_dependencies target)
         # headers to build against come from the ANGLE distribution the host
         # brings. The local stand-in installs the two together through the
         # loader component, which the artifact leaves out.
-        mln_ffi_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
+        file(READ "${PROJECT_SOURCE_DIR}/third_party/angle/manifest.json"
+             angle_manifest)
+        string(JSON angle_version GET "${angle_manifest}" version)
+        mln_ffi_add_component(
+          ${target}
+          angle
+          https://chromium.googlesource.com/angle/angle
+          BSD-3-Clause
+          VERSION
+          "${angle_version}"
+          NOTICES
+          "${MLN_FFI_EGL_ROOT}/LICENSE"
+          angle.txt)
         set_target_properties(
           ${target}
           PROPERTIES
