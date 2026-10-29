@@ -6,6 +6,7 @@ work="$root/build/react-native-spike"
 case "$preset" in
   android-arm-egl | android-arm-vulkan) abi=armeabi-v7a ;;
   android-arm64-egl | android-arm64-vulkan) abi=arm64-v8a ;;
+  android-x86-egl | android-x86-vulkan) abi=x86 ;;
   android-x64-egl | android-x64-vulkan) abi=x86_64 ;;
   ios-arm64-metal | ios-simulator-arm64-metal) abi= ;;
   *) echo "Unsupported React Native test preset: $preset" >&2; exit 2 ;;

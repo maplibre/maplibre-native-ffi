@@ -5,8 +5,7 @@
  * ReactApplication.reactHost so teardown can run before the JS queue stops.
  *
  * Android defaults to OpenGL; set maplibre.android.backend=vulkan in
- * gradle.properties to select Vulkan. Restrict abiFilters to armeabi-v7a, arm64-v8a, and x86_64:
- * the native runtime has no 32-bit x86 build. iOS uses Metal. This entry exposes
+ * gradle.properties to select Vulkan. iOS uses Metal. This entry exposes
  * the same low-level API as the desktop binding and creates no native views.
  *
  * @module react-native

@@ -63,7 +63,7 @@ scripts/test-arkts.sh "$usage_preset"
 description = "Build the React Native release app with the shared TypeScript suite and reload probe."
 usage = '''
 arg "<preset>" {
-  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal"
+  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal"
 }
 '''
 tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }

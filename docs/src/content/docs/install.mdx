@@ -579,14 +579,8 @@ cd ios
 node ../node_modules/react-native/scripts/setup-apple-spm.js add --deintegrate
 ```
 
-Exclude 32-bit x86 from Android's ABI filters. With the standard React Native
-template, set this in `android/gradle.properties`:
-
-```properties
-reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
-```
-
-To select Vulkan on Android, also set `maplibre.android.backend=vulkan`.
+To select Vulkan on Android, set `maplibre.android.backend=vulkan` in
+`android/gradle.properties`.
 
 Import from `@maplibre/native-ffi` as on Node. The binding creates no native
 view; the host supplies the graphics objects and surface for presentation.

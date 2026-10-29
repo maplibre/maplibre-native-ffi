@@ -249,6 +249,8 @@ class SuitesTest(unittest.TestCase):
             ("android-arm-vulkan", "build"),
             ("android-arm64-egl", "build"),
             ("android-arm64-vulkan", "build"),
+            ("android-x86-egl", "build"),
+            ("android-x86-vulkan", "build"),
             ("android-x64-egl", "test"),
             ("android-x64-vulkan", "test"),
             ("ios-arm64-metal", "build"),
