@@ -40,7 +40,8 @@ permissions:
 jobs:
   publish:
     name: Native package
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-6vcpu-macos-26
+    environment: apple-sdk
     timeout-minutes: 60
     permissions:
       actions: read
@@ -111,11 +112,23 @@ jobs:
           echo "timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
       - name: Prepare assets
         env:
+          APPLE_SDK_SIGNING_ENABLED: ${{ vars.APPLE_SDK_SIGNING_ENABLED }}
+          APPLE_SDK_TEAM_ID: ${{ vars.APPLE_SDK_TEAM_ID }}
+          APPLE_SDK_CERTIFICATE_BASE64:
+            ${{ secrets.APPLE_SDK_CERTIFICATE_BASE64 }}
+          APPLE_SDK_CERTIFICATE_PASSWORD:
+            ${{ secrets.APPLE_SDK_CERTIFICATE_PASSWORD }}
           PUBLISH_PREVIOUS_TAG: ${{ inputs.previous_tag }}
           PUBLISH_TIMESTAMP: ${{ steps.publish.outputs.timestamp }}
-        run: >-
-          mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
-          build/packages/native/release "$PUBLISH_VERSION"
+        run: |
+          set -euo pipefail
+
+          set --
+          if [[ "$APPLE_SDK_SIGNING_ENABLED" == true ]]; then
+            set -- --sign-apple-sdk
+          fi
+          mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL" \
+            build/packages/native/release "$PUBLISH_VERSION" "$@"
       - name: Attest the release assets
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:

@@ -18,6 +18,7 @@ import urllib.request
 import zipfile
 from collections.abc import Iterable
 
+from apple_sdk_signing import sign_archive
 from release_version import parse_version
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import write_package as write_zig_package
@@ -367,6 +368,8 @@ def prepare_assets(
     channel: str,
     version: str,
     repository: pathlib.Path | None = None,
+    *,
+    sign_apple_sdk: bool = False,
 ) -> None:
     if channel == "release":
         parse_version(version)
@@ -379,6 +382,8 @@ def prepare_assets(
     if not xcframework.is_file():
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")
     rewrite_xcframework(xcframework, version)
+    if sign_apple_sdk:
+        sign_archive(xcframework)
     tag = required_env("PUBLISH_TAG")
     artifacts_path = release_dir / ARTIFACTS_NAME
     index = write_artifacts(artifacts_path, tag, archives)
@@ -402,9 +407,15 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("channel", choices=("snapshot", "release"))
     parser.add_argument("release_dir", type=pathlib.Path)
     parser.add_argument("version")
+    parser.add_argument("--sign-apple-sdk", action="store_true")
 
     args = parser.parse_args(arguments)
-    prepare_assets(args.release_dir, args.channel, args.version)
+    prepare_assets(
+        args.release_dir,
+        args.channel,
+        args.version,
+        sign_apple_sdk=args.sign_apple_sdk,
+    )
     return 0
 
 

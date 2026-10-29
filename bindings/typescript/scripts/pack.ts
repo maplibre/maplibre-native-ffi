@@ -280,6 +280,17 @@ if (values.xcframework) {
     join(facade, "native/MaplibreNativeC.xcframework"),
     { recursive: true, dereference: true },
   );
+  // npm omits symlinks, so sign only after copying the final bundle layout.
+  if (process.env.APPLE_SDK_SIGNING_ENABLED === "true") {
+    execFileSync(
+      "python3",
+      [
+        join(root, "tools/release/apple_sdk_signing.py"),
+        join(facade, "native/MaplibreNativeC.xcframework"),
+      ],
+      { stdio: "inherit" },
+    );
+  }
 }
 // The facade loads whichever backend package the application installed. The
 // peer pins keep that package at the facade's version, and let a strict
