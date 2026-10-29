@@ -45,14 +45,13 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   final H _handle;
-  // Roots remain reachable through the owner until native retires them.
-  // ignore: unused_field
-  Object? _callbackRoots;
+  // AOT compilation removes a field that is only ever assigned, along with
+  // the reference it held, so retain reads this list to add to it.
+  final _retained = <Object>[];
 
-  /// Keeps callback registrations reachable through this owner's lifetime.
-  void retain(Object value) {
-    _callbackRoots = value;
-  }
+  /// Keeps [value], such as a parent owner or callback registrations,
+  /// reachable through this owner's lifetime.
+  void retain(Object value) => _retained.add(value);
 
   bool _closed = false;
   final Object _finalizerDetachToken = Object();

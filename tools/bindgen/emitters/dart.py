@@ -291,12 +291,11 @@ def render_scoped_views(bound, generated, values):
 def render_owner(native, handle, bodies, bound, roots):
     public, native_type = owner_names(handle)
     parameters, fields = [], []
+    retain = ""
     if handle.parent in bound.public_handles:
-        parameters.append("this._parent")
-        fields.append(
-            "  // Keeps the parent owner reachable while this owner lives.\n"
-            f"  // ignore: unused_field\n  final {owner_names(bound.handles[handle.parent])[0]} _parent;"
-        )
+        parameters.append(f"{owner_names(bound.handles[handle.parent])[0]} parent")
+        # Keeps the parent owner reachable while this owner lives.
+        retain = "..retain(parent)"
     if roots:
         fields.append(
             "  // Roots this owner's callback registrations for as long as it lives.\n"
@@ -330,7 +329,7 @@ def render_owner(native, handle, bodies, bound, roots):
         "/// Owner of one native handle.\n"
         + (f"///\n{summary}" if (summary := doc(bound, native)) else "")
         + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
-        f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
+        f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}'){retain};\n"
         + "\n".join(fields)
         + "\n\n"
         + (

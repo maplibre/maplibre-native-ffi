@@ -2901,11 +2901,8 @@ extension type const _NativeAcquiredFrame(int raw) implements NativeHandle {}
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class AcquiredFrameHandle implements Finalizable {
-  AcquiredFrameHandle._(this._parent, _NativeAcquiredFrame handle)
-    : _state = NativeHandleState(handle, 'AcquiredFrameHandle');
-  // Keeps the parent owner reachable while this owner lives.
-  // ignore: unused_field
-  final RenderSessionHandle _parent;
+  AcquiredFrameHandle._(RenderSessionHandle parent, _NativeAcquiredFrame handle)
+    : _state = NativeHandleState(handle, 'AcquiredFrameHandle')..retain(parent);
   final NativeHandleState<_NativeAcquiredFrame> _state;
   _NativeAcquiredFrame get _handle => _state.handle;
 
@@ -3758,11 +3755,8 @@ extension type const _NativeMap(int raw) implements NativeHandle {}
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapHandle implements Finalizable, _CallbackRootOwner {
-  MapHandle._(this._parent, _NativeMap handle)
-    : _state = NativeHandleState(handle, 'MapHandle');
-  // Keeps the parent owner reachable while this owner lives.
-  // ignore: unused_field
-  final RuntimeHandle _parent;
+  MapHandle._(RuntimeHandle parent, _NativeMap handle)
+    : _state = NativeHandleState(handle, 'MapHandle')..retain(parent);
   // Roots this owner's callback registrations for as long as it lives.
   @override
   final _callbackRoots = _CallbackRoots();
@@ -5610,11 +5604,8 @@ extension type const _NativeRenderSession(int raw) implements NativeHandle {}
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderSessionHandle implements Finalizable {
-  RenderSessionHandle._(this._parent, _NativeRenderSession handle)
-    : _state = NativeHandleState(handle, 'RenderSessionHandle');
-  // Keeps the parent owner reachable while this owner lives.
-  // ignore: unused_field
-  final MapHandle _parent;
+  RenderSessionHandle._(MapHandle parent, _NativeRenderSession handle)
+    : _state = NativeHandleState(handle, 'RenderSessionHandle')..retain(parent);
   final NativeHandleState<_NativeRenderSession> _state;
   _NativeRenderSession get _handle => _state.handle;
   RenderSessionHandleDiscarding get discarding =>
