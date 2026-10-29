@@ -27,6 +27,30 @@ A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main`.
 annotated, and its message below the title line becomes the release notes. The
 `release` agent skill drafts them.
 
+## Apple SDK signing
+
+Publisher signing is opt-in until a publishing identity is configured. Use an
+Apple Distribution certificate from the Apple Developer team that should appear
+as the SDK's publisher. Keep that team consistent across releases and snapshots;
+changing teams requires consumers to accept a new publisher in Xcode.
+
+Create the `apple-sdk` GitHub environment and restrict it to trusted publishing
+refs (`main` and release tags). Add these environment secrets:
+
+- `APPLE_SDK_CERTIFICATE_BASE64`: the base64-encoded, password-protected `.p12`
+  export of the certificate and its private key.
+- `APPLE_SDK_CERTIFICATE_PASSWORD`: the export's password.
+
+Set the environment variable `APPLE_SDK_TEAM_ID` to the ten-character Apple Team
+ID. Then set the **repository** variable `APPLE_SDK_SIGNING_ENABLED` to `true`.
+It must be a repository variable so npm packaging can select a macOS runner
+before the environment is available. Once enabled, missing credentials, an
+invalid identity, or signature verification failure stops publishing.
+
+Tagged releases and native snapshots use the same identity. Keep it valid and
+renew it under the same team. Revoking a certificate invalidates SDKs signed
+with it, so publish replacements if revocation is necessary.
+
 ## Snapshots
 
 The Publish snapshots workflow publishes every snapshot channel from `main`

@@ -245,7 +245,9 @@ class NativePackageReleaseTest(unittest.TestCase):
         create_archive(archive, preset, backend)
         return archive
 
-    def prepare(self, channel: str, version: str | None = None) -> None:
+    def prepare(
+        self, channel: str, version: str | None = None, *, sign_apple_sdk: bool = False
+    ) -> None:
         environment = {
             "CI_RUN_URL": "https://github.com/maplibre/repo/actions/runs/1",
             "GITHUB_REPOSITORY": "maplibre/repo",
@@ -257,7 +259,11 @@ class NativePackageReleaseTest(unittest.TestCase):
         }
         with mock.patch.dict(os.environ, environment, clear=False):
             prepare_assets(
-                self.release_dir, channel, version or self.version, self.repository
+                self.release_dir,
+                channel,
+                version or self.version,
+                self.repository,
+                sign_apple_sdk=sign_apple_sdk,
             )
 
     def assert_assets(self, channel: str, version: str, title: str) -> str:
@@ -384,6 +390,29 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
 
         self.assertIn(f"/compare/v0.202607.0...v{self.version}", notes)
+
+    def test_signing_sees_final_versions_and_checksums_cover_its_output(self) -> None:
+        self.archive()
+
+        def sign(archive: pathlib.Path) -> None:
+            with zipfile.ZipFile(archive, "a") as bundle:
+                for name in (IOS_PLIST, MACOS_PLIST, IOS_DSYM_PLIST):
+                    self.assertEqual(
+                        plistlib.loads(bundle.read(name))["CFBundleVersion"],
+                        self.version,
+                    )
+                bundle.writestr(
+                    "MaplibreNativeC.xcframework/_CodeSignature/CodeResources",
+                    b"signature",
+                )
+
+        with mock.patch("native_package_release.sign_archive", side_effect=sign):
+            self.prepare("release", sign_apple_sdk=True)
+        checksum = hashlib.sha256(self.xcframework.read_bytes()).hexdigest()
+        self.assertIn(
+            f"{checksum}  {XCFRAMEWORK_NAME}",
+            (self.release_dir / "SHA256SUMS").read_text(),
+        )
 
     def test_release_notes_are_the_tag_message_below_its_title(self) -> None:
         message = (
