@@ -88,7 +88,12 @@ JOBS = {
         "pypi",
         lambda target: python_wheel(target),
     ),
-    "typescript-npm": ("npm", lambda target: addon(target) == "typescript"),
+    "typescript-npm": (
+        "npm",
+        lambda target: (
+            addon(target) == "typescript" or target.preset == "android-x64-egl"
+        ),
+    ),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
     "swift-package": ("swiftpm", lambda target: target.backend == "metal"),
     "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64-egl"),
@@ -98,7 +103,10 @@ JOBS = {
 # The jobs whose artifacts a job downloads, which run whenever it does. A job
 # that a skipped one needs would skip it too, and a skip passes the required
 # check.
-JOB_NEEDS = {"swift-package": ("apple-xcframework",)}
+JOB_NEEDS = {
+    "swift-package": ("apple-xcframework",),
+    "typescript-npm": ("apple-xcframework",),
+}
 
 
 def lineage(presets: list[dict], name: str) -> list[dict]:

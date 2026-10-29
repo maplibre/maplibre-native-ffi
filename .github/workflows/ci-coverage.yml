@@ -462,6 +462,7 @@ jobs:
     needs:
       - plan
       - target
+      - apple-xcframework
     if: contains(fromJSON(needs.plan.outputs.jobs), 'typescript-npm')
     uses: ./.github/workflows/_typescript-npm.yml
     with:

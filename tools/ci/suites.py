@@ -234,6 +234,10 @@ def android_commands(target: Target, abi: str) -> list[str]:
         ]
         # Python replaces the EGL suite's API 26 emulator with a newer API,
         # so run it after every suite that reuses the API 26 device.
+        if preset == "android-x64-egl":
+            commands.append(
+                f"mise run //bindings/typescript:test:react-native {preset}"
+            )
         commands.append(f"mise run //bindings/python:test {preset}")
     else:
         commands = [
@@ -279,6 +283,7 @@ def apple_commands(target: Target) -> list[str]:
             f"mise run //bindings/swift:test {preset}",
             f"mise run //bindings/dart:test:ios {preset}",
             f"mise run //bindings/rust:test {preset}",
+            f"mise run //bindings/typescript:test:react-native {preset}",
         ]
     if target_platform == "ios-maccatalyst":
         # Kotlin/Native has no Mac Catalyst target.

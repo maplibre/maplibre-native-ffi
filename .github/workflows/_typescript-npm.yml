@@ -48,12 +48,19 @@ jobs:
           run-id: ${{ inputs.run_id }}
           pattern: typescript-addon-*-${{ env.PACKAGE_SHA }}
           path: build/typescript-addons
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: native-xcframework-${{ env.PACKAGE_SHA }}
+          path: build/typescript-xcframework
       - name: Pack the packages
         run: |
           set -euo pipefail
 
           shopt -s nullglob
           mise deps pnpm
+          unzip -q build/typescript-xcframework/MaplibreNativeC.xcframework.zip -d build/typescript-xcframework
           presets=()
           for artifact in build/typescript-addons/*; do
             preset="${artifact#build/typescript-addons/typescript-addon-}"
@@ -63,7 +70,9 @@ jobs:
             presets+=("$preset")
           done
           mise exec --no-deps core:node -- node bindings/typescript/scripts/pack.ts \
-            --version "$PACKAGE_VERSION" build/npm "${presets[@]}"
+            --version "$PACKAGE_VERSION" \
+            --xcframework build/typescript-xcframework/MaplibreNativeC.xcframework \
+            build/npm "${presets[@]}"
       # npm accepts a trusted publisher only for a package that exists, so the
       # first release of a package publishes these tarballs by hand. A rerun
       # replaces the previous attempt's tarballs.

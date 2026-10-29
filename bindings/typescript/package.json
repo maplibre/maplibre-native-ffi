@@ -1,7 +1,7 @@
 {
   "name": "@maplibre/native-ffi",
   "version": "0.0.0",
-  "description": "Low-level TypeScript bindings for the MapLibre Native C API on Node.js, Bun, Deno, OpenHarmony, and the browser.",
+  "description": "Low-level TypeScript bindings for the MapLibre Native C API on Node.js, Bun, Deno, OpenHarmony, React Native, and the browser.",
   "license": "BSD-2-Clause",
   "repository": {
     "type": "git",
@@ -12,6 +12,7 @@
   "type": "module",
   "exports": {
     ".": {
+      "react-native": "./src/react-native.ts",
       "browser": "./src/browser.ts",
       "default": "./src/index.ts"
     }
@@ -25,6 +26,29 @@
     "emnapi": "2.0.0-beta.2",
     "node-api-headers": "^1.9.0",
     "typedoc": "^0.28.20",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "react-native": "0.88.1",
+    "@types/react": "^19.2.0"
+  },
+  "peerDependencies": {
+    "react-native": "0.88.x"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
+  },
+  "codegenConfig": {
+    "name": "MaplibreNativeFfiSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/specs",
+    "android": {
+      "javaPackageName": "org.maplibre.nativeffi"
+    },
+    "ios": {
+      "modulesProvider": {
+        "MaplibreNativeFfi": "MaplibreNativeFfi"
+      }
+    }
   }
 }

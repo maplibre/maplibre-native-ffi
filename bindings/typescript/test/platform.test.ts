@@ -81,7 +81,7 @@ test(
     // take the first copy's completions and callbacks.
     const root = mkdtempSync(join(tmpdir(), "maplibre-native-ffi-"));
     teardown(() => rmSync(root, { recursive: true, force: true }));
-    const source = fileURLToPath(new URL("../src", import.meta.url));
+    const source = fileURLToPath(new URL("../src", import.meta.url).href);
     for (const copy of ["first", "second"]) {
       cpSync(source, join(root, copy, "src"), { recursive: true });
     }
@@ -127,7 +127,7 @@ test(
     // its own, so the case controls which ones are installed.
     const root = mkdtempSync(join(tmpdir(), "maplibre-native-ffi-"));
     teardown(() => rmSync(root, { recursive: true, force: true }));
-    const source = fileURLToPath(new URL("../src", import.meta.url));
+    const source = fileURLToPath(new URL("../src", import.meta.url).href);
     cpSync(source, join(root, "src"), { recursive: true });
     writeFileSync(
       join(root, "package.json"),

@@ -58,3 +58,25 @@ run = '''
 cmake --build "native/build/$usage_preset" --target maplibre_native_ffi_test_graphics
 scripts/test-arkts.sh "$usage_preset"
 '''
+
+[tasks."build:react-native"]
+description = "Build the React Native release app with the shared TypeScript suite and reload probe."
+usage = '''
+arg "<preset>" {
+  choices "android-x64-egl" "android-arm64-egl" "ios-simulator-arm64-metal"
+}
+'''
+tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
+env = { MLN_RN_JAVA_BUILD_VERSION = "{{vars.java_version}}" }
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = 'bash scripts/build-react-native.sh "$usage_preset"'
+
+[tasks."test:react-native"]
+description = "Run the React Native TypeScript suite, graphics readback and five release-mode reloads."
+usage = '''
+arg "<preset>" {
+  choices "android-x64-egl" "android-arm64-egl" "ios-simulator-arm64-metal"
+}
+'''
+depends = [{ task = ":build:react-native", args = ["{{usage.preset}}"] }]
+run = 'python scripts/run-react-native.py "$usage_preset"'

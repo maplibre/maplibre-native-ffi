@@ -13,7 +13,8 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vite-plus";
 
-const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+const here = (path: string) =>
+  fileURLToPath(new URL(path, import.meta.url).href);
 const unavailable = here("./node/unavailable.ts");
 const nodeModules: Record<string, string> = {
   "node:assert/strict": here("../arkts/node/assert.ts"),

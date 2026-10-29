@@ -1,6 +1,6 @@
 // Bundles the facade and packs the npm packages for one or more presets:
 //
-//   node scripts/pack.ts [--version <version>] <out dir> <preset>...
+//   node scripts/pack.ts [--version <version>] [--xcframework <directory>] <out dir> <preset>...
 //
 // A user installs the facade, @maplibre/native-ffi, and one backend package,
 // such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
@@ -27,12 +27,17 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 const { values, positionals } = parseArgs({
-  options: { version: { type: "string", default: "0.0.0" } },
+  options: {
+    version: { type: "string", default: "0.0.0" },
+    xcframework: { type: "string" },
+  },
   allowPositionals: true,
 });
 const [outArgument, ...presets] = positionals;
 if (outArgument === undefined || presets.length === 0) {
-  throw new Error("usage: pack.ts [--version <version>] <out dir> <preset>...");
+  throw new Error(
+    "usage: pack.ts [--version <version>] [--xcframework <directory>] <out dir> <preset>...",
+  );
 }
 const version = values.version;
 const out = resolve(outArgument);
@@ -133,8 +138,8 @@ function pack(directory: string, manifest: object): void {
 }
 
 // Node strips types only outside node_modules, so the published facade is the
-// bundle rather than the sources: one entry for Node, Bun, and Deno, and one
-// for the browser, which share their chunks. The browser entry bundles emnapi's
+// bundle rather than the sources: entries for Node, browser, and React Native
+// share their chunks. The browser entry bundles emnapi's
 // runtime, a development dependency, so the facade depends on nothing.
 const dist = join(binding, "build", "dist");
 rmSync(dist, { recursive: true, force: true });
@@ -146,11 +151,16 @@ execFileSync(
     "pack",
     "src/index.ts",
     "src/browser.ts",
+    "src/react-native.ts",
     "--no-config",
     // The browser entry runs where no require() exists, which the node
     // platform would bring through node:module.
     "--platform",
     "neutral",
+    "--target",
+    "es2021",
+    "--external",
+    "react-native",
     "--fixed-extension",
     "--dts",
     "--out-dir",
@@ -209,6 +219,57 @@ for (const backend of new Set(addons.map((addon) => addon.backend))) {
 const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
+// Metro consumes JavaScript; codegen separately reads the TurboModule spec.
+// Keep C sources separate from C++ so CocoaPods and CMake compile them as C11.
+for (const name of [
+  "android",
+  "MaplibreNativeFfi.podspec",
+  "react-native.config.cjs",
+  "src/specs",
+]) {
+  cpSync(join(binding, name), join(facade, name), { recursive: true });
+}
+for (const name of [
+  "generated_addon.c",
+  "generated_values.c",
+  "generated_addon.h",
+  "runtime.c",
+  "runtime.h",
+  "realm.c",
+  "react-native",
+]) {
+  cpSync(join(binding, "native", name), join(facade, "native", name), {
+    recursive: true,
+  });
+}
+cpSync(join(root, "include"), join(facade, "native/include"), {
+  recursive: true,
+});
+cpSync(
+  join(root, "third_party/maplibre-native/include/mln/plugin/plugin_api.h"),
+  join(facade, "native/include/mln/plugin/plugin_api.h"),
+);
+cpSync(
+  join(binding, "node_modules/node-api-headers/include"),
+  join(facade, "native/node-api-headers"),
+  { recursive: true },
+);
+cpSync(
+  join(binding, "node_modules/node-api-headers/LICENSE"),
+  join(facade, "native/node-api-headers/LICENSE"),
+);
+cpSync(
+  join(binding, "native/build", addons[0]!.preset, "install/licenses"),
+  join(facade, "native/licenses"),
+  { recursive: true },
+);
+if (values.xcframework) {
+  cpSync(
+    resolve(values.xcframework),
+    join(facade, "native/MaplibreNativeC.xcframework"),
+    { recursive: true, dereference: true },
+  );
+}
 // The facade loads whichever backend package the application installed. The
 // peer pins keep that package at the facade's version, and let a strict
 // layout such as pnpm's link it where the facade can resolve it.
@@ -224,14 +285,29 @@ pack(facade, {
   // and Deno take the default.
   exports: {
     ".": {
+      "react-native": {
+        types: "./dist/react-native.d.mts",
+        default: "./dist/react-native.mjs",
+      },
       browser: { types: "./dist/browser.d.mts", default: "./dist/browser.mjs" },
       default: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
     },
   },
   engines: source.engines,
-  peerDependencies: backendPeers,
+  peerDependencies: { ...backendPeers, ...source.peerDependencies },
   peerDependenciesMeta: Object.fromEntries(
-    Object.keys(backendPeers).map((name) => [name, { optional: true }]),
+    Object.keys({ ...backendPeers, ...source.peerDependencies }).map((name) => [
+      name,
+      { optional: true },
+    ]),
   ),
-  files: ["dist"],
+  codegenConfig: source.codegenConfig,
+  files: [
+    "dist",
+    "src/specs",
+    "native",
+    "android",
+    "MaplibreNativeFfi.podspec",
+    "react-native.config.cjs",
+  ],
 });
