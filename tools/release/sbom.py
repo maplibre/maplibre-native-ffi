@@ -102,6 +102,39 @@ def compose(root: dict, inventories: list[dict]) -> dict:
     return document(root, components, dependencies)
 
 
+def package_inventory(
+    name: str, version: str, ecosystem: str, inventories: list[dict]
+) -> dict:
+    root = component(name, version, "BSD-2-Clause")
+    root["group"] = "org.maplibre.nativeffi"
+    root["purl"] = f"pkg:{ecosystem}/{quote(name, safe='/')}@{quote(version, safe='')}"
+    root["bom-ref"] = root["purl"]
+    return compose(root, inventories)
+
+
+def without_native_rust(inventory: dict) -> dict:
+    """Cargo consumers rebuild the platform crate with their own resolution."""
+    result = copy.deepcopy(inventory)
+    result["components"] = [
+        item
+        for item in result["components"]
+        if not item.get("purl", "").startswith("pkg:cargo/")
+        and item.get("group") != "org.maplibre.nativeffi"
+        and item["name"] != "rust-std"
+    ]
+    refs = {item["bom-ref"] for item in result["components"]}
+    refs.add(result["metadata"]["component"]["bom-ref"])
+    result["dependencies"] = [
+        {
+            "ref": entry["ref"],
+            "dependsOn": [ref for ref in entry["dependsOn"] if ref in refs],
+        }
+        for entry in result["dependencies"]
+        if entry["ref"] in refs
+    ]
+    return result
+
+
 def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
     commit = git(source, "rev-parse", "HEAD")
     checkout = pathlib.Path(git(source, "rev-parse", "--show-toplevel"))
@@ -126,10 +159,12 @@ def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
 
 
 def cargo_components(
-    about: dict, target: str
+    about: dict,
+    target: str,
+    manifest: pathlib.Path = REPOSITORY / "src/platform/rust/Cargo.toml",
+    flags: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict[str, set[str]], str]:
     packages = {entry["package"]["id"]: entry for entry in about["crates"]}
-    manifest = REPOSITORY / "src/platform/rust/Cargo.toml"
     metadata = json.loads(
         subprocess.check_output(
             [
@@ -143,6 +178,7 @@ def cargo_components(
                 str(manifest),
                 "--filter-platform",
                 target,
+                *flags,
             ],
             cwd=REPOSITORY,
         )
@@ -165,7 +201,7 @@ def cargo_components(
             item["bom-ref"] = item["purl"]
         else:
             item["group"] = "org.maplibre.nativeffi"
-            if package["name"] == "maplibre-native-ffi-platform":
+            if package_id == metadata["resolve"]["root"]:
                 root = item["bom-ref"]
         refs[package_id] = item["bom-ref"]
         components.append(item)
@@ -180,7 +216,7 @@ def cargo_components(
             and any(kind["kind"] is None for kind in dep["dep_kinds"])
         }
     if not root:
-        raise ValueError("cargo-about inventory has no platform crate")
+        raise ValueError(f"cargo-about inventory has no root crate for {manifest}")
     return components, dependencies, root
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""License runtime builds and version Python packages for publication.
+"""Build dependency metadata and version Python packages for publication.
 
 Runtime wheels carry their native notices at build time. Release and snapshot
 packing changes their distribution metadata while preserving the tested binary.
@@ -12,9 +12,23 @@ import json
 import pathlib
 import re
 import shutil
+import subprocess
+import tempfile
 import zipfile
 
 from release_version import parse_version
+from sbom import (
+    REPOSITORY,
+    SBOM_NAME,
+    cargo_components,
+    cargo_notices,
+    component,
+    document,
+    package_inventory,
+    stamp,
+    without_native_rust,
+    write_json,
+)
 
 BACKENDS = ("opengl", "metal", "vulkan")
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
@@ -38,7 +52,7 @@ def prepare(package: pathlib.Path, version: str) -> None:
     shutil.copy2(LICENSE, package / "LICENSE")
 
 
-def license_runtime(package: pathlib.Path, prefix: pathlib.Path) -> None:
+def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
     backend = descriptor["backend"]
     if backend not in BACKENDS:
@@ -52,10 +66,98 @@ def license_runtime(package: pathlib.Path, prefix: pathlib.Path) -> None:
     shutil.rmtree(licenses, ignore_errors=True)
     shutil.copytree(notices, licenses)
     shutil.copy2(LICENSE, licenses.parent / "LICENSE")
+    target = descriptor["platform"]["rustTarget"]
+    manifest = package / "Cargo.toml"
+    flags = ("--features", "pyo3/extension-module")
+    if descriptor["platform"]["id"].startswith("android-"):
+        flags += ("--no-default-features",)
+    about = json.loads(
+        subprocess.check_output(
+            [
+                "cargo",
+                "about",
+                "generate",
+                "--manifest-path",
+                str(manifest),
+                "--config",
+                str(REPOSITORY / "src/platform/rust/about.toml"),
+                "--target",
+                target,
+                "--locked",
+                "--fail",
+                "--format",
+                "json",
+                *flags,
+            ],
+            cwd=REPOSITORY,
+        )
+    )
+    crates, graph, root_ref = cargo_components(about, target, manifest, flags)
+    rust_version = subprocess.check_output(["rustc", "--version"], text=True).split()[1]
+    rust = component("rust-std", rust_version, "MIT AND Apache-2.0")
+    crates.append(rust)
+    graph[root_ref].add(rust["bom-ref"])
+    crate_root = next(item for item in crates if item["bom-ref"] == root_ref)
+    extension = document(
+        crate_root, [item for item in crates if item is not crate_root], graph
+    )
+    inventory = json.loads((prefix / "share/maplibre-native-c" / SBOM_NAME).read_text())
+    result = package_inventory(
+        f"maplibre-native-ffi-runtime-{backend}",
+        "0.0.0",
+        "pypi",
+        [without_native_rust(inventory), extension],
+    )
+    result["metadata"]["component"]["properties"] = [
+        {"name": "maplibre:source-commit", "value": descriptor["commit"]}
+    ]
+    write_json(licenses.parent / SBOM_NAME, result)
+    (licenses / "rust.md").write_text(cargo_notices(about), encoding="utf-8")
+    sysroot = pathlib.Path(
+        subprocess.check_output(["rustc", "--print", "sysroot"], text=True).strip()
+    )
+    shutil.copyfile(
+        sysroot / "share/doc/rust/COPYRIGHT-library.html", licenses / "rust-std.html"
+    )
+
+
+def embed_wheel(wheel: pathlib.Path, inventory: dict) -> None:
+    from wheel.wheelfile import WheelFile
+
+    distribution, version, _ = wheel.name.split("-", 2)
+    info = f"{distribution}-{version}.dist-info/"
+    sbom = info + "sboms/maplibre-native-ffi.cdx.json"
+    with tempfile.TemporaryDirectory(dir=wheel.parent) as temporary:
+        destination = pathlib.Path(temporary) / wheel.name
+        with zipfile.ZipFile(wheel) as source, WheelFile(destination, "w") as target:
+            for entry in source.infolist():
+                # Maturin's Cargo-only inventory includes build dependencies and
+                # local Cargo IDs. Replace it with the composed runtime inventory.
+                if entry.filename != info + "RECORD" and not entry.filename.startswith(
+                    info + "sboms/"
+                ):
+                    target.writestr(entry, source.read(entry))
+            target.writestr(sbom, json.dumps(inventory, indent=2) + "\n")
+        destination.replace(wheel)
+
+
+def embed(wheels: pathlib.Path, inventory_path: pathlib.Path) -> None:
+    inventory = json.loads(inventory_path.read_text())
+    distribution = inventory["metadata"]["component"]["name"].replace("-", "_")
+    for wheel in sorted(wheels.glob(f"{distribution}-*.whl")):
+        embed_wheel(wheel, inventory)
+
+
+def embed_api(wheels: pathlib.Path) -> None:
+    for wheel in sorted(wheels.glob("maplibre_native_ffi-*.whl")):
+        _, version, _ = wheel.name.split("-", 2)
+        embed_wheel(
+            wheel, package_inventory("maplibre-native-ffi", version, "pypi", [])
+        )
 
 
 def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
-    # Target builds need no wheel tooling; only the packaging job repacks wheels.
+    # WheelFile regenerates RECORD after release metadata changes.
     from wheel.wheelfile import WheelFile
 
     parse_version(DEV_SUFFIX.sub("", version))
@@ -69,6 +171,7 @@ def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
         new_info = f"{distribution}-{version}.dist-info/"
         destination = output / f"{distribution}-{version}-{tags}"
         with zipfile.ZipFile(wheel) as source, WheelFile(destination, "w") as target:
+            source.getinfo(old_info + "sboms/maplibre-native-ffi.cdx.json")
             for entry in source.infolist():
                 if entry.filename == old_info + "RECORD":
                     continue
@@ -79,6 +182,18 @@ def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
                         if old not in data:
                             raise SystemExit(f"{wheel} has no matching {field.strip()}")
                         data = data.replace(old, f"{field}{version}\n".encode(), 1)
+                if entry.filename == old_info + "sboms/maplibre-native-ffi.cdx.json":
+                    inventory = json.loads(data)
+                    # CI generated this inventory from the binaries in this wheel.
+                    # Publishing changes their version, not their source revision.
+                    commit = next(
+                        prop["value"]
+                        for prop in inventory["metadata"]["component"]["properties"]
+                        if prop["name"] == "maplibre:source-commit"
+                    )
+                    data = (
+                        json.dumps(stamp(inventory, version, commit), indent=2) + "\n"
+                    ).encode()
                 entry.filename = entry.filename.replace(old_info, new_info, 1)
                 # WheelFile regenerates RECORD, including each file's hash and size.
                 target.writestr(entry, data)
@@ -87,16 +202,25 @@ def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
-    licenses_parser = commands.add_parser("licenses")
-    licenses_parser.add_argument("package", type=pathlib.Path)
-    licenses_parser.add_argument("prefix", type=pathlib.Path)
+    metadata_parser = commands.add_parser("metadata")
+    metadata_parser.add_argument("package", type=pathlib.Path)
+    metadata_parser.add_argument("prefix", type=pathlib.Path)
+    embed_parser = commands.add_parser("embed")
+    embed_parser.add_argument("wheels", type=pathlib.Path)
+    embed_parser.add_argument("inventory", type=pathlib.Path)
+    api_parser = commands.add_parser("embed-api")
+    api_parser.add_argument("wheels", type=pathlib.Path)
     pack_parser = commands.add_parser("pack")
     pack_parser.add_argument("package", type=pathlib.Path)
     pack_parser.add_argument("version")
     pack_parser.add_argument("wheels", type=pathlib.Path)
     args = parser.parse_args(arguments)
-    if args.command == "licenses":
-        license_runtime(args.package, args.prefix)
+    if args.command == "metadata":
+        runtime_metadata(args.package.resolve(), args.prefix)
+    elif args.command == "embed":
+        embed(args.wheels, args.inventory)
+    elif args.command == "embed-api":
+        embed_api(args.wheels)
     else:
         prepare(args.package, args.version)
         pack(args.wheels, args.package / "dist", args.version)

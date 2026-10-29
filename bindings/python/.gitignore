@@ -4,3 +4,5 @@ dist/
 /LICENSE
 /runtimes/*/LICENSE
 /runtimes/*/licenses/
+
+/runtimes/*/sbom.cdx.json

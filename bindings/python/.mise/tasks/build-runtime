@@ -18,7 +18,7 @@ if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
   echo "No Python runtime serves the backend of $usage_preset." >&2
   exit 2
 fi
-python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" licenses . "$install_dir"
+python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" metadata . "$install_dir"
 maturin_flags=()
 if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
 # Zig links a musl target against its own musl, so the wheel takes a
@@ -29,7 +29,13 @@ case "$usage_preset" in
   linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
   linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
 esac
+wheel_output=$(mktemp -d)
+trap 'rm -rf "$wheel_output"' EXIT
+mkdir -p dist
 cd "runtimes/$backend"
 MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$install_dir" \
-  uv run --project ../.. --no-sync maturin build --release --out ../../dist \
+  uv run --project ../.. --no-sync maturin build --release --out "$wheel_output" \
   ${maturin_flags[@]+"${maturin_flags[@]}"}
+
+uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed "$wheel_output" sbom.cdx.json
+mv "$wheel_output"/*.whl ../../dist/

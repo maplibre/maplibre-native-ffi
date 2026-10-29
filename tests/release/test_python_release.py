@@ -5,7 +5,8 @@ import pathlib
 import tempfile
 import unittest
 
-from python_release import BACKENDS, license_runtime, pack, prepare
+from python_release import BACKENDS, embed_wheel, pack, prepare, runtime_metadata
+from sbom import component, document, package_inventory
 from wheel.wheelfile import WheelFile
 
 API = """\
@@ -66,26 +67,11 @@ class PythonReleaseTest(unittest.TestCase):
 
         prepare(self.package, "0.202610.2")
 
-    def test_the_prefix_backend_runtime_takes_the_native_notices(self) -> None:
-        self.describe("metal")
-
-        license_runtime(self.package, self.prefix)
-
-        runtimes = self.package / "runtimes"
-        self.assertEqual((runtimes / "metal/licenses/icu.txt").read_text(), "ICU")
-        self.assertFalse((runtimes / "opengl/licenses").exists())
-        self.assertFalse((runtimes / "vulkan/licenses").exists())
-        self.assertIn("BSD", (runtimes / "metal/LICENSE").read_text())
-        self.assertEqual(
-            (runtimes / "metal/pyproject.toml").read_text(),
-            RUNTIME.format(backend="metal"),
-        )
-
     def test_rejects_a_backend_without_a_runtime(self) -> None:
         self.describe("webgpu")
 
         with self.assertRaisesRegex(SystemExit, "no Python runtime serves"):
-            license_runtime(self.package, self.prefix)
+            runtime_metadata(self.package, self.prefix)
 
     def test_rejects_a_version_outside_the_release_scheme(self) -> None:
         with self.assertRaisesRegex(SystemExit, "invalid release version"):
@@ -115,9 +101,57 @@ class RuntimeWheelTest(unittest.TestCase):
             with WheelFile(wheel, "w") as source:
                 for path, contents in files.items():
                     source.writestr(path, contents)
+                source.writestr(f"{stem}.dist-info/sboms/cargo.cdx.json", "{}")
+            native = component("maplibre-native-c", "0.1.0", "BSD-2-Clause")
+            native["group"] = "org.maplibre.nativeffi"
+            native["properties"] = [
+                {"name": "maplibre:source-commit", "value": "abc123"}
+            ]
+            vendor = component("dependency", "1.2.3", "MIT")
+            inventory = package_inventory(
+                "maplibre-native-ffi-runtime-opengl",
+                "0.0.0",
+                "pypi",
+                [document(native, [vendor], {native["bom-ref"]: {vendor["bom-ref"]}})],
+            )
+            inventory["metadata"]["component"]["properties"] = native["properties"]
+            embed_wheel(wheel, inventory)
             for version in ("0.202610.3", "0.202611.0.dev202610291234"):
                 pack(inputs, output, version)
                 with WheelFile(output / f"{name}-{version}-{tags}.whl") as stamped:
+                    self.assertEqual(
+                        [path for path in stamped.namelist() if "/sboms/" in path],
+                        [
+                            f"{name}-{version}.dist-info/sboms/maplibre-native-ffi.cdx.json"
+                        ],
+                    )
+                    published = json.loads(
+                        stamped.read(
+                            f"{name}-{version}.dist-info/sboms/maplibre-native-ffi.cdx.json"
+                        )
+                    )
+                    self.assertEqual(
+                        published["metadata"]["component"]["version"], version
+                    )
+                    native_component = next(
+                        item
+                        for item in published["components"]
+                        if item["name"] == "maplibre-native-c"
+                    )
+                    vendor_component = next(
+                        item
+                        for item in published["components"]
+                        if item["name"] == "dependency"
+                    )
+                    self.assertEqual(native_component["version"], version)
+                    self.assertEqual(vendor_component["version"], "1.2.3")
+                    self.assertIn(
+                        {"name": "maplibre:source-commit", "value": "abc123"},
+                        native_component["properties"],
+                    )
+                    refs = {item["bom-ref"] for item in published["components"]}
+                    for entry in published["dependencies"]:
+                        self.assertTrue(set(entry["dependsOn"]) <= refs)
                     # WheelFile checks every RECORD hash as it reads the contents.
                     for path, contents in files.items():
                         if path.endswith("/METADATA"):
