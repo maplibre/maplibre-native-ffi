@@ -10,6 +10,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from binding_sbom import PACKAGE_SBOM
+from binding_sbom import package as package_inventory
 from native_package_release import package_presets
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -110,8 +112,18 @@ def pack(
     project: pathlib.Path,
     output: pathlib.Path,
     version: str,
+    inventories: list[pathlib.Path] = (),
     **properties: str | pathlib.Path,
 ) -> None:
+    name = "Maplibre.NativeFfi"
+    dependencies = []
+    if project == RUNTIME_PROJECT:
+        name += f".Runtime.{properties['RenderBackend']}"
+        dependencies = [f"Maplibre.NativeFfi@{version}"]
+    sbom = output.parent / "sbom" / name / PACKAGE_SBOM
+    package_inventory(
+        name, version, "nuget", inventories, sbom, dependencies=dependencies
+    )
     run(
         "dotnet",
         "pack",
@@ -121,6 +133,7 @@ def pack(
         "--output",
         str(output),
         f"-p:PackageVersion={version}",
+        f"-p:SbomPath={sbom.resolve()}",
         *(f"-p:{name}={value}" for name, value in properties.items()),
     )
 
@@ -136,16 +149,21 @@ def package(args: argparse.Namespace) -> None:
         staging = pathlib.Path(temporary)
         for backend, presets in runtime_targets().items():
             assets = staging / backend
+            inventories = []
             for preset, rid in presets.items():
                 extracted = staging / "extract" / preset
                 with tarfile.open(archive(args.input, preset)) as tar:
                     tar.extractall(extracted, filter="data")
                 copy_runtime_assets(extracted, assets / rid / "native", preset)
+                inventories.append(
+                    next(extracted.glob("*/share/maplibre-native-c/sbom.cdx.json"))
+                )
 
             pack(
                 RUNTIME_PROJECT,
                 args.output,
                 args.version,
+                inventories=inventories,
                 RenderBackend=backend,
                 NativeAssetsDir=assets,
                 BaseOutputPath=f"{base_output}/",
@@ -175,6 +193,7 @@ def smoke_musl(args: argparse.Namespace) -> None:
         RUNTIME_PROJECT,
         packages,
         MUSL_SMOKE_VERSION,
+        inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
         RenderBackend=backend,
         NativeAssetsDir=assets,
         BaseOutputPath=f"{base_output}/",

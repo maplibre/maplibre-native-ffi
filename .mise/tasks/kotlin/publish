@@ -147,6 +147,7 @@ case "$operation" in
       "${release_version_args[@]}" \
       -Pmaplibre.localBuild="$build_root" \
       -Pmaplibre.maven.localRepository="$staging_root"
+    python3 tools/release/kotlin_release.py sboms "$staging_root"
     ;;
   verify)
     if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then

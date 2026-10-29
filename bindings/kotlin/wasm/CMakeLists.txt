@@ -134,6 +134,8 @@ function(mln_kw_module target output)
 endfunction()
 
 mln_kw_module(maplibre_native_kotlin maplibre-native-kotlin)
+include("${MLN_FFI_ROOT}/cmake/mln_ffi_binding_sbom.cmake")
+mln_ffi_install_wasm_sbom(maplibre_native_kotlin)
 # The module that the Kotlin/Wasm suite loads, with the fixtures in
 # test_support.c and their canvases and pool probe in test_support.js. The page
 # creates its own WebGL contexts and WebGPU devices, which the suite imports

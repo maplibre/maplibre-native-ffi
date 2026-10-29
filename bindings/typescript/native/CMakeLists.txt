@@ -137,6 +137,10 @@ install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
 install(
   DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
   DESTINATION licenses)
+install(
+  FILES "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/sbom.cdx.json"
+  DESTINATION sbom
+  RENAME maplibre-native-ffi.cdx.json)
 if(OHOS)
   # The OHPM package ships the shared C++ runtime beside the addon, which the
   # device does not carry, and the headers for the host's own native modules.

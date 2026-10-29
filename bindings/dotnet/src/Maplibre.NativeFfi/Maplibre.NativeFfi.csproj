@@ -21,6 +21,11 @@
     <AssemblyName>Maplibre.NativeFfi</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <None
+      Include="$(SbomPath)"
+      Pack="true"
+      PackagePath="sbom/maplibre-native-ffi.cdx.json"
+    />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>

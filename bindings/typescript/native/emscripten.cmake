@@ -125,9 +125,8 @@ install(
   DESTINATION .)
 # The addon package ships the licenses of the native library it embeds, as the
 # desktop addon's does.
-install(
-  DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/licenses/"
-  DESTINATION licenses)
+include("${MLN_FFI_ROOT}/cmake/mln_ffi_binding_sbom.cmake")
+mln_ffi_install_wasm_sbom(maplibre_native_ffi --emnapi "${MLN_FFI_EMNAPI}")
 
 # The module that the browser suite loads, whose entry adds the test exports
 # beside the addon's.

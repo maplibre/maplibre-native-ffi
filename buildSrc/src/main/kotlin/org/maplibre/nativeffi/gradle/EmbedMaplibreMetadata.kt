@@ -10,13 +10,16 @@ import org.gradle.api.Action
 import org.gradle.api.Task
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 
-fun CInteropProcess.embedMaplibreLicenseBundle(licenseDirectory: File) {
+fun CInteropProcess.embedMaplibreMetadata(licenseDirectory: File, sbom: File) {
   inputs.dir(licenseDirectory).withPropertyName("maplibreNativeCLicenses")
-  doLast(EmbedMaplibreLicenseBundle(licenseDirectory))
+  inputs.file(sbom).withPropertyName("maplibreSbom")
+  doLast(EmbedMaplibreMetadata(licenseDirectory, sbom))
 }
 
-private class EmbedMaplibreLicenseBundle(private val licenseDirectory: File) :
-  Action<Task>, Serializable {
+private class EmbedMaplibreMetadata(
+  private val licenseDirectory: File,
+  private val sbom: File,
+) : Action<Task>, Serializable {
   override fun execute(task: Task) {
     require(task is CInteropProcess) {
       "Expected CInteropProcess, found ${task::class.qualifiedName}"
@@ -29,9 +32,15 @@ private class EmbedMaplibreLicenseBundle(private val licenseDirectory: File) :
 
     if (klib.isDirectory) {
       copyLicenses(licenseDirectory, klib.resolve("resources/licenses/maplibre-native-c"))
+      val destination = klib.resolve("resources/sbom/maplibre-native-ffi.cdx.json")
+      destination.parentFile.mkdirs()
+      sbom.copyTo(destination, overwrite = true)
     } else {
       FileSystems.newFileSystem(URI.create("jar:${klib.toURI()}"), mapOf("create" to "false"))
         .use { archive ->
+          val inventory = archive.getPath("/resources/sbom/maplibre-native-ffi.cdx.json")
+          Files.createDirectories(inventory.parent)
+          Files.copy(sbom.toPath(), inventory, StandardCopyOption.REPLACE_EXISTING)
           val destination = archive.getPath("/resources/licenses/maplibre-native-c")
           licenseDirectory.walkTopDown().filter(File::isFile).forEach { license ->
             val relativePath = licenseDirectory.toPath().relativize(license.toPath())

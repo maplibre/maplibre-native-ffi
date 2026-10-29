@@ -12,6 +12,11 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
   </PropertyGroup>
   <ItemGroup>
+    <None
+      Include="$(SbomPath)"
+      Pack="true"
+      PackagePath="sbom/maplibre-native-ffi.cdx.json"
+    />
     <ProjectReference Include="../Maplibre.NativeFfi/Maplibre.NativeFfi.csproj" />
     <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)/" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />

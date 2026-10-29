@@ -299,6 +299,17 @@ def aar_keep_rules(aar: zipfile.ZipFile) -> str:
     return "\n".join(aar.read(name).decode("utf-8") for name in names)
 
 
+def verify_sbom(archive: zipfile.ZipFile, name: str) -> None:
+    inventory = json.loads(archive.read(name))
+    if inventory.get("bomFormat") != "CycloneDX":
+        raise SystemExit(f"{archive.filename} has no CycloneDX inventory at {name}")
+    refs = {item["bom-ref"] for item in inventory["components"]}
+    refs.add(inventory["metadata"]["component"]["bom-ref"])
+    for entry in inventory["dependencies"]:
+        if not {entry["ref"], *entry["dependsOn"]} <= refs:
+            raise SystemExit(f"{archive.filename} has dangling SBOM dependency references")
+
+
 def verify_android(root: pathlib.Path) -> None:
     # The binding AAR carries the Kotlin API and its private JNI shim. An
     # Android host of any language takes the C library and the TLS component from
@@ -345,6 +356,7 @@ def verify_android(root: pathlib.Path) -> None:
             f"{backend} Android runtime AAR",
         )
         with zipfile.ZipFile(runtime) as aar:
+            verify_sbom(aar, "META-INF/sbom/maplibre-native-ffi.cdx.json")
             names = set(aar.namelist())
             for license_name in native_licenses(backend, "android-arm64"):
                 expected = f"META-INF/licenses/maplibre-native-c/{license_name}"
@@ -416,6 +428,7 @@ def verify_jvm(root: pathlib.Path) -> None:
                 f"{backend} {classifier} JVM runtime JAR",
             )
             with zipfile.ZipFile(runtime) as jar:
+                verify_sbom(jar, "META-INF/sbom/maplibre-native-ffi.cdx.json")
                 prefix = f"META-INF/maplibre-native-ffi/{classifier}/"
                 license_prefix = "META-INF/licenses/maplibre-native-c/"
                 native_libraries = [
@@ -504,6 +517,7 @@ def verify_native(root: pathlib.Path) -> None:
             f"{module} runtime cinterop KLIB",
         )
         with zipfile.ZipFile(interop) as klib:
+            verify_sbom(klib, "resources/sbom/maplibre-native-ffi.cdx.json")
             names = set(klib.namelist())
             if not any(
                 name.endswith("/included/libmaplibre-native-c.a")
@@ -526,6 +540,7 @@ def verify_wasm(root: pathlib.Path) -> None:
         module = f"maplibre-native-ffi-runtime-{backend}-wasm-js"
         runtime = one(module_files(root, module, ".klib"), f"{backend} runtime KLIB")
         with zipfile.ZipFile(runtime) as archive:
+            verify_sbom(archive, "resources/sbom/maplibre-native-ffi.cdx.json")
             names = set(archive.namelist())
             for name in (
                 "package.json",
@@ -584,6 +599,10 @@ def main() -> int:
     root = pathlib.Path(sys.argv[1])
     expected_version = sys.argv[2] if len(sys.argv) == 3 else None
     verify_repository_layout(root, expected_version)
+    for pom in root.rglob("*.pom"):
+        sidecar = pom.with_name(pom.stem + "-cyclonedx.json")
+        if not sidecar.is_file():
+            raise SystemExit(f"{pom} has no cyclonedx classifier")
     verify_metadata(root, expected_version)
     verify_javadoc(root)
     verify_android(root)

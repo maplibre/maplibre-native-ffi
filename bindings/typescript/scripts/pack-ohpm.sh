@@ -72,9 +72,18 @@ for preset in "$@"; do
     "$install/libc++_shared.so" \
     "$package/libs/$abi/"
   cp -R "$install/include" "$install/licenses" "$package/"
+  mkdir -p "$staging/$backend/inventories"
+  cp "$install/sbom/maplibre-native-ffi.cdx.json" "$staging/$backend/inventories/$preset.json"
 done
 
 for package in "$staging"/*/package; do
   backend="$(basename "$(dirname "$package")")"
+  sbom_inputs=()
+  for inventory in "$staging/$backend/inventories"/*.json; do
+    sbom_inputs+=(--input "$inventory")
+  done
+  python3 "$binding/../../tools/release/binding_sbom.py" package \
+    --name "@maplibre/native-ffi-$backend" --version "$version" --ecosystem generic \
+    --output "$package/sbom/maplibre-native-ffi.cdx.json" "${sbom_inputs[@]}"
   tar -czf "$out/native-ffi-$backend-$version.har" -C "$(dirname "$package")" package
 done

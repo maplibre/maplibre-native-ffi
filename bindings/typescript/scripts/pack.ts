@@ -20,6 +20,7 @@ import {
   cpSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -128,7 +129,44 @@ const addons = presets
   .filter((preset) => !/^(android|ios)-/.test(preset))
   .map(addonOf);
 
-function pack(directory: string, manifest: object): void {
+function pack(
+  directory: string,
+  manifest: object,
+  inventories: string[] = [],
+  npm: string[] = [],
+): void {
+  const data = manifest as {
+    name: string;
+    files: string[];
+    optionalDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+  };
+  execFileSync(
+    "python3",
+    [
+      join(root, "tools/release/binding_sbom.py"),
+      "package",
+      "--name",
+      data.name,
+      "--version",
+      version,
+      "--ecosystem",
+      "npm",
+      "--output",
+      join(directory, "sbom/maplibre-native-ffi.cdx.json"),
+      ...inventories.flatMap((file) => ["--input", file]),
+      ...npm.flatMap((file) => ["--npm", file]),
+      ...Object.entries({
+        ...data.optionalDependencies,
+        ...data.peerDependencies,
+      }).flatMap(([name, version]) => [
+        "--optional-dependency",
+        `${name}@${version}`,
+      ]),
+    ],
+    { stdio: "inherit" },
+  );
+  data.files.push("sbom", "licenses");
   writeFileSync(
     join(directory, "package.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
@@ -187,20 +225,24 @@ for (const addon of addons) {
     recursive: true,
   });
   const { platform } = addon;
-  pack(directory, {
-    name: addon.name,
-    ...shared,
-    description:
-      platform === undefined
-        ? `The ${addon.preset} browser module of ${source.name}.`
-        : `The ${addon.preset} Node-API addon of ${source.name}.`,
-    ...(platform && {
-      os: [platform.os],
-      cpu: [platform.cpu],
-      ...(platform.libc === undefined ? {} : { libc: [platform.libc] }),
-    }),
-    files: [...addon.files, "licenses"],
-  });
+  pack(
+    directory,
+    {
+      name: addon.name,
+      ...shared,
+      description:
+        platform === undefined
+          ? `The ${addon.preset} browser module of ${source.name}.`
+          : `The ${addon.preset} Node-API addon of ${source.name}.`,
+      ...(platform && {
+        os: [platform.os],
+        cpu: [platform.cpu],
+        ...(platform.libc === undefined ? {} : { libc: [platform.libc] }),
+      }),
+      files: [...addon.files],
+    },
+    [join(install, "sbom/maplibre-native-ffi.cdx.json")],
+  );
 }
 
 for (const backend of new Set(addons.map((addon) => addon.backend))) {
@@ -262,23 +304,21 @@ cpSync(
   join(binding, "node_modules/node-api-headers/LICENSE"),
   join(facade, "native/node-api-headers/LICENSE"),
 );
-cpSync(
-  addons.length
-    ? join(binding, "native/build", addons[0]!.preset, "install/licenses")
-    : join(
-        root,
-        "build",
-        presets[0]!,
-        "install/share/maplibre-native-c/licenses",
-      ),
-  join(facade, "native/licenses"),
-  { recursive: true },
-);
 if (values.xcframework) {
   cpSync(
     resolve(values.xcframework),
     join(facade, "native/MaplibreNativeC.xcframework"),
     { recursive: true, dereference: true },
+  );
+  execFileSync(
+    "python3",
+    [
+      join(root, "tools/release/binding_sbom.py"),
+      "framework",
+      join(facade, "native/MaplibreNativeC.xcframework"),
+      version,
+    ],
+    { stdio: "inherit" },
   );
 }
 // The facade loads whichever backend package the application installed. The
@@ -287,40 +327,58 @@ if (values.xcframework) {
 const backendPeers = Object.fromEntries(
   Object.keys(titles).map((backend) => [`${source.name}-${backend}`, version]),
 );
-pack(facade, {
-  name: source.name,
-  ...shared,
-  description: source.description,
-  type: "module",
-  // A bundler that builds for the web takes the browser entry, and Node, Bun,
-  // and Deno take the default.
-  exports: {
-    ".": {
-      "react-native": {
-        types: "./dist/react-native.d.mts",
-        default: "./dist/react-native.mjs",
+const facadeInventories = values.xcframework
+  ? readdirSync(resolve(values.xcframework), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")
+      .map((entry) => join(entry.parentPath, entry.name))
+  : [];
+pack(
+  facade,
+  {
+    name: source.name,
+    ...shared,
+    description: source.description,
+    type: "module",
+    // A bundler that builds for the web takes the browser entry, and Node, Bun,
+    // and Deno take the default.
+    exports: {
+      ".": {
+        "react-native": {
+          types: "./dist/react-native.d.mts",
+          default: "./dist/react-native.mjs",
+        },
+        browser: {
+          types: "./dist/browser.d.mts",
+          default: "./dist/browser.mjs",
+        },
+        default: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
       },
-      browser: { types: "./dist/browser.d.mts", default: "./dist/browser.mjs" },
-      default: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
     },
+    engines: source.engines,
+    peerDependencies: { ...backendPeers, ...source.peerDependencies },
+    peerDependenciesMeta: Object.fromEntries(
+      Object.keys({ ...backendPeers, ...source.peerDependencies }).map(
+        (name) => [name, { optional: true }],
+      ),
+    ),
+    codegenConfig: source.codegenConfig,
+    swiftpmConfig: source.swiftpmConfig,
+    files: [
+      "dist",
+      "src/specs",
+      "native",
+      "android",
+      "Package.swift",
+      "MaplibreNativeFfi.podspec",
+      "react-native.config.cjs",
+    ],
   },
-  engines: source.engines,
-  peerDependencies: { ...backendPeers, ...source.peerDependencies },
-  peerDependenciesMeta: Object.fromEntries(
-    Object.keys({ ...backendPeers, ...source.peerDependencies }).map((name) => [
-      name,
-      { optional: true },
-    ]),
-  ),
-  codegenConfig: source.codegenConfig,
-  swiftpmConfig: source.swiftpmConfig,
-  files: [
-    "dist",
-    "src/specs",
-    "native",
-    "android",
-    "Package.swift",
-    "MaplibreNativeFfi.podspec",
-    "react-native.config.cjs",
+  facadeInventories,
+  [
+    join(binding, "node_modules/@emnapi/runtime"),
+    join(binding, "node_modules/node-api-headers"),
   ],
-});
+);

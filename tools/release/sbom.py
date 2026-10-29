@@ -107,7 +107,10 @@ def package_inventory(
 ) -> dict:
     root = component(name, version, "BSD-2-Clause")
     root["group"] = "org.maplibre.nativeffi"
-    root["purl"] = f"pkg:{ecosystem}/{quote(name, safe='/')}@{quote(version, safe='')}"
+    purl_name = name.lower() if ecosystem == "nuget" else name
+    root["purl"] = (
+        f"pkg:{ecosystem}/{quote(purl_name, safe='/')}@{quote(version, safe='')}"
+    )
     root["bom-ref"] = root["purl"]
     return compose(root, inventories)
 

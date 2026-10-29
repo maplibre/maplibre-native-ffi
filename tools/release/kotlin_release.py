@@ -11,6 +11,11 @@ import shutil
 import subprocess
 import tempfile
 import urllib.parse
+import xml.etree.ElementTree as element_tree
+import zipfile
+
+from binding_sbom import PACKAGE_SBOM
+from sbom import package_inventory, write_json
 
 GROUP_PATH = pathlib.PurePosixPath("org/maplibre/nativeffi")
 CHECKSUM_SUFFIXES = (".md5", ".sha1", ".sha256", ".sha512")
@@ -163,6 +168,96 @@ def is_signature_or_checksum(path: pathlib.Path) -> bool:
     return path.name.endswith((".asc", *CHECKSUM_SUFFIXES))
 
 
+def publication_sboms(repository: pathlib.Path) -> None:
+    namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+    for pom in sorted((repository / GROUP_PATH).glob("*/*/*.pom")):
+        model = element_tree.parse(pom).getroot()
+        group = model.findtext("m:groupId", namespaces=namespace)
+        module = model.findtext("m:artifactId", namespaces=namespace)
+        version = model.findtext("m:version", namespaces=namespace)
+        inventories = []
+        for artifact in sorted(pom.parent.iterdir()):
+            if artifact.suffix not in (".jar", ".aar", ".klib"):
+                continue
+            with zipfile.ZipFile(artifact) as archive:
+                inventories.extend(
+                    json.loads(archive.read(name))
+                    for name in archive.namelist()
+                    if name.endswith(f"/sbom/{PACKAGE_SBOM}")
+                )
+        result = package_inventory(f"{group}/{module}", version, "maven", inventories)
+        root_ref = result["metadata"]["component"]["bom-ref"]
+        dependencies = {}
+        for entry in model.findall("m:dependencies/m:dependency", namespace):
+            scope = entry.findtext("m:scope", namespaces=namespace)
+            if scope == "test":
+                continue
+            dependency = {
+                "group": entry.findtext("m:groupId", namespaces=namespace),
+                "module": entry.findtext("m:artifactId", namespaces=namespace),
+                "version": entry.findtext("m:version", namespaces=namespace),
+            }
+            dependencies[(dependency["group"], dependency["module"])] = (
+                dependency,
+                scope,
+            )
+        for metadata in pom.parent.glob("*.module"):
+            for variant in json.loads(metadata.read_text())["variants"]:
+                target = variant.get("available-at")
+                if target:
+                    dependencies[(target["group"], target["module"])] = (target, None)
+        for dependency, scope in dependencies.values():
+            name = f"{dependency['group']}/{dependency['module']}"
+            ref = (
+                f"pkg:maven/{name}@{urllib.parse.quote(dependency['version'], safe='')}"
+            )
+            result["components"].append(
+                {
+                    "type": "library",
+                    "name": dependency["module"],
+                    "group": dependency["group"],
+                    "version": dependency["version"],
+                    "purl": ref,
+                    "bom-ref": ref,
+                    "scope": "excluded"
+                    if scope in ("provided", "system")
+                    else "required",
+                }
+            )
+            next(entry for entry in result["dependencies"] if entry["ref"] == root_ref)[
+                "dependsOn"
+            ].append(ref)
+        sidecar = pom.with_name(pom.stem + "-cyclonedx.json")
+        write_json(sidecar, result)
+        for algorithm in ("md5", "sha1", "sha256", "sha512"):
+            write_checksum(sidecar, algorithm)
+        for metadata in pom.parent.glob("maven-metadata.xml"):
+            tree = element_tree.parse(metadata)
+            versions = tree.find("versioning/snapshotVersions")
+            if versions is None:
+                continue
+            reference = next(
+                entry for entry in versions if entry.findtext("extension") == "pom"
+            )
+            for entry in list(versions):
+                if (
+                    entry.findtext("classifier") == "cyclonedx"
+                    and entry.findtext("extension") == "json"
+                ):
+                    versions.remove(entry)
+            entry = element_tree.SubElement(versions, "snapshotVersion")
+            for key, value in (
+                ("classifier", "cyclonedx"),
+                ("extension", "json"),
+                ("value", reference.findtext("value")),
+                ("updated", reference.findtext("updated")),
+            ):
+                element_tree.SubElement(entry, key).text = value
+            tree.write(metadata, encoding="utf-8", xml_declaration=True)
+            for algorithm in ("md5", "sha1", "sha256", "sha512"):
+                write_checksum(metadata, algorithm)
+
+
 def create_bundle(repository: pathlib.Path, output: pathlib.Path, version: str) -> None:
     if output.suffix != ".zip":
         raise SystemExit(f"the bundle output must end in .zip: {output}")
@@ -270,6 +365,8 @@ def upload_snapshot(repository: pathlib.Path, version: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="operation", required=True)
+    sboms_parser = subparsers.add_parser("sboms")
+    sboms_parser.add_argument("repository", type=pathlib.Path)
 
     bundle_parser = subparsers.add_parser("bundle")
     bundle_parser.add_argument("repository", type=pathlib.Path)
@@ -285,7 +382,9 @@ def main() -> int:
     upload_snapshot_parser.add_argument("version")
 
     args = parser.parse_args()
-    if args.operation == "bundle":
+    if args.operation == "sboms":
+        publication_sboms(args.repository)
+    elif args.operation == "bundle":
         create_bundle(args.repository, args.output, args.version)
     elif args.operation == "sign-snapshot":
         sign_snapshot(args.repository, args.version)
