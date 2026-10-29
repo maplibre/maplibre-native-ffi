@@ -46,7 +46,7 @@ cp -R "$work/ohpm/package/libs/." "$work/libs/"
     MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE="$work/ohpm/package" \
     pnpm exec vp pack >/dev/null
 )
-# hypium, which mise.ohos.toml pins, is plain JavaScript with relative
+# hypium, which .config/mise.ohos.toml pins, is plain JavaScript with relative
 # imports, so its files become records beside the bundle's.
 hypium="$(mise where http:hypium)"
 mkdir -p "$work/ets/hypium"

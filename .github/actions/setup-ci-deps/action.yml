@@ -496,7 +496,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
-        # Match `min_version` in mise.toml.
+        # Match `min_version` in .config/mise.toml.
         version: 2026.10.19
         cache: false
         bootstrap: true
@@ -588,7 +588,7 @@ runs:
           ~/.cargo/bin
         key: ${{ steps.toolchain-key.outputs.key }}
 
-    # The R2 backend lives here rather than in mise.toml, because its keys carry
+    # The R2 backend lives here because its keys carry
     # the toolchain paths of the runner that produced them; a contributor
     # machine reads its own disk cache instead. Public reads use the R2 custom
     # domain. Writes use the account S3 endpoint + key prefix so object URLs

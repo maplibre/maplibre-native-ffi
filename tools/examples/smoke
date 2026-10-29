@@ -2,7 +2,7 @@
 # Runs a desktop example's smoke test. Each example's `smoke` task calls it with
 # its preset and the command that starts the example, and it runs that command
 # with MLN_EXAMPLE_SMOKE=1 once per render target, with the target as its last
-# argument. The ffi:example-run template in mise.toml describes smoke mode.
+# argument. The ffi:example-run template in .config/mise.toml describes smoke mode.
 #
 #   tools/examples/smoke [--x11 | --offscreen] <preset> <command> [args...]
 #

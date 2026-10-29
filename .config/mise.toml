@@ -77,7 +77,7 @@ sdl3_version = "3.4"
 
 [tools]
 # Repository and native tooling
-# hk.pkl names hk's Pkl package by version, so hk installs the version it names.
+# hk.pkl beside this config pins hk's Pkl package and executable together.
 "aqua:jdx/hk" = "{{ read_file(path='hk.pkl') | split(pat='/hk@') | nth(n=1) | split(pat='#') | first }}" # Linter orchestration
 "aqua:dprint/dprint" = "0.64.3" # Formatter orchestration
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
@@ -136,7 +136,7 @@ sccache = "0.18.0"
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
-# own: mise.android.toml, mise.emscripten.toml, and mise.ohos.toml.
+# own under .config/: mise.android.toml, mise.emscripten.toml, and mise.ohos.toml.
 
 [env]
 # The Android SDK packages the CMake presets and the Gradle builds resolve. They are

@@ -39,7 +39,7 @@ steps {
   // Whole-monorepo check: a task can depend on a task in another config root,
   // and each `mise.<env>.toml` adds or changes tasks of its own.
   ["mise-tasks"] {
-    glob = List("**/mise.toml", "mise.*.toml", "**/.mise/tasks/**")
+    glob = List("**/mise.toml", ".config/mise.*.toml", "**/.mise/tasks/**")
     check = "mise run //:check-tasks"
   }
   // Whole-repository check: the baseline counts violations per file, so a

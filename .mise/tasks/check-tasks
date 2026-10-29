@@ -84,7 +84,7 @@ def lint_usage(env: str | None, name: str, spec: str) -> list[str]:
 def main() -> int:
     envs = [None] + sorted(
         path.name.split(".")[1]
-        for path in ROOT.glob("mise.*.toml")
+        for path in (ROOT / ".config").glob("mise.*.toml")
         if path.name.count(".") == 2 and path.name != "mise.local.toml"
     )
     jobs = []

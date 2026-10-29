@@ -7,10 +7,11 @@
   "indentWidth": 2,
   "useTabs": false,
   "newLineKind": "lf",
+  // Patterns with a directory component are relative to this config file.
   "excludes": [
-    "third_party/**",
-    ".github/workflows/ci-*.yml",
-    ".github/workflows/_ci-*.yml",
+    "../third_party/**",
+    "../.github/workflows/ci-*.yml",
+    "../.github/workflows/_ci-*.yml",
     "**/*-lock.yaml",
     "**/*.lock.yaml",
     "**/*-lock.yml",
@@ -21,15 +22,15 @@
     // command that updates it, Dependabot included, so formatting them turns
     // each tool update into a hygiene failure.
     "**/.config/dotnet-tools.json",
-    "src/platform/rust/about.hbs",
+    "../src/platform/rust/about.hbs",
     "gradlew",
     "gradlew.bat",
     // Oxc rejects the declaration-only style attribute in this logo.
-    "docs/src/assets/maplibre-logo-square-for-light-bg.svg",
+    "../docs/src/assets/maplibre-logo-square-for-light-bg.svg",
     // Bindgen probe fixtures are generated-looking inputs, not formatted by
     // the Dart package formatter. Keep them out of dprint the way the old hk
     // dart-format glob did.
-    "tests/bindgen/fixtures/probes/dart/**",
+    "../tests/bindgen/fixtures/probes/dart/**",
   ],
   "oxc": {
     "experimentalSortImports": { "newlinesBetween": true },
