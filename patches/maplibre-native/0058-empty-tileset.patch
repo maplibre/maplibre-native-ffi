@@ -1,0 +1,57 @@
+Treats an empty tile URL list as a source with no tiles, so rendering does not
+throw while constructing a tile. Keeps empty sources available for later URL
+updates without changing style or TileJSON validation
+(https://github.com/maplibre/maplibre-native-ffi/issues/1385).
+Upstream: not proposed
+
+diff --git a/src/mln/renderer/sources/render_tile_source.cpp b/src/mln/renderer/sources/render_tile_source.cpp
+index a3856f4..7a34ff8 100644
+--- a/src/mln/renderer/sources/render_tile_source.cpp
++++ b/src/mln/renderer/sources/render_tile_source.cpp
+@@ -607,7 +607,7 @@ void RenderTileSetSource::update(Immutable<style::Source::Impl> baseImpl_,
+         tilePyramid.clearAll();
+     }
+ 
+-    if (!cachedTileset) return;
++    if (!cachedTileset || cachedTileset->tiles.empty()) return;
+ 
+     updateInternal(*cachedTileset, layers, needsRendering, needsRelayout, parameters);
+ }
+diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
+index ae2905a..fb1eef5 100644
+--- a/test/style/source.test.cpp
++++ b/test/style/source.test.cpp
+@@ -937,6 +937,33 @@ TEST(Source, RenderTileSetSourceUpdate) {
+     renderSource->update(uninitialized.baseImpl, layers, true, true, test.tileParameters());
+ }
+ 
++TEST(Source, EmptyTileset) {
++    SourceTest test;
++    VectorSource source("source", Tileset{});
++    source.loadDescription(*test.fileSource);
++    auto renderSource = RenderSource::create(source.baseImpl, test.threadPool);
++
++    LineLayer layer("id", "source");
++    Immutable<LayerProperties> layerProperties = makeMutable<LineLayerProperties>(
++        staticImmutableCast<LineLayer::Impl>(layer.baseImpl));
++    std::vector<Immutable<LayerProperties>> layers{layerProperties};
++
++    ASSERT_NO_THROW(renderSource->update(source.baseImpl, layers, true, true, test.tileParameters()));
++    EXPECT_TRUE(renderSource->isLoaded());
++
++    source.setTiles({"tiles"});
++    renderSource->update(source.baseImpl, layers, true, false, test.tileParameters());
++    EXPECT_FALSE(renderSource->isLoaded());
++
++    source.setTiles({});
++    ASSERT_NO_THROW(renderSource->update(source.baseImpl, layers, true, false, test.tileParameters()));
++    EXPECT_TRUE(renderSource->isLoaded());
++
++    source.setTiles({"tiles"});
++    renderSource->update(source.baseImpl, layers, true, false, test.tileParameters());
++    EXPECT_FALSE(renderSource->isLoaded());
++}
++
+ TEST(Source, VectorSourceSetTiles) {
+     SourceTest test;
+     test.styleObserver.sourceChanged = [&](Source& source) {
