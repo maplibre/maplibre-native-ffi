@@ -117,7 +117,6 @@ jobs:
           mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
           build/packages/native/release "$PUBLISH_VERSION"
       - name: Attest the release assets
-        if: ${{ inputs.release }}
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |

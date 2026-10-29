@@ -243,7 +243,6 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publish_packages == 'true' }}
-    # The reusable workflow needs these permissions even when attestation skips.
     permissions:
       actions: read
       attestations: write
