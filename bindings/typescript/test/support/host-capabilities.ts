@@ -259,7 +259,7 @@ const realmScript = new URL("../fixtures/realm.ts", import.meta.url);
 async function nodeWorkerThreads() {
   const { Worker } = await import("node:worker_threads");
   return (data: unknown): Realm => {
-    const worker = new Worker(realmScript.href);
+    const worker = new Worker(fileURLToPath(realmScript.href));
     const messages = inbox();
     const exited = new Promise<void>((resolve) =>
       worker.once("exit", () => resolve()),

@@ -59,7 +59,7 @@ jobs:
           set -euo pipefail
 
           shopt -s nullglob
-          mise deps pnpm
+          mise deps submodules pnpm
           unzip -q build/typescript-xcframework/MaplibreNativeC.xcframework.zip -d build/typescript-xcframework
           presets=()
           for artifact in build/typescript-addons/*; do

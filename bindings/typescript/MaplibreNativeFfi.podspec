@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.private_header_files = 'native/**/*.h'
   s.vendored_frameworks = 'native/MaplibreNativeC.xcframework'
   s.pod_target_xcconfig = {
-    'CLANG_C_LANGUAGE_STANDARD' => 'c11',
+    'GCC_C_LANGUAGE_STANDARD' => 'c11',
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/native/react-native" "$(PODS_TARGET_SRCROOT)/native/include" "$(PODS_TARGET_SRCROOT)/native/node-api-headers"',
     'OTHER_CFLAGS' => '$(inherited) -include "$(PODS_TARGET_SRCROOT)/native/react-native/symbols.h"',
   }

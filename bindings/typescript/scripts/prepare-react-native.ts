@@ -211,7 +211,14 @@ patch(
 );
 execFileSync(
   "npm",
-  ["install", "--ignore-scripts", "--no-audit", "--no-fund"],
+  [
+    "install",
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+    // An explicit request refreshes a rebuilt tarball at the same path.
+    manifest.dependencies["@maplibre/native-ffi"],
+  ],
   {
     cwd: app,
     stdio: "inherit",
