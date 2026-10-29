@@ -197,8 +197,8 @@ class SuitesTest(unittest.TestCase):
         extra = {
             "platforms": ["windows"],
             "commands": [
-                {"task": "//examples/c-map:check"},
-                {"task": "//examples/c-map:smoke"},
+                {"task": "//probe:check"},
+                {"task": "//probe:test"},
             ],
             "environments": [
                 {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
@@ -215,8 +215,7 @@ class SuitesTest(unittest.TestCase):
                 (preset, suite.command): suite.env
                 for preset in presets
                 for suite in suites.target_suites(self.targets[preset])
-                if "STEP_PROBE" in suite.env
-                or suite.task.startswith("//examples/c-map:")
+                if "STEP_PROBE" in suite.env or suite.task.startswith("//probe:")
             }
         # The packaged target's consumer environment still applies.
         probed = {"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}
@@ -224,11 +223,11 @@ class SuitesTest(unittest.TestCase):
         self.assertEqual(
             environments,
             {
-                (preset, ("mise", "run", f"//examples/c-map:{task}", preset)): (
+                (preset, ("mise", "run", f"//probe:{task}", preset)): (
                     probed if preset == "windows-x64-wgl" else plain
                 )
                 for preset in presets
-                for task in ("check", "smoke")
+                for task in ("check", "test")
             },
         )
 

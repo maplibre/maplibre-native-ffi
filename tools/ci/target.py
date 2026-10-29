@@ -34,8 +34,6 @@ def record(suite: Suite) -> dict[str, object]:
 
 def argv(suite: Suite) -> list[str]:
     command = list(suite.command)
-    if suite.wrapper == "xvfb":
-        return ["xvfb-run", "--auto-servernum", *command]
     if suite.wrapper == "windows-console":
         quoted = ", ".join(f"'{argument}'" for argument in command)
         script = f"./ci/with-windows-console.ps1 -Command @({quoted})"
@@ -52,10 +50,6 @@ def environment(suite: Suite) -> dict[str, str]:
         for key, value in os.environ.items()
         if not key.lower().startswith("usage_")
     }
-    if suite.wrapper == "xvfb":
-        # Draw on the virtual display's X11 platform rather than the
-        # surfaceless one that the job exports for the headless suites.
-        env.pop("EGL_PLATFORM", None)
     env.update(suite.env)
     return env
 

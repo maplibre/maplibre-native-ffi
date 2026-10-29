@@ -20,7 +20,7 @@ trap 'rm -rf "$scratch"' EXIT
 workspace="$scratch/workspace"
 mkdir -p "$workspace"
 git ls-files -z --cached --others --exclude-standard -- \
-  Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust examples/rust-map src/platform/rust |
+  Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust src/platform/rust |
   tar -c --null -T - | tar -x -C "$workspace"
 PYTHONPATH=tools/release python3 -c 'import pathlib, sys
 from native_package_release import write_artifacts

@@ -4,7 +4,6 @@ members = [
   "bindings/python",
   "bindings/rust/crates/maplibre-native-ffi",
   "bindings/rust/crates/maplibre-native-ffi-sys",
-  "examples/rust-map",
   "src/platform/rust",
 ]
 

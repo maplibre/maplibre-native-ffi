@@ -377,8 +377,7 @@ function(mln_ffi_install_c_api_library target)
     endif()
   endforeach()
   # The host supplies the graphics implementation and its headers, so this
-  # component stays out of the package. The build task installs it for tests
-  # and examples.
+  # component stays out of the package. The build task installs it for tests.
   get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
                       MLN_FFI_INSTALL_LOADER_FILES)
   if(MLN_FFI_INSTALL_LOADER_FILES

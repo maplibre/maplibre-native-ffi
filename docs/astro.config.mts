@@ -50,6 +50,7 @@ export default defineConfig({
         { label: "Overview", link: "/" },
         { label: "Install", slug: "install" },
         { label: "Concepts", slug: "concepts" },
+        { label: "Examples", slug: "examples" },
         {
           label: "Guides",
           items: [{ autogenerate: { directory: "guides" } }],

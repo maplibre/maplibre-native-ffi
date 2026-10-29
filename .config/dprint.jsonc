@@ -64,12 +64,6 @@
   "gofumpt": {
     "langVersion": "go1.24",
     "modulePath": "github.com/maplibre/maplibre-native-ffi/bindings/go",
-    "overrides": [
-      {
-        "files": ["examples/go-map/**"],
-        "modulePath": "github.com/maplibre/maplibre-native-ffi/examples/go-map",
-      },
-    ],
   },
   "clangFormat": {
     "associations": ["**/*.inc"],

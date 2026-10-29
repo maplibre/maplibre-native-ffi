@@ -31,7 +31,7 @@ package_root="$staging_dir/maplibre-native-c-$preset"
 install_dir="$build_dir/install"
 
 # A package carries no graphics implementation, neither the loader nor the
-# headers to build against, so the fixtures and examples that run against this
+# headers to build against, so the fixtures that run against this
 # tree supply one. The tree already holds it, put there by the loader component
 # or by an earlier run of this task, so it is set aside here and restored below
 # rather than fetched from wherever the build found it.

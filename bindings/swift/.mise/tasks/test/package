@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Write the Swift package as a release does, with a local XCFramework, then smoke-test the macOS example and build the iOS one against it."
+#MISE description="Write the Swift package as a release does, with a local XCFramework, then run a macOS consumer and build it for iOS."
 #MISE dir="../.."
 #MISE shell="bash"
 #USAGE arg "[assets]" default="build/packages/native/dist" help="Directory that holds MaplibreNativeC.xcframework.zip"
@@ -13,22 +13,33 @@ trap 'rm -rf "$scratch"' EXIT
 package="$scratch/maplibre-native-ffi-distribution"
 python3 tools/release/distribution.py "$package" "$usage_assets" --local
 
-# The example's copy depends on the package under the root package's name, so
-# its product references stay as they are.
-git ls-files -z --cached --others --exclude-standard -- examples/swift-map/Sources |
-  tar -c --null -T - | tar -x -C "$scratch"
-example="$scratch/examples/swift-map"
-sed "s|path: \"\.\./\.\.\"|path: \"$package\"|" examples/swift-map/Package.swift >"$example/Package.swift"
-if ! grep -qF "path: \"$package\"" "$example/Package.swift"; then
-  echo "examples/swift-map/Package.swift no longer depends on the repository root" >&2
-  exit 1
-fi
+consumer="$scratch/consumer"
+mkdir -p "$consumer"
+cp -R tests/release/swift-package/. "$consumer/"
+cat >"$consumer/Package.swift" <<EOF
+// swift-tools-version: 6.0
+import PackageDescription
 
-cd "$example"
-swift build --product swift-map --scratch-path "$scratch/build/macos"
-"$MISE_MONOREPO_ROOT/tools/examples/smoke" macos-arm64-metal "$scratch/build/macos/debug/swift-map"
+let package = Package(
+  name: "PackageConsumer",
+  platforms: [.macOS("14.3"), .iOS("15.0")],
+  dependencies: [.package(path: "$package")],
+  targets: [
+    .executableTarget(
+      name: "PackageConsumer",
+      dependencies: [
+        .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi-distribution"),
+        .product(name: "MaplibreNativeC", package: "maplibre-native-ffi-distribution"),
+      ]
+    ),
+  ]
+)
+EOF
+
+cd "$consumer"
+swift run --scratch-path "$scratch/build/macos" PackageConsumer
 swift build \
-  --product swift-map-ios \
+  --product PackageConsumer \
   --scratch-path "$scratch/build/ios" \
   --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
   --triple arm64-apple-ios15.0

@@ -103,16 +103,7 @@ class RunTest(unittest.TestCase):
 
 
 class CommandTest(unittest.TestCase):
-    def test_wrappers_preserve_the_display_and_desktop_session_paths(self):
-        xvfb = Suite(
-            "smoke", ("mise", "run", "//x:smoke", "p"), {}, "xvfb", None, None, ()
-        )
-        self.assertEqual(
-            target.argv(xvfb),
-            ["xvfb-run", "--auto-servernum", "mise", "run", "//x:smoke", "p"],
-        )
-        with mock.patch.dict(os.environ, {"EGL_PLATFORM": "surfaceless"}):
-            self.assertNotIn("EGL_PLATFORM", target.environment(xvfb))
+    def test_wrapper_preserves_the_desktop_session_path(self):
         console = Suite(
             "test",
             ("mise", "run", "test", "windows-x64-vulkan"),

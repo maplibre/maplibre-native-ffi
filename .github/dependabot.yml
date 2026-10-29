@@ -87,7 +87,7 @@ updates:
       - dependency-name: code_assets
         versions: [">=2.0.0"]
   - package-ecosystem: swift
-    directories: ["/bindings/swift", "/examples/swift-map"]
+    directories: ["/bindings/swift"]
     schedule:
       interval: weekly
     labels: [chore, "area:tooling", dependencies]

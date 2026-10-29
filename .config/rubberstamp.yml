@@ -195,8 +195,8 @@ ci:
     linux-x64:
       covers: >-
         Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
-        binding's suite, the Dart build, and the example builds: the general
-        check for shared native code, bindings, examples, and build logic.
+        binding's suite, and the Dart build: the general check for shared native
+        code, bindings, and build logic.
       rules:
         - if:
             files:
@@ -292,15 +292,14 @@ ci:
       covers: >-
         iOS and Mac Catalyst with Metal, on device and simulator. Builds the
         native library and the supported Kotlin, Swift, Rust, Dart, and Zig
-        bindings, builds the Swift example for iOS, and runs simulator and Mac
-        Catalyst tests. Catches mobile SDK and cross-compilation problems, and
-        stands in for tvOS and visionOS on what every Apple mobile platform
-        shares. Platform-independent code that Linux x64 tests doesn't need it.
+        bindings, and runs simulator and Mac Catalyst tests. Catches mobile SDK
+        and cross-compilation problems, and stands in for tvOS and visionOS on
+        what every Apple mobile platform shares. Platform-independent code that
+        Linux x64 tests doesn't need it.
       rules:
         - if:
             files:
               - bindings/kotlin/src/iosTest/**
-              - examples/swift-map/Sources/SwiftMapIOS/**
               - third_party/maplibre-native
           then: apply
     tvos:
@@ -476,19 +475,20 @@ ci:
       covers: >-
         Assembles the XCFramework from every Apple Metal target's slice, so it
         runs those targets, and writes the Swift package that a release pushes
-        to the distribution repository with it. Then builds and runs the Swift
-        example against the package on macOS and builds it for iOS. Only changes
-        to what the XCFramework or the package contains or how it is assembled
-        need it: XCFramework packaging, the release's distribution tool, the
-        root manifest's platforms and binding target, and the C module shims.
-        Ordinary Swift binding changes and one Apple target's native packaging
-        don't.
+        to the distribution repository with it. Then builds and runs a Swift
+        consumer against the package on macOS and builds it for iOS. Only
+        changes to what the XCFramework or the package contains or how it is
+        assembled need it: XCFramework packaging, the release's distribution
+        tool, the root manifest's platforms and binding target, and the C module
+        shims. Ordinary Swift binding changes and one Apple target's native
+        packaging don't.
       rules:
         - if:
             files:
               - .mise/tasks/package-xcframework
               - tools/release/swift_package.py
               - bindings/swift/.mise/tasks/test/package
+              - tests/release/swift-package/**
           then: apply
     vcpkg:
       covers: >-

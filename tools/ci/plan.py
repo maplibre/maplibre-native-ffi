@@ -192,13 +192,9 @@ def consumed(job: str, all_targets: list[Target]) -> list[Target]:
     return [target for target in all_targets if include(target)]
 
 
-ZIG_PROJECTS = (
-    "//bindings/zig:",
-    "//examples/zig-map:",
-    "//examples/zig-readback:",
-)
+ZIG_PROJECTS = ("//bindings/zig:",)
 GRADLE_PROJECTS = ("//bindings/kotlin:", "//:kotlin:")
-SWIFT_PROJECTS = ("//bindings/swift:", "//examples/swift-map:")
+SWIFT_PROJECTS = ("//bindings/swift:",)
 
 
 def addon(target: Target) -> str:

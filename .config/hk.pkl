@@ -31,7 +31,6 @@ steps {
     glob = List(
       "tests/conformance/**",
       "bindings/**",
-      "examples/**",
       "tools/lint/check-conformance.py",
     )
     check = "uv run --no-sync python tools/lint/check-conformance.py --strict"

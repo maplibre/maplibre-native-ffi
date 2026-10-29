@@ -41,7 +41,7 @@ activate_aggressive = true
 dotnet.isolated = true
 
 [monorepo]
-config_roots = ["bindings/*", "examples/*", "docs"]
+config_roots = ["bindings/*", "docs"]
 lockfile = true
 
 # Inline task scripts across the workspace are Bash. Cascading the shell gives
@@ -73,7 +73,6 @@ go_version = "1.27.3"
 java_version = "zulu-25.36.205.0"
 ohos_sdk_version = "6.1"
 python_version = "3.15.1"
-sdl3_version = "3.4"
 
 [tools]
 # Repository and native tooling
@@ -88,7 +87,7 @@ sdl3_version = "3.4"
 ninja = "1.13.2"
 "github:EmbarkStudios/cargo-about" = "0.9.2" # Rust dependency notices
 # Each worktree's Android emulator or Apple simulator, built from a commit with
-# Go, which the Go binding and example use too. devices-cli runs on Linux and
+# Go, which the Go binding uses too. devices-cli runs on Linux and
 # macOS only.
 "core:go" = "{{vars.go_version}}"
 "go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261027012014-caddba712662", os = [
@@ -128,7 +127,7 @@ sccache = "0.18.0"
 
 # The native CMake build compiles the Linux and FreeBSD targets with `zig cc`,
 # so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake. The
-# Zig binding, its examples, and the docs use this same install. Zig 0.17.0 is
+# Zig binding and the docs use this same install. Zig 0.17.0 is
 # unusable on Windows ARM64: the native aarch64 build exits non-zero with no
 # diagnostic while loading build.zig, and the x64 build under emulation hangs
 # until the job timeout.
@@ -187,29 +186,9 @@ postinstall = [
   "hk install --mise --quiet",
 ]
 
-# The standard task preambles. A binding or example task that builds or tests
-# against a native preset extends ffi:preset, which gives it the optional
-# preset argument and builds that preset first; the desktop examples' run tasks
-# extend ffi:example-run, which adds the render-target argument on top of the
-# example's own build. Shell dispatch stays in each task: `run` overrides a
-# template completely, and the shared parts of that dispatch live in scripts/.
 [task_templates."ffi:preset"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-
-# A desktop example takes its render target as its one positional argument.
-# With MLN_EXAMPLE_SMOKE=1 it loads an inline style, exits 0 after the first
-# frame that it shows, and exits nonzero on a failure or after 60 seconds, so
-# its smoke task needs no network. The examples share their style, initial
-# camera, window size, and controls; keep them in step when one changes.
-[task_templates."ffi:example-run"]
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-flag "--preset <preset>" default="{{vars.host_native_preset}}"
-'''
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
@@ -232,7 +211,7 @@ hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # The loader component holds the graphics implementation a host supplies for
 # itself, which the package deliberately leaves out. Installing it here is what
-# lets the fixtures and examples drive the API the way a host does; presets
+# lets the fixtures drive the API the way a host does; presets
 # whose loader comes from the platform or an SDK install nothing. The
 # test-graphics component, also left out of the package, holds the GPU fixtures
 # that binding suites load.

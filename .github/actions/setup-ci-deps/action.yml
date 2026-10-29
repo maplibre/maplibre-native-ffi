@@ -170,7 +170,6 @@ runs:
       if: ${{ runner.os == 'Linux' && inputs.software-gpu != '' }}
       shell: bash
       run: |
-        # xvfb-run needs xauth, which xvfb only recommends.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libegl-mesa0 \
@@ -178,9 +177,7 @@ runs:
           libvulkan1 \
           mesa-utils \
           mesa-utils-extra \
-          mesa-vulkan-drivers \
-          xauth \
-          xvfb
+          mesa-vulkan-drivers
         # Software rendering is slower than hardware, so the native suites
         # stretch their waits and hang watchdog to match.
         {
@@ -307,9 +304,8 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-pkg-v2-
 
-    # Zig's global cache holds downloaded package tarballs, which keeps SDL's
-    # source dependencies off the network. Windows resolves it under
-    # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
+    # Zig's global cache holds downloaded package tarballs. Windows resolves it
+    # under LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
     #
     # Restore only; the job saves this cache itself, after the checks that
     # populate it pass. A key is never overwritten, so a partial fetch that won
@@ -520,8 +516,6 @@ runs:
         if [[ "$ZIG" == skip ]]; then
           deps_args+=(
             --skip //bindings/zig:zig
-            --skip //examples/zig-map:zig
-            --skip //examples/zig-readback:zig
           )
         fi
         for attempt in 1 2 3; do
@@ -551,9 +545,7 @@ runs:
         $depsArgs = @("--monorepo", "--jobs", "1")
         if ($env:ZIG -eq "skip") {
           $depsArgs += @(
-            "--skip", "//bindings/zig:zig",
-            "--skip", "//examples/zig-map:zig",
-            "--skip", "//examples/zig-readback:zig"
+            "--skip", "//bindings/zig:zig"
           )
         }
         foreach ($attempt in 1..3) {

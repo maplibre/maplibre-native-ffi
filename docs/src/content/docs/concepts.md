@@ -138,5 +138,4 @@ a handle that the collector reclaims while still open as a leak.
 
 [Install](/maplibre-native-ffi/install/) covers packages for each language. The
 API references describe their generated shapes, and the
-[examples](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples)
-show complete integrations.
+[examples](/maplibre-native-ffi/examples/) show complete integrations.

@@ -185,16 +185,15 @@ class PresetTest(unittest.TestCase):
                 self.assertEqual(gnu.unit, f"linux-{architecture}")
 
     def test_each_row_names_its_sdk_software_driver_and_zig_packages(self):
-        # The platforms whose suites run every Zig project cache the packages,
-        # those that run some fetch them, and the rest skip them.
+        # Targets that run the Zig binding cache its packages; the rest skip them.
         zig = {
             "linux-gnu": "cache",
             "macos": "cache",
-            "linux-musl": "fetch",
-            "android": "fetch",
-            "ios-maccatalyst": "fetch",
-            "windows": "fetch",
-            "freebsd": "fetch",
+            "linux-musl": "cache",
+            "android": "cache",
+            "ios-maccatalyst": "cache",
+            "windows": "cache",
+            "freebsd": "cache",
         }
         expected = {}
         for name, target in self.targets.items():
@@ -209,13 +208,10 @@ class PresetTest(unittest.TestCase):
                 target.platform in ("linux-gnu", "linux-musl", "windows")
                 and not emulated
             )
-            packages = "fetch" if emulated else zig.get(target.platform, "skip")
+            packages = "cache" if emulated else zig.get(target.platform, "skip")
             # Windows ARM64 has no Zig toolchain.
             if name.startswith("windows-arm64-"):
                 packages = "skip"
-            # macOS x64 runs the Zig binding suite without the examples.
-            if name.startswith("macos-x64-"):
-                packages = "fetch"
             expected[name] = (mise_env, target.backend if gpu else "", packages)
         matrix = plan.plan(self.presets, True, [])["matrix"]
         self.assertEqual(

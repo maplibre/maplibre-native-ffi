@@ -12,21 +12,14 @@ if TYPE_CHECKING:
 DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
 
 # The macOS x64 presets run under Rosetta on arm64 runners. The Rust, Zig, and
-# Go binding suites build x86_64 executables of their own. The other suites and
-# the examples need x86_64 runtimes or dependencies that the runners lack.
+# Go binding suites build x86_64 executables of their own. The other suites
+# need x86_64 runtimes or dependencies that the runners lack.
 MACOS_X64 = ["macos-x64-metal"]
 
 # Most binding toolchains target neither RISC-V nor LoongArch, so a target on
 # one of these runs a command only when the command's `architectures` name it.
 OPT_IN_ARCHITECTURES = {"riscv64", "loongarch64"}
 
-# Desktop suites run in the matching native target job and reuse its build tree.
-#
-# Every example's `smoke` task renders one frame and exits. A command marked
-# `display` opens a window, so on Linux, whose runners have no display server,
-# it runs under Xvfb and draws with Mesa's software drivers. Windows CI runs
-# headless examples and covers window presentation in the native suite. A suite's
-# `environments` set variables on its commands in the listed targets.
 SUITES: list[dict] = [
     {
         "platforms": ["linux-gnu", "macos", "windows"],
@@ -36,15 +29,6 @@ SUITES: list[dict] = [
                 "task": "//bindings/rust:test",
                 "args": ["release"],
                 "include": ["linux-gnu-x64-vulkan"],
-            },
-            {
-                "task": "//examples/rust-map:check",
-                "exclude": ["macos-arm64-egl", *MACOS_X64],
-            },
-            {
-                "task": "//examples/rust-map:smoke",
-                "exclude": ["macos-arm64-egl", *MACOS_X64],
-                "display": True,
             },
         ],
     },
@@ -91,12 +75,6 @@ SUITES: list[dict] = [
                 "task": "//bindings/zig:test",
                 "architectures": ["riscv64", "loongarch64"],
             },
-            {
-                "task": "//examples/zig-map:smoke",
-                "exclude": MACOS_X64,
-                "display": True,
-            },
-            {"task": "//examples/zig-readback:smoke", "exclude": MACOS_X64},
         ],
     },
     # A JDK in Alpine or the FreeBSD virtual machine runs the musl and FreeBSD
@@ -116,7 +94,6 @@ SUITES: list[dict] = [
                 "args": ["release"],
                 "include": ["linux-gnu-x64-vulkan"],
             },
-            {"task": "//examples/swift-map:smoke", "include": ["macos-arm64-metal"]},
         ],
     },
     {
@@ -124,7 +101,6 @@ SUITES: list[dict] = [
         "exclude": MACOS_X64,
         "commands": [
             {"task": "//bindings/dotnet:test"},
-            {"task": "//examples/dotnet-map:smoke", "display": True},
         ],
     },
     # A Linux runner cross-builds the FreeBSD suite, which runs in the FreeBSD
@@ -132,26 +108,6 @@ SUITES: list[dict] = [
     {
         "platforms": ["linux-gnu", "macos", "freebsd"],
         "commands": [{"task": "//bindings/go:test"}],
-    },
-    # go-map drives OpenGL through EGL, on Linux only.
-    {
-        "platforms": ["linux-gnu"],
-        "commands": [
-            {
-                "task": "//examples/go-map:check",
-                "include": ["linux-gnu-x64-egl", "linux-gnu-arm64-egl"],
-            },
-            {
-                "task": "//examples/go-map:smoke",
-                "include": ["linux-gnu-x64-egl", "linux-gnu-arm64-egl"],
-                "display": True,
-            },
-        ],
-    },
-    {
-        "platforms": ["linux-gnu", "macos"],
-        "exclude": MACOS_X64,
-        "commands": [{"task": "//examples/c-map:smoke", "display": True}],
     },
     # One target runs the suite again on the oldest supported Python.
     {
@@ -211,8 +167,7 @@ class Suite:
     id: str
     command: tuple[str, ...]
     env: dict[str, str]
-    # `xvfb` runs the command on a virtual display, and `windows-console` runs
-    # it in the Windows desktop session.
+    # `windows-console` runs the command in the Windows desktop session.
     wrapper: str | None
     shell: str | None
     timeout_minutes: int | None
@@ -228,8 +183,8 @@ def suite_id(task: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", task).strip("-")
 
 
-def desktop_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
-    """Each desktop suite command, its environment, and whether it opens a window."""
+def desktop_commands(target: Target) -> list[tuple[list[str], dict[str, str]]]:
+    """Each desktop suite command and its environment."""
     preset = target.preset
     commands = []
     for suite in SUITES:
@@ -250,10 +205,6 @@ def desktop_commands(target: Target) -> list[tuple[list[str], dict[str, str], bo
                 target.architecture not in command.get("architectures", [])
             ):
                 continue
-            # Windows surface coverage lives in the native suite. Windowed
-            # examples run on Linux and macOS; headless examples still run here.
-            if command.get("display") and target.platform == "windows":
-                continue
             arguments = [
                 "mise",
                 "run",
@@ -261,7 +212,7 @@ def desktop_commands(target: Target) -> list[tuple[list[str], dict[str, str], bo
                 preset,
                 *command.get("args", []),
             ]
-            commands.append((arguments, dict(env), bool(command.get("display"))))
+            commands.append((arguments, dict(env)))
     return commands
 
 
@@ -314,7 +265,6 @@ def apple_commands(target: Target) -> list[str]:
         return [
             f"mise run //bindings/kotlin:ios-build {preset}",
             f"mise run //bindings/swift:build {preset}",
-            "mise run //examples/swift-map:build:ios",
             f"mise run //bindings/dart:build:mobile {preset}",
             f"mise run //bindings/rust:build {preset}",
         ]
@@ -322,7 +272,6 @@ def apple_commands(target: Target) -> list[str]:
         return [
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/swift:test {preset}",
-            "mise run //examples/swift-map:build:ios-simulator",
             f"mise run //bindings/dart:test:ios {preset}",
             f"mise run //bindings/rust:test {preset}",
         ]
@@ -354,8 +303,8 @@ def apple_commands(target: Target) -> list[str]:
     return []
 
 
-def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], bool]]:
-    """The binding and example commands, as `desktop_commands` returns them."""
+def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str]]]:
+    """The binding commands, as `desktop_commands` returns them."""
     target_platform = target.platform
     if target_platform in DESKTOP or target_platform in {"emscripten", "freebsd"}:
         return desktop_commands(target)
@@ -370,7 +319,7 @@ def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str], b
         lines = ohos_commands(target)
     else:
         lines = apple_commands(target)
-    return [(line.split(" "), {}, False) for line in lines]
+    return [(line.split(" "), {}) for line in lines]
 
 
 def runtime_tested(target: Target) -> bool:
@@ -408,12 +357,9 @@ def target_suites(target: Target) -> list[Suite]:
         command: list[str],
         prerequisites: tuple[str, ...],
         env: dict[str, str],
-        display: bool = False,
         step_id: str | None = None,
     ) -> None:
         wrapper, shell, timeout = None, None, None
-        if display and target.platform == "linux-gnu":
-            wrapper = "xvfb"
         # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
         # interactive desktop. WGL and the binding suites run in service session 0.
         if preset == "windows-x64-vulkan" and command[2:] == ["test", preset]:
@@ -447,13 +393,12 @@ def target_suites(target: Target) -> list[Suite]:
         {},
         step_id="install",
     )
-    for command, env, display in consumer_commands(target):
+    for command, env in consumer_commands(target):
         # The consumers run against the packaged install, which replaced the
         # build tree, so they must not rebuild it.
         add(
             command,
             (*native, "archive", "install"),
             {"MISE_TASK_SKIP": "//:build", **env},
-            display,
         )
     return suites
