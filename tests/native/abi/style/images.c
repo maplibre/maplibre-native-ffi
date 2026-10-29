@@ -87,10 +87,11 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   image.pixels = padded;
   image.byte_length = sizeof(padded);
   mln_style_image_options options = {.size = sizeof(mln_style_image_options)};
-  options.fields = MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO |
-                   MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_CONTENT |
-                   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
-                   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+  options.fields =
+    MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO | MLN_STYLE_IMAGE_OPTION_SDF |
+    MLN_STYLE_IMAGE_OPTION_CONTENT | MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
+    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT | MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
+  options.keep_unused = true;
   options.pixel_ratio = 2.0f;
   options.sdf = true;
   options.content = (mln_image_content){0.0f, 0.0f, 2.0f, 1.0f};
@@ -107,6 +108,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_MEMORY(packed, probe.pixels, sizeof(packed));
   TEST_ASSERT_EQUAL_FLOAT(2.0f, info->pixel_ratio);
   TEST_ASSERT_TRUE(info->sdf);
+  TEST_ASSERT_TRUE(info->keep_unused);
   TEST_ASSERT_EQUAL_HEX32(
     MLN_STYLE_IMAGE_INFO_CONTENT | MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH |
       MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
@@ -124,6 +126,17 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_x_count);
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_y_count);
 
+  // A rejected style leaves the image and its retention policy intact.
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_map_set_style_json(
+      map, MLN_BUFFER_LITERAL("{\"version\":8"), &completion.descriptor, NULL
+    )
+  );
+  probe = read_image(runtime, map, "marker");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_TRUE(info->keep_unused);
+
   // Replacing an image replaces its metadata too, back to the defaults.
   image.stride = 8;
   image.pixels = packed;
@@ -133,6 +146,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_MEMORY(packed, probe.pixels, sizeof(packed));
   TEST_ASSERT_EQUAL_FLOAT(1.0f, info->pixel_ratio);
   TEST_ASSERT_FALSE(info->sdf);
+  TEST_ASSERT_FALSE(info->keep_unused);
   TEST_ASSERT_EQUAL_HEX32(0, info->fields);
   // A member whose bit is absent reads as zero.
   const mln_image_content no_content = {0};
