@@ -22,6 +22,22 @@
 [![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=white)](https://slack.openstreetmap.us/)
 [![License](https://img.shields.io/github/license/sargunv/maplibre-native-ffi?label=License)](./LICENSE)
 
+[![Maven Central](https://img.shields.io/maven-central/v/org.maplibre.nativeffi/maplibre-native-ffi)](https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi)
+[![NuGet](https://img.shields.io/nuget/v/Maplibre.NativeFfi)](https://www.nuget.org/packages/Maplibre.NativeFfi)
+[![pub.dev](https://img.shields.io/pub/v/maplibre_native_ffi)](https://pub.dev/packages/maplibre_native_ffi)
+[![PyPI](https://img.shields.io/pypi/v/maplibre-native-ffi)](https://pypi.org/project/maplibre-native-ffi/)
+[![crates.io](https://img.shields.io/crates/v/maplibre-native-ffi)](https://crates.io/crates/maplibre-native-ffi)
+[![npm](https://img.shields.io/npm/v/@maplibre/native-ffi)](https://www.npmjs.com/package/@maplibre/native-ffi)
+[![OHPM](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fohpm.openharmony.cn%2Fohpm%2F%40maplibre%252Fnative-ffi-opengl&query=%24%5B%27dist-tags%27%5D.latest&label=OHPM&color=blue)](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl)
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/maplibre/maplibre-native-ffi/bindings/go.svg)](https://pkg.go.dev/github.com/maplibre/maplibre-native-ffi/bindings/go)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmaplibre%2Fmaplibre-native-ffi-distribution%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
+[![Swift platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmaplibre%2Fmaplibre-native-ffi-distribution%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
+[![vcpkg](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=vcpkg)](https://maplibre.org/maplibre-native-ffi/install/#vcpkg)
+[![Conan](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=Conan)](https://maplibre.org/maplibre-native-ffi/install/#conan)
+[![xmake](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=xmake)](https://maplibre.org/maplibre-native-ffi/install/#xmake)
+[![C / Zig](https://img.shields.io/github/v/release/maplibre/maplibre-native-ffi?label=C%20%2F%20Zig)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
+
 This project provides an experimental C API for
 [MapLibre Native](https://github.com/maplibre/maplibre-native). It is built for
 low-level language bindings and host integrations that need a C boundary instead
