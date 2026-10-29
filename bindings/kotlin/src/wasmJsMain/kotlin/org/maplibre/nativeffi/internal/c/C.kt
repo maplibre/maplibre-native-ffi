@@ -1367,6 +1367,9 @@ internal actual object C {
   ): Int =
     mln_kw_mln_render_session_get_capabilities(session, word(outCapabilities), word(outDiagnostic))
 
+  actual fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_render_session_get_failure(session, word(outDiagnostic))
+
   actual fun mln_render_session_get_snapshot(
     session: Long,
     outSnapshot: Long,
@@ -2897,6 +2900,11 @@ private fun mln_kw_mln_render_session_dump_debug_logs(p0: Long, p1: Int, p2: Int
 private fun mln_kw_mln_render_session_get_capabilities(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_capabilities(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_render_session_get_failure(p0: Long, p1: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_failure(p0, p1)",
   )
 
 private fun mln_kw_mln_render_session_get_snapshot(p0: Long, p1: Int, p2: Int): Int =

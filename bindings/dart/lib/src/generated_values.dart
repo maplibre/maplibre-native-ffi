@@ -573,12 +573,18 @@ final class RenderResult extends _Enum {
   /// A newer demand with the same flags, neither of them forced, replaced this
   /// demand. A still image's demand is never replaced, and never replaces one.
   static const superseded = RenderResult.fromRawValue(3);
+
+  /// The session failed before this demand could produce a usable frame. Read
+  /// its saved failure with `RenderSessionHandle.getFailure()`. Further demands
+  /// require disposing of this session and attaching a new one.
+  static const failed = RenderResult.fromRawValue(4);
   @override
   String toString() => switch (rawValue) {
     0 => 'RenderResult.rendered',
     1 => 'RenderResult.noUpdate',
     2 => 'RenderResult.targetNotReady',
     3 => 'RenderResult.superseded',
+    4 => 'RenderResult.failed',
     _ => 'RenderResult($rawValue)',
   };
 }
@@ -621,10 +627,14 @@ final class RenderSessionState extends _Enum {
   static const detaching = RenderSessionState.fromRawValue(3);
   static const detached = RenderSessionState.fromRawValue(4);
 
-  /// A frame or driver task failed and the session can no longer render. The
-  /// map reports the failure as `RuntimeEventType.mapRenderError`. A failed
-  /// attach reports it through its completion instead.
-  static const targetLost = RenderSessionState.fromRawValue(5);
+  /// Native rendering or driver work failed and the session can no longer
+  /// render. This does not imply target or device loss. Read the first failure
+  /// with `RenderSessionHandle.getFailure()`. The map also reports it as
+  /// `RuntimeEventType.mapRenderError`; a failed attach reports it through its
+  /// completion instead. Snapshots, frame-result drains, acquired-frame
+  /// release, abandon, and dispose remain available. Dispose this session
+  /// before attaching a replacement.
+  static const failed = RenderSessionState.fromRawValue(5);
   static const abandoned = RenderSessionState.fromRawValue(6);
   @override
   String toString() => switch (rawValue) {
@@ -632,7 +642,7 @@ final class RenderSessionState extends _Enum {
     2 => 'RenderSessionState.attached',
     3 => 'RenderSessionState.detaching',
     4 => 'RenderSessionState.detached',
-    5 => 'RenderSessionState.targetLost',
+    5 => 'RenderSessionState.failed',
     6 => 'RenderSessionState.abandoned',
     _ => 'RenderSessionState($rawValue)',
   };

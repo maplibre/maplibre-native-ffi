@@ -1672,6 +1672,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_get_failure(
+      session.toULong(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_render_session_get_snapshot(
     session: Long,
     outSnapshot: Long,

@@ -587,7 +587,8 @@ void a_view_and_its_own_abandonment_keep_a_session_busy() {
   fake.session->driver_work.push_back(
     mln::core::RenderDriverWork{
       .execute = {},
-      .abandon = [session, disposal, &reentrant_dispose_status] {
+      .cancel = [session, disposal,
+                 &reentrant_dispose_status](mln_status, const char*) {
         reentrant_dispose_status =
           mln_render_session_dispose(session, &disposal, nullptr);
       },

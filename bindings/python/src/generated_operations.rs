@@ -6987,6 +6987,15 @@ impl RenderSessionHandle {
         generated_copy_mln_render_session_capabilities(py, &out_capabilities)
     }
     #[pyo3(signature = ())]
+    fn get_failure(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.status(|diagnostic| sys::mln_render_session_get_failure(handle, diagnostic))
+        }?;
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
     fn get_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();

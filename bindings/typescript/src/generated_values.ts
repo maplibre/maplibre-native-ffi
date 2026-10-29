@@ -1834,6 +1834,12 @@ export const RenderResult = {
    * demand. A still image's demand is never replaced, and never replaces one.
    */
   superseded: 3,
+  /**
+   * The session failed before this demand could produce a usable frame. Read
+   * its saved failure with `RenderSessionHandle.getFailure()`. Further demands
+   * require disposing of this session and attaching a new one.
+   */
+  failed: 4,
 } as const;
 /** One of the RenderResult values, or a value this binding does not know. */
 export type RenderResult =
@@ -1962,11 +1968,15 @@ export const RenderSessionState = {
   detaching: 3,
   detached: 4,
   /**
-   * A frame or driver task failed and the session can no longer render. The map
-   * reports the failure as `RuntimeEventType.mapRenderError`. A failed attach
-   * reports it through its completion instead.
+   * Native rendering or driver work failed and the session can no longer
+   * render. This does not imply target or device loss. Read the first failure
+   * with `RenderSessionHandle.getFailure()`. The map also reports it as
+   * `RuntimeEventType.mapRenderError`; a failed attach reports it through its
+   * completion instead. Snapshots, frame-result drains, acquired-frame release,
+   * abandon, and dispose remain available. Dispose this session before
+   * attaching a replacement.
    */
-  targetLost: 5,
+  failed: 5,
   abandoned: 6,
 } as const;
 /** One of the RenderSessionState values, or a value this binding does not know. */

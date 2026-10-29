@@ -63,9 +63,7 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
     .size = sizeof(mln_render_session_snapshot)
   };
   MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_FAILED, snapshot.state);
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };

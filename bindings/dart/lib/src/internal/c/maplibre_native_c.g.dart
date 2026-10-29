@@ -1867,6 +1867,7 @@ const MLN_RENDER_RESULT_RENDERED = 0;
 const MLN_RENDER_RESULT_NO_UPDATE = 1;
 const MLN_RENDER_RESULT_TARGET_NOT_READY = 2;
 const MLN_RENDER_RESULT_SUPERSEDED = 3;
+const MLN_RENDER_RESULT_FAILED = 4;
 
 // mln_render_session_capability_flag
 const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
@@ -1879,7 +1880,7 @@ const MLN_RENDER_SESSION_STATE_ATTACHING = 1;
 const MLN_RENDER_SESSION_STATE_ATTACHED = 2;
 const MLN_RENDER_SESSION_STATE_DETACHING = 3;
 const MLN_RENDER_SESSION_STATE_DETACHED = 4;
-const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
+const MLN_RENDER_SESSION_STATE_FAILED = 5;
 const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
 
 // mln_rendered_feature_query_option_field
@@ -4051,6 +4052,12 @@ external int mln_render_session_dump_debug_logs(
 external int mln_render_session_get_capabilities(
   int session,
   Pointer<mln_render_session_capabilities> out_capabilities,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
+external int mln_render_session_get_failure(
+  int session,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

@@ -51,6 +51,12 @@ typedef enum mln_render_result : uint32_t {
    * demand. A still image's demand is never replaced, and never replaces one.
    */
   MLN_RENDER_RESULT_SUPERSEDED = 3,
+  /**
+   * The session failed before this demand could produce a usable frame.
+   * Read its saved failure with mln_render_session_get_failure(). Further
+   * demands require disposing of this session and attaching a new one.
+   */
+  MLN_RENDER_RESULT_FAILED = 4,
 } mln_render_result;
 
 /** Render-session lifecycle visible in snapshots. */
@@ -60,11 +66,15 @@ typedef enum mln_render_session_state : uint32_t {
   MLN_RENDER_SESSION_STATE_DETACHING = 3U,
   MLN_RENDER_SESSION_STATE_DETACHED = 4U,
   /**
-   * A frame or driver task failed and the session can no longer render. The
-   * map reports the failure as MLN_RUNTIME_EVENT_MAP_RENDER_ERROR. A failed
-   * attach reports it through its completion instead.
+   * Native rendering or driver work failed and the session can no longer
+   * render. This does not imply target or device loss. Read the first failure
+   * with mln_render_session_get_failure(). The map also reports it as
+   * MLN_RUNTIME_EVENT_MAP_RENDER_ERROR; a failed attach reports it through its
+   * completion instead. Snapshots, frame-result drains, acquired-frame release,
+   * abandon, and dispose remain available. Dispose this session before
+   * attaching a replacement.
    */
-  MLN_RENDER_SESSION_STATE_TARGET_LOST = 5U,
+  MLN_RENDER_SESSION_STATE_FAILED = 5U,
   MLN_RENDER_SESSION_STATE_ABANDONED = 6U,
 } mln_render_session_state;
 
@@ -289,6 +299,25 @@ MLN_API mln_status mln_render_session_get_snapshot(
 ) MLN_NOEXCEPT;
 
 /**
+ * Reports the session's first terminal failure from any native thread.
+ *
+ * A failure's status and diagnostic remain available until disposal, including
+ * after abandonment. Temporary target unavailability does not record a
+ * failure. The diagnostic is truncated to mln_diagnostic's capacity.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when no terminal failure has occurred.
+ * - MLN_STATUS_NATIVE_ERROR with the saved diagnostic when native work failed.
+ * - MLN_STATUS_TARGET_LOST with the saved diagnostic when the target or
+ * graphics receiver was lost.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when session has been released.
+ */
+MLN_API mln_status mln_render_session_get_failure(
+  mln_render_session session, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Requests a frame without waiting. Every accepted demand produces one terminal
  * result record. Caller-driver sessions require service on the graphics thread.
  * Core-worker sessions need no host service.
@@ -374,6 +403,8 @@ MLN_API mln_status mln_render_session_acquire_frame(
 /**
  * Copies common metadata for an acquired frame.
  *
+ * A failed session returns its saved failure and diagnostic.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_result
@@ -396,7 +427,7 @@ MLN_API mln_status mln_acquired_frame_get_result(
  * The host waits on it before it reads the texture. See mln_gpu_sync_kind for
  * what each kind promises. Attachment selects the producer kind through
  * mln_render_session_attach_options.producer_sync_kind; acquisition never
- * changes it.
+ * changes it. A failed session returns its saved failure and diagnostic.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -420,8 +451,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * completed before this call. The call consumes frame on success. A
  * synchronization kind the backend does not support fails with
  * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
- * frame ownership. After abandonment the call closes the handle without
- * graphics work. When the driver fails to wait for the consumer
+ * frame ownership. After session failure or abandonment the call closes the
+ * handle without graphics work. When the driver fails to wait for the consumer
  * synchronization, the host's GPU may still read the frame's texture, so the
  * frame's slot is quarantined as mln_acquired_frame_discard() quarantines it.
  *
@@ -451,7 +482,8 @@ MLN_API mln_status mln_acquired_frame_release(
  * session. Discard and disposal reject later scopes immediately and wait for
  * active scopes to end before they retire graphics resources. Explicit frame
  * release and session abandonment report MLN_STATUS_BUSY while a scope is
- * active. Each successful call requires exactly one
+ * active. A failed session returns its saved failure and diagnostic.
+ * Each successful call requires exactly one
  * mln_acquired_frame_view_end() call, on any thread.
  *
  * Returns:
@@ -505,7 +537,9 @@ MLN_API void mln_acquired_frame_view_end(
  *   apply the new extent and the map publishes its snapshot.
  * - MLN_STATUS_INVALID_STATE when the session starts detaching before the
  *   driver applies the extent.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_NATIVE_ERROR with the saved diagnostic when the session fails.
+ * - MLN_STATUS_TARGET_LOST when the target is lost or the session is abandoned
+ *   first.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
@@ -530,7 +564,9 @@ MLN_API mln_status mln_render_session_resize(
  *
  * Completes with:
  * - MLN_STATUS_OK once earlier driver work has finished.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_NATIVE_ERROR with the saved diagnostic when the session fails.
+ * - MLN_STATUS_TARGET_LOST when the target is lost or the session is abandoned
+ *   first.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_barrier(
@@ -667,7 +703,9 @@ MLN_API mln_status mln_render_session_service_driver_work(
  *
  * Completes with:
  * - MLN_STATUS_OK once the target is released.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_NATIVE_ERROR with the saved diagnostic when the session fails.
+ * - MLN_STATUS_TARGET_LOST when the target is lost or the session is abandoned
+ *   first.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_render_session_detach(

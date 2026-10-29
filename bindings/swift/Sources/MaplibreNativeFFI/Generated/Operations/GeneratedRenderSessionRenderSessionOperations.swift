@@ -170,6 +170,17 @@ public extension RenderSessionHandle {
     } result: { RenderSessionCapabilities(raw: value0) }
   }
 
+  /// Reports the session's first terminal failure from any native thread.
+  ///
+  /// See `mln_render_session_get_failure` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  func getFailure() throws {
+    try nativeInvoke { raw, _, diagnostic in mln_render_session_get_failure(
+      raw,
+      diagnostic
+    ) }
+  }
+
   /// Copies the latest render-session snapshot from any native thread.
   ///
   /// See `mln_render_session_get_snapshot` in the

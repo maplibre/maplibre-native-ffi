@@ -918,6 +918,8 @@ internal actual object C {
     Ffm.downcall("mln_render_session_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_get_capabilities =
     Ffm.downcall("mln_render_session_get_capabilities", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_get_failure =
+    Ffm.downcall("mln_render_session_get_failure", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_get_snapshot =
     Ffm.downcall("mln_render_session_get_snapshot", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_query_feature_extensions =
@@ -2662,6 +2664,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_get_capabilities.invokeExact(session, outCapabilities, outDiagnostic) as Int
+
+  actual fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int =
+    mln_render_session_get_failure.invokeExact(session, outDiagnostic) as Int
 
   actual fun mln_render_session_get_snapshot(
     session: Long,

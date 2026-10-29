@@ -663,6 +663,10 @@ const (
 	// A newer demand with the same flags, neither of them forced, replaced this
 	// demand. A still image's demand is never replaced, and never replaces one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
+	// The session failed before this demand could produce a usable frame. Read its
+	// saved failure with RenderSessionHandle.Failure(). Further demands require
+	// disposing of this session and attaching a new one.
+	RenderResultFailed RenderResult = RenderResult(C.MLN_RENDER_RESULT_FAILED)
 )
 
 func (value RenderResult) String() string {
@@ -675,6 +679,8 @@ func (value RenderResult) String() string {
 		return "RenderResultTargetNotReady"
 	case 3:
 		return "RenderResultSuperseded"
+	case 4:
+		return "RenderResultFailed"
 	}
 	return fmt.Sprintf("RenderResult(%d)", value)
 }
@@ -713,11 +719,15 @@ const (
 	RenderSessionStateAttached  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ATTACHED)
 	RenderSessionStateDetaching RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHING)
 	RenderSessionStateDetached  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHED)
-	// A frame or driver task failed and the session can no longer render. The map
-	// reports the failure as RuntimeEventTypeMapRenderError. A failed attach
-	// reports it through its completion instead.
-	RenderSessionStateTargetLost RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_TARGET_LOST)
-	RenderSessionStateAbandoned  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ABANDONED)
+	// Native rendering or driver work failed and the session can no longer render.
+	// This does not imply target or device loss. Read the first failure with
+	// RenderSessionHandle.Failure(). The map also reports it as
+	// RuntimeEventTypeMapRenderError; a failed attach reports it through its
+	// completion instead. Snapshots, frame-result drains, acquired-frame release,
+	// abandon, and dispose remain available. Dispose this session before attaching
+	// a replacement.
+	RenderSessionStateFailed    RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_FAILED)
+	RenderSessionStateAbandoned RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ABANDONED)
 )
 
 func (value RenderSessionState) String() string {
@@ -731,7 +741,7 @@ func (value RenderSessionState) String() string {
 	case 4:
 		return "RenderSessionStateDetached"
 	case 5:
-		return "RenderSessionStateTargetLost"
+		return "RenderSessionStateFailed"
 	case 6:
 		return "RenderSessionStateAbandoned"
 	}
@@ -7094,6 +7104,16 @@ func (receiver *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, 
 		return int32(C.mln_render_session_get_capabilities(C.mln_render_session(raw), &outCapabilities, diagnostic))
 	}, func(arena *bindingArena) RenderSessionCapabilities {
 		return copyRenderSessionCapabilities(outCapabilities)
+	})
+}
+
+// Failure reports the session's first terminal failure from any native thread.
+//
+// See mln_render_session_get_failure in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) Failure() error {
+	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_failure(C.mln_render_session(raw), diagnostic))
 	})
 }
 

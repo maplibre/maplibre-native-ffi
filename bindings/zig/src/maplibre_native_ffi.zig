@@ -1166,6 +1166,14 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_get_capabilities", .handle, self, null, diagnostic, .{call.sizedOut(RenderSessionCapabilities)});
     }
 
+    /// Reports the session's first terminal failure from any native thread.
+    ///
+    /// See `mln_render_session_get_failure` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn getFailure(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_render_session_get_failure", .handle, self, null, diagnostic, .{});
+    }
+
     /// Copies the latest render-session snapshot from any native thread.
     ///
     /// See `mln_render_session_get_snapshot` in the
@@ -4299,6 +4307,10 @@ pub const RenderResult = enum(u32) {
     /// this demand. A still image's demand is never replaced, and never
     /// replaces one.
     superseded = 3,
+    /// The session failed before this demand could produce a usable frame. Read
+    /// its saved failure with `RenderSession.getFailure()`. Further demands
+    /// require disposing of this session and attaching a new one.
+    failed = 4,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4433,10 +4445,14 @@ pub const RenderSessionState = enum(u32) {
     attached = 2,
     detaching = 3,
     detached = 4,
-    /// A frame or driver task failed and the session can no longer render. The
-    /// map reports the failure as `RuntimeEventType.map_render_error`. A failed
-    /// attach reports it through its completion instead.
-    target_lost = 5,
+    /// Native rendering or driver work failed and the session can no longer
+    /// render. This does not imply target or device loss. Read the first
+    /// failure with `RenderSession.getFailure()`. The map also reports it as
+    /// `RuntimeEventType.map_render_error`; a failed attach reports it through
+    /// its completion instead. Snapshots, frame-result drains, acquired-frame
+    /// release, abandon, and dispose remain available. Dispose this session
+    /// before attaching a replacement.
+    failed = 5,
     abandoned = 6,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;

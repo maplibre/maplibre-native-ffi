@@ -3333,6 +3333,16 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
+   * Reports the session's first terminal failure from any native thread.
+   *
+   * See `mln_render_session_get_failure` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   */
+  getFailure(): void {
+    native.mln_render_session_get_failure(this.id);
+  }
+
+  /**
    * Copies the latest render-session snapshot from any native thread.
    *
    * See `mln_render_session_get_snapshot` in the

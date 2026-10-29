@@ -557,9 +557,9 @@ class RenderableSlotRing {
 
 // Records the frame status that mln::Renderer reports synchronously out of
 // render(), so render_session_render_update_on_driver() can return its render
-// mode and repaint flag with the terminal frame result, and forwards every
-// callback to the map's observer so runtime event delivery is unchanged. Runs
-// entirely on the session's driver thread.
+// mode and repaint flag with the terminal frame result. Successful completion
+// reaches the map only after the whole frame attempt succeeds, since it can
+// complete a still-image request. Runs on the session's driver thread.
 class SessionFrameObserver final : public mln::RendererObserver {
  public:
   auto set_delegate(mln::RendererObserver* delegate) -> void {
@@ -572,8 +572,19 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   auto begin_render() -> void {
     frame_completed_ = false;
+    map_completed_ = false;
     needs_repaint_ = false;
     mode_ = MLN_RENDER_MODE_PARTIAL;
+    stats_.reset();
+  }
+
+  auto commit_render() -> void {
+    if (delegate_ == nullptr || !frame_completed_) return;
+    delegate_->onDidFinishRenderingFrame(
+      mode_ == MLN_RENDER_MODE_FULL ? RenderMode::Full : RenderMode::Partial,
+      needs_repaint_, placement_changed_, std::move(stats_)
+    );
+    if (map_completed_) delegate_->onDidFinishRenderingMap();
   }
 
   [[nodiscard]] auto frame_completed() const -> bool {
@@ -624,18 +635,12 @@ class SessionFrameObserver final : public mln::RendererObserver {
     mode_ =
       mode == RenderMode::Full ? MLN_RENDER_MODE_FULL : MLN_RENDER_MODE_PARTIAL;
     frame_completed_ = true;
-    if (delegate_ != nullptr) {
-      delegate_->onDidFinishRenderingFrame(
-        mode, repaint, placement_changed, std::move(stats)
-      );
-    }
+    placement_changed_ = placement_changed;
+    stats_ = std::move(stats);
   }
 
   void onDidFinishRenderingMap() override {
-    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
-      return;
-    }
-    delegate_->onDidFinishRenderingMap();
+    if (!suppress_frame_callbacks_) map_completed_ = true;
   }
 
   void onStyleImageMissing(
@@ -724,6 +729,9 @@ class SessionFrameObserver final : public mln::RendererObserver {
   bool needs_repaint_ = false;
   mln_render_mode mode_ = MLN_RENDER_MODE_PARTIAL;
   bool frame_completed_ = false;
+  bool map_completed_ = false;
+  bool placement_changed_ = false;
+  std::shared_ptr<mln::gfx::RenderingStats> stats_;
   bool suppress_frame_callbacks_ = false;
 };
 
@@ -743,7 +751,7 @@ struct RenderTextureState {
 
 struct RenderDriverWork {
   std::function<void()> execute;
-  std::function<void()> abandon;
+  std::function<void(mln_status, const char*)> cancel;
   // Empty for work the driver runs as soon as it reaches it. Otherwise the
   // item, and every item behind it, waits at the front of the queue until this
   // holds. Read under the session's control_mutex, on any thread.
@@ -751,6 +759,17 @@ struct RenderDriverWork {
   // Whether the work may render a frame, which waits while the GPU has as many
   // unfinished frames as the texture ring has slots. Work behind it waits too.
   bool renders_frame = false;
+
+  void complete_failure(
+    mln_status status = MLN_STATUS_TARGET_LOST,
+    const char* message = "render target was abandoned"
+  ) const noexcept {
+    try {
+      if (cancel) cancel(status, message);
+    } catch (...) {
+      // A failed completion must not prevent the remaining work from ending.
+    }
+  }
 };
 
 // What a driver result's work leaves as its result to finish the result on a
@@ -793,6 +812,8 @@ struct mln_render_session_object
   bool abandonment_complete = false;
   std::optional<mln::core::OwnerThreadToken> abandonment_thread;
   mln_render_session_state state = MLN_RENDER_SESSION_STATE_ATTACHING;
+  mln_status failure_status = MLN_STATUS_OK;
+  mln_diagnostic failure{.size = sizeof(mln_diagnostic), .message = {}};
   mln_render_session_capabilities capabilities{};
   uint64_t generation = 1;
   uint64_t map_update_generation = 0;
@@ -827,6 +848,8 @@ struct mln_render_session_object
   bool destruction_started = false;
   bool attached = false;
   std::vector<mln_render_frame_result> frame_results;
+  // Every accepted demand reserves its result before it can reach the driver.
+  std::size_t unfinished_demands = 0;
   std::deque<std::shared_ptr<const mln_frame_demand>> demands;
   // Waiting demands hold no work item until an update or target change.
   std::deque<std::shared_ptr<const mln_frame_demand>> update_waiting_demands;
@@ -1219,6 +1242,7 @@ auto render_session_get_capabilities(
 auto render_session_get_snapshot(
   mln_render_session session, mln_render_session_snapshot* out_snapshot
 ) -> mln_status;
+auto render_session_get_failure(mln_render_session session) -> mln_status;
 auto render_session_request_frame(
   mln_render_session session, const mln_frame_demand* demand
 ) -> mln_status;
@@ -1264,8 +1288,8 @@ auto render_session_abandon(
 ) -> mln_status;
 
 // Leases an acquired frame and checks that its session can still describe it.
-// A session that lost or abandoned its target no longer owns the texture the
-// frame names, so both states report MLN_STATUS_TARGET_LOST.
+// A failed session reports its saved cause. An abandoned session no longer
+// owns the texture the frame names and reports MLN_STATUS_TARGET_LOST.
 auto lease_valid_acquired_frame(
   mln_acquired_frame frame,
   std::shared_ptr<mln_acquired_frame_object>& out_frame

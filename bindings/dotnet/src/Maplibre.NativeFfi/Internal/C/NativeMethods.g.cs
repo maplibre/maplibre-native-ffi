@@ -1053,6 +1053,12 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_get_failure(
+        MlnRenderSession session,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_get_snapshot(
         MlnRenderSession session,
         mln_render_session_snapshot* out_snapshot,

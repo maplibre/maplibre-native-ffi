@@ -1360,6 +1360,14 @@ int32_t mln_kw_mln_render_session_get_capabilities(
   );
 }
 
+int32_t mln_kw_mln_render_session_get_failure(
+  int64_t session, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_get_failure(
+    (mln_render_session)session, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_render_session_get_snapshot(
   int64_t session, uintptr_t out_snapshot, uintptr_t out_diagnostic
 ) {

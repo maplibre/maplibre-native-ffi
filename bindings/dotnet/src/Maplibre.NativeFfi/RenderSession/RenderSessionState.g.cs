@@ -16,10 +16,14 @@ public enum RenderSessionState : uint
     Detached = 4,
 
     /// <summary>
-    /// A frame or driver task failed and the session can no longer render. The
-    /// map reports the failure as <c>RuntimeEventType.MapRenderError</c>. A
-    /// failed attach reports it through its completion instead.
+    /// Native rendering or driver work failed and the session can no longer
+    /// render. This does not imply target or device loss. Read the first
+    /// failure with <c>RenderSessionHandle.GetFailure()</c>. The map also
+    /// reports it as <c>RuntimeEventType.MapRenderError</c>; a failed attach
+    /// reports it through its completion instead. Snapshots, frame-result
+    /// drains, acquired-frame release, abandon, and dispose remain available.
+    /// Dispose this session before attaching a replacement.
     /// </summary>
-    TargetLost = 5,
+    Failed = 5,
     Abandoned = 6,
 }

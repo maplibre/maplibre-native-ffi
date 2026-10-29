@@ -654,6 +654,7 @@ export interface NativeOperations {
   mln_render_session_get_capabilities(
     session: bigint,
   ): RenderSessionCapabilities;
+  mln_render_session_get_failure(session: bigint): void;
   mln_render_session_get_snapshot(session: bigint): RenderSessionSnapshot;
   mln_render_session_query_feature_extensions(
     session: bigint,

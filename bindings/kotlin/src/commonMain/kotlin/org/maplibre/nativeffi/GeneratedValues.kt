@@ -714,6 +714,7 @@ public value class RenderResult(public val rawValue: UInt) {
       1u -> "NO_UPDATE"
       2u -> "TARGET_NOT_READY"
       3u -> "SUPERSEDED"
+      4u -> "FAILED"
       else -> "RenderResult($rawValue)"
     }
 
@@ -738,6 +739,12 @@ public value class RenderResult(public val rawValue: UInt) {
      * image's demand is never replaced, and never replaces one.
      */
     public val SUPERSEDED: RenderResult = RenderResult(3u)
+    /**
+     * The session failed before this demand could produce a usable frame. Read its saved failure
+     * with `RenderSessionHandle.getFailure()`. Further demands require disposing of this session
+     * and attaching a new one.
+     */
+    public val FAILED: RenderResult = RenderResult(4u)
   }
 }
 
@@ -798,7 +805,7 @@ public value class RenderSessionState(public val rawValue: UInt) {
       2u -> "ATTACHED"
       3u -> "DETACHING"
       4u -> "DETACHED"
-      5u -> "TARGET_LOST"
+      5u -> "FAILED"
       6u -> "ABANDONED"
       else -> "RenderSessionState($rawValue)"
     }
@@ -809,11 +816,13 @@ public value class RenderSessionState(public val rawValue: UInt) {
     public val DETACHING: RenderSessionState = RenderSessionState(3u)
     public val DETACHED: RenderSessionState = RenderSessionState(4u)
     /**
-     * A frame or driver task failed and the session can no longer render. The map reports the
-     * failure as `RuntimeEventType.MAP_RENDER_ERROR`. A failed attach reports it through its
-     * completion instead.
+     * Native rendering or driver work failed and the session can no longer render. This does not
+     * imply target or device loss. Read the first failure with `RenderSessionHandle.getFailure()`.
+     * The map also reports it as `RuntimeEventType.MAP_RENDER_ERROR`; a failed attach reports it
+     * through its completion instead. Snapshots, frame-result drains, acquired-frame release,
+     * abandon, and dispose remain available. Dispose this session before attaching a replacement.
      */
-    public val TARGET_LOST: RenderSessionState = RenderSessionState(5u)
+    public val FAILED: RenderSessionState = RenderSessionState(5u)
     public val ABANDONED: RenderSessionState = RenderSessionState(6u)
   }
 }

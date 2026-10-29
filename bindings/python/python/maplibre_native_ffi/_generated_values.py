@@ -498,6 +498,7 @@ class RenderResult(UnknownIntEnum):
     NO_UPDATE = 1
     TARGET_NOT_READY = 2
     SUPERSEDED = 3
+    FAILED = 4
 
 
 class RenderSessionCapabilityFlag(IntFlag):
@@ -524,7 +525,7 @@ class RenderSessionState(UnknownIntEnum):
     ATTACHED = 2
     DETACHING = 3
     DETACHED = 4
-    TARGET_LOST = 5
+    FAILED = 5
     ABANDONED = 6
 
 

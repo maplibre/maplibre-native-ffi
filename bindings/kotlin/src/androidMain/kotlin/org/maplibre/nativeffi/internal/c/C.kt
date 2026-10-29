@@ -1047,6 +1047,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
+  @JvmStatic
+  actual external fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int
+
   @CriticalNative
   @JvmStatic
   actual external fun mln_render_session_get_snapshot(

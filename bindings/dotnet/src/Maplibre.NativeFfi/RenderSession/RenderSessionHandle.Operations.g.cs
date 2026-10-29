@@ -299,6 +299,19 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Reports the session's first terminal failure from any native thread.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_get_failure</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public void GetFailure()
+    {
+        using var call = Enter(this);
+        Check(NativeMethods.mln_render_session_get_failure(Handle, Diagnostic));
+    }
+
+    /// <summary>
     /// Copies the latest render-session snapshot from any native thread.
     /// </summary>
     /// <remarks>

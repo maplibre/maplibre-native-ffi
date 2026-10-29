@@ -1615,6 +1615,7 @@ internal enum mln_render_result : uint
     MLN_RENDER_RESULT_NO_UPDATE = 1,
     MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
     MLN_RENDER_RESULT_SUPERSEDED = 3,
+    MLN_RENDER_RESULT_FAILED = 4,
 }
 
 internal enum mln_render_session_capability_flag : uint
@@ -1631,7 +1632,7 @@ internal enum mln_render_session_state : uint
     MLN_RENDER_SESSION_STATE_ATTACHED = 2,
     MLN_RENDER_SESSION_STATE_DETACHING = 3,
     MLN_RENDER_SESSION_STATE_DETACHED = 4,
-    MLN_RENDER_SESSION_STATE_TARGET_LOST = 5,
+    MLN_RENDER_SESSION_STATE_FAILED = 5,
     MLN_RENDER_SESSION_STATE_ABANDONED = 6,
 }
 

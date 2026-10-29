@@ -210,6 +210,7 @@ pub const MLN_RENDER_RESULT_RENDERED: mln_render_result = 0;
 pub const MLN_RENDER_RESULT_NO_UPDATE: mln_render_result = 1;
 pub const MLN_RENDER_RESULT_TARGET_NOT_READY: mln_render_result = 2;
 pub const MLN_RENDER_RESULT_SUPERSEDED: mln_render_result = 3;
+pub const MLN_RENDER_RESULT_FAILED: mln_render_result = 4;
 pub type mln_render_session_capability_flag = u32;
 pub const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION: mln_render_session_capability_flag = 1;
 pub const MLN_RENDER_SESSION_CAPABILITY_READBACK: mln_render_session_capability_flag = 2;
@@ -220,7 +221,7 @@ pub const MLN_RENDER_SESSION_STATE_ATTACHING: mln_render_session_state = 1;
 pub const MLN_RENDER_SESSION_STATE_ATTACHED: mln_render_session_state = 2;
 pub const MLN_RENDER_SESSION_STATE_DETACHING: mln_render_session_state = 3;
 pub const MLN_RENDER_SESSION_STATE_DETACHED: mln_render_session_state = 4;
-pub const MLN_RENDER_SESSION_STATE_TARGET_LOST: mln_render_session_state = 5;
+pub const MLN_RENDER_SESSION_STATE_FAILED: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
@@ -2631,6 +2632,10 @@ unsafe extern "C" {
     pub fn mln_render_session_get_capabilities(
         session: mln_render_session,
         out_capabilities: *mut mln_render_session_capabilities,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_get_failure(
+        session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_get_snapshot(

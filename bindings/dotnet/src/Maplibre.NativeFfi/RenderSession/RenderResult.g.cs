@@ -38,4 +38,11 @@ public enum RenderResult : uint
     /// replaces one.
     /// </summary>
     Superseded = 3,
+
+    /// <summary>
+    /// The session failed before this demand could produce a usable frame. Read
+    /// its saved failure with <c>RenderSessionHandle.GetFailure()</c>. Further
+    /// demands require disposing of this session and attaching a new one.
+    /// </summary>
+    Failed = 4,
 }

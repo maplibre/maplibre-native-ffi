@@ -3183,6 +3183,10 @@ pub enum RenderResult: u32 {
     /// this demand. A still image's demand is never replaced, and never
     /// replaces one.
     Superseded = 3,
+    /// The session failed before this demand could produce a usable frame. Read
+    /// its saved failure with `RenderSessionHandle::get_failure()`. Further
+    /// demands require disposing of this session and attaching a new one.
+    Failed = 4,
 } Unknown
 }
 impl Default for RenderResult {
@@ -3327,10 +3331,14 @@ pub enum RenderSessionState: u32 {
     Attached = 2,
     Detaching = 3,
     Detached = 4,
-    /// A frame or driver task failed and the session can no longer render. The
-    /// map reports the failure as `RuntimeEventType::MapRenderError`. A failed
-    /// attach reports it through its completion instead.
-    TargetLost = 5,
+    /// Native rendering or driver work failed and the session can no longer
+    /// render. This does not imply target or device loss. Read the first
+    /// failure with `RenderSessionHandle::get_failure()`. The map also reports
+    /// it as `RuntimeEventType::MapRenderError`; a failed attach reports it
+    /// through its completion instead. Snapshots, frame-result drains,
+    /// acquired-frame release, abandon, and dispose remain available. Dispose
+    /// this session before attaching a replacement.
+    Failed = 5,
     Abandoned = 6,
 } Unknown
 }

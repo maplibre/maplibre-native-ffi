@@ -206,12 +206,17 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// A newer demand with the same flags, neither of them forced, replaced this
   /// demand. A still image's demand is never replaced, and never replaces one.
   public static let superseded: RenderResult = .init(rawValue: 3)
+  /// The session failed before this demand could produce a usable frame. Read
+  /// its saved failure with `RenderSessionHandle.getFailure()`. Further demands
+  /// require disposing of this session and attaching a new one.
+  public static let failed: RenderResult = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
     case 0: return "rendered"
     case 1: return "noUpdate"
     case 2: return "targetNotReady"
     case 3: return "superseded"
+    case 4: return "failed"
     default: return "RenderResult(\(rawValue))"
     }
   }
@@ -282,10 +287,14 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
   public static let attached: RenderSessionState = .init(rawValue: 2)
   public static let detaching: RenderSessionState = .init(rawValue: 3)
   public static let detached: RenderSessionState = .init(rawValue: 4)
-  /// A frame or driver task failed and the session can no longer render. The
-  /// map reports the failure as `RuntimeEventType.mapRenderError`. A failed
-  /// attach reports it through its completion instead.
-  public static let targetLost: RenderSessionState = .init(rawValue: 5)
+  /// Native rendering or driver work failed and the session can no longer
+  /// render. This does not imply target or device loss. Read the first failure
+  /// with `RenderSessionHandle.getFailure()`. The map also reports it as
+  /// `RuntimeEventType.mapRenderError`; a failed attach reports it through its
+  /// completion instead. Snapshots, frame-result drains, acquired-frame
+  /// release, abandon, and dispose remain available. Dispose this session
+  /// before attaching a replacement.
+  public static let failed: RenderSessionState = .init(rawValue: 5)
   public static let abandoned: RenderSessionState = .init(rawValue: 6)
   public var description: String {
     switch rawValue {
@@ -293,7 +302,7 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
     case 2: return "attached"
     case 3: return "detaching"
     case 4: return "detached"
-    case 5: return "targetLost"
+    case 5: return "failed"
     case 6: return "abandoned"
     default: return "RenderSessionState(\(rawValue))"
     }
