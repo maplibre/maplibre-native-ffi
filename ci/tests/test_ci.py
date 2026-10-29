@@ -246,8 +246,11 @@ class SuitesTest(unittest.TestCase):
     def test_react_native_builds_mobile_hosts_and_tests_device_targets(self):
         for preset, action in (
             ("android-arm-egl", "build"),
+            ("android-arm-vulkan", "build"),
             ("android-arm64-egl", "build"),
+            ("android-arm64-vulkan", "build"),
             ("android-x64-egl", "test"),
+            ("android-x64-vulkan", "test"),
             ("ios-arm64-metal", "build"),
             ("ios-simulator-arm64-metal", "test"),
         ):
@@ -258,14 +261,6 @@ class SuitesTest(unittest.TestCase):
                 ("mise", "run", f"//bindings/typescript:{action}:react-native", preset),
                 commands,
             )
-        for target in self.targets.values():
-            if target.platform == "android" and target.backend == "vulkan":
-                self.assertFalse(
-                    any(
-                        suite.task.endswith(":react-native")
-                        for suite in suites.target_suites(target)
-                    )
-                )
 
 
 class RetryTest(unittest.TestCase):

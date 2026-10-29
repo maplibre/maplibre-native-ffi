@@ -38,6 +38,9 @@
       "optional": true
     }
   },
+  "swiftpmConfig": {
+    "name": "MaplibreNativeFfi"
+  },
   "codegenConfig": {
     "name": "MaplibreNativeFfiSpec",
     "type": "modules",

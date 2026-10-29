@@ -1,8 +1,8 @@
+#import <MaplibreNativeFfiSpec/MaplibreNativeFfiSpec.h>
 #import <React/RCTBridge+Private.h>
 #import <React/RCTInvalidating.h>
 #import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
 
-#import "MaplibreNativeFfiSpec.h"
 #include "module.h"
 
 @interface MaplibreNativeFfi : NSObject <

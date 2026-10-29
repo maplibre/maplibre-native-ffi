@@ -4,7 +4,8 @@
  * reloads. The app's Android Application must expose its ReactHost through
  * ReactApplication.reactHost so teardown can run before the JS queue stops.
  *
- * Android uses OpenGL and must restrict abiFilters to armeabi-v7a, arm64-v8a, and x86_64:
+ * Android defaults to OpenGL; set maplibre.android.backend=vulkan in
+ * gradle.properties to select Vulkan. Restrict abiFilters to armeabi-v7a, arm64-v8a, and x86_64:
  * the native runtime has no 32-bit x86 build. iOS uses Metal. This entry exposes
  * the same low-level API as the desktop binding and creates no native views.
  *

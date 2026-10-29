@@ -1,9 +1,9 @@
+#import <LifecycleProbeSpec/LifecycleProbeSpec.h>
 #import <React/RCTBridge+Private.h>
 #import <React/RCTInvalidating.h>
 #import <React/RCTReloadCommand.h>
 #import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
 
-#import "LifecycleProbeSpec.h"
 #include "Probe.h"
 
 @interface LifecycleProbe : NSObject <

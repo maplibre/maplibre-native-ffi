@@ -223,9 +223,10 @@ const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
 // Metro consumes JavaScript; codegen separately reads the TurboModule spec.
-// Keep C sources separate from C++ so CocoaPods and CMake compile them as C11.
+// Keep C sources separate from C++ so SwiftPM and CMake compile them as C11.
 for (const name of [
   "android",
+  "Package.swift",
   "MaplibreNativeFfi.podspec",
   "react-native.config.cjs",
   "src/specs",
@@ -312,11 +313,13 @@ pack(facade, {
     ]),
   ),
   codegenConfig: source.codegenConfig,
+  swiftpmConfig: source.swiftpmConfig,
   files: [
     "dist",
     "src/specs",
     "native",
     "android",
+    "Package.swift",
     "MaplibreNativeFfi.podspec",
     "react-native.config.cjs",
   ],

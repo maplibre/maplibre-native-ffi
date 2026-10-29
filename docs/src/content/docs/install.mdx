@@ -563,12 +563,20 @@ const runtime = await RuntimeHandle.create();
 ```
 
 In React Native 0.88, use the New Architecture and the bundled Hermes engine.
-Install the facade alone; autolinking selects Metal on iOS and OpenGL on
+Install the facade alone; autolinking defaults to Metal on iOS and OpenGL on
 Android:
 
 ```bash frame="terminal"
 npm install @maplibre/native-ffi
-cd ios && pod install
+```
+
+On iOS, use the app's dependency manager: run `pod install` for CocoaPods, or
+React Native's `setup-apple-spm.js` for SwiftPM. To migrate the standard React
+Native template to SwiftPM:
+
+```bash frame="terminal"
+cd ios
+node ../node_modules/react-native/scripts/setup-apple-spm.js add --deintegrate
 ```
 
 Exclude 32-bit x86 from Android's ABI filters. With the standard React Native
@@ -577,6 +585,8 @@ template, set this in `android/gradle.properties`:
 ```properties
 reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
 ```
+
+To select Vulkan on Android, also set `maplibre.android.backend=vulkan`.
 
 Import from `@maplibre/native-ffi` as on Node. The binding creates no native
 view; the host supplies the graphics objects and surface for presentation.

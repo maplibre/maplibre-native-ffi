@@ -24,7 +24,9 @@ def run(preset):
             str(ROOT / "tools/devices/android-serial"),
             abi,
             "--api",
-            "26" if abi == "x86_64" else "36",
+            "26"
+            if preset == "android-x64-egl"
+            else os.environ["MLN_FFI_ANDROID_EMULATOR_API"],
         )
         adb = str(Path(os.environ["ANDROID_HOME"]) / "platform-tools/adb")
         device = [adb, "-s", serial]
@@ -139,6 +141,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "preset",
-        choices=["android-x64-egl", "android-arm64-egl", "ios-simulator-arm64-metal"],
+        choices=[
+            "android-x64-egl",
+            "android-x64-vulkan",
+            "android-arm64-egl",
+            "android-arm64-vulkan",
+            "ios-simulator-arm64-metal",
+        ],
     )
     run(parser.parse_args().preset)

@@ -16,7 +16,7 @@ add_library(
     ../native/test_graphics.c
     ../support/native_probe.c
     ../graphics/graphics.c
-    ${MLN_NATIVE}/react-native/shim.cpp)
+    ../native/shim.cpp)
 target_include_directories(
   mln_lifecycle_probe
   PRIVATE

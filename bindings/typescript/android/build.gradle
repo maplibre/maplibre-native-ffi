@@ -7,6 +7,7 @@ if (project.findProperty('newArchEnabled') != 'true') {
 
 def manifest = new groovy.json.JsonSlurper().parse(file('../package.json'))
 def runtimeAar = project.findProperty('maplibreNativeFfiRuntimeAar')
+def backend = project.findProperty('maplibre.android.backend') ?: 'opengl'
 
 react {
     root = file('..')
@@ -40,7 +41,7 @@ dependencies {
         implementation files(runtimeAar)
     } else {
         // This adapter uses the native library, not the AAR's Kotlin marker.
-        implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:${manifest.version}") {
+        implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-${backend}-android:${manifest.version}") {
             transitive = false
         }
     }

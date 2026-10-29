@@ -63,7 +63,7 @@ scripts/test-arkts.sh "$usage_preset"
 description = "Build the React Native release app with the shared TypeScript suite and reload probe."
 usage = '''
 arg "<preset>" {
-  choices "android-arm-egl" "android-arm64-egl" "android-x64-egl" "ios-arm64-metal" "ios-simulator-arm64-metal"
+  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal"
 }
 '''
 tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
@@ -75,7 +75,7 @@ run = 'bash scripts/build-react-native.sh "$usage_preset"'
 description = "Run the React Native TypeScript suite, graphics readback and runtime reload."
 usage = '''
 arg "<preset>" {
-  choices "android-x64-egl" "android-arm64-egl" "ios-simulator-arm64-metal"
+  choices "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal"
 }
 '''
 depends = [{ task = ":build:react-native", args = ["{{usage.preset}}"] }]

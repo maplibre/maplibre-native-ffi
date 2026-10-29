@@ -81,6 +81,9 @@ manifest.codegenConfig = {
   android: { javaPackageName: "org.maplibre.lifecycle" },
   ios: { modulesProvider: { LifecycleProbe: "LifecycleProbe" } },
 };
+manifest.swiftpmConfig = {
+  modules: [{ name: "LifecycleProbe", path: "probe" }],
+};
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 
 const packArgs = ["scripts/pack.ts"];
@@ -137,13 +140,6 @@ patch(
   'ndkVersion = "27.1.12297006"',
   `ndkVersion = "${process.env.MLN_FFI_ANDROID_NDK_VERSION ?? "30.0.16248370"}"`,
 );
-patch(
-  "ios/Podfile",
-  "  config = use_native_modules!",
-  `  config = use_native_modules!
-  pod 'LifecycleProbe', :path => '../probe'
-`,
-);
 execFileSync(
   "npm",
   [
@@ -158,5 +154,13 @@ execFileSync(
     cwd: app,
     stdio: "inherit",
   },
+);
+// Each test module owns its shim; the package's Node-API symbols stay private.
+cpSync(
+  resolve(
+    app,
+    "node_modules/@maplibre/native-ffi/native/react-native/shim.cpp",
+  ),
+  resolve(app, "probe/native/shim.cpp"),
 );
 console.log(app);

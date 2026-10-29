@@ -247,13 +247,8 @@ def android_commands(target: Target, abi: str) -> list[str]:
         # Flutter has no Android x86 target.
         if abi != "x86":
             commands.append(f"mise run //bindings/dart:build:mobile {preset}")
-    # React Native's Android host supports OpenGL. Device targets run the
-    # suite; the other architectures build the same release app.
-    if target.backend == "egl":
-        action = "test" if target.device else "build"
-        commands.append(
-            f"mise run //bindings/typescript:{action}:react-native {preset}"
-        )
+    action = "test" if target.device else "build"
+    commands.append(f"mise run //bindings/typescript:{action}:react-native {preset}")
     return commands
 
 
