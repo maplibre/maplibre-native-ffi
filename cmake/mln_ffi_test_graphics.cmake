@@ -96,6 +96,9 @@ function(mln_ffi_add_test_graphics)
     return()
   endif()
   add_library(mln_test_graphics SHARED)
+  if(MINGW)
+    set_target_properties(mln_test_graphics PROPERTIES PREFIX "")
+  endif()
   target_link_libraries(mln_test_graphics PRIVATE mln_test_graphics_objects)
   target_include_directories(
     mln_test_graphics
