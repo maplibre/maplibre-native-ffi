@@ -26,9 +26,9 @@ inputs:
     description: R2 S3 access key ID with Object Read & Write (push jobs only)
     required: false
     default: ""
-  sccache-secret-access-key:
+  sccache-api-token:
     description:
-      R2 S3 secret access key with Object Read & Write (push jobs only)
+      Cloudflare API token with R2 Object Read & Write (push jobs only)
     required: false
     default: ""
   zig:
@@ -600,6 +600,23 @@ runs:
           ~/.cargo/bin
         key: ${{ steps.toolchain-key.outputs.key }}
 
+    - name: Derive the R2 S3 secret
+      if:
+        github.event_name != 'pull_request' && inputs.sccache-access-key-id !=
+        '' && inputs.sccache-api-token != ''
+      shell: python
+      env:
+        SCCACHE_API_TOKEN: ${{ inputs.sccache-api-token }}
+      run: |
+        import hashlib
+        import os
+
+        # R2's S3 secret is the hash of the original Cloudflare API token.
+        secret = hashlib.sha256(os.environ["SCCACHE_API_TOKEN"].encode()).hexdigest()
+        print(f"::add-mask::{secret}")
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+            output.write(f"AWS_SECRET_ACCESS_KEY={secret}\n")
+
     # The R2 backend lives here because its keys carry
     # the toolchain paths of the runner that produced them; a contributor
     # machine reads its own disk cache instead. Public reads use the R2 custom
@@ -611,7 +628,6 @@ runs:
       shell: bash
       env:
         SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
-        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
       run: |
         bucket="maplibre-native-ffi-sccache"
         account_id="6cda5be3bf367f2885f3696d3c9b2653"
@@ -632,12 +648,11 @@ runs:
           echo "CARGO_INCREMENTAL=0"
         } >> "$GITHUB_ENV"
 
-        if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${SCCACHE_ACCESS_KEY_ID}" && -n "${SCCACHE_SECRET_ACCESS_KEY}" ]]; then
+        if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${SCCACHE_ACCESS_KEY_ID}" && -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
           {
             echo "SCCACHE_ENDPOINT=${write_endpoint}"
             echo "SCCACHE_S3_KEY_PREFIX=${bucket}/"
             echo "AWS_ACCESS_KEY_ID=${SCCACHE_ACCESS_KEY_ID}"
-            echo "AWS_SECRET_ACCESS_KEY=${SCCACHE_SECRET_ACCESS_KEY}"
           } >> "$GITHUB_ENV"
           echo "Configured sccache R2 backend (read-write)"
         else
@@ -658,7 +673,6 @@ runs:
       shell: pwsh
       env:
         SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
-        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
       run: |
         $bucket = "maplibre-native-ffi-sccache"
         $accountId = "6cda5be3bf367f2885f3696d3c9b2653"
@@ -682,13 +696,12 @@ runs:
         if (
           $env:GITHUB_EVENT_NAME -ne "pull_request" -and
           $env:SCCACHE_ACCESS_KEY_ID -and
-          $env:SCCACHE_SECRET_ACCESS_KEY
+          $env:AWS_SECRET_ACCESS_KEY
         ) {
           @(
             "SCCACHE_ENDPOINT=$writeEndpoint"
             "SCCACHE_S3_KEY_PREFIX=$bucket/"
             "AWS_ACCESS_KEY_ID=$env:SCCACHE_ACCESS_KEY_ID"
-            "AWS_SECRET_ACCESS_KEY=$env:SCCACHE_SECRET_ACCESS_KEY"
           ) >> $env:GITHUB_ENV
           Write-Output "Configured sccache R2 backend (read-write)"
         } else {

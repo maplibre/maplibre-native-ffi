@@ -949,6 +949,12 @@ url = "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-arm64.zip"
 checksum = "sha256:b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4"
 url = "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip"
 
+[[tools."npm:wrangler"]]
+version = "4.152.0"
+aube = { path = "mise/locks/npm-wrangler/4.152.0", digest = "sha256:32b12239ed97e7d1308d599d4ababc367f04d542baf62ea00c454a188d6994ab" }
+backend = "npm:wrangler"
+specifiers = ["4.152.0"]
+
 [[tools.python]]
 version = "3.15.1"
 backend = "core:python"

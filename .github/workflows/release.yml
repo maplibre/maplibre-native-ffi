@@ -564,11 +564,11 @@ jobs:
         with:
           skip-existing: true
 
-  # The docs quote the latest release, so republish them after it publishes.
   # OHPM lists a version only after its review, so the docs do not wait for it.
   docs:
-    name: Docs
+    name: Docs Pages
     needs:
+      - source
       - dart
       - distribution
       - dotnet
@@ -578,12 +578,60 @@ jobs:
       - rust
       - typescript
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 5
+    timeout-minutes: 60
     permissions:
-      actions: write
+      actions: read
+      contents: read
+    env:
+      RELEASE_SHA: ${{ needs.source.outputs.sha }}
+      DOCS_VERSION: ${{ needs.source.outputs.version }}
     steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Read the Android compile SDK
+        id: android
+        shell: bash
+        run: |
+          sdk="$(sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)" *$/\1/p' gradle/libs.versions.toml)"
+          test -n "$sdk" || { echo "android-compileSdk missing from gradle/libs.versions.toml" >&2; exit 1; }
+          echo "compile-sdk=$sdk" >> "$GITHUB_OUTPUT"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages:
+            platform-tools platforms;android-${{
+            steps.android.outputs.compile-sdk }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.source.outputs.run_id }}
+          name: native-package-linux-gnu-x64-vulkan-${{ env.RELEASE_SHA }}
+          path: build/packages/native/docs-input
+      - name: Install packaged native artifact
         run: >-
-          gh workflow run publish-snapshots.yml --repo "$GITHUB_REPOSITORY"
-          --ref main -f docs_only=true
+          mise run install-native-package linux-gnu-x64-vulkan
+          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+      - run: mise run //docs:build
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/dist
+
+  deploy-docs:
+    name: Deploy Docs Pages
+    needs:
+      - docs
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

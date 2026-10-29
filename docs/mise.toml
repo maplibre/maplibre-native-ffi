@@ -1,4 +1,5 @@
 [tools]
+"npm:wrangler" = "{{vars.wrangler_version}}"
 "conda:doxygen" = { version = "1.18.0", os = ["linux", "macos", "windows/x64"] }
 
 [tasks.install]
@@ -49,6 +50,38 @@ run = "pnpm exec astro dev"
 [tasks.build]
 depends = ["prepare"]
 run = "pnpm exec astro build"
+
+[tasks.package-cloudflare]
+description = "Package the built site under its base path for Cloudflare Pages"
+dir = ".."
+run = '''
+test -d docs/dist
+rm -rf build/cloudflare-pages
+mkdir -p build/cloudflare-pages/maplibre-native-ffi
+cp -a docs/dist/. build/cloudflare-pages/maplibre-native-ffi/
+cp docs/cloudflare-pages/_redirects build/cloudflare-pages/_redirects
+'''
+
+[tasks.deploy-cloudflare]
+description = "Deploy the packaged docs preview to a Cloudflare Pages branch"
+tools = { "npm:wrangler" = "{{vars.wrangler_version}}" }
+usage = 'arg "<branch>"'
+dir = ".."
+run = '''
+output="$(mktemp)"
+trap 'rm -f "$output"' EXIT
+WRANGLER_OUTPUT_FILE_PATH="$output" wrangler pages deploy build/cloudflare-pages \
+  --project-name=maplibre-native-ffi --branch="$usage_branch"
+url="$(jq -ers '[.[] | select(.type == "pages-deploy-detailed")][-1] | .alias // .url' "$output")"
+url="${url%/}/maplibre-native-ffi/"
+echo "Cloudflare Pages: $url"
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "url=$url" >> "$GITHUB_OUTPUT"
+fi
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  echo "Cloudflare Pages: $url" >> "$GITHUB_STEP_SUMMARY"
+fi
+'''
 
 [tasks.preview]
 depends = ["prepare"]
