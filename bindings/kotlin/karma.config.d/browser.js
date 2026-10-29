@@ -15,23 +15,17 @@ config.customHeaders = [
   { match: ".*", name: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { match: ".*", name: "Cross-Origin-Embedder-Policy", value: "require-corp" },
 ];
-// Karma serves files outside its base path under /absolute. The tests load
-// the module from the fixed path in Platform.wasmJs.kt, and the module finds
-// its .wasm and its pthread workers beside itself.
-config.files.push({
-  pattern: `${moduleDir}/maplibre-native-kotlin*`,
-  included: false,
-  served: true,
-  watched: false,
-  nocache: true,
-});
-config.proxies = Object.assign({}, config.proxies, {
-  "/maplibre-native-kotlin/": `/absolute${moduleDir}/`,
-});
-config.mime = Object.assign({}, config.mime, {
-  "application/wasm": ["wasm"],
-  "text/javascript": ["mjs"],
-});
+// The suite bundles its fixture-bearing engine through the same import as a published runtime.
+config.webpack = {
+  ...config.webpack,
+  resolve: {
+    ...config.webpack?.resolve,
+    alias: {
+      ...config.webpack?.resolve?.alias,
+      "@maplibre/native-ffi-runtime$": `${moduleDir}/maplibre-native-kotlin-test.mjs`,
+    },
+  },
+};
 
 // Each test bounds itself with TEST_TIMEOUT, 60 s, and each of its waits fails
 // naming what it waited for, so Mocha's own limit, 2 s by default, sits above

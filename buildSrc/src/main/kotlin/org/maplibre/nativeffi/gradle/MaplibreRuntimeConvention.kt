@@ -6,6 +6,7 @@ enum class MaplibreRuntimeBackend(val id: String, val displayName: String) {
   OPENGL("opengl", "OpenGL"),
   VULKAN("vulkan", "Vulkan"),
   METAL("metal", "Metal"),
+  WEBGPU("webgpu", "WebGPU"),
 }
 
 class MaplibreRuntimeConvention(val backend: MaplibreRuntimeBackend)

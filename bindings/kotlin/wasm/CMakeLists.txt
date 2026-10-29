@@ -4,7 +4,7 @@
 # Emscripten toolchain as the native build. The module links the archives and
 # link flags from that build's install prefix with the generated wrappers and
 # the binding's wake shim, into an ES module factory and its .wasm. Kotlin
-# loads the factory by URL with Maplibre.loadModule.
+# bundles the factory through the selected runtime KLIB.
 cmake_minimum_required(VERSION 3.28)
 project(maplibre_native_kotlin_wasm LANGUAGES C)
 
@@ -38,7 +38,7 @@ set(MLN_FFI_LINK_FLAGS_FILE
     "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/emscripten-link-flags.txt")
 file(STRINGS "${MLN_FFI_LINK_FLAGS_FILE}" MLN_FFI_LINK_FLAGS)
 list(FILTER MLN_FFI_LINK_FLAGS EXCLUDE REGEX "^[ \t]*$")
-# Maplibre.loadModule passes the pool size that its caller asks for as
+# loadWasmModule passes the pool size that its caller asks for as
 # Module.mlnPoolSize, which the module reads as it starts. The installed size
 # stays the default for a caller that passes none.
 set(MLN_KW_POOL_DEFAULT "")
@@ -129,7 +129,8 @@ function(mln_kw_module target output)
   install(
     FILES "$<TARGET_FILE:${target}>"
     "$<TARGET_FILE_DIR:${target}>/${output}.wasm"
-    DESTINATION .)
+    DESTINATION .
+    COMPONENT ${target})
 endfunction()
 
 mln_kw_module(maplibre_native_kotlin maplibre-native-kotlin)

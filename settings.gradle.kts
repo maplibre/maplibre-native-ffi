@@ -15,3 +15,5 @@ include(":bindings:kotlin:runtimes:metal")
 include(":bindings:kotlin:runtimes:opengl")
 
 include(":bindings:kotlin:runtimes:vulkan")
+
+include(":bindings:kotlin:runtimes:webgpu")

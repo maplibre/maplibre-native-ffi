@@ -179,6 +179,7 @@ Take one runtime module:
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
+- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-webgpu` (Kotlin/Wasm only)
 
 On the JVM, the runtime's native library comes in a separate JAR for each
 platform. Add the JAR of each platform the application runs on, by its
@@ -198,6 +199,13 @@ need no classifier.
 
 On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.
+
+For Kotlin/Wasm, add the binding and either the OpenGL runtime (WebGL) or the
+WebGPU runtime to `wasmJsMain`. Before using the binding, await
+`loadWasmModule()`. The browser bundle includes the selected runtime. The page
+must be cross-origin isolated; the
+[API reference](https://maplibre.org/maplibre-native-ffi/reference/kotlin/)
+describes the hosting requirements.
 
 For the snapshot channel, add the Maven snapshot repository and take the
 snapshot version of both modules. The runtime modules and Android initialization

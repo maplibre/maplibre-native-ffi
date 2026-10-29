@@ -60,11 +60,29 @@ prepare_native_inputs() {
     windows-arm64-wgl
     windows-x64-vulkan
     windows-arm64-vulkan
+    emscripten-wasm32-webgl
+    emscripten-wasm32-webgpu
   )
 
   rm -rf "$build_root"
   for preset in "${presets[@]}"; do
     extract_preset "$preset"
+  done
+}
+
+prepare_browser_runtimes() {
+  local backend preset directory
+  for backend in webgl webgpu; do
+    preset="emscripten-wasm32-${backend}"
+    directory="${build_root}/${preset}/install/share/maplibre-native-kotlin"
+    rm -rf "$directory"
+    cmake -S bindings/kotlin/wasm --preset "$preset" \
+      -B "${build_root}/${preset}/module" \
+      -DMLN_FFI_NATIVE_PREFIX="${build_root}/${preset}/install" \
+      -DCMAKE_INSTALL_PREFIX="$directory"
+    cmake --build "${build_root}/${preset}/module" \
+      --target maplibre_native_kotlin --config Release --parallel
+    cmake --install "${build_root}/${preset}/module" --component maplibre_native_kotlin --config Release
   done
 }
 
@@ -95,8 +113,9 @@ publish() {
     ":bindings:kotlin:runtimes:vulkan:publishAndroidPublicationTo${repository}"
 
   publication_tasks=()
-  add_publications :bindings:kotlin KotlinMultiplatform Jvm "${apple[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64
+  add_publications :bindings:kotlin KotlinMultiplatform Jvm WasmJs "${apple[@]}"
+  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64 WasmJs
+  add_publications :bindings:kotlin:runtimes:webgpu KotlinMultiplatform WasmJs
   add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm MacosArm64
   add_publications :bindings:kotlin:runtimes:metal KotlinMultiplatform Jvm "${apple[@]}"
   ./gradlew "$@" "${publication_tasks[@]}"
@@ -117,6 +136,7 @@ case "$operation" in
     staging_root="${staging_base}/maven-staging"
     rm -rf "$staging_root"
     prepare_native_inputs
+    prepare_browser_runtimes
     release_version_args=()
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")

@@ -341,12 +341,9 @@ canonicalizeKmpRootMetadata(
       "linuxArm64" to "$mavenArtifact-linuxarm64",
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
+      "wasmJs" to "$mavenArtifact-wasm-js",
     ),
-  // The wasm KLIB needs a browser module that ships per backend, which no package carries yet.
-  unpublishedTargets = setOf("wasmJs"),
 )
-
-tasks.configureEach { if (name.startsWith("publishWasmJsPublication")) enabled = false }
 
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory

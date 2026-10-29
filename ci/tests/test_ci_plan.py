@@ -327,6 +327,18 @@ class PresetTest(unittest.TestCase):
             },
         )
 
+    def test_maven_runs_both_browser_runtime_inputs(self):
+        result = plan.plan(self.presets, False, ["maven"])
+        browser_presets = {
+            row["preset"]
+            for row in result["matrix"]
+            if row["preset"].startswith("emscripten-")
+        }
+        self.assertEqual(
+            browser_presets,
+            {"emscripten-wasm32-webgl", "emscripten-wasm32-webgpu"},
+        )
+
     def test_an_unknown_unit_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown coverage units: nope"):
             plan.plan(self.presets, False, ["nope"])

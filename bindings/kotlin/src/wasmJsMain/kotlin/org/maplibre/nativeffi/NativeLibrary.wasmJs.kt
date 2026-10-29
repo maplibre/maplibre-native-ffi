@@ -9,8 +9,9 @@ public actual fun loadNativeLibrary() {
 }
 
 /**
- * Loads the browser module from [url], the `maplibre-native-kotlin.mjs` that the binding's module
- * build installs beside its `.wasm`, and checks its C ABI version. Every other call throws an
+ * Loads the browser module bundled by the selected `maplibre-native-ffi-runtime-opengl` or
+ * `maplibre-native-ffi-runtime-webgpu` dependency. The runtime and binding must have the same
+ * version. This checks the module's C ABI version. Every other call throws an
  * `IllegalStateException` until this returns. A later call returns once the first load finishes,
  * and ignores its own arguments. Cancelling a caller ends only that caller's wait, and the load
  * goes on for the others.
@@ -19,11 +20,13 @@ public actual fun loadNativeLibrary() {
  * for one runtime with one map and one render session. A thread that finds the pool empty starts
  * once the page yields, so a larger pool only saves that wait.
  *
- * The page must be cross-origin isolated, because the module's threads share its memory.
+ * The page must be cross-origin isolated, because the module's threads share its memory: serve
+ * `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`
+ * headers.
  */
-public suspend fun loadWasmModule(url: String, pthreadPoolSize: Int? = null) {
+public suspend fun loadWasmModule(pthreadPoolSize: Int? = null) {
   require(pthreadPoolSize == null || pthreadPoolSize > 0) {
     "pthreadPoolSize must be positive, got $pthreadPoolSize"
   }
-  ModuleLoader.load(url, pthreadPoolSize)
+  ModuleLoader.load(pthreadPoolSize)
 }

@@ -443,6 +443,7 @@ ci:
               - .mise/tasks/kotlin/publish
               - .mise/tasks/kotlin/verify-staging
               - tests/distribution/kotlin/**
+              - tests/distribution/kotlin-wasm/**
           then: apply
     nuget:
       covers: >-

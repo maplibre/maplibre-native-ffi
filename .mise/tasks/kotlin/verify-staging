@@ -26,6 +26,7 @@ ROOT_TARGET_MODULES = {
         "linuxArm64": "maplibre-native-ffi-linuxarm64",
         "linuxX64": "maplibre-native-ffi-linuxx64",
         "macosArm64": "maplibre-native-ffi-macosarm64",
+        "wasmJs": "maplibre-native-ffi-wasm-js",
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
@@ -36,6 +37,7 @@ ROOT_TARGET_MODULES = {
         "linuxArm64": "maplibre-native-ffi-runtime-opengl-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-opengl-linuxx64",
         "macosArm64": "maplibre-native-ffi-runtime-opengl-macosarm64",
+        "wasmJs": "maplibre-native-ffi-runtime-opengl-wasm-js",
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
@@ -54,6 +56,9 @@ ROOT_TARGET_MODULES = {
         "tvosSimulatorArm64": "maplibre-native-ffi-runtime-metal-tvossimulatorarm64",
         "jvm": "maplibre-native-ffi-runtime-metal-jvm",
         "macosArm64": "maplibre-native-ffi-runtime-metal-macosarm64",
+    },
+    "maplibre-native-ffi-runtime-webgpu": {
+        "wasmJs": "maplibre-native-ffi-runtime-webgpu-wasm-js",
     },
 }
 
@@ -115,6 +120,8 @@ POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
 
 
 def jvm_classifiers(backend: str) -> set[str]:
+    if backend == "webgpu":
+        return set()
     return {"natives-macos-arm64"} if backend == "metal" else JVM_CLASSIFIERS
 
 
@@ -509,6 +516,59 @@ def verify_native(root: pathlib.Path) -> None:
                     raise SystemExit(f"{interop} is missing {expected}")
 
 
+def verify_wasm(root: pathlib.Path) -> None:
+    one(module_files(root, "maplibre-native-ffi-wasm-js", ".klib"), "binding KLIB")
+    for backend in ("opengl", "webgpu"):
+        module = f"maplibre-native-ffi-runtime-{backend}-wasm-js"
+        runtime = one(module_files(root, module, ".klib"), f"{backend} runtime KLIB")
+        with zipfile.ZipFile(runtime) as archive:
+            names = set(archive.namelist())
+            for name in (
+                "package.json",
+                "maplibre-native-kotlin.mjs",
+                "maplibre-native-kotlin.wasm",
+                "META-INF/LICENSE",
+                *(
+                    f"META-INF/licenses/maplibre-native-c/{name}"
+                    for name in COMMON_NATIVE_LICENSES | {"rust.md", "fastpfor.txt"}
+                ),
+            ):
+                if name not in names:
+                    raise SystemExit(f"{runtime} is missing {name}")
+            package = json.loads(archive.read("package.json"))
+            if (
+                package["name"] != "@maplibre/native-ffi-runtime"
+                or package["main"] != "maplibre-native-kotlin.mjs"
+            ):
+                raise SystemExit(f"{runtime} has invalid browser package metadata")
+            if not archive.read("maplibre-native-kotlin.wasm").startswith(b"\0asm"):
+                raise SystemExit(f"{runtime} does not contain a WebAssembly module")
+            if any("-test" in name for name in names):
+                raise SystemExit(f"{runtime} contains test fixtures")
+
+
+def verify_wasm_consumer(root: pathlib.Path) -> None:
+    pom = one(module_files(root, "maplibre-native-ffi", ".pom"), "binding POM")
+    version = required_pom_text(pom, element_tree.parse(pom).getroot(), "m:version")
+    chromium = subprocess.check_output(
+        ["node", ROOT / "scripts/find-chromium.mjs"], text=True
+    ).strip()
+    for backend in ("webgl", "webgpu"):
+        subprocess.run(
+            [
+                ROOT / "gradlew",
+                "--project-dir",
+                ROOT / "tests/distribution/kotlin-wasm",
+                "wasmJsBrowserTest",
+                f"-Pmaplibre.repository={root.resolve().as_uri()}",
+                f"-Pmaplibre.version={version}",
+                f"-Pmaplibre.backend={backend}",
+                f"-Pmaplibre.chromium={chromium}",
+            ],
+            check=True,
+        )
+
+
 def main() -> int:
     if len(sys.argv) not in (2, 3):
         print(
@@ -527,6 +587,8 @@ def main() -> int:
     verify_jvm(root)
     verify_jvm_consumer(root)
     verify_native(root)
+    verify_wasm(root)
+    verify_wasm_consumer(root)
     return 0
 
 

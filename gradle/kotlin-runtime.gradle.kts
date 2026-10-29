@@ -61,6 +61,8 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
         put("macosArm64", NativeTargetConfiguration("macos-${backend.id}.def"))
       }
 
+    MaplibreRuntimeBackend.WEBGPU -> emptyMap()
+
     MaplibreRuntimeBackend.METAL ->
       mapOf(
         "iosArm64" to NativeTargetConfiguration("ios-metal.def"),
@@ -285,10 +287,45 @@ extensions.configure<KotlinMultiplatformExtension> {
   }
 }
 
-configureJvmRuntimeArtifacts(runtimeBackend, jvmClassifiers)
+if ("jvm" in extensions.getByType<KotlinMultiplatformExtension>().targets.names) {
+  configureJvmRuntimeArtifacts(runtimeBackend, jvmClassifiers)
+}
 
-if (backend != MaplibreRuntimeBackend.METAL) {
+if (backend == MaplibreRuntimeBackend.OPENGL || backend == MaplibreRuntimeBackend.VULKAN) {
   configureAndroidRuntimePublication(backend)
+}
+
+if ("wasmJs" in extensions.getByType<KotlinMultiplatformExtension>().targets.names) {
+  val install = nativeInstall("emscripten-wasm32", runtimeBackend)
+  val verifyLocalBuild = registerLocalBuildVerification("verifyWasmLocalBuild", install)
+  val moduleDirectory = install.prefix?.resolve("share/maplibre-native-kotlin")
+  extensions.configure<KotlinMultiplatformExtension> {
+    sourceSets.getByName("wasmJsMain") {
+      resources.srcDir(runtimeInteropDirectory.dir("src/wasmJsMain/resources"))
+      moduleDirectory?.let(resources::srcDir)
+    }
+  }
+  val packageProperties = mapOf("version" to mavenVersion, "backend" to runtimeBackend)
+  tasks.named<Copy>("wasmJsProcessResources") {
+    dependsOn(verifyLocalBuild)
+    filesMatching("package.json") {
+      // Different backend versions keep KGP's generated npm packages distinct.
+      expand(packageProperties)
+    }
+    from(rootProject.file("LICENSE")) { into("META-INF") }
+    install.prefix?.let {
+      from(it.resolve("share/maplibre-native-c/licenses")) {
+        into("META-INF/licenses/maplibre-native-c")
+      }
+    }
+    doFirst {
+      for (name in listOf("maplibre-native-kotlin.mjs", "maplibre-native-kotlin.wasm")) {
+        check(moduleDirectory?.resolve(name)?.isFile == true) {
+          "Missing browser runtime $name; link bindings/kotlin/wasm into $moduleDirectory"
+        }
+      }
+    }
+  }
 }
 
 extensions.configure<MavenPublishBaseExtension> {
@@ -321,7 +358,12 @@ canonicalizeKmpRootMetadata(
           put("linuxArm64", "$mavenArtifact-linuxarm64")
           put("linuxX64", "$mavenArtifact-linuxx64")
           put("macosArm64", "$mavenArtifact-macosarm64")
+          if (backend == MaplibreRuntimeBackend.OPENGL) {
+            put("wasmJs", "$mavenArtifact-wasm-js")
+          }
         }
+
+      MaplibreRuntimeBackend.WEBGPU -> mapOf("wasmJs" to "$mavenArtifact-wasm-js")
 
       MaplibreRuntimeBackend.METAL ->
         mapOf(

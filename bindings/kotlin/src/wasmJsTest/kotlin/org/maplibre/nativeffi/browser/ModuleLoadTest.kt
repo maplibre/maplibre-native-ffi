@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EXPECTED_C_ABI_VERSION
-import org.maplibre.nativeffi.TEST_MODULE_URL
 import org.maplibre.nativeffi.TEST_POOL_SIZE
 import org.maplibre.nativeffi.cVersion
 import org.maplibre.nativeffi.internal.loader.ModuleLoader
@@ -29,9 +28,9 @@ class ModuleLoadTest {
   }
 
   @Test
-  fun theModuleLoadsFromItsUrlAndReportsTheExpectedAbi() = runSuspendTest {
+  fun theBundledModuleLoadsAndReportsTheExpectedAbi() = runSuspendTest {
     // A later load returns the module that the first one loaded.
-    loadWasmModule(TEST_MODULE_URL)
+    loadWasmModule()
     loadNativeLibrary()
     assertEquals(EXPECTED_C_ABI_VERSION.toUInt(), cVersion())
     assertEquals(TEST_POOL_SIZE, workersAtLoad, "the module ignored the pool size it was given")

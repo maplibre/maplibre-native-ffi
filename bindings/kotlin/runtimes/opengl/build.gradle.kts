@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
@@ -17,6 +18,8 @@ val packagedAndroidRuntimeLibs =
   project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/runtime")
 
 kotlin {
+  @OptIn(ExperimentalWasmDsl::class) wasmJs { browser() }
+
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
   androidNativeArm32()

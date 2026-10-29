@@ -11,13 +11,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
-/**
- * Where Karma serves the test module, the browser module with the fixtures of test_support.c; see
- * karma.config.d/browser.js.
- */
-internal const val TEST_MODULE_URL: String =
-  "/maplibre-native-kotlin/maplibre-native-kotlin-test.mjs"
-
 /** The pool size the suite loads the module with, unlike the module's default of 20. */
 internal const val TEST_POOL_SIZE: Int = 24
 
@@ -31,7 +24,7 @@ internal var workersAtLoad: Int = 0
 internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): TestResult =
   runTest(timeout = TEST_TIMEOUT) {
     withContext(Dispatchers.Default) {
-      loadWasmModule(TEST_MODULE_URL, TEST_POOL_SIZE)
+      loadWasmModule(TEST_POOL_SIZE)
       if (workersAtLoad == 0) workersAtLoad = TestSupport.allWorkers()
       block()
     }

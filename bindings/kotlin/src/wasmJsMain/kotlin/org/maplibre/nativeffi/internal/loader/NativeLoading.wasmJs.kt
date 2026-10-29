@@ -53,11 +53,11 @@ internal object ModuleLoader {
   var loaded: Boolean = false
     private set
 
-  suspend fun load(url: String, poolSize: Int?) = shared.await { loadOnce(url, poolSize) }
+  suspend fun load(poolSize: Int?) = shared.await { loadOnce(poolSize) }
 
-  private suspend fun loadOnce(url: String, poolSize: Int?) {
+  private suspend fun loadOnce(poolSize: Int?) {
     try {
-      val module = instantiate(url, poolSize ?: 0).await<JsAny>()
+      val module = instantiate(options(poolSize ?: 0)).await<JsAny>()
       install(
         module,
         dispatch = { HostDelivery.wake() },
@@ -102,10 +102,12 @@ internal actual fun ensureNativeLibrary() {
 /** A loaded module has passed its C ABI version check already. */
 internal actual fun loadNativeLibraryUnchecked() = ensureNativeLibrary()
 
-// The module is an Emscripten ES module factory that the bundler must leave to the browser. Its
-// link reads the pool size as Module.mlnPoolSize, and a size of 0 selects the link's default.
-private fun instantiate(url: String, poolSize: Int): Promise<JsAny> =
-  js("import(/* webpackIgnore: true */ url).then((m) => m.default({ mlnPoolSize: poolSize }))")
+// KGP extracts this package from the selected runtime KLIB; the static import lets the bundler
+// follow the module's .wasm and pthread Worker references. A size of 0 selects the link's default.
+@JsModule("@maplibre/native-ffi-runtime")
+private external fun instantiate(options: JsAny): Promise<JsAny>
+
+private fun options(poolSize: Int): JsAny = js("({ mlnPoolSize: poolSize })")
 
 // Scalars go through one DataView over the module's fixed heap, which never grows.
 private fun install(

@@ -1,0 +1,6 @@
+{
+  "name": "@maplibre/native-ffi-runtime",
+  "version": "${version}-${backend}",
+  "type": "module",
+  "main": "maplibre-native-kotlin.mjs"
+}
