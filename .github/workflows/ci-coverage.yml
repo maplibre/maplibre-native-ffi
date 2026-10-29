@@ -138,12 +138,14 @@ jobs:
             documentation is at <a
             href="https://maplibre.org/maplibre-native-ffi/">maplibre.org</a>.' }}
       - run: mise run //docs:package-cloudflare
+      # Swift DocC filenames contain colons, which artifact uploads reject.
+      - run: tar -cf build/cloudflare-pages.tar -C build/cloudflare-pages .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 7
           if-no-files-found: error
           name: docs-cloudflare-${{ github.sha }}
-          path: build/cloudflare-pages
+          path: build/cloudflare-pages.tar
   docs-preview:
     name: docs preview
     needs: docs
@@ -171,7 +173,10 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: docs-cloudflare-${{ github.sha }}
-          path: build/cloudflare-pages
+          path: build
+      - run: |
+          mkdir -p build/cloudflare-pages
+          tar -xf build/cloudflare-pages.tar -C build/cloudflare-pages
       - name: Deploy the Cloudflare Pages preview
         id: deploy
         env:
