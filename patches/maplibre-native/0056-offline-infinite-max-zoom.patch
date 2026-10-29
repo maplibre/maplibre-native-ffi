@@ -1,0 +1,63 @@
+Lets an offline region with an infinite maxZoom cover each source's zooms up to
+that source's maxzoom, as OfflineRegionDefinition documents. Converting the
+infinity to an integer is undefined, and x86-64 produces INT32_MIN, so such a
+region needed no tiles there.
+Upstream: not proposed
+
+diff --git a/platform/default/src/mln/storage/offline_download.cpp b/platform/default/src/mln/storage/offline_download.cpp
+--- a/platform/default/src/mln/storage/offline_download.cpp
++++ b/platform/default/src/mln/storage/offline_download.cpp
+@@ -19,6 +19,7 @@
+ #include <mln/util/tile_cover.hpp>
+ #include <mln/util/tileset.hpp>
+ 
++#include <cmath>
+ #include <set>
+ 
+ namespace {
+@@ -40,7 +41,11 @@ Range<uint8_t> coveringZoomRange(const RegionDefinition& definition,
+                                  uint16_t tileSize,
+                                  const Range<uint8_t>& zoomRange) {
+     double minZ = std::max<double>(util::coveringZoomLevel(definition.minZoom, type, tileSize), zoomRange.min);
+-    double maxZ = std::min<double>(util::coveringZoomLevel(definition.maxZoom, type, tileSize), zoomRange.max);
++    // An infinite maxZoom takes the source's maximum. coveringZoomLevel would convert it to an integer, which is
++    // undefined and yields INT32_MIN on x86-64.
++    double maxZ = std::isinf(definition.maxZoom)
++                      ? zoomRange.max
++                      : std::min<double>(util::coveringZoomLevel(definition.maxZoom, type, tileSize), zoomRange.max);
+ 
+     assert(minZ >= 0);
+     assert(maxZ >= 0);
+diff --git a/test/storage/offline_download.test.cpp b/test/storage/offline_download.test.cpp
+--- a/test/storage/offline_download.test.cpp
++++ b/test/storage/offline_download.test.cpp
+@@ -470,6 +470,29 @@ TEST(OfflineDownload, GetStatusStyleAndSourceComplete) {
+     EXPECT_FALSE(status.complete());
+ }
+ 
++TEST(OfflineDownload, GetStatusInfiniteMaxZoom) {
++    OfflineTest test;
++    auto region = test.createRegion();
++    ASSERT_TRUE(region);
++    OfflineDownload download(region->getID(),
++                             OfflineTilePyramidRegionDefinition("http://127.0.0.1:3000/style.json",
++                                                                LatLngBounds::hull({0.5, 0.5}, {0.5001, 0.5001}),
++                                                                14.0,
++                                                                INFINITY,
++                                                                1.0,
++                                                                true),
++                             test.db,
++                             test.fileSource);
++
++    test.db.putRegionResource(1, Resource::style("http://127.0.0.1:3000/style.json"), test.response("style.json"));
++    test.db.putRegionResource(1, Resource::source("http://127.0.0.1:3000/streets.json"), test.response("streets.json"));
++
++    OfflineRegionStatus status = download.getStatus();
++
++    // One tile at z14 and one at the source's maxzoom, z15.
++    EXPECT_EQ(2u, status.requiredTileCount);
++}
++
+ TEST(OfflineDownload, RequestError) {
+     OfflineTest test;
+     auto region = test.createRegion();
