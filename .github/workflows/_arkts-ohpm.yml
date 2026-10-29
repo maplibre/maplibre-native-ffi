@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   pack:
-    name: ArkTS OHPM packing
+    name: pack
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:

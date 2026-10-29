@@ -24,7 +24,7 @@ env:
 
 jobs:
   stage:
-    name: Kotlin Maven staging
+    name: stage
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 240
     permissions:

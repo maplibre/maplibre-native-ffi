@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   pack:
-    name: Python wheel packing
+    name: pack
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:

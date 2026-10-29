@@ -232,7 +232,7 @@ jobs:
   # Each packaging job waits for the whole target matrix, so any failed target
   # skips it. The run fails on that target either way.
   android-multi:
-    name: Android multi-ABI packaging
+    name: package / android-multi-abi
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -259,7 +259,7 @@ jobs:
       - run: mise run //:kotlin:verify-android-multi-abi build/packages/native/android-multi-input
   # The artifact is what the native package publish uploads.
   apple-xcframework:
-    name: Apple XCFramework
+    name: package / xcframework
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -295,7 +295,7 @@ jobs:
   # The package that a release writes into the distribution repository, with
   # this run's XCFramework in place of the release's.
   swift-package:
-    name: Swift package
+    name: package / swiftpm
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 30
     needs:
@@ -319,7 +319,7 @@ jobs:
           path: build/packages/native/swift-input
       - run: mise run --no-deps //bindings/swift:test:package build/packages/native/swift-input
   vcpkg-registry:
-    name: vcpkg registry
+    name: package / vcpkg
     env:
       MISE_NO_HOOKS: "1"
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -353,7 +353,7 @@ jobs:
           build/packages/native/vcpkg-input "$RUNNER_TEMP/vcpkg"
           --triplet x64-linux --backend opengl
   conan-recipes:
-    name: Conan recipes
+    name: package / conan
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     needs:
@@ -378,7 +378,7 @@ jobs:
           python tools/release/check_conan.py
           build/packages/native/conan-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
   xmake-package:
-    name: xmake package
+    name: package / xmake
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     needs:
@@ -413,7 +413,7 @@ jobs:
   # Every run stages at the snapshot version, because snapshot publication
   # reuses the verified repository of a run on main.
   kotlin-maven:
-    name: Kotlin Maven
+    name: package / maven
     permissions:
       actions: read
       contents: read
@@ -427,7 +427,7 @@ jobs:
       sha: ${{ github.sha }}
       version: 0.1.0-SNAPSHOT
   dotnet-nuget:
-    name: .NET NuGet
+    name: package / nuget
     permissions:
       actions: read
       contents: read
@@ -441,7 +441,7 @@ jobs:
       sha: ${{ github.sha }}
       version: 0.202601.0-dev.0
   python-wheels:
-    name: Python wheels
+    name: package / pypi
     permissions:
       actions: read
       contents: read
@@ -455,7 +455,7 @@ jobs:
       sha: ${{ github.sha }}
       version: 0.202601.0.dev0
   typescript-npm:
-    name: TypeScript npm
+    name: package / npm
     permissions:
       actions: read
       contents: read
@@ -469,7 +469,7 @@ jobs:
       sha: ${{ github.sha }}
       version: 0.202601.0-dev.0
   arkts-ohpm:
-    name: ArkTS OHPM
+    name: package / ohpm
     permissions:
       actions: read
       contents: read

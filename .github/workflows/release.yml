@@ -44,7 +44,7 @@ jobs:
   # the GitHub release, so every package of a version refers to native archives
   # that exist.
   kotlin-maven:
-    name: Kotlin Maven
+    name: package / maven
     needs:
       - source
     permissions:
@@ -184,7 +184,7 @@ jobs:
       version: ${{ needs.source.outputs.version }}
 
   typescript-npm:
-    name: TypeScript npm
+    name: package / npm
     needs:
       - source
     permissions:
@@ -263,7 +263,7 @@ jobs:
           done
 
   arkts-ohpm:
-    name: ArkTS OHPM
+    name: package / ohpm
     needs:
       - source
     permissions:
@@ -433,7 +433,7 @@ jobs:
           echo "### Distribution repository $PUBLISH_TAG" >> "$GITHUB_STEP_SUMMARY"
 
   dotnet-nuget:
-    name: .NET NuGet
+    name: package / nuget
     needs:
       - source
     permissions:
@@ -501,7 +501,7 @@ jobs:
           echo "### .NET $PUBLISH_VERSION" >> "$GITHUB_STEP_SUMMARY"
 
   python-wheels:
-    name: Python wheels
+    name: package / pypi
     needs:
       - source
     permissions:
