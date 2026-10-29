@@ -367,7 +367,7 @@ ci:
             files:
               - src/platform/android/**
               - cmake/platform/android.cmake
-              - mise.android.*
+              - .config/mise.android.*
               - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
               - .mise/tasks/kotlin/verify-android-multi-abi
@@ -386,7 +386,7 @@ ci:
         - if:
             files:
               - cmake/platform/ohos.cmake
-              - mise.ohos.*
+              - .config/mise.ohos.*
               - src/platform/ohos/**
               - tests/native/abi/platform/transport.c
               - bindings/typescript/scripts/build-hap.sh
@@ -412,7 +412,7 @@ ci:
               - cmake/platform/emscripten.cmake
               - cmake/toolchains/emscripten.cmake
               - cmake/mln_ffi_emscripten.cmake
-              - mise.emscripten.*
+              - .config/mise.emscripten.*
               - bindings/kotlin/src/wasmJs*/**
               - bindings/kotlin/wasm/**
               - bindings/kotlin/karma.config.d/**
