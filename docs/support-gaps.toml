@@ -154,12 +154,6 @@ status = "not-investigated"
 reason = "An embedded Python host needs a cross-built extension, app packaging, and simulator binding tests."
 
 [[entry]]
-bindings = ["typescript"]
-platforms = ["android", "ios"]
-status = "not-investigated"
-reason = "An app host needs a Node-API runtime, native addon packaging, and binding tests on the emulator or simulator."
-
-[[entry]]
 bindings = ["kotlin-native"]
 platforms = ["windows-mingw"]
 status = "not-investigated"
