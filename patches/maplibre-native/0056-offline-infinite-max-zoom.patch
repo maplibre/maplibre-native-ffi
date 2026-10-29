@@ -15,13 +15,12 @@ diff --git a/platform/default/src/mln/storage/offline_download.cpp b/platform/de
  #include <set>
  
  namespace {
-@@ -40,7 +41,11 @@ Range<uint8_t> coveringZoomRange(const RegionDefinition& definition,
+@@ -40,7 +41,10 @@ Range<uint8_t> coveringZoomRange(const RegionDefinition& definition,
                                   uint16_t tileSize,
                                   const Range<uint8_t>& zoomRange) {
      double minZ = std::max<double>(util::coveringZoomLevel(definition.minZoom, type, tileSize), zoomRange.min);
 -    double maxZ = std::min<double>(util::coveringZoomLevel(definition.maxZoom, type, tileSize), zoomRange.max);
-+    // An infinite maxZoom takes the source's maximum. coveringZoomLevel would convert it to an integer, which is
-+    // undefined and yields INT32_MIN on x86-64.
++    // Converting an infinite maxZoom to an integer is undefined.
 +    double maxZ = std::isinf(definition.maxZoom)
 +                      ? zoomRange.max
 +                      : std::min<double>(util::coveringZoomLevel(definition.maxZoom, type, tileSize), zoomRange.max);
