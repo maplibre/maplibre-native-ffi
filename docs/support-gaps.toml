@@ -1,15 +1,6 @@
 issue = 936
 
-# Targets that CI does not build yet.
-
-[[entry]]
-bindings = ["c"]
-platforms = ["freebsd"]
-archs = ["arm64"]
-backends = ["vulkan", "opengl"]
-status = "not-investigated"
-
-# Cells blocked by upstream toolchains, runtime behavior, or registry policy.
+# Upstream bugs, pending support proposals or releases, and registry restrictions.
 
 [[entry]]
 bindings = ["c"]
@@ -19,13 +10,6 @@ backends = ["webgpu"]
 status = "blocked"
 reason = "WASI has no graphics API yet. `wasi:webgpu`, which brings WebGPU to WASI, is a Phase 2 proposal."
 link = "https://github.com/WebAssembly/wasi-gfx"
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["freebsd"]
-status = "blocked"
-reason = "Microsoft ships no .NET for FreeBSD, and the ports tree carries .NET 9, older than the binding's `net10.0`."
-link = "https://github.com/dotnet/runtime/blob/main/docs/workflow/requirements/freebsd-requirements.md"
 
 [[entry]]
 bindings = ["dotnet"]
@@ -78,70 +62,27 @@ reason = "Swift.org provides only a mutable development preview for FreeBSD 14 o
 link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
 
 [[entry]]
-bindings = ["dart"]
-platforms = ["freebsd"]
-status = "blocked"
-reason = "The upstream Dart SDK does not target FreeBSD; running the binding requires a community port."
-link = "https://github.com/dart-lang/sdk/issues/52374"
-
-[[entry]]
-bindings = ["swift"]
-platforms = ["ohos"]
-status = "blocked"
-reason = "The upstream Swift toolchain does not target OpenHarmony. The community port uses Swift 6.0.3, older than the package's required Swift tools 6.2, runs only on arm64 devices, and does not promise SwiftPM."
-link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
-
-[[entry]]
-bindings = ["dart"]
-platforms = ["ohos"]
-status = "blocked"
-reason = "The upstream Dart and Flutter toolchains do not target OpenHarmony; support requires a community Flutter fork and its bundled Dart SDK."
-link = "https://gitcode.com/openharmony-sig/flutter_flutter"
-
-[[entry]]
-bindings = ["kotlin-native"]
-platforms = ["ohos"]
-status = "blocked"
-reason = "The upstream Kotlin/Native toolchain has no OpenHarmony target; community forks add one for arm64 devices only."
-link = "https://github.com/zxystd/Kotlin-OHOS"
-
-[[entry]]
-bindings = ["python"]
-platforms = ["ohos"]
-status = "blocked"
-reason = "Running Python on OpenHarmony requires a community CPython port, outside the project's supported toolchains."
-link = "https://gitcode.com/ai_model_sig/ohos_python"
-
-[[entry]]
 bindings = ["dotnet"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64"]
 status = "blocked"
-reason = "Microsoft publishes no .NET SDK for RISC-V; available SDKs are community builds, outside the project's supported toolchains."
-link = "https://github.com/filipnavara/dotnet-riscv/releases"
+reason = "The upstream .NET RISC-V port is in progress, but Microsoft publishes no released SDK for it."
+link = "https://github.com/dotnet/runtime/issues/84834"
 
 [[entry]]
 bindings = ["dotnet"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
 status = "blocked"
-reason = "Microsoft publishes no .NET SDK for LoongArch; available SDKs are community builds, outside the project's supported toolchains."
-link = "https://github.com/chenguohui/dotnet-loongarch/releases"
-
-[[entry]]
-bindings = ["dart"]
-platforms = ["linux-gnu"]
-archs = ["loongarch64"]
-status = "blocked"
-reason = "Dart's maintainers do not plan to support LoongArch; available SDKs come from a community fork, outside the project's supported toolchains."
-link = "https://github.com/Flutter-Dart-loong64/flutter-loong64-releases"
+reason = "The upstream .NET LoongArch port has landed and runtime work continues, but Microsoft publishes no released SDK for it."
+link = "https://github.com/dotnet/runtime/issues/59561"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["linux-musl"]
 status = "blocked"
-reason = "The upstream Dart SDK uses glibc, not musl. Alpine SDKs are community ports, outside the project's supported toolchains."
-link = "https://github.com/dart-lang/sdk/issues/51642#issuecomment-1458312850"
+reason = "Upstream has accepted musl build work and tracks the remaining build configuration, but publishes no released musl SDK. Alpine SDKs are community builds."
+link = "https://github.com/dart-lang/sdk/issues/51983"
 
 [[entry]]
 bindings = ["python"]
@@ -162,7 +103,7 @@ link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
 bindings = ["python"]
 platforms = ["ios-maccatalyst"]
 status = "blocked"
-reason = "Upstream CPython has no Mac Catalyst target. Embedding it requires a community port, outside the project's supported toolchains."
+reason = "Mac Catalyst support is proposed upstream, but CPython has no released target for it; current embedding uses a community port."
 link = "https://github.com/python/cpython/issues/98297"
 
 [[entry]]
@@ -172,7 +113,21 @@ status = "blocked"
 reason = "CPython's tvOS and visionOS support has landed in its 3.16 development branch, but no released runtime supports them, including the project's pinned Python 3.15.1."
 link = "https://github.com/python/cpython/pull/159944"
 
-# App hosts and linking designs that still need investigation.
+[[entry]]
+bindings = ["dart"]
+platforms = ["visionos"]
+status = "blocked"
+reason = "Upstream proposes visionOS support for native assets, but build hooks do not yet accept the visionOS SDK."
+link = "https://github.com/dart-lang/native/issues/961"
+
+# Large app-host, linking, or native-target investigations.
+
+[[entry]]
+bindings = ["c"]
+platforms = ["freebsd"]
+archs = ["arm64"]
+backends = ["vulkan", "opengl"]
+status = "not-investigated"
 
 [[entry]]
 bindings = ["dotnet"]
@@ -211,7 +166,7 @@ status = "not-investigated"
 reason = "Kotlin/Native's older MinGW sysroot and C++ runtime need a compatible embedded archive. The proposed llvm-mingw build and C++ symbol-renaming workaround have not been validated against that runtime."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
-# Cells with a known path that no one has started.
+# Medium integration work with an established toolchain and approach.
 
 [[entry]]
 bindings = ["c"]
@@ -354,11 +309,61 @@ status = "path-known"
 reason = "The pinned Node.js and Bun releases ship musl runtimes. Build and package musl addons, select them by libc in the loader, and run their suites in Alpine. Deno's musl runtime remains a separate gap."
 link = "https://nodejs.org/dist/v26.12.1/SHASUMS256.txt"
 
-# Cells that the binding's toolchain does not target.
+# No supported toolchain or ABI. Unrejected upstream support work is blocked instead.
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["freebsd"]
+status = "not-applicable"
+reason = "Microsoft ships no FreeBSD SDK for the binding's `net10.0`; upstream declined the request for official .NET 10 support."
+link = "https://github.com/dotnet/runtime/issues/122058"
 
 [[entry]]
 bindings = ["dart"]
-platforms = ["tvos", "visionos"]
+platforms = ["freebsd"]
+status = "not-applicable"
+reason = "Dart has no supported FreeBSD SDK; upstream declined first-party BSD support."
+link = "https://github.com/dart-lang/sdk/issues/52374"
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["ohos"]
+status = "not-applicable"
+reason = "Swift has no supported OpenHarmony target. The community toolchain uses Swift 6.0.3, older than the package's required Swift tools 6.2."
+link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["ohos"]
+status = "not-applicable"
+reason = "Dart has no supported OpenHarmony target; the available SDK belongs to a community Flutter fork."
+link = "https://gitcode.com/openharmony-sig/flutter_flutter"
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["ohos"]
+status = "not-applicable"
+reason = "Kotlin/Native has no OpenHarmony target. Upstream has no plans for it; available targets are community forks."
+link = "https://youtrack.jetbrains.com/issue/KT-63976"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["ohos"]
+status = "not-applicable"
+reason = "CPython has no supported OpenHarmony target; the available runtime is a community port."
+link = "https://gitcode.com/ai_model_sig/ohos_python"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["linux-gnu"]
+archs = ["loongarch64"]
+status = "not-applicable"
+reason = "Dart has no supported LoongArch SDK; upstream explicitly has no plans to support it."
+link = "https://github.com/dart-lang/sdk/issues/53480"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["tvos"]
 status = "not-applicable"
 reason = "Dart's build hooks, which deliver the binding's native library, target no such OS."
 link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
@@ -409,16 +414,16 @@ reason = "No JVM runs on these platforms."
 bindings = ["kotlin-native"]
 platforms = ["linux-musl", "freebsd", "ios-maccatalyst", "visionos"]
 status = "not-applicable"
-reason = "Kotlin/Native has no target for these platforms."
-link = "https://kotlinlang.org/docs/native-target-support.html"
+reason = "Kotlin/Native has no supported target for these platforms. Upstream currently declines new targets, including the visionOS contribution; Catalyst has only an unsupported experimental flag."
+link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 
 [[entry]]
 bindings = ["kotlin-native"]
 platforms = ["linux-gnu"]
 archs = ["riscv64", "loongarch64"]
 status = "not-applicable"
-reason = "Kotlin/Native has no target for these architectures."
-link = "https://kotlinlang.org/docs/native-target-support.html"
+reason = "Kotlin/Native has no target for these architectures, and upstream currently declines new targets."
+link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 
 [[entry]]
 bindings = ["swift"]
