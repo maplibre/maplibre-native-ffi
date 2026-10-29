@@ -9,7 +9,7 @@ archs = ["arm64"]
 backends = ["vulkan", "opengl"]
 status = "not-investigated"
 
-# Cells that wait on an upstream fix or release.
+# Cells blocked by upstream toolchains, runtime behavior, or registry policy.
 
 [[entry]]
 bindings = ["c"]
@@ -136,6 +136,81 @@ status = "blocked"
 reason = "Dart's maintainers do not plan to support LoongArch; available SDKs come from a community fork, outside the project's supported toolchains."
 link = "https://github.com/Flutter-Dart-loong64/flutter-loong64-releases"
 
+[[entry]]
+bindings = ["dart"]
+platforms = ["linux-musl"]
+status = "blocked"
+reason = "The upstream Dart SDK uses glibc, not musl. Alpine SDKs are community ports, outside the project's supported toolchains."
+link = "https://github.com/dart-lang/sdk/issues/51642#issuecomment-1458312850"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["freebsd"]
+status = "blocked"
+reason = "PyPI rejects FreeBSD wheel tags, so the package cannot publish its runtime wheel even after the extension builds and tests are wired up in the FreeBSD VM."
+link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["loongarch64"]
+status = "blocked"
+reason = "Debian and Alpine package Python for LoongArch, but PyPI rejects its wheel tags, so the package cannot publish its runtime wheel."
+link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["ios-maccatalyst"]
+status = "blocked"
+reason = "Upstream CPython has no Mac Catalyst target. Embedding it requires a community port, outside the project's supported toolchains."
+link = "https://github.com/python/cpython/issues/98297"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["tvos", "visionos"]
+status = "blocked"
+reason = "CPython's tvOS and visionOS support has landed in its 3.16 development branch, but no released runtime supports them, including the project's pinned Python 3.15.1."
+link = "https://github.com/python/cpython/pull/159944"
+
+# App hosts and linking designs that still need investigation.
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["android", "ios"]
+status = "not-investigated"
+reason = "A `net10.0-android` or `net10.0-ios` host needs native asset packaging and binding tests on the emulator or simulator. Android also needs its platform services initialized."
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["emscripten"]
+status = "not-investigated"
+reason = "A browser WebAssembly host needs native archives linked through `NativeFileReference` with matching Emscripten flags, and browser tests."
+
+[[entry]]
+bindings = ["go"]
+platforms = ["ios"]
+status = "not-investigated"
+reason = "A cgo or gomobile build needs an app or framework and a simulator test host."
+
+[[entry]]
+bindings = ["python"]
+platforms = ["ios"]
+status = "not-investigated"
+reason = "An embedded Python host needs a cross-built extension, app packaging, and simulator binding tests."
+
+[[entry]]
+bindings = ["typescript"]
+platforms = ["android", "ios"]
+status = "not-investigated"
+reason = "An app host needs a Node-API runtime, native addon packaging, and binding tests on the emulator or simulator."
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["windows-mingw"]
+status = "not-investigated"
+reason = "Kotlin/Native's older MinGW sysroot and C++ runtime need a compatible embedded archive. The proposed llvm-mingw build and C++ symbol-renaming workaround have not been validated against that runtime."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
+
 # Cells with a known path that no one has started.
 
 [[entry]]
@@ -144,60 +219,22 @@ platforms = ["windows-mingw"]
 archs = ["arm64"]
 backends = ["vulkan", "opengl"]
 status = "path-known"
-reason = "A DLL built with Zig's `windows-gnu` target passes the C suites under Wine, after the build changes that the issue lists. A static archive has to hide its bundled C++ runtime without `ld -r`, which lld lacks for COFF, by renaming that runtime's symbols with `llvm-objcopy`."
-link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["android", "ios"]
-status = "path-known"
-reason = "Add a `net10.0-android` or `net10.0-ios` host, package the native assets, and run a test app on the emulator or simulator. Android also needs its platform services initialized."
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["emscripten"]
-status = "path-known"
-reason = "Add a browser WebAssembly host that links the native archives through `NativeFileReference` with matching Emscripten flags, and run browser tests."
+reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the MSYS2 presets and runtime dependency handling for its UCRT and libc++, select Rust's matching `aarch64-pc-windows-gnullvm` target, and run the C suites on the Windows ARM64 runners."
+link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
 bindings = ["go"]
 platforms = ["windows-mingw"]
 status = "path-known"
 reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
-link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
-
-[[entry]]
-bindings = ["go"]
-platforms = ["ios"]
-status = "path-known"
-reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
-
-[[entry]]
-bindings = ["kotlin-native"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "Kotlin/Native links `mingwX64` against GCC 9's `libstdc++` and `msvcrt.dll`. Its runtime KLIB needs a static archive built for msvcrt, as llvm-mingw can, with the bundled C++ runtime's symbols renamed so that they cannot collide with `libstdc++`."
-link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
-
-[[entry]]
-bindings = ["python"]
-platforms = ["freebsd"]
-status = "path-known"
-reason = "Build and test the extension in the FreeBSD VM. PyPI rejects FreeBSD wheel tags, so the package cannot publish one."
-link = "https://github.com/pypi/warehouse/blob/main/warehouse/utils/wheel.py"
-
-[[entry]]
-bindings = ["python"]
-platforms = ["ios"]
-status = "path-known"
-reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
+link = "https://github.com/maplibre/maplibre-native-ffi/pull/1380"
 
 [[entry]]
 bindings = ["rust"]
 platforms = ["windows-mingw"]
 status = "path-known"
-reason = "Select MinGW artifacts for `*-pc-windows-gnullvm` targets in the sys crate's build script, and run the suite on the Windows runners."
-link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
+reason = "Select target-matched MinGW artifacts in the sys crate's build script, starting with the current `x86_64-pc-windows-gnu` preset and its MSVCRT dependencies. GNU LLVM targets need UCRT artifacts instead. Link the runtime dependencies and run the suite on the Windows runners."
+link = "https://github.com/rust-lang/rust/blob/1.99.1/src/doc/rustc/src/platform-support/windows-gnullvm.md"
 
 [[entry]]
 bindings = ["swift"]
@@ -210,12 +247,6 @@ bindings = ["typescript"]
 platforms = ["freebsd"]
 status = "path-known"
 reason = "Build the addon and run the Node suite in the FreeBSD VM. Node supports FreeBSD x64 as experimental and ships no official binaries."
-
-[[entry]]
-bindings = ["typescript"]
-platforms = ["android", "ios"]
-status = "path-known"
-reason = "Add an app host with a Node-API runtime, package the addon, and run tests on the emulator or simulator."
 
 [[entry]]
 bindings = [
@@ -257,11 +288,18 @@ reason = "The Dart SDK runs on RISC-V. Run the suite with it under QEMU's user-m
 link = "https://dart.dev/get-dart"
 
 [[entry]]
-bindings = ["kotlin-jvm", "python"]
+bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
-reason = "Debian and Alpine package OpenJDK and Python for both architectures. Package the binding's native part for them, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
+reason = "Debian and Alpine package OpenJDK for both architectures. Package the binding's native part for them, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
+
+[[entry]]
+bindings = ["python"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["riscv64"]
+status = "path-known"
+reason = "Debian and Alpine package Python for RISC-V. Package the binding's native extension for it, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
 
 [[entry]]
 bindings = ["typescript"]
@@ -269,6 +307,52 @@ platforms = ["linux-gnu"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
 reason = "Debian packages Node.js for both architectures. Build the addon for them, and run the Node.js suite with Debian's Node.js under QEMU's user-mode emulator."
+
+[[entry]]
+bindings = ["kotlin-jvm"]
+platforms = ["windows-mingw"]
+status = "path-known"
+reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
+
+[[entry]]
+bindings = ["zig"]
+platforms = ["windows-mingw"]
+status = "path-known"
+reason = "Zig supports Windows GNU targets. Select MinGW import libraries instead of MSVC `.lib` names for the C library and test graphics helper, and run the suite on the Windows runners."
+
+[[entry]]
+bindings = ["go"]
+platforms = ["windows"]
+status = "path-known"
+reason = "cgo's GNU-style compiler can consume the MSVC-built C DLL. Configure import-library discovery and Windows platform generation, then run the suite on the Windows runners."
+link = "https://pkg.go.dev/cmd/cgo#hdr-Using_cgo_with_the_go_command"
+
+[[entry]]
+bindings = ["go"]
+platforms = ["ios-maccatalyst"]
+status = "path-known"
+reason = "Upstream gomobile already builds for Mac Catalyst. Add its iOS target, Catalyst build tag, SDK and macabi triple, link the native artifact, and run the binding suite."
+link = "https://github.com/golang/mobile/blob/master/cmd/gomobile/env.go"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["windows-mingw"]
+status = "path-known"
+reason = "The PyO3 extension embeds the C archive through the Rust sys crate. Add its MinGW artifact selection and linkage, build the extension for GNU-target Rust, package runtime DLL dependencies, and test the wheel with Windows CPython."
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["windows", "windows-mingw"]
+status = "path-known"
+reason = "Swift.org ships a Windows toolchain. Add generated Windows platform coverage, SwiftPM import-library discovery and Windows test flags, consume each preset's C DLL, and run the suite with its dependencies on PATH."
+link = "https://www.swift.org/install/windows/"
+
+[[entry]]
+bindings = ["typescript"]
+platforms = ["linux-musl"]
+status = "path-known"
+reason = "The pinned Node.js and Bun releases ship musl runtimes. Build and package musl addons, select them by libc in the loader, and run their suites in Alpine. Deno's musl runtime remains a separate gap."
+link = "https://nodejs.org/dist/v26.12.1/SHASUMS256.txt"
 
 # Cells that the binding's toolchain does not target.
 
