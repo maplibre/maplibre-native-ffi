@@ -2,7 +2,7 @@
 //
 //   node scripts/pack.ts [--version <version>] [--xcframework <directory>] <out dir> <preset>...
 //
-// A user installs the facade, @maplibre/native-ffi, and one backend package,
+// A desktop user installs the facade, @maplibre/native-ffi, and one backend package,
 // such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
 // pins one addon package per platform through optionalDependencies, and each
 // desktop addon package declares the platform it serves, so a package manager
@@ -123,7 +123,10 @@ function addonOf(preset: string): Addon {
   };
 }
 
-const addons = presets.map(addonOf);
+// Mobile hosts compile the addon from the facade's sources.
+const addons = presets
+  .filter((preset) => !/^(android|ios)-/.test(preset))
+  .map(addonOf);
 
 function pack(directory: string, manifest: object): void {
   writeFileSync(
@@ -259,7 +262,14 @@ cpSync(
   join(facade, "native/node-api-headers/LICENSE"),
 );
 cpSync(
-  join(binding, "native/build", addons[0]!.preset, "install/licenses"),
+  addons.length
+    ? join(binding, "native/build", addons[0]!.preset, "install/licenses")
+    : join(
+        root,
+        "build",
+        presets[0]!,
+        "install/share/maplibre-native-c/licenses",
+      ),
   join(facade, "native/licenses"),
   { recursive: true },
 );

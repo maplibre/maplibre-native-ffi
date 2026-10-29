@@ -4,17 +4,7 @@
 
 import { test } from "node:test";
 
-import "../callbacks.test.ts";
-import "../completions.test.ts";
-import "../errors.test.ts";
-import "../event-loop.test.ts";
-import "../lifecycle.test.ts";
-import "../log.test.ts";
-import "../platform.test.ts";
-import "../realms.test.ts";
-import "../render.test.ts";
-import "../resource-provider.test.ts";
-import "../values.test.ts";
+import "../suite.ts";
 import { execute, scheduled } from "../support/harness.ts";
 
 for (const entry of scheduled()) {

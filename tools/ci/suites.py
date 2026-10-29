@@ -232,13 +232,6 @@ def android_commands(target: Target, abi: str) -> list[str]:
             f"mise run //bindings/zig:test {preset}",
             f"mise run //bindings/dart:test:android {preset}",
         ]
-        # Python replaces the EGL suite's API 26 emulator with a newer API,
-        # so run it after every suite that reuses the API 26 device.
-        if preset == "android-x64-egl":
-            commands.append(
-                f"mise run //bindings/typescript:test:react-native {preset}"
-            )
-        commands.append(f"mise run //bindings/python:test {preset}")
     else:
         commands = [
             f"mise run //bindings/kotlin:build {preset}",
@@ -253,6 +246,17 @@ def android_commands(target: Target, abi: str) -> list[str]:
         # Flutter has no Android x86 target.
         if abi != "x86":
             commands.append(f"mise run //bindings/dart:build:mobile {preset}")
+    # React Native's Android host supports OpenGL. Device targets run the
+    # suite; the other architectures build the same release app.
+    if target.backend == "egl":
+        action = "test" if target.device else "build"
+        commands.append(
+            f"mise run //bindings/typescript:{action}:react-native {preset}"
+        )
+    # Python replaces the EGL suite's API 26 emulator with a newer API,
+    # so run it after every suite that reuses the API 26 device.
+    if target.device:
+        commands.append(f"mise run //bindings/python:test {preset}")
     return commands
 
 
@@ -276,6 +280,7 @@ def apple_commands(target: Target) -> list[str]:
             f"mise run //bindings/swift:build {preset}",
             f"mise run //bindings/dart:build:mobile {preset}",
             f"mise run //bindings/rust:build {preset}",
+            f"mise run //bindings/typescript:build:react-native {preset}",
         ]
     if target_platform == "ios-simulator":
         return [

@@ -17,7 +17,7 @@ const work = resolve(root, "build/react-native-spike");
 const app = resolve(work, "app");
 const fixture = resolve(root, "bindings/typescript/test/react-native");
 const binding = resolve(root, "bindings/typescript");
-const backend = resolve(work, "backend");
+const packages = resolve(work, "npm");
 const preset = process.argv[2] ?? "ios-simulator-arm64-metal";
 const prefix = resolve(root, "build", preset, "install");
 mkdirSync(work, { recursive: true });
@@ -73,7 +73,7 @@ execFileSync("pnpm", ["exec", "vp", "pack"], {
 const manifestPath = resolve(app, "package.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 manifest.dependencies["@maplibre/native-ffi"] =
-  `file:${process.env.MLN_RN_PACKAGE ?? "../backend"}`;
+  `file:${resolve(packages, "maplibre-native-ffi-0.0.0.tgz")}`;
 manifest.codegenConfig = {
   name: "LifecycleProbeSpec",
   type: "modules",
@@ -83,62 +83,7 @@ manifest.codegenConfig = {
 };
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 
-rmSync(backend, { recursive: true, force: true });
-mkdirSync(backend, { recursive: true });
-for (const name of [
-  "src",
-  "native",
-  "android",
-  "MaplibreNativeFfi.podspec",
-  "react-native.config.cjs",
-  "package.json",
-]) {
-  cpSync(resolve(binding, name), resolve(backend, name), {
-    recursive: true,
-    filter: (path) => !path.includes("/native/build/"),
-  });
-}
-execFileSync(
-  "pnpm",
-  [
-    "exec",
-    "vp",
-    "pack",
-    "src/react-native.ts",
-    "--no-config",
-    "--platform",
-    "neutral",
-    "--target",
-    "es2021",
-    "--external",
-    "react-native",
-    "--fixed-extension",
-    "--out-dir",
-    resolve(backend, "dist"),
-  ],
-  { cwd: binding, stdio: "inherit" },
-);
-const backendManifest = JSON.parse(
-  readFileSync(resolve(backend, "package.json"), "utf8"),
-);
-backendManifest.exports["."]["react-native"] = "./dist/react-native.mjs";
-writeFileSync(
-  resolve(backend, "package.json"),
-  JSON.stringify(backendManifest, null, 2) + "\n",
-);
-cpSync(resolve(root, "include"), resolve(backend, "native/include"), {
-  recursive: true,
-});
-mkdirSync(resolve(backend, "native/include/mln/plugin"), { recursive: true });
-cpSync(
-  resolve(root, "third_party/maplibre-native/include/mln/plugin/plugin_api.h"),
-  resolve(backend, "native/include/mln/plugin/plugin_api.h"),
-);
-cpSync(
-  resolve(binding, "node_modules/node-api-headers/include"),
-  resolve(backend, "native/node-api-headers"),
-  { recursive: true },
-);
+const packArgs = ["scripts/pack.ts"];
 if (preset.startsWith("ios-")) {
   rmSync(resolve(work, "MaplibreNativeC.xcframework"), {
     recursive: true,
@@ -155,12 +100,12 @@ if (preset.startsWith("ios-")) {
     ],
     { stdio: "inherit" },
   );
-  cpSync(
-    resolve(work, "MaplibreNativeC.xcframework"),
-    resolve(backend, "native/MaplibreNativeC.xcframework"),
-    { recursive: true },
-  );
+  packArgs.push("--xcframework", resolve(work, "MaplibreNativeC.xcframework"));
 }
+execFileSync("node", [...packArgs, packages, preset], {
+  cwd: binding,
+  stdio: "inherit",
+});
 
 function patch(path: string, before: string, after: string) {
   const target = resolve(app, path);
@@ -168,16 +113,6 @@ function patch(path: string, before: string, after: string) {
   if (!text.includes(before)) throw new Error(`Template changed: ${path}`);
   writeFileSync(target, text.replace(before, after));
 }
-
-patch(
-  "metro.config.js",
-  "const config = {};",
-  `const path = require('node:path');
-const config = {
-  watchFolders: [path.resolve(__dirname, '../backend')],
-  resolver: { nodeModulesPaths: [path.resolve(__dirname, 'node_modules')] },
-};`,
-);
 
 patch(
   "android/app/src/main/java/com/helloworld/MainApplication.kt",

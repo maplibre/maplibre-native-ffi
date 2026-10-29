@@ -4,17 +4,7 @@
 //     --allow-run --allow-write --v8-flags=--expose-gc test/run/deno.test.ts
 
 import { execute, scheduled } from "../support/harness.ts";
-import "../callbacks.test.ts";
-import "../completions.test.ts";
-import "../errors.test.ts";
-import "../event-loop.test.ts";
-import "../lifecycle.test.ts";
-import "../log.test.ts";
-import "../platform.test.ts";
-import "../realms.test.ts";
-import "../render.test.ts";
-import "../resource-provider.test.ts";
-import "../values.test.ts";
+import "../suite.ts";
 
 declare const Deno: {
   test(definition: {

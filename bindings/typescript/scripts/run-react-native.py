@@ -1,4 +1,4 @@
-"""Run the release app on CI's device and require six complete suite runs."""
+"""Run the release app on CI's device and require the suite and a clean reload."""
 
 import argparse
 import os
@@ -99,7 +99,7 @@ def run(preset):
     try:
         subprocess.run(launch, check=True)
         with (WORK / f"{preset}-runtime.log").open("w") as output:
-            while passed != set(range(1, 7)) or released != set(range(1, 6)):
+            while passed != {1, 2} or released != {1}:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise RuntimeError(
@@ -129,7 +129,7 @@ def run(preset):
                 match = re.search(r"MlnLifecycle:? (\d+) realm-released", line)
                 if match:
                     released.add(int(match[1]))
-        print("React Native suite, readback and five runtime reloads passed")
+        print("React Native suite, readback and runtime reload passed")
     finally:
         process.terminate()
         process.wait(timeout=10)

@@ -243,6 +243,30 @@ class SuitesTest(unittest.TestCase):
                 ("mise", "run", f"//bindings/dart:{action}", preset), commands
             )
 
+    def test_react_native_builds_mobile_hosts_and_tests_device_targets(self):
+        for preset, action in (
+            ("android-arm-egl", "build"),
+            ("android-arm64-egl", "build"),
+            ("android-x64-egl", "test"),
+            ("ios-arm64-metal", "build"),
+            ("ios-simulator-arm64-metal", "test"),
+        ):
+            commands = [
+                suite.command for suite in suites.target_suites(self.targets[preset])
+            ]
+            self.assertIn(
+                ("mise", "run", f"//bindings/typescript:{action}:react-native", preset),
+                commands,
+            )
+        for target in self.targets.values():
+            if target.platform == "android" and target.backend == "vulkan":
+                self.assertFalse(
+                    any(
+                        suite.task.endswith(":react-native")
+                        for suite in suites.target_suites(target)
+                    )
+                )
+
 
 class RetryTest(unittest.TestCase):
     def test_only_infrastructure_step_failures_retry(self):

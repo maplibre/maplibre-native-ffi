@@ -54,8 +54,8 @@ static napi_value create(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value argv[1] = {NULL};
   napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  uint32_t backend = 0;
-  if (argc < 1 || napi_get_value_uint32(env, argv[0], &backend) != napi_ok) {
+  double backend = 0;
+  if (argc < 1 || napi_get_value_double(env, argv[0], &backend) != napi_ok) {
     napi_throw_type_error(env, NULL, "expected a backend number");
     return NULL;
   }
@@ -70,7 +70,7 @@ static napi_value create(napi_env env, napi_callback_info info) {
   napi_value number = NULL;
   napi_create_object(env, &object);
   set(env, object, "graphics", address(env, graphics));
-  napi_create_uint32(env, context.backend, &number);
+  napi_create_double(env, context.backend, &number);
   set(env, object, "backend", number);
   set(env, object, "metalDevice", address(env, context.metal_device));
   set(env, object, "eglDisplay", address(env, context.egl_display));
@@ -84,7 +84,7 @@ static napi_value create(napi_env env, napi_callback_info info) {
   );
   set(env, object, "vulkanDevice", address(env, context.vulkan_device));
   set(env, object, "vulkanQueue", address(env, context.vulkan_queue));
-  napi_create_uint32(env, context.vulkan_queue_family_index, &number);
+  napi_create_double(env, context.vulkan_queue_family_index, &number);
   set(env, object, "vulkanQueueFamilyIndex", number);
   set(
     env, object, "vulkanGetInstanceProcAddr",
@@ -115,6 +115,7 @@ static napi_value destroy(napi_env env, napi_callback_info info) {
   return NULL;
 }
 
+#ifdef __OHOS__
 /** A turn's empty work item and the callback that its completion calls. */
 typedef struct turn_work {
   napi_async_work work;
@@ -176,6 +177,7 @@ static napi_value turn(napi_env env, napi_callback_info info) {
   }
   return NULL;
 }
+#endif
 
 NAPI_MODULE_EXPORT napi_value
 napi_register_module_v1(napi_env env, napi_value exports) {
@@ -185,7 +187,9 @@ napi_register_module_v1(napi_env env, napi_value exports) {
   } entries[] = {
     {"create", create},   {"makeCurrent", make_current},
     {"destroy", destroy}, {"nativeProbe", mln_ts_test_native_probe},
+#ifdef __OHOS__
     {"turn", turn},
+#endif
   };
   for (size_t index = 0; index < sizeof entries / sizeof entries[0]; index++) {
     napi_value function = NULL;

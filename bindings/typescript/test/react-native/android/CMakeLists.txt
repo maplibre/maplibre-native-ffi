@@ -13,7 +13,6 @@ add_library(
     jni/adapter.cpp
     ../native/Probe.cpp
     ../native/shim_test.c
-    ../native/test_api.c
     ../native/test_graphics.c
     ../support/native_probe.c
     ../graphics/graphics.c

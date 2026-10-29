@@ -67,7 +67,6 @@ struct Probe::State : std::enable_shared_from_this<State> {
         require(state->jsThread == std::this_thread::get_id());
         require(state->hook && state->functionFinalized && state->drained == 2);
         state->instanceFinalized = true;
-        event(state->id, "instance-finalizer");
         delete holder;
       },
       nullptr
@@ -78,7 +77,6 @@ struct Probe::State : std::enable_shared_from_this<State> {
         auto state = static_cast<State*>(data);
         require(state->drained == 2 && !state->instanceFinalized);
         state->functionFinalized = true;
-        event(state->id, "threadsafe-function-abort");
       },
       state,
       [](napi_env env, napi_value, void* context, void* data) {
@@ -87,7 +85,6 @@ struct Probe::State : std::enable_shared_from_this<State> {
         require(state->jsThread == std::this_thread::get_id());
         require(state->hook && !state->instanceFinalized);
         ++state->drained;
-        event(state->id, "null-env-drain");
       },
       &state->function
     ));
@@ -97,7 +94,6 @@ struct Probe::State : std::enable_shared_from_this<State> {
         auto state = static_cast<State*>(data);
         require(state->jsThread == std::this_thread::get_id());
         state->hook = true;
-        event(state->id, "cleanup-hook");
         // A real CallInvoker pump posted here may be silently dropped. Cleanup
         // must drain both messages synchronously even when it never runs.
         check(napi_call_threadsafe_function(
@@ -119,10 +115,8 @@ struct Probe::State : std::enable_shared_from_this<State> {
           if (env) {
             require(state->jsThread == std::this_thread::get_id());
             require(!state->instanceFinalized);
-            event(state->id, "external-on-js-thread");
           } else {
             require(state->instanceFinalized);
-            event(state->id, "external-after-instance");
           }
           ++state->finalized;
           delete holder;
@@ -187,10 +181,9 @@ Probe::Probe(
   runtime.global().setProperty(
     runtime, "__mlnLifecycleGeneration", double(state_->id)
   );
-  event(state_->id, "installed");
 }
 
 void Probe::cleanup() { env_->cleanup(); }
-Probe::~Probe() { event(state_->id, "module-destroyed"); }
+Probe::~Probe() = default;
 
 }  // namespace mln::test

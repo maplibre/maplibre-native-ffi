@@ -28,17 +28,7 @@ try {
     pending: pendingCompletions(),
   };
   await loadModule(new URL("maplibre_native_ffi_test.mjs", location.href));
-  await import("../callbacks.test.ts");
-  await import("../completions.test.ts");
-  await import("../errors.test.ts");
-  await import("../event-loop.test.ts");
-  await import("../lifecycle.test.ts");
-  await import("../log.test.ts");
-  await import("../platform.test.ts");
-  await import("../realms.test.ts");
-  await import("../render.test.ts");
-  await import("../resource-provider.test.ts");
-  await import("../values.test.ts");
+  await import("../suite.ts");
   const { execute, scheduled } = await import("../support/harness.ts");
   const failures: string[] = [];
   const order = scheduled();

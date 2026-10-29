@@ -91,7 +91,10 @@ JOBS = {
     "typescript-npm": (
         "npm",
         lambda target: (
-            addon(target) == "typescript" or target.preset == "android-x64-egl"
+            addon(target) == "typescript"
+            or any(
+                suite.task.endswith(":react-native") for suite in target_suites(target)
+            )
         ),
     ),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
