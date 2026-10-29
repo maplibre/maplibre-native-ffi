@@ -64,12 +64,15 @@ mln_status mln_drain_readings(
 );
 """
 
-# One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
-# every other target is LP64.
-TARGETS = {32: "armv7a-linux-androideabi24", 64: "aarch64-linux-android24"}
+# One Android target per data model the common Kotlin codecs use.
+TARGETS = {
+    "armv7a-linux-androideabi24": (32, 8),
+    "aarch64-linux-android24": (64, 8),
+    "i686-linux-android24": (32, 4),
+}
 
 
-def layout_assertions(api, width: int) -> str:
+def layout_assertions(api, width: int, scalar64_align: int) -> str:
     """Static assertions that the C compiler agrees with every computed layout."""
     abi = Abi(api)
     lines = ["#include <stddef.h>"]
@@ -77,7 +80,7 @@ def layout_assertions(api, width: int) -> str:
         if not record.complete or record.name.startswith("@"):
             continue
         try:
-            layout = abi.record_named(record.name, width)
+            layout = abi.record_named(record.name, width, scalar64_align)
         except LayoutError:
             continue
         lines.append(
@@ -94,7 +97,7 @@ def layout_assertions(api, width: int) -> str:
 
 
 class KotlinLayoutTests(unittest.TestCase):
-    def compile(self, headers, source: str, width: int, *includes: Path):
+    def compile(self, headers, source: str, target: str, *includes: Path):
         clang = require_tool(self, "clang").executable
         with TemporaryDirectory() as directory:
             check = Path(directory) / "check.c"
@@ -108,7 +111,7 @@ class KotlinLayoutTests(unittest.TestCase):
                 self,
                 [
                     clang,
-                    f"--target={TARGETS[width]}",
+                    f"--target={target}",
                     "-ffreestanding",
                     "-std=c2x",
                     "-fsyntax-only",
@@ -121,23 +124,23 @@ class KotlinLayoutTests(unittest.TestCase):
                 ROOT,
             )
 
-    def test_record_layouts_match_the_compiler_for_both_data_models(self):
+    def test_record_layouts_match_the_compiler_for_all_data_models(self):
         api = real_api()
-        for width in TARGETS:
-            with self.subTest(width=width):
+        for target, (width, scalar64_align) in TARGETS.items():
+            with self.subTest(target=target):
                 self.compile(
                     (
                         "maplibre_native_c.h",
                         "maplibre_native_c/plugin.h",
                         "maplibre_native_c/binding_support.h",
                     ),
-                    layout_assertions(api, width),
-                    width,
+                    layout_assertions(api, width, scalar64_align),
+                    target,
                     ROOT / "include",
                     NATIVE_INCLUDE,
                 )
 
-    def test_fixture_layouts_match_the_compiler_for_both_data_models(self):
+    def test_fixture_layouts_match_the_compiler_for_all_data_models(self):
         groups = protocol_groups()
         api = parse(groups=groups)
         with TemporaryDirectory() as directory:
@@ -147,23 +150,25 @@ class KotlinLayoutTests(unittest.TestCase):
                 + "\n"
                 + (ROOT / "tests/bindgen/fixtures/protocols.h").read_text()
             )
-            for width in TARGETS:
-                with self.subTest(width=width):
-                    self.compile((header,), layout_assertions(api, width), width)
+            for target, (width, scalar64_align) in TARGETS.items():
+                with self.subTest(target=target):
+                    self.compile(
+                        (header,), layout_assertions(api, width, scalar64_align), target
+                    )
 
-    def test_the_jni_glue_compiles_against_the_headers_for_both_data_models(self):
+    def test_the_jni_glue_compiles_against_the_headers_for_all_data_models(self):
         # The glue casts each carrier to its C parameter type, so compiling it
         # against the real prototypes checks every cast.
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)
         home = java.resolve().parents[1]
         machine = next((home / "include").glob("*/jni_md.h")).parent
         source = emitted(kotlin, real_api())[kotlin.JNI]
-        for width in TARGETS:
-            with self.subTest(width=width):
+        for target in TARGETS:
+            with self.subTest(target=target):
                 self.compile(
                     (),
                     source,
-                    width,
+                    target,
                     ROOT / "include",
                     NATIVE_INCLUDE,
                     ROOT / "bindings/kotlin/src/androidMain/jni",

@@ -95,7 +95,7 @@ internal constructor(
       options: StyleExpressionOptions? = null,
     ): StyleExpressionHandle =
       nativeCall(null, null) {
-        val out = allocate(8, 8)
+        val out = allocate(8, w(8, 8, 4))
         check(
           C.mln_style_expression_create(
             view(expression),

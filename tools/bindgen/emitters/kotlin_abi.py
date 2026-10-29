@@ -5,12 +5,10 @@ passes only primitives: integers, floats, and addresses carried as `Long`. A
 record that C passes by value crosses as the address of a copy, and a record
 that C returns by value is written to an address the caller supplies.
 
-Common code reads and writes records at offsets computed here for both data
-models a Kotlin target can have: ILP32 (Android ARM32) and LP64 (everything
-else). Every target follows the C natural-alignment rules, which hold on the
-supported ABIs, including the 8-byte alignment that ARM EABI gives 64-bit
-fields. A generator test compiles these offsets as static assertions for both
-data models.
+Common code reads and writes records at offsets computed here for LP64 and
+two ILP32 layouts: Android ARM32 and WebAssembly align 64-bit scalars to eight
+bytes, while Android x86 aligns them to four. A generator test compiles these
+offsets as static assertions against each Android ABI.
 """
 
 from __future__ import annotations
@@ -114,15 +112,19 @@ class Layout:
     offsets: dict[str, int]
 
 
+# Pointer width and 64-bit scalar alignment, in Kotlin's w() argument order.
+DATA_MODELS = ((32, 8), (64, 8), (32, 4))
+
+
 class Abi:
-    """Classify C types and compute their layouts for both data models."""
+    """Classify C types and compute their layouts for each supported ABI."""
 
     def __init__(self, api: Api):
         self.api = api
         self.records = api.records_by_name
         self.typedefs = api.typedefs_by_name
         self.enums = {enum.name: enum for enum in api.enums}
-        self._layouts: dict[tuple[str, int], Layout] = {}
+        self._layouts: dict[tuple[str, int, int], Layout] = {}
 
     def classify(self, ctype: CType):
         """Resolve a C type to a Primitive, Record, or Array."""
@@ -163,22 +165,22 @@ class Abi:
             return POINTER
         raise LayoutError(f"{ctype.spelling}: no C layout rule")
 
-    def size_align(self, kind, width: int) -> tuple[int, int]:
+    def size_align(self, kind, width: int, scalar64_align: int = 8) -> tuple[int, int]:
         if isinstance(kind, Primitive):
             size = kind.size(width)
-            return size, size
+            return size, min(size, scalar64_align)
         if isinstance(kind, Array):
-            size, align = self.size_align(kind.element, width)
+            size, align = self.size_align(kind.element, width, scalar64_align)
             return size * kind.length, align
-        layout = self.record(kind, width)
+        layout = self.record(kind, width, scalar64_align)
         return layout.size, layout.align
 
-    def record(self, kind: Record, width: int) -> Layout:
-        key = (kind.name, width)
+    def record(self, kind: Record, width: int, scalar64_align: int = 8) -> Layout:
+        key = (kind.name, width, scalar64_align)
         if key not in self._layouts:
             offsets, size, align = {}, 0, 1
             for name, field in kind.fields:
-                field_size, field_align = self.size_align(field, width)
+                field_size, field_align = self.size_align(field, width, scalar64_align)
                 align = max(align, field_align)
                 if kind.union:
                     offsets[name] = 0
@@ -190,28 +192,34 @@ class Abi:
             self._layouts[key] = Layout(-(-size // align) * align, align, offsets)
         return self._layouts[key]
 
-    def record_named(self, name: str, width: int) -> Layout:
+    def record_named(self, name: str, width: int, scalar64_align: int = 8) -> Layout:
         kind = self.classify(CType("record", name, "struct " + name, name))
         assert isinstance(kind, Record)
-        return self.record(kind, width)
+        return self.record(kind, width, scalar64_align)
 
-    def offset(self, record: str, field: str) -> tuple[int, int]:
-        """The byte offset of a field per data model (ILP32, LP64)."""
-        return (
-            self.record_named(record, 32).offsets[field],
-            self.record_named(record, 64).offsets[field],
+    def offset(self, record: str, field: str) -> tuple[int, ...]:
+        """The byte offset of a field in each supported data model."""
+        return tuple(
+            self.record_named(record, width, align).offsets[field]
+            for width, align in DATA_MODELS
         )
 
-    def size(self, ctype: CType) -> tuple[int, int]:
+    def size(self, ctype: CType) -> tuple[int, ...]:
         kind = self.classify(ctype)
-        return self.size_align(kind, 32)[0], self.size_align(kind, 64)[0]
+        return tuple(
+            self.size_align(kind, width, align)[0] for width, align in DATA_MODELS
+        )
 
-    def align(self, ctype: CType) -> tuple[int, int]:
+    def align(self, ctype: CType) -> tuple[int, ...]:
         kind = self.classify(ctype)
-        return self.size_align(kind, 32)[1], self.size_align(kind, 64)[1]
+        return tuple(
+            self.size_align(kind, width, align)[1] for width, align in DATA_MODELS
+        )
 
 
-def width_expression(pair: tuple[int, int]) -> str:
-    """A Kotlin expression for a value that may differ between data models."""
-    narrow, wide = pair
+def width_expression(values: tuple[int, ...]) -> str:
+    """A Kotlin expression for a value that may differ between ABI layouts."""
+    narrow, wide, x86 = values
+    if narrow != x86:
+        return f"w({narrow}, {wide}, {x86})"
     return str(wide) if narrow == wide else f"w({narrow}, {wide})"

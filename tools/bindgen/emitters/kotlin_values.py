@@ -14,7 +14,7 @@ from .. import docs
 from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import enum_member_prefix, required_callbacks
-from .kotlin_abi import Abi, LayoutError, width_expression
+from .kotlin_abi import DATA_MODELS, Abi, LayoutError, width_expression
 
 SCALARS = {
     "bool": ("Boolean", "Bool"),
@@ -537,17 +537,17 @@ class Values:
 
     def size(self, native):
         return width_expression(
-            (
-                self.abi.record_named(native, 32).size,
-                self.abi.record_named(native, 64).size,
+            tuple(
+                self.abi.record_named(native, width, align).size
+                for width, align in DATA_MODELS
             )
         )
 
     def align(self, native):
         return width_expression(
-            (
-                self.abi.record_named(native, 32).align,
-                self.abi.record_named(native, 64).align,
+            tuple(
+                self.abi.record_named(native, width, align).align
+                for width, align in DATA_MODELS
             )
         )
 
@@ -962,10 +962,7 @@ class Values:
             arms.append(
                 f"{literal(field.value.empty_variant[1], tag_type)} -> {public}.None"
             )
-        sizes = (
-            self.abi.size_align(self.abi.classify(field.value.ctype), 32)[0],
-            self.abi.size_align(self.abi.classify(field.value.ctype), 64)[0],
-        )
+        sizes = self.abi.size(field.value.ctype)
         arms.append(
             f"else -> {public}.Unknown({'tag' if tag_type == 'UInt' else 'tag.toUInt()'}, NativeMemory.getBytes({union}, {width_expression(sizes)}))"
             if field.value.native in self.bound.returned

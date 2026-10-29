@@ -6,8 +6,13 @@ package org.maplibre.nativeffi.internal.memory
  * `size_t` and pointers take [NativeMemory.addressSize] bytes. A C `bool` is one byte.
  */
 
-/** Picks a field offset or size by data model: [narrow] for ILP32 and [wide] for LP64. */
-internal fun w(narrow: Int, wide: Int): Int = if (NativeMemory.addressSize == 8) wide else narrow
+/** Picks a field offset or size by pointer width and 64-bit scalar alignment. */
+internal fun w(narrow: Int, wide: Int, x86: Int = narrow): Int =
+  when {
+    NativeMemory.addressSize == 8 -> wide
+    NativeMemory.scalar64Alignment == 4 -> x86
+    else -> narrow
+  }
 
 internal fun readBool(address: Long): Boolean = NativeMemory.getByte(address) != 0.toByte()
 

@@ -51,7 +51,7 @@ internal constructor(
       options: GeoJsonSourceOptions? = null,
     ): GeoJsonSourceDataHandle =
       nativeCall(null, null) {
-        val out = allocate(8, 8)
+        val out = allocate(8, w(8, 8, 4))
         check(
           C.mln_geo_json_source_data_create(
             view(data),

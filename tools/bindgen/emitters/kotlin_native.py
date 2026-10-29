@@ -32,6 +32,7 @@ from ..protocol import (
 )
 from ..semantic import DeliverySupport
 from .kotlin_abi import (
+    DATA_MODELS,
     POINTER,
     Abi,
     Array,
@@ -354,15 +355,17 @@ class NativeShims:
         ):
             if record not in self.bound.source.records_by_name:
                 continue
-            narrow = self.abi.record_named(record, 32)
-            wide = self.abi.record_named(record, 64)
+            layouts = tuple(
+                self.abi.record_named(record, width, align)
+                for width, align in DATA_MODELS
+            )
             members = [
-                f"  val SIZEOF: Int = {width_expression((narrow.size, wide.size))}",
-                f"  val ALIGNOF: Int = {width_expression((narrow.align, wide.align))}",
+                f"  val SIZEOF: Int = {width_expression(tuple(layout.size for layout in layouts))}",
+                f"  val ALIGNOF: Int = {width_expression(tuple(layout.align for layout in layouts))}",
             ]
-            for field, offset in wide.offsets.items():
+            for field in layouts[0].offsets:
                 members.append(
-                    f"  val {field.upper()}: Int = {width_expression((narrow.offsets[field], offset))}"
+                    f"  val {field.upper()}: Int = {width_expression(self.abi.offset(record, field))}"
                 )
             objects.append(
                 f"internal object {public} {{\n" + "\n".join(members) + "\n}"

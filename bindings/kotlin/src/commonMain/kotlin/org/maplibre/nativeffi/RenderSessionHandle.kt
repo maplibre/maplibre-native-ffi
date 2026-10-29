@@ -60,7 +60,7 @@ internal constructor(
    */
   public fun acquireFrame(): AcquiredFrameHandle? =
     nativeCall(this, binding) {
-      val out = allocate(8, 8)
+      val out = allocate(8, w(8, 8, 4))
       if (present(C.mln_render_session_acquire_frame(handle, out, diagnostic), absent = -9))
         adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
           AcquiredFrameHandle(it, this@RenderSessionHandle)
@@ -133,7 +133,7 @@ internal constructor(
    */
   public fun drainFrameResults(): List<RenderFrameResult> =
     nativeCall(this, binding) {
-      val batch = allocate(8, 8)
+      val batch = allocate(8, w(8, 8, 4))
       val out = sized(w(16, 24), w(4, 8))
       if (
         present(
@@ -177,7 +177,7 @@ internal constructor(
    */
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding) {
-      val out = sized(64, 8)
+      val out = sized(w(64, 64, 60), w(8, 8, 4))
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }

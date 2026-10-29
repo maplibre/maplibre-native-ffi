@@ -26,7 +26,7 @@ public fun cVersion(): UInt = nativeUncheckedCall {
  */
 public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng =
   nativeCall(null, null) {
-    val out = allocate(16, 8)
+    val out = allocate(16, w(8, 8, 4))
     check(C.mln_lat_lng_for_projected_meters(writeProjectedMeters(meters), out, diagnostic))
     readLatLng(out)
   }
@@ -119,7 +119,7 @@ public fun getPluginRegisterFunctionV1(): NativePointer =
  */
 public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters =
   nativeCall(null, null) {
-    val out = allocate(16, 8)
+    val out = allocate(16, w(8, 8, 4))
     check(C.mln_projected_meters_for_lat_lng(writeLatLng(coordinate), out, diagnostic))
     readProjectedMeters(out)
   }

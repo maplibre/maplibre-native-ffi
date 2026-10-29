@@ -87,7 +87,7 @@ internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
 }
 
 internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
-  allocate(w(24, 40), 8).also { putLogHandler(it, value) }
+  allocate(w(24, 40), w(8, 8, 4)).also { putLogHandler(it, value) }
 
 internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
   writeU32(target, w(24, 48).toUInt())

@@ -16,6 +16,8 @@ import org.maplibre.nativeffi.internal.c.word
 internal actual object NativeMemory {
   actual val addressSize: Int = 4
 
+  actual val scalar64Alignment: Int = 8
+
   actual fun allocate(size: Long): Long = allocateUninitialized(size).also { clear(it, size) }
 
   actual fun allocateUninitialized(size: Long): Long =

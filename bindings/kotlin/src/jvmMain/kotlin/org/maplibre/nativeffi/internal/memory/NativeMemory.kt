@@ -40,6 +40,8 @@ internal actual object NativeMemory {
 
   actual val addressSize: Int = ADDRESS.byteSize().toInt()
 
+  actual val scalar64Alignment: Int = JAVA_LONG.byteAlignment().toInt()
+
   actual fun allocate(size: Long): Long {
     val address = calloc.invokeExact(1L, maxOf(size, 1L)) as Long
     if (address == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")

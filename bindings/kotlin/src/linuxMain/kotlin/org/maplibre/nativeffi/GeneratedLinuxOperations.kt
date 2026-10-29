@@ -19,7 +19,7 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
       { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
       { C.mln_acquired_frame_view_end(it) },
     ) { scope ->
-      val out = sized(80, 8)
+      val out = sized(w(80, 80, 68), w(8, 8, 4))
       check(C.mln_acquired_frame_get_vulkan_texture(handle, out, diagnostic))
       block(readVulkanTextureFrame(out, scope))
     }

@@ -60,7 +60,7 @@ internal fun NativeCall.putQueuedLogHandler(target: Long, value: QueuedLogHandle
 }
 
 internal fun NativeCall.writeQueuedLogHandler(value: QueuedLogHandler): Long =
-  allocate(w(24, 40), 8).also { putQueuedLogHandler(it, value) }
+  allocate(w(24, 40), w(8, 8, 4)).also { putQueuedLogHandler(it, value) }
 
 internal fun NativeCall.putHttpHeaderTransformRules(target: Long, value: HttpHeaderTransformRules) {
   writeU32(target, w(24, 48).toUInt())

@@ -8,8 +8,11 @@ package org.maplibre.nativeffi.internal.memory
  * [NativeArena], so these functions trust it.
  */
 internal expect object NativeMemory {
-  /** The byte size of a C pointer and of `size_t`: 4 on Android ARM32 and 8 elsewhere. */
+  /** The byte size of a C pointer and of `size_t`: 4 on 32-bit targets and 8 on 64-bit targets. */
   val addressSize: Int
+
+  /** The C alignment of 64-bit integers and doubles, in bytes. */
+  val scalar64Alignment: Int
 
   /** Allocates [size] zeroed bytes aligned for any C type, throwing when native memory runs out. */
   fun allocate(size: Long): Long

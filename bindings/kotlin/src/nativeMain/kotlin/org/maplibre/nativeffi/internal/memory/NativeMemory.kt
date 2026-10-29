@@ -13,6 +13,7 @@ import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.LongVar
 import kotlinx.cinterop.ShortVar
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.alignOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.readBytes
@@ -21,6 +22,7 @@ import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.internal.cinterop.mln_lat_lng
 import platform.posix.calloc
 import platform.posix.malloc
 import platform.posix.memcpy
@@ -30,6 +32,9 @@ import platform.posix.strlen
 /** Native memory through C pointers. */
 internal actual object NativeMemory {
   actual val addressSize: Int = sizeOf<COpaquePointerVar>().toInt()
+
+  // CStructVar preserves the C ABI alignment; Kotlin LongVar always reports eight.
+  actual val scalar64Alignment: Int = alignOf<mln_lat_lng>()
 
   actual fun allocate(size: Long): Long =
     calloc(1.convert(), maxOf(size, 1L).convert()).toLong().also {

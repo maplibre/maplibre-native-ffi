@@ -50,7 +50,7 @@ internal constructor(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(64, 8)
+        val out = sized(w(64, 64, 60), w(8, 8, 4))
         check(C.mln_acquired_frame_get_open_gl_texture(handle, out, diagnostic))
         block(readOpenGlTextureFrame(out, scope))
       }
@@ -68,7 +68,7 @@ internal constructor(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(16, 8)
+        val out = sized(16, w(8, 8, 4))
         check(C.mln_acquired_frame_get_producer_sync(handle, out, diagnostic))
         block(readGpuSync(out, scope))
       }
@@ -82,7 +82,7 @@ internal constructor(
    */
   public fun getResult(): RenderFrameResult =
     nativeCall(this, binding) {
-      val out = sized(264, 8)
+      val out = sized(w(264, 264, 244), w(8, 8, 4))
       check(C.mln_acquired_frame_get_result(handle, out, diagnostic))
       readRenderFrameResult(out)
     }

@@ -35,7 +35,7 @@ internal constructor(
    */
   public fun getCamera(): CameraOptions =
     nativeCall(this, binding) {
-      val out = sized(120, 8)
+      val out = sized(120, w(8, 8, 4))
       check(C.mln_map_projection_get_camera(handle, out, diagnostic))
       readCameraOptions(out)
     }
@@ -48,7 +48,7 @@ internal constructor(
    */
   public fun latLngForPixel(point: ScreenPoint): LatLng =
     nativeCall(this, binding) {
-      val out = allocate(16, 8)
+      val out = allocate(16, w(8, 8, 4))
       check(
         C.mln_map_projection_lat_lng_for_pixel(handle, writeScreenPoint(point), out, diagnostic),
       )
@@ -63,7 +63,7 @@ internal constructor(
    */
   public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng =
     nativeCall(this, binding) {
-      val out = allocate(16, 8)
+      val out = allocate(16, w(8, 8, 4))
       check(
         C.mln_map_projection_lat_lng_for_pixel_unwrapped(
           handle,
@@ -83,11 +83,11 @@ internal constructor(
    */
   public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> =
     nativeCall(this, binding) {
-      val out = allocate(points.size.toLong() * 16, 8)
+      val out = allocate(points.size.toLong() * 16, w(8, 8, 4))
       check(
         C.mln_map_projection_lat_lngs_for_pixels(
           handle,
-          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
+          array(points, 16, w(8, 8, 4)) { at, item -> putScreenPoint(at, item) },
           points.size.toLong(),
           out,
           diagnostic,
@@ -104,11 +104,11 @@ internal constructor(
    */
   public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> =
     nativeCall(this, binding) {
-      val out = allocate(points.size.toLong() * 16, 8)
+      val out = allocate(points.size.toLong() * 16, w(8, 8, 4))
       check(
         C.mln_map_projection_lat_lngs_for_pixels_unwrapped(
           handle,
-          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
+          array(points, 16, w(8, 8, 4)) { at, item -> putScreenPoint(at, item) },
           points.size.toLong(),
           out,
           diagnostic,
@@ -126,7 +126,7 @@ internal constructor(
    */
   public fun metersPerPixelAtLatitude(latitude: Double): Double =
     nativeCall(this, binding) {
-      val out = allocate(8, 8)
+      val out = allocate(8, w(8, 8, 4))
       check(C.mln_map_projection_meters_per_pixel_at_latitude(handle, latitude, out, diagnostic))
       readF64(out)
     }
@@ -139,7 +139,7 @@ internal constructor(
    */
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint =
     nativeCall(this, binding) {
-      val out = allocate(16, 8)
+      val out = allocate(16, w(8, 8, 4))
       check(
         C.mln_map_projection_pixel_for_lat_lng(handle, writeLatLng(coordinate), out, diagnostic),
       )
@@ -154,11 +154,11 @@ internal constructor(
    */
   public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> =
     nativeCall(this, binding) {
-      val out = allocate(coordinates.size.toLong() * 16, 8)
+      val out = allocate(coordinates.size.toLong() * 16, w(8, 8, 4))
       check(
         C.mln_map_projection_pixels_for_lat_lngs(
           handle,
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           out,
           diagnostic,
@@ -200,7 +200,7 @@ internal constructor(
      */
     public fun create(view: MapView): MapProjectionHandle =
       nativeCall(null, null) {
-        val out = allocate(8, 8)
+        val out = allocate(8, w(8, 8, 4))
         check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
         adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
       }

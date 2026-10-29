@@ -48,7 +48,7 @@ internal constructor(
      */
     public fun create(options: GraphicsDeviceOptions? = null): GraphicsDeviceHandle =
       nativeCall(null, null) {
-        val out = allocate(8, 8)
+        val out = allocate(8, w(8, 8, 4))
         check(
           C.mln_graphics_device_create(
             options?.let { writeGraphicsDeviceOptions(it) } ?: 0L,

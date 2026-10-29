@@ -148,7 +148,7 @@ internal constructor(
         C.mln_map_add_image_source_image(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           writePremultipliedRgba8Image(image),
           completion,
@@ -173,7 +173,7 @@ internal constructor(
         C.mln_map_add_image_source_url(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           view(url),
           completion,
@@ -425,7 +425,7 @@ internal constructor(
       check(
         C.mln_map_camera_for_lat_lngs(
           handle,
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
           completion,
@@ -577,7 +577,7 @@ internal constructor(
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(440, 8)
+      val out = sized(w(440, 440, 416), w(8, 8, 4))
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }
@@ -841,7 +841,7 @@ internal constructor(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(56, 88),
+          w(56, 88, 52),
         ) {
           readStyleLayerInfo(it)
         }
@@ -865,7 +865,7 @@ internal constructor(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(120, 152),
+          w(120, 152, 108),
         ) {
           readStyleSourceInfo(it)
         }
@@ -1257,7 +1257,7 @@ internal constructor(
         C.mln_map_set_image_source_coordinates(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           completion,
           diagnostic,
@@ -1605,7 +1605,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
         C.mln_map_add_image_source_image(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           writePremultipliedRgba8Image(image),
           completion,
@@ -1621,7 +1621,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
         C.mln_map_add_image_source_url(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           view(url),
           completion,
@@ -1981,7 +1981,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
         C.mln_map_set_image_source_coordinates(
           handle,
           view(sourceId),
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           completion,
           diagnostic,

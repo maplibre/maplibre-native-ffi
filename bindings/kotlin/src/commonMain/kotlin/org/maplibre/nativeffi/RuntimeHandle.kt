@@ -158,7 +158,7 @@ internal constructor(
    */
   public fun getEventMask(): RuntimeEventFlag =
     nativeCall(this, binding) {
-      val out = allocate(8, 8)
+      val out = allocate(8, w(8, 8, 4))
       check(C.mln_runtime_get_event_mask(handle, out, diagnostic))
       RuntimeEventFlag(readU64(out))
     }
@@ -457,7 +457,7 @@ internal constructor(
      */
     public suspend fun create(options: RuntimeOptions): RuntimeHandle =
       nativeThreadStart({ it.dispose() }) {
-        val out = allocate(8, 8)
+        val out = allocate(8, w(8, 8, 4))
         threadStart { diagnostic ->
           C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic)
         }

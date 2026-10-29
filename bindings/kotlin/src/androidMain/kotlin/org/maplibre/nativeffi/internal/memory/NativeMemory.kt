@@ -11,6 +11,8 @@ internal actual object NativeMemory {
 
   actual val addressSize: Int = addressSizeNative()
 
+  actual val scalar64Alignment: Int = scalar64AlignmentNative()
+
   actual fun allocate(size: Long): Long =
     allocateNative(size).also {
       if (it == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")
@@ -60,6 +62,8 @@ internal actual object NativeMemory {
   @CriticalNative @JvmStatic actual external fun stringLength(address: Long): Long
 
   @CriticalNative @JvmStatic private external fun addressSizeNative(): Int
+
+  @CriticalNative @JvmStatic private external fun scalar64AlignmentNative(): Int
 
   @CriticalNative @JvmStatic private external fun allocateNative(size: Long): Long
 }

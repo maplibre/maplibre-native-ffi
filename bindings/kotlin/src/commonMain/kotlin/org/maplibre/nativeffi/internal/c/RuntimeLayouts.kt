@@ -5,7 +5,7 @@ import org.maplibre.nativeffi.internal.memory.w
 
 internal object CompletionLayout {
   val SIZEOF: Int = w(24, 40)
-  val ALIGNOF: Int = 8
+  val ALIGNOF: Int = w(8, 8, 4)
   val SIZE: Int = 0
   val CALLBACK: Int = w(4, 8)
   val USER_DATA: Int = w(8, 16)
@@ -15,7 +15,7 @@ internal object CompletionLayout {
 
 internal object CompletionResultLayout {
   val SIZEOF: Int = w(48, 64)
-  val ALIGNOF: Int = 8
+  val ALIGNOF: Int = w(8, 8, 4)
   val SIZE: Int = 0
   val STATUS: Int = 4
   val DISPOSITION: Int = 8

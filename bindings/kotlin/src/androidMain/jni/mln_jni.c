@@ -119,6 +119,10 @@ bool mln_jni_upcall_boolean(
 
 static jint mln_jni_address_size(void) { return (jint)sizeof(void*); }
 
+static jint mln_jni_scalar64_alignment(void) {
+  return (jint) _Alignof(int64_t);
+}
+
 static jlong mln_jni_allocate(jlong size) {
   if (size < 0 || (uint64_t)size > SIZE_MAX) {
     return 0;
@@ -244,6 +248,9 @@ static jlong mln_jni_put_utf8(
   }
 MLN_JNI_FALLBACK(jint, mln_jni_address_size, (JNIEnv * env, jclass type), ())
 MLN_JNI_FALLBACK(
+  jint, mln_jni_scalar64_alignment, (JNIEnv * env, jclass type), ()
+)
+MLN_JNI_FALLBACK(
   jlong, mln_jni_allocate, (JNIEnv * env, jclass type, jlong size), (size)
 )
 MLN_JNI_FALLBACK(
@@ -278,6 +285,8 @@ MLN_JNI_ACCESSOR_FALLBACK(double, jdouble)
 
 #define MLN_JNI_MEMORY_METHODS(suffix)                               \
   {"addressSizeNative", "()I", (void*)mln_jni_address_size##suffix}, \
+    {"scalar64AlignmentNative", "()I",                               \
+     (void*)mln_jni_scalar64_alignment##suffix},                     \
     {"allocateNative", "(J)J", (void*)mln_jni_allocate##suffix},     \
     {"allocateUninitializedNative", "(J)J",                          \
      (void*)mln_jni_allocate_uninitialized##suffix},                 \
