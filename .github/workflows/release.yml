@@ -189,11 +189,13 @@ jobs:
     name: package / npm
     needs:
       - source
+      - native
     permissions:
       actions: read
       contents: read
     uses: ./.github/workflows/_typescript-npm.yml
     with:
+      tag: ${{ github.ref_name }}
       run_id: ${{ needs.source.outputs.run_id }}
       sha: ${{ needs.source.outputs.sha }}
       version: ${{ needs.source.outputs.version }}
