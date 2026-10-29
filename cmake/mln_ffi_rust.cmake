@@ -158,6 +158,7 @@ function(mln_ffi_link_rust_platform target)
     COMMAND "${RUSTC_EXECUTABLE}" --print sysroot
     OUTPUT_VARIABLE rust_sysroot OUTPUT_STRIP_TRAILING_WHITESPACE
     COMMAND_ERROR_IS_FATAL ANY)
+  string(REPLACE "\\" "/" rust_sysroot "${rust_sysroot}")
   execute_process(
     COMMAND "${RUSTC_EXECUTABLE}" --version
     OUTPUT_VARIABLE rust_version OUTPUT_STRIP_TRAILING_WHITESPACE
