@@ -27,62 +27,7 @@ A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main`.
 annotated, and its message below the title line becomes the release notes. The
 `release` agent skill drafts them.
 
-## Apple SDK signing
-
-Publisher signing is opt-in until a publishing identity is configured. Use an
-Apple Distribution certificate from the Apple Developer team that should appear
-as the SDK's publisher. Keep that team consistent across releases and snapshots;
-changing teams requires consumers to accept a new publisher in Xcode.
-
-Create the `apple-sdk` GitHub environment and restrict it to trusted publishing
-refs (`main` and release tags). Add these environment secrets:
-
-- `APPLE_SDK_CERTIFICATE_BASE64`: the base64-encoded, password-protected `.p12`
-  export of the certificate and its private key.
-- `APPLE_SDK_CERTIFICATE_PASSWORD`: the export's password.
-
-Set the environment variable `APPLE_SDK_TEAM_ID` to the ten-character Apple Team
-ID. Then set the **repository** variable `APPLE_SDK_SIGNING_ENABLED` to `true`.
-It must be a repository variable so npm packaging can select a macOS runner
-before the environment is available. Once enabled, missing credentials, an
-invalid identity, or signature verification failure stops publishing.
-
-Tagged releases and native snapshots use the same identity. Keep it valid and
-renew it under the same team. Revoking a certificate invalidates SDKs signed
-with it, so publish replacements if revocation is necessary.
-
 ## Snapshots
 
 The Publish snapshots workflow publishes every snapshot channel from `main`
 daily. Dispatch it to publish now.
-
-## Documentation hosting
-
-GitHub Pages serves the documentation from the latest release at
-[maplibre.org/maplibre-native-ffi/](https://maplibre.org/maplibre-native-ffi/).
-Set the repository's Pages source to GitHub Actions and allow release tags in
-the `github-pages` environment's deployment rules.
-
-Cloudflare Pages serves previews of `main` and pull requests. Create a Direct
-Upload project named `maplibre-native-ffi`, with `main` as its production
-branch. Store `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in this
-repository's `cloudflare-pages` environment. The token needs Account /
-Cloudflare Pages / Edit permission for that account. Allow `main` and pull
-request merge refs in the environment's deployment rules. Fork and Dependabot
-pull requests build the site without deploying it.
-
-The same token can also authorize R2 cache writes when it has Object Read &
-Write access to the `maplibre-native-ffi-sccache` bucket. Store its original
-value as `CLOUDFLARE_API_TOKEN` in the `sccache` environment too, and its token
-ID as `R2_SCCACHE_ACCESS_KEY_ID`. CI derives the S3 secret from the token, so
-rotating it requires updating the original value in both environments.
-
-Each preview's URL appears in the CI deployment and job summary. Pull requests
-use the `pr-<number>` branch alias; `main` updates the project's production URL.
-Cloudflare retains deployments after a pull request closes.
-
-To deploy a built preview locally, authenticate with
-`mise -C docs exec --no-deps -- wrangler login --device`, or set the same
-Cloudflare environment variables. Run `mise run //docs:package-cloudflare`, then
-`mise run //docs:deploy-cloudflare <branch>`. Mise installs the pinned Wrangler
-CLI for the deployment task.
