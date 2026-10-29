@@ -12,6 +12,7 @@ description = "Low-level Python bindings for MapLibre Native FFI"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "BSD-2-Clause"
+license-files = ["LICENSE"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3.12",

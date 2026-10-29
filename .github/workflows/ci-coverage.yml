@@ -205,6 +205,14 @@ jobs:
           path: bindings/typescript/native/build/${{ matrix.preset }}/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload Python runtime wheel
+        if: matrix.python_wheel
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-runtime-${{ matrix.preset }}-${{ github.sha }}
+          path: bindings/python/dist/maplibre_native_ffi_runtime_*.whl
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Upload ArkTS addon
         if: matrix.addon == 'arkts'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

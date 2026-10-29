@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Stamps the Python distributions with a version, before their wheels build.
+"""License runtime builds and version Python packages for publication.
 
-The API distribution in bindings/python holds the Python modules, and each
-runtime distribution in bindings/python/runtimes/<backend> holds the extension
-for one render backend. Every distribution takes the version, and every runtime
-pins the API to it. With a native install prefix, the runtime for the prefix's
-backend also takes the license notices of the native library that it embeds.
+Runtime wheels carry their native notices at build time. Release and snapshot
+packing changes their distribution metadata while preserving the tested binary.
 """
 
 from __future__ import annotations
@@ -15,6 +12,7 @@ import json
 import pathlib
 import re
 import shutil
+import zipfile
 
 from release_version import parse_version
 
@@ -31,34 +29,16 @@ def substitute(path: pathlib.Path, pattern: str, replacement: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def stamp(project: pathlib.Path, version: str, license_files: list[str]) -> None:
-    pyproject = project / "pyproject.toml"
-    substitute(pyproject, r'^version = "0\.0\.0"$', f'version = "{version}"')
-    substitute(
-        pyproject,
-        r'^(license = "BSD-2-Clause")$',
-        r"\1" + f"\nlicense-files = {json.dumps(license_files)}",
-    )
-    shutil.copy2(LICENSE, project / "LICENSE")
-
-
-def prepare(
-    package: pathlib.Path, version: str, prefix: pathlib.Path | None = None
-) -> None:
+def prepare(package: pathlib.Path, version: str) -> None:
     # A snapshot builds toward the next release, as <release>.devSTAMP.
     parse_version(DEV_SUFFIX.sub("", version))
-    stamp(package, version, ["LICENSE"])
-    for backend in BACKENDS:
-        runtime = package / "runtimes" / backend
-        substitute(
-            runtime / "pyproject.toml",
-            r'"maplibre-native-ffi==0\.0\.0"',
-            f'"maplibre-native-ffi=={version}"',
-        )
-        stamp(runtime, version, ["LICENSE", "licenses/*"])
-    if prefix is None:
-        return
+    substitute(
+        package / "pyproject.toml", r'^version = "0\.0\.0"$', f'version = "{version}"'
+    )
+    shutil.copy2(LICENSE, package / "LICENSE")
 
+
+def license_runtime(package: pathlib.Path, prefix: pathlib.Path) -> None:
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
     backend = descriptor["backend"]
     if backend not in BACKENDS:
@@ -71,15 +51,55 @@ def prepare(
     licenses = package / "runtimes" / backend / "licenses"
     shutil.rmtree(licenses, ignore_errors=True)
     shutil.copytree(notices, licenses)
+    shutil.copy2(LICENSE, licenses.parent / "LICENSE")
+
+
+def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
+    # Target builds need no wheel tooling; only the packaging job repacks wheels.
+    from wheel.wheelfile import WheelFile
+
+    parse_version(DEV_SUFFIX.sub("", version))
+    inputs = sorted(wheels.rglob("*.whl"))
+    if not inputs:
+        raise SystemExit(f"no runtime wheels in {wheels}")
+    output.mkdir(parents=True, exist_ok=True)
+    for wheel in inputs:
+        distribution, old_version, tags = wheel.name.split("-", 2)
+        old_info = f"{distribution}-{old_version}.dist-info/"
+        new_info = f"{distribution}-{version}.dist-info/"
+        destination = output / f"{distribution}-{version}-{tags}"
+        with zipfile.ZipFile(wheel) as source, WheelFile(destination, "w") as target:
+            for entry in source.infolist():
+                if entry.filename == old_info + "RECORD":
+                    continue
+                data = source.read(entry)
+                if entry.filename == old_info + "METADATA":
+                    for field in ("Version: ", "Requires-Dist: maplibre-native-ffi=="):
+                        old = f"{field}{old_version}\n".encode()
+                        if old not in data:
+                            raise SystemExit(f"{wheel} has no matching {field.strip()}")
+                        data = data.replace(old, f"{field}{version}\n".encode(), 1)
+                entry.filename = entry.filename.replace(old_info, new_info, 1)
+                # WheelFile regenerates RECORD, including each file's hash and size.
+                target.writestr(entry, data)
 
 
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("package", type=pathlib.Path)
-    parser.add_argument("version")
-    parser.add_argument("--prefix", type=pathlib.Path)
+    commands = parser.add_subparsers(dest="command", required=True)
+    licenses_parser = commands.add_parser("licenses")
+    licenses_parser.add_argument("package", type=pathlib.Path)
+    licenses_parser.add_argument("prefix", type=pathlib.Path)
+    pack_parser = commands.add_parser("pack")
+    pack_parser.add_argument("package", type=pathlib.Path)
+    pack_parser.add_argument("version")
+    pack_parser.add_argument("wheels", type=pathlib.Path)
     args = parser.parse_args(arguments)
-    prepare(args.package, args.version, args.prefix)
+    if args.command == "licenses":
+        license_runtime(args.package, args.prefix)
+    else:
+        prepare(args.package, args.version)
+        pack(args.wheels, args.package / "dist", args.version)
     return 0
 
 

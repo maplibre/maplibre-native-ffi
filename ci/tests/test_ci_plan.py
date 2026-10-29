@@ -314,6 +314,19 @@ class PresetTest(unittest.TestCase):
             [row["preset"] for row in result["matrix"]], ["linux-gnu-x64-vulkan"]
         )
 
+    def test_pypi_selects_runtime_wheel_producers_including_android(self):
+        matrix = plan.plan(self.presets, False, ["pypi"])["matrix"]
+        self.assertEqual(len(matrix), 19)
+        self.assertTrue(all(row["python_wheel"] for row in matrix))
+        self.assertEqual(
+            {row["preset"] for row in matrix if row["preset"].startswith("android-")},
+            {
+                f"android-{arch}-{backend}"
+                for arch in ("x64", "arm64")
+                for backend in ("egl", "vulkan")
+            },
+        )
+
     def test_an_unknown_unit_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown coverage units: nope"):
             plan.plan(self.presets, False, ["nope"])

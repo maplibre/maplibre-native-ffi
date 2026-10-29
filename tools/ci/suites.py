@@ -244,6 +244,9 @@ def android_commands(target: Target, abi: str) -> list[str]:
             f"mise run //bindings/zig:build {preset}",
             f"mise run //bindings/dart:build:mobile {preset}",
         ]
+        # CPython ships Android runtimes for arm64 and x64, not 32-bit ARM.
+        if target.architecture == "arm64":
+            commands.append(f"mise run //bindings/python:build-runtime {preset}")
     return commands
 
 

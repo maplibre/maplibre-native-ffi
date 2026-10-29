@@ -42,10 +42,6 @@ KOTLIN_MAVEN_PLATFORMS = {
 # RUNTIME_PLATFORMS in tools/release/dotnet_release.py names them.
 DOTNET_NUGET_PLATFORMS = {"android", "linux-gnu", "linux-musl", "macos", "windows"}
 
-# These platforms supply the runtime wheels that the Python wheels workflow
-# builds, one per preset in its matrix.
-PYTHON_WHEEL_PLATFORMS = {"linux-gnu", "linux-musl", "macos", "windows"}
-
 
 @dataclasses.dataclass(frozen=True)
 class Target:
@@ -89,7 +85,7 @@ JOBS = {
     ),
     "python-wheels": (
         "pypi",
-        packaged(PYTHON_WHEEL_PLATFORMS),
+        lambda target: python_wheel(target),
     ),
     "typescript-npm": ("npm", lambda target: addon(target) == "typescript"),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
@@ -217,6 +213,14 @@ def addon(target: Target) -> str:
     return ""
 
 
+def python_wheel(target: Target) -> bool:
+    """Whether the target builds a Python runtime wheel for publication."""
+    return any(
+        suite.task in {"//bindings/python:test", "//bindings/python:build-runtime"}
+        for suite in target_suites(target)
+    )
+
+
 def row(target: Target, save_toolchains: bool) -> dict[str, object]:
     """Return how the target job sets up, runs, and uploads for one target."""
     tasks = [suite.task for suite in target_suites(target)]
@@ -247,6 +251,7 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         "device": target.device["name"] if target.device else "",
         "device_command": target.device["command"] if target.device else "",
         "addon": addon(target),
+        "python_wheel": python_wheel(target),
         # devices-cli writes the logs of the Android emulators it boots.
         "emulator_logs": target.platform == "android" and target.device is not None,
     }

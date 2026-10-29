@@ -1,24 +1,21 @@
 [tasks.build-api]
 description = "Build the API wheel, which holds the Python modules, into dist/."
-run = "uv build --wheel --out-dir dist ."
+run = '''
+cp "$MISE_MONOREPO_ROOT/LICENSE" LICENSE
+uv build --wheel --out-dir dist .
+'''
 
 [tasks.prepare-release]
-description = "Version and license the API and runtime distributions before their wheels build."
+description = "Version the API distribution and the runtime wheels built by CI."
 usage = '''
 arg "<version>" help="The release version, or a snapshot's <next release>.devSTAMP"
-arg "[preset]" help="The preset whose runtime wheel builds next; it takes the preset's license notices"
+arg "<wheels>" help="Directory containing the runtime wheels from CI"
 '''
-run = '''
-prefix=()
-if [[ -n "${usage_preset:-}" ]]; then
-  prefix=(--prefix "$MISE_MONOREPO_ROOT/build/$usage_preset/install")
-fi
-python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" . "$usage_version" "${prefix[@]}"
-'''
+run = 'uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" pack . "$usage_version" "$usage_wheels"'
 
 [tasks._test-android]
 hide = true
 usage = 'arg "<preset>"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
-run = '"$MISE_MONOREPO_ROOT/scripts/test-python-android-device.sh" "$usage_preset"'
+run = '"$MISE_MONOREPO_ROOT/scripts/build-python-android-wheel.sh" "$usage_preset" --test'

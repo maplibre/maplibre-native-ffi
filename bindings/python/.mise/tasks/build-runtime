@@ -4,6 +4,10 @@
 #MISE shell="bash"
 set -euo pipefail
 
+if [[ "$usage_preset" == android-* ]]; then
+  exec "$MISE_MONOREPO_ROOT/scripts/build-python-android-wheel.sh" "$usage_preset"
+fi
+
 # The extension embeds the native archive, so a wheel carries one binary and
 # needs no repair. On Linux the link goes through zig: the archive is built
 # against the glibc in cmake/toolchains/zig.cmake, and the host's linker
@@ -14,11 +18,14 @@ if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
   echo "No Python runtime serves the backend of $usage_preset." >&2
   exit 2
 fi
+python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" licenses . "$install_dir"
 maturin_flags=()
 if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
 # Zig links a musl target against its own musl, so the wheel takes a
 # musllinux tag and needs no repair either.
 case "$usage_preset" in
+  # Match the native archive's minimum OS rather than maturin's default.
+  macos-*) export MACOSX_DEPLOYMENT_TARGET=14.3 ;;
   linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
   linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
 esac

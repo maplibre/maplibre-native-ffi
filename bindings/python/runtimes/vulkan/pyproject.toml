@@ -2,14 +2,15 @@
 requires = ["maturin>=1.15.0,<2"]
 build-backend = "maturin"
 
-# The release workflow stamps the version, the pin on the API distribution, and
-# the license files of the native library that the wheel embeds.
+# CI builds the extension once; packaging stamps the wheel version and API pin.
+# The build copies the license notices of the native library that it embeds.
 [project]
 name = "maplibre-native-ffi-runtime-vulkan"
 version = "0.0.0"
 description = "Vulkan runtime for the maplibre-native-ffi Python binding"
 requires-python = ">=3.12"
 license = "BSD-2-Clause"
+license-files = ["LICENSE", "licenses/*"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3.12",
