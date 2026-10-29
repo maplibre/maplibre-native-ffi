@@ -16,6 +16,12 @@ final _android = CodeAssetExtension(
   android: AndroidCodeConfig(targetNdkApi: 24),
 );
 
+final _windows = CodeAssetExtension(
+  targetArchitecture: Architecture.x64,
+  targetOS: OS.windows,
+  linkModePreference: LinkModePreference.dynamic,
+);
+
 void main() {
   late Directory temporary;
   setUp(() async {
@@ -157,6 +163,72 @@ void main() {
     });
   });
 
+  group('a local MinGW build', () {
+    void mingw(String backend, {String architecture = 'x64'}) {
+      _writePrefix(
+        temporary.uri.resolve('build/mingw-$architecture-$backend/install/'),
+        backend,
+        platform: 'windows-mingw-$architecture',
+        defaultBackend: 'vulkan',
+        libraries: [
+          'maplibre-native-c.dll',
+          'libstdc++-6.dll',
+          'libwinpthread-1.dll',
+        ],
+      );
+    }
+
+    for (final backend in ['opengl', 'vulkan']) {
+      test('serves the $backend prefix and its runtime DLLs', () async {
+        mingw(backend);
+        final output = await runHook(_windows, {
+          'local_build': 'build/mingw-x64-$backend/install',
+        });
+        expect(await bundled(output), 'windows-mingw-x64-$backend');
+        expect(output.assets.code, hasLength(3));
+      });
+    }
+
+    test('selects the default or requested backend in a build root', () async {
+      mingw('opengl');
+      mingw('vulkan');
+      expect(
+        await bundled(await runHook(_windows, {'local_build': 'build'})),
+        'windows-mingw-x64-vulkan',
+      );
+      expect(
+        await bundled(
+          await runHook(_windows, {
+            'local_build': 'build',
+            'backend': {'windows': 'opengl'},
+          }),
+        ),
+        'windows-mingw-x64-opengl',
+      );
+    });
+
+    test(
+      'rejects another architecture or a selected backend mismatch',
+      () async {
+        mingw('opengl', architecture: 'arm64');
+        await expectLater(
+          runHook(_windows, {
+            'local_build': 'build/mingw-arm64-opengl/install',
+          }),
+          throwsStateError,
+        );
+        mingw('opengl');
+        await expectLater(
+          runHook(_windows, {
+            'local_build': 'build/mingw-x64-opengl/install',
+            'backend': {'windows': 'vulkan'},
+          }),
+          throwsStateError,
+        );
+      },
+    );
+  });
+
   group('a published package', () {
     late HttpServer server;
     final served = <String, List<int>>{};
@@ -243,12 +315,14 @@ void main() {
   });
 }
 
-/// Writes an Android arm64 install prefix's descriptor and [libraries], each
+/// Writes an install prefix's descriptor and [libraries], each
 /// library holding the platform and backend that it stands in for, and returns
 /// the files.
 List<File> _writePrefix(
   Uri prefix,
   String backend, {
+  String platform = 'android-arm64',
+  String defaultBackend = 'opengl',
   List<String> libraries = const ['libmaplibre-native-c.so'],
 }) {
   File write(String name, String content) => File.fromUri(prefix.resolve(name))
@@ -258,11 +332,14 @@ List<File> _writePrefix(
     write(
       'share/maplibre-native-c/artifact.json',
       jsonEncode({
-        'platform': {'id': 'android-arm64', 'defaultBackend': 'opengl'},
+        'platform': {'id': platform, 'defaultBackend': defaultBackend},
         'backend': backend,
       }),
     ),
     for (final library in libraries)
-      write('lib/$library', 'android-arm64-$backend'),
+      write(
+        '${platform.startsWith('windows-') ? 'bin' : 'lib'}/$library',
+        '$platform-$backend',
+      ),
   ];
 }

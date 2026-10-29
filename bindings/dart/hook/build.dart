@@ -135,7 +135,7 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
     // without one, the prefix's own backend serves.
     final descriptor = _readDescriptor(directory);
     final built = _platform(descriptor);
-    if (built['id'] != platform ||
+    if (!_matchesLocalPlatform(built['id'], platform) ||
         (backend != null && descriptor['backend'] != backend)) {
       throw StateError(
         '$_defines.local_build names an install prefix built for '
@@ -189,9 +189,15 @@ bool _serves(
   String? backend,
 ) {
   final built = _platform(descriptor);
-  return built['id'] == platform &&
+  return _matchesLocalPlatform(built['id'], platform) &&
       descriptor['backend'] == (backend ?? built['defaultBackend']);
 }
+
+// A local Windows DLL uses the same C ABI whether MSVC or MinGW built it.
+bool _matchesLocalPlatform(Object? built, String requested) =>
+    built == requested ||
+    (requested.startsWith('windows-') &&
+        built == requested.replaceFirst('windows-', 'windows-mingw-'));
 
 Map<String, Object?> _platform(Map<String, Object?> descriptor) =>
     descriptor['platform']! as Map<String, Object?>;
