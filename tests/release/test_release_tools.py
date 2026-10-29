@@ -15,8 +15,14 @@ import unittest
 import zipfile
 from unittest import mock
 
-from native_package_release import ARTIFACTS_NAME, XCFRAMEWORK_NAME, prepare_assets
+from native_package_release import (
+    ARTIFACTS_NAME,
+    XCFRAMEWORK_NAME,
+    prepare_assets,
+    sbom_path,
+)
 from release_version import next_release, require_current_month, validate_tag
+from sbom import SBOM_NAME, component, document
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
 
@@ -69,6 +75,13 @@ def create_xcframework(path: pathlib.Path) -> None:
         archive.writestr(IOS_PLIST, FRAMEWORK_PLIST)
         archive.writestr(MACOS_PLIST, FRAMEWORK_PLIST)
         archive.writestr(IOS_DSYM_PLIST, FRAMEWORK_PLIST)
+        for platform, resources in (
+            ("ios-arm64", IOS_PLIST.removesuffix("Info.plist") + "Resources"),
+            ("macos-arm64", MACOS_PLIST.removesuffix("/Info.plist")),
+        ):
+            archive.writestr(
+                f"{resources}/{SBOM_NAME}", json.dumps(inventory(platform, "metal"))
+            )
         add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", "Versions/Current/Headers")
 
 
@@ -93,6 +106,24 @@ def descriptor(preset: str, backend: str = "vulkan") -> dict:
     }
 
 
+def inventory(platform: str, backend: str) -> dict:
+    root = component("maplibre-native-c", "0.1.0", "BSD-2-Clause")
+    root["bom-ref"] = f"native:{platform}:{backend}"
+    root["group"] = "org.maplibre.nativeffi"
+    local = component("maplibre-native-ffi-platform", "0.1.0", "BSD-2-Clause")
+    local["group"] = "org.maplibre.nativeffi"
+    vendor = component("vendor", "1.2.3", "MIT")
+    return document(
+        root,
+        [local, vendor],
+        {
+            root["bom-ref"]: {local["bom-ref"]},
+            local["bom-ref"]: {vendor["bom-ref"]},
+            vendor["bom-ref"]: set(),
+        },
+    )
+
+
 def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
@@ -112,6 +143,15 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
             json.dumps(descriptor(preset, backend)).encode(),
         )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
+        for relative in (
+            "share/maplibre-native-c",
+            "Frameworks/MaplibreNativeC.framework/Resources",
+        ):
+            add_bytes(
+                archive,
+                f"{root}/{relative}/{SBOM_NAME}",
+                json.dumps(inventory(PLATFORM["id"], backend)).encode(),
+            )
 
 
 class ReleaseVersionTest(unittest.TestCase):
@@ -293,6 +333,8 @@ class NativePackageReleaseTest(unittest.TestCase):
                     self.xcframework,
                     self.release_dir / ZIG_PACKAGE_NAME,
                     self.release_dir / ARTIFACTS_NAME,
+                    sbom_path(archive),
+                    sbom_path(self.xcframework),
                 )
             },
         )
@@ -310,13 +352,73 @@ class NativePackageReleaseTest(unittest.TestCase):
                         "backend": "vulkan",
                         "archive": archive.name,
                         "sha256": checksums[archive.name],
+                        "sbom": self.sbom_reference(archive, checksums),
                     }
                 ],
+                "xcframework": {
+                    "archive": self.xcframework.name,
+                    "sha256": checksums[self.xcframework.name],
+                    "sbom": self.sbom_reference(self.xcframework, checksums),
+                },
             },
         )
         self.assertIn(title, notes)
         self.assertIn(f"/commit/{self.sha}", notes)
         return notes
+
+    def sbom_reference(self, archive: pathlib.Path, checksums: dict) -> dict:
+        name = sbom_path(archive).name
+        return {
+            "file": name,
+            "url": f"https://github.com/maplibre/maplibre-native-ffi/releases/download/v{self.version}/{name}",
+            "sha256": checksums[name],
+        }
+
+    def test_sboms_follow_release_versions_graphs_and_final_archive_checksums(
+        self,
+    ) -> None:
+        archive = self.archive()
+        version = "0.0.0-dev.202610290101"
+        self.prepare("snapshot", version)
+        with tarfile.open(archive, "r:gz") as package:
+            embedded = [
+                json.load(package.extractfile(member))
+                for member in package
+                if member.isfile() and member.name.endswith(SBOM_NAME)
+            ]
+        self.assertEqual(len(embedded), 2)
+        self.assertEqual(embedded[0], embedded[1])
+        result = json.loads(sbom_path(archive).read_text())
+        root = result["metadata"]["component"]
+        self.assertEqual(root["version"], version)
+        self.assertEqual(
+            root["externalReferences"][-1]["hashes"],
+            [
+                {
+                    "alg": "SHA-256",
+                    "content": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                }
+            ],
+        )
+        self.assertNotIn("externalReferences", embedded[0]["metadata"]["component"])
+        local, vendor = result["components"]
+        self.assertEqual(local["version"], version)
+        self.assertTrue(local["purl"].endswith(f"@{version}"))
+        self.assertIn(
+            {"name": "maplibre:source-commit", "value": self.sha}, local["properties"]
+        )
+        self.assertEqual(vendor["version"], "1.2.3")
+        graph = {entry["ref"]: entry["dependsOn"] for entry in result["dependencies"]}
+        self.assertEqual(graph[root["bom-ref"]], [local["bom-ref"]])
+        self.assertEqual(graph[local["bom-ref"]], [vendor["bom-ref"]])
+        combined = json.loads(sbom_path(self.xcframework).read_text())
+        refs = [item["bom-ref"] for item in combined["components"]]
+        self.assertEqual(len(refs), len(set(refs)))
+        self.assertEqual(len(refs), 6)
+        self.assertTrue(any("ios-arm64" in ref for ref in refs))
+        self.assertTrue(any("macos-arm64" in ref for ref in refs))
+        for entry in combined["dependencies"]:
+            self.assertTrue(set(entry["dependsOn"]) <= set(refs))
 
     def test_refuses_an_incomplete_native_release(self) -> None:
         self.write_presets("linux-gnu-x64-egl", self.preset)

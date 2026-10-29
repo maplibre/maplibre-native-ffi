@@ -121,6 +121,7 @@ jobs:
         with:
           subject-path: |
             build/packages/native/release/*.tar.gz
+            build/packages/native/release/*.cdx.json
             build/packages/native/release/MaplibreNativeC.xcframework.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
             build/packages/native/release/SHA256SUMS
@@ -183,6 +184,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             build/packages/native/release/*.tar.gz
+            build/packages/native/release/*.cdx.json
             build/packages/native/release/MaplibreNativeC.xcframework.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
       - name: Remove stale snapshot assets
@@ -225,7 +227,7 @@ jobs:
              .tagName == $tag' \
             <<<"$release" >/dev/null
 
-          assets=(build/packages/native/release/*.tar.gz)
+          assets=(build/packages/native/release/*.tar.gz build/packages/native/release/*.cdx.json)
           assets+=(build/packages/native/release/MaplibreNativeC.xcframework.zip)
           assets+=(build/packages/native/release/maplibre-native-c-artifacts.json)
           assets+=(build/packages/native/release/SHA256SUMS)

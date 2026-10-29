@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import pathlib
@@ -57,6 +58,48 @@ def write_json(path: pathlib.Path, value: dict) -> None:
     path.write_text(
         json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+
+
+def stamp(inventory: dict, version: str, commit: str) -> dict:
+    """Relabel project components when CI binaries become a release."""
+    result = copy.deepcopy(inventory)
+    refs = {}
+    for item in [result["metadata"]["component"], *result["components"]]:
+        if item.get("group") != "org.maplibre.nativeffi":
+            continue
+        old_version = item["version"]
+        old_ref = item["bom-ref"]
+        item["version"] = version
+        if old_ref.endswith(f"@{old_version}"):
+            item["bom-ref"] = old_ref.removesuffix(f"@{old_version}") + f"@{version}"
+        refs[old_ref] = item["bom-ref"]
+        item["purl"] = item["purl"].rsplit("@", 1)[0] + f"@{quote(version, safe='')}"
+        properties = item.setdefault("properties", [])
+        properties[:] = [p for p in properties if p["name"] != "maplibre:source-commit"]
+        properties.append({"name": "maplibre:source-commit", "value": commit})
+    for entry in result["dependencies"]:
+        entry["ref"] = refs.get(entry["ref"], entry["ref"])
+        entry["dependsOn"] = sorted(refs.get(ref, ref) for ref in entry["dependsOn"])
+    return result
+
+
+def compose(root: dict, inventories: list[dict]) -> dict:
+    """Keep each artifact's dependency graph, including platform variants."""
+    components = []
+    dependencies = {root["bom-ref"]: set()}
+    for inventory in inventories:
+        inventory = copy.deepcopy(inventory)
+        child = inventory["metadata"]["component"]
+        prefix = child["bom-ref"] + "/"
+        for item in [child, *inventory["components"]]:
+            item["bom-ref"] = prefix + item["bom-ref"]
+            components.append(item)
+        dependencies[root["bom-ref"]].add(child["bom-ref"])
+        for entry in inventory["dependencies"]:
+            dependencies[prefix + entry["ref"]] = {
+                prefix + ref for ref in entry["dependsOn"]
+            }
+    return document(root, components, dependencies)
 
 
 def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
