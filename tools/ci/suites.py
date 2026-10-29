@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tools.ci.plan import Target
 
-DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
+DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows", "windows-mingw"}
 
 # The macOS x64 presets run under Rosetta on arm64 runners. The Rust, Zig, and
 # Go binding suites build x86_64 executables of their own. The other suites
@@ -97,7 +97,7 @@ SUITES: list[dict] = [
         ],
     },
     {
-        "platforms": ["linux-gnu", "macos", "windows"],
+        "platforms": ["linux-gnu", "macos", "windows", "windows-mingw"],
         "exclude": MACOS_X64,
         "commands": [
             {"task": "//bindings/dotnet:test"},
@@ -122,7 +122,7 @@ SUITES: list[dict] = [
         ],
     },
     {
-        "platforms": ["linux-gnu", "macos", "windows"],
+        "platforms": ["linux-gnu", "macos", "windows", "windows-mingw"],
         "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/dart:test"}],
     },
