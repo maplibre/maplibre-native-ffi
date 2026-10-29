@@ -44,7 +44,9 @@ jobs:
     timeout-minutes: 60
     permissions:
       actions: read
+      attestations: write
       contents: write
+      id-token: write
     env:
       CI_RUN_URL: ${{ inputs.ci_run_url }}
       MISE_NO_HOOKS: "1"
@@ -114,6 +116,15 @@ jobs:
         run: >-
           mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
           build/packages/native/release "$PUBLISH_VERSION"
+      - name: Attest the release assets
+        if: ${{ inputs.release }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            build/packages/native/release/*.tar.gz
+            build/packages/native/release/MaplibreNativeC.xcframework.zip
+            build/packages/native/release/maplibre-native-c-artifacts.json
+            build/packages/native/release/SHA256SUMS
       - name: Move the snapshot tag
         if: ${{ !inputs.release }}
         env:

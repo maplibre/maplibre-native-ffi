@@ -29,7 +29,9 @@ jobs:
       - source
     permissions:
       actions: read
+      attestations: write
       contents: write
+      id-token: write
     uses: ./.github/workflows/_native-package.yml
     with:
       ci_run_url: ${{ needs.source.outputs.ci_run_url }}

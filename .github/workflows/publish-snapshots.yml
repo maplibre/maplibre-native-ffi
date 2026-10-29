@@ -243,9 +243,12 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publish_packages == 'true' }}
+    # The reusable workflow needs these permissions even when attestation skips.
     permissions:
       actions: read
+      attestations: write
       contents: write
+      id-token: write
     uses: ./.github/workflows/_native-package.yml
     with:
       ci_run_url: ${{ needs.plan.outputs.ci_run_url }}
