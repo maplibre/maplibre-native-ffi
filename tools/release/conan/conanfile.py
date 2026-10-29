@@ -47,6 +47,7 @@ class MaplibreNativeC(ConanFile):
             "Emscripten": "emscripten",
         }
         architectures = {
+            "x86": "x86",
             "x86_64": "x64",
             "armv8": "arm64",
             "armv7": "arm",

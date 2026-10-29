@@ -328,6 +328,17 @@
       }
     },
     {
+      "name": "_android-x86",
+      "hidden": true,
+      "inherits": "_android",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86",
+        "MLN_FFI_TARGET_PLATFORM": "android-x86",
+        "MLN_FFI_ZIG_TARGET": "x86-linux-android",
+        "MLN_FFI_RUST_TARGET": "i686-linux-android"
+      }
+    },
+    {
       "name": "_android-x64",
       "hidden": true,
       "inherits": "_android",
@@ -769,6 +780,16 @@
       "name": "android-arm64-vulkan",
       "displayName": "Android ARM64 Vulkan",
       "inherits": ["_android-arm64", "_vulkan"]
+    },
+    {
+      "name": "android-x86-egl",
+      "displayName": "Android x86 EGL",
+      "inherits": ["_android-x86", "_egl"]
+    },
+    {
+      "name": "android-x86-vulkan",
+      "displayName": "Android x86 Vulkan",
+      "inherits": ["_android-x86", "_vulkan"]
     },
     {
       "name": "android-x64-egl",

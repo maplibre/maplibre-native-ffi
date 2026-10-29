@@ -19,6 +19,8 @@ class RuntimeTargetTests(unittest.TestCase):
             "linux-musl-arm64", targets["Vulkan"]["linux-musl-arm64-vulkan"]
         )
         self.assertEqual("android-arm", targets["Vulkan"]["android-arm-vulkan"])
+        self.assertEqual("android-x86", targets["OpenGL"]["android-x86-egl"])
+        self.assertEqual("android-x86", targets["Vulkan"]["android-x86-vulkan"])
         presets = {preset for backend in targets.values() for preset in backend}
         self.assertEqual(
             set(),

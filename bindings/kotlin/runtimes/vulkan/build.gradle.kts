@@ -21,6 +21,7 @@ kotlin {
 
   androidNativeArm32()
   androidNativeArm64()
+  androidNativeX86()
   androidNativeX64()
   linuxArm64()
   linuxX64()

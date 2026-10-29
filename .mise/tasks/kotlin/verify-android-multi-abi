@@ -18,6 +18,8 @@ presets=(
   android-arm-vulkan
   android-arm64-egl
   android-arm64-vulkan
+  android-x86-egl
+  android-x86-vulkan
   android-x64-egl
   android-x64-vulkan
 )
@@ -49,6 +51,6 @@ for backend in opengl vulkan; do
   ./gradlew \
     -Pmaplibre.localBuild="$build_root" \
     -Pmaplibre.android.backend="$backend" \
-    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86,x86_64 \
     :bindings:kotlin:androidBuild
 done

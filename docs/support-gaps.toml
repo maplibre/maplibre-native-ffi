@@ -194,6 +194,7 @@ link = "https://github.com/rust-lang/rust/blob/1.99.1/src/doc/rustc/src/platform
 [[entry]]
 bindings = ["swift"]
 platforms = ["android"]
+archs = ["arm", "arm64", "x64"]
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
 
@@ -317,6 +318,22 @@ platforms = ["freebsd"]
 status = "not-applicable"
 reason = "Microsoft ships no FreeBSD SDK for the binding's `net10.0`; upstream declined the request for official .NET 10 support."
 link = "https://github.com/dotnet/runtime/issues/122058"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["android"]
+archs = ["x86"]
+status = "not-applicable"
+reason = "Flutter supports Android ARMv7, ARM64, and x64, but has no x86 target."
+link = "https://docs.flutter.dev/reference/supported-platforms"
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["android"]
+archs = ["x86"]
+status = "not-applicable"
+reason = "The Swift Android SDK has no x86 target."
+link = "https://www.swift.org/documentation/articles/swift-sdk-for-android-getting-started.html"
 
 [[entry]]
 bindings = ["dart"]

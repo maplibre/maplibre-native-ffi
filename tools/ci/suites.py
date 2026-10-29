@@ -242,11 +242,13 @@ def android_commands(target: Target, abi: str) -> list[str]:
             f"mise run //bindings/go:build {preset}",
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/zig:build {preset}",
-            f"mise run //bindings/dart:build:mobile {preset}",
         ]
-        # CPython ships Android runtimes for arm64 and x64, not 32-bit ARM.
+        # CPython ships Android runtimes for arm64 and x64, not 32-bit targets.
         if target.architecture == "arm64":
             commands.append(f"mise run //bindings/python:build-runtime {preset}")
+        # Flutter has no Android x86 target.
+        if abi != "x86":
+            commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     return commands
 
 
@@ -315,6 +317,7 @@ def consumer_commands(target: Target) -> list[tuple[list[str], dict[str, str]]]:
         abi = {
             "arm": "armeabi-v7a",
             "arm64": "arm64-v8a",
+            "x86": "x86",
             "x64": "x86_64",
         }[target.architecture]
         lines = android_commands(target, abi)

@@ -37,6 +37,8 @@ prepare_native_inputs() {
     android-arm-vulkan
     android-arm64-egl
     android-arm64-vulkan
+    android-x86-egl
+    android-x86-vulkan
     android-x64-egl
     android-x64-vulkan
     linux-gnu-arm64-egl
@@ -97,7 +99,7 @@ add_publications() {
 }
 
 publish() {
-  local android_native=(AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64)
+  local android_native=(AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX86 AndroidNativeX64)
   local linux=(LinuxX64 LinuxArm64)
   local apple=(MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64)
 

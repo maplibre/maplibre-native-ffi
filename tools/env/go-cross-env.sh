@@ -10,7 +10,7 @@
 goos=
 
 case "$1" in
-  android-arm-* | android-arm64-* | android-x64-*)
+  android-arm-* | android-arm64-* | android-x86-* | android-x64-*)
     goos=android
     case "$1" in
       android-arm-*)
@@ -21,6 +21,10 @@ case "$1" in
       android-arm64-*)
         goarch=arm64
         compiler_prefix=aarch64-linux-android
+        ;;
+      android-x86-*)
+        goarch=386
+        compiler_prefix=i686-linux-android
         ;;
       android-x64-*)
         goarch=amd64

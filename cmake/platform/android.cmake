@@ -1,10 +1,11 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic log z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
-  # Both emulator architectures run the suite through the Android task runner.
+  # The 64-bit emulator architectures run the suite through the Android task
+  # runner.
   if(ANDROID_ABI MATCHES "^(x86_64|arm64-v8a)$")
     set(android_test_supported TRUE)
-  elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+  elseif(ANDROID_ABI MATCHES "^(armeabi-v7a|x86)$")
     set(android_test_supported FALSE)
   else()
     message(FATAL_ERROR "Unsupported Android ABI: ${ANDROID_ABI}")

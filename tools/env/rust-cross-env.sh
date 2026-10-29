@@ -14,6 +14,7 @@ cargo_runner=
 case "$1" in
   android-arm-*) cargo_target=armv7-linux-androideabi ;;
   android-arm64-*) cargo_target=aarch64-linux-android ;;
+  android-x86-*) cargo_target=i686-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
   tvos-arm64-*) cargo_target=aarch64-apple-tvos ;;
   tvos-simulator-arm64-*) cargo_target=aarch64-apple-tvos-sim ;;

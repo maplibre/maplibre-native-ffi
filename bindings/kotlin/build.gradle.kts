@@ -52,6 +52,7 @@ val androidConsumerKeepRules =
 kotlin {
   androidNativeArm32()
   androidNativeArm64()
+  androidNativeX86()
   androidNativeX64()
   iosArm64()
   iosSimulatorArm64()
@@ -305,7 +306,7 @@ kotlin {
           name.startsWith("macos")
       ) {
         // C interop commonizes size_t as an unsafe number because it is UInt on
-        // Android ARM32 and ULong on the other native targets. These declarations
+        // 32-bit Android and ULong on the other native targets. These declarations
         // remain internal and are used only at the target-local C boundary.
         languageSettings.optIn("kotlinx.cinterop.UnsafeNumber")
       }
@@ -332,6 +333,7 @@ canonicalizeKmpRootMetadata(
       "android" to "$mavenArtifact-android",
       "androidNativeArm32" to "$mavenArtifact-androidnativearm32",
       "androidNativeArm64" to "$mavenArtifact-androidnativearm64",
+      "androidNativeX86" to "$mavenArtifact-androidnativex86",
       "androidNativeX64" to "$mavenArtifact-androidnativex64",
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",

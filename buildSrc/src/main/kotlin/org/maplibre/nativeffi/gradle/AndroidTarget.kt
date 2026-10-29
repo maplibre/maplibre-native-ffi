@@ -24,6 +24,14 @@ enum class AndroidTarget(
     ndkTargetTriple = "aarch64-linux-android",
     taskSuffix = "Arm64",
   ),
+  X86(
+    cargoTarget = "i686-linux-android",
+    kotlinNativeTarget = "androidNativeX86",
+    targetPlatform = "android-x86",
+    ndkAbi = "x86",
+    ndkTargetTriple = "i686-linux-android",
+    taskSuffix = "X86",
+  ),
   X64(
     cargoTarget = "x86_64-linux-android",
     kotlinNativeTarget = "androidNativeX64",

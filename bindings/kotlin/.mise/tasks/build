@@ -12,6 +12,8 @@ case "$usage_preset" in
   android-arm-vulkan) kotlin_target=androidNativeArm32; runtime_backend=vulkan ;;
   android-arm64-egl) kotlin_target=androidNativeArm64; runtime_backend=opengl ;;
   android-arm64-vulkan) kotlin_target=androidNativeArm64; runtime_backend=vulkan ;;
+  android-x86-egl) kotlin_target=androidNativeX86; runtime_backend=opengl ;;
+  android-x86-vulkan) kotlin_target=androidNativeX86; runtime_backend=vulkan ;;
   android-x64-egl) kotlin_target=androidNativeX64; runtime_backend=opengl ;;
   android-x64-vulkan) kotlin_target=androidNativeX64; runtime_backend=vulkan ;;
   linux-gnu-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;

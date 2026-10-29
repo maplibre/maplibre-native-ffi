@@ -492,8 +492,8 @@ fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Buil
     }
 
     const target = options.native.target.result;
-    if (target.abi == .android and target.cpu.arch == .arm) {
-        const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
+    if (target.abi == .android and (target.cpu.arch == .arm or target.cpu.arch == .x86)) {
+        const unsupported = b.addFail("The Android test runner supports ARM64 and x64 guests; build this target without the test step.");
         test_step.dependOn(&unsupported.step);
     } else if (target.abi == .android or target.abi == .musl or target.os.tag == .freebsd or
         target.cpu.arch == .riscv64 or target.cpu.arch == .loongarch64)

@@ -33,6 +33,7 @@ PLATFORMS = {
     "freebsd-x64": "freebsd-x64",
     "android-arm": "android-arm",
     "android-arm64": "android-arm64",
+    "android-x86": "android-x86",
     "android-x64": "android-x64",
 }
 SYSTEMS = {
@@ -156,7 +157,7 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
             "description": "MapLibre Native C API (prebuilt release)",
             "homepage": "https://maplibre.org/maplibre-native-ffi/",
             "license": "BSD-2-Clause",
-            "supports": "(linux & (x64 | arm64)) | (osx & (x64 | arm64)) | (windows & !mingw & !uwp & (x64 | arm64)) | (freebsd & x64) | (android & (arm | arm64 | x64))",
+            "supports": "(linux & (x64 | arm64)) | (osx & (x64 | arm64)) | (windows & !mingw & !uwp & (x64 | arm64)) | (freebsd & x64) | (android & (arm | arm64 | x86 | x64))",
             "features": {
                 name: {"description": description}
                 for name, description in FEATURES.items()

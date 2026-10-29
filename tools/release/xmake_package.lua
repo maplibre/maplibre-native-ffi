@@ -39,7 +39,7 @@ package("maplibre-native-c")
             platform = "ios-maccatalyst"
         end
         local architectures = {
-            x86_64 = "x64", x64 = "x64", arm64 = "arm64",
+            x86 = "x86", x86_64 = "x64", x64 = "x64", arm64 = "arm64",
             ["arm64-v8a"] = "arm64", armv7 = "arm", ["armeabi-v7a"] = "arm",
             wasm32 = "wasm32"
         }

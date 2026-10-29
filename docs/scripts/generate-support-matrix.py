@@ -35,7 +35,7 @@ PLATFORM_LABELS = {
 PLATFORM_ORDER = list(PLATFORM_LABELS)
 # Apple mobile platforms list device and simulator rows separately.
 DEVICE_PLATFORMS = {"ios", "tvos", "visionos"}
-ARCH_ORDER = ["x64", "arm64", "arm", "riscv64", "loongarch64", "wasm32"]
+ARCH_ORDER = ["x64", "x86", "arm64", "arm", "riscv64", "loongarch64", "wasm32"]
 BACKEND_LABELS = {
     "vulkan": "Vulkan",
     "opengl": "OpenGL",

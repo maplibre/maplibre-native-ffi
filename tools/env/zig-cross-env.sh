@@ -24,7 +24,7 @@ case "$1" in
     fi
 
     zig_target_triple=$(jq -r .platform.zigTarget "$descriptor")
-    if [[ ! "$zig_target_triple" =~ ^(aarch64|x86_64|arm)-linux-android$ ]]; then
+    if [[ ! "$zig_target_triple" =~ ^(aarch64|x86_64|x86|arm)-linux-android$ ]]; then
       echo "The Android native artifact has an invalid Zig target: $zig_target_triple" >&2
       exit 2
     fi
@@ -35,6 +35,8 @@ case "$1" in
     ndk_target_triple=$zig_target_triple
     if [[ "$zig_target_triple" == arm-linux-android ]]; then
       ndk_target_triple=arm-linux-androideabi
+    elif [[ "$zig_target_triple" == x86-linux-android ]]; then
+      ndk_target_triple=i686-linux-android
     fi
     zig_include_dir="$ndk_sysroot/usr/include/$ndk_target_triple"
     zig_crt_dir="$ndk_sysroot/usr/lib/$ndk_target_triple/$zig_api_level"

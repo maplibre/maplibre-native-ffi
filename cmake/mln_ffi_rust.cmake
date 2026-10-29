@@ -42,10 +42,12 @@ function(mln_ffi_link_rust_platform target)
       set(android_tool_prefix "armv7a-linux-androideabi${android_api_level}")
     elseif(rust_target STREQUAL "x86_64-linux-android")
       set(android_tool_prefix "x86_64-linux-android${android_api_level}")
+    elseif(rust_target STREQUAL "i686-linux-android")
+      set(android_tool_prefix "i686-linux-android${android_api_level}")
     else()
       message(
         FATAL_ERROR
-          "Android Rust platform builds support armv7-linux-androideabi, aarch64-linux-android, and x86_64-linux-android; got ${rust_target}")
+          "Android Rust platform builds support armv7-linux-androideabi, aarch64-linux-android, i686-linux-android, and x86_64-linux-android; got ${rust_target}")
     endif()
     set(android_cc "${rust_compiler_dir}/${android_tool_prefix}-clang")
     set(android_cxx "${rust_compiler_dir}/${android_tool_prefix}-clang++")
