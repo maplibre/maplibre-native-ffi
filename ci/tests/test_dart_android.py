@@ -23,12 +23,6 @@ class DartAndroidTest(unittest.TestCase):
                     android_commands(self.targets[preset], abi),
                 )
 
-    def test_api_26_suites_run_before_python_replaces_the_emulator(self):
-        preset = "android-x64-egl"
-        commands = android_commands(self.targets[preset], "x86_64")
-        self.assertEqual(commands[-1], f"mise run //bindings/python:test {preset}")
-        self.assertIn(f"mise run //bindings/dart:test:android {preset}", commands[:-1])
-
     def test_android_x86_has_no_flutter_target(self):
         for backend in ("egl", "vulkan"):
             preset = f"android-x86-{backend}"

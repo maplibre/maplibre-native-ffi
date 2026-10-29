@@ -231,6 +231,7 @@ def android_commands(target: Target, abi: str) -> list[str]:
             f"mise run //bindings/rust:test {preset}",
             f"mise run //bindings/zig:test {preset}",
             f"mise run //bindings/dart:test:android {preset}",
+            f"mise run //bindings/python:test {preset}",
         ]
     else:
         commands = [
@@ -253,10 +254,6 @@ def android_commands(target: Target, abi: str) -> list[str]:
         commands.append(
             f"mise run //bindings/typescript:{action}:react-native {preset}"
         )
-    # Python replaces the EGL suite's API 26 emulator with a newer API,
-    # so run it after every suite that reuses the API 26 device.
-    if target.device:
-        commands.append(f"mise run //bindings/python:test {preset}")
     return commands
 
 
