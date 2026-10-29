@@ -35,10 +35,11 @@ publishes.
 - Organize by what changed, not by PR, and link no PRs.
 - Open with one or two sentences on the release's theme, then use whatever
   sections this release needs.
-- For a breaking change, say what a host must change. When much breaks, give
-  each kind of change one example instead of listing every rename.
-- One line per change where possible. No title line and no links footer; CI
-  appends the footer.
+- For a breaking change, say what a host must change. Merge changes that share a
+  pattern into one line with an example; the compiler and API reference give the
+  details.
+- Use plain language, one line per change where possible. No title line and no
+  links footer; CI appends the footer.
 
 Revise the draft with the maintainer until they approve it.
 
