@@ -70,6 +70,72 @@ status = "blocked"
 reason = "Swift's build lists RISC-V as a Linux target, but its standard library does not compile for it, and Swift.org ships no RISC-V toolchain."
 link = "https://github.com/swiftlang/swift/issues/78349"
 
+[[entry]]
+bindings = ["swift"]
+platforms = ["freebsd"]
+status = "blocked"
+reason = "Swift.org provides only a mutable development preview for FreeBSD 14 on x64, with no versioned toolchain release to pin."
+link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["freebsd"]
+status = "blocked"
+reason = "The upstream Dart SDK does not target FreeBSD; running the binding requires a community port."
+link = "https://github.com/dart-lang/sdk/issues/52374"
+
+[[entry]]
+bindings = ["swift"]
+platforms = ["ohos"]
+status = "blocked"
+reason = "The upstream Swift toolchain does not target OpenHarmony. The community port uses Swift 6.0.3, older than the package's required Swift tools 6.2, runs only on arm64 devices, and does not promise SwiftPM."
+link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["ohos"]
+status = "blocked"
+reason = "The upstream Dart and Flutter toolchains do not target OpenHarmony; support requires a community Flutter fork and its bundled Dart SDK."
+link = "https://gitcode.com/openharmony-sig/flutter_flutter"
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["ohos"]
+status = "blocked"
+reason = "The upstream Kotlin/Native toolchain has no OpenHarmony target; community forks add one for arm64 devices only."
+link = "https://github.com/zxystd/Kotlin-OHOS"
+
+[[entry]]
+bindings = ["python"]
+platforms = ["ohos"]
+status = "blocked"
+reason = "Running Python on OpenHarmony requires a community CPython port, outside the project's supported toolchains."
+link = "https://gitcode.com/ai_model_sig/ohos_python"
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["riscv64"]
+status = "blocked"
+reason = "Microsoft publishes no .NET SDK for RISC-V; available SDKs are community builds, outside the project's supported toolchains."
+link = "https://github.com/filipnavara/dotnet-riscv/releases"
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["linux-gnu", "linux-musl"]
+archs = ["loongarch64"]
+status = "blocked"
+reason = "Microsoft publishes no .NET SDK for LoongArch; available SDKs are community builds, outside the project's supported toolchains."
+link = "https://github.com/chenguohui/dotnet-loongarch/releases"
+
+[[entry]]
+bindings = ["dart"]
+platforms = ["linux-gnu"]
+archs = ["loongarch64"]
+status = "blocked"
+reason = "Dart's maintainers do not plan to support LoongArch; available SDKs come from a community fork, outside the project's supported toolchains."
+link = "https://github.com/Flutter-Dart-loong64/flutter-loong64-releases"
+
 # Cells with a known path that no one has started.
 
 [[entry]]
@@ -135,13 +201,6 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[entry]]
 bindings = ["swift"]
-platforms = ["freebsd"]
-status = "path-known"
-reason = "Swift.org ships a preview toolchain for FreeBSD 14 on x64 only. Run the suite with it in the FreeBSD VM."
-link = "https://forums.swift.org/t/swift-on-freebsd-preview/83064"
-
-[[entry]]
-bindings = ["swift"]
 platforms = ["android"]
 status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
@@ -174,41 +233,6 @@ status = "path-known"
 reason = "CI builds the x64 library and runs these suites on arm64 alone. Package the binding for x64 where it needs one, and run its suite under an x64 runtime on the arm64 runners, which Rosetta runs."
 
 [[entry]]
-bindings = ["dart"]
-platforms = ["freebsd"]
-status = "path-known"
-reason = "Only a community port of the Dart SDK runs on FreeBSD. Run the suite with it in the FreeBSD VM."
-link = "https://github.com/dart-lang/sdk/issues/52374"
-
-[[entry]]
-bindings = ["swift"]
-platforms = ["ohos"]
-status = "path-known"
-reason = "Only a community Swift 6.0.3 toolchain targets OpenHarmony. It runs on aarch64 devices alone, so the suite would run on an arm64 device rather than the x64 emulator that CI uses, and it does not promise SwiftPM."
-link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
-
-[[entry]]
-bindings = ["dart"]
-platforms = ["ohos"]
-status = "path-known"
-reason = "A community fork of Flutter targets OpenHarmony and bundles its own Dart SDK. Deliver the native library through it, and run the suite on the emulator."
-link = "https://gitcode.com/openharmony-sig/flutter_flutter"
-
-[[entry]]
-bindings = ["kotlin-native"]
-platforms = ["ohos"]
-status = "path-known"
-reason = "Community forks of Kotlin/Native add an arm64 OpenHarmony target. Build the KLIB with one, and run the suite on an arm64 device."
-link = "https://github.com/zxystd/Kotlin-OHOS"
-
-[[entry]]
-bindings = ["python"]
-platforms = ["ohos"]
-status = "path-known"
-reason = "Community builds of CPython target OpenHarmony. Build the extension against one, and run the suite on the emulator."
-link = "https://gitcode.com/ai_model_sig/ohos_python"
-
-[[entry]]
 bindings = ["go"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
@@ -231,30 +255,6 @@ archs = ["riscv64"]
 status = "path-known"
 reason = "The Dart SDK runs on RISC-V. Run the suite with it under QEMU's user-mode emulator."
 link = "https://dart.dev/get-dart"
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64"]
-status = "path-known"
-reason = "Microsoft publishes no .NET for RISC-V, a community architecture of .NET, but a community build of the .NET 10 SDK covers both libcs. Run the suite with it under QEMU's user-mode emulator."
-link = "https://github.com/filipnavara/dotnet-riscv/releases"
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["loongarch64"]
-status = "path-known"
-reason = "Microsoft publishes no .NET for LoongArch, a community architecture of .NET, but a community build of the .NET 10 SDK covers both libcs. Run the suite with it under QEMU's user-mode emulator."
-link = "https://github.com/chenguohui/dotnet-loongarch/releases"
-
-[[entry]]
-bindings = ["dart"]
-platforms = ["linux-gnu"]
-archs = ["loongarch64"]
-status = "path-known"
-reason = "Dart's maintainers do not plan to support LoongArch, but a community fork publishes Dart SDKs for it. Run the suite with one under QEMU's user-mode emulator."
-link = "https://github.com/Flutter-Dart-loong64/flutter-loong64-releases"
 
 [[entry]]
 bindings = ["kotlin-jvm", "python"]
