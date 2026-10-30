@@ -13,6 +13,6 @@ fi
 swift_windows_args=(
   --scratch-path ".build/$usage_preset"
   -Xcc "-I$native_install_dir/include"
-  -L "$swift_windows_import_dir"
+  -Xlinker "-libpath:$(cygpath -m "$swift_windows_import_dir")"
   -Xlinker "$swift_windows_import_dir/maplibre-native-c.lib"
 )
