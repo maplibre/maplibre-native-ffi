@@ -521,7 +521,8 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
 ) {
   attach_vulkan_owner = owner;
   attach_vulkan_initial_layout = initial_layout;
-  attach_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
+  attach_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                      MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
   const bool attached = mln_test_render_fixture_create_borrowed_ring(
     map, fixture, 1, MLN_TEST_PRESET_DRIVER
   );

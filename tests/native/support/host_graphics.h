@@ -91,7 +91,7 @@ bool mln_test_render_fixture_create_vulkan_borrowed_texture(
 
 // Attaches a borrowed ring of one Vulkan image whose frames go to `owner`
 // between renders and come back in `initial_layout`, with timeline producer
-// synchronization.
+// synchronization where the device has it.
 bool mln_test_render_fixture_create_vulkan_handoff_ring(
   mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner,
   uint32_t initial_layout

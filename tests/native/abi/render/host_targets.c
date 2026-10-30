@@ -532,11 +532,14 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
       );
       mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
       MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
-      TEST_ASSERT_EQUAL_INT(
-        1, mln_test_graphics_vulkan_timeline_wait(
-             graphics, producer.handle, producer.value, UINT64_MAX
-           )
-      );
+      // A frame without a timeline completed with its release.
+      if (producer.kind == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE) {
+        TEST_ASSERT_EQUAL_INT(
+          1, mln_test_graphics_vulkan_timeline_wait(
+               graphics, producer.handle, producer.value, UINT64_MAX
+             )
+        );
+      }
       mln_test_render_release_frame(&frame);
     }
     mln_test_render_fixture_destroy(&fixture);
