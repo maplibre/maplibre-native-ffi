@@ -115,9 +115,13 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
             generated,
         )
         self.assertIn("func `redraw`() throws", generated)
-        # No Swift target serves the browser or Android.
+        # Android declarations stay behind their platform guard; no Swift
+        # target serves the browser.
+        self.assertIn(
+            "#if os(Android)\npublic func `androidStart`(",
+            generated,
+        )
         self.assertNotIn("attachCanvas", generated)
-        self.assertNotIn("androidStart", generated)
 
     def test_zig_declares_a_function_void_off_the_platforms_it_serves(self):
         source = emitted(zig, api())["maplibre_native_ffi.zig"]
