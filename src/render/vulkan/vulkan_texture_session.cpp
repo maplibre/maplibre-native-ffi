@@ -242,7 +242,10 @@ class VulkanTextureSessionBackend final
     return backend_.drain_for_teardown();
   }
 
-  void quarantine() noexcept override { backend_.release_queue_access(); }
+  void quarantine() noexcept override {
+    backend_.release_queue_access();
+    backend_.close_sync_files();
+  }
 
   auto set_vulkan_borrowed_target(const VulkanBorrowedTarget& target)
     -> mln_status override {

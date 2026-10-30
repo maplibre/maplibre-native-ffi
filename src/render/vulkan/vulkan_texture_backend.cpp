@@ -457,9 +457,7 @@ VulkanTextureBackend::~VulkanTextureBackend() {
       // work in flight, so it ends the process, as mbgl's teardown does.
     }
   }
-  for (const auto fd : slot_fds_) {
-    close_fd(fd);
-  }
+  close_sync_files();
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   getThreadPool().runRenderJobs(true);
@@ -679,10 +677,19 @@ void VulkanTextureBackend::submit_wait(
   );
 }
 
-void VulkanTextureBackend::wait_timeline(VkSemaphore semaphore, uint64_t value) {
+void VulkanTextureBackend::wait_timeline(
+  VkSemaphore semaphore, uint64_t value
+) {
   const auto timeline =
     vk::TimelineSemaphoreSubmitInfo().setWaitSemaphoreValues(value);
   submit_wait(vk::Semaphore(semaphore), &timeline, nullptr);
+}
+
+void VulkanTextureBackend::close_sync_files() noexcept {
+  for (auto& fd : slot_fds_) {
+    close_fd(fd);
+    fd = -1;
+  }
 }
 
 void VulkanTextureBackend::wait_sync_fd(int fd) {

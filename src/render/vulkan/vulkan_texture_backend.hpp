@@ -83,6 +83,9 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Makes the session's later work on its queue wait for a sync file, which
   // this takes ownership of, even when it throws. -1 has signaled already.
   void wait_sync_fd(int fd);
+  // Closes the sync files that frames exported, for a backend that is kept
+  // rather than destroyed.
+  void close_sync_files() noexcept;
   void prepareRenderResources();
   auto frame_resources() -> VulkanTextureFrameResources;
   auto select_slot(std::size_t slot) -> bool;

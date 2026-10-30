@@ -737,6 +737,14 @@ class OpenGLTextureSessionBackend final
     }
   }
 
+  // A kept backend is never destroyed, so its exported sync files close now.
+  void quarantine() noexcept override {
+    for (auto& fd : producer_fds_) {
+      mln::core::close_fd(fd);
+      fd = -1;
+    }
+  }
+
   auto initialize_sync() -> mln_status {
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (

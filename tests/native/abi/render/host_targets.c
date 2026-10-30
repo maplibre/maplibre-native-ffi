@@ -622,10 +622,13 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
     mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
     MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
     TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_SYNC_FD, producer.kind);
+    // -1 is a fence that has already signaled.
     const int produced = (int)(int64_t)producer.handle;
-    TEST_ASSERT_GREATER_OR_EQUAL_INT(0, produced);
-    struct pollfd signaled = {.fd = produced, .events = POLLIN};
-    TEST_ASSERT_EQUAL_INT(1, poll(&signaled, 1, 10000));
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(-1, produced);
+    if (produced >= 0) {
+      struct pollfd signaled = {.fd = produced, .events = POLLIN};
+      TEST_ASSERT_EQUAL_INT(1, poll(&signaled, 1, 10000));
+    }
     expect_texture_color(
       mln_test_render_fixture_texture(&fixture, 0), colors[index],
       "the sync file frame's texture"
@@ -633,7 +636,7 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
     mln_gpu_sync consumer = {
       .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_SYNC_FD
     };
-    if (index == 0) {
+    if (index == 0 && produced >= 0) {
       consumer.handle = (uint64_t)(int64_t)dup(produced);
       void* scope = NULL;
       MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scope, NULL));
