@@ -208,13 +208,6 @@ reason = "Go ships `GOOS=ios` with cgo. Cross-compile with Apple Clang and the i
 link = "https://github.com/golang/go/blob/master/misc/ios/README"
 
 [[entry]]
-bindings = ["go"]
-platforms = ["ios-maccatalyst"]
-status = "path-known"
-reason = "Upstream gomobile already builds for Mac Catalyst. Add its iOS target, Catalyst build tag, SDK and macabi triple, link the native artifact, and run the binding suite."
-link = "https://github.com/golang/mobile/blob/master/cmd/gomobile/env.go"
-
-[[entry]]
 bindings = ["python"]
 platforms = ["windows-mingw"]
 status = "path-known"
