@@ -71,8 +71,9 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     flags = ("--features", "pyo3/extension-module")
     if descriptor["platform"]["id"].startswith("android-"):
         flags += ("--no-default-features",)
-    about = json.loads(
-        subprocess.check_output(
+    with tempfile.TemporaryDirectory() as temporary:
+        about_path = pathlib.Path(temporary) / "cargo-about.json"
+        subprocess.run(
             [
                 "cargo",
                 "about",
@@ -87,11 +88,14 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
                 "--fail",
                 "--format",
                 "json",
+                "--output-file",
+                str(about_path),
                 *flags,
             ],
             cwd=REPOSITORY,
+            check=True,
         )
-    )
+        about = json.loads(about_path.read_text(encoding="utf-8"))
     crates, graph, root_ref = cargo_components(about, target, manifest, flags)
     rust_version = subprocess.check_output(["rustc", "--version"], text=True).split()[1]
     rust = component("rust-std", rust_version, "MIT AND Apache-2.0")
