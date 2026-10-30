@@ -89,6 +89,8 @@ if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
     --env PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}" \
     --workdir "$PWD" \
     "$MLN_FFI_DART_TEST_IMAGE" sh -euc '
+      # LLVM 19 lavapipe fails to JIT RISC-V shaders; match the QEMU roots.
+      sed -i s/trixie/forky/g /etc/apt/sources.list.d/debian.sources
       apt-get update -qq
       apt-get install --yes --quiet --no-install-recommends \
         libegl1 libgles2 libvulkan1 mesa-vulkan-drivers
