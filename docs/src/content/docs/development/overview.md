@@ -71,13 +71,11 @@ root of Debian or Alpine packages that it lays out in `build/roots`. Ubuntu and
 Fedora package the emulator as `qemu-user`.
 
 Suites that start child processes, including TypeScript, need registered
-emulators. Register the image CI uses before running them; Ubuntu 24.04's older
-QEMU corrupts Node's base64 decoding on LoongArch:
+emulators. Install and register the emulators CI uses before running them;
+Ubuntu 24.04's older QEMU corrupts Node's base64 decoding on LoongArch:
 
 ```bash
-docker run --privileged --rm \
-  tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 \
-  --install riscv64,loong64
+bash scripts/setup-qemu.sh
 ```
 
 ## MSYS2

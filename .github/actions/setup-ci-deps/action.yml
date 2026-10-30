@@ -244,10 +244,8 @@ runs:
     # Ubuntu 24.04's QEMU corrupts Node's base64 decoding on LoongArch64.
     - name: Install QEMU user mode
       if: ${{ runner.os == 'Linux' && inputs.device == 'QEMU user mode' }}
-      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
-      with:
-        image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
-        platforms: riscv64,loong64
+      shell: bash
+      run: bash scripts/setup-qemu.sh
 
     # The hosted runner exposes /dev/kvm, and this rule grants the runner
     # process access to hardware acceleration. Without it the emulators and the
