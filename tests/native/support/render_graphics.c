@@ -49,7 +49,6 @@ static mln_test_graphics* shared_graphics = NULL;
 // attaches.
 static mln_vulkan_image_owner attach_vulkan_owner =
   MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE;
-static uint32_t attach_vulkan_initial_layout = 0;
 #endif
 // Set only while mln_test_render_fixture_create_synced() attaches. A Metal
 // fixture that accepts queue order also names the graphics object's queue.
@@ -301,10 +300,6 @@ static bool describe_ring(
   };
   out->context = host_context(context);
   out->format = info.format;
-  out->initial_layout =
-    attach_vulkan_owner != MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE
-      ? attach_vulkan_initial_layout
-      : info.vulkan_initial_layout;
   out->final_layout = info.vulkan_final_layout;
   out->owner = attach_vulkan_owner;
 #else
@@ -516,18 +511,15 @@ bool mln_test_render_fixture_create_vulkan_borrowed_texture(
 }
 
 bool mln_test_render_fixture_create_vulkan_handoff_ring(
-  mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner,
-  uint32_t initial_layout
+  mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner
 ) {
   attach_vulkan_owner = owner;
-  attach_vulkan_initial_layout = initial_layout;
   attach_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
                       MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
   const bool attached = mln_test_render_fixture_create_borrowed_ring(
     map, fixture, 1, MLN_TEST_PRESET_DRIVER
   );
   attach_vulkan_owner = MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE;
-  attach_vulkan_initial_layout = 0;
   attach_sync_kinds = 0;
   return attached;
 }

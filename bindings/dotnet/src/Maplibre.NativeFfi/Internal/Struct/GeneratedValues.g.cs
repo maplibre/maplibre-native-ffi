@@ -2326,7 +2326,6 @@ internal static unsafe class GeneratedValues
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.format = value.Format;
-        native.initial_layout = value.InitialLayout;
         native.final_layout = value.FinalLayout;
         native.owner = (mln_vulkan_image_owner)value.Owner;
         return native;

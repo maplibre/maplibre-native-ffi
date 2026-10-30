@@ -383,7 +383,7 @@ internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
   target: Long,
   value: VulkanBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(88, 120, 80).toUInt())
+  writeU32(target, w(80, 120, 76).toUInt())
   putLogicalExtent(target + w(8, 8, 4), value.extent)
   writeU32(target + w(24, 24, 20), value.physicalWidth)
   writeU32(target + w(28, 28, 24), value.physicalHeight)
@@ -394,15 +394,14 @@ internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
   )
   writeSize(target + w(64, 96, 60), value.textures.size.toULong())
   writeU32(target + w(68, 104, 64), value.format)
-  writeU32(target + w(72, 108, 68), value.initialLayout)
-  writeU32(target + w(76, 112, 72), value.finalLayout)
-  writeU32(target + w(80, 116, 76), value.owner.rawValue)
+  writeU32(target + w(72, 108, 68), value.finalLayout)
+  writeU32(target + w(76, 112, 72), value.owner.rawValue)
 }
 
 internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
   value: VulkanBorrowedTextureDescriptor,
 ): Long =
-  allocate(w(88, 120, 80), w(8, 8, 4)).also { putVulkanBorrowedTextureDescriptor(it, value) }
+  allocate(w(80, 120, 76), w(8, 8, 4)).also { putVulkanBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanOwnedTextureDescriptor(
   target: Long,

@@ -3409,7 +3409,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     required this.context,
     required List<VulkanBorrowedTexture> textures,
     required this.format,
-    this.initialLayout = 0,
     required this.finalLayout,
     this.owner = const VulkanImageOwner.fromRawValue(0),
   }) : textures = List.unmodifiable(textures);
@@ -3435,20 +3434,17 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// VK_FORMAT_UNDEFINED is invalid.
   final int format;
 
-  /// Backend-native VkImageLayout value expected at render-pass begin.
-  final int initialLayout;
-
   /// Backend-native VkImageLayout value left after rendering succeeds, such as
   /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
+  /// takes the image in any layout and the host returns no layout.
   final int finalLayout;
 
   /// The queue family that owns each image while the host holds its frame.
   /// Unless it is the graphics queue's family, the session releases a frame's
   /// image to it in final_layout, before the frame's producer synchronization,
-  /// and takes the image back without a transfer before it renders into it
-  /// again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
-  /// keeps the owner the session attached with.
+  /// and, since a render clears the image, takes it back without a transfer. A
+  /// replacement keeps the owner the session attached with.
   final VulkanImageOwner owner;
 
   /// A copy of this value with the given members replaced.
@@ -3459,7 +3455,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     VulkanContextDescriptor? context,
     List<VulkanBorrowedTexture>? textures,
     int? format,
-    int? initialLayout,
     int? finalLayout,
     VulkanImageOwner? owner,
   }) => VulkanBorrowedTextureDescriptor(
@@ -3469,7 +3464,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     context: context ?? this.context,
     textures: textures ?? this.textures,
     format: format ?? this.format,
-    initialLayout: initialLayout ?? this.initialLayout,
     finalLayout: finalLayout ?? this.finalLayout,
     owner: owner ?? this.owner,
   );
@@ -3482,7 +3476,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     context,
     textures,
     format,
-    initialLayout,
     finalLayout,
     owner,
   ];
@@ -3494,7 +3487,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     'context',
     'textures',
     'format',
-    'initialLayout',
     'finalLayout',
     'owner',
   ]);

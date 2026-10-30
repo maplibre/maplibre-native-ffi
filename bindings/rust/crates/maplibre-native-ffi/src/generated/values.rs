@@ -5325,19 +5325,17 @@ pub struct VulkanBorrowedTextureDescriptor {
     /// Backend-native VkFormat value of every image. Required, so
     /// VK_FORMAT_UNDEFINED is invalid.
     pub format: u32,
-    /// Backend-native VkImageLayout value expected at render-pass begin.
-    pub initial_layout: u32,
     /// Backend-native VkImageLayout value left after rendering succeeds, such
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
+    /// takes the image in any layout and the host returns no layout.
     pub final_layout: u32,
     /// The queue family that owns each image while the host holds its frame.
     /// Unless it is the graphics queue's family, the session releases a frame's
     /// image to it in final_layout, before the frame's producer
-    /// synchronization, and takes the image back without a transfer before it
-    /// renders into it again, so initial_layout must be
-    /// VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the session
-    /// attached with.
+    /// synchronization, and, since a render clears the image, takes it back
+    /// without a transfer. A replacement keeps the owner the session attached
+    /// with.
     pub owner: VulkanImageOwner,
 }
 impl VulkanBorrowedTextureDescriptor {
@@ -5357,7 +5355,6 @@ impl VulkanBorrowedTextureDescriptor {
             context,
             textures,
             format,
-            initial_layout: Default::default(),
             final_layout,
             owner: Default::default(),
         }
@@ -5377,7 +5374,6 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
         raw.textures = convert::array(&self.textures, arena)?;
         raw.texture_count = convert::count(self.textures.len())?;
         raw.format = self.format;
-        raw.initial_layout = self.initial_layout;
         raw.final_layout = self.final_layout;
         raw.owner = to_native(&self.owner, arena)?;
         Ok(raw)

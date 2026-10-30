@@ -313,14 +313,6 @@ class TextureSessionBackend {
     out_rendered = true;
     return MLN_STATUS_OK;
   }
-  // Narrows the session's consumer_sync_kinds to what the backend found at
-  // initialization. Rejecting a sync kind here keeps the release synchronous
-  // and all-or-nothing: the caller keeps frame ownership instead of losing the
-  // handle to a release whose wait can never run.
-  virtual auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool {
-    (void)kind;
-    return true;
-  }
   // Waits for a consumer sync that names an object, on the driver.
   virtual auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status {
     (void)sync;

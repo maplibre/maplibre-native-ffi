@@ -104,8 +104,8 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
  private:
   void initSharedDevice();
   mln_vulkan_owned_texture_descriptor descriptor_;
-  // The borrowed format and layouts. Its textures array is null; the images
-  // are in borrowed_images_.
+  // The borrowed format, final layout, and owner. Its textures array is null;
+  // the images are in borrowed_images_.
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
   // The caller's image for each slot, or empty for a session-owned ring.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;

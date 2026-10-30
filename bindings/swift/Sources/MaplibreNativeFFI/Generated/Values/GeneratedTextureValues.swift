@@ -509,18 +509,16 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Backend-native VkFormat value of every image. Required, so
   /// VK_FORMAT_UNDEFINED is invalid.
   public var format: UInt32
-  /// Backend-native VkImageLayout value expected at render-pass begin.
-  public var initialLayout: UInt32
   /// Backend-native VkImageLayout value left after rendering succeeds, such as
   /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
+  /// takes the image in any layout and the host returns no layout.
   public var finalLayout: UInt32
   /// The queue family that owns each image while the host holds its frame.
   /// Unless it is the graphics queue's family, the session releases a frame's
   /// image to it in final_layout, before the frame's producer synchronization,
-  /// and takes the image back without a transfer before it renders into it
-  /// again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
-  /// keeps the owner the session attached with.
+  /// and, since a render clears the image, takes it back without a transfer. A
+  /// replacement keeps the owner the session attached with.
   public var owner: VulkanImageOwner
   public init(
     extent: LogicalExtent,
@@ -529,7 +527,6 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     context: VulkanContextDescriptor,
     textures: [VulkanBorrowedTexture],
     format: UInt32,
-    initialLayout: UInt32 = 0,
     finalLayout: UInt32,
     owner: VulkanImageOwner = .init(rawValue: 0)
   ) {
@@ -539,7 +536,6 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.context = context
     self.textures = textures
     self.format = format
-    self.initialLayout = initialLayout
     self.finalLayout = finalLayout
     self.owner = owner
   }
@@ -557,7 +553,6 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       count: Int(raw.texture_count)
     ).map { VulkanBorrowedTexture(raw: $0) }
     format = raw.format
-    initialLayout = raw.initial_layout
     finalLayout = raw.final_layout
     owner = VulkanImageOwner(rawValue: raw.owner.rawValue)
   }
@@ -574,7 +569,6 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.textures = arena.array(textures.map { $0.nativeValue() })
     raw.texture_count = try NativeInputArena.count(textures.count)
     raw.format = format
-    raw.initial_layout = initialLayout
     raw.final_layout = finalLayout
     raw.owner = mln_vulkan_image_owner(rawValue: owner.rawValue)
     return raw

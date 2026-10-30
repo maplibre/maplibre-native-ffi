@@ -1564,7 +1564,6 @@ pub struct mln_vulkan_borrowed_texture_descriptor {
     pub textures: *const mln_vulkan_borrowed_texture,
     pub texture_count: usize,
     pub format: u32,
-    pub initial_layout: u32,
     pub final_layout: u32,
     pub owner: mln_vulkan_image_owner,
 }

@@ -2718,19 +2718,17 @@ public data class VulkanBorrowedTextureDescriptor(
   public val textures: List<VulkanBorrowedTexture>,
   /** Backend-native VkFormat value of every image. Required, so VK_FORMAT_UNDEFINED is invalid. */
   public val format: UInt,
-  /** Backend-native VkImageLayout value expected at render-pass begin. */
-  public val initialLayout: UInt = 0u,
   /**
    * Backend-native VkImageLayout value left after rendering succeeds, such as
-   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so VK_IMAGE_LAYOUT_UNDEFINED is invalid. A
+   * render clears its image, so it takes the image in any layout and the host returns no layout.
    */
   public val finalLayout: UInt,
   /**
    * The queue family that owns each image while the host holds its frame. Unless it is the graphics
    * queue's family, the session releases a frame's image to it in final_layout, before the frame's
-   * producer synchronization, and takes the image back without a transfer before it renders into it
-   * again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the
-   * session attached with.
+   * producer synchronization, and, since a render clears the image, takes it back without a
+   * transfer. A replacement keeps the owner the session attached with.
    */
   public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
 )

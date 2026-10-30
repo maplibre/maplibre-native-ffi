@@ -1482,8 +1482,6 @@ final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int format;
   @Uint32()
-  external int initial_layout;
-  @Uint32()
   external int final_layout;
   @Uint32()
   external int owner;

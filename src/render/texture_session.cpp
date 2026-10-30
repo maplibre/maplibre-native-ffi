@@ -245,15 +245,6 @@ auto validate_vulkan_borrowed_texture_descriptor(
     set_thread_error("Vulkan image owner is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->owner != MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE &&
-    descriptor->initial_layout != 0
-  ) {
-    set_thread_error(
-      "a Vulkan image with another owner needs an undefined initial_layout"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   return MLN_STATUS_OK;
 }
 

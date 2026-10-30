@@ -279,7 +279,8 @@ class VulkanTextureSessionBackend final
     }
     if (!backend_.matches_borrowed_target(target.descriptor)) {
       return mln::core::unsupported_retarget(
-        "Vulkan image target must have the format, layouts, and owner this "
+        "Vulkan image target must have the format, final layout, and owner "
+        "this "
         "session's render pass was built for; destroy the session and attach "
         "again to change them"
       );

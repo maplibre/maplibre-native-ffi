@@ -1165,7 +1165,6 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
     public mln_vulkan_borrowed_texture* textures;
     public nuint texture_count;
     public uint format;
-    public uint initial_layout;
     public uint final_layout;
     public mln_vulkan_image_owner owner;
 }

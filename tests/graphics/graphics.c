@@ -1034,7 +1034,6 @@ static bool vulkan_texture_create(
   }
   texture->info.vulkan_image_view = (uint64_t)(uintptr_t)view;
   texture->info.format = VK_FORMAT_R8G8B8A8_UNORM;
-  texture->info.vulkan_initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
   texture->info.vulkan_final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   return true;
 }

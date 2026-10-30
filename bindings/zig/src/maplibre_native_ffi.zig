@@ -6328,19 +6328,17 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     /// Backend-native VkFormat value of every image. Required, so
     /// VK_FORMAT_UNDEFINED is invalid.
     format: u32,
-    /// Backend-native VkImageLayout value expected at render-pass begin.
-    initial_layout: u32 = 0,
     /// Backend-native VkImageLayout value left after rendering succeeds, such
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
+    /// takes the image in any layout and the host returns no layout.
     final_layout: u32,
     /// The queue family that owns each image while the host holds its frame.
     /// Unless it is the graphics queue's family, the session releases a frame's
     /// image to it in final_layout, before the frame's producer
-    /// synchronization, and takes the image back without a transfer before it
-    /// renders into it again, so initial_layout must be
-    /// VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the session
-    /// attached with.
+    /// synchronization, and, since a render clears the image, takes it back
+    /// without a transfer. A replacement keeps the owner the session attached
+    /// with.
     owner: VulkanImageOwner = .graphics_queue,
     pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_descriptor);
@@ -6356,7 +6354,6 @@ pub const VulkanBorrowedTextureDescriptor = struct {
         };
         raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
         raw.format = self.format;
-        raw.initial_layout = self.initial_layout;
         raw.final_layout = self.final_layout;
         raw.owner = self.owner.toNative();
         return raw;
@@ -6374,7 +6371,6 @@ pub const VulkanBorrowedTextureDescriptor = struct {
                 break :blk copied;
             },
             .format = raw.format,
-            .initial_layout = raw.initial_layout,
             .final_layout = raw.final_layout,
             .owner = VulkanImageOwner.fromNative(raw.owner),
         };

@@ -3052,7 +3052,6 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
         storage.keep_array(items)
     };
     raw.format = value.getattr("format")?.extract::<u32>()?;
-    raw.initial_layout = value.getattr("initial_layout")?.extract::<u32>()?;
     raw.final_layout = value.getattr("final_layout")?.extract::<u32>()?;
     raw.owner = value
         .getattr("owner")?

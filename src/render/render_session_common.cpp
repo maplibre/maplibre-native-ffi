@@ -3791,13 +3791,11 @@ auto acquired_frame_release(
       set_thread_error("acquired frame was already released");
       return MLN_STATUS_INVALID_STATE;
     }
-    // A valid frame keeps detach from destroying the backend. Reject an
-    // unsupported sync before consuming the handle, so the host keeps it.
+    // Reject an unsupported sync before consuming the handle, so the host
+    // keeps it.
     if (
       (live->session->capabilities.consumer_sync_kinds &
-       gpu_sync_kind_flag(copied.kind)) == 0 ||
-      (live->session->texture.backend &&
-       !live->session->texture.backend->supports_consumer_sync(copied.kind))
+       gpu_sync_kind_flag(copied.kind)) == 0
     ) {
       set_thread_error("render backend does not support this gpu sync kind");
       return MLN_STATUS_UNSUPPORTED;

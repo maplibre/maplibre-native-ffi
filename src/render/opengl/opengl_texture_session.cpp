@@ -534,39 +534,6 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
-  auto supports_fence_sync() -> bool {
-    if (
-      context_.ownership != MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED ||
-      context_.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL
-    )
-      return false;
-    auto guard = mln::gfx::BackendScope{*this};
-    for (const auto* name :
-         {"glFenceSync", "glWaitSync", "glDeleteSync", "glIsSync"}) {
-      if (getExtensionFunctionPointer(name) == nullptr) return false;
-    }
-    auto major = mln::platform::GLint{};
-    auto minor = mln::platform::GLint{};
-    mln::platform::glGetIntegerv(GL_MAJOR_VERSION, &major);
-    mln::platform::glGetIntegerv(GL_MINOR_VERSION, &minor);
-    const auto* version =
-      reinterpret_cast<const char*>(mln::platform::glGetString(GL_VERSION));
-    const auto gles =
-      version != nullptr &&
-      std::string_view{version}.find("OpenGL ES") != std::string_view::npos;
-    if (major > 3 || (major == 3 && (gles || minor >= 2))) return true;
-    auto count = mln::platform::GLint{};
-    mln::platform::glGetIntegerv(GL_NUM_EXTENSIONS, &count);
-    for (auto index = mln::platform::GLint{}; index < count; ++index) {
-      const auto* extension = reinterpret_cast<const char*>(
-        mln::platform::glGetStringi(GL_EXTENSIONS, static_cast<uint32_t>(index))
-      );
-      if (extension != nullptr && std::string_view{extension} == "GL_ARB_sync")
-        return true;
-    }
-    return false;
-  }
-
   void set_borrowed_textures(const OpenGLBorrowedTarget& target) {
     borrowed_textures_ = borrowed_texture_names(target);
     // setSize() drops the selected renderable unconditionally, and the reset
@@ -894,21 +861,7 @@ class OpenGLTextureSessionBackend final
     }
 #endif
 #endif
-    fence_sync_supported_ = backend_.supports_fence_sync();
-    if (
-      producer_sync_kind_ == MLN_GPU_SYNC_OPEN_GL_FENCE &&
-      !fence_sync_supported_
-    ) {
-      mln::core::set_thread_error(
-        "OpenGL context does not support shared GLsync objects"
-      );
-      return MLN_STATUS_UNSUPPORTED;
-    }
     return MLN_STATUS_OK;
-  }
-
-  auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool override {
-    return kind != MLN_GPU_SYNC_OPEN_GL_FENCE || fence_sync_supported_;
   }
 
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
@@ -919,8 +872,7 @@ class OpenGLTextureSessionBackend final
       return wait_metal_event(sync);
 #endif
 #endif
-    if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE || !fence_sync_supported_)
-      return MLN_STATUS_UNSUPPORTED;
+    if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE) return MLN_STATUS_UNSUPPORTED;
     try {
       auto guard = mln::gfx::BackendScope{backend_};
       auto* fence = reinterpret_cast<mln::platform::GLsync>(
@@ -1123,7 +1075,6 @@ class OpenGLTextureSessionBackend final
   std::array<mln::platform::GLsync, mln::core::max_texture_ring_depth>
     producer_fences_{};
   bool has_producer_fences_ = false;
-  bool fence_sync_supported_ = false;
   // The sync file each slot's last frame exported, or -1.
   std::array<int, mln::core::max_texture_ring_depth> producer_fds_ = [] {
     auto fds = std::array<int, mln::core::max_texture_ring_depth>{};

@@ -6176,16 +6176,6 @@ bool mln_ts_write_vulkan_borrowed_texture_descriptor(
       return false;
     out->format = (uint32_t)number;
   }
-  if (!mln_ts_member(call, value, "initialLayout", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "initialLayout");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->initial_layout = (uint32_t)number;
-    }
-  }
   if (!mln_ts_member(call, value, "finalLayout", &member)) return false;
   mln_ts_path(child, sizeof child, path, "finalLayout");
   {

@@ -277,12 +277,7 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
     return backend_->prepare_off_thread_teardown();
   }
   void quarantine() noexcept override { backend_->quarantine(); }
-  // Takes any synchronization, then fails to wait for it.
-  auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool override {
-    return failure_ == FrameFailure::Release ||
-           failure_ == FrameFailure::ReleaseTargetLost ||
-           backend_->supports_consumer_sync(kind);
-  }
+  // Fails to wait for any synchronization.
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
     if (failure_ == FrameFailure::Release) return MLN_STATUS_NATIVE_ERROR;
     if (failure_ == FrameFailure::ReleaseTargetLost) {

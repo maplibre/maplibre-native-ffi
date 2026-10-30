@@ -204,31 +204,18 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    */
   uint32_t format MLN_BINDING("required=true");
   /**
-   * Backend-native VkImageLayout value expected at render-pass begin.
-   *
-   * The session expects an image in this layout each time it renders into
-   * it: the first time, and again after the host releases a frame of its
-   * slot. A frame's image is in final_layout when the host acquires it, so
-   * the host returns it to this layout before it releases the frame.
-   * VK_IMAGE_LAYOUT_UNDEFINED accepts an image in any layout and discards its
-   * previous contents. Setting it equal to final_layout, or to
-   * VK_IMAGE_LAYOUT_UNDEFINED, lets the host release a frame without a layout
-   * transition.
-   */
-  uint32_t initial_layout;
-  /**
    * Backend-native VkImageLayout value left after rendering succeeds, such as
    * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-   * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
+   * VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
+   * takes the image in any layout and the host returns no layout.
    */
   uint32_t final_layout MLN_BINDING("required=true");
   /**
    * The queue family that owns each image while the host holds its frame.
    * Unless it is the graphics queue's family, the session releases a frame's
    * image to it in final_layout, before the frame's producer synchronization,
-   * and takes the image back without a transfer before it renders into it
-   * again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
-   * keeps the owner the session attached with.
+   * and, since a render clears the image, takes it back without a transfer. A
+   * replacement keeps the owner the session attached with.
    */
   mln_vulkan_image_owner owner;
 } mln_vulkan_borrowed_texture_descriptor;
@@ -868,8 +855,8 @@ MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
  * Completes with:
  * - MLN_STATUS_OK once the driver renders into the new textures.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
- * - MLN_STATUS_UNSUPPORTED when the replacement's format or layouts differ from
- *   those the session attached with.
+ * - MLN_STATUS_UNSUPPORTED when the replacement's format, final layout, or
+ * owner differ from those the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING(

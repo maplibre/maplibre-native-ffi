@@ -144,21 +144,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   void swap() override {
-    // Submit the recorded frame. A discarded borrowed render then restores the
-    // host initial layout so the next render in this update matches the layout
-    // contract.
     SurfaceRenderableResource::swap();
-    const auto initial_layout =
-      static_cast<vk::ImageLayout>(owner_.borrowed_descriptor_.initial_layout);
-    const auto final_layout =
-      static_cast<vk::ImageLayout>(owner_.borrowed_descriptor_.final_layout);
-    if (
-      mln::core::discard_renderable_present && owner_.uses_borrowed_texture_ &&
-      initial_layout != final_layout &&
-      initial_layout != vk::ImageLayout::eUndefined
-    ) {
-      restore_borrowed_initial_layout(initial_layout, final_layout);
-    }
     // A discarded render publishes no frame, so its image stays.
     auto release = vk::CommandBuffer{};
     if (!mln::core::discard_renderable_present && owner_.handoff_family()) {
@@ -265,19 +251,12 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     );
   }
 
-  [[nodiscard]] auto initial_layout() const -> vk::ImageLayout {
-    return owner_.uses_borrowed_texture_
-             ? static_cast<vk::ImageLayout>(
-                 owner_.borrowed_descriptor_.initial_layout
-               )
-             : vk::ImageLayout::eUndefined;
-  }
-
   [[nodiscard]] auto final_layout() const -> vk::ImageLayout {
     return static_cast<vk::ImageLayout>(owner_.frame_layout());
   }
 
-  // Built once: a replacement target must match its format and layouts, which
+  // Built once: a replacement target must match its format and final layout,
+  // which
   // VulkanTextureBackend::matches_borrowed_target checks.
   void create_render_pass() {
     const auto& device = backend.getDevice();
@@ -291,7 +270,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         .setStoreOp(vk::AttachmentStoreOp::eStore)
         .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
         .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-        .setInitialLayout(initial_layout())
+        .setInitialLayout(vk::ImageLayout::eUndefined)
         .setFinalLayout(final_layout()),
       vk::AttachmentDescription()
         .setFormat(depthFormat)
@@ -387,35 +366,6 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     );
   }
 
-  void restore_borrowed_initial_layout(
-    vk::ImageLayout initial_layout, vk::ImageLayout final_layout
-  ) {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    auto& context_impl =
-      static_cast<mln::vulkan::Context&>(backend.getContext());
-    wait_frame(context_impl);
-    const auto rendered = slots_.at(selected_).image;
-    context_impl.submitOneTimeCommand(
-      [&](const vk::UniqueCommandBuffer& command_buffer) -> void {
-        const auto barrier =
-          vk::ImageMemoryBarrier()
-            .setImage(rendered)
-            .setOldLayout(final_layout)
-            .setNewLayout(initial_layout)
-            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-        command_buffer->pipelineBarrier(
-          vk::PipelineStageFlagBits::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, nullptr,
-          nullptr, barrier, backend.getDispatcher()
-        );
-      }
-    );
-  }
-
   VulkanTextureBackend& owner_;
   std::vector<Slot> slots_;
   std::size_t selected_ = 0;
@@ -502,7 +452,6 @@ auto VulkanTextureBackend::matches_borrowed_target(
   // pass, so a replacement keeps them to keep those pipelines usable. It keeps
   // the owner too, since the outgoing images may still be with it.
   return descriptor.format == borrowed_descriptor_.format &&
-         descriptor.initial_layout == borrowed_descriptor_.initial_layout &&
          descriptor.final_layout == borrowed_descriptor_.final_layout &&
          descriptor.owner == borrowed_descriptor_.owner;
 }

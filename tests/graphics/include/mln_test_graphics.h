@@ -95,10 +95,8 @@ typedef struct mln_test_graphics_texture_info {
   uint32_t height;
   // MTLPixelFormat, VkFormat, or the OpenGL internal format.
   uint32_t format;
-  // Vulkan: the layouts to name as the descriptor's initial_layout and
-  // final_layout. mln_test_graphics_texture_read_rgba8() expects the image in
-  // the final layout.
-  uint32_t vulkan_initial_layout;
+  // Vulkan: the layout to name as the descriptor's final_layout, in which
+  // mln_test_graphics_texture_read_rgba8() expects the image.
   uint32_t vulkan_final_layout;
   // EGL and WGL: the texture name, and its target, GL_TEXTURE_2D.
   uint32_t opengl_texture;

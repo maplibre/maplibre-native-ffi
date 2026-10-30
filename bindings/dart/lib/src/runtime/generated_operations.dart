@@ -1139,11 +1139,6 @@ _writeVulkanBorrowedTextureDescriptor(
     );
   }
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  result.ref.initial_layout = _nativeInteger(
-    value.initialLayout,
-    0,
-    4294967295,
-  );
   result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
   result.ref.owner = value.owner.rawValue;
   return result;

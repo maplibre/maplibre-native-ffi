@@ -117,7 +117,6 @@ static void describe_borrowed(mln_test_target_call* call) {
   descriptor->texture_count = 1;
   // VK_FORMAT_R8G8B8A8_UNORM, from undefined to shader-read-only.
   descriptor->format = 37;
-  descriptor->initial_layout = 0;
   descriptor->final_layout = 5;
   descriptor->physical_width = 64;
   descriptor->physical_height = 64;
