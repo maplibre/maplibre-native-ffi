@@ -28,7 +28,8 @@
     "typedoc": "^0.28.20",
     "typescript": "^7.0.2",
     "react-native": "0.88.1",
-    "@types/react": "^19.2.0"
+    "@types/react": "^19.2.0",
+    "amaro": "1.3.0"
   },
   "peerDependencies": {
     "react-native": "0.88.x"

@@ -28,7 +28,7 @@ esac
 
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 root="$repository/build/roots/linux-$libc-$architecture"
-if [[ -f "$root/.complete" ]]; then
+if [[ -f "$root/.complete" && ( "$libc" != gnu || -x "$root/usr/bin/node" ) ]]; then
   printf '%s\n' "$root"
   exit 0
 fi
@@ -59,8 +59,8 @@ case "$libc" in
       packages=$(apt-cache depends --recurse --no-recommends --no-suggests \
         --no-conflicts --no-breaks --no-replaces --no-enhances \
         "base-files:$1" "libc6:$1" "libvulkan1:$1" "mesa-vulkan-drivers:$1" \
-        "libegl1:$1" "libegl-mesa0:$1" "libgles2:$1" |
-        grep -E "^[a-z0-9][^ ]*:$1\$" | sort -u)
+        "libegl1:$1" "libegl-mesa0:$1" "libgles2:$1" "nodejs:$1" |
+        grep -E "^([a-z0-9][^ ]*:$1|node-[a-z0-9-]+)\$" | sort -u)
       cd /tmp
       # shellcheck disable=SC2086
       apt-get download -qq $packages >&2

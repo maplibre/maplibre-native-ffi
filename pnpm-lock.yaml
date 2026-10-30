@@ -186,6 +186,9 @@ importers:
       '@types/react':
         specifier: ^19.2.0
         version: 19.3.0
+      amaro:
+        specifier: 1.3.0
+        version: 1.3.0
       emnapi:
         specifier: 2.0.0-beta.2
         version: 2.0.0-beta.2
@@ -1878,6 +1881,10 @@ packages:
   am-i-vibing@0.5.0:
     resolution: {integrity: sha512-KLcsDhqf1XRrJmJr+9I/C0EX2K+sGrAGZFgkmd84c8TJO9zJBu+/kFInjazu1KfJWFhWDKdRWkpBzEs7s35DVA==}
     hasBin: true
+
+  amaro@1.3.0:
+    resolution: {integrity: sha512-AuQra8VNxiToMaXpQWLEeDZZqo13unyNvKq81VhdtIh0cO9ZE+fElw+rpwrdVwjzomaqB40bin8ycHmoLlhvoQ==}
+    engines: {node: '>=22'}
 
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
@@ -5117,6 +5124,8 @@ snapshots:
   am-i-vibing@0.5.0:
     dependencies:
       process-ancestry: 0.1.0
+
+  amaro@1.3.0: {}
 
   anser@1.4.10: {}
 

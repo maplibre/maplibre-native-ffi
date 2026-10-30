@@ -211,7 +211,7 @@ def addon(target: Target) -> str:
     # The npm packages carry the addon that the TypeScript suite built against
     # the packaged native artifact and tested, for each preset that
     # bindings/typescript/scripts/pack.ts packs.
-    if target.platform in {"linux-gnu", "macos", "emscripten"} and (
+    if target.platform in {"linux-gnu", "linux-musl", "macos", "emscripten"} and (
         "//bindings/typescript:test" in tasks
     ):
         return "typescript"

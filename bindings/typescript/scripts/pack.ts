@@ -56,6 +56,7 @@ const shared = {
 // from process.platform and process.arch.
 const platforms: Record<string, { os: string; libc?: string }> = {
   "linux-gnu": { os: "linux", libc: "glibc" },
+  "linux-musl": { os: "linux", libc: "musl" },
   macos: { os: "darwin" },
 };
 const titles: Record<string, string> = {
@@ -96,18 +97,19 @@ function addonOf(preset: string): Addon {
       files: ["maplibre_native_ffi.mjs", "maplibre_native_ffi.wasm"],
     };
   }
-  const match = /^(linux-gnu|macos)-(x64|arm64)-(egl|metal|vulkan)$/.exec(
-    preset,
-  );
+  const match =
+    /^(linux-gnu|linux-musl|macos)-(x64|arm64|riscv64|loongarch64)-(egl|metal|vulkan)$/.exec(
+      preset,
+    );
   if (match === null) {
     throw new Error(
-      `${preset} has no addon package; only the Linux glibc, macOS, and Emscripten presets do`,
+      `${preset} has no addon package; only the Linux, macOS, and Emscripten presets do`,
     );
   }
   const { os, libc } = platforms[match[1]!]!;
   const backend = backends[match[3]!]!;
-  const cpu = match[2]!;
-  const suffix = libc === undefined ? "" : "-gnu";
+  const cpu = match[2] === "loongarch64" ? "loong64" : match[2]!;
+  const suffix = libc === undefined ? "" : libc === "musl" ? "-musl" : "-gnu";
   return {
     preset,
     backend,

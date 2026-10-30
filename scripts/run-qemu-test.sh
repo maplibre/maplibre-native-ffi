@@ -29,10 +29,15 @@ case "$preset" in
     ;;
 esac
 
-emulator=$(command -v "qemu-$architecture" || command -v "qemu-$architecture-static" || true)
-if [[ -z "$emulator" ]]; then
-  echo "$preset tests require QEMU's user-mode emulator, qemu-$architecture." >&2
-  exit 2
+emulator=()
+registration="/proc/sys/fs/binfmt_misc/qemu-$architecture"
+if [[ ! -r "$registration" ]] || ! grep -qx enabled "$registration"; then
+  executable=$(command -v "qemu-$architecture" || command -v "qemu-$architecture-static" || true)
+  if [[ -z "$executable" ]]; then
+    echo "$preset tests require QEMU's user-mode emulator, qemu-$architecture." >&2
+    exit 2
+  fi
+  emulator=("$executable")
 fi
 root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "$libc" "$architecture")
 
@@ -50,4 +55,4 @@ export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-5}"
 
 export QEMU_LD_PREFIX="$root"
 
-exec timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" "$emulator" "$@"
+exec timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" "${emulator[@]}" "$@"

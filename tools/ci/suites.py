@@ -126,14 +126,29 @@ SUITES: list[dict] = [
         "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/dart:test"}],
     },
-    # The TypeScript suite runs under Node, Bun, and Deno in turn, and loads the
-    # packages that it packs and installs. The binding does not support Windows yet:
+    # The TypeScript suite loads the packages it packs and installs under Node,
+    # Bun, and Deno (Node and Bun on musl). The binding does not support Windows yet:
     # on Windows x64, the addon's first double in a process reached JavaScript as a
     # heap address, for a reason that is unknown.
     {
-        "platforms": ["linux-gnu", "macos"],
+        "platforms": ["linux-gnu", "linux-musl", "macos"],
         "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/typescript:test"}],
+    },
+    {
+        "platforms": ["linux-gnu"],
+        "commands": [
+            {
+                "task": "//bindings/typescript:test",
+                "architectures": ["riscv64", "loongarch64"],
+                "include": [
+                    "linux-gnu-riscv64-egl",
+                    "linux-gnu-riscv64-vulkan",
+                    "linux-gnu-loongarch64-egl",
+                    "linux-gnu-loongarch64-vulkan",
+                ],
+            },
+        ],
     },
     # The browser suites run against the Emscripten build in headless Chromium. The
     # Kotlin/Wasm suite runs on the page and links its own module from the package.

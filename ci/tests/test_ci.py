@@ -182,6 +182,30 @@ class SuitesTest(unittest.TestCase):
     def setUpClass(cls):
         cls.targets = targets()
 
+    def test_typescript_linux_suites_publish_their_tested_addons(self):
+        expected = {
+            f"linux-{libc}-{arch}-{backend}"
+            for libc, architectures in (
+                ("gnu", ("x64", "arm64", "riscv64", "loongarch64")),
+                ("musl", ("x64", "arm64")),
+            )
+            for arch in architectures
+            for backend in ("egl", "vulkan")
+        }
+        tested = {
+            name
+            for name, target in self.targets.items()
+            if target.platform.startswith("linux-")
+            and any(
+                suite.task == "//bindings/typescript:test"
+                for suite in suites.target_suites(target)
+            )
+        }
+        self.assertEqual(tested, expected)
+        for name in expected:
+            with self.subTest(preset=name):
+                self.assertEqual(plan.addon(self.targets[name]), "typescript")
+
     def test_a_target_cannot_run_one_task_as_two_suites(self):
         extra = {
             "platforms": ["windows"],

@@ -5,6 +5,7 @@
 # preset fails before the native library builds.
 #MISE depends=[{ task = ":_check-preset", args = ["{{usage.preset}}"] }, { task = "//:build", args = ["{{usage.preset}}"] }]
 #MISE env={ MLN_FFI_GLIBC_FLOOR = '{{ vars.glibc_floor | default(value="") }}' }
+#MISE env={ MLN_FFI_GLIBC_FLOOR_RISCV64 = '{{ vars.glibc_floor_riscv64 | default(value="") }}', MLN_FFI_GLIBC_FLOOR_LOONGARCH64 = '{{ vars.glibc_floor_loongarch64 | default(value="") }}' }
 #MISE shell="bash"
 set -euo pipefail
 
@@ -23,7 +24,12 @@ case "$usage_preset" in
   linux-gnu-*)
     # Only .config/mise.linux.toml defines the floor, and this task renders on every
     # host.
-    "$MISE_MONOREPO_ROOT/tools/lint/check-glibc-floor.sh" "$MLN_FFI_GLIBC_FLOOR" "$addon"
+    case "$usage_preset" in
+      *-riscv64-*) floor=$MLN_FFI_GLIBC_FLOOR_RISCV64 ;;
+      *-loongarch64-*) floor=$MLN_FFI_GLIBC_FLOOR_LOONGARCH64 ;;
+      *) floor=$MLN_FFI_GLIBC_FLOOR ;;
+    esac
+    "$MISE_MONOREPO_ROOT/tools/lint/check-glibc-floor.sh" "$floor" "$addon"
     ;;
   ohos-*)
     # OpenHarmony loads a module by library name.

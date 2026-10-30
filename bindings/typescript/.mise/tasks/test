@@ -3,7 +3,7 @@
 #MISE extends="ffi:preset"
 #MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
-#USAGE arg "[runtime]" help="One runtime instead of all three, for a desktop preset" {
+#USAGE arg "[runtime]" help="One of the preset's supported desktop runtimes" {
 #USAGE   choices "node" "bun" "deno"
 #USAGE }
 set -euo pipefail

@@ -195,8 +195,9 @@ reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK 
 [[entry]]
 bindings = ["typescript"]
 platforms = ["freebsd"]
-status = "path-known"
-reason = "Build the addon and run the Node suite in the FreeBSD VM. Node supports FreeBSD x64 as experimental and ships no official binaries."
+status = "blocked"
+reason = "Node supports FreeBSD x64 as experimental but ships no official binaries. Bun and Deno publish no FreeBSD runtime either."
+link = "https://github.com/nodejs/node/blob/main/BUILDING.md#platform-list"
 
 [[entry]]
 bindings = [
@@ -252,13 +253,6 @@ status = "path-known"
 reason = "Debian and Alpine package Python for RISC-V. Package the binding's native extension for it, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
 
 [[entry]]
-bindings = ["typescript"]
-platforms = ["linux-gnu"]
-archs = ["riscv64", "loongarch64"]
-status = "path-known"
-reason = "Debian packages Node.js for both architectures. Build the addon for them, and run the Node.js suite with Debian's Node.js under QEMU's user-mode emulator."
-
-[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["windows-mingw"]
 status = "path-known"
@@ -296,13 +290,6 @@ platforms = ["windows", "windows-mingw"]
 status = "path-known"
 reason = "Swift.org ships a Windows toolchain. Add generated Windows platform coverage, SwiftPM import-library discovery and Windows test flags, consume each preset's C DLL, and run the suite with its dependencies on PATH."
 link = "https://www.swift.org/install/windows/"
-
-[[entry]]
-bindings = ["typescript"]
-platforms = ["linux-musl"]
-status = "path-known"
-reason = "The pinned Node.js and Bun releases ship musl runtimes. Build and package musl addons, select them by libc in the loader, and run their suites in Alpine. Deno's musl runtime remains a separate gap."
-link = "https://nodejs.org/dist/v26.12.1/SHASUMS256.txt"
 
 # No supported toolchain or ABI. Unrejected upstream support work is blocked instead.
 

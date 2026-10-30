@@ -17,7 +17,13 @@ const BACKENDS = ["opengl", "metal", "vulkan"];
 
 /** The addon package of a backend for this platform and architecture. */
 function addonPackage(backend: string): string {
-  const libc = process.platform === "linux" ? "-gnu" : "";
+  let libc = "";
+  if (process.platform === "linux") {
+    const report = process.report.getReport() as {
+      header: { glibcVersionRuntime?: string };
+    };
+    libc = report.header.glibcVersionRuntime ? "-gnu" : "-musl";
+  }
   return `${SCOPE}-${backend}-${process.platform}-${process.arch}${libc}`;
 }
 
