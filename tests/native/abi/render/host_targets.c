@@ -357,10 +357,19 @@ static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// The Android emulator's Vulkan device has no timeline semaphores; every other
+// CI driver does.
+#if defined(__ANDROID__)
+#define TIMELINES_REQUIRED 0
+#else
+#define TIMELINES_REQUIRED 1
+#endif
+
 // A timeline frame is acquirable once submitted: the session signals its
 // semaphore after the frame, and the host waits for the frame's value before
 // it reads. The host releases the frame with its own timeline, and the
-// session's next frame waits until the host signals it.
+// session's next frame waits until the host signals it. A device without
+// timelines refuses them.
 static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -380,9 +389,28 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   MLN_TEST_OK(
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, capabilities.producer_sync_kind
-  );
+  if (
+    capabilities.producer_sync_kind != MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE
+  ) {
+    TEST_ASSERT_FALSE_MESSAGE(
+      TIMELINES_REQUIRED, "this target's driver has no timeline semaphores"
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_GPU_SYNC_CPU_COMPLETE, capabilities.producer_sync_kind
+    );
+    TEST_ASSERT_BITS_LOW(
+      MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE,
+      capabilities.consumer_sync_kinds
+    );
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_render_fixture fallback = {0};
+    TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
+      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
+    ));
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    return;
+  }
   TEST_ASSERT_BITS_HIGH(
     MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE,
     capabilities.consumer_sync_kinds
