@@ -1,9 +1,10 @@
 # Sourced by the Go binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, Android, macOS x64, and OpenHarmony presets to
-# GOOS/GOARCH and exports the cross C toolchain from the native build's Zig
-# wrappers, the Android NDK, MSYS2 Clang, Apple Clang, or the OpenHarmony SDK. Leaves `goos`
-# empty for presets that run on the host, which macOS x64 does under Rosetta. OpenHarmony has no
-# Go port, so its presets build GOOS=linux binaries against the OHOS sysroot;
+# $1. Maps musl, FreeBSD, RISC-V, LoongArch, Android, macOS x64, and
+# OpenHarmony presets to GOOS/GOARCH and exports the cross C toolchain from
+# the native build's Zig wrappers, the Android NDK, MSYS2 Clang, Apple Clang,
+# or the OpenHarmony SDK. Leaves `goos` empty for presets that run on the
+# host, which macOS x64 does under Rosetta. OpenHarmony has no Go port, so its
+# presets build GOOS=linux binaries against the OHOS sysroot;
 # the Oniro emulator runs them.
 # shellcheck shell=bash
 
@@ -39,17 +40,18 @@ case "$1" in
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
     ;;
-  linux-musl-arm64-* | linux-musl-x64-* | freebsd-x64-*)
+  linux-musl-arm64-* | linux-musl-x64-* | freebsd-x64-* | linux-*-riscv64-* | linux-*-loongarch64-*)
     if [[ "$1" == freebsd-* ]]; then
       goos=freebsd
     else
       goos=linux
     fi
-    if [[ "$1" == linux-musl-arm64-* ]]; then
-      goarch=arm64
-    else
-      goarch=amd64
-    fi
+    case "$1" in
+      *-arm64-*) goarch=arm64 ;;
+      *-riscv64-*) goarch=riscv64 ;;
+      *-loongarch64-*) goarch=loong64 ;;
+      *) goarch=amd64 ;;
+    esac
     compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
     compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
     if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
