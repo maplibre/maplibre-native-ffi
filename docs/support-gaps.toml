@@ -401,13 +401,6 @@ link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
 # Missing runner integration must be explicit, even when a toolchain exists.
 
 [[entry]]
-bindings = ["typescript"]
-platforms = ["linux-musl"]
-archs = ["riscv64", "loongarch64"]
-status = "path-known"
-reason = "The musl test task uses official Node and Bun images for x64 and ARM64. Add a target Node runtime to the Alpine QEMU roots and run the suite there."
-
-[[entry]]
 bindings = ["kotlin-native"]
 platforms = ["linux-gnu"]
 archs = ["arm64"]

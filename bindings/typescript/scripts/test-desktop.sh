@@ -10,10 +10,10 @@ set -euo pipefail
 
 preset=${1:?usage: test-desktop.sh <preset> [runtime]}
 case "$preset" in
-  linux-gnu-riscv64-* | linux-gnu-loongarch64-*)
+  linux-*-riscv64-* | linux-*-loongarch64-*)
     read -r -a runtimes <<<"${2:-node}"
-    if [[ "${runtimes[0]}" != node ]]; then
-      echo "error: this architecture runs the suite on Debian's Node.js" >&2
+    if [[ "${runtimes[*]}" != node ]]; then
+      echo "error: this architecture runs the suite on the target distribution's Node.js" >&2
       exit 2
     fi
     ;;
@@ -77,15 +77,17 @@ case "$preset" in
       node --expose-gc --test --test-isolation=none --test-timeout=300000 \
       "$PWD/test/run/node.ts"
     ;;
-  linux-gnu-riscv64-* | linux-gnu-loongarch64-*)
-    architecture=${preset#linux-gnu-}
-    root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" gnu "${architecture%%-*}")
-    # Debian builds Node without its bundled TypeScript stripper. Amaro's
+  linux-*-riscv64-* | linux-*-loongarch64-*)
+    target=${preset#linux-}
+    libc=${target%%-*}
+    architecture=${target#*-}
+    root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "$libc" "${architecture%%-*}")
+    # Distribution Node builds can lack the TypeScript stripper. Amaro's
     # portable loader also reaches the suite's workers and child processes.
     strip_loader="$PWD/test/run/strip-types.mjs"
     export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import=$strip_loader"
     "$MISE_MONOREPO_ROOT/scripts/run-qemu-test.sh" "$preset" "$root/usr/bin/node" \
-      --expose-gc --test --test-isolation=none --test-timeout=300000 test/run/node.ts
+      --expose-gc --test --test-timeout=300000 test/run/node.ts
     ;;
   linux-musl-*)
     # The host packs and type-checks; Alpine runs the addon and consumer with

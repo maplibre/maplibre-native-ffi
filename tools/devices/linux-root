@@ -28,7 +28,7 @@ esac
 
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 root="$repository/build/roots/linux-$libc-$architecture"
-if [[ -f "$root/.complete" && ( "$libc" != gnu || -x "$root/usr/bin/node" ) ]]; then
+if [[ -f "$root/.complete" && -x "$root/usr/bin/node" ]]; then
   printf '%s\n' "$root"
   exit 0
 fi
@@ -77,7 +77,7 @@ case "$libc" in
         --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/main \
         --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
         add alpine-baselayout musl mesa-vulkan-swrast vulkan-loader \
-        mesa-dri-gallium mesa-egl mesa-gles >&2
+        mesa-dri-gallium mesa-egl mesa-gles nodejs >&2
       # The emulator falls back to a host file wherever the root lacks one, so
       # musl searches a single directory, which links every library in /lib.
       for library in /target/lib/*.so*; do

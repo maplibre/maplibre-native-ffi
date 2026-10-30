@@ -187,7 +187,7 @@ class SuitesTest(unittest.TestCase):
             f"linux-{libc}-{arch}-{backend}"
             for libc, architectures in (
                 ("gnu", ("x64", "arm64", "riscv64", "loongarch64")),
-                ("musl", ("x64", "arm64")),
+                ("musl", ("x64", "arm64", "riscv64", "loongarch64")),
             )
             for arch in architectures
             for backend in ("egl", "vulkan")
