@@ -343,14 +343,6 @@ link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
 
 [[entry]]
 bindings = ["kotlin-native"]
-platforms = ["linux-gnu"]
-archs = ["arm64"]
-operations = ["build", "test"]
-status = "path-known"
-reason = "Kotlin/Native builds Linux ARM64 KLIBs from an x64 host, but CI uses an ARM64 runner without a Kotlin/Native host toolchain. Cross-build the suite on x64 and run it on ARM64."
-
-[[entry]]
-bindings = ["kotlin-native"]
 platforms = ["windows"]
 archs = ["x64"]
 operations = ["package"]

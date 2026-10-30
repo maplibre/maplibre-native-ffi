@@ -30,15 +30,6 @@ case "$usage_preset" in
     ;;
 esac
 gradle_args=(-Pmaplibre.localBuild="build/$usage_preset/install")
-# Kotlin/Native has no Linux arm64 host toolchain, so this target only builds
-# through KLIB cross-compilation from a Linux x64 host.
-if [[ "$kotlin_target" == "linuxArm64" ]]; then
-  if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
-    echo "Linux ARM64 Kotlin/Native KLIBs cross-compile from a Linux x64 host only." >&2
-    exit 2
-  fi
-  gradle_args+=(-Pkotlin.native.enableKlibsCrossCompilation=true)
-fi
 if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Klib")
 fi
@@ -47,4 +38,7 @@ fi
 if [[ -n "$runtime_backend" ]]; then
   tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
 fi
-./gradlew "${gradle_args[@]}" "${tasks[@]}"
+if [[ "$kotlin_target" == linuxArm64 ]]; then
+  exec bindings/kotlin/scripts/gradle-linux-arm64.sh "${gradle_args[@]}" "${tasks[@]}"
+fi
+exec ./gradlew "${gradle_args[@]}" "${tasks[@]}"

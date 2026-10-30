@@ -199,9 +199,8 @@ kotlin {
       }
     }
 
-    // Every native test compiles against tests/graphics through cinterop. Android
-    // loads the installed fixture beside the native library; other targets link its object.
-    if (name.startsWith("androidNative")) {
+    // Cross-compiled suites load the installed fixture beside the native library.
+    if (name.startsWith("androidNative") || name == "linuxArm64") {
       val toolchain = providers.gradleProperty("maplibre.android.nativeTestToolchain")
       binaries.withType<TestExecutable>().configureEach {
         // Kotlin's API 21 sysroot cannot resolve the API 26 library's transitive
@@ -236,7 +235,6 @@ kotlin {
             "-fno-stack-protector",
           )
         "linuxX64" -> listOf("clang", "--target=x86_64-linux-gnu")
-        "linuxArm64" -> listOf("clang", "--target=aarch64-linux-gnu")
         "macosArm64" ->
           listOf("xcrun", "--sdk", "macosx", "clang", "-target", "arm64-apple-macos11.0")
         "macosX64" ->

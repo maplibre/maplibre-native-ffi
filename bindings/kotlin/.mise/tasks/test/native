@@ -8,6 +8,7 @@ set -euo pipefail
 gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
+  linux-gnu-arm64-*) kotlin_target=linuxArm64 ;;
   windows-x64-*)
     kotlin_target=mingwX64
     export PATH="$PWD/build/$usage_preset/install/bin:$PATH"
@@ -46,6 +47,12 @@ case "$usage_preset" in
     ;;
 esac
 install="build/$usage_preset/install"
+if [[ "$kotlin_target" == linuxArm64 ]]; then
+  bindings/kotlin/scripts/gradle-linux-arm64.sh -Pmaplibre.localBuild="$install" \
+    :bindings:kotlin:linkDebugTestLinuxArm64
+  export MLN_FFI_DEVICE_INSTALL="$install" MLN_FFI_DEVICE_TIMEOUT=300
+  exec tools/devices/run bindings/kotlin/build/bin/linuxArm64/debugTest/test.kexe
+fi
 if [[ "$kotlin_target" != androidNative* ]]; then
   exec ./gradlew -Pmaplibre.localBuild="$install" \
     ${gradle_tasks[@]+"${gradle_tasks[@]}"} ":bindings:kotlin:${kotlin_target}Test"
