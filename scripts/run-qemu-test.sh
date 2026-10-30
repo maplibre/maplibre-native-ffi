@@ -40,6 +40,8 @@ if [[ ! -r "$registration" ]] || ! grep -qx enabled "$registration"; then
   emulator=("$executable")
 fi
 root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "$libc" "$architecture")
+# The guest uses the host's UIDs, so account lookups need the host's names.
+cp /etc/passwd /etc/group "$root/etc/"
 
 # Through the emulator, the loaders find no drivers by listing their manifest
 # directories, so each one is named.
