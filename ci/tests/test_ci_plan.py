@@ -109,17 +109,6 @@ class ResolverTest(unittest.TestCase):
         )
         self.assertEqual(target.backend, "egl")
 
-    def test_a_target_runs_ctest_unless_its_vendor_block_says_not(self):
-        source = presets(
-            preset("_device", hidden=True, vendor={"ctest": False}),
-            preset("tested", vendor=RUNS, **TARGET),
-            preset("untested", inherits="_device", vendor=RUNS, **TARGET),
-        )
-        self.assertEqual(
-            [(target.preset, target.tested) for target in plan.targets(source)],
-            [("tested", True), ("untested", False)],
-        )
-
     def test_a_missing_parent_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown preset '_gone'"):
             plan.targets(presets(preset("child", inherits=["_gone"])))

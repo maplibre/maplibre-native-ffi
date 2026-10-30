@@ -7,6 +7,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -15,6 +16,10 @@ from binding_sbom import package as package_inventory
 from native_package_release import package_presets
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from tools.ci.plan import dotnet_runtime_target as runtime_target
+
 MANAGED_PROJECT = (
     ROOT / "bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj"
 )
@@ -29,25 +34,6 @@ PACKAGE_SMOKE_PROJECT = (
 MUSL_SMOKE_VERSION = "0.0.0-musl-ci"
 ANDROID_SMOKE_VERSION = "0.0.0-android-ci"
 MUSL_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22"
-
-# .NET has no runtime identifiers for the other package platforms.
-RUNTIME_PLATFORMS = {
-    "linux-gnu": "linux",
-    "linux-musl": "linux-musl",
-    "macos": "osx",
-    "windows": "win",
-    "android": "android",
-}
-BACKENDS = {"egl": "OpenGL", "wgl": "OpenGL", "metal": "Metal", "vulkan": "Vulkan"}
-
-
-def runtime_target(preset: str) -> tuple[str, str] | None:
-    """The runtime package backend and runtime identifier of a preset."""
-    platform, arch, backend = preset.rsplit("-", 2)
-    # CI runs no .NET suite on RISC-V or LoongArch.
-    if platform not in RUNTIME_PLATFORMS or arch in {"riscv64", "loongarch64"}:
-        return None
-    return BACKENDS[backend], f"{RUNTIME_PLATFORMS[platform]}-{arch}"
 
 
 def runtime_targets() -> dict[str, dict[str, str]]:

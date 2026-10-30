@@ -10,3 +10,9 @@ run = "./gradlew :bindings:kotlin:compileAndroidMain"
 description = "Verify the Android binding stays on the android-minSdk floor."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:checkAndroidApiFloor"
+
+[tasks."build:jvm"]
+description = "Build the Kotlin/JVM binding against a native preset's install."
+extends = "ffi:preset"
+dir = "../.."
+run = './gradlew -Pmaplibre.localBuild="build/$usage_preset/install" :bindings:kotlin:jvmJar'

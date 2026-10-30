@@ -207,53 +207,24 @@ class SuitesTest(unittest.TestCase):
                 self.assertEqual(plan.addon(self.targets[name]), "typescript")
 
     def test_a_target_cannot_run_one_task_as_two_suites(self):
-        extra = {
-            "platforms": ["windows"],
-            "commands": [{"task": "//bindings/rust:test", "args": ["release"]}],
-        }
+        target = self.targets["windows-x64-wgl"]
+        command = ["mise", "run", "//bindings/rust:test", target.preset]
         with (
-            mock.patch.object(suites, "SUITES", [*suites.SUITES, extra]),
+            mock.patch.object(
+                suites, "consumer_commands", return_value=[command, command]
+            ),
             self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"),
         ):
-            suites.target_suites(self.targets["windows-x64-wgl"])
+            suites.target_suites(target)
 
-    def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
-        extra = {
-            "platforms": ["windows"],
-            "commands": [
-                {"task": "//probe:check"},
-                {"task": "//probe:test"},
-            ],
-            "environments": [
-                {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
-            ],
-        }
-        presets = (
-            "windows-x64-wgl",
-            "windows-x64-vulkan",
-            "windows-arm64-wgl",
-            "windows-arm64-vulkan",
-        )
-        with mock.patch.object(suites, "SUITES", [*suites.SUITES, extra]):
-            environments = {
-                (preset, suite.command): suite.env
-                for preset in presets
-                for suite in suites.target_suites(self.targets[preset])
-                if "STEP_PROBE" in suite.env or suite.task.startswith("//probe:")
-            }
-        # The packaged target's consumer environment still applies.
-        probed = {"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}
-        plain = {"MISE_TASK_SKIP": "//:build"}
-        self.assertEqual(
-            environments,
-            {
-                (preset, ("mise", "run", f"//probe:{task}", preset)): (
-                    probed if preset == "windows-x64-wgl" else plain
-                )
-                for preset in presets
-                for task in ("check", "test")
-            },
-        )
+    def test_consumer_suites_use_the_packaged_install(self):
+        for target in self.targets.values():
+            for suite in suites.target_suites(target):
+                if suite.task.startswith("//bindings/"):
+                    with self.subTest(preset=target.preset, task=suite.task):
+                        self.assertEqual(suite.env, {"MISE_TASK_SKIP": "//:build"})
+                        self.assertIn("archive", suite.prerequisites)
+                        self.assertIn("install", suite.prerequisites)
 
     def test_dart_ios_runs_on_the_simulator_and_builds_for_the_device(self):
         for preset, action in (

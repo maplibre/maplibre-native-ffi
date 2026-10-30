@@ -12,6 +12,7 @@ import pathlib
 import plistlib
 import re
 import subprocess
+import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -22,6 +23,10 @@ from release_version import parse_version
 from sbom import SBOM_NAME, component, compose, stamp, write_json
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import write_package as write_zig_package
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+
+from tools.ci import gaps
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"
@@ -53,12 +58,15 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def package_presets(repository: pathlib.Path) -> list[str]:
-    """The presets that a release publishes: every visible configure preset."""
+    """Visible native targets without a declared package gap."""
     presets = json.loads(
         (repository / "CMakePresets.json").read_text(encoding="utf-8")
     ).get("configurePresets", [])
     names = sorted(
-        preset["name"] for preset in presets if not preset.get("hidden", False)
+        preset["name"]
+        for preset in presets
+        if not preset.get("hidden", False)
+        and gaps.gap("c", gaps.target_from_name(preset["name"]), "package") is None
     )
     if not names:
         raise SystemExit("CMakePresets.json defines no native configure presets")

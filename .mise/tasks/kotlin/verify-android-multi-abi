@@ -13,20 +13,11 @@ fi
 
 input_root="$1"
 build_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/android-multi-build"
-presets=(
-  android-arm-egl
-  android-arm-vulkan
-  android-arm64-egl
-  android-arm64-vulkan
-  android-x86-egl
-  android-x86-vulkan
-  android-x64-egl
-  android-x64-vulkan
-)
+presets="$(python3 -m tools.ci.plan --package-inputs android-multi)"
 
 rm -rf "$build_root"
 mkdir -p "$build_root"
-for preset in "${presets[@]}"; do
+while IFS= read -r preset; do
   archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
     echo "Missing native package for ${preset} under ${input_root}" >&2
@@ -44,7 +35,7 @@ for preset in "${presets[@]}"; do
       "${archive_root}/lib/libmaplibre-native-c.so" \
       "${archive_root}/share/maplibre-native-c"
   )
-done
+done <<< "$presets"
 
 for backend in opengl vulkan; do
   ./gradlew \

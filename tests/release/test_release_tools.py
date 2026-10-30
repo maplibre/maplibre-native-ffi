@@ -18,6 +18,7 @@ from unittest import mock
 from native_package_release import (
     ARTIFACTS_NAME,
     XCFRAMEWORK_NAME,
+    package_presets,
     prepare_assets,
     sbom_path,
 )
@@ -259,6 +260,50 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.xcframework = self.release_dir / XCFRAMEWORK_NAME
         create_xcframework(self.xcframework)
         self.write_zig_sources()
+
+    def test_native_package_gaps_match_the_ci_package_planner(self) -> None:
+        from tools.ci import gaps, plan
+
+        self.write_presets(self.preset, "linux-gnu-x64-egl")
+        entry = gaps.Entry(
+            0,
+            {
+                "bindings": ("c",),
+                "platforms": ("linux-gnu",),
+                "archs": ("x64",),
+                "backends": ("vulkan",),
+                "operations": ("package",),
+            },
+            "path-known",
+            "native packaging integration needed",
+            None,
+        )
+        targets = plan.targets(
+            json.loads((REPOSITORY / "CMakePresets.json").read_text())
+        )
+        with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
+            self.assertEqual(package_presets(self.repository), ["linux-gnu-x64-egl"])
+            self.assertNotIn(
+                self.preset,
+                {
+                    t.preset
+                    for t in plan.consumed(
+                        "dotnet-nuget",
+                        [t for t in targets if t.platform == "linux-gnu"],
+                    )
+                },
+            )
+            self.assertIn(
+                self.preset,
+                {
+                    r["preset"]
+                    for r in plan.plan(
+                        json.loads((REPOSITORY / "CMakePresets.json").read_text()),
+                        False,
+                        ["linux-x64"],
+                    )["matrix"]
+                },
+            )
 
     def write_zig_sources(self) -> None:
         manifest = (REPOSITORY / "build.zig.zon").read_text()

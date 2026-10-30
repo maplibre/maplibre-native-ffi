@@ -49,9 +49,10 @@ jobs:
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
-          # The root's files, CMakePresets.json among them, come with any
-          # cone.
-          sparse-checkout: tools/ci
+          # The plan reads CMakePresets.json and docs/support-gaps.toml.
+          sparse-checkout: |
+            tools/ci
+            docs
       - name: Plan the jobs that the units run
         id: matrix
         shell: bash

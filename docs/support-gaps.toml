@@ -1,5 +1,13 @@
 issue = 936
 
+# Every binding is supported unless an entry below declares its gap. CI and
+# the support matrix share these selectors; omitting an axis matches all its
+# values. `operations` can narrow a gap to build, test, package production,
+# or the combined Apple XCFramework (separate from per-target native archives).
+# A C gap applies to every binding on that target, including targets
+# that do not yet have a CMake preset. `simulators` distinguishes Apple
+# devices from simulators; omitting it matches both.
+
 # Upstream bugs, pending support proposals or releases, and registry restrictions.
 
 [[entry]]
@@ -172,7 +180,6 @@ link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
 bindings = [
-  "dotnet",
   "dart",
   "kotlin-jvm",
   "kotlin-native",
@@ -186,11 +193,19 @@ status = "path-known"
 reason = "CI builds the x64 library and runs these suites on arm64 alone. Package the binding for x64 where it needs one, and run its suite under an x64 runtime on the arm64 runners, which Rosetta runs."
 
 [[entry]]
+bindings = ["dotnet"]
+platforms = ["macos"]
+archs = ["x64"]
+operations = ["test"]
+status = "path-known"
+reason = "CI builds the .NET binding and ships its Intel macOS native asset, but has no x64 test runtime on the ARM64 runner. Run the binding suite under Rosetta."
+
+[[entry]]
 bindings = ["go"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
-reason = "The suite passes under QEMU's user-mode emulator except its test that runs its own executable again, which needs the runners to register QEMU with binfmt_misc."
+reason = "The proposed cross-build runs the suite under QEMU. Update its target compiler and runner integration; CI now registers QEMU with binfmt_misc for tests that launch child executables."
 link = "https://github.com/maplibre/maplibre-native-ffi/pull/1327"
 
 [[entry]]
@@ -198,7 +213,7 @@ bindings = ["rust"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
-reason = "The suite passes under QEMU's user-mode emulator except its test that runs its own executable again, which needs the runners to register QEMU with binfmt_misc."
+reason = "The proposed cross-build runs the suite under QEMU. Update its target compiler and runner integration; CI now registers QEMU with binfmt_misc for tests that launch child executables."
 link = "https://github.com/maplibre/maplibre-native-ffi/pull/1328"
 
 [[entry]]
@@ -395,3 +410,104 @@ platforms = ["emscripten"]
 status = "not-applicable"
 reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
 link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
+
+# Missing runner integration must be explicit, even when a toolchain exists.
+
+[[entry]]
+bindings = ["typescript"]
+platforms = ["linux-musl"]
+archs = ["riscv64", "loongarch64"]
+status = "path-known"
+reason = "The musl test task uses official Node and Bun images for x64 and ARM64. Add a target Node runtime to the Alpine QEMU roots and run the suite there."
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["linux-gnu"]
+archs = ["arm64"]
+operations = ["build", "test"]
+status = "path-known"
+reason = "Kotlin/Native builds Linux ARM64 KLIBs from an x64 host, but CI uses an ARM64 runner without a Kotlin/Native host toolchain. Cross-build the suite on x64 and run it on ARM64."
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["windows"]
+status = "path-known"
+reason = "The binding declares no Windows Kotlin/Native target. Add its KLIB, link the MSVC-built C DLL with the Kotlin/Native toolchain, and run the suite."
+
+[[entry]]
+bindings = ["zig"]
+platforms = ["windows"]
+archs = ["arm64"]
+status = "blocked"
+reason = "Zig 0.17.0's native ARM64 compiler fails to load build.zig, and its x64 compiler hangs under emulation."
+
+[[entry]]
+bindings = ["python"]
+platforms = ["android"]
+archs = ["arm", "x86"]
+status = "not-applicable"
+reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["ios-maccatalyst", "tvos"]
+status = "not-investigated"
+reason = "The binding has no Apple app host for these .NET targets. Add native asset packaging and a runnable binding suite."
+
+[[entry]]
+bindings = ["go"]
+platforms = ["tvos", "visionos"]
+status = "not-investigated"
+reason = "The binding has no Go app host or cross-compilation runner for these Apple targets."
+
+[[entry]]
+bindings = ["dotnet"]
+platforms = ["windows-mingw"]
+operations = ["package"]
+status = "path-known"
+reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
+
+[[entry]]
+bindings = ["c"]
+platforms = ["macos"]
+archs = ["x64"]
+backends = ["metal"]
+operations = ["xcframework"]
+status = "path-known"
+reason = "The XCFramework ships ARM64 macOS alone. Combine the x64 and ARM64 frameworks into one universal macOS slice before adding Intel macOS; the per-target native archives already ship both."
+
+# Missing test devices apply to native and binding suites alike. Packages are
+# still built and published; a simulator is a distinct execution target.
+
+[[entry]]
+bindings = ["c"]
+platforms = ["android"]
+archs = ["arm", "arm64", "x86"]
+operations = ["test"]
+status = "path-known"
+reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. Add an emulator or device for each remaining ABI."
+
+[[entry]]
+bindings = ["c"]
+platforms = ["ios", "tvos", "visionos"]
+simulators = [false]
+operations = ["test"]
+status = "path-known"
+reason = "CI builds the device packages and runs the simulator suites. Add physical Apple devices to execute these packages."
+
+[[entry]]
+bindings = ["c"]
+platforms = ["ohos"]
+archs = ["arm64"]
+operations = ["test"]
+status = "path-known"
+reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Add an ARM64 device to run the suites."
+
+[[entry]]
+bindings = ["c"]
+platforms = ["ohos"]
+archs = ["x64"]
+backends = ["vulkan"]
+operations = ["test"]
+status = "path-known"
+reason = "The OpenHarmony emulator runs the OpenGL suite alone. Wire the Vulkan target to a device with a Vulkan driver."

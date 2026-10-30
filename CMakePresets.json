@@ -300,8 +300,7 @@
       "vendor": {
         "maplibre-native-ffi": {
           "unit": "android",
-          "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "ctest": false
+          "runner": "blacksmith-4vcpu-ubuntu-2404"
         }
       }
     },
@@ -402,7 +401,6 @@
         "maplibre-native-ffi": {
           "unit": "ohos",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "ctest": false,
           "miseEnv": "ohos"
         }
       }
@@ -421,7 +419,6 @@
         "maplibre-native-ffi": {
           "unit": "ohos",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "ctest": false,
           "miseEnv": "ohos"
         }
       }
@@ -664,9 +661,6 @@
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "iphoneos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-ios"
-      },
-      "vendor": {
-        "maplibre-native-ffi": { "ctest": false }
       }
     },
     {
@@ -706,9 +700,6 @@
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "appletvos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-tvos"
-      },
-      "vendor": {
-        "maplibre-native-ffi": { "ctest": false }
       }
     },
     {
@@ -718,9 +709,6 @@
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "xros",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-visionos"
-      },
-      "vendor": {
-        "maplibre-native-ffi": { "ctest": false }
       }
     },
     {

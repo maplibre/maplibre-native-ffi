@@ -7,17 +7,7 @@ set -euo pipefail
 
 input_root="${usage_input?}"
 output="${MISE_MONOREPO_ROOT}/build/packages/native/dist/MaplibreNativeC.xcframework.zip"
-# Each slice's preset, SDK, and clang target OS and variant.
-slices=(
-  "ios-arm64-metal iphoneos ios"
-  "ios-maccatalyst-arm64-metal macosx ios macabi"
-  "ios-simulator-arm64-metal iphonesimulator ios simulator"
-  "macos-arm64-metal macosx macos"
-  "tvos-arm64-metal appletvos tvos"
-  "tvos-simulator-arm64-metal appletvsimulator tvos simulator"
-  "visionos-arm64-metal xros xros"
-  "visionos-simulator-arm64-metal xrsimulator xros simulator"
-)
+presets="$(python3 -m tools.ci.plan --package-inputs apple-xcframework)"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -32,8 +22,22 @@ int main(void) { return mln_plugin_get_register_function_v1() == NULL; }
 EOF
 
 frameworks=()
-for slice in "${slices[@]}"; do
-  read -r preset sdk os variant <<<"$slice"
+while IFS= read -r preset; do
+  variant=
+  case "${preset%-*-*}" in
+    ios) sdk=iphoneos; os=ios ;;
+    ios-maccatalyst) sdk=macosx; os=ios; variant=macabi ;;
+    ios-simulator) sdk=iphonesimulator; os=ios; variant=simulator ;;
+    macos) sdk=macosx; os=macos ;;
+    tvos) sdk=appletvos; os=tvos ;;
+    tvos-simulator) sdk=appletvsimulator; os=tvos; variant=simulator ;;
+    visionos) sdk=xros; os=xros ;;
+    visionos-simulator) sdk=xrsimulator; os=xros; variant=simulator ;;
+    *) echo "Missing XCFramework SDK mapping for $preset" >&2; exit 1 ;;
+  esac
+  arch="${preset%-*}"
+  arch="${arch##*-}"
+  [[ "$arch" != x64 ]] || arch=x86_64
   archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
     echo "Missing native package for ${preset} under ${input_root}" >&2
@@ -46,7 +50,7 @@ for slice in "${slices[@]}"; do
   frameworks+=(-framework "$framework" -debug-symbols "$framework.dSYM")
 
   minimum="$(vtool -show-build "$framework/MaplibreNativeC" | awk '$1 == "minos" { print $2 }')"
-  xcrun --sdk "$sdk" clang -target "arm64-apple-${os}${minimum}${variant:+-$variant}" \
+  xcrun --sdk "$sdk" clang -target "${arch}-apple-${os}${minimum}${variant:+-$variant}" \
     -fmodules -fmodules-cache-path="$work/module-cache" \
     -Werror -Wall -Wincomplete-umbrella \
     -F "${framework%/*}" -framework MaplibreNativeC -Wl,-rpath,"${framework%/*}" \
@@ -55,7 +59,7 @@ for slice in "${slices[@]}"; do
     "$work/consumer-${preset}"
   fi
   echo "Checked ${preset}"
-done
+done <<< "$presets"
 
 xcframework="$work/MaplibreNativeC.xcframework"
 xcodebuild -create-xcframework "${frameworks[@]}" -output "$xcframework"

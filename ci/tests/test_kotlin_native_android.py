@@ -2,7 +2,7 @@ import json
 import unittest
 
 from tools.ci.plan import ROOT, targets
-from tools.ci.suites import android_commands
+from tools.ci.suites import consumer_commands
 
 
 class KotlinNativeAndroidTest(unittest.TestCase):
@@ -11,10 +11,15 @@ class KotlinNativeAndroidTest(unittest.TestCase):
         found = {target.preset: target for target in targets(presets)}
         for backend in ("egl", "vulkan"):
             preset = f"android-x64-{backend}"
-            commands = android_commands(found[preset], "x86_64")
+            commands = [
+                " ".join(command) for command in consumer_commands(found[preset])
+            ]
             self.assertIn(f"mise run //bindings/kotlin:test:native {preset}", commands)
             self.assertIn(f"mise run //bindings/kotlin:test {preset}", commands)
-            arm = android_commands(found[f"android-arm64-{backend}"], "arm64-v8a")
+            arm = [
+                " ".join(command)
+                for command in consumer_commands(found[f"android-arm64-{backend}"])
+            ]
             self.assertFalse(
                 any("//bindings/kotlin:test:native" in line for line in arm)
             )

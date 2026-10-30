@@ -4,8 +4,7 @@ Each visible configure preset is a target. Its `vendor.maplibre-native-ffi`
 block, usually inherited from a hidden platform preset, names the Rubberstamp
 coverage unit that runs it, the runner label it runs on, and the device its
 suites run on, if any. A device is the name of the CI step that boots it and
-the command that step runs. `ctest: false` marks a target whose native tests
-CI runs only on the device the target names, if any. `miseEnv` names the mise
+the command that step runs. `miseEnv` names the mise
 configuration environment that supplies the target's SDK, and `softwareGpu`
 asks for a software driver for the target's backend on a runner without a
 GPU. This script uses only the standard library, so CI can run it with the
@@ -19,29 +18,11 @@ import dataclasses
 import json
 import pathlib
 
-from tools.ci.suites import OPT_IN_ARCHITECTURES, target_suites
+from tools.ci import gaps
+from tools.ci.suites import target_suites
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 VENDOR = "maplibre-native-ffi"
-
-# These platforms supply native inputs to Kotlin Maven staging.
-KOTLIN_MAVEN_PLATFORMS = {
-    "android",
-    "emscripten",
-    "freebsd",
-    "linux-gnu",
-    "linux-musl",
-    "macos",
-    "ios",
-    "ios-simulator",
-    "tvos",
-    "tvos-simulator",
-    "windows",
-}
-
-# These platforms supply the runtime packages of .NET NuGet packing, as
-# RUNTIME_PLATFORMS in tools/release/dotnet_release.py names them.
-DOTNET_NUGET_PLATFORMS = {"android", "linux-gnu", "linux-musl", "macos", "windows"}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -52,18 +33,35 @@ class Target:
     backend: str
     unit: str
     runner: str
-    # False when CI runs the target's native tests only on its device.
-    tested: bool
     device: dict[str, str] | None
     mise_env: str
     software_gpu: bool
 
 
-def packaged(platforms: set[str]):
-    """Select a binding package's targets, which include no RISC-V or LoongArch."""
-    return lambda target: (
-        target.platform in platforms and target.architecture not in OPT_IN_ARCHITECTURES
+def packaged(*bindings: str):
+    """Select native inputs for the bindings that have no declared gap."""
+    return lambda target: any(
+        gaps.supported(binding, target, "package") for binding in bindings
     )
+
+
+def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
+    """The NuGet backend and RID, shared with the packager that consumes it."""
+    target = gaps.target_from_name(preset)
+    if gaps.gap("dotnet", target, "package"):
+        return None
+    rid_platform = {
+        "linux-gnu": "linux",
+        "linux-musl": "linux-musl",
+        "macos": "osx",
+        "windows": "win",
+        "windows-mingw": "win",
+        "android": "android",
+    }[target.platform]
+    package_backend = {"opengl": "OpenGL", "metal": "Metal", "vulkan": "Vulkan"}[
+        target.backend
+    ]
+    return package_backend, f"{rid_platform}-{target.arch}"
 
 
 # The jobs other than target jobs: the unit that owns each, and which targets it
@@ -72,17 +70,28 @@ def packaged(platforms: set[str]):
 JOBS = {
     "docs": ("docs", lambda target: False),
     "support-matrix": ("support-matrix", lambda target: False),
-    "android-multi": ("android", lambda target: target.platform == "android"),
+    "android-multi": (
+        "android",
+        lambda target: (
+            target.platform == "android"
+            and gaps.supported("kotlin-jvm", target, "package")
+        ),
+    ),
     # Every Metal preset is an Apple one, and each contributes one XCFramework
     # slice.
-    "apple-xcframework": ("swiftpm", lambda target: target.backend == "metal"),
+    "apple-xcframework": (
+        "swiftpm",
+        lambda target: (
+            target.backend == "metal" and gaps.supported("c", target, "xcframework")
+        ),
+    ),
     "kotlin-maven": (
         "maven",
-        packaged(KOTLIN_MAVEN_PLATFORMS),
+        packaged("kotlin-jvm", "kotlin-native"),
     ),
     "dotnet-nuget": (
         "nuget",
-        packaged(DOTNET_NUGET_PLATFORMS),
+        lambda target: dotnet_runtime_target(target.preset) is not None,
     ),
     "python-wheels": (
         "pypi",
@@ -91,12 +100,17 @@ JOBS = {
     "typescript-npm": (
         "npm",
         lambda target: (
-            addon(target) == "typescript"
-            or any(suite.task.endswith(":hermes") for suite in target_suites(target))
+            target.platform != "ohos"
+            and gaps.supported("typescript", target, "package")
         ),
     ),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
-    "swift-package": ("swiftpm", lambda target: target.backend == "metal"),
+    "swift-package": (
+        "swiftpm",
+        lambda target: (
+            target.backend == "metal" and gaps.supported("swift", target, "package")
+        ),
+    ),
     "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64-egl"),
     "conan-recipes": ("conan", lambda target: target.preset == "linux-gnu-x64-vulkan"),
     "xmake-package": ("xmake", lambda target: target.preset == "linux-gnu-x64-egl"),
@@ -183,7 +197,6 @@ def targets(presets: dict) -> list[Target]:
                 backend=backend,
                 unit=vendor["unit"],
                 runner=vendor["runner"],
-                tested=vendor.get("ctest", True),
                 device=device,
                 mise_env=vendor.get("miseEnv", ""),
                 software_gpu=vendor.get("softwareGpu", False),
@@ -195,7 +208,11 @@ def targets(presets: dict) -> list[Target]:
 def consumed(job: str, all_targets: list[Target]) -> list[Target]:
     """Return the targets that a job other than a target job consumes."""
     _, include = JOBS[job]
-    return [target for target in all_targets if include(target)]
+    return [
+        target
+        for target in all_targets
+        if gaps.supported("c", target, "package") and include(target)
+    ]
 
 
 ZIG_PROJECTS = ("//bindings/zig:",)
@@ -205,36 +222,27 @@ SWIFT_PROJECTS = ("//bindings/swift:",)
 
 def addon(target: Target) -> str:
     """Return which package's addon artifact the target job uploads, if any."""
-    tasks = [suite.task for suite in target_suites(target)]
-    # The npm packages carry the addon that the TypeScript suite built against
-    # the packaged native artifact and tested, for each preset that
-    # bindings/typescript/scripts/pack.ts packs.
+    if not gaps.supported("typescript", target, "package"):
+        return ""
+    # Mobile hosts compile the sources shipped in the facade. The other
+    # targets carry a prebuilt Node-API addon or browser module.
     if target.platform in {
-        "linux-gnu",
-        "linux-musl",
-        "macos",
-        "freebsd",
-        "windows",
-        "windows-mingw",
-        "emscripten",
-    } and ("//bindings/typescript:test" in tasks):
-        return "typescript"
-    # The OHPM packages carry the addon that each OpenHarmony job built against
-    # the packaged native artifact. npm packing downloads every
-    # typescript-addon artifact, so these take another prefix.
-    if target.platform == "ohos" and any(
-        f"//bindings/typescript:{action}" in tasks for action in ("build", "test")
-    ):
-        return "arkts"
-    return ""
+        "android",
+        "ios",
+        "ios-simulator",
+        "ios-maccatalyst",
+        "tvos",
+        "tvos-simulator",
+        "visionos",
+        "visionos-simulator",
+    }:
+        return ""
+    return "arkts" if target.platform == "ohos" else "typescript"
 
 
 def python_wheel(target: Target) -> bool:
     """Whether the target builds a Python runtime wheel for publication."""
-    return any(
-        suite.task in {"//bindings/python:test", "//bindings/python:build-runtime"}
-        for suite in target_suites(target)
-    )
+    return gaps.supported("python", target, "package")
 
 
 def row(target: Target, save_toolchains: bool) -> dict[str, object]:
@@ -292,6 +300,8 @@ def plan(presets: dict, run_all: bool, units: list[str]) -> dict[str, list]:
     # one row per runner label is enough to write every entry the others read.
     claimed: set[str] = set()
     for target in all_targets:
+        if not gaps.supported("c", target, "build"):
+            continue
         if target.unit not in selected and target.preset not in needed:
             continue
         matrix.append(row(target, target.runner not in claimed))
@@ -312,9 +322,22 @@ def main() -> int:
         default="[]",
         help="Rubberstamp's `units` output: a JSON array of unit names",
     )
+    parser.add_argument(
+        "--package-inputs",
+        choices=list(JOBS),
+        help="Print the native preset inputs of one package job, one per line",
+    )
     args = parser.parse_args()
     presets = json.loads((ROOT / "CMakePresets.json").read_text())
-    print(json.dumps(plan(presets, args.all == "true", json.loads(args.units))))
+    if args.package_inputs:
+        print(
+            "\n".join(
+                target.preset
+                for target in consumed(args.package_inputs, targets(presets))
+            )
+        )
+    else:
+        print(json.dumps(plan(presets, args.all == "true", json.loads(args.units))))
     return 0
 
 
