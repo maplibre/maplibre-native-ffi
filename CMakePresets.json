@@ -419,7 +419,11 @@
         "maplibre-native-ffi": {
           "unit": "ohos",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "miseEnv": "ohos"
+          "miseEnv": "ohos",
+          "device": {
+            "name": "OpenHarmony emulator",
+            "command": "tools/devices/ohos-key"
+          }
         }
       }
     },
@@ -810,15 +814,7 @@
     {
       "name": "ohos-x64-egl",
       "displayName": "OHOS x64 EGL",
-      "inherits": ["_ohos-x64", "_egl"],
-      "vendor": {
-        "maplibre-native-ffi": {
-          "device": {
-            "name": "OpenHarmony emulator",
-            "command": "tools/devices/ohos-key"
-          }
-        }
-      }
+      "inherits": ["_ohos-x64", "_egl"]
     },
     {
       "name": "ohos-x64-vulkan",
