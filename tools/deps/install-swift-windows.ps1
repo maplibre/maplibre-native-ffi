@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $prefix = $env:MISE_TOOL_INSTALL_PATH
-$installer = Join-Path $prefix 'swift-installer.exe'
+$installer = Join-Path $prefix "Toolchains/$($env:MISE_TOOL_VERSION)+Asserts/usr/bin/swift-installer.exe"
 $arguments = @(
     '/quiet', '/norestart',
     "InstallRoot=`"$prefix`"",

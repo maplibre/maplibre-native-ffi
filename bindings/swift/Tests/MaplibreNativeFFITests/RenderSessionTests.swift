@@ -80,7 +80,9 @@ private func attachOwnedTextureSession(
   do {
     try await fixture.map.setStyleJson(style)
     graphics = try TestGraphics()
-    if graphics.backend == MLN_TEST_GRAPHICS_BACKEND_EGL {
+    if graphics.backend == MLN_TEST_GRAPHICS_BACKEND_EGL ||
+      graphics.backend == MLN_TEST_GRAPHICS_BACKEND_WGL
+    {
       let host = RenderThread()
       thread = host
       try await host.perform { try graphics.makeCurrentIfNeeded() }
