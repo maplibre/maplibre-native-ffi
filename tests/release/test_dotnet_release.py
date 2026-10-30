@@ -44,6 +44,17 @@ class RuntimeTargetTests(unittest.TestCase):
             },
         )
 
+    def test_mingw_runtime_packages_do_not_share_msvc_assets(self) -> None:
+        targets = runtime_targets()
+        for backend, preset in (
+            ("OpenGL", "mingw-x64-wgl"),
+            ("Vulkan", "mingw-x64-vulkan"),
+        ):
+            self.assertEqual({preset: "win-x64"}, targets[f"{backend}.MinGW"])
+            self.assertNotIn(preset, targets[backend])
+        for package, presets in targets.items():
+            self.assertEqual(len(presets), len(set(presets.values())), package)
+
 
 class AppleFrameworkTests(unittest.TestCase):
     def test_catalyst_zip_preserves_versioned_framework_symlinks(self) -> None:

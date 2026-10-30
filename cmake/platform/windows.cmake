@@ -52,6 +52,50 @@ function(mln_ffi_configure_platform_dependencies target)
     set(archive_format mingw)
     # A C consumer of the static archive also needs the MSYS2 C++ runtime.
     target_link_libraries(${target} INTERFACE stdc++ winpthread)
+    # Registry packages must load without the build machine's MSYS2 on PATH.
+    set_property(
+      TARGET ${target}
+      APPEND
+      PROPERTY
+        MLN_FFI_INSTALL_LIBRARY_FILES
+        "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
+        "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
+        "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
+    foreach(package libstdc++ libgcc libwinpthread)
+      execute_process(
+        COMMAND
+          "${MLN_FFI_MSYS2_ROOT}/../usr/bin/pacman.exe" -Q
+          "mingw-w64-x86_64-${package}"
+        OUTPUT_VARIABLE package_version OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY)
+      string(REGEX REPLACE "^[^ ]+ " "" package_version "${package_version}")
+      set(notices "${MLN_FFI_MSYS2_ROOT}/share/licenses/${package}")
+      if(package STREQUAL "libwinpthread")
+        mln_ffi_add_component(
+          ${target}
+          ${package}
+          https://www.mingw-w64.org
+          "MIT AND BSD-3-Clause"
+          VERSION
+          "${package_version}"
+          NOTICES
+          "${notices}/COPYING"
+          "${package}.txt")
+      else()
+        mln_ffi_add_component(
+          ${target}
+          ${package}
+          https://gcc.gnu.org
+          "GPL-3.0-or-later WITH GCC-exception-3.1"
+          VERSION
+          "${package_version}"
+          NOTICES
+          "${notices}/COPYING3"
+          "${package}.txt"
+          "${notices}/COPYING.RUNTIME"
+          "${package}-exception.txt")
+      endif()
+    endforeach()
   endif()
   set_target_properties(
     ${target}

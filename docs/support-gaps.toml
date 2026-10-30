@@ -381,13 +381,6 @@ status = "blocked"
 reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
 
 [[entry]]
-bindings = ["dotnet"]
-platforms = ["windows-mingw"]
-operations = ["package"]
-status = "path-known"
-reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
-
-[[entry]]
 bindings = ["c"]
 platforms = ["android"]
 archs = ["arm", "arm64"]

@@ -124,7 +124,9 @@ class PlatformGapsTest(unittest.TestCase):
             "//bindings/dotnet:test",
             {suite.task for suite in suites.target_suites(target)},
         )
-        self.assertIsNone(plan.dotnet_runtime_target("mingw-x64-vulkan"))
+        self.assertEqual(
+            plan.dotnet_runtime_target("mingw-x64-vulkan"), ("Vulkan.MinGW", "win-x64")
+        )
         self.assertIn(
             "//bindings/dotnet:test",
             {

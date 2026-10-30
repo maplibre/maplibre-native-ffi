@@ -240,6 +240,10 @@ Take one runtime package:
 - `Maplibre.NativeFfi.Runtime.Metal`
 - `Maplibre.NativeFfi.Runtime.Vulkan`
 
+For Windows with MinGW, take `Maplibre.NativeFfi.Runtime.OpenGL.MinGW` or
+`Maplibre.NativeFfi.Runtime.Vulkan.MinGW` instead. These alternatives carry
+Windows assets only; the packages above use MSVC on Windows.
+
 For the snapshot channel, download the packages from the
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
 into a directory, and add that directory as a package source.
