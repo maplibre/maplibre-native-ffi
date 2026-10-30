@@ -113,10 +113,11 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     commandBuffer =
       NS::RetainPtr(context.getBackend().getCommandQueue()->commandBuffer());
     // A wait applies to the passes encoded after it in the command buffer.
+    // Each pass binds a new buffer, and only the last one commits, so every
+    // buffer gets the waits until the frame commits.
     for (const auto& wait : backend.event_waits_) {
       commandBuffer->encodeWait(wait.event.get(), wait.value);
     }
-    backend.event_waits_.clear();
     renderPassDescriptor =
       NS::TransferPtr(MTL::RenderPassDescriptor::alloc()->init());
     if (
@@ -294,6 +295,7 @@ void MetalTextureBackend::commit(NS::SharedPtr<MTL::CommandBuffer> buffer) {
     buffer->encodeSignalEvent(event_.get(), ++event_value_);
   }
   buffer->commit();
+  event_waits_.clear();
   if (producer_sync_kind_ != MLN_GPU_SYNC_CPU_COMPLETE) {
     in_flight_ = std::move(buffer);
     return;

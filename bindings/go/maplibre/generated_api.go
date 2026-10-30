@@ -251,7 +251,7 @@ const (
 	// id<MTLSharedEvent> / MTL::SharedEvent*, and the value that the work signals.
 	// handle is nonzero. Metal supports it, as does EGL on ANGLE where the display
 	// has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK once the device
-	// enables VK_EXT_metal_objects.
+	// enables VK_EXT_metal_objects and the timelineSemaphore feature.
 	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
 )
 
