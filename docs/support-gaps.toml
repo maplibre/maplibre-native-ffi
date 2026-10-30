@@ -39,6 +39,14 @@ link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[entry]]
 bindings = ["swift"]
+platforms = ["linux-musl"]
+archs = ["x64", "arm64"]
+status = "blocked"
+reason = "Swift's released musl SDK supports only fully static executables, with no dynamic linking or `dlopen`, so it cannot load the C shared library or graphics drivers."
+link = "https://github.com/swiftlang/swift/issues/47209"
+
+[[entry]]
+bindings = ["swift"]
 platforms = ["linux-gnu"]
 archs = ["riscv64"]
 status = "blocked"
