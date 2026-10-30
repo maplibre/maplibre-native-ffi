@@ -1,11 +1,5 @@
-# Sourced by the Go binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, RISC-V, LoongArch, Android, macOS x64, and
-# OpenHarmony presets to GOOS/GOARCH and exports the cross C toolchain from
-# the native build's Zig wrappers, the Android NDK, MSYS2 Clang, Apple Clang,
-# or the OpenHarmony SDK. Leaves `goos` empty for presets that run on the
-# host, which macOS x64 does under Rosetta. OpenHarmony has no Go port, so its
-# presets build GOOS=linux binaries against the OHOS sysroot;
-# the Oniro emulator runs them.
+# Sourced by Go tasks with a native preset as $1. Exports cross-compilation
+# settings and leaves `goos` nonempty when tests need tools/devices/run.
 # shellcheck shell=bash
 
 goos=
@@ -82,6 +76,7 @@ case "$1" in
     export CC="clang -arch x86_64" CXX="clang++ -arch x86_64"
     ;;
   ohos-arm64-* | ohos-x64-*)
+    # Go has no OpenHarmony port, so use its Linux port with the OHOS sysroot.
     goos=linux
     if [[ "$1" == ohos-arm64-* ]]; then
       goarch=arm64
