@@ -414,6 +414,15 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
+  // A queue-ordered frame may still render, and the host's reads of one it
+  // released may still run, so the ring's images wait for the shared queue.
+  if (graphicsQueue) {
+    try {
+      graphicsQueue.waitIdle(dispatcher);
+    } catch (...) {
+      // A lost device has finished every submission.
+    }
+  }
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   getThreadPool().runRenderJobs(true);

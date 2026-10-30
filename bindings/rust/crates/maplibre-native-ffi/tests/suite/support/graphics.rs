@@ -181,6 +181,7 @@ impl Graphics {
                         },
                         // MTLPixelFormatBGRA8Unorm.
                         pixel_format: 80,
+                        command_queue: std::ptr::null_mut(),
                     },
                     options,
                 ),

@@ -280,6 +280,7 @@ internal object TestGraphics {
       MetalContextDescriptor(pointer(context.metalDevice)),
       // MTLPixelFormatBGRA8Unorm.
       pixelFormat = 80uL,
+      commandQueue = NativePointer.NULL_POINTER,
     )
 
   /** A Vulkan owned texture of [extent] on [context]'s device. */

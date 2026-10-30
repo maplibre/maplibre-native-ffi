@@ -291,6 +291,17 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
     };
     MLN_TEST_OK(mln_acquired_frame_release(frame, &consumer, NULL));
   }
+  // Detach right after a queue-ordered frame and its release, which may both
+  // still run on the queue, waits for them before it destroys the ring.
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 3, 0)
+  );
+  mln_acquired_frame last = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &last, NULL));
+  const mln_gpu_sync queued = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_QUEUE_ORDER
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(last, &queued, NULL));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

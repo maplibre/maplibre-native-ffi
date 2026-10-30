@@ -159,7 +159,8 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * are visible to every later command on that queue, and its next render
    * into the slot waits for every earlier one. Metal orders on the texture
    * descriptor's command_queue, through Metal's hazard tracking, so a target
-   * without one does not support this kind.
+   * without one does not support this kind, and a borrowed texture must leave
+   * hazard tracking on.
    */
   MLN_GPU_SYNC_QUEUE_ORDER = 2U,
 } mln_gpu_sync_kind;
