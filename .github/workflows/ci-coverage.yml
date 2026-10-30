@@ -227,6 +227,7 @@ jobs:
       - name: Resolve Swift packages
         id: resolve
         if: matrix.swift
+        shell: bash
         run: |
           mise run //bindings/swift:resolve
           case '${{ matrix.preset }}' in
