@@ -203,7 +203,10 @@ class PresetTest(unittest.TestCase):
             )
             packages = "cache" if emulated else zig.get(target.platform, "skip")
             # Windows ARM64 has no Zig toolchain.
-            if name.startswith("windows-arm64-"):
+            if (
+                target.platform in ("windows", "windows-mingw")
+                and target.architecture == "arm64"
+            ):
                 packages = "skip"
             expected[name] = (mise_env, target.backend if gpu else "", packages)
         matrix = plan.plan(self.presets, True, [])["matrix"]
@@ -306,7 +309,7 @@ class PresetTest(unittest.TestCase):
 
     def test_pypi_selects_runtime_wheel_producers_including_android(self):
         matrix = plan.plan(self.presets, False, ["pypi"])["matrix"]
-        self.assertEqual(len(matrix), 26)
+        self.assertEqual(len(matrix), 28)
         self.assertTrue(all(row["python_wheel"] for row in matrix))
         self.assertEqual(
             {row["preset"] for row in matrix if row["preset"].startswith("android-")},

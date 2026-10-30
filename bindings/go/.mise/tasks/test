@@ -45,7 +45,7 @@ fi
 # race detector for windows/arm64.
 race=-race
 case "$usage_preset" in
-  windows-arm64-*) race= ;;
+  windows-arm64-* | mingw-arm64-*) race= ;;
 esac
 # Go's test cache cannot see the native library, so always rerun the suite.
 go test -count=1 ${race:+"$race"} -tags "$go_test_tags" ./...

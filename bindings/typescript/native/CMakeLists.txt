@@ -69,12 +69,17 @@ if(WIN32)
   if(MINGW)
     find_program(MLN_FFI_DLLTOOL NAMES llvm-dlltool REQUIRED)
     set(MLN_FFI_NODE_IMPORT_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libnode_api.a")
+    if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
+      set(node_machine arm64)
+    else()
+      set(node_machine i386:x86-64)
+    endif()
     add_custom_command(
       OUTPUT "${MLN_FFI_NODE_IMPORT_LIBRARY}"
       COMMAND
         "${MLN_FFI_DLLTOOL}"
         -m
-        i386:x86-64
+        "${node_machine}"
         -d
         "${MLN_FFI_NODE_DEF}"
         -l
@@ -100,10 +105,8 @@ if(WIN32)
     REQUIRED)
   set(MLN_FFI_WINDOWS_DLLS "${MLN_FFI_NATIVE_DLL}")
   if(MINGW)
-    list(
-      APPEND MLN_FFI_WINDOWS_DLLS "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
-      "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
-      "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
+    file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/lib/*.dll")
+    list(APPEND MLN_FFI_WINDOWS_DLLS ${runtime_dlls})
   endif()
 endif()
 
@@ -196,13 +199,6 @@ endif()
 install(TARGETS maplibre_native_ffi LIBRARY DESTINATION . RUNTIME DESTINATION .)
 if(WIN32)
   install(FILES ${MLN_FFI_WINDOWS_DLLS} DESTINATION .)
-  if(MINGW)
-    install(
-      DIRECTORY "${MLN_FFI_MSYS2_ROOT}/share/licenses/libgcc"
-      "${MLN_FFI_MSYS2_ROOT}/share/licenses/libstdc++"
-      "${MLN_FFI_MSYS2_ROOT}/share/licenses/libwinpthread"
-      DESTINATION licenses)
-  endif()
 else()
   install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
 endif()

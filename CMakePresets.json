@@ -500,6 +500,22 @@
       }
     },
     {
+      "name": "_mingw-arm64",
+      "hidden": true,
+      "inherits": "_mingw-x64",
+      "cacheVariables": {
+        "MLN_FFI_TARGET_ARCHITECTURE": "arm64",
+        "MLN_FFI_TARGET_PLATFORM": "windows-mingw-arm64",
+        "MLN_FFI_ZIG_TARGET": "aarch64-windows-gnu",
+        "MLN_FFI_RUST_TARGET": "aarch64-pc-windows-gnullvm"
+      },
+      "vendor": {
+        "maplibre-native-ffi": {
+          "runner": "windows-11-arm"
+        }
+      }
+    },
+    {
       "name": "_metal",
       "hidden": true,
       "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "metal" }
@@ -838,6 +854,16 @@
       "name": "mingw-x64-vulkan",
       "displayName": "MSYS2 MinGW x64 Vulkan",
       "inherits": ["_mingw-x64", "_vulkan"]
+    },
+    {
+      "name": "mingw-arm64-wgl",
+      "displayName": "MSYS2 MinGW ARM64 WGL",
+      "inherits": ["_mingw-arm64", "_wgl"]
+    },
+    {
+      "name": "mingw-arm64-vulkan",
+      "displayName": "MSYS2 MinGW ARM64 Vulkan",
+      "inherits": ["_mingw-arm64", "_vulkan"]
     },
     {
       "name": "windows-x64-wgl",

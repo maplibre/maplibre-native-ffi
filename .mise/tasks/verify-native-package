@@ -75,9 +75,10 @@ PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
 # Presets whose complete static archive holds ELF objects.
 ELF_ARCHIVE_PRESETS = ("android-", "freebsd-", "linux-", "ohos-")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
-MINGW_RUNTIME_DLLS = frozenset(
-    {"libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll"}
-)
+MINGW_RUNTIME_DLLS = {
+    "x64": {"libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll"},
+    "arm64": {"libc++.dll", "libunwind.dll"},
+}
 # The binary of MaplibreNativeC.framework.
 PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
 # The prefix's and the framework's header directories.
@@ -368,7 +369,7 @@ def main() -> int:
             if (
                 preset.startswith("mingw-")
                 and image == "pe"
-                and binary.name in MINGW_RUNTIME_DLLS
+                and binary.name in MINGW_RUNTIME_DLLS[preset.split("-")[1]]
             ):
                 continue
             if (

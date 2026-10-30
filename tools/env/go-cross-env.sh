@@ -57,8 +57,8 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$compiler" CXX="$compiler_cxx"
     ;;
-  windows-x64-* | windows-arm64-* | mingw-x64-*)
-    if [[ "$1" == windows-arm64-* ]]; then
+  windows-x64-* | windows-arm64-* | mingw-*)
+    if [[ "$1" == *-arm64-* ]]; then
       goarch=arm64
     else
       goarch=amd64

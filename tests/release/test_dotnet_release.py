@@ -50,8 +50,15 @@ class RuntimeTargetTests(unittest.TestCase):
             ("OpenGL", "mingw-x64-wgl"),
             ("Vulkan", "mingw-x64-vulkan"),
         ):
-            self.assertEqual({preset: "win-x64"}, targets[f"{backend}.MinGW"])
-            self.assertNotIn(preset, targets[backend])
+            self.assertEqual(
+                {
+                    preset.replace("x64", arch): f"win-{arch}"
+                    for arch in ("x64", "arm64")
+                },
+                targets[f"{backend}.MinGW"],
+            )
+            for arch in ("x64", "arm64"):
+                self.assertNotIn(preset.replace("x64", arch), targets[backend])
         for package, presets in targets.items():
             self.assertEqual(len(presets), len(set(presets.values())), package)
 

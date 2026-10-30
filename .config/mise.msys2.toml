@@ -1,12 +1,12 @@
-# Opt in with `mise -E msys2` on Windows after installing MSYS2's MINGW64
-# clang and llvm packages. Project tasks still run in Git Bash.
+# Opt in with `mise -E msys2` after installing MSYS2's MINGW64 (x64) or
+# CLANGARM64 toolchain. Project tasks still run in Git Bash.
 [vars]
-host_native_preset = "mingw-x64-wgl"
+host_native_preset = "mingw-{{ arch() }}-wgl"
 
 [env]
 # This toolchain uses no Visual Studio environment.
 BASH_ENV = ""
-MLN_FFI_MSYS2_ROOT = "{{ env.MLN_FFI_MSYS2_ROOT | default(value='C:/msys64/mingw64') }}"
+MLN_FFI_MSYS2_ROOT = "{{ env.MLN_FFI_MSYS2_ROOT | default(value='C:/msys64/' ~ ('clangarm64' if arch() == 'arm64' else 'mingw64')) }}"
 _.path = [
-  "{{ env.MLN_FFI_MSYS2_ROOT | default(value='C:/msys64/mingw64') }}/bin",
+  "{{ env.MLN_FFI_MSYS2_ROOT | default(value='C:/msys64/' ~ ('clangarm64' if arch() == 'arm64' else 'mingw64')) }}/bin",
 ]

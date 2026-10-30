@@ -50,27 +50,46 @@ function(mln_ffi_configure_platform_dependencies target)
   set(archive_format coff)
   if(MINGW)
     set(archive_format mingw)
-    # A C consumer of the static archive also needs the MSYS2 C++ runtime.
-    target_link_libraries(${target} INTERFACE stdc++ winpthread)
-    # Registry packages must load without the build machine's MSYS2 on PATH.
+    if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
+      target_link_libraries(${target} INTERFACE c++)
+      set(runtime_packages libc++ libunwind)
+      set(package_prefix mingw-w64-clang-aarch64)
+      set(runtime_dlls "${MLN_FFI_MSYS2_ROOT}/bin/libc++.dll"
+          "${MLN_FFI_MSYS2_ROOT}/bin/libunwind.dll")
+    else()
+      target_link_libraries(${target} INTERFACE stdc++ winpthread)
+      set(runtime_packages libstdc++ libgcc libwinpthread)
+      set(package_prefix mingw-w64-x86_64)
+      set(runtime_dlls
+          "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
+          "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
+          "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
+    endif()
     set_property(
       TARGET ${target}
       APPEND
-      PROPERTY
-        MLN_FFI_INSTALL_LIBRARY_FILES
-        "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
-        "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
-        "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
-    foreach(package libstdc++ libgcc libwinpthread)
+      PROPERTY MLN_FFI_INSTALL_LIBRARY_FILES ${runtime_dlls})
+    foreach(package IN LISTS runtime_packages)
       execute_process(
         COMMAND
           "${MLN_FFI_MSYS2_ROOT}/../usr/bin/pacman.exe" -Q
-          "mingw-w64-x86_64-${package}"
+          "${package_prefix}-${package}"
         OUTPUT_VARIABLE package_version OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY)
       string(REGEX REPLACE "^[^ ]+ " "" package_version "${package_version}")
       set(notices "${MLN_FFI_MSYS2_ROOT}/share/licenses/${package}")
-      if(package STREQUAL "libwinpthread")
+      if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
+        mln_ffi_add_component(
+          ${target}
+          ${package}
+          https://llvm.org
+          "Apache-2.0 WITH LLVM-exception"
+          VERSION
+          "${package_version}"
+          NOTICES
+          "${notices}/LICENSE"
+          "${package}.txt")
+      elseif(package STREQUAL "libwinpthread")
         mln_ffi_add_component(
           ${target}
           ${package}

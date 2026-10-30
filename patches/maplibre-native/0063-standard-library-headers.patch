@@ -1,0 +1,76 @@
+Include the standard-library headers used directly. libc++ 23 no longer
+supplies them through unrelated headers.
+Upstream: not proposed
+
+diff --git a/vendor/maplibre-tile-spec/cpp/src/mlt/util/rle.hpp b/vendor/maplibre-tile-spec/cpp/src/mlt/util/rle.hpp
+--- a/vendor/maplibre-tile-spec/cpp/src/mlt/util/rle.hpp
++++ b/vendor/maplibre-tile-spec/cpp/src/mlt/util/rle.hpp
+@@ -6,6 +6,7 @@
+ #include <algorithm>
+ #include <functional>
+ #include <type_traits>
++#include <vector>
+ 
+ namespace mlt::metadata::stream {
+ class StreamMetadata;
+
+diff --git a/include/mln/gfx/context_observer.hpp b/include/mln/gfx/context_observer.hpp
+--- a/include/mln/gfx/context_observer.hpp
++++ b/include/mln/gfx/context_observer.hpp
+@@ -3,6 +3,7 @@
+ #include <mln/gfx/backend.hpp>
+ #include <mln/shaders/shader_source.hpp>
+ 
++#include <exception>
+ #include <string>
+ 
+ namespace mln {
+
+diff --git a/include/mln/util/convert.hpp b/include/mln/util/convert.hpp
+--- a/include/mln/util/convert.hpp
++++ b/include/mln/util/convert.hpp
+@@ -4,6 +4,8 @@
+ 
+ #include <algorithm>
+ #include <array>
++#include <cerrno>
+ #include <cstddef>
++#include <cstdlib>
+ #include <tuple>
+ #include <type_traits>
+
+diff --git a/src/mln/util/mapbox.cpp b/src/mln/util/mapbox.cpp
+--- a/src/mln/util/mapbox.cpp
++++ b/src/mln/util/mapbox.cpp
+@@ -5,6 +5,7 @@
+ #include <mln/util/tileset.hpp>
+ #include <mln/util/tile_server_options.hpp>
+ 
++#include <iterator>
+ #include <stdexcept>
+ #include <vector>
+ #include <map>
+
+diff --git a/platform/default/src/mln/storage/sqlite3.cpp b/platform/default/src/mln/storage/sqlite3.cpp
+--- a/platform/default/src/mln/storage/sqlite3.cpp
++++ b/platform/default/src/mln/storage/sqlite3.cpp
+@@ -5,6 +5,7 @@
+ #include <algorithm>
+ #include <cassert>
+ #include <cstring>
++#include <exception>
+ #include <cstdio>
+ #include <chrono>
+ #include <optional>
+
+diff --git a/platform/windows/src/thread.cpp b/platform/windows/src/thread.cpp
+--- a/platform/windows/src/thread.cpp
++++ b/platform/windows/src/thread.cpp
+@@ -2,6 +2,7 @@
+ #include <mln/platform/thread.hpp>
+ #include <mln/util/logging.hpp>
+ 
++#include <cstdlib>
+ #include <string>
+ 
+ #include "thread.h"

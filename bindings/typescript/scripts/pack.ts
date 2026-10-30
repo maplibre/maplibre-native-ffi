@@ -132,7 +132,11 @@ function addonOf(preset: string): Addon {
           ? "libmaplibre-native-c.dylib"
           : "libmaplibre-native-c.so",
       ...(mingw
-        ? ["libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll"]
+        ? readdirSync(
+            join(binding, "native", "build", preset, "install"),
+          ).filter(
+            (file) => file.endsWith(".dll") && file !== "maplibre-native-c.dll",
+          )
         : []),
     ],
   };
