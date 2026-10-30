@@ -22,7 +22,7 @@ if docker info --format '{{json .SecurityOptions}}' | grep -q rootless; then
 fi
 exec docker run --rm --platform linux/amd64 --user "$user" \
   --volume "$PWD:$PWD" --workdir "$PWD" --env HOME="$HOME" \
-  --env MLN_FFI_ANDROID_NDK_VERSION \
+  --env MLN_FFI_ANDROID_NDK_VERSION --env ANDROID_USER_HOME="$gradle_cache/android" \
   --volume "$git_metadata:$git_metadata:ro" \
   --volume "$gradle_cache:$gradle_cache" --env GRADLE_USER_HOME="$gradle_cache" \
   --volume "$konan_cache:$konan_cache" --env KONAN_DATA_DIR="$konan_cache" \
