@@ -190,7 +190,13 @@ mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
             kotlin.source_sets(
                 frozenset({"android", "linux", "macos", "ohos", "windows"})
             ),
-            ["jvmAndroidMain", "androidNativeMain", "macosMain", "linuxMain"],
+            [
+                "jvmAndroidMain",
+                "androidNativeMain",
+                "macosMain",
+                "linuxMain",
+                "mingwMain",
+            ],
         )
         self.assertEqual(kotlin.source_sets(frozenset({"web"})), ["wasmJsMain"])
         generated = emitted(kotlin, api())

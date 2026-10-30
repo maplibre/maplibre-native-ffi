@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.konan.target.Family
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
@@ -27,6 +28,16 @@ plugins {
 }
 
 val hostPlatform = HostPlatform.current()
+
+val packagedNativePlatforms =
+  providers
+    .exec {
+      workingDir(rootProject.projectDir)
+      commandLine("python3", "-m", "tools.ci.plan", "--package-platforms", "kotlin-native")
+    }
+    .standardOutput
+    .asText
+    .map { it.lineSequence().toSet() }
 
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
@@ -62,6 +73,7 @@ kotlin {
   linuxX64()
   macosArm64()
   macosX64()
+  mingwX64()
 
   // The browser target runs on the page, which never blocks, and calls the Emscripten module that
   // bindings/kotlin/wasm links. Karma serves that module; see karma.config.d.
@@ -137,10 +149,10 @@ kotlin {
       binaries.all {
         linkerOpts("-L${maplibreNativeC.linkDir}")
         linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
-        if (hostPlatform.isMac || hostPlatform.isLinux) {
+        if (konanTarget.family == Family.LINUX || konanTarget.family.isAppleFamily) {
           linkerOpts("-Wl,-rpath,${maplibreNativeC.runtimeLibraryDir}")
         }
-        if (hostPlatform.isMac) {
+        if (konanTarget.family.isAppleFamily) {
           linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
         }
       }
@@ -214,6 +226,15 @@ kotlin {
     }
     val graphicsCompiler =
       when (name) {
+        "mingwX64" ->
+          listOf(
+            "zig",
+            "cc",
+            "-target",
+            "x86_64-windows-gnu",
+            "-fno-sanitize=undefined",
+            "-fno-stack-protector",
+          )
         "linuxX64" -> listOf("clang", "--target=x86_64-linux-gnu")
         "linuxArm64" -> listOf("clang", "--target=aarch64-linux-gnu")
         "macosArm64" ->
@@ -306,7 +327,8 @@ kotlin {
           name.startsWith("ios") ||
           name.startsWith("tvos") ||
           name.startsWith("linux") ||
-          name.startsWith("macos")
+          name.startsWith("macos") ||
+          name.startsWith("mingw")
       ) {
         // C interop commonizes size_t as an unsafe number because it is UInt on
         // 32-bit Android and ULong on the other native targets. These declarations
@@ -331,6 +353,12 @@ dokka { moduleName.set(mavenArtifact) }
 canonicalizeKmpRootMetadata(
   group = mavenGroup,
   version = mavenVersion,
+  unpublishedTargets =
+    kotlin.targets
+      .withType<KotlinNativeTarget>()
+      .filter { kotlinNativeTargetPlatform(it.name) !in packagedNativePlatforms.get() }
+      .map { it.name }
+      .toSet(),
   targetModules =
     mapOf(
       "android" to "$mavenArtifact-android",

@@ -22,7 +22,8 @@ case "$usage_preset" in
   linux-gnu-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
   macos-arm64-*) kotlin_target=macosArm64; tasks+=(:bindings:kotlin:jvmJar) ;;
   macos-x64-metal) kotlin_target=macosX64; runtime_backend=metal ;;
-  windows-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
+  windows-x64-*) kotlin_target=mingwX64; tasks+=(:bindings:kotlin:jvmJar) ;;
+  windows-arm64-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2

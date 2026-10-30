@@ -8,6 +8,10 @@ set -euo pipefail
 gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
+  windows-x64-*)
+    kotlin_target=mingwX64
+    export PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin:$PATH"
+    ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   macos-x64-metal)
     kotlin_target=macosX64

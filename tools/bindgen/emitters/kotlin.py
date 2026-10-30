@@ -68,7 +68,7 @@ SOURCE_SET_CHILDREN = {
     "commonMain": ("threadedMain", "wasmJsMain"),
     "threadedMain": ("jvmAndroidMain", "nativeMain"),
     "jvmAndroidMain": ("jvmMain", "androidMain"),
-    "nativeMain": ("androidNativeMain", "appleMain", "linuxMain"),
+    "nativeMain": ("androidNativeMain", "appleMain", "linuxMain", "mingwMain"),
     "appleMain": ("iosMain", "macosMain", "tvosMain"),
 }
 TARGET_PLATFORMS = {
@@ -79,6 +79,7 @@ TARGET_PLATFORMS = {
     "macosMain": frozenset({"macos"}),
     "tvosMain": frozenset({"tvos"}),
     "linuxMain": frozenset({"linux"}),
+    "mingwMain": frozenset({"windows"}),
     "wasmJsMain": frozenset({"web"}),
 }
 TARGETS = frozenset().union(*TARGET_PLATFORMS.values())

@@ -87,6 +87,27 @@ class PlatformGapsTest(unittest.TestCase):
                 {"metal": {"natives-macos-x64": "macos-x64"}},
             )
 
+    def test_windows_native_kotlin_tests_do_not_imply_a_runtime_package(self):
+        for preset in ("windows-x64-wgl", "windows-x64-vulkan"):
+            target = self.targets[preset]
+            with self.subTest(preset=preset):
+                self.assertTrue(gaps.supported("kotlin-native", target, "build"))
+                self.assertTrue(gaps.supported("kotlin-native", target, "test"))
+                self.assertFalse(gaps.supported("kotlin-native", target, "package"))
+                self.assertIn(
+                    "//bindings/kotlin:test:native",
+                    {suite.task for suite in suites.target_suites(target)},
+                )
+        self.assertFalse(
+            gaps.supported(
+                "kotlin-native", self.targets["windows-arm64-vulkan"], "test"
+            )
+        )
+        self.assertNotIn(
+            "windows-x64",
+            plan.package_platforms("kotlin-native", list(self.targets.values())),
+        )
+
     def test_nuget_inputs_match_its_packager_and_preserve_macos_x64(self):
         selected = plan.consumed("dotnet-nuget", list(self.targets.values()))
         self.assertEqual(

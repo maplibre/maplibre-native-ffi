@@ -352,8 +352,19 @@ reason = "Kotlin/Native builds Linux ARM64 KLIBs from an x64 host, but CI uses a
 [[entry]]
 bindings = ["kotlin-native"]
 platforms = ["windows"]
-status = "path-known"
-reason = "The binding declares no Windows Kotlin/Native target. Add its KLIB, link the MSVC-built C DLL with the Kotlin/Native toolchain, and run the suite."
+archs = ["x64"]
+operations = ["package"]
+status = "blocked"
+reason = "The x64 binding builds and tests against the MSVC DLL, but its runtime KLIB needs an embedded static archive. Kotlin/Native's MinGW linker cannot resolve the MSVC archive's CRT directives."
+link = "https://youtrack.jetbrains.com/issue/KT-52275"
+
+[[entry]]
+bindings = ["kotlin-native"]
+platforms = ["windows"]
+archs = ["arm64"]
+status = "blocked"
+reason = "Kotlin/Native ships no Windows ARM64 target."
+link = "https://youtrack.jetbrains.com/issue/KT-73917"
 
 [[entry]]
 bindings = ["zig"]

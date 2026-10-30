@@ -45,6 +45,15 @@ def packaged(*bindings: str):
     )
 
 
+def package_platforms(binding: str, all_targets: list[Target]) -> set[str]:
+    """Native platforms whose binding packages have no declared gap."""
+    return {
+        f"{target.platform}-{target.architecture}"
+        for target in all_targets
+        if gaps.supported(binding, target, "package")
+    }
+
+
 def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
     """The NuGet backend and RID, shared with the packager that consumes it."""
     target = gaps.target_from_name(preset)
@@ -353,10 +362,21 @@ def main() -> int:
         action="store_true",
         help="Print the supported JVM runtime JAR classifiers and native platforms as JSON",
     )
+    parser.add_argument(
+        "--package-platforms",
+        choices=list(gaps.BINDING_LABELS),
+        help="Print native platform IDs with no package gap for a binding, one per line",
+    )
     args = parser.parse_args()
     presets = json.loads((ROOT / "CMakePresets.json").read_text())
     if args.jvm_runtimes:
         print(json.dumps(jvm_runtimes(targets(presets))))
+    elif args.package_platforms:
+        print(
+            "\n".join(
+                sorted(package_platforms(args.package_platforms, targets(presets)))
+            )
+        )
     elif args.package_inputs:
         print(
             "\n".join(

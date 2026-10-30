@@ -150,6 +150,7 @@ fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
       "linuxX64" -> "linux-gnu-x64"
       "macosArm64" -> "macos-arm64"
       "macosX64" -> "macos-x64"
+      "mingwX64" -> "windows-x64"
       else -> error("No native target platform for Kotlin/Native target $kotlinTarget")
     }
 
