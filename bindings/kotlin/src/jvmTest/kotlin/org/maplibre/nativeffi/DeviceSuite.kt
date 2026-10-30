@@ -10,10 +10,7 @@ import org.junit.Test
 import org.junit.internal.TextListener
 import org.junit.runner.JUnitCore
 
-/**
- * Runs every test class under the class directory that its argument names, for a JVM that Gradle
- * does not start: one in Alpine or in the FreeBSD virtual machine.
- */
+/** Runs the test classes under its argument's directory on a JVM launched outside Gradle. */
 object DeviceSuite {
   @JvmStatic
   fun main(args: Array<String>) {

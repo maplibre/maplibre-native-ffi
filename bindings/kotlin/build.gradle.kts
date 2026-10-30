@@ -408,8 +408,7 @@ tasks.named<Test>("jvmTest") {
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }
 
-// Alpine and the FreeBSD virtual machine see only the repository, so the suite's classpath is
-// copied into it, and a JVM there runs the suite through DeviceSuite.
+// Stage the classpath for JVMs launched outside Gradle.
 tasks.register<Sync>("jvmDeviceTestClasspath") {
   val test = kotlin.jvm().compilations.getByName("test")
   val classpath = files(test.output.allOutputs, test.runtimeDependencyFiles)

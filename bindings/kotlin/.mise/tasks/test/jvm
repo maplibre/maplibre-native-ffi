@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Run the Kotlin/JVM suite against a host, musl, or FreeBSD preset's install."
+#MISE description="Run the Kotlin/JVM suite against a native preset's install."
 #MISE extends="ffi:preset"
 #MISE dir="../.."
 #MISE shell="bash"
 set -euo pipefail
 
 case "$usage_preset" in
-  linux-musl-* | freebsd-*)
-    # Gradle runs on the host, so it stages the suite's classpath in the
-    # repository, and tools/devices/run starts a JDK 25 in Alpine or the
-    # worktree's FreeBSD virtual machine, which mount it.
+  linux-musl-* | freebsd-* | linux-*-riscv64-*)
+    # Gradle stages the classpath on the host; the target JVM runs it.
     ./gradlew :bindings:kotlin:jvmDeviceTestClasspath
     install="$PWD/build/$usage_preset/install"
     suite="$PWD/bindings/kotlin/build/jvm-device-test"
@@ -20,7 +18,17 @@ case "$usage_preset" in
       host=$(tools/devices/freebsd-host)
       ssh -o BatchMode=yes "$host" pkg install --yes --quiet openjdk25-jre-headless >&2
     fi
-    exec tools/devices/run java --enable-native-access=ALL-UNNAMED -cp "$classpath" \
+    java=java
+    case "$usage_preset" in
+      linux-*-riscv64-*)
+        libc=${usage_preset#linux-}
+        architecture=${libc#*-}
+        root=$(tools/devices/linux-root "${libc%%-*}" "${architecture%%-*}")
+        runtimes=("$root"/usr/lib/jvm/java-25-openjdk*/bin/java)
+        java=${runtimes[0]}
+        ;;
+    esac
+    exec tools/devices/run "$java" --enable-native-access=ALL-UNNAMED -cp "$classpath" \
       -Djava.library.path="$install/lib" \
       -Dorg.maplibre.nativeffi.test.graphics.library="$install/lib/libmln_test_graphics.so" \
       -Dorg.maplibre.nativeffi.test.classpath="$classpath" \

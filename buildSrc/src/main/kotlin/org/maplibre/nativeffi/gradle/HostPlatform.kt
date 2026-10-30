@@ -53,8 +53,10 @@ class HostPlatform private constructor(osName: String, arch: String) {
       linkedMapOf(
         "natives-linux-x64" to "linux-gnu-x64",
         "natives-linux-arm64" to "linux-gnu-arm64",
+        "natives-linux-riscv64" to "linux-gnu-riscv64",
         "natives-linux-musl-x64" to "linux-musl-x64",
         "natives-linux-musl-arm64" to "linux-musl-arm64",
+        "natives-linux-musl-riscv64" to "linux-musl-riscv64",
         "natives-freebsd-x64" to "freebsd-x64",
         "natives-macos-arm64" to "macos-arm64",
         "natives-windows-x64" to "windows-x64",

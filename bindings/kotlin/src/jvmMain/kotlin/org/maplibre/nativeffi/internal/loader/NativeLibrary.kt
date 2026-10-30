@@ -298,6 +298,8 @@ internal object NativeLibrary {
       osName.contains("windows") && arm64 -> "natives-windows-arm64"
       osName.contains("windows") -> "natives-windows-x64"
       osName.contains("mac") && arm64 -> "natives-macos-arm64"
+      osName.contains("linux") && architecture == "riscv64" ->
+        "natives-linux-${if (linksMusl("riscv64")) "musl-" else ""}riscv64"
       osName.contains("linux") && arm64 && linksMusl("aarch64") -> "natives-linux-musl-arm64"
       osName.contains("linux") && !arm64 && linksMusl("x86_64") -> "natives-linux-musl-x64"
       osName.contains("linux") && arm64 -> "natives-linux-arm64"
@@ -314,7 +316,8 @@ internal object NativeLibrary {
   private fun linksMusl(architecture: String): Boolean =
     try {
       val loader = Path.of("/lib/ld-musl-$architecture.so.1").toRealPath().toString()
-      Files.readAllLines(Path.of("/proc/self/maps")).any { it.endsWith(" $loader") }
+      // QEMU's mapped paths can carry its root prefix.
+      Files.readAllLines(Path.of("/proc/self/maps")).any { it.endsWith(loader) }
     } catch (_: IOException) {
       false
     }

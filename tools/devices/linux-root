@@ -28,7 +28,7 @@ esac
 
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 root="$repository/build/roots/linux-$libc-$architecture"
-if [[ -f "$root/.complete" && -x "$root/usr/bin/node" ]]; then
+if [[ -f "$root/.complete" && -x "$root/usr/bin/node" && -d "$root/usr/lib/jvm" ]]; then
   printf '%s\n' "$root"
   exit 0
 fi
@@ -59,7 +59,7 @@ case "$libc" in
       packages=$(apt-cache depends --recurse --no-recommends --no-suggests \
         --no-conflicts --no-breaks --no-replaces --no-enhances \
         "base-files:$1" "libc6:$1" "libvulkan1:$1" "mesa-vulkan-drivers:$1" \
-        "libegl1:$1" "libegl-mesa0:$1" "libgles2:$1" "nodejs:$1" |
+        "libegl1:$1" "libegl-mesa0:$1" "libgles2:$1" "nodejs:$1" "openjdk-25-jre-headless:$1" |
         grep -E "^([a-z0-9][^ ]*:$1|node-[a-z0-9-]+)\$" | sort -u)
       cd /tmp
       # shellcheck disable=SC2086
@@ -71,13 +71,13 @@ case "$libc" in
       tar --extract --ignore-zeros --directory "$staging"
     ;;
   musl)
-    "$container_engine" run --rm alpine:3.22 sh -euc '
+    "$container_engine" run --rm alpine:3.23 sh -euc '
       apk --arch "$1" --root /target --initdb --no-scripts --quiet \
         --keys-dir "/usr/share/apk/keys/$1" \
-        --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/main \
-        --repository https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.23/main \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.23/community \
         add alpine-baselayout musl mesa-vulkan-swrast vulkan-loader \
-        mesa-dri-gallium mesa-egl mesa-gles nodejs >&2
+        mesa-dri-gallium mesa-egl mesa-gles nodejs openjdk25-jre-headless >&2
       # The emulator falls back to a host file wherever the root lacks one, so
       # musl searches a single directory, which links every library in /lib.
       for library in /target/lib/*.so*; do
@@ -96,6 +96,15 @@ case "$libc" in
     exit 2
     ;;
 esac
+
+# The JVM reads its configuration through its absolute java.home path. Make
+# package symlinks stay inside the root instead of reaching the host's /etc.
+while IFS= read -r -d '' link; do
+  target=$(readlink "$link")
+  if [[ "$target" == /* ]]; then
+    ln -snf "$(realpath -m --relative-to="$(dirname "$link")" "$staging$target")" "$link"
+  fi
+done < <(find "$staging/usr/lib/jvm" -type l -print0)
 
 # The emulator also falls back to the host's devices. An empty /dev/dri hides
 # the host's GPUs, which the root has no drivers for, so the suites see only
