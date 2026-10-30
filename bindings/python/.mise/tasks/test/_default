@@ -9,6 +9,35 @@ set -euo pipefail
 if [[ "$usage_preset" == android-* ]]; then
   exec mise run :_test-android "$usage_preset"
 fi
+if [[ "$usage_preset" == macos-x64-* ]]; then
+  python=$(MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
+    MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps python -- python -c 'import sys; print(sys.executable)')
+  venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-test"
+  uv venv --quiet --allow-existing --python "$python" "$venv"
+  uv pip install --quiet --python "$venv" 'pytest>=9,<10'
+  uv pip install --quiet --python "$venv" --reinstall --no-index dist/*.whl
+  MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+    exec "$venv/bin/python" -m pytest
+fi
+if [[ "$usage_preset" == linux-*-riscv64-* ]]; then
+  target=${usage_preset#linux-}
+  root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "${target%%-*}" riscv64)
+  python="$root/usr/bin/python3"
+  runner="$MISE_MONOREPO_ROOT/scripts/run-qemu-test.sh"
+  version=$("$runner" "$usage_preset" "$python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  wheels=(dist/*riscv64.whl)
+  platform=${wheels[0]##*-}
+  platform=${platform%.whl}
+  packages="$MISE_MONOREPO_ROOT/build/$usage_preset/python-test"
+  rm -rf "$packages"
+  # Install without querying the guest's musl loader at an unavailable host path.
+  uv run --no-project --with 'pip>=26,<27' python -m pip install --quiet \
+    --disable-pip-version-check --no-compile --only-binary=:all: \
+    --target "$packages" --platform "${platform%%.*}" --python-version "$version" \
+    --implementation cp --abi abi3 'pytest>=9,<10' dist/*.whl
+  MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+    PYTHONPATH="$packages" exec "$runner" "$usage_preset" "$python" -m pytest
+fi
 if [[ "$usage_preset" == linux-musl-* ]]; then
   # The image runs the pinned Python. The repository mounts read-only, so
   # neither pytest nor Python writes beside the tests.

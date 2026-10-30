@@ -1,0 +1,41 @@
+name: Blacksmith Testbox Linux x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      testbox_id:
+        description: Blacksmith Testbox session ID
+        required: true
+        type: string
+
+# begin-testbox authenticates with the VM metadata service's sticky disk token.
+permissions:
+  contents: read
+
+# A warmup dispatch starts every job in its workflow, so each runner has a
+# workflow of its own.
+jobs:
+  linux-x64:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 120
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - uses: useblacksmith/begin-testbox@22ff2ea5697369864347140857d218e42815b33c # v2
+        with:
+          testbox_id: ${{ inputs.testbox_id }}
+      # Matches the linux-gnu-x64-egl target job, including source/submodule
+      # sync. Covers x64 GNU and musl presets with EGL or Vulkan. Android/OHOS
+      # emulators and Emscripten need the setup-ci-deps inputs of their matrix
+      # rows, which name their SDKs and devices. FreeBSD presets build here too,
+      # and their suites need QEMU and KVM access; see the FreeBSD steps in
+      # setup-ci-deps.
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          software-gpu: egl
+          zig: cache
+          save-toolchains: true
+      - name: Preserve the environment for Testbox SSH commands
+        run: ci/preserve-testbox-env.sh
+      - uses: useblacksmith/run-testbox@9b976c32aa3bcbffb348889673585a5deee1b2f3 # v2

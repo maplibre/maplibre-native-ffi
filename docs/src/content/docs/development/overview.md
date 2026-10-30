@@ -181,9 +181,13 @@ Blacksmith account needs access to the MapLibre organization.
 
 ```bash
 blacksmith auth login
-blacksmith testbox warmup .github/workflows/blacksmith-testbox.yml --job linux --ref <branch>
+blacksmith testbox warmup .github/workflows/blacksmith-testbox-linux-x64.yml --job linux-x64 --ref <branch>
 blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
 ```
+
+For an ARM64 runner, warm up
+`.github/workflows/blacksmith-testbox-linux-arm64.yml` with `--job linux-arm64`
+instead.
 
 Run `blacksmith testbox run` from the repository root, because rsync mirrors the
 current directory with `--delete`.

@@ -1,0 +1,148 @@
+Reports a failed MBTiles request instead of terminating the process when the
+file is not a readable MBTiles database or its metadata does not parse. Treats
+an empty mbtiles:// path as not absolute instead of throwing
+(https://github.com/maplibre/maplibre-native-ffi/issues/1435).
+Upstream: not proposed
+
+diff --git a/platform/default/src/mln/storage/mbtiles_file_source.cpp b/platform/default/src/mln/storage/mbtiles_file_source.cpp
+index 7211a2a..a6864b9 100644
+--- a/platform/default/src/mln/storage/mbtiles_file_source.cpp
++++ b/platform/default/src/mln/storage/mbtiles_file_source.cpp
+@@ -72,8 +72,24 @@ public:
+ 
+     std::string db_path(const std::string &path) { return path.substr(0, path.find('?')); }
+ 
+-    // Generate a tilejson resource from .mbtiles file
+     void request_tilejson(const Resource &resource, ActorRef<FileSourceRequest> req) {
++        try {
++            tilejson(resource, req);
++        } catch (const std::exception &e) {
++            respondWithError(req, e);
++        }
++    }
++
++    void request_tile(const Resource &resource, ActorRef<FileSourceRequest> req) {
++        try {
++            tile(resource, req);
++        } catch (const std::exception &e) {
++            respondWithError(req, e);
++        }
++    }
++
++    // Generate a tilejson resource from .mbtiles file
++    void tilejson(const Resource &resource, ActorRef<FileSourceRequest> req) {
+         const auto path = url_to_path(resource.url);
+ 
+         Response response;
+@@ -187,7 +203,7 @@ public:
+     }
+ 
+     // Load data for specific tile
+-    void request_tile(const Resource &resource, ActorRef<FileSourceRequest> req) {
++    void tile(const Resource &resource, ActorRef<FileSourceRequest> req) {
+         std::string base_path = url_to_path(resource.url);
+         std::string path = db_path(base_path);
+         auto &db = get_db(path);
+@@ -243,6 +259,14 @@ public:
+     }
+ 
+ private:
++    // SQLite and metadata parsing throw for a file that is not a valid MBTiles
++    // database, and nothing above this thread catches.
++    void respondWithError(const ActorRef<FileSourceRequest> &req, const std::exception &e) {
++        Response response;
++        response.error = std::make_unique<Response::Error>(Response::Error::Reason::Other, e.what());
++        req.invoke(&FileSourceRequest::setResponse, response);
++    }
++
+     std::map<std::string, mapbox::sqlite::Database> db_cache;
+ 
+     void close_db(const std::string &path) {
+diff --git a/platform/default/src/mln/util/filesystem.cpp b/platform/default/src/mln/util/filesystem.cpp
+index b6e21c9..9fc437b 100644
+--- a/platform/default/src/mln/util/filesystem.cpp
++++ b/platform/default/src/mln/util/filesystem.cpp
+@@ -8,6 +8,6 @@ bool mln::util::is_absolute_path(std::string path) {
+ }
+ #else
+ bool mln::util::is_absolute_path(std::string path) {
+-    return path.at(0) == '/';
++    return !path.empty() && path[0] == '/';
+ }
+ #endif
+diff --git a/test/storage/mbtiles_file_source.test.cpp b/test/storage/mbtiles_file_source.test.cpp
+index 72532c0..8b7cec8 100644
+--- a/test/storage/mbtiles_file_source.test.cpp
++++ b/test/storage/mbtiles_file_source.test.cpp
+@@ -47,6 +47,23 @@ TEST(MBTilesFileSource, AbsolutePath) {
+     loop.run();
+ }
+ 
++// An empty path is not absolute
++TEST(MBTilesFileSource, EmptyPath) {
++    util::RunLoop loop;
++
++    MBTilesFileSource mbtiles(ResourceOptions::Default(), ClientOptions());
++
++    std::unique_ptr<AsyncRequest> req = mbtiles.request({Resource::Unknown, "mbtiles://"}, [&](Response res) {
++        req.reset();
++        ASSERT_NE(nullptr, res.error);
++        EXPECT_EQ(Response::Error::Reason::Other, res.error->reason);
++        EXPECT_NE((res.error->message).find("absolute"), std::string::npos);
++        loop.stop();
++    });
++
++    loop.run();
++}
++
+ // Nonexistent mbtiles file raises error
+ TEST(MBTilesFileSource, NonExistentFile) {
+     util::RunLoop loop;
+@@ -66,6 +83,24 @@ TEST(MBTilesFileSource, NonExistentFile) {
+     loop.run();
+ }
+ 
++// A file that is not an mbtiles database raises error
++TEST(MBTilesFileSource, NotADatabase) {
++    util::RunLoop loop;
++
++    MBTilesFileSource mbtiles(ResourceOptions::Default(), ClientOptions());
++
++    std::unique_ptr<AsyncRequest> req = mbtiles.request(
++        {Resource::Unknown, toAbsoluteURL("../pmtiles/geography-class-png.pmtiles")}, [&](Response res) {
++            req.reset();
++            ASSERT_NE(nullptr, res.error);
++            EXPECT_EQ(Response::Error::Reason::Other, res.error->reason);
++            ASSERT_FALSE(res.data.get());
++            loop.stop();
++        });
++
++    loop.run();
++}
++
+ // Existing mbtiles file default request returns TileJSON
+ TEST(MBTilesFileSource, TileJSON) {
+     util::RunLoop loop;
+@@ -124,3 +159,22 @@ TEST(MBTilesFileSource, NonExistentTile) {
+ 
+     loop.run();
+ }
++
++// Tiles from a nonexistent mbtiles file raise errors
++TEST(MBTilesFileSource, NonExistentFileTile) {
++    util::RunLoop loop;
++
++    MBTilesFileSource mbtiles(ResourceOptions::Default(), ClientOptions());
++
++    std::unique_ptr<AsyncRequest> req = mbtiles.request(
++        Resource::tile(toAbsoluteURL("does_not_exist?file={z}/{x}/{y}.png"), 1.0, 0, 0, 0, Tileset::Scheme::XYZ),
++        [&](Response res) {
++            req.reset();
++            ASSERT_NE(nullptr, res.error);
++            EXPECT_EQ(Response::Error::Reason::Other, res.error->reason);
++            ASSERT_FALSE(res.data.get());
++            loop.stop();
++        });
++
++    loop.run();
++}

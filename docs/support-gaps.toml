@@ -167,7 +167,7 @@ reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the
 link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
-bindings = ["dart", "python", "typescript"]
+bindings = ["dart", "typescript"]
 platforms = ["macos"]
 archs = ["x64"]
 status = "path-known"
@@ -179,13 +179,6 @@ platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
 status = "blocked"
 reason = "Debian and Alpine's Java 25 Zero/libffi runtimes pass 76 of 77 binding tests under QEMU, but hang when a render-completion callback exits the JVM. Their shutdown stack traces omit the callback frames that the binding uses to avoid deadlocking session abandonment."
-
-[[entry]]
-bindings = ["python"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64"]
-status = "path-known"
-reason = "Debian and Alpine package Python for RISC-V. Package the binding's native extension for it, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
 
 [[entry]]
 bindings = ["kotlin-jvm"]
@@ -408,7 +401,7 @@ platforms = ["android"]
 archs = ["arm", "arm64", "x86"]
 operations = ["test"]
 status = "path-known"
-reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. Add an emulator or device for each remaining ABI."
+reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. The ARM64 runner can't run ARM64 guests: Google ships no emulator for Linux ARM64 hosts, and the runner lacks KVM for Cuttlefish and binder for redroid. Add an emulator or device for each remaining ABI."
 
 [[entry]]
 bindings = ["c"]
@@ -424,7 +417,7 @@ platforms = ["ohos"]
 archs = ["arm64"]
 operations = ["test"]
 status = "path-known"
-reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Add an ARM64 device to run the suites."
+reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Oniro publishes only an x64 emulator image, and the ARM64 runner lacks KVM to run one. Add an ARM64 device to run the suites."
 
 [[entry]]
 bindings = ["c"]

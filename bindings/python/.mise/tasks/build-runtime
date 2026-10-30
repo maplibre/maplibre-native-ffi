@@ -25,9 +25,16 @@ if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
 # musllinux tag and needs no repair either.
 case "$usage_preset" in
   # Match the native archive's minimum OS rather than maturin's default.
-  macos-*) export MACOSX_DEPLOYMENT_TARGET=14.3 ;;
+  macos-*)
+    export MACOSX_DEPLOYMENT_TARGET=14.3
+    if [[ "$usage_preset" == macos-x64-* ]]; then
+      maturin_flags+=(--target x86_64-apple-darwin)
+    fi
+    ;;
   linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
   linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
+  linux-gnu-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-gnu) ;;
+  linux-musl-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-musl) ;;
 esac
 wheel_output=$(mktemp -d)
 trap 'rm -rf "$wheel_output"' EXIT

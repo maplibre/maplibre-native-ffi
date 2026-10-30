@@ -12,9 +12,8 @@ fi
 rm -rf dist
 mise run --no-deps --skip-deps :build-api
 mise run --no-deps --skip-deps :build-runtime "$usage_preset"
-# A musl extension cannot load into the host's glibc Python, so the test
-# installs the wheels in Alpine instead.
-if [[ "$usage_preset" == linux-musl-* ]]; then
+# The test task installs off-host wheels for the target interpreter.
+if [[ "$usage_preset" == macos-x64-* || "$usage_preset" == linux-musl-* || "$usage_preset" == linux-gnu-riscv64-* ]]; then
   exit 0
 fi
 # Another preset's runtime would refuse the import beside this one.
