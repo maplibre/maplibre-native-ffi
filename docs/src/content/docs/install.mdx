@@ -6,7 +6,9 @@ description: Add a language binding and its native library to a project.
 Choose a render backend first. Prefer Metal for Apple platforms, OpenGL for
 emulators and virtual machines, and Vulkan for other platforms. Then install the
 C library, a binding for your language, or both. Each section covers its tagged
-releases, where they exist, and its snapshot channel.
+releases, where they exist, and its snapshot channel. See the
+[support matrix](/maplibre-native-ffi/#status) for platform, architecture, and
+backend coverage.
 
 ## C library
 
@@ -20,7 +22,6 @@ yourself, see the
 A preset name has the form `<platform>-<arch>-<backend>`, as in
 `macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their context
 provider in place of the backend: `egl`, `wgl`, or `webgl`.
-[Platforms](#platforms) lists the backends and providers for each platform.
 
 ### Build against a prefix
 
@@ -60,9 +61,9 @@ On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
 the executable. Linux, FreeBSD, and macOS executables find the library through
 the rpath that pkg-config adds.
 
-Linux and FreeBSD prefixes also carry a complete static archive. A static musl
-executable can link it for the non-rendering APIs, but rendering loads EGL or
-Vulkan drivers at run time and needs a dynamic loader.
+A static musl executable can link the complete archive for the non-rendering
+APIs, but rendering loads EGL or Vulkan drivers at run time and needs a dynamic
+loader.
 
 ### xmake
 
@@ -179,7 +180,7 @@ Take one runtime module:
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
-- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-webgpu` (Kotlin/Wasm only)
+- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-webgpu`
 
 On the JVM, the runtime's native library comes in a separate JAR for each
 platform. Add the JAR of each platform the application runs on, by its
@@ -191,11 +192,8 @@ dependencies {
 }
 ```
 
-The classifiers are `natives-linux-x64`, `natives-linux-arm64`,
-`natives-linux-musl-x64`, `natives-linux-musl-arm64`, `natives-freebsd-x64`,
-`natives-macos-arm64`, `natives-windows-x64`, and `natives-windows-arm64`. The
-Metal runtime has only `natives-macos-arm64`. Android and Kotlin/Native targets
-need no classifier.
+Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl.
+Android and Kotlin/Native targets need no classifier.
 
 On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.
@@ -229,8 +227,7 @@ dependencies {
 
 Add the binding and the runtime for your backend from
 [NuGet](https://www.nuget.org/packages/Maplibre.NativeFfi). The runtime carries
-the native library for each Linux, macOS, Windows, and Android runtime
-identifier that its backend runs on.
+the native library.
 
 ```bash frame="terminal"
 dotnet add package Maplibre.NativeFfi
@@ -275,8 +272,7 @@ Add the package from [pub.dev](https://pub.dev/packages/maplibre_native_ffi).
 dart pub add maplibre_native_ffi
 ```
 
-The package downloads the C library for each target when it builds. Releases
-include macOS x64 for Metal alone.
+The package downloads the C library for the target when it builds.
 
 To build against your own copy of the [C library](#build-against-a-prefix), name
 it in your application's pubspec. Name an install prefix, or a directory holding
@@ -316,8 +312,7 @@ hooks:
 The snapshot rebuilds `main` once a day. If `main` has moved past it, set `ref`
 to the commit that the release names.
 
-Each target uses Metal on Apple platforms, OpenGL on Android, and Vulkan
-elsewhere. Map an OS to a different backend in `backend`.
+To override the default backend, map an OS to a backend in `backend`.
 
 ```yaml title="pubspec.yaml"
 hooks:
@@ -380,10 +375,8 @@ Take one runtime distribution. Importing `maplibre_native_ffi` raises
 - `maplibre-native-ffi-runtime-metal`
 - `maplibre-native-ffi-runtime-vulkan`
 
-The wheels serve Python 3.12 and later. The OpenGL and Vulkan runtimes serve
-Linux with glibc or musl and Windows, for x64 and arm64, and macOS 14.3 and
-later for arm64. The Metal runtime serves macOS alone. To choose the runtime by
-platform, add an environment marker to each:
+Use Python 3.12 or later. To choose the runtime by platform, add an environment
+marker to each:
 
 ```toml title="pyproject.toml"
 [project]
@@ -431,15 +424,13 @@ Add the crate from [crates.io](https://crates.io/crates/maplibre-native-ffi).
 cargo add maplibre-native-ffi
 ```
 
-The build script downloads the C library for the target. Releases include macOS
-x64 for Metal alone. A browser build also needs a standard library built with
-atomics and the C library's link options, which the `maplibre-native-ffi-sys`
-documentation lists.
+The build script downloads the C library for the target. A browser build also
+needs a standard library built with atomics and the C library's link options,
+which the `maplibre-native-ffi-sys` documentation lists.
 
-Each target uses Metal on Apple platforms, OpenGL on Android and OpenHarmony,
-WebGPU in the browser, and Vulkan elsewhere. Enable one backend feature,
-`opengl`, `metal`, `vulkan`, or `webgpu`, to choose another. A feature on a
-target-specific dependency applies to that target alone.
+To override the default backend, enable one feature: `opengl`, `metal`,
+`vulkan`, or `webgpu`. A feature on a target-specific dependency applies to that
+target alone.
 
 ```toml title="Cargo.toml"
 [dependencies]
@@ -545,12 +536,9 @@ with exactly one backend package: `@maplibre/native-ffi-opengl`,
 npm install @maplibre/native-ffi @maplibre/native-ffi-vulkan
 ```
 
-The backend package installs the C library for the host. The binding runs on
-Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later, on Linux with glibc and on
-macOS. Linux with musl supports Node.js and Bun on x64 and arm64; GNU RISC-V and
-LoongArch64 and FreeBSD x64 support Node.js. Releases include macOS for arm64
-alone. Deno imports the package as `npm:@maplibre/native-ffi` and needs
-`--allow-ffi --allow-read --allow-env`.
+The backend package installs the C library for the host. Use Node.js 24.11, Bun
+1.4.3, Deno 2.9.7, or later. Deno imports the package as
+`npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
 
 In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
 `@maplibre/native-ffi-webgpu` with WebGPU. Serve `maplibre_native_ffi.mjs` and
@@ -564,8 +552,7 @@ await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
 const runtime = await RuntimeHandle.create();
 ```
 
-For an embedded Hermes runtime on Android, iOS, Mac Catalyst, tvOS, or visionOS,
-install the facade and import its Hermes entry:
+For an embedded Hermes runtime, install the facade and import its Hermes entry:
 
 ```ts
 import { RuntimeHandle } from "@maplibre/native-ffi/hermes";
@@ -579,9 +566,6 @@ host's threading and lifetime requirements. On Android, initialize the C API's
 platform services with the application context. The host supplies graphics
 objects and the surface for presentation.
 
-Meta's official Hermes artifacts include Android and all four Apple mobile
-targets; no app framework is required.
-
 npm has no snapshot channel. To try `main`, pack the packages for your preset in
 a checkout of this repository, then install the tarballs:
 
@@ -593,7 +577,7 @@ npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
 On OpenHarmony, add `@maplibre/native-ffi-opengl` or
 `@maplibre/native-ffi-vulkan` from
 [OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl),
-and import the binding from that package. Both support `arm64-v8a` and `x86_64`.
+and import the binding from that package.
 
 ```bash frame="terminal"
 ohpm install @maplibre/native-ffi-opengl
@@ -608,9 +592,7 @@ ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/native-f
 
 ### Zig
 
-Add the package from a release. The Zig binding does not support the iOS device
-or simulator, tvOS, visionOS, OpenHarmony, or Emscripten. Mac Catalyst builds
-target `aarch64-maccatalyst`.
+Add the package from a release.
 
 ```bash frame="terminal"
 zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/v{{version}}/maplibre-native-ffi-zig.tar.gz
@@ -624,17 +606,16 @@ const maplibre = b.dependency("maplibre_native_ffi", .{
 exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_native_ffi"));
 ```
 
-The build downloads the C library for the target. Releases include macOS x64 for
-Metal alone. Each target uses Metal on macOS and Mac Catalyst, OpenGL on
-Android, and Vulkan elsewhere. Pass `.backend` as `.opengl`, `.metal`, or
-`.vulkan` to choose another. Windows needs the `msvc` ABI, which Zig doesn't
-choose by default, so build with `-Dtarget=x86_64-windows-msvc` or
+The build downloads the C library for the target. To override the default
+backend, pass `.backend` as `.opengl`, `.metal`, or `.vulkan`. Mac Catalyst
+builds target `aarch64-maccatalyst`. Windows needs the `msvc` ABI, which Zig
+doesn't choose by default, so build with `-Dtarget=x86_64-windows-msvc` or
 `-Dtarget=aarch64-windows-msvc`.
 
-On Linux, macOS, Mac Catalyst, and Android, an executable that `zig build run`
-runs finds the library in Zig's package directory. An installed executable finds
-it beside itself on Windows and in `../lib` elsewhere, so install it from the
-package's `prefix`, and on Windows run the installed executable:
+An installed executable finds the library beside itself on Windows and in
+`../lib` elsewhere, so install it from the package's `prefix`. On Windows, run
+the installed executable; elsewhere, `zig build run` also finds the library in
+Zig's package directory:
 
 ```zig title="build.zig"
 const library = switch (target.result.os.tag) {
@@ -679,33 +660,13 @@ const maplibre = b.dependency("maplibre_native_ffi", .{
 
 ## Platforms
 
-### Linux
-
-Linux runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
-provider.
-
 ### macOS
 
-macOS runs the Metal, Vulkan, and OpenGL backends, with EGL as the OpenGL
-context provider. On x64, releases include Metal alone. Apple provides neither
-Vulkan nor EGL, so a host that chooses one of those backends loads
-[MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
+Apple provides neither Vulkan nor EGL, so a host that chooses one of those
+backends loads [MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
 [ANGLE](https://chromium.googlesource.com/angle/angle) itself.
 
-### Windows
-
-Windows runs the Vulkan and OpenGL backends, with WGL as the OpenGL context
-provider.
-
-### FreeBSD
-
-FreeBSD 14.0 and later runs the Vulkan and OpenGL backends on x64, with EGL as
-the OpenGL context provider.
-
 ### Android
-
-Android runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
-provider.
 
 An Android app using Kotlin/JVM depends on a Kotlin runtime AAR, which carries
 the native library for every ABI.
@@ -743,22 +704,9 @@ Android platform initialization is required once per process, before creating a
 runtime. Pass an `android.content.Context`; every binding exposes this call
 under its own name.
 
-### iOS
-
-iOS runs the Metal backend, on the device, in the simulator, and under Mac
-Catalyst. A Mac Catalyst app links the Mac Catalyst library in place of the
-macOS library.
-
-### OpenHarmony
-
-OpenHarmony API 20 and later runs the Vulkan and OpenGL backends, with EGL as
-the OpenGL context provider.
-
 ### Web
 
-Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
-provider. The WebGPU backend needs JSPI: Chrome 137 or Firefox 139 and later,
-not Safari.
+The WebGPU backend needs JSPI: Chrome 137 or Firefox 139 and later, not Safari.
 
 A page that loads a browser module must be cross-origin isolated: serve it with
 the `Cross-Origin-Opener-Policy: same-origin` and
