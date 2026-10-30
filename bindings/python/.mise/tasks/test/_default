@@ -10,7 +10,8 @@ if [[ "$usage_preset" == android-* ]]; then
   exec mise run :_test-android "$usage_preset"
 fi
 if [[ "$usage_preset" == macos-x64-* ]]; then
-  python=$(MISE_ARCH=x64 mise exec python -- python -c 'import sys; print(sys.executable)')
+  python=$(MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
+    MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps python -- python -c 'import sys; print(sys.executable)')
   venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-test"
   uv venv --quiet --allow-existing --python "$python" "$venv"
   uv pip install --quiet --python "$venv" 'pytest>=9,<10'
