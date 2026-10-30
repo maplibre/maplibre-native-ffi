@@ -104,6 +104,7 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
         "tvosArm64" to NativeTargetConfiguration("ios-metal.def"),
         "tvosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def"),
         "macosArm64" to NativeTargetConfiguration("macos-metal.def"),
+        "macosX64" to NativeTargetConfiguration("macos-metal.def"),
       )
   }
 
@@ -448,6 +449,7 @@ canonicalizeKmpRootMetadata(
           "tvosSimulatorArm64" to "$mavenArtifact-tvossimulatorarm64",
           "jvm" to "$mavenArtifact-jvm",
           "macosArm64" to "$mavenArtifact-macosarm64",
+          "macosX64" to "$mavenArtifact-macosx64",
         )
     },
 )

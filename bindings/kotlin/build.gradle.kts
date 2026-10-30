@@ -61,6 +61,7 @@ kotlin {
   linuxArm64()
   linuxX64()
   macosArm64()
+  macosX64()
 
   // The browser target runs on the page, which never blocks, and calls the Emscripten module that
   // bindings/kotlin/wasm links. Karma serves that module; see karma.config.d.
@@ -217,6 +218,8 @@ kotlin {
         "linuxArm64" -> listOf("clang", "--target=aarch64-linux-gnu")
         "macosArm64" ->
           listOf("xcrun", "--sdk", "macosx", "clang", "-target", "arm64-apple-macos11.0")
+        "macosX64" ->
+          listOf("xcrun", "--sdk", "macosx", "clang", "-target", "x86_64-apple-macos11.0")
         "iosArm64" ->
           listOf("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios15.0")
         "iosSimulatorArm64" ->
@@ -343,6 +346,7 @@ canonicalizeKmpRootMetadata(
       "linuxArm64" to "$mavenArtifact-linuxarm64",
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
+      "macosX64" to "$mavenArtifact-macosx64",
       "wasmJs" to "$mavenArtifact-wasm-js",
     ),
 )
@@ -462,6 +466,8 @@ tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
 }
 
 tasks.withType<KotlinNativeTest>().configureEach {
+  // Kotlin disables tests for another host architecture, which Rosetta can run.
+  if (hostPlatform.isMac && targetName == "macosX64") enabled = true
   timeout.set(Duration.ofMinutes(5))
   testLogging {
     events(TestLogEvent.STARTED, TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)

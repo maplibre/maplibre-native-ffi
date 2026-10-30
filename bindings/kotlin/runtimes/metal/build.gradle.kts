@@ -15,6 +15,7 @@ kotlin {
   tvosArm64()
   tvosSimulatorArm64()
   macosArm64()
+  macosX64()
 }
 
 configureMaplibreRuntime(MaplibreRuntimeBackend.METAL)

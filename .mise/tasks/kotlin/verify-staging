@@ -27,6 +27,7 @@ ROOT_TARGET_MODULES = {
         "linuxArm64": "maplibre-native-ffi-linuxarm64",
         "linuxX64": "maplibre-native-ffi-linuxx64",
         "macosArm64": "maplibre-native-ffi-macosarm64",
+        "macosX64": "maplibre-native-ffi-macosx64",
         "wasmJs": "maplibre-native-ffi-wasm-js",
     },
     "maplibre-native-ffi-runtime-opengl": {
@@ -59,6 +60,7 @@ ROOT_TARGET_MODULES = {
         "tvosSimulatorArm64": "maplibre-native-ffi-runtime-metal-tvossimulatorarm64",
         "jvm": "maplibre-native-ffi-runtime-metal-jvm",
         "macosArm64": "maplibre-native-ffi-runtime-metal-macosarm64",
+        "macosX64": "maplibre-native-ffi-runtime-metal-macosx64",
     },
     "maplibre-native-ffi-runtime-webgpu": {
         "wasmJs": "maplibre-native-ffi-runtime-webgpu-wasm-js",
@@ -93,6 +95,7 @@ NATIVE_TARGETS = {
     "linuxArm64": "linux-arm64",
     "linuxX64": "linux-x64",
     "macosArm64": "macos-arm64",
+    "macosX64": "macos-x64",
     "tvosArm64": "tvos-arm64",
     "tvosSimulatorArm64": "tvos-simulator-arm64",
 }

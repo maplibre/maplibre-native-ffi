@@ -9,6 +9,10 @@ gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
+  macos-x64-metal)
+    kotlin_target=macosX64
+    gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
+    ;;
   android-arm64-*) kotlin_target=androidNativeArm64 ;;
   android-x64-*) kotlin_target=androidNativeX64 ;;
   ios-simulator-arm64-metal)
