@@ -6,6 +6,9 @@
 set -euo pipefail
 
 case "$usage_preset" in
+  android-*)
+    exec mise run //bindings/dotnet:_android "$usage_preset"
+    ;;
   ios-* | tvos-*)
     echo "The .NET binding has no iOS or tvOS target." >&2
     exit 2

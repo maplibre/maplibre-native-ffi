@@ -27,6 +27,7 @@ PACKAGE_SMOKE_PROJECT = (
     / "bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Maplibre.NativeFfi.PackageSmoke.csproj"
 )
 MUSL_SMOKE_VERSION = "0.0.0-musl-ci"
+ANDROID_SMOKE_VERSION = "0.0.0-android-ci"
 MUSL_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22"
 
 # .NET has no runtime identifiers for the other package platforms.
@@ -233,6 +234,37 @@ def smoke_musl(args: argparse.Namespace) -> None:
     )
 
 
+def prepare_android(args: argparse.Namespace) -> None:
+    target = runtime_target(args.preset)
+    if target is None or not args.preset.startswith("android-"):
+        raise SystemExit(f"the Android package test cannot build {args.preset}")
+    backend, rid = target
+    work = ROOT / "build" / args.preset / "dotnet-android-test"
+    install = ROOT / "build" / args.preset / "install"
+    if work.exists():
+        shutil.rmtree(work)
+    packages = work / "packages"
+    packages.mkdir(parents=True)
+    assets = work / "assets"
+    base_output = ROOT / "build" / "dotnet" / args.preset
+    copy_runtime_assets(install, assets / rid / "native", args.preset)
+    pack(
+        MANAGED_PROJECT,
+        packages,
+        ANDROID_SMOKE_VERSION,
+        BaseOutputPath=f"{base_output}/",
+    )
+    pack(
+        RUNTIME_PROJECT,
+        packages,
+        ANDROID_SMOKE_VERSION,
+        inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
+        RenderBackend=backend,
+        NativeAssetsDir=assets,
+        BaseOutputPath=f"{base_output}/",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -242,10 +274,13 @@ def main() -> None:
     package_parser.add_argument("version")
     smoke_parser = commands.add_parser("smoke-musl")
     smoke_parser.add_argument("preset")
+    android_parser = commands.add_parser("prepare-android")
+    android_parser.add_argument("preset")
     args = parser.parse_args()
     {
         "package": package,
         "smoke-musl": smoke_musl,
+        "prepare-android": prepare_android,
     }[args.command](args)
 
 

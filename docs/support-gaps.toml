@@ -131,9 +131,9 @@ status = "not-investigated"
 
 [[entry]]
 bindings = ["dotnet"]
-platforms = ["android", "ios"]
+platforms = ["ios"]
 status = "not-investigated"
-reason = "A `net10.0-android` or `net10.0-ios` host needs native asset packaging and binding tests on the emulator or simulator. Android also needs its platform services initialized."
+reason = "A `net10.0-ios` host needs native asset packaging and binding tests on the simulator."
 
 [[entry]]
 bindings = ["dotnet"]

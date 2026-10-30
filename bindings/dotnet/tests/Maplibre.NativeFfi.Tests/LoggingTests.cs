@@ -17,14 +17,14 @@ public sealed class LoggingTests
     {
         try
         {
-            var first = InstallCapturingCallback();
+            var first = Gc.OnThread(InstallCapturingCallback);
             Assert.True(Gc.IsAlive(first));
 
-            var second = InstallCapturingCallback();
+            var second = Gc.OnThread(InstallCapturingCallback);
             Assert.False(Gc.IsAlive(first));
             Assert.True(Gc.IsAlive(second));
 
-            MaplibreNative.ClearLogCallback();
+            Gc.OnThread(MaplibreNative.ClearLogCallback);
             Assert.False(Gc.IsAlive(second));
         }
         finally

@@ -11,6 +11,25 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed unsafe class GeneratedCallbackTests
 {
     [Fact]
+    public void AReleasedRootDropsItsCallbackWhileTheWrapperRemainsAlive()
+    {
+        var (root, captured) = Gc.OnThread(CreateCapturingRoot);
+        root.Dispose();
+        Assert.False(Gc.IsAlive(captured));
+        GC.KeepAlive(root);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (NativeCallbackRoot Root, WeakReference Captured) CreateCapturingRoot()
+    {
+        var captured = new object();
+        return (
+            new NativeCallbackRoot(new Action(() => GC.KeepAlive(captured))),
+            new WeakReference(captured)
+        );
+    }
+
+    [Fact]
     public void GeneratedCallbacksCopyArgumentsAndContainFailures()
     {
         CanonicalTileId? fetched = null;

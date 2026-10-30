@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#MISE description="Build or run the Android NuGet package consumer."
+#MISE dir="../.."
+#MISE shell="bash"
+# The .NET Android workload requires JDK 21, independently of Gradle's JDK.
+#MISE tools={ java = "zulu-21.54.107.0" }
+#USAGE arg "<preset>" help="Installed Android native preset"
+#USAGE flag "--build-only" help="Build the APK without running its tests"
+set -euo pipefail
+
+arguments=("$usage_preset")
+if [[ ${usage_build_only:-false} == true ]]; then
+  arguments+=(--build-only)
+fi
+exec "$MISE_MONOREPO_ROOT/scripts/test-dotnet-android.sh" "${arguments[@]}"

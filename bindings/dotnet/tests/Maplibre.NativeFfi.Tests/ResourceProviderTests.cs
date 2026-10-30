@@ -195,9 +195,8 @@ public sealed class ResourceProviderTests
         var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
         var calls = 0;
 
-        var (cancelled, captured) = RegisterCapturing(
-            handle,
-            () => Interlocked.Increment(ref calls)
+        var (cancelled, captured) = Gc.OnThread(() =>
+            RegisterCapturing(handle, () => Interlocked.Increment(ref calls))
         );
         Assert.False(cancelled);
         Assert.True(Gc.IsAlive(captured));
@@ -224,9 +223,8 @@ public sealed class ResourceProviderTests
         Assert.True(handle.IsCancelled());
         var calls = 0;
 
-        var (cancelled, captured) = RegisterCapturing(
-            handle,
-            () => Interlocked.Increment(ref calls)
+        var (cancelled, captured) = Gc.OnThread(() =>
+            RegisterCapturing(handle, () => Interlocked.Increment(ref calls))
         );
 
         Assert.True(cancelled);

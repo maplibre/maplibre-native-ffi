@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Maplibre.NativeFfi.Tests</AssemblyName>
+    <ApplicationId>org.maplibre.nativeffi.dotnet.tests</ApplicationId>
+    <ApplicationTitle>MapLibre .NET tests</ApplicationTitle>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference
+      Include="Maplibre.NativeFfi.Runtime.$(MaplibreNativeFfiRenderBackend)"
+      VersionOverride="[$(MaplibreNativeFfiPackageVersion)]"
+    />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.runner.common" />
+    <PackageReference Include="xunit.v3.assert" />
+    <!-- The suite reflects over every public API and discovers tests at runtime. -->
+    <TrimmerRootAssembly Include="$(AssemblyName)" RootMode="All" />
+    <TrimmerRootAssembly Include="Maplibre.NativeFfi" RootMode="All" />
+    <Compile
+      Include="../Maplibre.NativeFfi.Tests/**/*.cs"
+      Exclude="../Maplibre.NativeFfi.Tests/obj/**;../Maplibre.NativeFfi.Tests/bin/**;../Maplibre.NativeFfi.Tests/ProcessExitTests.cs;../Maplibre.NativeFfi.Tests/Support/NativeLibraryTestSetup.cs"
+      Link="Tests/%(RecursiveDir)%(Filename)%(Extension)"
+    />
+    <Compile Include="../MobileTestRunner.cs" Link="MobileTestRunner.cs" />
+    <AndroidNativeLibrary
+      Include="$(MaplibreNativeCInstallDir)/lib/libmln_test_graphics.so"
+      Abi="$(MaplibreAndroidAbi)"
+    />
+  </ItemGroup>
+</Project>

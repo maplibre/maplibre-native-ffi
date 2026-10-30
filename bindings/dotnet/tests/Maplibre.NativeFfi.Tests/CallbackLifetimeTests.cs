@@ -12,7 +12,7 @@ public sealed class CallbackLifetimeTests
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
-        var (added, accepted) = AddCapturingSource(fixture.Map);
+        var (added, accepted) = Gc.OnThread(() => AddCapturingSource(fixture.Map));
         await added;
         Assert.True(Gc.IsAlive(accepted));
 
@@ -22,7 +22,7 @@ public sealed class CallbackLifetimeTests
         Assert.False(Gc.IsAlive(accepted));
 
         // Native validates the zoom range before it takes the registration.
-        var (rejection, rejected) = AddRejectedCapturingSource(fixture.Map);
+        var (rejection, rejected) = Gc.OnThread(() => AddRejectedCapturingSource(fixture.Map));
         Assert.IsType<MaplibreException>(rejection);
         Assert.False(Gc.IsAlive(rejected));
     }
@@ -68,7 +68,7 @@ public sealed class CallbackLifetimeTests
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
         var ends = new System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd>();
-        var (started, captured) = StartCapturingEase(fixture.Map, ends);
+        var (started, captured) = Gc.OnThread(() => StartCapturingEase(fixture.Map, ends));
         await started;
         Assert.True(Gc.IsAlive(captured));
 
@@ -79,7 +79,7 @@ public sealed class CallbackLifetimeTests
         Assert.NotEqual(0UL, end.Generation);
         Assert.False(Gc.IsAlive(captured));
 
-        var (rejection, rejected) = ApplyRejectedCapturingDelta(fixture.Map);
+        var (rejection, rejected) = Gc.OnThread(() => ApplyRejectedCapturingDelta(fixture.Map));
         Assert.IsType<MaplibreException>(rejection);
         Assert.False(Gc.IsAlive(rejected));
     }

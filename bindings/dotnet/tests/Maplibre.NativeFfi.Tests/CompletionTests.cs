@@ -111,7 +111,7 @@ public sealed class CompletionTests
     [Fact]
     public void ARejectedSubmissionFreesItsCompletionState()
     {
-        var (error, captured) = SubmitRejected();
+        var (error, captured) = Gc.OnThread(SubmitRejected);
 
         Assert.IsType<MaplibreException>(error);
         Assert.False(Gc.IsAlive(captured));
