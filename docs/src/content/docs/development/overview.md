@@ -185,6 +185,9 @@ blacksmith testbox warmup .github/workflows/blacksmith-testbox.yml --job linux -
 blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
 ```
 
+For an ARM64 runner, warm up `.github/workflows/blacksmith-testbox-arm.yml` with
+`--job linux-arm` instead.
+
 Run `blacksmith testbox run` from the repository root, because rsync mirrors the
 current directory with `--delete`.
 

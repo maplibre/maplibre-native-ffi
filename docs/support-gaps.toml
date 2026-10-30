@@ -408,7 +408,7 @@ platforms = ["android"]
 archs = ["arm", "arm64", "x86"]
 operations = ["test"]
 status = "path-known"
-reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. Add an emulator or device for each remaining ABI."
+reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. The ARM64 runner can't run ARM64 guests: Google ships no emulator for Linux ARM64 hosts, and the runner lacks KVM for Cuttlefish and binder for redroid. Add an emulator or device for each remaining ABI."
 
 [[entry]]
 bindings = ["c"]
@@ -424,7 +424,7 @@ platforms = ["ohos"]
 archs = ["arm64"]
 operations = ["test"]
 status = "path-known"
-reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Add an ARM64 device to run the suites."
+reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Oniro publishes only an x64 emulator image, and the ARM64 runner lacks KVM to run one. Add an ARM64 device to run the suites."
 
 [[entry]]
 bindings = ["c"]
