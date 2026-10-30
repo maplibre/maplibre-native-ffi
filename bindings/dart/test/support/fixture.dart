@@ -7,13 +7,17 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
 /// How long any single wait lasts before its test fails.
-const waitDeadline = Duration(seconds: 10);
+final waitDeadline = Duration(
+  seconds:
+      10 * int.parse(Platform.environment['MLN_TEST_TIMEOUT_SCALE'] ?? '1'),
+);
 
 const emptyStyle = {
   'version': 8,

@@ -181,14 +181,6 @@ status = "path-known"
 reason = "CI builds the x64 library and runs these suites on arm64 alone. Package the binding for x64 where it needs one, and run its suite under an x64 runtime on the arm64 runners, which Rosetta runs."
 
 [[entry]]
-bindings = ["dart"]
-platforms = ["linux-gnu"]
-archs = ["riscv64"]
-status = "path-known"
-reason = "The Dart SDK runs on RISC-V. Run the suite with it under QEMU's user-mode emulator."
-link = "https://dart.dev/get-dart"
-
-[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]

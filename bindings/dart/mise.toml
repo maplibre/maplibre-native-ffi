@@ -69,6 +69,7 @@ ln -s "$MISE_MONOREPO_ROOT/build/$usage_preset/install" .dart_tool/native
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+env.MLN_FFI_DART_TEST_IMAGE = "dart:{{vars.dart_version}}"
 depends = [
   { task = "//:build", args = [
     "{{usage.preset}}",
@@ -79,7 +80,24 @@ depends = [
   ":analyze",
   ":check-publish",
 ]
-run = "dart test"
+run = '''
+if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
+  # Build hooks strip QEMU's loader environment, so run inside the target OS.
+  exec docker run --rm --platform linux/riscv64 \
+    --volume "$MISE_MONOREPO_ROOT:$MISE_MONOREPO_ROOT" \
+    --volume "${PUB_CACHE:-$HOME/.pub-cache}:${PUB_CACHE:-$HOME/.pub-cache}:ro" \
+    --env PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}" \
+    --workdir "$PWD" \
+    "$MLN_FFI_DART_TEST_IMAGE" sh -euc '
+      apt-get update -qq
+      apt-get install --yes --quiet --no-install-recommends \
+        libegl1 libgles2 libvulkan1 mesa-vulkan-drivers
+      export LIBGL_ALWAYS_SOFTWARE=true MLN_TEST_TIMEOUT_SCALE=5
+      exec dart test
+    '
+fi
+exec dart test
+'''
 run_windows = '''
 # The DLL loads its own dependencies from the prefix it was installed into.
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
