@@ -173,7 +173,8 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * frame's work on the context's graphics_queue, with a value larger than the
    * last frame's. The host waits for value, on a queue of the device or on the
    * CPU, before it reads the texture. The host never signals the semaphore,
-   * which stays valid until detach completes.
+   * which stays valid until detach completes, and finishes the work that
+   * waits on it before then.
    *
    * A consumer semaphore belongs to the host, which signals value once its
    * reads complete. The session's later work on its queue waits for it. The

@@ -548,42 +548,8 @@ void VulkanTextureBackend::signal_timeline() {
 void VulkanTextureBackend::wait_timeline(
   VkSemaphore semaphore, uint64_t value
 ) {
-  if (!wait_pool_) {
-    wait_pool_ = device->createCommandPoolUnique(
-      vk::CommandPoolCreateInfo().setQueueFamilyIndex(
-        static_cast<uint32_t>(graphicsQueueIndex)
-      ),
-      nullptr, dispatcher
-    );
-    wait_barrier_ = device
-                      ->allocateCommandBuffers(
-                        vk::CommandBufferAllocateInfo()
-                          .setCommandPool(wait_pool_.get())
-                          .setLevel(vk::CommandBufferLevel::ePrimary)
-                          .setCommandBufferCount(1),
-                        dispatcher
-                      )
-                      .front();
-    wait_barrier_.begin(
-      vk::CommandBufferBeginInfo().setFlags(
-        vk::CommandBufferUsageFlagBits::eSimultaneousUse
-      ),
-      dispatcher
-    );
-    const auto barrier = vk::MemoryBarrier()
-                           .setSrcAccessMask(vk::AccessFlagBits::eMemoryWrite)
-                           .setDstAccessMask(
-                             vk::AccessFlags{vk::AccessFlagBits::eMemoryRead} |
-                             vk::AccessFlagBits::eMemoryWrite
-                           );
-    wait_barrier_.pipelineBarrier(
-      vk::PipelineStageFlagBits::eAllCommands,
-      vk::PipelineStageFlagBits::eAllCommands, {}, barrier, {}, {}, dispatcher
-    );
-    wait_barrier_.end(dispatcher);
-  }
-  // A wait orders only its own batch, so the batch carries the barrier, which
-  // orders everything submitted after it.
+  // A wait's second scope holds every later submission to the queue, so a
+  // batch without commands orders the session's later work.
   const auto timeline =
     vk::TimelineSemaphoreSubmitInfo().setWaitSemaphoreValues(value);
   const auto waited = vk::Semaphore(semaphore);
@@ -593,8 +559,7 @@ void VulkanTextureBackend::wait_timeline(
     vk::SubmitInfo()
       .setPNext(&timeline)
       .setWaitSemaphores(waited)
-      .setWaitDstStageMask(stage)
-      .setCommandBuffers(wait_barrier_),
+      .setWaitDstStageMask(stage),
     nullptr, dispatcher
   );
 }

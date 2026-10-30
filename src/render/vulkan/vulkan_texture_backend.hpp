@@ -104,10 +104,6 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // its last frame signaled.
   vk::UniqueSemaphore timeline_;
   uint64_t timeline_value_ = 0;
-  // A command buffer holding one global barrier, so that a semaphore wait
-  // submitted with it orders every later submission on the queue.
-  vk::UniqueCommandPool wait_pool_;
-  vk::CommandBuffer wait_barrier_;
 
   void signal_timeline();
   std::size_t slot_count_;
