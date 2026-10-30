@@ -167,7 +167,10 @@ mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
     def test_dotnet_marks_the_platforms_that_a_function_serves(self):
         generated = "\n".join(emitted(dotnet, api()).values())
         self.assertIn(
+            '    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]\n'
+            '    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]\n'
             '    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]\n'
+            '    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]\n'
             "    public void UseMetal(",
             generated,
         )

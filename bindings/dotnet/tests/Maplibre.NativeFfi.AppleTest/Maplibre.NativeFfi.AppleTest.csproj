@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <MaplibreApplePlatform Condition="'$(MaplibreApplePlatform)' == ''">ios</MaplibreApplePlatform>
+    <TargetFramework>net10.0-$(MaplibreApplePlatform)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Maplibre.NativeFfi.Tests</AssemblyName>
+    <ApplicationId>org.maplibre.nativeffi.dotnet.tests</ApplicationId>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Mono LLVM AOT intermittently corrupts xUnit's generic async state machines. -->
+    <MtouchUseLlvm>false</MtouchUseLlvm>
+    <!-- Interpret xUnit to avoid Mono's shared generic initialization assertion. -->
+    <MtouchInterpreter Condition="'$(MaplibreApplePlatform)' == 'maccatalyst'">-all,xunit.v3.core,xunit.v3.common,xunit.v3.runner.common,xunit.v3.assert</MtouchInterpreter>
+    <CodesignKey>-</CodesignKey>
+    <CodesignRequireProvisioningProfile>false</CodesignRequireProvisioningProfile>
+    <EnableCodeSigning Condition="'$(RuntimeIdentifier)' == 'ios-arm64' Or '$(RuntimeIdentifier)' == 'tvos-arm64'">false</EnableCodeSigning>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference
+      Include="Maplibre.NativeFfi.Runtime.Metal"
+      VersionOverride="[$(MaplibreNativeFfiPackageVersion)]"
+    />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.runner.common" />
+    <PackageReference Include="xunit.v3.assert" />
+    <!-- The suite reflects over every public API and discovers tests at runtime. -->
+    <TrimmerRootAssembly Include="$(AssemblyName)" RootMode="All" />
+    <TrimmerRootAssembly Include="Maplibre.NativeFfi" RootMode="All" />
+    <Compile
+      Include="../Maplibre.NativeFfi.Tests/**/*.cs"
+      Exclude="../Maplibre.NativeFfi.Tests/obj/**;../Maplibre.NativeFfi.Tests/bin/**;../Maplibre.NativeFfi.Tests/ProcessExitTests.cs;../Maplibre.NativeFfi.Tests/Support/NativeLibraryTestSetup.cs"
+      Link="Tests/%(RecursiveDir)%(Filename)%(Extension)"
+    />
+    <Compile Include="../MobileTestRunner.cs" Link="MobileTestRunner.cs" />
+    <NativeReference
+      Include="$(MaplibreNativeCInstallDir)/lib/libmln_test_graphics.dylib"
+      Kind="Dynamic"
+      NoSymbolStrip="true"
+    >
+      <!-- SDK 26.4 defaults to the Catalyst layout on iOS and tvOS too. -->
+      <RelativePath Condition="'$(MaplibreApplePlatform)' != 'maccatalyst'">libmln_test_graphics.dylib</RelativePath>
+    </NativeReference>
+  </ItemGroup>
+</Project>

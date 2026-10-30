@@ -62,7 +62,8 @@ internal sealed class MobileTestRunner(Action<string> write) : IMessageSink
                     break;
                 case IErrorMetadata error:
                     failed = true;
-                    write(string.Join("\n", error.Messages));
+                    write($"{message.GetType().Name}: {string.Join("\n", error.Messages)}");
+                    write(string.Join("\n", error.StackTraces));
                     break;
                 case ITestAssemblyFinished summary:
                     finished = true;

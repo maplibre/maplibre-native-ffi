@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Internal.C;
 using Xunit;
 
@@ -111,16 +112,16 @@ public sealed class CompletionTests
     [Fact]
     public void ARejectedSubmissionFreesItsCompletionState()
     {
-        var (error, captured) = Gc.OnThread(SubmitRejected);
-
-        Assert.IsType<MaplibreException>(error);
-        Assert.False(Gc.IsAlive(captured));
+        var (state, captured) = Gc.OnThread(SubmitRejected);
+        Gc.CollectUntilReclaimed("the rejected completion capture", captured);
+        GC.KeepAlive(state);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static unsafe (Exception? Error, WeakReference Captured) SubmitRejected()
+    private static unsafe (object State, WeakReference Captured) SubmitRejected()
     {
         var captured = new object();
+        object? state = null;
         var error = Record.Exception(() =>
         {
             mln_completion completion;
@@ -133,9 +134,42 @@ public sealed class CompletionTests
                 },
                 out var pending
             );
+            state = GCHandle.FromIntPtr((nint)completion.user_data).Target;
             _ = pending.Submitted(mln_status.MLN_STATUS_INVALID_ARGUMENT);
         });
-        return (error, new WeakReference(captured));
+        Assert.IsType<MaplibreException>(error);
+        return (state!, new WeakReference(captured));
+    }
+
+    [Fact]
+    public void AReleasedCompletionDropsItsCaptureWhileStateRemainsAlive()
+    {
+        var (state, captured) = Gc.OnThread(CompleteAndReleaseCapturingState);
+        Gc.CollectUntilReclaimed("the released completion capture", captured);
+        GC.KeepAlive(state);
+    }
+
+    private static unsafe (object State, WeakReference Captured) CompleteAndReleaseCapturingState()
+    {
+        var captured = new object();
+        mln_completion completion;
+        NativeCompletion.Start(
+            &completion,
+            _ =>
+            {
+                GC.KeepAlive(captured);
+                return 7;
+            },
+            out var pending
+        );
+        var state = GCHandle.FromIntPtr((nint)completion.user_data).Target!;
+        var task = pending.Submitted(mln_status.MLN_STATUS_OK);
+        var result = new mln_completion_result { status = mln_status.MLN_STATUS_OK };
+        completion.callback(completion.user_data, &result);
+        completion.release_user_data(completion.user_data);
+        Assert.True(task.IsCompletedSuccessfully);
+        Assert.Equal(7, task.Result);
+        return (state, new WeakReference(captured));
     }
 
     // Native fails a command it accepted, and the test plays native's part for a cancelled one,

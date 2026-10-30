@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'ios' Or '$(TargetPlatformIdentifier)' == 'tvos' Or '$(TargetPlatformIdentifier)' == 'maccatalyst'">
+    <NativeReference Include="$(MSBuildThisFileDirectory)native/$(RuntimeIdentifier)/MaplibreNativeC.xcframework.zip"
+      Kind="Framework" />
+  </ItemGroup>
+</Project>

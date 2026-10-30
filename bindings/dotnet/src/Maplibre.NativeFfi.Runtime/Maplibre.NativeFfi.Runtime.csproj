@@ -22,8 +22,20 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None
       Include="$(NativeAssetsDir)/**"
+      Condition="'$(NativeAssetsDir)' != ''"
       Pack="true"
       PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)"
+    />
+    <None
+      Include="$(AppleFrameworksDir)/**"
+      Condition="'$(AppleFrameworksDir)' != ''"
+      Pack="true"
+      PackagePath="buildTransitive/native/%(RecursiveDir)%(Filename)%(Extension)"
+    />
+    <None
+      Include="Maplibre.NativeFfi.Runtime.targets"
+      Pack="true"
+      PackagePath="buildTransitive/$(PackageId).targets"
     />
   </ItemGroup>
 </Project>

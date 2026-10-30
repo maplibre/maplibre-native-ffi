@@ -21,7 +21,7 @@ internal sealed unsafe class NativeHandleState<T>
     private readonly StatusDestroy<T>? disposeAbandoned;
     private readonly string typeName;
     private readonly T handle;
-    private readonly object? retainedParent;
+    private object? retainedParent;
     private bool closed;
 
     internal NativeHandleState(
@@ -73,7 +73,9 @@ internal sealed unsafe class NativeHandleState<T>
         }
         finally
         {
-            GC.KeepAlive(retainedParent);
+            // Mono may conservatively retain this finalized state. Its former parent must
+            // be free to finalize once native disposal has finished.
+            retainedParent = null;
         }
     }
 

@@ -49,7 +49,6 @@ STATUS_LABELS = {
     "path-known": "Not started, path known",
     "blocked": "Blocked upstream",
     "not-investigated": "Not investigated",
-    "not-applicable": "Does not apply",
 }
 GAP_STATUSES = {"path-known", "blocked"}
 # A language whose bindings reach one platform through more than one mechanism
@@ -126,7 +125,7 @@ SELECTORS = {
     "simulators": (False, True),
 }
 # The statuses an entry may give. CI gives `tested` and `build-only`.
-ENTRY_STATUSES = {*GAP_STATUSES, "not-applicable", "not-investigated"}
+ENTRY_STATUSES = {*GAP_STATUSES, "not-investigated"}
 # Every row has a platform, an architecture, and a backend.
 ROW_AXES = ("platforms", "archs", "backends")
 

@@ -18,11 +18,11 @@ public sealed class NativeLibraryLoaderTests
         Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion + 1, error.Actual);
     }
 
-    // The suite's module initializer resolves the library through the standard lookup, so an
-    // explicit path can no longer choose a different one.
+    // Once standard lookup resolves the library, an explicit path cannot choose a different one.
     [Fact]
     public void AnExplicitPathAfterTheStandardLookupIsRefused()
     {
+        MaplibreNative.LoadNativeLibrary();
         var error = Assert.Throws<InvalidOperationException>(() =>
             MaplibreNative.LoadNativeLibrary(
                 Path.Combine(AppContext.BaseDirectory, "missing-library")

@@ -25,14 +25,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     internal MapHandle(RuntimeHandle parent, MlnMap handle, Task completion)
     {
+        // Mono may retain a completed continuation on its worker stack.
+        // Clear its holder so it no longer roots this handle.
         Ready = completion
             .ContinueWith(
                 static (finished, retained) =>
                 {
-                    GC.KeepAlive(retained);
+                    ((System.Runtime.CompilerServices.StrongBox<object?>)retained!).Value = null;
                     return finished;
                 },
-                this,
+                new System.Runtime.CompilerServices.StrongBox<object?>(this),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default
@@ -344,7 +346,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_borrowed_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
     public RenderSessionHandle AttachMetalBorrowedTexture(
         MetalBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -375,7 +380,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_owned_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
     public RenderSessionHandle AttachMetalOwnedTexture(
         MetalOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -406,7 +414,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
     public RenderSessionHandle AttachMetalSurface(
         MetalSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -527,6 +538,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_vulkan_borrowed_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public RenderSessionHandle AttachVulkanBorrowedTexture(
         VulkanBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -557,6 +572,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_vulkan_owned_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public RenderSessionHandle AttachVulkanOwnedTexture(
         VulkanOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -587,6 +606,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_vulkan_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public RenderSessionHandle AttachVulkanSurface(
         VulkanSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options

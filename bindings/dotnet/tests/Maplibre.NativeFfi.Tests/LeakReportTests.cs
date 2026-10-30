@@ -21,9 +21,10 @@ public sealed class LeakReportTests
     {
         using var reports = new LeakCapture();
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var (map, mapId, undisposable) = Abandon(runtime);
+        var (map, mapId, undisposable) = Gc.OnThread(() => Abandon(runtime));
 
-        Gc.CollectUntilReclaimed("the abandoned handles", map, undisposable);
+        Gc.CollectUntilReclaimed("the abandoned map", map);
+        Gc.CollectUntilReclaimed("the failed-disposal state", undisposable);
 
         var report = $"Leaked MapHandle native handle 0x{mapId:x}; it was disposed when collected.";
         Assert.Contains(report, reports.Text, StringComparison.Ordinal);
@@ -59,7 +60,7 @@ public sealed class LeakReportTests
     public void UnreachableHandlesAreReclaimedAndReported()
     {
         using var reports = new LeakCapture();
-        var (runtime, runtimeId, map, mapId) = CreateUnreachableRuntimeAndMap();
+        var (runtime, runtimeId, map, mapId) = Gc.OnThread(CreateUnreachableRuntimeAndMap);
 
         // The map's finalizer lets the runtime finish disposing, so a later pass collects it.
         Gc.CollectUntilReclaimed("the unreachable runtime and map", runtime, map);
@@ -93,6 +94,41 @@ public sealed class LeakReportTests
         map.Ready.GetAwaiter().GetResult();
         map.GetStyleUrlAsync().GetAwaiter().GetResult();
         return map;
+    }
+
+    // Mono may retain a finalized state on the finalizer thread's conservative stack. Keeping
+    // that state alive after finalization must not keep its former parent alive too.
+    [Fact]
+    public void AFinalizedHandleReleasesItsRetainedParent()
+    {
+        using var reports = new LeakCapture();
+        var (abandoned, parent) = Gc.OnThread(CreateAbandonedChildState);
+        var finalized = Gc.OnThread(() =>
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            return abandoned.Target;
+        });
+
+        Assert.NotNull(finalized);
+        Assert.False(Gc.IsAlive(parent));
+        GC.KeepAlive(finalized);
+    }
+
+    private static unsafe (WeakReference State, WeakReference Parent) CreateAbandonedChildState()
+    {
+        var parent = new object();
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(6789),
+            static (_, _) => mln_status.MLN_STATUS_OK,
+            "RuntimeHandle",
+            static (_, _) => mln_status.MLN_STATUS_OK,
+            retainedParent: parent
+        );
+        return (
+            new WeakReference(state, trackResurrection: true),
+            new WeakReference(parent, trackResurrection: true)
+        );
     }
 
     // The default listener writes only to an attached debugger, so a report goes to the trace

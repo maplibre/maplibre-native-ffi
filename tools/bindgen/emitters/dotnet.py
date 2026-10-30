@@ -34,10 +34,12 @@ from .dotnet_values import (
 
 # The platform analyzer's name for each platform that the package serves.
 PLATFORMS = {
-    "android": "android",
-    "linux": "linux",
-    "macos": "macos",
-    "windows": "windows",
+    "android": ("android",),
+    "linux": ("linux",),
+    "macos": ("macos",),
+    "ios": ("ios", "maccatalyst"),
+    "tvos": ("tvos",),
+    "windows": ("windows",),
 }
 TARGETS = frozenset(PLATFORMS)
 DIRECTORY = "bindings/dotnet/src/Maplibre.NativeFfi"
@@ -49,8 +51,9 @@ def supported_platforms(plan: OperationPlan, indent: str = "    ") -> str:
     if platforms is None:
         return ""
     return "".join(
-        f'{indent}[global::System.Runtime.Versioning.SupportedOSPlatform("{PLATFORMS[name]}")]\n'
+        f'{indent}[global::System.Runtime.Versioning.SupportedOSPlatform("{platform}")]\n'
         for name in sorted(platforms)
+        for platform in PLATFORMS[name]
     )
 
 
@@ -473,7 +476,9 @@ def lower(api: Api | BoundApi) -> Lowered:
         constructor = []
         if immediate_completion:
             constructor.append(
-                "Ready = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
+                "// Mono may retain a completed continuation on its worker stack.\n"
+                "// Clear its holder so it no longer roots this handle.\n"
+                "Ready = completion.ContinueWith(static (finished, retained) => { ((System.Runtime.CompilerServices.StrongBox<object?>)retained!).Value = null; return finished; }, new System.Runtime.CompilerServices.StrongBox<object?>(this), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
             )
         constructor.append(
             f"state = new(handle, {destroy}, nameof({owner}), Abandon{', retainedParent: parent' if handle.parent else ''});"

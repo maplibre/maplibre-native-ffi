@@ -19,12 +19,11 @@ public sealed class CallbackLifetimeTests
         // Removing the source is what makes native release the registration.
         await fixture.Map.RemoveStyleSourceAsync("custom");
         Assert.Null(await fixture.Map.GetStyleSourceAsync("custom"));
-        Assert.False(Gc.IsAlive(accepted));
+        Gc.CollectUntilReclaimed("the removed source callback", accepted);
 
         // Native validates the zoom range before it takes the registration.
-        var (rejection, rejected) = Gc.OnThread(() => AddRejectedCapturingSource(fixture.Map));
-        Assert.IsType<MaplibreException>(rejection);
-        Assert.False(Gc.IsAlive(rejected));
+        var rejected = Gc.OnThread(() => AddRejectedCapturingSource(fixture.Map));
+        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -41,9 +40,7 @@ public sealed class CallbackLifetimeTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (Exception? Rejection, WeakReference Captured) AddRejectedCapturingSource(
-        MapHandle map
-    )
+    private static WeakReference AddRejectedCapturingSource(MapHandle map)
     {
         var captured = new object();
         var rejection = Record.Exception(() =>
@@ -58,7 +55,8 @@ public sealed class CallbackLifetimeTests
                 }
             );
         });
-        return (rejection, new WeakReference(captured));
+        Assert.IsType<MaplibreException>(rejection);
+        return new WeakReference(captured);
     }
 
     // A camera command's end handler sits two records deep in its input. The binding roots it while
@@ -77,11 +75,10 @@ public sealed class CallbackLifetimeTests
         var end = Assert.Single(ends);
         Assert.Equal(CameraTransitionOutcome.Cancelled, end.Outcome);
         Assert.NotEqual(0UL, end.Generation);
-        Assert.False(Gc.IsAlive(captured));
+        Gc.CollectUntilReclaimed("the completed camera end handler", captured);
 
-        var (rejection, rejected) = Gc.OnThread(() => ApplyRejectedCapturingDelta(fixture.Map));
-        Assert.IsType<MaplibreException>(rejection);
-        Assert.False(Gc.IsAlive(rejected));
+        var rejected = Gc.OnThread(() => ApplyRejectedCapturingDelta(fixture.Map));
+        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -113,9 +110,7 @@ public sealed class CallbackLifetimeTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (Exception? Rejection, WeakReference Captured) ApplyRejectedCapturingDelta(
-        MapHandle map
-    )
+    private static WeakReference ApplyRejectedCapturingDelta(MapHandle map)
     {
         var captured = new object();
         var delta = new CameraDelta
@@ -130,7 +125,8 @@ public sealed class CallbackLifetimeTests
         {
             _ = map.ApplyCameraDeltaAsync(delta);
         });
-        return (rejection, new WeakReference(captured));
+        Assert.IsType<MaplibreException>(rejection);
+        return new WeakReference(captured);
     }
 
     // Native holds a strong root until the registration is released.

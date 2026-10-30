@@ -72,7 +72,10 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// See <c>mln_acquired_frame_get_metal_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
     public void WithMetalTexture(Action<MetalTextureFrameView> callback)
     {
         using var call = Enter(this);
@@ -179,6 +182,10 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public void WithVulkanTexture(Action<VulkanTextureFrameView> callback)
     {
         using var call = Enter(this);

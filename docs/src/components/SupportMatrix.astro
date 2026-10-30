@@ -6,8 +6,7 @@ type Status =
   | "build-only"
   | "path-known"
   | "blocked"
-  | "not-investigated"
-  | "not-applicable";
+  | "not-investigated";
 
 type Cell = {
   status: string;
@@ -20,7 +19,6 @@ const glyphs: Record<Status, string> = {
   "path-known": "○",
   blocked: "✕",
   "not-investigated": "?",
-  "not-applicable": "–",
 };
 
 const statusLabels = new Map(
@@ -271,9 +269,6 @@ td {
   background: var(--sl-color-orange-low);
   border-color: var(--sl-color-orange);
   color: var(--sl-color-orange-high);
-}
-.not-applicable {
-  color: var(--sl-color-gray-4);
 }
 .note {
   color: var(--sl-color-gray-3);
