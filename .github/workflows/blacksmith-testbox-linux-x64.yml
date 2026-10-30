@@ -1,4 +1,4 @@
-name: Blacksmith Testbox
+name: Blacksmith Testbox Linux x64
 
 on:
   workflow_dispatch:
@@ -12,10 +12,10 @@ on:
 permissions:
   contents: read
 
-# A warmup dispatch runs every job in its workflow, so ARM64 has
-# blacksmith-testbox-arm.yml.
+# A warmup dispatch starts every job in its workflow, so each runner has a
+# workflow of its own.
 jobs:
-  linux:
+  linux-x64:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     steps:
