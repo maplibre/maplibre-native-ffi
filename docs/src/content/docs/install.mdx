@@ -519,6 +519,21 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 swift build -Xlinker -rpath -Xlinker <prefix>/lib
 ```
 
+For Android, cross-compile on Linux with the
+[Swift SDK for Android](https://www.swift.org/documentation/articles/swift-sdk-for-android-getting-started.html)
+matching your Swift compiler and its required NDK. Install the C library for the
+same Android ABI and backend, then pass its pkg-config directory explicitly:
+
+```bash frame="terminal"
+swift build --swift-sdk <swift-android-sdk> \
+  --triple aarch64-unknown-linux-android26 \
+  --pkg-config-path <prefix>/share/pkgconfig
+```
+
+Package the C library, the Swift SDK's shared runtime libraries, and the NDK's
+`libc++_shared.so` for that ABI with the application. Android supports ARMv7,
+ARM64, and x64.
+
 For the snapshot channel, depend on this repository at `main`, whose package
 always builds against an installed C library. SwiftPM takes the package identity
 from the repository name, so name it as `maplibre-native-ffi`. Install the

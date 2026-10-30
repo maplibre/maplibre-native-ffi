@@ -39,6 +39,15 @@ Pass the same `-E` to every later command for that target, or set `MISE_ENV` for
 the shell. After an NDK change, run `mise run clean <preset>` for each Android
 preset, because CMake caches the compiler path.
 
+The Swift Android tasks install the matching Swift SDK on demand. They need the
+open-source Linux host compiler at the version pinned by mise. ARMv7, ARM64, and
+x64 are supported:
+
+```bash
+mise -E android run //bindings/swift:build android-arm64-egl
+mise -E android run //bindings/swift:test android-x64-egl
+```
+
 `mise run test` boots an Android or OpenHarmony emulator on demand and leaves it
 running. An emulator boots in minutes under KVM on Linux. Without KVM it runs in
 software, which takes an hour or more on Linux, but the OpenHarmony emulator

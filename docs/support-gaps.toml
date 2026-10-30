@@ -179,13 +179,6 @@ reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the s
 link = "https://github.com/maplibre/maplibre-native-ffi/pull/1380"
 
 [[entry]]
-bindings = ["swift"]
-platforms = ["android"]
-archs = ["arm", "arm64", "x64"]
-status = "path-known"
-reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
-
-[[entry]]
 bindings = ["typescript"]
 platforms = ["freebsd"]
 status = "blocked"

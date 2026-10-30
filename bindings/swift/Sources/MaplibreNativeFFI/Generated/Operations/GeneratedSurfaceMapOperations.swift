@@ -52,7 +52,7 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  #if os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS)
     /// Starts attachment of a Vulkan surface target.
     ///
     /// See `mln_map_attach_vulkan_surface` in the

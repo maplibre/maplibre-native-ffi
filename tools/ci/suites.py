@@ -263,6 +263,9 @@ def android_commands(target: Target, abi: str) -> list[str]:
         if abi != "x86":
             commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     action = "test" if target.device else "build"
+    # The Swift Android SDK has no 32-bit x86 target.
+    if target.architecture != "x86":
+        commands.append(f"mise run //bindings/swift:{action} {preset}")
     commands.append(f"mise run //bindings/typescript:{action}:hermes {preset}")
     return commands
 

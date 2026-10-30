@@ -279,6 +279,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedGraphicsDeviceGraphicsDeviceOperations.swift linguist-generated=true

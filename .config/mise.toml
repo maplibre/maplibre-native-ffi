@@ -73,6 +73,7 @@ go_version = "1.27.3"
 java_version = "zulu-25.36.205.0"
 ohos_sdk_version = "6.1"
 python_version = "3.15.1"
+swift_version = "6.4.1"
 wrangler_version = "4.152.0"
 
 [tools]
