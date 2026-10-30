@@ -376,32 +376,38 @@ operations = ["package"]
 status = "path-known"
 reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
 
-# Missing test devices apply to native and binding suites alike. Packages are
-# still built and published; a simulator is a distinct execution target.
+[[entry]]
+bindings = ["c"]
+platforms = ["android"]
+archs = ["arm", "arm64"]
+operations = ["test"]
+status = "blocked"
+reason = "No ARM Android device is configured. Google's Linux x64 emulator rejects ARM64 images, no Linux ARM64 emulator is available, and Blacksmith's ARM runners, including macOS, lack nested virtualization. Cuttlefish and redroid need unavailable KVM or binder support."
+link = "https://docs.blacksmith.sh/blacksmith-runners/overview"
 
 [[entry]]
 bindings = ["c"]
 platforms = ["android"]
-archs = ["arm", "arm64", "x86"]
+archs = ["x86"]
 operations = ["test"]
 status = "path-known"
-reason = "CI cross-builds these Android ABIs on x64 and runs the x64 emulator alone. The ARM64 runner can't run ARM64 guests: Google ships no emulator for Linux ARM64 hosts, and the runner lacks KVM for Cuttlefish and binder for redroid. Add an emulator or device for each remaining ABI."
+reason = "CI cross-builds Android x86 but runs the x64 emulator alone. Add an x86 emulator to run the suites."
 
 [[entry]]
 bindings = ["c"]
 platforms = ["ios", "tvos", "visionos"]
 simulators = [false]
 operations = ["test"]
-status = "path-known"
-reason = "CI builds the device packages and runs the simulator suites. Add physical Apple devices to execute these packages."
+status = "blocked"
+reason = "CI has no physical iOS, tvOS, or visionOS device runner. Its simulator suites cannot execute device packages."
 
 [[entry]]
 bindings = ["c"]
 platforms = ["ohos"]
 archs = ["arm64"]
 operations = ["test"]
-status = "path-known"
-reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Oniro publishes only an x64 emulator image, and the ARM64 runner lacks KVM to run one. Add an ARM64 device to run the suites."
+status = "blocked"
+reason = "No ARM64 OpenHarmony device is configured. Oniro publishes an x64 emulator image, and CI has no ARM64 system image or device runner to execute the ARM64 packages."
 
 [[entry]]
 bindings = ["c"]
