@@ -1,0 +1,48 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0ef4a68..8df03bd 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -29,7 +29,7 @@ endif()
+ # Detect system
+ ###########################################################
+ 
+-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
++if(CMAKE_SYSTEM_NAME MATCHES "Linux|OHOS")
+     set(LINUX TRUE)
+ elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
+     set(ANDROID TRUE)
+diff --git a/third_party/marl/include/marl/thread.h b/third_party/marl/include/marl/thread.h
+index e72f33e..ebe6718 100644
+--- a/third_party/marl/include/marl/thread.h
++++ b/third_party/marl/include/marl/thread.h
+@@ -53,7 +53,7 @@ class Thread {
+     // supported is true if marl supports controlling thread affinity for this
+     // platform.
+ #if defined(_WIN32) ||                                                       \
+-    (defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__)) || \
++    (defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__) && !defined(__OHOS__)) || \
+     defined(__FreeBSD__)
+     static constexpr bool supported = true;
+ #else
+diff --git a/third_party/marl/src/thread.cpp b/third_party/marl/src/thread.cpp
+index 3a275c9..460ed52 100644
+--- a/third_party/marl/src/thread.cpp
++++ b/third_party/marl/src/thread.cpp
+@@ -154,7 +154,7 @@ Thread::Affinity Thread::Affinity::all(
+       }
+     }
+   }
+-#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__)
++#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__) && !defined(__OHOS__)
+   auto thread = pthread_self();
+   cpu_set_t cpuset;
+   CPU_ZERO(&cpuset);
+@@ -397,7 +397,7 @@ class Thread::Impl {
+       return;
+     }
+ 
+-#if defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__)
++#if defined(__linux__) && !defined(__ANDROID__) && !defined(__BIONIC__) && !defined(__OHOS__)
+     cpu_set_t cpuset;
+     CPU_ZERO(&cpuset);
+     for (size_t i = 0; i < count; i++) {

@@ -30,6 +30,23 @@ url = "https://ohpm.openharmony.cn/ohpm/@ohos/hypium/-/hypium-1.0.29.har"
 checksum = "sha256:c81d27c4098d9d3beafffa9602e5f45388bf8107a766bdbca1c8494e67074798"
 url = "https://ohpm.openharmony.cn/ohpm/@ohos/hypium/-/hypium-1.0.29.har"
 
+[[tools."http:ohos-swiftshader-source"]]
+version = "cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5"
+backend = "http:ohos-swiftshader-source"
+specifiers = ["cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5"]
+
+[tools."http:ohos-swiftshader-source"."platforms.linux-arm64"]
+checksum = "sha256:ea162eebba5a021069bc5d4d1c6bcb8eb50befbe4c4d304947cdfc0e8a49db75"
+url = "https://github.com/google/swiftshader/archive/cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5.tar.gz"
+
+[tools."http:ohos-swiftshader-source"."platforms.linux-x64"]
+checksum = "sha256:ea162eebba5a021069bc5d4d1c6bcb8eb50befbe4c4d304947cdfc0e8a49db75"
+url = "https://github.com/google/swiftshader/archive/cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5.tar.gz"
+
+[tools."http:ohos-swiftshader-source"."platforms.macos-arm64"]
+checksum = "sha256:ea162eebba5a021069bc5d4d1c6bcb8eb50befbe4c4d304947cdfc0e8a49db75"
+url = "https://github.com/google/swiftshader/archive/cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5.tar.gz"
+
 [[tools."http:oniro-emulator"]]
 version = "6.1"
 backend = "http:oniro-emulator"

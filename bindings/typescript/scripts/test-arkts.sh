@@ -60,6 +60,9 @@ patch --batch --forward --fuzz=0 -p1 -d "$work/ets/hypium" \
 perl -pi -e 's#from "\@ohos/hypium"#from "./hypium/index"#' "$work/ets/TestRunner.js"
 cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
+if [[ "$preset" == ohos-x64-vulkan ]]; then
+  cp "$("$binding/../../tools/devices/ohos-vulkan-driver")" "$work/libs/$abi/libvulkan.so"
+fi
 # The application requires the API floor that the package declares.
 api=$(jq -er .compatibleSdkVersion "$work/ohpm/package/oh-package.json5")
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi" "$api"

@@ -2,6 +2,10 @@
 # `MISE_ENV=ohos`. See the development overview.
 
 [tools]
+"http:ohos-swiftshader-source" = { version = "cddb5c91b23ff70a1f607ea31610aa0d7f4b5ad5", url = "https://github.com/google/swiftshader/archive/{{ version }}.tar.gz", checksum = "sha256:ea162eebba5a021069bc5d4d1c6bcb8eb50befbe4c4d304947cdfc0e8a49db75", bin_path = ".", os = [
+  "linux",
+  "macos",
+] }
 # mise has no registry entry for the OpenHarmony SDK, so this resolves through the
 # plugin that the hook below registers. Its unpacking step needs a POSIX shell,
 # which is why Windows is left out.

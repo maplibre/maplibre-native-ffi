@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Builds the x64 software Vulkan library used only by the OpenHarmony suites.
+set -euo pipefail
+
+repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+source=$(mise where http:ohos-swiftshader-source)
+sdk=${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must point at the OpenHarmony SDK}
+sdk_version=$(basename "$(dirname "$sdk")")
+build="$repository/build/tools/ohos-swiftshader-${source##*/}-$sdk_version"
+library="$build/build/libvulkan.so"
+if [[ -f "$library" ]]; then
+  printf '%s\n' "$library"
+  exit 0
+fi
+
+if [[ ! -d "$build/source" ]]; then
+  mkdir -p "$build"
+  rm -rf "$build/source.partial"
+  cp -R "$source/swiftshader-${source##*/}" "$build/source.partial"
+  patch --batch --forward --fuzz=0 -p1 -d "$build/source.partial" \
+    <"$repository/patches/swiftshader/0001-ohos-platform.patch" >&2
+  mv "$build/source.partial" "$build/source"
+fi
+cmake -S "$build/source" -B "$build/build" -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$sdk/build/cmake/ohos.toolchain.cmake" \
+  -DOHOS_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS=-Wno-unused-command-line-argument \
+  -DSWIFTSHADER_BUILD_TESTS=OFF -DSWIFTSHADER_BUILD_WSI_XCB=OFF \
+  -DSWIFTSHADER_BUILD_WSI_WAYLAND=OFF -DREACTOR_BACKEND=Subzero >&2
+cmake --build "$build/build" --target vk_swiftshader --parallel >&2
+# The guest loader rejects this ICD during device creation. SwiftShader also
+# exports the Vulkan API directly, so the test process loads it as its library.
+ln -sf libvk_swiftshader.so "$library"
+printf '%s\n' "$library"

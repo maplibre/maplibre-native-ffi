@@ -33,6 +33,10 @@ artifact=$(field .name)
 target_platform=$(field .platform.id)
 devices="$MISE_MONOREPO_ROOT/tools/devices"
 scripts="$MISE_MONOREPO_ROOT/scripts"
+ohos_libraries=()
+if [[ "$target_platform" == ohos-x64 && "$(field .backend)" == vulkan ]]; then
+  ohos_libraries=(--library "$("$devices/ohos-vulkan-driver")")
+fi
 
 # The x64 OpenGL suites run on API 26, the oldest release the library
 # supports; the other Android targets run on the default API level.
@@ -83,6 +87,7 @@ case "$target_platform" in
     exec "$scripts/run-ohos-emulator-test.sh" "$timeout_seconds" \
       "$install/lib/libmaplibre-native-c.so" \
       "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must point at the OpenHarmony SDK}/llvm/lib/$(field .platform.zigTarget)/libc++_shared.so" \
+      ${ohos_libraries[@]+"${ohos_libraries[@]}"} \
       ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
     ;;
   *-simulator-*)

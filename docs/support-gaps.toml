@@ -404,10 +404,10 @@ status = "path-known"
 reason = "CI cross-builds ARM64 OpenHarmony packages and runs the x64 emulator. Oniro publishes only an x64 emulator image, and the ARM64 runner lacks KVM to run one. Add an ARM64 device to run the suites."
 
 [[entry]]
-bindings = ["c"]
+bindings = ["typescript"]
 platforms = ["ohos"]
 archs = ["x64"]
 backends = ["vulkan"]
 operations = ["test"]
-status = "path-known"
-reason = "The OpenHarmony emulator runs the OpenGL suite alone. Wire the Vulkan target to a device with a Vulkan driver."
+status = "blocked"
+reason = "The emulator passes Vulkan rendering with a test-only software driver, but the ArkTS suite does not reliably receive abandoned-owner leak reports after collection. Diagnostic I/O changes the result; the uninstrumented suite repeatedly fails its finalizer-report check."

@@ -17,11 +17,7 @@ case "$usage_preset" in
     echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/rust:build and test an android-arm64 or android-x64 preset instead." >&2
     exit 2
     ;;
-  ohos-x64-egl) ;;
-  ohos-x64-*)
-    echo "The OpenHarmony emulator runs EGL only; check $usage_preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
-    exit 2
-    ;;
+  ohos-x64-*) ;;
   ohos-*)
     echo "The OpenHarmony emulator runs an x64 guest; check $usage_preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
     exit 2
