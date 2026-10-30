@@ -58,7 +58,7 @@ class PlatformGapsTest(unittest.TestCase):
                 [("dotnet", "tested")],
             )
 
-    def test_nuget_inputs_match_its_packager_and_preserve_untested_assets(self):
+    def test_nuget_inputs_match_its_packager_and_preserve_macos_x64(self):
         selected = plan.consumed("dotnet-nuget", list(self.targets.values()))
         self.assertEqual(
             {target.preset for target in selected},
@@ -69,9 +69,9 @@ class PlatformGapsTest(unittest.TestCase):
         self.assertEqual(
             plan.dotnet_runtime_target(target.preset), ("Metal", "osx-x64")
         )
-        self.assertFalse(gaps.supported("dotnet", target))
+        self.assertTrue(gaps.supported("dotnet", target))
         self.assertIn(
-            "//bindings/dotnet:build",
+            "//bindings/dotnet:test",
             {suite.task for suite in suites.target_suites(target)},
         )
         self.assertIsNone(plan.dotnet_runtime_target("mingw-x64-vulkan"))
