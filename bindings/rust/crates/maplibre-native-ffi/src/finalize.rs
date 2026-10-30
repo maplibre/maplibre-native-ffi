@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::sync::{OnceLock, mpsc};
 
 thread_local! {
-    #[cfg_attr(any(target_os = "android", target_env = "ohos"), allow(clippy::missing_const_for_thread_local))]
+    #[cfg_attr(any(target_os = "android", target_env = "ohos", all(target_os = "windows", target_env = "gnu")), allow(clippy::missing_const_for_thread_local))]
     static DEPTH: Cell<usize> = const { Cell::new(0) };
 }
 
