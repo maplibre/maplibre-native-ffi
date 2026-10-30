@@ -69,7 +69,6 @@ ln -s "$MISE_MONOREPO_ROOT/build/$usage_preset/install" .dart_tool/native
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-env.MLN_FFI_DART_TEST_IMAGE = "dart:{{vars.dart_version}}"
 depends = [
   { task = "//:build", args = [
     "{{usage.preset}}",
@@ -88,7 +87,7 @@ if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
     --volume "${PUB_CACHE:-$HOME/.pub-cache}:${PUB_CACHE:-$HOME/.pub-cache}:ro" \
     --env PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}" \
     --workdir "$PWD" \
-    "$MLN_FFI_DART_TEST_IMAGE" sh -euc '
+    "dart:{{vars.dart_version}}" sh -euc '
       # LLVM 19 lavapipe fails to JIT RISC-V shaders; match the QEMU roots.
       sed -i s/trixie/forky/g /etc/apt/sources.list.d/debian.sources
       apt-get update -qq
