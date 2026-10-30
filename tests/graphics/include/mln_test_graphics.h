@@ -137,6 +137,14 @@ MLN_TEST_GRAPHICS_API bool mln_test_graphics_get_context(
   mln_test_graphics_context* MLN_TEST_GRAPHICS_NONNULL out_context
 );
 
+// Returns the id<MTLCommandQueue> of a Metal graphics object, on which
+// mln_test_graphics_texture_read_rgba8() submits its copies, or null for
+// another backend. The graphics object owns the queue.
+MLN_TEST_GRAPHICS_API void* MLN_TEST_GRAPHICS_NULLABLE
+mln_test_graphics_metal_command_queue(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics
+);
+
 // Makes the EGL or WGL context current on the calling thread, as a host that
 // drives a session on its own graphics thread would. Fails for Metal and
 // Vulkan, which have no current context.

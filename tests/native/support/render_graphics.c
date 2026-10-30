@@ -44,9 +44,9 @@ static void report(const char* what) {
 // Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
 // attaches a fixture on the graphics object of another.
 static mln_test_graphics* shared_graphics = NULL;
-#if defined(HOST_OPENGL)
-static bool attach_fence_sync = false;
-#endif
+// Set only while mln_test_render_fixture_create_synced() attaches. A Metal
+// fixture that accepts queue order also names the graphics object's queue.
+static mln_gpu_sync_kind_flags attach_sync_kinds = 0;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 // MTLPixelFormatRGBA8Unorm, the format a fixture attaches with by default.
 #define DEFAULT_METAL_PIXEL_FORMAT UINT64_C(70)
@@ -206,8 +206,13 @@ bool mln_test_backend_attach(
   descriptor.context = host_context(&state->context);
   descriptor.pixel_format =
     attach_pixel_format != 0 ? attach_pixel_format : DEFAULT_METAL_PIXEL_FORMAT;
+  if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+    descriptor.command_queue =
+      mln_test_graphics_metal_command_queue(state->graphics);
+  mln_render_session_attach_options attach = *options;
+  attach.producer_sync_kinds |= attach_sync_kinds;
   *out_status = mln_map_attach_metal_owned_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   mln_vulkan_owned_texture_descriptor descriptor = {
@@ -216,6 +221,7 @@ bool mln_test_backend_attach(
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
+  attach.producer_sync_kinds |= attach_sync_kinds;
   if (attach_queue_lock != NULL) {
     attach.queue_lock = *attach_queue_lock;
   }
@@ -229,8 +235,7 @@ bool mln_test_backend_attach(
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync)
-    attach.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
+  attach.producer_sync_kinds |= attach_sync_kinds;
   *out_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -371,12 +376,16 @@ static bool attach_borrowed_texture(
     return false;
   }
   *out_state = state;
+  mln_render_session_attach_options attach = *options;
+  attach.producer_sync_kinds |= attach_sync_kinds;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+    descriptor.command_queue =
+      mln_test_graphics_metal_command_queue(state->graphics);
   *out_status = mln_map_attach_metal_borrowed_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_render_session_attach_options attach = *options;
   if (attach_queue_lock != NULL) {
     attach.queue_lock = *attach_queue_lock;
   }
@@ -384,9 +393,6 @@ static bool attach_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync)
-    attach.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   *out_status = mln_map_attach_open_gl_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -466,19 +472,18 @@ bool mln_test_render_fixture_create_metal_owned_texture(
 }
 #endif
 
-#if defined(HOST_OPENGL)
-bool mln_test_render_fixture_create_opengl_fence_texture(
-  mln_map map, mln_test_render_fixture* fixture, bool borrowed
+bool mln_test_render_fixture_create_synced(
+  mln_map map, mln_test_render_fixture* fixture, bool borrowed,
+  mln_gpu_sync_kind_flags producer_sync_kinds
 ) {
-  attach_fence_sync = true;
+  attach_sync_kinds = producer_sync_kinds;
   const bool attached = borrowed ? mln_test_render_fixture_create_borrowed_ring(
                                      map, fixture, 1, MLN_TEST_PRESET_DRIVER
                                    )
                                  : mln_test_render_fixture_create(map, fixture);
-  attach_fence_sync = false;
+  attach_sync_kinds = 0;
   return attached;
 }
-#endif
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(

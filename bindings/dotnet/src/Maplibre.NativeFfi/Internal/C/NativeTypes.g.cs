@@ -453,6 +453,7 @@ internal unsafe struct mln_metal_borrowed_texture_descriptor
     public uint physical_height;
     public mln_metal_borrowed_texture* textures;
     public nuint texture_count;
+    public void* command_queue;
 }
 
 internal unsafe struct mln_metal_context_descriptor
@@ -466,6 +467,7 @@ internal unsafe struct mln_metal_owned_texture_descriptor
     public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
     public ulong pixel_format;
+    public void* command_queue;
 }
 
 internal unsafe struct mln_metal_surface_descriptor

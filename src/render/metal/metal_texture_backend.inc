@@ -8,6 +8,7 @@
 #include <mln/mtl/headless_backend.hpp>
 
 #include <Metal/MTLCommandBuffer.hpp>
+#include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLTexture.hpp>
 
@@ -27,12 +28,14 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
     std::string description;
   };
 
+  // A null host_queue makes the backend create its own queue on the device.
   MetalTextureBackend(
-    MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
-    MTL::PixelFormat pixel_format
+    MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
+    std::size_t ring_depth, MTL::PixelFormat pixel_format
   );
   MetalTextureBackend(
-    std::vector<MTL::Texture*> borrowed_textures, mln::Size size
+    std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
+    mln::Size size
   );
   MetalTextureBackend(const MetalTextureBackend&) = delete;
   auto operator=(const MetalTextureBackend&) -> MetalTextureBackend& = delete;
@@ -47,6 +50,11 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void deactivate() override;
 
   auto metal_texture() -> MTL::Texture*;
+  // Makes a frame acquirable once committed rather than once complete.
+  void set_queue_ordered(bool queue_ordered) { queue_ordered_ = queue_ordered; }
+  // Waits for the frame a queue-ordered render left in flight, and records its
+  // result.
+  void finish_frame();
   auto select_slot(std::size_t slot) -> bool;
   void set_ring_size(mln::Size size);
 
@@ -64,6 +72,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
 
  private:
   void record_command_buffer_result(const MTL::CommandBuffer& buffer);
+  void commit(NS::SharedPtr<MTL::CommandBuffer> buffer);
 
   // The caller's texture for each slot, or empty for a session-owned ring.
   std::vector<MTL::Texture*> borrowed_textures_;
@@ -74,6 +83,8 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;
   std::optional<CommandBufferFailure> command_buffer_failure_;
+  bool queue_ordered_ = false;
+  NS::SharedPtr<MTL::CommandBuffer> in_flight_;
 };
 
 }  // namespace mln::core

@@ -236,7 +236,7 @@ const (
 	// The host needs no synchronization object. The work was submitted, before the
 	// frame became acquirable or before the release call, to the queue that the
 	// session and the host share, which orders it before any work submitted there
-	// afterwards. WebGPU supports it.
+	// afterwards.
 	GpuSyncKindQueueOrder GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_QUEUE_ORDER)
 )
 
@@ -2880,6 +2880,11 @@ type MetalBorrowedTextureDescriptor struct {
 	PhysicalHeight uint32
 	// The ring's textures, one per slot, in slot order. Required.
 	Textures []MetalBorrowedTexture
+	// id<MTLCommandQueue> / MTL::CommandQueue* on the textures' device that the
+	// session submits its work to, retained by the session. Optional; null makes
+	// the session create its own queue. GpuSyncKindQueueOrder orders frames on this
+	// queue. A replacement names the queue the session attached with.
+	CommandQueue uintptr
 }
 
 func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, arena *bindingArena) C.mln_metal_borrowed_texture_descriptor {
@@ -2896,6 +2901,7 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 			items[i] = nativeMetalBorrowedTexture(item, arena)
 		}
 	}
+	raw.command_queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.CommandQueue)))
 	return raw
 }
 
@@ -2931,6 +2937,11 @@ type MetalOwnedTextureDescriptor struct {
 	// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
 	// returns RGBA8 for either format.
 	PixelFormat uint64
+	// id<MTLCommandQueue> / MTL::CommandQueue* on context.device that the session
+	// submits its work to, retained by the session. Optional; null makes the
+	// session create its own queue. GpuSyncKindQueueOrder orders frames on this
+	// queue.
+	CommandQueue uintptr
 }
 
 func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena *bindingArena) C.mln_metal_owned_texture_descriptor {
@@ -2939,6 +2950,7 @@ func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena 
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
 	raw.pixel_format = C.uint64_t(input.PixelFormat)
+	raw.command_queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.CommandQueue)))
 	return raw
 }
 

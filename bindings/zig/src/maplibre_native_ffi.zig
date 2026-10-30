@@ -2666,7 +2666,7 @@ pub const GpuSyncKind = enum(u32) {
     /// The host needs no synchronization object. The work was submitted, before
     /// the frame became acquirable or before the release call, to the queue
     /// that the session and the host share, which orders it before any work
-    /// submitted there afterwards. WebGPU supports it.
+    /// submitted there afterwards.
     queue_order = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
@@ -3380,6 +3380,12 @@ pub const MetalBorrowedTextureDescriptor = struct {
     physical_height: u32,
     /// The ring's textures, one per slot, in slot order. Required.
     textures: []const MetalBorrowedTexture,
+    /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device
+    /// that the session submits its work to, retained by the session. Optional;
+    /// null makes the session create its own queue. `GpuSyncKind.queue_order`
+    /// orders frames on this queue. A replacement names the queue the session
+    /// attached with.
+    command_queue: ?*anyopaque = null,
     pub fn toNative(self: MetalBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_metal_borrowed_texture_descriptor);
@@ -3392,6 +3398,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
             break :blk items.ptr;
         };
         raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        raw.command_queue = self.command_queue;
         return raw;
     }
 
@@ -3405,6 +3412,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
                 for (try marshal.nativeSlice(c.mln_metal_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = MetalBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
+            .command_queue = raw.command_queue,
         };
     }
 };
@@ -3442,12 +3450,18 @@ pub const MetalOwnedTextureDescriptor = struct {
     /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
     /// returns RGBA8 for either format.
     pixel_format: u64,
+    /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+    /// session submits its work to, retained by the session. Optional; null
+    /// makes the session create its own queue. `GpuSyncKind.queue_order` orders
+    /// frames on this queue.
+    command_queue: ?*anyopaque = null,
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_owned_texture_descriptor);
         raw.size = @sizeOf(c.mln_metal_owned_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
         raw.pixel_format = self.pixel_format;
+        raw.command_queue = self.command_queue;
         return raw;
     }
     pub fn fromNative(raw: c.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
@@ -3455,6 +3469,7 @@ pub const MetalOwnedTextureDescriptor = struct {
             .extent = LogicalExtent.fromNative(raw.extent),
             .context = MetalContextDescriptor.fromNative(raw.context),
             .pixel_format = raw.pixel_format,
+            .command_queue = raw.command_queue,
         };
     }
 };

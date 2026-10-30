@@ -16,13 +16,15 @@ public readonly partial record struct MetalBorrowedTextureDescriptor
         LogicalExtent Extent,
         uint PhysicalWidth,
         uint PhysicalHeight,
-        ImmutableArray<MetalBorrowedTexture> Textures
+        ImmutableArray<MetalBorrowedTexture> Textures,
+        NativePointer CommandQueue
     )
     {
         this.Extent = Extent;
         this.PhysicalWidth = PhysicalWidth;
         this.PhysicalHeight = PhysicalHeight;
         this.Textures = Textures;
+        this.CommandQueue = CommandQueue;
     }
 
     /// <summary>
@@ -51,4 +53,13 @@ public readonly partial record struct MetalBorrowedTextureDescriptor
         init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
+
+    /// <summary>
+    /// <c>id&lt;MTLCommandQueue&gt;</c> / <c>MTL::CommandQueue*</c> on the
+    /// textures' device that the session submits its work to, retained by the
+    /// session. Optional; null makes the session create its own queue.
+    /// <c>GpuSyncKind.QueueOrder</c> orders frames on this queue. A replacement
+    /// names the queue the session attached with.
+    /// </summary>
+    public NativePointer CommandQueue { get; init; }
 }

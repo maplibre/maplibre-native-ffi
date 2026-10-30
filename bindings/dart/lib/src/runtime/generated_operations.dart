@@ -872,6 +872,9 @@ _writeMetalBorrowedTextureDescriptor(
       into: result.ref.textures + index,
     );
   }
+  result.ref.command_queue = Pointer<Void>.fromAddress(
+    value.commandQueue.address,
+  ).cast();
   return result;
 }
 
@@ -896,6 +899,9 @@ _writeMetalOwnedTextureDescriptor(
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
   result.ref.pixel_format = value.pixelFormat;
+  result.ref.command_queue = Pointer<Void>.fromAddress(
+    value.commandQueue.address,
+  ).cast();
   return result;
 }
 

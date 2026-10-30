@@ -43,16 +43,24 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalHeight: UInt32
   /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [MetalBorrowedTexture]
+  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
+  /// the session submits its work to, retained by the session. Optional; null
+  /// makes the session create its own queue. `GpuSyncKind.queueOrder` orders
+  /// frames on this queue. A replacement names the queue the session attached
+  /// with.
+  public var commandQueue: NativePointer
   public init(
     extent: LogicalExtent,
     physicalWidth: UInt32,
     physicalHeight: UInt32,
-    textures: [MetalBorrowedTexture]
+    textures: [MetalBorrowedTexture],
+    commandQueue: NativePointer = .null
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.textures = textures
+    self.commandQueue = commandQueue
   }
 
   init(
@@ -66,6 +74,10 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       raw.textures,
       count: Int(raw.texture_count)
     ).map { MetalBorrowedTexture(raw: $0) }
+    commandQueue = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_queue,
+      to: UInt.self
+    ))
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -78,6 +90,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.physical_height = physicalHeight
     raw.textures = arena.array(textures.map { $0.nativeValue() })
     raw.texture_count = try NativeInputArena.count(textures.count)
+    raw.command_queue = commandQueue.unsafeMutableRawPointer
     return raw
   }
 }
@@ -96,20 +109,31 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
   /// returns RGBA8 for either format.
   public var pixelFormat: UInt64
+  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+  /// session submits its work to, retained by the session. Optional; null makes
+  /// the session create its own queue. `GpuSyncKind.queueOrder` orders frames
+  /// on this queue.
+  public var commandQueue: NativePointer
   public init(
     extent: LogicalExtent,
     context: MetalContextDescriptor = .init(),
-    pixelFormat: UInt64
+    pixelFormat: UInt64,
+    commandQueue: NativePointer = .null
   ) {
     self.extent = extent
     self.context = context
     self.pixelFormat = pixelFormat
+    self.commandQueue = commandQueue
   }
 
   init(raw: mln_metal_owned_texture_descriptor) {
     extent = LogicalExtent(raw: raw.extent)
     context = MetalContextDescriptor(raw: raw.context)
     pixelFormat = raw.pixel_format
+    commandQueue = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_queue,
+      to: UInt.self
+    ))
   }
 
   func nativeValue() -> mln_metal_owned_texture_descriptor {
@@ -118,6 +142,7 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
     raw.pixel_format = pixelFormat
+    raw.command_queue = commandQueue.unsafeMutableRawPointer
     return raw
   }
 }

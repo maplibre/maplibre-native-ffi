@@ -883,6 +883,7 @@ pub struct mln_metal_borrowed_texture_descriptor {
     pub physical_height: u32,
     pub textures: *const mln_metal_borrowed_texture,
     pub texture_count: usize,
+    pub command_queue: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -896,6 +897,7 @@ pub struct mln_metal_owned_texture_descriptor {
     pub extent: mln_logical_extent,
     pub context: mln_metal_context_descriptor,
     pub pixel_format: u64,
+    pub command_queue: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

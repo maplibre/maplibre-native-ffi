@@ -26,7 +26,7 @@ public enum GpuSyncKind : uint
     /// The host needs no synchronization object. The work was submitted, before
     /// the frame became acquirable or before the release call, to the queue
     /// that the session and the host share, which orders it before any work
-    /// submitted there afterwards. WebGPU supports it.
+    /// submitted there afterwards.
     /// </summary>
     QueueOrder = 2,
 }

@@ -147,11 +147,19 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * The host needs no synchronization object. The work was submitted, before
    * the frame became acquirable or before the release call, to the queue that
    * the session and the host share, which orders it before any work submitted
-   * there afterwards. WebGPU supports it.
+   * there afterwards.
    *
    * As producer synchronization, the host submits its reads of the frame's
    * texture to that queue. As consumer synchronization, the host submitted its
    * reads there before the release call.
+   *
+   * WebGPU orders on the device's queue. Vulkan orders on the context's
+   * graphics_queue, which the host shares through the attach options'
+   * queue_lock: the session's writes and its transition to the frame's layout
+   * are visible to every later command on that queue, and its next render
+   * into the slot waits for every earlier one. Metal orders on the texture
+   * descriptor's command_queue, through Metal's hazard tracking, so a target
+   * without one does not support this kind.
    */
   MLN_GPU_SYNC_QUEUE_ORDER = 2U,
 } mln_gpu_sync_kind;

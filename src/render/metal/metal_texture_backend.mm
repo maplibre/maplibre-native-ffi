@@ -107,6 +107,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
       }
     }
 
+    backend.finish_frame();
     assert(context.getBackend().getCommandQueue());
     commandBuffer =
       NS::RetainPtr(context.getBackend().getCommandQueue()->commandBuffer());
@@ -143,10 +144,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
   void swap() override {
     assert(commandBuffer);
-    commandBuffer->commit();
-    commandBuffer->waitUntilCompleted();
-    backend.record_command_buffer_result(*commandBuffer.get());
-    commandBuffer.reset();
+    backend.commit(std::exchange(commandBuffer, {}));
     renderPassDescriptor.reset();
   }
 
@@ -210,19 +208,22 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 };
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
-  MTL::PixelFormat pixel_format
+  MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
+  std::size_t ring_depth, MTL::PixelFormat pixel_format
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       owned_pixel_format_(pixel_format),
       ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
-  commandQueue = NS::TransferPtr(device->newCommandQueue());
+  commandQueue = host_queue != nullptr
+                   ? NS::RetainPtr(host_queue)
+                   : NS::TransferPtr(device->newCommandQueue());
 }
 
 MetalTextureBackend::MetalTextureBackend(
-  std::vector<MTL::Texture*> borrowed_textures, mln::Size size
+  std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
+  mln::Size size
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
@@ -230,10 +231,13 @@ MetalTextureBackend::MetalTextureBackend(
       borrowed_pixel_format_(borrowed_textures_.front()->pixelFormat()),
       ring_(borrowed_textures_.size()) {
   device = NS::RetainPtr(borrowed_textures_.front()->device());
-  commandQueue = NS::TransferPtr(device->newCommandQueue());
+  commandQueue = host_queue != nullptr
+                   ? NS::RetainPtr(host_queue)
+                   : NS::TransferPtr(device->newCommandQueue());
 }
 
 MetalTextureBackend::~MetalTextureBackend() {
+  finish_frame();
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   ring_.clear();
@@ -258,6 +262,7 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
 }
 
 auto MetalTextureBackend::readStillImage() -> mln::PremultipliedImage {
+  finish_frame();
   // A render that aborted before it asked for the renderable leaves no
   // resource behind, so build it here rather than dereference nothing.
   getDefaultRenderable();
@@ -275,6 +280,23 @@ void MetalTextureBackend::deactivate() {}
 auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().metal_texture();
+}
+
+void MetalTextureBackend::commit(NS::SharedPtr<MTL::CommandBuffer> buffer) {
+  buffer->commit();
+  if (queue_ordered_) {
+    in_flight_ = std::move(buffer);
+    return;
+  }
+  buffer->waitUntilCompleted();
+  record_command_buffer_result(*buffer.get());
+}
+
+void MetalTextureBackend::finish_frame() {
+  if (!in_flight_) return;
+  in_flight_->waitUntilCompleted();
+  record_command_buffer_result(*in_flight_.get());
+  in_flight_.reset();
 }
 
 void MetalTextureBackend::record_command_buffer_result(
@@ -326,6 +348,8 @@ auto MetalTextureBackend::has_borrowed_pixel_format(
 void MetalTextureBackend::set_borrowed_textures(
   std::vector<MTL::Texture*> textures, mln::Size new_size
 ) {
+  // The session no longer touches a texture that it replaces.
+  finish_frame();
   borrowed_textures_ = std::move(textures);
   setRenderableSize(new_size);
   // Drop every slot's renderable rather than patch it: its depth and stencil

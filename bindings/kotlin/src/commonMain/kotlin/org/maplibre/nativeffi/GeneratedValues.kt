@@ -256,7 +256,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
     /**
      * The host needs no synchronization object. The work was submitted, before the frame became
      * acquirable or before the release call, to the queue that the session and the host share,
-     * which orders it before any work submitted there afterwards. WebGPU supports it.
+     * which orders it before any work submitted there afterwards.
      */
     public val QUEUE_ORDER: GpuSyncKind = GpuSyncKind(2u)
   }
@@ -2338,6 +2338,13 @@ public data class MetalBorrowedTextureDescriptor(
   public val physicalHeight: UInt,
   /** The ring's textures, one per slot, in slot order. Required. */
   public val textures: List<MetalBorrowedTexture>,
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that the session submits
+   * its work to, retained by the session. Optional; null makes the session create its own queue.
+   * `GpuSyncKind.QUEUE_ORDER` orders frames on this queue. A replacement names the queue the
+   * session attached with.
+   */
+  public val commandQueue: NativePointer,
 )
 
 /**
@@ -2370,6 +2377,12 @@ public data class MetalOwnedTextureDescriptor(
    * MTLPixelFormatBGRA8Unorm. Required. Readback returns RGBA8 for either format.
    */
   public val pixelFormat: ULong,
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the session submits its
+   * work to, retained by the session. Optional; null makes the session create its own queue.
+   * `GpuSyncKind.QUEUE_ORDER` orders frames on this queue.
+   */
+  public val commandQueue: NativePointer,
 )
 
 /**

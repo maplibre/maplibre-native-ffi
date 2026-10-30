@@ -134,6 +134,10 @@ class VulkanTextureSessionBackend final
 
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
+  void set_queue_ordered(bool queue_ordered) {
+    backend_.set_queue_ordered(queue_ordered);
+  }
+
   [[nodiscard]] auto allows_off_thread_teardown() const noexcept
     -> bool override {
     return true;
@@ -252,6 +256,7 @@ auto vulkan_owned_texture_attach_start(
   set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Owned;
   session->accepts_queue_lock = true;
+  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   const auto copied = *descriptor;
   const auto ring_depth = attach_ring_depth(options);
   session->initialize_backend =
@@ -260,10 +265,14 @@ auto vulkan_owned_texture_attach_start(
       if (handles_status != MLN_STATUS_OK) {
         return handles_status;
       }
-      target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
+      auto backend = std::make_unique<VulkanTextureSessionBackend>(
         copied, mln::Size{target.physical_width, target.physical_height},
         ring_depth, target.queue_lock
       );
+      backend->set_queue_ordered(
+        target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
+      );
+      target.texture.backend = std::move(backend);
       return MLN_STATUS_OK;
     };
   const auto capabilities = mln_render_session_capabilities{
@@ -273,7 +282,8 @@ auto vulkan_owned_texture_attach_start(
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
              MLN_RENDER_SESSION_CAPABILITY_READBACK,
     .producer_sync_kind = {},
-    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
+    .consumer_sync_kinds =
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -312,6 +322,7 @@ auto vulkan_borrowed_texture_attach_start(
   );
   session->texture.mode = TextureSessionMode::Borrowed;
   session->accepts_queue_lock = true;
+  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
@@ -324,10 +335,14 @@ auto vulkan_borrowed_texture_attach_start(
     if (handles_status != MLN_STATUS_OK) {
       return handles_status;
     }
-    live.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
+    auto backend = std::make_unique<VulkanTextureSessionBackend>(
       target, mln::Size{live.physical_width, live.physical_height},
       live.queue_lock
     );
+    backend->set_queue_ordered(
+      live.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
+    );
+    live.texture.backend = std::move(backend);
     return MLN_STATUS_OK;
   };
   const auto capabilities = mln_render_session_capabilities{
@@ -336,7 +351,8 @@ auto vulkan_borrowed_texture_attach_start(
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
     .producer_sync_kind = {},
-    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
+    .consumer_sync_kinds =
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,

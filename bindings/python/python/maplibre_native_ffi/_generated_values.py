@@ -1966,6 +1966,14 @@ class MetalBorrowedTextureDescriptor:
     textures: Sequence[MetalBorrowedTexture]
     """The ring's textures, one per slot, in slot order. Required."""
 
+    command_queue: int = 0
+    """`id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
+    the session submits its work to, retained by the session. Optional; null
+    makes the session create its own queue. `GpuSyncKind.QUEUE_ORDER` orders
+    frames on this queue. A replacement names the queue the session attached
+    with.
+    """
+
     def __post_init__(self):
         object.__setattr__(self, "textures", _sequence(self.textures))
 
@@ -1978,6 +1986,7 @@ class MetalBorrowedTextureDescriptor:
             textures=tuple(
                 MetalBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
+            command_queue=raw["command_queue"],
         )
 
 
@@ -2021,12 +2030,20 @@ class MetalOwnedTextureDescriptor:
     )
     """Metal backend context. device is required."""
 
+    command_queue: int = 0
+    """`id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+    session submits its work to, retained by the session. Optional; null
+    makes the session create its own queue. `GpuSyncKind.QUEUE_ORDER` orders
+    frames on this queue.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             extent=LogicalExtent._from_native(raw["extent"]),
             context=MetalContextDescriptor._from_native(raw["context"]),
             pixel_format=raw["pixel_format"],
+            command_queue=raw["command_queue"],
         )
 
 

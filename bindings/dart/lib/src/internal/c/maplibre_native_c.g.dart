@@ -635,6 +635,7 @@ final class mln_metal_borrowed_texture_descriptor extends Struct {
   external Pointer<mln_metal_borrowed_texture> textures;
   @Size()
   external int texture_count;
+  external Pointer<Void> command_queue;
 }
 
 final class mln_metal_context_descriptor extends Struct {
@@ -648,6 +649,7 @@ final class mln_metal_owned_texture_descriptor extends Struct {
   external mln_metal_context_descriptor context;
   @Uint64()
   external int pixel_format;
+  external Pointer<Void> command_queue;
 }
 
 final class mln_metal_surface_descriptor extends Struct {

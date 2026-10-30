@@ -33,6 +33,13 @@ typedef struct mln_metal_owned_texture_descriptor {
    * returns RGBA8 for either format.
    */
   uint64_t pixel_format MLN_BINDING("required=true");
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+   * session submits its work to, retained by the session. Optional; null makes
+   * the session create its own queue. MLN_GPU_SYNC_QUEUE_ORDER orders frames on
+   * this queue.
+   */
+  void* command_queue;
 } mln_metal_owned_texture_descriptor;
 
 /** One caller-owned Metal texture of a borrowed texture ring. */
@@ -72,6 +79,14 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * attached with.
    */
   size_t texture_count;
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
+   * the session submits its work to, retained by the session. Optional; null
+   * makes the session create its own queue. MLN_GPU_SYNC_QUEUE_ORDER orders
+   * frames on this queue. A replacement names the queue the session attached
+   * with.
+   */
+  void* command_queue;
 } mln_metal_borrowed_texture_descriptor;
 
 /** Metal frame acquired from a texture ring. */

@@ -15,12 +15,14 @@ public readonly partial record struct MetalOwnedTextureDescriptor
     public MetalOwnedTextureDescriptor(
         LogicalExtent Extent,
         MetalContextDescriptor Context,
-        ulong PixelFormat
+        ulong PixelFormat,
+        NativePointer CommandQueue
     )
     {
         this.Extent = Extent;
         this.Context = Context;
         this.PixelFormat = PixelFormat;
+        this.CommandQueue = CommandQueue;
     }
 
     /// <summary>
@@ -40,4 +42,12 @@ public readonly partial record struct MetalOwnedTextureDescriptor
     /// returns RGBA8 for either format.
     /// </summary>
     public required ulong PixelFormat { get; init; }
+
+    /// <summary>
+    /// <c>id&lt;MTLCommandQueue&gt;</c> / <c>MTL::CommandQueue*</c> on
+    /// context.device that the session submits its work to, retained by the
+    /// session. Optional; null makes the session create its own queue.
+    /// <c>GpuSyncKind.QueueOrder</c> orders frames on this queue.
+    /// </summary>
+    public NativePointer CommandQueue { get; init; }
 }

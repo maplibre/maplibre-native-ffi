@@ -494,20 +494,25 @@ static void metal_texture_destroy(mln_test_graphics_texture* texture) {
   }
 }
 
+// Returns the queue that reads submit to, creating it on first use.
+static void* metal_queue(mln_test_graphics* graphics) {
+  if (graphics->metal_queue == NULL) {
+    graphics->metal_queue =
+      objc_send(graphics, graphics->context.metal_device, "newCommandQueue");
+    if (graphics->metal_queue == NULL) {
+      set_error("could not create a Metal command queue");
+    }
+  }
+  return graphics->metal_queue;
+}
+
 static bool metal_texture_read(
   mln_test_graphics_texture* texture, uint8_t* pixels
 ) {
   mln_test_graphics* graphics = texture->graphics;
   const unsigned long width = texture->info.width;
   const unsigned long height = texture->info.height;
-  if (graphics->metal_queue == NULL) {
-    graphics->metal_queue =
-      objc_send(graphics, graphics->context.metal_device, "newCommandQueue");
-    if (graphics->metal_queue == NULL) {
-      set_error("could not create a Metal command queue");
-      return false;
-    }
-  }
+  if (metal_queue(graphics) == NULL) return false;
   void* pool = graphics->objc.pool_push();
   void* buffer = ((message_new_buffer)graphics->objc.message)(
     graphics->context.metal_device,
@@ -2144,6 +2149,15 @@ bool mln_test_graphics_get_context(
   }
   *out_context = graphics->context;
   return true;
+}
+
+void* mln_test_graphics_metal_command_queue(mln_test_graphics* graphics) {
+#if defined(MLN_TG_HAS_METAL)
+  if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_METAL)
+    return metal_queue(graphics);
+#endif
+  set_error("only a Metal graphics object has a command queue");
+  return NULL;
 }
 
 bool mln_test_graphics_make_current(mln_test_graphics* graphics) {

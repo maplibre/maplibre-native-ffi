@@ -627,7 +627,7 @@ export const GpuSyncKind = {
    * The host needs no synchronization object. The work was submitted, before
    * the frame became acquirable or before the release call, to the queue that
    * the session and the host share, which orders it before any work submitted
-   * there afterwards. WebGPU supports it.
+   * there afterwards.
    */
   queueOrder: 2,
 } as const;
@@ -1093,6 +1093,14 @@ export interface MetalBorrowedTextureDescriptor {
    * The ring's textures, one per slot, in slot order. Required.
    */
   textures: readonly MetalBorrowedTexture[];
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
+   * the session submits its work to, retained by the session. Optional; null
+   * makes the session create its own queue. `GpuSyncKind.queueOrder` orders
+   * frames on this queue. A replacement names the queue the session attached
+   * with.
+   */
+  commandQueue?: bigint;
 }
 
 /**
@@ -1130,6 +1138,13 @@ export interface MetalOwnedTextureDescriptor {
    * returns RGBA8 for either format.
    */
   pixelFormat: bigint;
+  /**
+   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+   * session submits its work to, retained by the session. Optional; null makes
+   * the session create its own queue. `GpuSyncKind.queueOrder` orders frames on
+   * this queue.
+   */
+  commandQueue?: bigint;
 }
 
 /**

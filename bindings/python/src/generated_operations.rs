@@ -2299,6 +2299,7 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
         raw.texture_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
+    raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
@@ -2322,6 +2323,7 @@ fn generated_input_mln_metal_owned_texture_descriptor<'py>(
     raw.context =
         generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
     raw.pixel_format = value.getattr("pixel_format")?.extract::<u64>()?;
+    raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
     Ok(raw)
 }
 

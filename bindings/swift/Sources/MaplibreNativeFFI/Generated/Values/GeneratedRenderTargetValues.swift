@@ -118,7 +118,7 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   /// The host needs no synchronization object. The work was submitted, before
   /// the frame became acquirable or before the release call, to the queue that
   /// the session and the host share, which orders it before any work submitted
-  /// there afterwards. WebGPU supports it.
+  /// there afterwards.
   public static let queueOrder: GpuSyncKind = .init(rawValue: 2)
   public var description: String {
     switch rawValue {

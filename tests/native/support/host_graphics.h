@@ -48,12 +48,13 @@ bool mln_test_render_fixture_create_metal_owned_texture(
 );
 #endif
 
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
-// Attaches a shared OpenGL texture target with fence producer synchronization.
-bool mln_test_render_fixture_create_opengl_fence_texture(
-  mln_map map, mln_test_render_fixture* fixture, bool borrowed
+// Attaches the preset's owned texture target, or a borrowed ring of one
+// texture, whose attach options accept `producer_sync_kinds`. A Metal target
+// that accepts queue order names the graphics object's command queue.
+bool mln_test_render_fixture_create_synced(
+  mln_map map, mln_test_render_fixture* fixture, bool borrowed,
+  mln_gpu_sync_kind_flags producer_sync_kinds
 );
-#endif
 
 // The texture at `index` of a borrowed fixture's ring, or null past its end.
 mln_test_graphics_texture* mln_test_render_fixture_texture(

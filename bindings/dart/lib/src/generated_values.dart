@@ -196,7 +196,7 @@ final class GpuSyncKind extends _Enum {
   /// The host needs no synchronization object. The work was submitted, before
   /// the frame became acquirable or before the release call, to the queue that
   /// the session and the host share, which orders it before any work submitted
-  /// there afterwards. WebGPU supports it.
+  /// there afterwards.
   static const queueOrder = GpuSyncKind.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
@@ -2692,6 +2692,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
     required this.physicalWidth,
     required this.physicalHeight,
     required List<MetalBorrowedTexture> textures,
+    this.commandQueue = NativePointer.nullPointer,
   }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. Required. physical_width and physical_height give
@@ -2708,17 +2709,26 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// The ring's textures, one per slot, in slot order. Required.
   final List<MetalBorrowedTexture> textures;
 
+  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
+  /// the session submits its work to, retained by the session. Optional; null
+  /// makes the session create its own queue. `GpuSyncKind.queueOrder` orders
+  /// frames on this queue. A replacement names the queue the session attached
+  /// with.
+  final NativePointer commandQueue;
+
   /// A copy of this value with the given members replaced.
   MetalBorrowedTextureDescriptor copyWith({
     LogicalExtent? extent,
     int? physicalWidth,
     int? physicalHeight,
     List<MetalBorrowedTexture>? textures,
+    NativePointer? commandQueue,
   }) => MetalBorrowedTextureDescriptor(
     extent: extent ?? this.extent,
     physicalWidth: physicalWidth ?? this.physicalWidth,
     physicalHeight: physicalHeight ?? this.physicalHeight,
     textures: textures ?? this.textures,
+    commandQueue: commandQueue ?? this.commandQueue,
   );
 
   @override
@@ -2727,6 +2737,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     textures,
+    commandQueue,
   ];
   @override
   String toString() => _describe('MetalBorrowedTextureDescriptor', const [
@@ -2734,6 +2745,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
     'physicalWidth',
     'physicalHeight',
     'textures',
+    'commandQueue',
   ]);
 }
 
@@ -2766,6 +2778,7 @@ final class MetalOwnedTextureDescriptor extends _Value {
     required this.extent,
     this.context = const MetalContextDescriptor(),
     required this.pixelFormat,
+    this.commandQueue = NativePointer.nullPointer,
   });
 
   /// Logical texture extent. Required. A scale_factor that differs from the
@@ -2780,24 +2793,33 @@ final class MetalOwnedTextureDescriptor extends _Value {
   /// returns RGBA8 for either format.
   final int pixelFormat;
 
+  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+  /// session submits its work to, retained by the session. Optional; null makes
+  /// the session create its own queue. `GpuSyncKind.queueOrder` orders frames
+  /// on this queue.
+  final NativePointer commandQueue;
+
   /// A copy of this value with the given members replaced.
   MetalOwnedTextureDescriptor copyWith({
     LogicalExtent? extent,
     MetalContextDescriptor? context,
     int? pixelFormat,
+    NativePointer? commandQueue,
   }) => MetalOwnedTextureDescriptor(
     extent: extent ?? this.extent,
     context: context ?? this.context,
     pixelFormat: pixelFormat ?? this.pixelFormat,
+    commandQueue: commandQueue ?? this.commandQueue,
   );
 
   @override
-  List<Object?> get _members => [extent, context, pixelFormat];
+  List<Object?> get _members => [extent, context, pixelFormat, commandQueue];
   @override
   String toString() => _describe('MetalOwnedTextureDescriptor', const [
     'extent',
     'context',
     'pixelFormat',
+    'commandQueue',
   ]);
 }
 

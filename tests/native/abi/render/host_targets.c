@@ -233,6 +233,115 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+// A queue-ordered frame is acquirable once submitted. The host reads its
+// texture on the queue that it shares with the session, with no wait of its
+// own, and releases the frame in queue order, after which the session renders
+// into the slot again.
+static void queue_ordered_frames_share_the_hosts_queue(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_synced(
+      map, &fixture, true,
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_GPU_SYNC_QUEUE_ORDER, capabilities.producer_sync_kind
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER, capabilities.consumer_sync_kinds
+  );
+
+  const uint8_t* const colors[] = {red, blue};
+  for (uint64_t index = 0; index < 2; index += 1) {
+    if (index == 1) paint_background_blue(runtime, map);
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+    );
+    mln_acquired_frame frame = MLN_HANDLE_NULL;
+    MLN_TEST_OK(
+      mln_render_session_acquire_frame(fixture.session, &frame, NULL)
+    );
+    mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+    MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
+    TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_QUEUE_ORDER, producer.kind);
+    TEST_ASSERT_EQUAL_UINT64(0, producer.handle);
+    uint32_t slot = UINT32_MAX;
+    TEST_ASSERT_NOT_EQUAL_UINT64(
+      0, mln_test_frame_texture_handle(frame, &slot)
+    );
+    TEST_ASSERT_EQUAL_UINT32(0, slot);
+    expect_texture_color(
+      mln_test_render_fixture_texture(&fixture, slot), colors[index],
+      "the queue-ordered frame's texture"
+    );
+    const mln_gpu_sync consumer = {
+      .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_QUEUE_ORDER
+    };
+    MLN_TEST_OK(mln_acquired_frame_release(frame, &consumer, NULL));
+  }
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A queue-ordered owned ring rebuilds its textures at a new size once the
+// queue it shares with the host has finished with the old ones.
+static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_synced(
+      map, &fixture, false, MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
+    ),
+    mln_test_graphics_last_error()
+  );
+  const mln_gpu_sync consumer = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_QUEUE_ORDER
+  };
+  const mln_logical_extent smaller = {
+    .width = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .height = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .scale_factor = 1.0,
+  };
+  for (uint64_t index = 0; index < 2; index += 1) {
+    if (index == 1) {
+      MLN_TEST_RENDER_AWAIT(
+        MLN_STATUS_OK, &fixture,
+        mln_render_session_resize(
+          fixture.session, smaller, &completion.descriptor, NULL
+        )
+      );
+    }
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+    );
+    mln_acquired_frame frame = MLN_HANDLE_NULL;
+    MLN_TEST_OK(
+      mln_render_session_acquire_frame(fixture.session, &frame, NULL)
+    );
+    MLN_TEST_OK(mln_acquired_frame_release(frame, &consumer, NULL));
+  }
+  MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
 static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   bool borrowed
@@ -242,8 +351,8 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_opengl_fence_texture(
-      map, &fixture, borrowed
+    mln_test_render_fixture_create_synced(
+      map, &fixture, borrowed, MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE
     ),
     mln_test_graphics_last_error()
   );
@@ -444,6 +553,10 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  RUN_TEST(queue_ordered_frames_share_the_hosts_queue);
+  RUN_TEST(a_queue_ordered_ring_resizes_after_the_hosts_reads);
+#endif
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
   RUN_TEST(owned_opengl_frames_support_gpu_fences);

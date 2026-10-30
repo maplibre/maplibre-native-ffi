@@ -1203,7 +1203,7 @@ pub enum GpuSyncKind: u32 {
     /// The host needs no synchronization object. The work was submitted, before
     /// the frame became acquirable or before the release call, to the queue
     /// that the session and the host share, which orders it before any work
-    /// submitted there afterwards. WebGPU supports it.
+    /// submitted there afterwards.
     QueueOrder = 2,
 } Unknown
 }
@@ -2115,6 +2115,12 @@ pub struct MetalBorrowedTextureDescriptor {
     pub physical_height: u32,
     /// The ring's textures, one per slot, in slot order. Required.
     pub textures: Vec<MetalBorrowedTexture>,
+    /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device
+    /// that the session submits its work to, retained by the session. Optional;
+    /// null makes the session create its own queue. `GpuSyncKind::QueueOrder`
+    /// orders frames on this queue. A replacement names the queue the session
+    /// attached with.
+    pub command_queue: *mut std::ffi::c_void,
 }
 impl MetalBorrowedTextureDescriptor {
     pub fn new(
@@ -2128,6 +2134,7 @@ impl MetalBorrowedTextureDescriptor {
             physical_width,
             physical_height,
             textures,
+            command_queue: Default::default(),
         }
     }
 }
@@ -2143,6 +2150,7 @@ impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextu
         raw.physical_height = self.physical_height;
         raw.textures = convert::array(&self.textures, arena)?;
         raw.texture_count = convert::count(self.textures.len())?;
+        raw.command_queue = self.command_queue;
         Ok(raw)
     }
 }
@@ -2179,6 +2187,11 @@ pub struct MetalOwnedTextureDescriptor {
     /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
     /// returns RGBA8 for either format.
     pub pixel_format: u64,
+    /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
+    /// session submits its work to, retained by the session. Optional; null
+    /// makes the session create its own queue. `GpuSyncKind::QueueOrder` orders
+    /// frames on this queue.
+    pub command_queue: *mut std::ffi::c_void,
 }
 impl MetalOwnedTextureDescriptor {
     pub fn new(extent: LogicalExtent, pixel_format: u64) -> Self {
@@ -2186,6 +2199,7 @@ impl MetalOwnedTextureDescriptor {
             extent,
             context: Default::default(),
             pixel_format,
+            command_queue: Default::default(),
         }
     }
 }
@@ -2196,6 +2210,7 @@ impl ToNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDesc
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
         raw.pixel_format = self.pixel_format;
+        raw.command_queue = self.command_queue;
         Ok(raw)
     }
 }

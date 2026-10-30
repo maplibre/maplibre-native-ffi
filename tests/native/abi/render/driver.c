@@ -892,11 +892,22 @@ static void attach_picks_a_producer_sync_kind(void) {
                                    map, &options, &attach.descriptor, &fixture
                                  )
   );
+  // The fixture's Metal target names no command queue, so it lacks queue
+  // order.
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const mln_gpu_sync_kind expected = MLN_GPU_SYNC_QUEUE_ORDER;
+  const mln_gpu_sync_kind expected[] = {
+    MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_QUEUE_ORDER
+  };
   options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  const mln_gpu_sync_kind expected[] = {
+    MLN_GPU_SYNC_CPU_COMPLETE, MLN_GPU_SYNC_QUEUE_ORDER
+  };
+  options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
 #else
-  const mln_gpu_sync_kind expected = MLN_GPU_SYNC_CPU_COMPLETE;
+  const mln_gpu_sync_kind expected[] = {
+    MLN_GPU_SYNC_CPU_COMPLETE, MLN_GPU_SYNC_CPU_COMPLETE
+  };
   options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
 #endif
   MLN_TEST_STATUS(
@@ -919,7 +930,7 @@ static void attach_picks_a_producer_sync_kind(void) {
     MLN_TEST_OK(
       mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
     );
-    TEST_ASSERT_EQUAL_UINT32(expected, capabilities.producer_sync_kind);
+    TEST_ASSERT_EQUAL_UINT32(expected[index], capabilities.producer_sync_kind);
     MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attached));
     mln_test_completion_destroy(&attached);
     mln_test_render_fixture_destroy(&fixture);

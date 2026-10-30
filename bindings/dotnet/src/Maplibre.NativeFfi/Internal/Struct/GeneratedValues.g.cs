@@ -1015,6 +1015,7 @@ internal static unsafe class GeneratedValues
             static (item, scope) => NativeMetalBorrowedTexture(item)
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
+        native.command_queue = (void*)value.CommandQueue.Address;
         return native;
     }
 
@@ -1036,6 +1037,7 @@ internal static unsafe class GeneratedValues
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
         native.pixel_format = value.PixelFormat;
+        native.command_queue = (void*)value.CommandQueue.Address;
         return native;
     }
 

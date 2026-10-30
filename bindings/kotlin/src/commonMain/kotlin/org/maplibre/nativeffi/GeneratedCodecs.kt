@@ -292,7 +292,7 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(40, 48, 36).toUInt())
+  writeU32(target, w(48, 56, 40).toUInt())
   putLogicalExtent(target + w(8, 8, 4), value.extent)
   writeU32(target + w(24, 24, 20), value.physicalWidth)
   writeU32(target + w(28, 28, 24), value.physicalHeight)
@@ -301,25 +301,27 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
     array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
   )
   writeSize(target + w(36, 40, 32), value.textures.size.toULong())
+  writeAddress(target + w(40, 48, 36), value.commandQueue.address)
 }
 
 internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
   value: MetalBorrowedTextureDescriptor,
-): Long = allocate(w(40, 48, 36), w(8, 8, 4)).also { putMetalBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(48, 56, 40), w(8, 8, 4)).also { putMetalBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putMetalOwnedTextureDescriptor(
   target: Long,
   value: MetalOwnedTextureDescriptor,
 ) {
-  writeU32(target, w(40, 40, 32).toUInt())
+  writeU32(target, w(48, 48, 36).toUInt())
   putLogicalExtent(target + w(8, 8, 4), value.extent)
   putMetalContextDescriptor(target + w(24, 24, 20), value.context)
   writeU64(target + w(32, 32, 24), value.pixelFormat)
+  writeAddress(target + w(40, 40, 32), value.commandQueue.address)
 }
 
 internal fun NativeArena.writeMetalOwnedTextureDescriptor(
   value: MetalOwnedTextureDescriptor,
-): Long = allocate(w(40, 40, 32), w(8, 8, 4)).also { putMetalOwnedTextureDescriptor(it, value) }
+): Long = allocate(w(48, 48, 36), w(8, 8, 4)).also { putMetalOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
   writeU32(target, w(32, 40, 28).toUInt())

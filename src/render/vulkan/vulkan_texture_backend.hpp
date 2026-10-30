@@ -68,6 +68,8 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   void activate() override;
   void deactivate() override;
 
+  // Makes a frame acquirable once submitted rather than once complete.
+  void set_queue_ordered(bool queue_ordered) { queue_ordered_ = queue_ordered; }
   void prepareRenderResources();
   auto frame_resources() -> VulkanTextureFrameResources;
   auto select_slot(std::size_t slot) -> bool;
@@ -89,6 +91,7 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // The caller's image for each slot, or empty for a session-owned ring.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
+  bool queue_ordered_ = false;
   std::size_t slot_count_;
   std::size_t selected_slot_ = 0;
   // Set by select_slot() and set_borrowed_target(), so the next

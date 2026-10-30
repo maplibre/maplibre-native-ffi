@@ -9,6 +9,7 @@
 #include <mln/util/size.hpp>
 
 #include <Metal/MTLCommandBuffer.hpp>
+#include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLTexture.hpp>
@@ -116,15 +117,22 @@ class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   MetalTextureSessionBackend(
-    MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
-    MTL::PixelFormat pixel_format
+    MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
+    std::size_t ring_depth, MTL::PixelFormat pixel_format
   )
-      : backend_(host_device, size, ring_depth, pixel_format) {}
+      : backend_(host_device, host_queue, size, ring_depth, pixel_format),
+        host_queue_(host_queue) {}
 
   MetalTextureSessionBackend(
-    std::vector<MTL::Texture*> borrowed_textures, mln::Size size
+    std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
+    mln::Size size
   )
-      : backend_(std::move(borrowed_textures), size) {}
+      : backend_(std::move(borrowed_textures), host_queue, size),
+        host_queue_(host_queue) {}
+
+  void set_queue_ordered(bool queue_ordered) {
+    backend_.set_queue_ordered(queue_ordered);
+  }
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
@@ -140,6 +148,13 @@ class MetalTextureSessionBackend final
 
   auto set_metal_borrowed_target(const mln::core::MetalBorrowedTarget& target)
     -> mln_status override {
+    if (target.descriptor.command_queue != host_queue_) {
+      mln::core::set_thread_error(
+        "Metal texture target must name the command queue this session "
+        "attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto textures = metal_textures(target.textures);
     if (!backend_.has_device(textures.front()->device())) {
       mln::core::set_thread_error(
@@ -203,7 +218,27 @@ class MetalTextureSessionBackend final
 
  private:
   mln::core::MetalTextureBackend backend_;
+  // The host's queue that the session submits to, or null for its own. The
+  // backend retains it.
+  const void* host_queue_;
 };
+
+// Retains the host's command queue, and checks that it belongs to `device`.
+auto retain_host_queue(
+  void* queue, const MTL::Device* device,
+  NS::SharedPtr<MTL::CommandQueue>& out_queue
+) -> mln_status {
+  if (queue == nullptr) return MLN_STATUS_OK;
+  auto* const command_queue = static_cast<MTL::CommandQueue*>(queue);
+  if (command_queue->device() != device) {
+    mln::core::set_thread_error(
+      "Metal command queue must belong to the target's device"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_queue = NS::RetainPtr(command_queue);
+  return MLN_STATUS_OK;
+}
 
 }  // namespace
 
@@ -217,7 +252,7 @@ auto create_metal_owned_texture_backend(
   MTL::Device* device, mln::Size size, std::size_t ring_depth
 ) -> std::unique_ptr<TextureSessionBackend> {
   return std::make_unique<MetalTextureSessionBackend>(
-    device, size, ring_depth, MTL::PixelFormatRGBA8Unorm
+    device, nullptr, size, ring_depth, MTL::PixelFormatRGBA8Unorm
   );
 }
 
@@ -257,16 +292,26 @@ auto metal_owned_texture_attach_start(
   session->texture.mode = TextureSessionMode::Owned;
   auto device =
     NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
+  auto queue = NS::SharedPtr<MTL::CommandQueue>{};
+  const auto queue_status =
+    retain_host_queue(descriptor->command_queue, device.get(), queue);
+  if (queue_status != MLN_STATUS_OK) return queue_status;
+  if (queue) session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   const auto ring_depth = attach_ring_depth(options);
   const auto pixel_format =
     static_cast<MTL::PixelFormat>(descriptor->pixel_format);
   session->initialize_backend =
-    [device = std::move(device), ring_depth,
+    [device = std::move(device), queue, ring_depth,
      pixel_format](mln_render_session_object& target) mutable {
-      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-        device.get(), mln::Size{target.physical_width, target.physical_height},
-        ring_depth, pixel_format
+      auto backend = std::make_unique<MetalTextureSessionBackend>(
+        device.get(), queue.get(),
+        mln::Size{target.physical_width, target.physical_height}, ring_depth,
+        pixel_format
       );
+      backend->set_queue_ordered(
+        target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
+      );
+      target.texture.backend = std::move(backend);
       return MLN_STATUS_OK;
     };
   const auto capabilities = mln_render_session_capabilities{
@@ -276,7 +321,8 @@ auto metal_owned_texture_attach_start(
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
              MLN_RENDER_SESSION_CAPABILITY_READBACK,
     .producer_sync_kind = {},
-    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           (queue ? MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER : 0U),
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -307,22 +353,34 @@ auto metal_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
-  session->initialize_backend =
-    [textures = metal_textures(
-       {descriptor->textures, descriptor->texture_count}
-     )](mln_render_session_object& target) {
-      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-        textures, mln::Size{target.physical_width, target.physical_height}
-      );
-      return MLN_STATUS_OK;
-    };
+  auto textures =
+    metal_textures({descriptor->textures, descriptor->texture_count});
+  auto queue = NS::SharedPtr<MTL::CommandQueue>{};
+  const auto queue_status = retain_host_queue(
+    descriptor->command_queue, textures.front()->device(), queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
+  if (queue) session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  session->initialize_backend = [textures = std::move(textures),
+                                 queue](mln_render_session_object& target) {
+    auto backend = std::make_unique<MetalTextureSessionBackend>(
+      textures, queue.get(),
+      mln::Size{target.physical_width, target.physical_height}
+    );
+    backend->set_queue_ordered(
+      target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
+    );
+    target.texture.backend = std::move(backend);
+    return MLN_STATUS_OK;
+  };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
     .producer_sync_kind = {},
-    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           (queue ? MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER : 0U),
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,

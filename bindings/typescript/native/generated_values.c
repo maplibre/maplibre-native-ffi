@@ -4628,6 +4628,15 @@ bool mln_ts_write_metal_borrowed_texture_descriptor(
     out->textures = items;
     out->texture_count = (size_t)count;
   }
+  if (!mln_ts_member(call, value, "commandQueue", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "commandQueue");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->command_queue = (void*)(uintptr_t)number;
+    }
+  }
   return true;
 }
 
@@ -4679,6 +4688,15 @@ bool mln_ts_write_metal_owned_texture_descriptor(
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, member, &number, child)) return false;
     out->pixel_format = (uint64_t)number;
+  }
+  if (!mln_ts_member(call, value, "commandQueue", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "commandQueue");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->command_queue = (void*)(uintptr_t)number;
+    }
   }
   return true;
 }
