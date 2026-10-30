@@ -279,6 +279,7 @@
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift",
+    "bindings/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedGraphicsDeviceGraphicsDeviceOperations.swift",

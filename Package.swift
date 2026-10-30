@@ -13,7 +13,7 @@ let testDependencies: [Target.Dependency] = [
   "GraphicsSupport",
 ]
 
-/// The simulator test runner is a root executable target, which SwiftPM builds
+/// The device test runner is a root executable target, which SwiftPM builds
 /// by --product without listing it here for consumers.
 let products: [Product] = [
   .library(name: "MaplibreNativeFFI", targets: ["MaplibreNativeFFI"]),
@@ -39,7 +39,7 @@ let targets: [Target] = [
         "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"
       ),
     ],
-    linkerSettings: [.linkedLibrary("dl", .when(platforms: [.linux]))]
+    linkerSettings: [.linkedLibrary("dl", .when(platforms: [.android, .linux]))]
   ),
   .systemLibrary(
     name: "MaplibreNativeC",
@@ -66,9 +66,9 @@ let targets: [Target] = [
     path: "bindings/swift/Tests/MaplibreNativeFFITestsHost"
   ),
   .executableTarget(
-    name: "MaplibreNativeFFIIOSSimulatorTests",
+    name: "MaplibreNativeFFIDeviceTests",
     dependencies: ["MaplibreNativeFFITestCases"],
-    path: "bindings/swift/Tests/MaplibreNativeFFIIOSSimulatorTests"
+    path: "bindings/swift/Tests/MaplibreNativeFFIDeviceTests"
   ),
 ]
 

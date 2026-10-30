@@ -73,7 +73,7 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      #if os(Linux) || os(macOS)
+      #if os(Android) || os(Linux) || os(macOS)
         return try map.attachVulkanOwnedTexture(
           descriptor: VulkanOwnedTextureDescriptor(
             extent: extent,
@@ -91,7 +91,7 @@ final class TestGraphics: @unchecked Sendable {
           options: options
         )
       #else
-        throw FixtureError("a Vulkan backend needs Linux or macOS")
+        throw FixtureError("a Vulkan backend needs Android, Linux, or macOS")
       #endif
     default:
       let dedicated = options.driver == .coreWorker
@@ -126,10 +126,10 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      #if os(Linux) || os(macOS)
+      #if os(Android) || os(Linux) || os(macOS)
         try frame.withVulkanTexture { try body($0) }
       #else
-        throw FixtureError("a Vulkan backend needs Linux or macOS")
+        throw FixtureError("a Vulkan backend needs Android, Linux, or macOS")
       #endif
     default:
       try frame.withOpenGlTexture { try body($0) }

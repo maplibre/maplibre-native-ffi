@@ -267,6 +267,24 @@ class SuitesTest(unittest.TestCase):
                 ("mise", "run", f"//bindings/dart:{action}", preset), commands
             )
 
+    def test_swift_builds_android_arm_targets_and_tests_x64(self):
+        for architecture in ("arm", "arm64", "x64", "x86"):
+            for backend in ("egl", "vulkan"):
+                preset = f"android-{architecture}-{backend}"
+                with self.subTest(preset=preset):
+                    commands = [
+                        suite.command
+                        for suite in suites.target_suites(self.targets[preset])
+                        if suite.task.startswith("//bindings/swift:")
+                    ]
+                    action = "test" if architecture == "x64" else "build"
+                    self.assertEqual(
+                        commands,
+                        []
+                        if architecture == "x86"
+                        else [("mise", "run", f"//bindings/swift:{action}", preset)],
+                    )
+
     def test_hermes_builds_mobile_hosts_and_tests_device_targets(self):
         for preset, action in (
             ("android-arm-egl", "build"),

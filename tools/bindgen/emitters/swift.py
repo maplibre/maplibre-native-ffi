@@ -15,6 +15,7 @@ from tools.bindgen.semantic import BoundApi, OperationPlan
 
 # The condition that selects each platform the package builds for.
 PLATFORMS = {
+    "android": "os(Android)",
     "ios": "os(iOS)",
     "linux": "os(Linux)",
     "macos": "os(macOS)",

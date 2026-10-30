@@ -1,5 +1,8 @@
 [tools]
-"core:swift" = { version = "6.4.1", os = ["linux/x64", "linux/arm64"] }
+"core:swift" = { version = "{{vars.swift_version}}", os = [
+  "linux/x64",
+  "linux/arm64",
+] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
 # libxml2.so.16. tools/env/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
@@ -10,6 +13,19 @@
 # Package.resolved keeps the plugin's pins.
 [env]
 MLN_FFI_SWIFT_DOCC = "1"
+MLN_FFI_SWIFT_ANDROID_SDK = "swift-{{vars.swift_version}}-RELEASE_android"
+
+[tasks.android-sdk]
+description = "Install the Android Swift SDK matching the host compiler."
+dir = "../.."
+run = '''
+source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
+if ! swift sdk list | grep -Fxq "$MLN_FFI_SWIFT_ANDROID_SDK"; then
+  swift sdk install \
+    "https://download.swift.org/swift-{{vars.swift_version}}-release/android-sdk/swift-{{vars.swift_version}}-RELEASE/$MLN_FFI_SWIFT_ANDROID_SDK.artifactbundle.tar.gz" \
+    --checksum a356b79f8f1daa6ae3a66f4c556966ca20c0208b3659805cf30a83a0a31d6772
+fi
+'''
 
 # The manifest lives at the repository root, so SwiftPM runs from there.
 [tasks.resolve]

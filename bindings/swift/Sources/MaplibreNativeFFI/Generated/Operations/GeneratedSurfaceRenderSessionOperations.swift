@@ -40,7 +40,7 @@ public extension RenderSessionHandle {
     }
   }
 
-  #if os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS)
     /// Starts an ordered Vulkan surface replacement.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the

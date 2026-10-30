@@ -369,11 +369,11 @@ ci:
     android:
       covers: >-
         Android on ARM, ARM64, and x64 with OpenGL ES and Vulkan, built with the
-        NDK. The x64 jobs run the C, Kotlin, Go, Rust, Zig, and Python tests in
-        the emulator; the ARM jobs only build. Also builds Dart and verifies
-        multi-ABI packaging. Catches NDK, Android API, JNI, emulator, and AAR
-        problems. Platform-independent code that Linux x64 tests doesn't need
-        it.
+        NDK. The x64 jobs run the C, Kotlin, Go, Rust, Swift, Zig, and Python
+        tests in the emulator; the ARM jobs only build. Also builds Dart and
+        verifies multi-ABI packaging. Catches NDK, Android API, JNI, emulator,
+        and AAR problems. Platform-independent code that Linux x64 tests doesn't
+        need it.
       rules:
         - if:
             files:
@@ -384,6 +384,7 @@ ci:
               - .mise/tasks/kotlin/check-android-api-floor
               - .mise/tasks/kotlin/verify-android-multi-abi
               - tools/devices/android-serial
+              - tools/env/swift-android-env.sh
               - third_party/maplibre-native
           then: apply
     ohos:

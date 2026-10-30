@@ -226,7 +226,11 @@ jobs:
       - name: Resolve Swift packages
         id: resolve
         if: matrix.swift
-        run: mise run //bindings/swift:resolve
+        run: |
+          mise run //bindings/swift:resolve
+          case '${{ matrix.preset }}' in
+            android-*) mise run //bindings/swift:android-sdk ;;
+          esac
       - id: build
         run: mise run build ${{ matrix.preset }}
       - name: Boot ${{ matrix.device }}
