@@ -241,6 +241,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
       2u -> "QUEUE_ORDER"
       3u -> "VULKAN_TIMELINE_SEMAPHORE"
       4u -> "SYNC_FD"
+      5u -> "METAL_SHARED_EVENT"
       else -> "GpuSyncKind($rawValue)"
     }
 
@@ -275,6 +276,13 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * EGL_KHR_wait_sync.
      */
     public val SYNC_FD: GpuSyncKind = GpuSyncKind(4u)
+    /**
+     * `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work signals. handle is
+     * nonzero. Metal supports it, as does EGL on ANGLE where the display has
+     * EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK once the device enables
+     * VK_EXT_metal_objects.
+     */
+    public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(5u)
   }
 }
 
@@ -307,6 +315,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
         4uL to "QUEUE_ORDER",
         8uL to "VULKAN_TIMELINE_SEMAPHORE",
         16uL to "SYNC_FD",
+        32uL to "METAL_SHARED_EVENT",
       ),
     )
 
@@ -318,6 +327,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
     public val QUEUE_ORDER: GpuSyncKindFlag = GpuSyncKindFlag(4u)
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag = GpuSyncKindFlag(8u)
     public val SYNC_FD: GpuSyncKindFlag = GpuSyncKindFlag(16u)
+    public val METAL_SHARED_EVENT: GpuSyncKindFlag = GpuSyncKindFlag(32u)
   }
 }
 
@@ -1784,7 +1794,10 @@ public class OpenGlTextureFrame(
  */
 public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
-  /** Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file descriptor. */
+  /**
+   * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file descriptor, or the
+   * MTLSharedEvent pointer.
+   */
   handle: ULong = 0uL,
   /** Counter value of a timeline kind. Zero for other kinds. */
   public val value: ULong = 0uL,
@@ -2346,10 +2359,11 @@ public data class RenderSessionAttachOptions(
   /**
    * Producer synchronization kinds that the host accepts for acquired texture frames. The session
    * picks the first one its target supports in this order: `GpuSyncKind.QUEUE_ORDER`,
-   * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, `GpuSyncKind.SYNC_FD`,
-   * then `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero accepts
-   * `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single
-   * queue. A set that the target cannot satisfy fails the attach with `Status.UNSUPPORTED`.
+   * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`,
+   * `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.SYNC_FD`, then `GpuSyncKind.CPU_COMPLETE`. Its
+   * capabilities report the pick. Zero accepts `GpuSyncKind.CPU_COMPLETE`, or
+   * `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single queue. A set that the target
+   * cannot satisfy fails the attach with `Status.UNSUPPORTED`.
    */
   public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */

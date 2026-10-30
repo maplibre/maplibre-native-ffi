@@ -248,6 +248,11 @@ const (
 	// enables VK_KHR_external_semaphore_fd, and EGL where the display has
 	// EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
 	GpuSyncKindSyncFd GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_SYNC_FD)
+	// id<MTLSharedEvent> / MTL::SharedEvent*, and the value that the work signals.
+	// handle is nonzero. Metal supports it, as does EGL on ANGLE where the display
+	// has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK once the device
+	// enables VK_EXT_metal_objects.
+	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
 )
 
 func (value GpuSyncKind) String() string {
@@ -262,6 +267,8 @@ func (value GpuSyncKind) String() string {
 		return "GpuSyncKindVulkanTimelineSemaphore"
 	case 4:
 		return "GpuSyncKindSyncFd"
+	case 5:
+		return "GpuSyncKindMetalSharedEvent"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
 }
@@ -279,12 +286,13 @@ const (
 	GpuSyncKindFlagQueueOrder              GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
 	GpuSyncKindFlagVulkanTimelineSemaphore GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE)
 	GpuSyncKindFlagSyncFd                  GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_SYNC_FD)
+	GpuSyncKindFlagMetalSharedEvent        GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT)
 )
 
 func (value GpuSyncKindFlag) Has(flags GpuSyncKindFlag) bool { return value&flags == flags }
 
 func (value GpuSyncKindFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}, {8, "GpuSyncKindFlagVulkanTimelineSemaphore"}, {16, "GpuSyncKindFlagSyncFd"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}, {8, "GpuSyncKindFlagVulkanTimelineSemaphore"}, {16, "GpuSyncKindFlagSyncFd"}, {32, "GpuSyncKindFlagMetalSharedEvent"}})
 }
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
@@ -2385,8 +2393,8 @@ func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena)
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type GpuSync struct {
 	Kind GpuSyncKind
-	// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
-	// descriptor.
+	// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
+	// descriptor, or the MTLSharedEvent pointer.
 	Handle uint64
 	// Counter value of a timeline kind. Zero for other kinds.
 	Value uint64
@@ -3662,11 +3670,11 @@ type RenderSessionAttachOptions struct {
 	// Producer synchronization kinds that the host accepts for acquired texture
 	// frames. The session picks the first one its target supports in this order:
 	// GpuSyncKindQueueOrder, GpuSyncKindOpenGlFence,
-	// GpuSyncKindVulkanTimelineSemaphore, GpuSyncKindSyncFd, then
-	// GpuSyncKindCpuComplete. Its capabilities report the pick. Zero accepts
-	// GpuSyncKindCpuComplete, or GpuSyncKindQueueOrder on WebGPU, whose device has
-	// a single queue. A set that the target cannot satisfy fails the attach with
-	// StatusUnsupported.
+	// GpuSyncKindVulkanTimelineSemaphore, GpuSyncKindMetalSharedEvent,
+	// GpuSyncKindSyncFd, then GpuSyncKindCpuComplete. Its capabilities report the
+	// pick. Zero accepts GpuSyncKindCpuComplete, or GpuSyncKindQueueOrder on
+	// WebGPU, whose device has a single queue. A set that the target cannot satisfy
+	// fails the attach with StatusUnsupported.
 	ProducerSyncKinds GpuSyncKindFlag
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake

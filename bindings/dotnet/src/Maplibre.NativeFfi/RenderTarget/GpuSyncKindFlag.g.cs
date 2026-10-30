@@ -16,4 +16,5 @@ public enum GpuSyncKindFlag : uint
     QueueOrder = 4,
     VulkanTimelineSemaphore = 8,
     SyncFd = 16,
+    MetalSharedEvent = 32,
 }

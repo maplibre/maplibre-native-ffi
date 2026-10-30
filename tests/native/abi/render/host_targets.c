@@ -656,6 +656,119 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
 }
 #endif
 
+#if defined(__APPLE__)
+typedef struct event_target {
+  void* event;
+  uint64_t value;
+} event_target;
+
+static bool event_reached(void* context) {
+  const event_target* target = context;
+  return mln_test_graphics_metal_shared_event_value(target->event) >=
+         target->value;
+}
+
+// A shared event frame is acquirable once committed: the session signals its
+// event after the frame, and the host waits for the frame's value before it
+// reads. The host releases the frame with its own event, and the session's
+// next frame waits until the host signals it. Metal, MoltenVK, and ANGLE all
+// hand frames over this way.
+static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_synced(
+      map, &fixture, true,
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+        MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_GPU_SYNC_METAL_SHARED_EVENT, capabilities.producer_sync_kind
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT, capabilities.consumer_sync_kinds
+  );
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+  );
+  mln_acquired_frame first = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
+  mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_METAL_SHARED_EVENT, producer.kind);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.handle);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.value);
+  event_target produced = {
+    .event = (void*)(uintptr_t)producer.handle, .value = producer.value
+  };
+  TEST_ASSERT_TRUE(mln_test_await(
+    event_reached, &produced, mln_test_deadline_default(),
+    "the first frame's event"
+  ));
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, 0), red,
+    "the first shared event frame's texture"
+  );
+
+  void* consumed = mln_test_graphics_metal_shared_event_create();
+  TEST_ASSERT_NOT_NULL_MESSAGE(consumed, mln_test_graphics_last_error());
+  const uint64_t release_value =
+    mln_test_graphics_metal_shared_event_value(consumed) + 1;
+  const mln_gpu_sync consumer = {
+    .size = sizeof(mln_gpu_sync),
+    .kind = MLN_GPU_SYNC_METAL_SHARED_EVENT,
+    .handle = (uint64_t)(uintptr_t)consumed,
+    .value = release_value,
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(first, &consumer, NULL));
+
+  paint_background_blue(runtime, map);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+  );
+  mln_acquired_frame second = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT64(
+    (uint64_t)(uintptr_t)produced.event, producer.handle
+  );
+  TEST_ASSERT_GREATER_THAN_UINT64(produced.value, producer.value);
+  produced.value = producer.value;
+  // The second frame waits for the host's event.
+  TEST_ASSERT_FALSE(event_reached(&produced));
+  mln_test_graphics_metal_shared_event_signal(consumed, release_value);
+  TEST_ASSERT_TRUE(mln_test_await(
+    event_reached, &produced, mln_test_deadline_default(),
+    "the second frame's event"
+  ));
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, 0), blue,
+    "the reused texture after the host's event"
+  );
+  mln_test_render_release_frame(&second);
+  // The host's event stays valid until detach completes.
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_test_graphics_metal_shared_event_release(consumed);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
 static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   bool borrowed
@@ -878,6 +991,9 @@ MLN_TEST_GROUP {
 #if !defined(_WIN32) && \
   (defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL))
   RUN_TEST(sync_files_order_frame_reads_and_slot_reuse);
+#endif
+#if defined(__APPLE__)
+  RUN_TEST(metal_shared_events_order_frame_reads_and_slot_reuse);
 #endif
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);

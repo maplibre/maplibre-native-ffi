@@ -31,6 +31,9 @@
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#if defined(__APPLE__)
+#include <dlfcn.h>
+#endif
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
 #include <emscripten/threading.h>
@@ -60,6 +63,18 @@ constexpr auto opengl_pixel_type = uint32_t{GL_UNSIGNED_BYTE};
 using mln::core::OpenGLBorrowedTarget;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+auto egl_has_extension(EGLDisplay display, std::string_view name) -> bool {
+  const auto* list = eglQueryString(display, EGL_EXTENSIONS);
+  if (list == nullptr) return false;
+  for (auto rest = std::string_view{list}; !rest.empty();) {
+    const auto end = rest.find(' ');
+    if (rest.substr(0, end) == name) return true;
+    if (end == std::string_view::npos) break;
+    rest.remove_prefix(end + 1);
+  }
+  return false;
+}
+
 // The EGL_ANDROID_native_fence_sync entry points of a display that also has
 // EGL_KHR_wait_sync, through which a session hands sync files over.
 struct EglNativeFences {
@@ -73,19 +88,10 @@ struct EglNativeFences {
     -> std::optional<EglNativeFences> {
     auto fences =
       EglNativeFences{.display = static_cast<EGLDisplay>(egl.display)};
-    const auto* list = eglQueryString(fences.display, EGL_EXTENSIONS);
-    if (list == nullptr) return std::nullopt;
-    const auto has = [extensions =
-                        std::string_view{list}](std::string_view name) {
-      for (auto rest = extensions; !rest.empty();) {
-        const auto end = rest.find(' ');
-        if (rest.substr(0, end) == name) return true;
-        if (end == std::string_view::npos) break;
-        rest.remove_prefix(end + 1);
-      }
-      return false;
-    };
-    if (!has("EGL_ANDROID_native_fence_sync") || !has("EGL_KHR_wait_sync"))
+    if (
+      !egl_has_extension(fences.display, "EGL_ANDROID_native_fence_sync") ||
+      !egl_has_extension(fences.display, "EGL_KHR_wait_sync")
+    )
       return std::nullopt;
     const auto proc = [&egl](const char* name) {
       return mln::core::opengl::get_egl_proc_address(egl, name, EGL_NONE);
@@ -145,18 +151,128 @@ struct EglNativeFences {
   }
 };
 
+#if defined(__APPLE__)
+// ANGLE's EGL_ANGLE_metal_shared_event_sync, through which a session on its
+// Metal backend hands frames over as MTLSharedEvent signals.
+struct EglMetalEvents {
+  static constexpr EGLenum sync_type = 0x34D8;
+  static constexpr EGLAttrib event_object = 0x34D9;
+  static constexpr EGLAttrib value_low = 0x34DA;
+  static constexpr EGLAttrib value_high = 0x34DB;
+  static constexpr EGLAttrib signaled_condition = 0x34DC;
+  using CopyEvent = void* (*)(EGLDisplay, EGLSync);
+
+  EGLDisplay display = EGL_NO_DISPLAY;
+  PFNEGLCREATESYNCPROC create_sync = nullptr;
+  PFNEGLDESTROYSYNCPROC destroy_sync = nullptr;
+  PFNEGLWAITSYNCPROC wait_sync = nullptr;
+  CopyEvent copy_event = nullptr;
+
+  static auto load(const mln_egl_context_descriptor& egl)
+    -> std::optional<EglMetalEvents> {
+    auto events =
+      EglMetalEvents{.display = static_cast<EGLDisplay>(egl.display)};
+    if (!egl_has_extension(events.display, "EGL_ANGLE_metal_shared_event_sync"))
+      return std::nullopt;
+    const auto proc = [&egl](const char* name) {
+      return mln::core::opengl::get_egl_proc_address(egl, name, EGL_NONE);
+    };
+    // EGL hands out its functions as untyped procedure pointers.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    events.create_sync =
+      reinterpret_cast<PFNEGLCREATESYNCPROC>(proc("eglCreateSync"));
+    events.destroy_sync =
+      reinterpret_cast<PFNEGLDESTROYSYNCPROC>(proc("eglDestroySync"));
+    events.wait_sync =
+      reinterpret_cast<PFNEGLWAITSYNCPROC>(proc("eglWaitSync"));
+    events.copy_event =
+      reinterpret_cast<CopyEvent>(proc("eglCopyMetalSharedEventANGLE"));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (
+      events.create_sync == nullptr || events.destroy_sync == nullptr ||
+      events.wait_sync == nullptr || events.copy_event == nullptr
+    )
+      return std::nullopt;
+    return events;
+  }
+
+  // Signals `event` with `value` once the context's work so far completes.
+  // A null event makes ANGLE create one, which this returns retained for the
+  // caller to release. Returns null on failure. The context is current.
+  [[nodiscard]] auto signal(void* event, uint64_t value) const -> void* {
+    const EGLAttrib attributes[] = {
+      event_object,
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      reinterpret_cast<EGLAttrib>(event),
+      value_low,
+      static_cast<EGLAttrib>(value & 0xFFFFFFFFU),
+      value_high,
+      static_cast<EGLAttrib>(value >> 32U),
+      EGL_NONE,
+    };
+    auto* const sync = create_sync(display, sync_type, attributes);
+    if (sync == EGL_NO_SYNC) return nullptr;
+    auto* const signaled = event != nullptr ? event : copy_event(display, sync);
+    mln::platform::glFlush();
+    destroy_sync(display, sync);
+    return signaled;
+  }
+
+  // Makes the context's later work wait for `event` to reach `value`. The
+  // context is current.
+  [[nodiscard]] auto wait(void* event, uint64_t value) const -> bool {
+    const EGLAttrib attributes[] = {
+      event_object,
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      reinterpret_cast<EGLAttrib>(event),
+      value_low,
+      static_cast<EGLAttrib>(value & 0xFFFFFFFFU),
+      value_high,
+      static_cast<EGLAttrib>(value >> 32U),
+      EGL_SYNC_CONDITION,
+      signaled_condition,
+      EGL_NONE,
+    };
+    auto* const sync = create_sync(display, sync_type, attributes);
+    if (sync == EGL_NO_SYNC) return false;
+    const auto waited = wait_sync(display, sync, 0) == EGL_TRUE;
+    destroy_sync(display, sync);
+    return waited;
+  }
+};
+
+// Releases an MTLSharedEvent that ANGLE handed over retained.
+void release_metal_event(void* event) noexcept {
+  using Send = void (*)(void*, void*);
+  using Register = void* (*)(const char*);
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+  static const auto send =
+    reinterpret_cast<Send>(dlsym(RTLD_DEFAULT, "objc_msgSend"));
+  static const auto register_selector =
+    reinterpret_cast<Register>(dlsym(RTLD_DEFAULT, "sel_registerName"));
+  // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+  if (event == nullptr || send == nullptr || register_selector == nullptr)
+    return;
+  send(event, register_selector("release"));
+}
+#endif
+
 // The sync kinds that the shared EGL context's display adds.
 auto opengl_sync_support(const mln_open_gl_context_descriptor& context)
   -> mln::core::GpuSyncSupport {
-  if (
-    context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_EGL ||
-    !EglNativeFences::load(context.data.egl)
-  )
-    return {};
-  return {
-    .producer = MLN_GPU_SYNC_KIND_FLAG_SYNC_FD,
-    .consumer = MLN_GPU_SYNC_KIND_FLAG_SYNC_FD,
-  };
+  auto support = mln::core::GpuSyncSupport{};
+  if (context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_EGL) return support;
+  if (EglNativeFences::load(context.data.egl)) {
+    support.producer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+    support.consumer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+  }
+#if defined(__APPLE__)
+  if (EglMetalEvents::load(context.data.egl)) {
+    support.producer |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
+    support.consumer |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
+  }
+#endif
+  return support;
 }
 #endif
 
@@ -723,6 +839,9 @@ class OpenGLTextureSessionBackend final
 
   ~OpenGLTextureSessionBackend() noexcept override {
     for (const auto fd : producer_fds_) mln::core::close_fd(fd);
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) && defined(__APPLE__)
+    release_metal_event(metal_event_);
+#endif
     try {
       if (has_producer_fences_) {
         auto guard = mln::gfx::BackendScope{backend_};
@@ -756,6 +875,19 @@ class OpenGLTextureSessionBackend final
       mln::core::set_thread_error("EGL display does not export sync files");
       return MLN_STATUS_UNSUPPORTED;
     }
+#if defined(__APPLE__)
+    if (
+      const auto& context = backend_.context_descriptor();
+      context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
+    )
+      metal_events_ = EglMetalEvents::load(context.data.egl);
+    if (
+      producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT && !metal_events_
+    ) {
+      mln::core::set_thread_error("EGL display does not signal Metal events");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+#endif
 #endif
     fence_sync_supported_ = backend_.supports_fence_sync();
     if (
@@ -777,6 +909,10 @@ class OpenGLTextureSessionBackend final
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (sync.kind == MLN_GPU_SYNC_SYNC_FD) return wait_sync_fd(sync);
+#if defined(__APPLE__)
+    if (sync.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT)
+      return wait_metal_event(sync);
+#endif
 #endif
     if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE || !fence_sync_supported_)
       return MLN_STATUS_UNSUPPORTED;
@@ -876,6 +1012,22 @@ class OpenGLTextureSessionBackend final
         sizeof(mln_gpu_sync), MLN_GPU_SYNC_SYNC_FD,
         static_cast<uint64_t>(static_cast<int64_t>(fd)), 0
       };
+#if defined(__APPLE__)
+    } else if (producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT) {
+      auto* const event = metal_events_->signal(metal_event_, metal_value_ + 1);
+      if (event == nullptr) {
+        mln::core::set_thread_error(
+          "signaling the producer Metal event failed"
+        );
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      metal_event_ = event;
+      ++metal_value_;
+      producer_sync_ = mln_gpu_sync{
+        sizeof(mln_gpu_sync), MLN_GPU_SYNC_METAL_SHARED_EVENT,
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(event)), metal_value_
+      };
+#endif
 #endif
     } else {
       backend_.finish_rendering();
@@ -927,6 +1079,36 @@ class OpenGLTextureSessionBackend final
   }
 
   std::optional<EglNativeFences> native_fences_;
+#if defined(__APPLE__)
+  auto wait_metal_event(const mln_gpu_sync& sync) -> mln_status {
+    try {
+      auto guard = mln::gfx::BackendScope{backend_};
+      // The C ABI carries the event as the bit pattern of its pointer.
+      // NOLINTNEXTLINE(performance-no-int-to-ptr)
+      auto* const event =
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sync.handle));
+      if (metal_events_ && metal_events_->wait(event, sync.value))
+        return MLN_STATUS_OK;
+      mln::core::set_thread_error(
+        "waiting for the consumer Metal event failed"
+      );
+      return MLN_STATUS_NATIVE_ERROR;
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error(
+        "waiting for the consumer Metal event failed"
+      );
+    }
+    return MLN_STATUS_TARGET_LOST;
+  }
+
+  std::optional<EglMetalEvents> metal_events_;
+  // The producer event, which ANGLE made for the first frame, and the value
+  // the last frame signaled.
+  void* metal_event_ = nullptr;
+  uint64_t metal_value_ = 0;
+#endif
 #endif
   OpenGLTextureBackend backend_;
   mln_gpu_sync_kind producer_sync_kind_;

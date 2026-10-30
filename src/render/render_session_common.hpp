@@ -491,7 +491,7 @@ inline constexpr mln_gpu_sync_kind_flags known_gpu_sync_kinds =
   MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE |
   MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER |
   MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE |
-  MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+  MLN_GPU_SYNC_KIND_FLAG_SYNC_FD | MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
 
 // The sync kinds a target can produce and consume beyond those it always can.
 struct GpuSyncSupport {

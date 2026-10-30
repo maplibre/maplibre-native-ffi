@@ -759,8 +759,8 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
 }
 
 // Takes the first physical device and queue family that accept a graphics
-// device, enabling VK_KHR_swapchain, timeline semaphores, and sync file
-// semaphores where the device has them.
+// device, enabling VK_KHR_swapchain, timeline semaphores, sync file
+// semaphores, and Metal object export where the device has them.
 static bool vulkan_create_device(mln_test_graphics* graphics) {
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   PFN_vkEnumeratePhysicalDevices enumerate_devices =
@@ -825,8 +825,11 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
     }
     get_queues(devices[d], &queue_count, queues);
     enumerate_extensions(devices[d], NULL, &extension_count, extensions);
-    const char* enabled[4];
+    const char* enabled[5];
     uint32_t enabled_count = 0;
+    if (has_extension(extensions, extension_count, "VK_EXT_metal_objects")) {
+      enabled[enabled_count++] = "VK_EXT_metal_objects";
+    }
     if (
       has_extension(extensions, extension_count, "VK_KHR_external_semaphore_fd")
     ) {
@@ -2176,6 +2179,70 @@ bool mln_test_graphics_get_context(
   }
   *out_context = graphics->context;
   return true;
+}
+
+#if defined(MLN_TG_HAS_METAL)
+// The runtime of the shared event helpers, which need no graphics object.
+static const metal_runtime* metal_event_runtime(void) {
+  static metal_runtime runtime;
+  static bool loaded = false;
+  if (!loaded) loaded = metal_load(&runtime);
+  return loaded ? &runtime : NULL;
+}
+#endif
+
+void* mln_test_graphics_metal_shared_event_create(void) {
+#if defined(MLN_TG_HAS_METAL)
+  const metal_runtime* objc = metal_event_runtime();
+  if (objc == NULL) return NULL;
+  void* device = objc->create_device();
+  if (device == NULL) {
+    set_error("this host has no Metal device");
+    return NULL;
+  }
+  void* event =
+    ((message_object)objc->message)(device, objc->selector("newSharedEvent"));
+  ((message_void)objc->message)(device, objc->selector("release"));
+  if (event == NULL) set_error("could not create a Metal shared event");
+  return event;
+#else
+  set_error("this platform has no Metal");
+  return NULL;
+#endif
+}
+
+uint64_t mln_test_graphics_metal_shared_event_value(void* event) {
+#if defined(MLN_TG_HAS_METAL)
+  const metal_runtime* objc = metal_event_runtime();
+  return ((uint64_t (*)(void*, void*))objc->message)(
+    event, objc->selector("signaledValue")
+  );
+#else
+  (void)event;
+  return 0;
+#endif
+}
+
+void mln_test_graphics_metal_shared_event_signal(void* event, uint64_t value) {
+#if defined(MLN_TG_HAS_METAL)
+  const metal_runtime* objc = metal_event_runtime();
+  ((void (*)(void*, void*, uint64_t))objc->message)(
+    event, objc->selector("setSignaledValue:"), value
+  );
+#else
+  (void)event;
+  (void)value;
+#endif
+}
+
+void mln_test_graphics_metal_shared_event_release(void* event) {
+#if defined(MLN_TG_HAS_METAL)
+  if (event == NULL) return;
+  const metal_runtime* objc = metal_event_runtime();
+  ((message_void)objc->message)(event, objc->selector("release"));
+#else
+  (void)event;
+#endif
 }
 
 void* mln_test_graphics_metal_command_queue(mln_test_graphics* graphics) {

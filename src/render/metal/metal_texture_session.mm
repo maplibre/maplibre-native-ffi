@@ -130,8 +130,24 @@ class MetalTextureSessionBackend final
       : backend_(std::move(borrowed_textures), host_queue, size),
         host_queue_(host_queue) {}
 
-  void set_queue_ordered(bool queue_ordered) {
-    backend_.set_queue_ordered(queue_ordered);
+  void set_producer_sync_kind(mln_gpu_sync_kind kind) {
+    backend_.set_producer_sync_kind(kind);
+  }
+
+  auto producer_sync() const -> mln_gpu_sync override {
+    return backend_.producer_sync();
+  }
+
+  auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
+    if (sync.kind != MLN_GPU_SYNC_METAL_SHARED_EVENT)
+      return MLN_STATUS_UNSUPPORTED;
+    backend_.wait_event(
+      // The C ABI carries the event as the bit pattern of its pointer.
+      // NOLINTNEXTLINE(performance-no-int-to-ptr)
+      reinterpret_cast<MTL::SharedEvent*>(static_cast<uintptr_t>(sync.handle)),
+      sync.value
+    );
+    return MLN_STATUS_OK;
   }
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
@@ -297,6 +313,7 @@ auto metal_owned_texture_attach_start(
     retain_host_queue(descriptor->command_queue, device.get(), queue);
   if (queue_status != MLN_STATUS_OK) return queue_status;
   if (queue) session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
   const auto ring_depth = attach_ring_depth(options);
   const auto pixel_format =
     static_cast<MTL::PixelFormat>(descriptor->pixel_format);
@@ -308,9 +325,7 @@ auto metal_owned_texture_attach_start(
         mln::Size{target.physical_width, target.physical_height}, ring_depth,
         pixel_format
       );
-      backend->set_queue_ordered(
-        target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
-      );
+      backend->set_producer_sync_kind(target.producer_sync_kind);
       target.texture.backend = std::move(backend);
       return MLN_STATUS_OK;
     };
@@ -322,6 +337,7 @@ auto metal_owned_texture_attach_start(
              MLN_RENDER_SESSION_CAPABILITY_READBACK,
     .producer_sync_kind = {},
     .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT |
                            (queue ? MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER : 0U),
   };
   return start_attach_render_session(
@@ -361,15 +377,14 @@ auto metal_borrowed_texture_attach_start(
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
   if (queue) session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
   session->initialize_backend = [textures = std::move(textures),
                                  queue](mln_render_session_object& target) {
     auto backend = std::make_unique<MetalTextureSessionBackend>(
       textures, queue.get(),
       mln::Size{target.physical_width, target.physical_height}
     );
-    backend->set_queue_ordered(
-      target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
-    );
+    backend->set_producer_sync_kind(target.producer_sync_kind);
     target.texture.backend = std::move(backend);
     return MLN_STATUS_OK;
   };
@@ -380,6 +395,7 @@ auto metal_borrowed_texture_attach_start(
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
     .producer_sync_kind = {},
     .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT |
                            (queue ? MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER : 0U),
   };
   return start_attach_render_session(

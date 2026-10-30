@@ -210,6 +210,12 @@ final class GpuSyncKind extends _Enum {
   /// the device enables VK_KHR_external_semaphore_fd, and EGL where the display
   /// has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
   static const syncFd = GpuSyncKind.fromRawValue(4);
+
+  /// `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
+  /// signals. handle is nonzero. Metal supports it, as does EGL on ANGLE where
+  /// the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK
+  /// once the device enables VK_EXT_metal_objects.
+  static const metalSharedEvent = GpuSyncKind.fromRawValue(5);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
@@ -217,6 +223,7 @@ final class GpuSyncKind extends _Enum {
     2 => 'GpuSyncKind.queueOrder',
     3 => 'GpuSyncKind.vulkanTimelineSemaphore',
     4 => 'GpuSyncKind.syncFd',
+    5 => 'GpuSyncKind.metalSharedEvent',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -232,6 +239,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
   static const queueOrder = GpuSyncKindFlag.fromRawValue(4);
   static const vulkanTimelineSemaphore = GpuSyncKindFlag.fromRawValue(8);
   static const syncFd = GpuSyncKindFlag.fromRawValue(16);
+  static const metalSharedEvent = GpuSyncKindFlag.fromRawValue(32);
 
   /// No flags.
   static const none = GpuSyncKindFlag.fromRawValue(0);
@@ -245,6 +253,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
     4: 'queueOrder',
     8: 'vulkanTimelineSemaphore',
     16: 'syncFd',
+    32: 'metalSharedEvent',
   });
 }
 
@@ -1508,8 +1517,8 @@ final class GpuSync extends _Value {
   });
   final GpuSyncKind kind;
 
-  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
-  /// descriptor.
+  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
+  /// descriptor, or the MTLSharedEvent pointer.
   final int handle;
 
   /// Counter value of a timeline kind. Zero for other kinds.
@@ -2658,11 +2667,11 @@ final class RenderSessionAttachOptions extends _Value {
   /// Producer synchronization kinds that the host accepts for acquired texture
   /// frames. The session picks the first one its target supports in this order:
   /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.syncFd`, then
-  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-  /// device has a single queue. A set that the target cannot satisfy fails the
-  /// attach with `Status.unsupported`.
+  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
+  /// `GpuSyncKind.syncFd`, then `GpuSyncKind.cpuComplete`. Its capabilities
+  /// report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
+  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
+  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
   final GpuSyncKindFlag producerSyncKinds;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.

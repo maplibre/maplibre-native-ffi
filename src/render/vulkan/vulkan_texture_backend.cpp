@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -23,13 +25,16 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
-
-#include "render/vulkan/vulkan_texture_backend.hpp"
+#include <vulkan/vulkan_metal.h>
+#if defined(__APPLE__)
+#include <dlfcn.h>
+#endif
 
 #include "maplibre_native_c/texture.h"
 #include "render/discard_present.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
+#include "render/vulkan/vulkan_texture_backend.hpp"
 
 namespace {
 
@@ -527,6 +532,15 @@ void VulkanTextureBackend::set_borrowed_target(
 }
 
 auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
+  if (producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT) {
+    return mln_gpu_sync{
+      .size = sizeof(mln_gpu_sync),
+      .kind = producer_sync_kind_,
+      .handle =
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(metal_event_)),
+      .value = timeline_value_,
+    };
+  }
   if (producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD) {
     return mln_gpu_sync{
       .size = sizeof(mln_gpu_sync),
@@ -611,17 +625,51 @@ auto VulkanTextureBackend::record_release(vk::Image image)
 }
 
 void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
+  // A Metal event frame signals a timeline that MoltenVK backs with the event.
+  const auto metal = producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT;
   const auto timeline_signal =
-    producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+    metal || producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
   const auto exports = producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD;
   if (!release && !timeline_signal && !exports) return;
   if (timeline_signal && !timeline_) {
+    auto exportable = VkExportMetalObjectCreateInfoEXT{
+      .sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT,
+      .pNext = nullptr,
+      .exportObjectType =
+        VK_EXPORT_METAL_OBJECT_TYPE_METAL_SHARED_EVENT_BIT_EXT,
+    };
     auto type = vk::SemaphoreTypeCreateInfo()
                   .setSemaphoreType(vk::SemaphoreType::eTimeline)
-                  .setInitialValue(0);
+                  .setInitialValue(0)
+                  .setPNext(metal ? &exportable : nullptr);
     timeline_ = device->createSemaphoreUnique(
       vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
     );
+    if (metal) {
+      // The extension's commands are outside vulkan.hpp's dispatcher, which
+      // this build makes without the Metal platform.
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      const auto export_objects = reinterpret_cast<PFN_vkExportMetalObjectsEXT>(
+        dispatcher.vkGetDeviceProcAddr(device.get(), "vkExportMetalObjectsEXT")
+      );
+      auto event = VkExportMetalSharedEventInfoEXT{
+        .sType = VK_STRUCTURE_TYPE_EXPORT_METAL_SHARED_EVENT_INFO_EXT,
+        .pNext = nullptr,
+        .semaphore = timeline_.get(),
+        .event = VK_NULL_HANDLE,
+        .mtlSharedEvent = nullptr,
+      };
+      auto objects = VkExportMetalObjectsInfoEXT{
+        .sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECTS_INFO_EXT,
+        .pNext = &event,
+      };
+      if (export_objects != nullptr) export_objects(device.get(), &objects);
+      if (event.mtlSharedEvent == nullptr) {
+        timeline_.reset();
+        throw std::runtime_error("exporting the producer Metal event failed");
+      }
+      metal_event_ = event.mtlSharedEvent;
+    }
   }
   if (exports && !exported_) {
     auto exportable = vk::ExportSemaphoreCreateInfo().setHandleTypes(
@@ -690,6 +738,48 @@ void VulkanTextureBackend::close_sync_files() noexcept {
     close_fd(fd);
     fd = -1;
   }
+}
+
+void VulkanTextureBackend::wait_metal_event(void* event, uint64_t value) {
+  auto found = std::find_if(
+    imported_events_.begin(), imported_events_.end(),
+    [event](const auto& imported) { return imported.first == event; }
+  );
+  if (found == imported_events_.end()) {
+    // MoltenVK resets an imported event to the semaphore's initial value, so
+    // the import starts from the value the event has.
+    auto initial = uint64_t{0};
+#if defined(__APPLE__)
+    using Send = uint64_t (*)(void*, void*);
+    using Register = void* (*)(const char*);
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    static const auto send =
+      reinterpret_cast<Send>(dlsym(RTLD_DEFAULT, "objc_msgSend"));
+    static const auto register_selector =
+      reinterpret_cast<Register>(dlsym(RTLD_DEFAULT, "sel_registerName"));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (send == nullptr || register_selector == nullptr)
+      throw std::runtime_error("the Objective-C runtime is not loaded");
+    static auto* const signaled_value = register_selector("signaledValue");
+    initial = send(event, signaled_value);
+#endif
+    auto imported = VkImportMetalSharedEventInfoEXT{
+      .sType = VK_STRUCTURE_TYPE_IMPORT_METAL_SHARED_EVENT_INFO_EXT,
+      .pNext = nullptr,
+      .mtlSharedEvent = event,
+    };
+    auto type = vk::SemaphoreTypeCreateInfo()
+                  .setSemaphoreType(vk::SemaphoreType::eTimeline)
+                  .setInitialValue(initial)
+                  .setPNext(&imported);
+    imported_events_.emplace_back(
+      event, device->createSemaphoreUnique(
+               vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
+             )
+    );
+    found = std::prev(imported_events_.end());
+  }
+  wait_timeline(found->second.get(), value);
 }
 
 void VulkanTextureBackend::wait_sync_fd(int fd) {

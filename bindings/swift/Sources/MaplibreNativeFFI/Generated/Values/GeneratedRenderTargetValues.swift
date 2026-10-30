@@ -76,8 +76,8 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSync: Equatable, Hashable, Sendable {
   public var kind: GpuSyncKind
-  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
-  /// descriptor.
+  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
+  /// descriptor, or the MTLSharedEvent pointer.
   public var handle: UInt64
   /// Counter value of a timeline kind. Zero for other kinds.
   public var value: UInt64
@@ -140,6 +140,11 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   /// the device enables VK_KHR_external_semaphore_fd, and EGL where the display
   /// has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
   public static let syncFd: GpuSyncKind = .init(rawValue: 4)
+  /// `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
+  /// signals. handle is nonzero. Metal supports it, as does EGL on ANGLE where
+  /// the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK
+  /// once the device enables VK_EXT_metal_objects.
+  public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 5)
   public var description: String {
     switch rawValue {
     case 0: return "cpuComplete"
@@ -147,6 +152,7 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
     case 2: return "queueOrder"
     case 3: return "vulkanTimelineSemaphore"
     case 4: return "syncFd"
+    case 5: return "metalSharedEvent"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
@@ -170,6 +176,7 @@ public struct GpuSyncKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let vulkanTimelineSemaphore: GpuSyncKindFlag =
     .init(rawValue: 8)
   public static let syncFd: GpuSyncKindFlag = .init(rawValue: 16)
+  public static let metalSharedEvent: GpuSyncKindFlag = .init(rawValue: 32)
 }
 
 /// Metal backend context fields shared by Metal render targets.
@@ -428,11 +435,11 @@ public struct RenderSessionAttachOptions: Sendable {
   /// Producer synchronization kinds that the host accepts for acquired texture
   /// frames. The session picks the first one its target supports in this order:
   /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.syncFd`, then
-  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-  /// device has a single queue. A set that the target cannot satisfy fails the
-  /// attach with `Status.unsupported`.
+  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
+  /// `GpuSyncKind.syncFd`, then `GpuSyncKind.cpuComplete`. Its capabilities
+  /// report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
+  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
+  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
   public var producerSyncKinds: GpuSyncKindFlag
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake

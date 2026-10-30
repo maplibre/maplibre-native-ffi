@@ -303,6 +303,7 @@ class GpuSyncKind(UnknownIntEnum):
     QUEUE_ORDER = 2
     VULKAN_TIMELINE_SEMAPHORE = 3
     SYNC_FD = 4
+    METAL_SHARED_EVENT = 5
 
 
 class GpuSyncKindFlag(IntFlag):
@@ -317,6 +318,7 @@ class GpuSyncKindFlag(IntFlag):
     QUEUE_ORDER = 4
     VULKAN_TIMELINE_SEMAPHORE = 8
     SYNC_FD = 16
+    METAL_SHARED_EVENT = 32
 
 
 class LogEvent(UnknownIntEnum):
@@ -1510,8 +1512,8 @@ class GpuSync:
     kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
 
     handle: int = 0
-    """Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
-    descriptor.
+    """Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
+    descriptor, or the MTLSharedEvent pointer.
     """
 
     value: int = 0
@@ -2787,7 +2789,8 @@ class RenderSessionAttachOptions:
     """Producer synchronization kinds that the host accepts for acquired texture
     frames. The session picks the first one its target supports in this
     order: `GpuSyncKind.QUEUE_ORDER`, `GpuSyncKind.OPEN_GL_FENCE`,
-    `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, `GpuSyncKind.SYNC_FD`, then
+    `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`,
+    `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.SYNC_FD`, then
     `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero
     accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on
     WebGPU, whose device has a single queue. A set that the target cannot

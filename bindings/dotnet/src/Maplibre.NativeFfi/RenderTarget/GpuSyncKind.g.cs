@@ -45,4 +45,13 @@ public enum GpuSyncKind : uint
     /// display has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
     /// </summary>
     SyncFd = 4,
+
+    /// <summary>
+    /// <c>id&lt;MTLSharedEvent&gt;</c> / <c>MTL::SharedEvent*</c>, and the
+    /// value that the work signals. handle is nonzero. Metal supports it, as
+    /// does EGL on ANGLE where the display has
+    /// EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK once the
+    /// device enables VK_EXT_metal_objects.
+    /// </summary>
+    MetalSharedEvent = 5,
 }

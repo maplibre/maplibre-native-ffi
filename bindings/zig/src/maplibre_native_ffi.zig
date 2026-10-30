@@ -2635,8 +2635,8 @@ pub const GesturePhase = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSync = struct {
     kind: GpuSyncKind = .cpu_complete,
-    /// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
-    /// descriptor.
+    /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
+    /// descriptor, or the MTLSharedEvent pointer.
     handle: u64 = 0,
     /// Counter value of a timeline kind. Zero for other kinds.
     value: u64 = 0,
@@ -2683,6 +2683,11 @@ pub const GpuSyncKind = enum(u32) {
     /// once the device enables VK_KHR_external_semaphore_fd, and EGL where the
     /// display has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
     sync_fd = 4,
+    /// `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
+    /// signals. handle is nonzero. Metal supports it, as does EGL on ANGLE
+    /// where the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on
+    /// MoltenVK once the device enables VK_EXT_metal_objects.
+    metal_shared_event = 5,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2698,8 +2703,9 @@ pub const GpuSyncKindFlag = struct {
     queue_order: bool = false,
     vulkan_timeline_semaphore: bool = false,
     sync_fd: bool = false,
+    metal_shared_event: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4388,7 +4394,8 @@ pub const RenderSessionAttachOptions = struct {
     /// Producer synchronization kinds that the host accepts for acquired
     /// texture frames. The session picks the first one its target supports in
     /// this order: `GpuSyncKind.queue_order`, `GpuSyncKind.open_gl_fence`,
-    /// `GpuSyncKind.vulkan_timeline_semaphore`, `GpuSyncKind.sync_fd`, then
+    /// `GpuSyncKind.vulkan_timeline_semaphore`,
+    /// `GpuSyncKind.metal_shared_event`, `GpuSyncKind.sync_fd`, then
     /// `GpuSyncKind.cpu_complete`. Its capabilities report the pick. Zero
     /// accepts `GpuSyncKind.cpu_complete`, or `GpuSyncKind.queue_order` on
     /// WebGPU, whose device has a single queue. A set that the target cannot

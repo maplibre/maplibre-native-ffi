@@ -150,6 +150,18 @@ auto vulkan_sync_support(const mln_vulkan_context_descriptor& context)
   ) {
     support.producer |= MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
     support.consumer |= MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
+#if defined(__APPLE__)
+    // MoltenVK backs a timeline with an MTLSharedEvent, which it exports and
+    // imports once the host enables VK_EXT_metal_objects.
+    if (
+      dispatcher.vkGetDeviceProcAddr(
+        static_cast<VkDevice>(context.device), "vkExportMetalObjectsEXT"
+      ) != nullptr
+    ) {
+      support.producer |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
+      support.consumer |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
+    }
+#endif
   }
   const auto sync_fd = VkPhysicalDeviceExternalSemaphoreInfo{
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
@@ -217,6 +229,13 @@ class VulkanTextureSessionBackend final
       if (sync.kind == MLN_GPU_SYNC_SYNC_FD) {
         backend_.wait_sync_fd(
           static_cast<int>(static_cast<int64_t>(sync.handle))
+        );
+      } else if (sync.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT) {
+        backend_.wait_metal_event(
+          // The C ABI carries the event as the bit pattern of its pointer.
+          // NOLINTNEXTLINE(performance-no-int-to-ptr)
+          reinterpret_cast<void*>(static_cast<uintptr_t>(sync.handle)),
+          sync.value
         );
       } else {
         backend_.wait_timeline(

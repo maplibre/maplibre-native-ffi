@@ -10,6 +10,7 @@
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLDevice.hpp>
+#include <Metal/MTLEvent.hpp>
 #include <Metal/MTLTexture.hpp>
 
 #include "render/render_session_common.hpp"
@@ -50,8 +51,15 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void deactivate() override;
 
   auto metal_texture() -> MTL::Texture*;
-  // Makes a frame acquirable once committed rather than once complete.
-  void set_queue_ordered(bool queue_ordered) { queue_ordered_ = queue_ordered; }
+  // Selects how each frame is handed over. Any kind but CPU completion makes
+  // a frame acquirable once committed rather than once complete.
+  void set_producer_sync_kind(mln_gpu_sync_kind kind) {
+    producer_sync_kind_ = kind;
+  }
+  // The synchronization of the last frame committed.
+  [[nodiscard]] auto producer_sync() const -> mln_gpu_sync;
+  // Makes the next frame wait for `event` to reach `value`.
+  void wait_event(MTL::SharedEvent* event, uint64_t value);
   // Waits for the frame a queue-ordered render left in flight, and records its
   // result.
   void finish_frame();
@@ -83,8 +91,18 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;
   std::optional<CommandBufferFailure> command_buffer_failure_;
-  bool queue_ordered_ = false;
+  mln_gpu_sync_kind producer_sync_kind_ = MLN_GPU_SYNC_CPU_COMPLETE;
   NS::SharedPtr<MTL::CommandBuffer> in_flight_;
+  // The producer event, made when the first frame signals it, and the value
+  // its last frame signaled.
+  NS::SharedPtr<MTL::SharedEvent> event_;
+  uint64_t event_value_ = 0;
+  // Consumer events that the next frame waits for.
+  struct EventWait {
+    NS::SharedPtr<MTL::SharedEvent> event;
+    uint64_t value = 0;
+  };
+  std::vector<EventWait> event_waits_;
 };
 
 }  // namespace mln::core

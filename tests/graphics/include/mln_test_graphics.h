@@ -166,6 +166,23 @@ MLN_TEST_GRAPHICS_API int mln_test_graphics_vulkan_timeline_wait(
   uint64_t value, uint64_t timeout_nanoseconds
 );
 
+// Creates an id<MTLSharedEvent> on the system's default Metal device, which a
+// case uses as a host's own event whatever its backend, or returns null where
+// Metal is unavailable. The caller releases it with
+// mln_test_graphics_metal_shared_event_release().
+MLN_TEST_GRAPHICS_API void* MLN_TEST_GRAPHICS_NULLABLE
+mln_test_graphics_metal_shared_event_create(void);
+// The event's signaledValue, and a CPU signal of `value`.
+MLN_TEST_GRAPHICS_API uint64_t mln_test_graphics_metal_shared_event_value(
+  void* MLN_TEST_GRAPHICS_NONNULL event
+);
+MLN_TEST_GRAPHICS_API void mln_test_graphics_metal_shared_event_signal(
+  void* MLN_TEST_GRAPHICS_NONNULL event, uint64_t value
+);
+MLN_TEST_GRAPHICS_API void mln_test_graphics_metal_shared_event_release(
+  void* MLN_TEST_GRAPHICS_NULLABLE event
+);
+
 // Makes the EGL or WGL context current on the calling thread, as a host that
 // drives a session on its own graphics thread would. Fails for Metal and
 // Vulkan, which have no current context.
