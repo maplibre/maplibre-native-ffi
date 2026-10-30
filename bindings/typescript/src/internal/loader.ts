@@ -17,8 +17,9 @@ const BACKENDS = ["opengl", "metal", "vulkan"];
 
 /** The addon package of a backend for this platform and architecture. */
 function addonPackage(backend: string): string {
-  let libc = "";
-  if (process.platform === "linux") {
+  let libc = process.platform === "linux" ? "-gnu" : "";
+  // Deno publishes GNU Linux binaries; its getReport() needs --allow-sys.
+  if (process.platform === "linux" && !("Deno" in globalThis)) {
     const report = process.report.getReport() as {
       header: { glibcVersionRuntime?: string };
     };

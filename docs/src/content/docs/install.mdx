@@ -547,8 +547,10 @@ npm install @maplibre/native-ffi @maplibre/native-ffi-vulkan
 
 The backend package installs the C library for the host. The binding runs on
 Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later, on Linux with glibc and on
-macOS. Releases include macOS for arm64 alone. Deno imports the package as
-`npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
+macOS. Linux with musl supports Node.js and Bun on x64 and arm64; GNU RISC-V and
+LoongArch64 support Node.js. Releases include macOS for arm64 alone. Deno
+imports the package as `npm:@maplibre/native-ffi` and needs
+`--allow-ffi --allow-read --allow-env`.
 
 In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
 `@maplibre/native-ffi-webgpu` with WebGPU. Serve `maplibre_native_ffi.mjs` and
