@@ -44,7 +44,7 @@ cp test/fixtures/consumer/* "$consumer/"
 echo '{ "private": true }' > "$consumer/package.json"
 # npm applies platform overrides to optional dependencies only; the explicit
 # local addon tarball needs --force when the host and target differ.
-install_args=()
+install_args=(--offline --no-audit --no-fund)
 case "$preset" in
   *-riscv64-*) install_args+=(--cpu=riscv64 --force) ;;
   *-loongarch64-*) install_args+=(--cpu=loong64 --force) ;;
@@ -52,7 +52,7 @@ esac
 if [[ "$preset" == linux-musl-* ]]; then
   install_args+=(--libc=musl --force)
 fi
-(cd "$consumer" && npm install --offline --no-audit --no-fund "${install_args[@]}" ./npm/*.tgz)
+(cd "$consumer" && npm install "${install_args[@]}" ./npm/*.tgz)
 pnpm exec tsc -p "$consumer"
 export MAPLIBRE_NATIVE_FFI_TEST_CONSUMER="$consumer"
 
