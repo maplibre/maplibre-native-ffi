@@ -22,9 +22,17 @@ mkdir -p "$workspace"
 git ls-files -z --cached --others --exclude-standard -- \
   Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust src/platform/rust |
   tar -c --null -T - | tar -x -C "$workspace"
-PYTHONPATH=tools/release python3 -c 'import pathlib, sys
-from native_package_release import write_artifacts
-write_artifacts(pathlib.Path(sys.argv[1]), sys.argv[2], [pathlib.Path(sys.argv[3])])' "$scratch/artifacts.json" "$tag" "$archive"
+PYTHONPATH=tools/release python3 - "$scratch/artifacts.json" "$tag" "$archive" <<'PY'
+import json, pathlib, sys, tarfile
+from native_package_release import artifact_index, publish_inventory
+
+archive = pathlib.Path(sys.argv[3])
+archive_root = archive.name.removesuffix(".tar.gz")
+with tarfile.open(archive) as source:
+    inventory = json.load(source.extractfile(f"{archive_root}/share/maplibre-native-c/sbom.cdx.json"))
+publish_inventory(archive, inventory, sys.argv[2])
+pathlib.Path(sys.argv[1]).write_text(json.dumps(artifact_index(sys.argv[2], [archive])))
+PY
 python3 tools/release/rust_release.py "$workspace" "$tag" --artifacts "$scratch/artifacts.json"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \
