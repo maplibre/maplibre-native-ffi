@@ -269,18 +269,6 @@ runs:
         test -r /dev/kvm
         test -w /dev/kvm
 
-    # Mesa's software drivers back sync files with udmabuf, and offer neither
-    # sync file semaphores nor native fences without it.
-    - name: Open udmabuf for sync files
-      if:
-        ${{ runner.os == 'Linux' && inputs.device == '' && (inputs.software-gpu
-        == 'egl' || inputs.software-gpu == 'vulkan') }}
-      shell: bash
-      run: |
-        sudo modprobe udmabuf
-        sudo chmod 0666 /dev/udmabuf
-        ls -l /dev/udmabuf
-
     - name: Use Windows Vulkan software driver
       if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
       uses: ./.github/actions/setup-windows-vulkan-software

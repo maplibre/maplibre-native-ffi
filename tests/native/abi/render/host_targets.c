@@ -556,11 +556,9 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
 
 #if !defined(_WIN32) && \
   (defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL))
-// Builds whose CI drivers hand out sync files: Android's for Vulkan, and Mesa's
-// with udmabuf on the Linux hosts that run their suites natively.
-#if (defined(__ANDROID__) && defined(MLN_FFI_TEST_BACKEND_VULKAN)) ||   \
-  (defined(__linux__) && !defined(__ANDROID__) && defined(__GLIBC__) && \
-   (defined(__x86_64__) || defined(__aarch64__)))
+// Builds whose CI drivers hand out sync files: Android's for Vulkan. Mesa's
+// software drivers need udmabuf for them, which CI's Linux kernels lack.
+#if defined(__ANDROID__) && defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #define SYNC_FILES_REQUIRED 1
 #else
 #define SYNC_FILES_REQUIRED 0
