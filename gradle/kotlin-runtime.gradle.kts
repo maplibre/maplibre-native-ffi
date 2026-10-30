@@ -1,5 +1,6 @@
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import groovy.json.JsonSlurper
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.Exec
@@ -9,7 +10,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.maplibre.nativeffi.gradle.AndroidTarget
-import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeConvention
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
@@ -108,9 +108,8 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
       )
   }
 
-fun configureJvmRuntimeArtifacts(backend: String, classifiers: Collection<String>) {
-  val runtimeJars = classifiers.map { classifier ->
-    val targetPlatform = HostPlatform.JVM_TARGET_PLATFORMS.getValue(classifier)
+fun configureJvmRuntimeArtifacts(backend: String, classifiers: Map<String, String>) {
+  val runtimeJars = classifiers.map { (classifier, targetPlatform) ->
     val taskSuffix = classifier.taskSuffix()
     val nativeInstall = nativeInstall(targetPlatform, backend)
     val verifyLocalBuild =
@@ -291,12 +290,21 @@ val mavenArtifact = "maplibre-native-ffi-runtime-${backend.id}"
 val runtimeInteropDirectory =
   rootProject.layout.projectDirectory.dir("bindings/kotlin/runtimes/common")
 val configuredNativeTargets = nativeTargets(backend)
+val jvmRuntimePlan =
+  providers
+    .exec {
+      workingDir(rootProject.projectDir)
+      commandLine("python3", "-m", "tools.ci.plan", "--jvm-runtimes")
+    }
+    .standardOutput
+    .asText
+    .get()
+@Suppress("UNCHECKED_CAST")
 val jvmClassifiers =
-  if (backend == MaplibreRuntimeBackend.METAL) {
-    listOf("natives-macos-arm64")
-  } else {
-    HostPlatform.JVM_TARGET_PLATFORMS.keys
-  }
+  (JsonSlurper().parseText(jvmRuntimePlan) as Map<String, Map<String, String>>).getOrDefault(
+    runtimeBackend,
+    emptyMap(),
+  )
 
 extensions.configure<KotlinMultiplatformExtension> {
   sourceSets.getByName("commonMain") {

@@ -298,6 +298,7 @@ internal object NativeLibrary {
       osName.contains("windows") && arm64 -> "natives-windows-arm64"
       osName.contains("windows") -> "natives-windows-x64"
       osName.contains("mac") && arm64 -> "natives-macos-arm64"
+      osName.contains("mac") -> "natives-macos-x64"
       osName.contains("linux") && architecture == "riscv64" ->
         "natives-linux-${if (linksMusl("riscv64")) "musl-" else ""}riscv64"
       osName.contains("linux") && arm64 && linksMusl("aarch64") -> "natives-linux-musl-arm64"

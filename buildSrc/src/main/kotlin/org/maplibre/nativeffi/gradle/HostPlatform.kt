@@ -20,6 +20,7 @@ class HostPlatform private constructor(osName: String, arch: String) {
     get() =
       when {
         isMac && isArm64 -> "natives-macos-arm64"
+        isMac -> "natives-macos-x64"
         isLinux && isArm64 -> "natives-linux-arm64"
         isLinux -> "natives-linux-x64"
         isWindows && isArm64 -> "natives-windows-arm64"
@@ -29,9 +30,7 @@ class HostPlatform private constructor(osName: String, arch: String) {
 
   /** The native target platform that the JVM on this host loads. */
   val targetPlatform: String
-    get() =
-      if (isMac) "macos-${if (isArm64) "arm64" else "x64"}"
-      else JVM_TARGET_PLATFORMS.getValue(maplibreNativeClassifier)
+    get() = maplibreNativeClassifier.removePrefix("natives-").replaceFirst("linux-", "linux-gnu-")
 
   val androidNdkPrebuiltTag: String
     get() =
@@ -50,21 +49,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
     get() = if (isWindows) ".cmd" else ""
 
   companion object {
-    /** The native target platform of each JVM runtime JAR classifier. */
-    val JVM_TARGET_PLATFORMS: Map<String, String> =
-      linkedMapOf(
-        "natives-linux-x64" to "linux-gnu-x64",
-        "natives-linux-arm64" to "linux-gnu-arm64",
-        "natives-linux-riscv64" to "linux-gnu-riscv64",
-        "natives-linux-musl-x64" to "linux-musl-x64",
-        "natives-linux-musl-arm64" to "linux-musl-arm64",
-        "natives-linux-musl-riscv64" to "linux-musl-riscv64",
-        "natives-freebsd-x64" to "freebsd-x64",
-        "natives-macos-arm64" to "macos-arm64",
-        "natives-windows-x64" to "windows-x64",
-        "natives-windows-arm64" to "windows-arm64",
-      )
-
     fun current(): HostPlatform =
       HostPlatform(
         System.getProperty("os.name").lowercase(),

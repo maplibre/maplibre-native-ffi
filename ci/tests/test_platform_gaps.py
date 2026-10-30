@@ -58,6 +58,35 @@ class PlatformGapsTest(unittest.TestCase):
                 [("dotnet", "tested")],
             )
 
+    def test_jvm_runtime_jars_follow_package_gaps_and_available_backends(self):
+        target = self.targets["macos-x64-metal"]
+        runtimes = plan.jvm_runtimes(list(self.targets.values()))
+        self.assertEqual(runtimes["metal"]["natives-macos-x64"], "macos-x64")
+        self.assertNotIn("natives-macos-x64", runtimes["opengl"])
+        self.assertNotIn("natives-macos-x64", runtimes["vulkan"])
+        entry = gaps.Entry(
+            0,
+            {
+                "bindings": ("kotlin-jvm",),
+                "platforms": ("macos",),
+                "archs": ("x64",),
+                "operations": ("package",),
+            },
+            "path-known",
+            "runtime JAR needed",
+            None,
+        )
+        with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
+            self.assertEqual(plan.jvm_runtimes([target]), {})
+        entry = dataclasses.replace(
+            entry, selectors={**entry.selectors, "operations": ("test",)}
+        )
+        with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
+            self.assertEqual(
+                plan.jvm_runtimes([target]),
+                {"metal": {"natives-macos-x64": "macos-x64"}},
+            )
+
     def test_nuget_inputs_match_its_packager_and_preserve_macos_x64(self):
         selected = plan.consumed("dotnet-nuget", list(self.targets.values()))
         self.assertEqual(

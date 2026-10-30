@@ -12,6 +12,14 @@ import sys
 import xml.etree.ElementTree as element_tree
 import zipfile
 
+ROOT = pathlib.Path(
+    os.environ.get("MISE_MONOREPO_ROOT") or pathlib.Path(__file__).resolve().parents[3]
+)
+sys.path.insert(0, str(ROOT))
+from tools.ci.plan import jvm_runtimes, targets
+
+JVM_RUNTIMES = jvm_runtimes(targets(json.loads((ROOT / "CMakePresets.json").read_text())))
+
 ROOT_TARGET_MODULES = {
     "maplibre-native-ffi": {
         "android": "maplibre-native-ffi-android",
@@ -100,23 +108,6 @@ NATIVE_TARGETS = {
     "tvosSimulatorArm64": "tvos-simulator-arm64",
 }
 
-# Metal runs only on macOS; the other backends ship every desktop classifier.
-JVM_CLASSIFIERS = {
-    "natives-linux-x64",
-    "natives-linux-arm64",
-    "natives-linux-riscv64",
-    "natives-linux-musl-x64",
-    "natives-linux-musl-arm64",
-    "natives-linux-musl-riscv64",
-    "natives-freebsd-x64",
-    "natives-macos-arm64",
-    "natives-windows-x64",
-    "natives-windows-arm64",
-}
-
-ROOT = pathlib.Path(
-    os.environ.get("MISE_MONOREPO_ROOT") or pathlib.Path(__file__).resolve().parents[3]
-)
 
 COMMON_NATIVE_LICENSES = {
     "icu.txt",
@@ -129,9 +120,7 @@ POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
 
 
 def jvm_classifiers(backend: str) -> set[str]:
-    if backend == "webgpu":
-        return set()
-    return {"natives-macos-arm64"} if backend == "metal" else JVM_CLASSIFIERS
+    return set(JVM_RUNTIMES.get(backend, {}))
 
 
 def native_licenses(backend: str, target: str) -> set[str]:
@@ -467,7 +456,7 @@ def host_jvm_classifier() -> str:
         "x86_64": "x64",
     }.get(platform.machine().lower())
     classifier = f"natives-{os_name}-{arch}"
-    if classifier not in JVM_CLASSIFIERS:
+    if not any(classifier in runtimes for runtimes in JVM_RUNTIMES.values()):
         raise SystemExit(f"no JVM runtime classifier for {system}/{platform.machine()}")
     return classifier
 

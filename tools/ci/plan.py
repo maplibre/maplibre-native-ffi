@@ -220,6 +220,23 @@ def consumed(job: str, all_targets: list[Target]) -> list[Target]:
     ]
 
 
+def jvm_runtimes(all_targets: list[Target]) -> dict[str, dict[str, str]]:
+    """The desktop runtime JAR classifiers and native platforms of each backend."""
+    result: dict[str, dict[str, str]] = {}
+    for target in all_targets:
+        if target.platform == "android" or not gaps.supported(
+            "kotlin-jvm", target, "package"
+        ):
+            continue
+        normalized = gaps.target_from_preset(target)
+        platform = normalized.platform.replace("linux-gnu", "linux")
+        classifier = f"natives-{platform}-{normalized.arch}"
+        result.setdefault(normalized.backend, {})[classifier] = (
+            f"{target.platform}-{target.architecture}"
+        )
+    return result
+
+
 ZIG_PROJECTS = ("//bindings/zig:",)
 GRADLE_PROJECTS = ("//bindings/kotlin:", "//:kotlin:")
 SWIFT_PROJECTS = ("//bindings/swift:",)
@@ -332,9 +349,16 @@ def main() -> int:
         choices=list(JOBS),
         help="Print the native preset inputs of one package job, one per line",
     )
+    parser.add_argument(
+        "--jvm-runtimes",
+        action="store_true",
+        help="Print the supported JVM runtime JAR classifiers and native platforms as JSON",
+    )
     args = parser.parse_args()
     presets = json.loads((ROOT / "CMakePresets.json").read_text())
-    if args.package_inputs:
+    if args.jvm_runtimes:
+        print(json.dumps(jvm_runtimes(targets(presets))))
+    elif args.package_inputs:
         print(
             "\n".join(
                 target.preset

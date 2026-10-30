@@ -6,6 +6,11 @@
 set -euo pipefail
 
 case "$usage_preset" in
+  macos-x64-*)
+    MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
+      MISE_ARCH=x64 MISE_NO_HOOKS=1 exec mise -C bindings/kotlin exec --no-deps java -- \
+      ../../gradlew -Pmaplibre.localBuild="build/$usage_preset/install" :bindings:kotlin:jvmTest
+    ;;
   linux-musl-* | freebsd-* | linux-*-riscv64-*)
     # Gradle stages the classpath on the host; the target JVM runs it.
     ./gradlew :bindings:kotlin:jvmDeviceTestClasspath
