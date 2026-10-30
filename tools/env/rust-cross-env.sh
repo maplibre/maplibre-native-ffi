@@ -1,7 +1,7 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, FreeBSD, Android, iOS, tvOS, visionOS, Mac Catalyst, macOS
-# x64, MinGW, and OpenHarmony presets to their Cargo target. Exports the
-# cross-compilation environment (CC/CXX, linker) from the Zig and Rust
+# $1. Maps musl, RISC-V, LoongArch, FreeBSD, Android, iOS, tvOS, visionOS,
+# Mac Catalyst, macOS x64, MinGW, and OpenHarmony presets to their Cargo target.
+# Exports the cross-compilation environment (CC/CXX, linker) from Zig and Rust
 # toolchains, Android NDK, or OpenHarmony SDK, and for targets that run off the
 # host, tools/devices/run as Cargo's runner, which it also names in
 # `cargo_runner`. Leaves `cargo_target` and `cargo_runner` empty for host
@@ -27,6 +27,10 @@ case "$1" in
   mingw-x64-*) cargo_target=x86_64-pc-windows-gnu ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
+  linux-gnu-riscv64-*) cargo_target=riscv64gc-unknown-linux-gnu ;;
+  linux-musl-riscv64-*) cargo_target=riscv64gc-unknown-linux-musl ;;
+  linux-gnu-loongarch64-*) cargo_target=loongarch64-unknown-linux-gnu ;;
+  linux-musl-loongarch64-*) cargo_target=loongarch64-unknown-linux-musl ;;
   freebsd-x64-*) cargo_target=x86_64-unknown-freebsd ;;
   ohos-arm64-*) cargo_target=aarch64-unknown-linux-ohos ;;
   ohos-x64-*) cargo_target=x86_64-unknown-linux-ohos ;;
@@ -65,7 +69,18 @@ case "$1" in
     if [[ "${MLN_FFI_RUST_MUSL_DYNAMIC:-}" == 1 ]]; then
       dynamic_dir="$MISE_MONOREPO_ROOT/build/$1/zig-shim/rust-dynamic"
       mkdir -p "$dynamic_dir"
-      if [[ ! -f "$dynamic_dir/libc.so" ]]; then
+      case "$cargo_target" in
+        aarch64-*) dynamic_loader=/lib/ld-musl-aarch64.so.1 ;;
+        x86_64-*) dynamic_loader=/lib/ld-musl-x86_64.so.1 ;;
+        riscv64gc-*) dynamic_loader=/lib/ld-musl-riscv64.so.1 ;;
+        loongarch64-*) dynamic_loader=/lib/ld-musl-loongarch64.so.1 ;;
+      esac
+      if [[ ! -f "$dynamic_dir/libc.so" && "$1" =~ -(riscv64|loongarch64)- ]]; then
+        # Alpine's images run only on the host's architecture, so the loader
+        # comes from the root that the tests run against.
+        root="$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" musl "${BASH_REMATCH[1]}")"
+        cp -L "$root$dynamic_loader" "$dynamic_dir/libc.so"
+      elif [[ ! -f "$dynamic_dir/libc.so" ]]; then
         if command -v docker >/dev/null; then
           container_engine=docker
         elif command -v podman >/dev/null; then
@@ -80,10 +95,6 @@ case "$1" in
           sh -euc 'cp -L /lib/ld-musl-*.so.1 /out/libc.so'
       fi
       ln -sf libc.so "$dynamic_dir/libgcc_s.so"
-      case "$cargo_target" in
-        aarch64-*) dynamic_loader=/lib/ld-musl-aarch64.so.1 ;;
-        x86_64-*) dynamic_loader=/lib/ld-musl-x86_64.so.1 ;;
-      esac
       rustflags="$rustflags -C target-feature=-crt-static -C link-self-contained=yes -C link-arg=--dynamic-linker=$dynamic_loader -L native=$dynamic_dir"
     fi
     export "CC_$target_env=$compiler"
@@ -94,6 +105,21 @@ case "$1" in
     export "CXXFLAGS_$target_env=-fno-sanitize=undefined"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
     export "$rustflags_variable=${rustflags# }"
+    ;;
+  linux-gnu-riscv64-* | linux-gnu-loongarch64-*)
+    # The native build's Zig wrappers compile and link against the target's
+    # glibc floor.
+    target_env="${cargo_target//-/_}"
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
+    compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
+    if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
+      echo "The Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+      return 2
+    fi
+    export "CC_$target_env=$compiler"
+    export "CXX_$target_env=$compiler_cxx"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$compiler"
     ;;
   freebsd-x64-*)
     # The native build's Zig wrappers compile and link against FreeBSD's libc.
@@ -170,7 +196,7 @@ esac
 # Cargo hands each executable it runs for these targets to tools/devices/run,
 # which finds the device from the preset's install.
 case "$1" in
-  android-* | ohos-*64-* | ios-simulator-arm64-* | tvos-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-* | freebsd-x64-*)
+  android-* | ohos-*64-* | ios-simulator-arm64-* | tvos-simulator-arm64-* | visionos-simulator-arm64-* | linux-musl-*64-* | linux-gnu-riscv64-* | linux-gnu-loongarch64-* | freebsd-x64-*)
     cargo_runner="$MISE_MONOREPO_ROOT/tools/devices/run"
     target_env_upper="$(printf '%s' "${cargo_target//-/_}" | tr '[:lower:]' '[:upper:]')"
     export "CARGO_TARGET_${target_env_upper}_RUNNER=$cargo_runner"

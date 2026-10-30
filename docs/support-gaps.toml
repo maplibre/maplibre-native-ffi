@@ -195,14 +195,6 @@ status = "path-known"
 reason = "CI builds the .NET binding and ships its Intel macOS native asset, but has no x64 test runtime on the ARM64 runner. Run the binding suite under Rosetta."
 
 [[entry]]
-bindings = ["rust"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64", "loongarch64"]
-status = "path-known"
-reason = "The proposed cross-build runs the suite under QEMU. Update its target compiler and runner integration; CI now registers QEMU with binfmt_misc for tests that launch child executables."
-link = "https://github.com/maplibre/maplibre-native-ffi/pull/1328"
-
-[[entry]]
 bindings = ["dart"]
 platforms = ["linux-gnu"]
 archs = ["riscv64"]
