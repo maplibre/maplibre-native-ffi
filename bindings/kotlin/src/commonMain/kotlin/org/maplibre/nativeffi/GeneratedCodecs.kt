@@ -8,13 +8,14 @@ import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
 
 internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
-  writeU32(target, 16.toUInt())
+  writeU32(target, 24.toUInt())
   writeU32(target + 4, value.kind.rawValue)
   writeU64(target + 8, value.handle)
+  writeU64(target + 16, value.value)
 }
 
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
-  allocate(16, w(8, 8, 4)).also { putGpuSync(it, value) }
+  allocate(24, w(8, 8, 4)).also { putGpuSync(it, value) }
 
 internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
   writeU32(target, w(64, 72).toUInt())
@@ -1063,9 +1064,12 @@ internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): Ope
     .also { it.bindingScope = scope }
 
 internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
-  GpuSync(kind = GpuSyncKind(readU32(source + 4)), handle = readU64(source + 8)).also {
-    it.bindingScope = scope
-  }
+  GpuSync(
+      kind = GpuSyncKind(readU32(source + 4)),
+      handle = readU64(source + 8),
+      value = readU64(source + 16),
+    )
+    .also { it.bindingScope = scope }
 
 internal fun readRenderFrameResult(source: Long): RenderFrameResult =
   RenderFrameResult(

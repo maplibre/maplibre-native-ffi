@@ -198,11 +198,18 @@ final class GpuSyncKind extends _Enum {
   /// the session and the host share, which orders it before any work submitted
   /// there afterwards.
   static const queueOrder = GpuSyncKind.fromRawValue(2);
+
+  /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+  /// device, and the counter value that the work signals. handle is nonzero.
+  /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
+  /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+  static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(3);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
     1 => 'GpuSyncKind.openGlFence',
     2 => 'GpuSyncKind.queueOrder',
+    3 => 'GpuSyncKind.vulkanTimelineSemaphore',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -216,6 +223,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
   static const cpuComplete = GpuSyncKindFlag.fromRawValue(1);
   static const openGlFence = GpuSyncKindFlag.fromRawValue(2);
   static const queueOrder = GpuSyncKindFlag.fromRawValue(4);
+  static const vulkanTimelineSemaphore = GpuSyncKindFlag.fromRawValue(8);
 
   /// No flags.
   static const none = GpuSyncKindFlag.fromRawValue(0);
@@ -227,6 +235,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
     1: 'cpuComplete',
     2: 'openGlFence',
     4: 'queueOrder',
+    8: 'vulkanTimelineSemaphore',
   });
 }
 
@@ -1460,20 +1469,27 @@ final class GpuSync extends _Value {
   const GpuSync({
     this.kind = const GpuSyncKind.fromRawValue(0),
     this.handle = 0,
+    this.value = 0,
   });
   final GpuSyncKind kind;
 
-  /// Bit pattern of the GLsync pointer.
+  /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
   final int handle;
 
+  /// Counter value of a timeline kind. Zero for other kinds.
+  final int value;
+
   /// A copy of this value with the given members replaced.
-  GpuSync copyWith({GpuSyncKind? kind, int? handle}) =>
-      GpuSync(kind: kind ?? this.kind, handle: handle ?? this.handle);
+  GpuSync copyWith({GpuSyncKind? kind, int? handle, int? value}) => GpuSync(
+    kind: kind ?? this.kind,
+    handle: handle ?? this.handle,
+    value: value ?? this.value,
+  );
 
   @override
-  List<Object?> get _members => [kind, handle];
+  List<Object?> get _members => [kind, handle, value];
   @override
-  String toString() => _describe('GpuSync', const ['kind', 'handle']);
+  String toString() => _describe('GpuSync', const ['kind', 'handle', 'value']);
 }
 
 /// Geographic coordinate in degrees used by map and projection APIs.
@@ -2605,11 +2621,11 @@ final class RenderSessionAttachOptions extends _Value {
 
   /// Producer synchronization kinds that the host accepts for acquired texture
   /// frames. The session picks the first one its target supports in this order:
-  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
-  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-  /// device has a single queue. A set that the target cannot satisfy fails the
-  /// attach with `Status.unsupported`.
+  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
+  /// `GpuSyncKind.vulkanTimelineSemaphore`, then `GpuSyncKind.cpuComplete`. Its
+  /// capabilities report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
+  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
+  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
   final GpuSyncKindFlag producerSyncKinds;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.

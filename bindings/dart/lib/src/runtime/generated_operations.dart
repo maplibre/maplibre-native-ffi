@@ -39,11 +39,15 @@ Pointer<raw.mln_gpu_sync> _writeGpuSync(
   result.ref.size = sizeOf<raw.mln_gpu_sync>();
   result.ref.kind = value.kind.rawValue;
   result.ref.handle = value.handle;
+  result.ref.value = value.value;
   return result;
 }
 
-GpuSync _readGpuSync(raw.mln_gpu_sync source) =>
-    GpuSync(kind: GpuSyncKind.fromRawValue(source.kind), handle: source.handle);
+GpuSync _readGpuSync(raw.mln_gpu_sync source) => GpuSync(
+  kind: GpuSyncKind.fromRawValue(source.kind),
+  handle: source.handle,
+  value: source.value,
+);
 
 Pointer<raw.mln_lat_lng> _writeLatLng(
   LatLng value,
@@ -6923,6 +6927,7 @@ final class ScopedGpuSync {
   final _NativeViewScope _scope;
   GpuSyncKind get kind => _value.kind;
   int get handle => _scope.active(_value).handle;
+  int get value => _value.value;
 }
 
 /// A `VulkanTextureFrame` whose native objects are readable only while the

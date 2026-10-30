@@ -301,6 +301,7 @@ class GpuSyncKind(UnknownIntEnum):
     CPU_COMPLETE = 0
     OPEN_GL_FENCE = 1
     QUEUE_ORDER = 2
+    VULKAN_TIMELINE_SEMAPHORE = 3
 
 
 class GpuSyncKindFlag(IntFlag):
@@ -313,6 +314,7 @@ class GpuSyncKindFlag(IntFlag):
     CPU_COMPLETE = 1
     OPEN_GL_FENCE = 2
     QUEUE_ORDER = 4
+    VULKAN_TIMELINE_SEMAPHORE = 8
 
 
 class LogEvent(UnknownIntEnum):
@@ -1494,11 +1496,16 @@ class GpuSync:
     kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
 
     handle: int = 0
-    """Bit pattern of the GLsync pointer."""
+    """Bit pattern of the GLsync pointer or the VkSemaphore handle."""
+
+    value: int = 0
+    """Counter value of a timeline kind. Zero for other kinds."""
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(kind=GpuSyncKind(raw["kind"]), handle=raw["handle"])
+        return cls(
+            kind=GpuSyncKind(raw["kind"]), handle=raw["handle"], value=raw["value"]
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2763,11 +2770,12 @@ class RenderSessionAttachOptions:
     )
     """Producer synchronization kinds that the host accepts for acquired texture
     frames. The session picks the first one its target supports in this
-    order: `GpuSyncKind.QUEUE_ORDER`, `GpuSyncKind.OPEN_GL_FENCE`, then
-    `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero
-    accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on
-    WebGPU, whose device has a single queue. A set that the target cannot
-    satisfy fails the attach with `Status.UNSUPPORTED`.
+    order: `GpuSyncKind.QUEUE_ORDER`, `GpuSyncKind.OPEN_GL_FENCE`,
+    `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, then `GpuSyncKind.CPU_COMPLETE`.
+    Its capabilities report the pick. Zero accepts
+    `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose
+    device has a single queue. A set that the target cannot satisfy fails the
+    attach with `Status.UNSUPPORTED`.
     """
 
     frame_wake: Wake | NativeWake = field(default_factory=lambda: Wake())

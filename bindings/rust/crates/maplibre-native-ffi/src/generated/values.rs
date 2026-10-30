@@ -1167,8 +1167,10 @@ impl Default for GesturePhase {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct GpuSync {
     pub kind: GpuSyncKind,
-    /// Bit pattern of the GLsync pointer.
+    /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
     pub handle: u64,
+    /// Counter value of a timeline kind. Zero for other kinds.
+    pub value: u64,
 }
 impl ToNative<sys::mln_gpu_sync> for GpuSync {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_gpu_sync> {
@@ -1176,6 +1178,7 @@ impl ToNative<sys::mln_gpu_sync> for GpuSync {
         raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
         raw.kind = to_native(&self.kind, arena)?;
         raw.handle = self.handle;
+        raw.value = self.value;
         Ok(raw)
     }
 }
@@ -1184,6 +1187,7 @@ impl FromNative<sys::mln_gpu_sync> for GpuSync {
         Ok(Self {
             kind: GpuSyncKind::from_raw(raw.kind),
             handle: raw.handle,
+            value: raw.value,
         })
     }
 }
@@ -1205,6 +1209,11 @@ pub enum GpuSyncKind: u32 {
     /// that the session and the host share, which orders it before any work
     /// submitted there afterwards.
     QueueOrder = 2,
+    /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+    /// device, and the counter value that the work signals. handle is nonzero.
+    /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
+    /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+    VulkanTimelineSemaphore = 3,
 } Unknown
 }
 impl Default for GpuSyncKind {
@@ -1222,6 +1231,7 @@ pub struct GpuSyncKindFlag: u32 {
     const CPU_COMPLETE = 1;
     const OPEN_GL_FENCE = 2;
     const QUEUE_ORDER = 4;
+    const VULKAN_TIMELINE_SEMAPHORE = 8;
 }
 }
 
@@ -3250,11 +3260,12 @@ pub struct RenderSessionAttachOptions {
     pub requested_texture_ring_depth: u32,
     /// Producer synchronization kinds that the host accepts for acquired
     /// texture frames. The session picks the first one its target supports in
-    /// this order: `GpuSyncKind::QueueOrder`, `GpuSyncKind::OpenGlFence`, then
-    /// `GpuSyncKind::CpuComplete`. Its capabilities report the pick. Zero
-    /// accepts `GpuSyncKind::CpuComplete`, or `GpuSyncKind::QueueOrder` on
-    /// WebGPU, whose device has a single queue. A set that the target cannot
-    /// satisfy fails the attach with `Status::Unsupported`.
+    /// this order: `GpuSyncKind::QueueOrder`, `GpuSyncKind::OpenGlFence`,
+    /// `GpuSyncKind::VulkanTimelineSemaphore`, then `GpuSyncKind::CpuComplete`.
+    /// Its capabilities report the pick. Zero accepts
+    /// `GpuSyncKind::CpuComplete`, or `GpuSyncKind::QueueOrder` on WebGPU,
+    /// whose device has a single queue. A set that the target cannot satisfy
+    /// fails the attach with `Status::Unsupported`.
     pub producer_sync_kinds: GpuSyncKindFlag,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,

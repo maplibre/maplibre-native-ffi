@@ -2635,19 +2635,23 @@ pub const GesturePhase = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSync = struct {
     kind: GpuSyncKind = .cpu_complete,
-    /// Bit pattern of the GLsync pointer.
+    /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
     handle: u64 = 0,
+    /// Counter value of a timeline kind. Zero for other kinds.
+    value: u64 = 0,
     pub fn toNative(self: GpuSync) c.mln_gpu_sync {
         var raw = std.mem.zeroes(c.mln_gpu_sync);
         raw.size = @sizeOf(c.mln_gpu_sync);
         raw.kind = self.kind.toNative();
         raw.handle = self.handle;
+        raw.value = self.value;
         return raw;
     }
     pub fn fromNative(raw: c.mln_gpu_sync) GpuSync {
         return .{
             .kind = GpuSyncKind.fromNative(raw.kind),
             .handle = raw.handle,
+            .value = raw.value,
         };
     }
 };
@@ -2668,6 +2672,11 @@ pub const GpuSyncKind = enum(u32) {
     /// that the session and the host share, which orders it before any work
     /// submitted there afterwards.
     queue_order = 2,
+    /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+    /// device, and the counter value that the work signals. handle is nonzero.
+    /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
+    /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+    vulkan_timeline_semaphore = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2681,8 +2690,9 @@ pub const GpuSyncKindFlag = struct {
     cpu_complete: bool = false,
     open_gl_fence: bool = false,
     queue_order: bool = false,
+    vulkan_timeline_semaphore: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4370,7 +4380,8 @@ pub const RenderSessionAttachOptions = struct {
     requested_texture_ring_depth: u32 = 0,
     /// Producer synchronization kinds that the host accepts for acquired
     /// texture frames. The session picks the first one its target supports in
-    /// this order: `GpuSyncKind.queue_order`, `GpuSyncKind.open_gl_fence`, then
+    /// this order: `GpuSyncKind.queue_order`, `GpuSyncKind.open_gl_fence`,
+    /// `GpuSyncKind.vulkan_timeline_semaphore`, then
     /// `GpuSyncKind.cpu_complete`. Its capabilities report the pick. Zero
     /// accepts `GpuSyncKind.cpu_complete`, or `GpuSyncKind.queue_order` on
     /// WebGPU, whose device has a single queue. A set that the target cannot

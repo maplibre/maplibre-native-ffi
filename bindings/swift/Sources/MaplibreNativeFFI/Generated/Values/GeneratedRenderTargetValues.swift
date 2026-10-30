@@ -76,16 +76,24 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSync: Equatable, Hashable, Sendable {
   public var kind: GpuSyncKind
-  /// Bit pattern of the GLsync pointer.
+  /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
   public var handle: UInt64
-  public init(kind: GpuSyncKind = .init(rawValue: 0), handle: UInt64 = 0) {
+  /// Counter value of a timeline kind. Zero for other kinds.
+  public var value: UInt64
+  public init(
+    kind: GpuSyncKind = .init(rawValue: 0),
+    handle: UInt64 = 0,
+    value: UInt64 = 0
+  ) {
     self.kind = kind
     self.handle = handle
+    self.value = value
   }
 
   init(raw: mln_gpu_sync) {
     kind = GpuSyncKind(rawValue: raw.kind.rawValue)
     handle = raw.handle
+    value = raw.value
   }
 
   func nativeValue() -> mln_gpu_sync {
@@ -93,6 +101,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
     raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
     raw.kind = mln_gpu_sync_kind(rawValue: kind.rawValue)
     raw.handle = handle
+    raw.value = value
     return raw
   }
 }
@@ -120,11 +129,17 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   /// the session and the host share, which orders it before any work submitted
   /// there afterwards.
   public static let queueOrder: GpuSyncKind = .init(rawValue: 2)
+  /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+  /// device, and the counter value that the work signals. handle is nonzero.
+  /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
+  /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+  public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
     case 0: return "cpuComplete"
     case 1: return "openGlFence"
     case 2: return "queueOrder"
+    case 3: return "vulkanTimelineSemaphore"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
@@ -145,6 +160,8 @@ public struct GpuSyncKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let cpuComplete: GpuSyncKindFlag = .init(rawValue: 1)
   public static let openGlFence: GpuSyncKindFlag = .init(rawValue: 2)
   public static let queueOrder: GpuSyncKindFlag = .init(rawValue: 4)
+  public static let vulkanTimelineSemaphore: GpuSyncKindFlag =
+    .init(rawValue: 8)
 }
 
 /// Metal backend context fields shared by Metal render targets.
@@ -402,11 +419,11 @@ public struct RenderSessionAttachOptions: Sendable {
   public var requestedTextureRingDepth: UInt32
   /// Producer synchronization kinds that the host accepts for acquired texture
   /// frames. The session picks the first one its target supports in this order:
-  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
-  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-  /// device has a single queue. A set that the target cannot satisfy fails the
-  /// attach with `Status.unsupported`.
+  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
+  /// `GpuSyncKind.vulkanTimelineSemaphore`, then `GpuSyncKind.cpuComplete`. Its
+  /// capabilities report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
+  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
+  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
   public var producerSyncKinds: GpuSyncKindFlag
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake

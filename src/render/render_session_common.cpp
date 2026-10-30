@@ -1559,6 +1559,7 @@ namespace {
 constexpr std::array producer_sync_preference = {
   MLN_GPU_SYNC_QUEUE_ORDER,
   MLN_GPU_SYNC_OPEN_GL_FENCE,
+  MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
   MLN_GPU_SYNC_CPU_COMPLETE,
 };
 
@@ -1597,15 +1598,6 @@ auto start_attach_render_session(
   if (request_status != MLN_STATUS_OK) {
     return request_status;
   }
-  const auto producer_sync_kind = pick_producer_sync_kind(
-    options->producer_sync_kinds, session->producer_sync_kinds
-  );
-  if (!producer_sync_kind) {
-    set_thread_error(
-      "render target supports none of the requested producer sync kinds"
-    );
-    return MLN_STATUS_UNSUPPORTED;
-  }
   if (capabilities.size < sizeof(mln_render_session_capabilities)) {
     set_thread_error("render session capabilities size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1631,6 +1623,22 @@ auto start_attach_render_session(
     set_thread_error("this render target does not take a queue lock");
     return MLN_STATUS_UNSUPPORTED;
   }
+  // Probed only now, since a probe may call the host's graphics objects.
+  auto consumer_sync_kinds = capabilities.consumer_sync_kinds;
+  if (session->probe_sync_kinds) {
+    const auto probed = session->probe_sync_kinds();
+    session->producer_sync_kinds |= probed;
+    consumer_sync_kinds |= probed;
+  }
+  const auto producer_sync_kind = pick_producer_sync_kind(
+    options->producer_sync_kinds, session->producer_sync_kinds
+  );
+  if (!producer_sync_kind) {
+    set_thread_error(
+      "render target supports none of the requested producer sync kinds"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
   auto frame_wake =
     std::make_shared<Wake>(options->frame_wake, std::move(frame_wake_queue));
   auto driver_wake = std::make_shared<Wake>(
@@ -1651,6 +1659,7 @@ auto start_attach_render_session(
   session->capabilities = capabilities;
   session->producer_sync_kind = *producer_sync_kind;
   session->capabilities.producer_sync_kind = *producer_sync_kind;
+  session->capabilities.consumer_sync_kinds = consumer_sync_kinds;
   if (kind == RenderSessionKind::Texture) {
     // A borrowed ring's depth is the texture count its descriptor validated.
     const auto depth = session->texture.mode == TextureSessionMode::Owned
@@ -3085,7 +3094,7 @@ auto run_frame_demand(
     auto view = mln_map_view{};
     auto metadata = std::any{};
     auto producer_sync =
-      mln_gpu_sync{sizeof(mln_gpu_sync), session->producer_sync_kind, 0};
+      mln_gpu_sync{sizeof(mln_gpu_sync), session->producer_sync_kind, 0, 0};
     // One backend scope spans the render and the frame's metadata, so the
     // scopes they open themselves nest in it and activate the backend once.
     auto scope = std::optional<mln::gfx::BackendScope>{};
@@ -3687,13 +3696,16 @@ auto acquired_frame_release(
   const auto copied =
     consumer_completion != nullptr
       ? *consumer_completion
-      : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
+      : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
   if (copied.size < sizeof(mln_gpu_sync)) {
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (copied.kind == MLN_GPU_SYNC_OPEN_GL_FENCE && copied.handle == 0) {
-    set_thread_error("OpenGL fence must have a nonzero handle");
+  if (
+    (known_gpu_sync_kinds & gpu_sync_kind_flag(copied.kind)) != 0 &&
+    gpu_sync_names_object(copied.kind) && copied.handle == 0
+  ) {
+    set_thread_error("consumer synchronization must have a nonzero handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(frame);

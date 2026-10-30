@@ -14,4 +14,5 @@ public enum GpuSyncKindFlag : uint
     CpuComplete = 1,
     OpenGlFence = 2,
     QueueOrder = 4,
+    VulkanTimelineSemaphore = 8,
 }

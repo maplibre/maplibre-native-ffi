@@ -465,7 +465,7 @@ void a_failed_release_submission_preserves_the_acquired_frame() {
   const auto handle =
     mln::core::handle_table<mln_acquired_frame_object>().insert(frame);
   const auto sync =
-    mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE, 1};
+    mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE, 1, 0};
   auto status = MLN_STATUS_OK;
   {
     const auto faults = mln::native_tests::AllocationFaults{};
@@ -1463,7 +1463,7 @@ void release_with_a_gpu_wait(
   auto& racing = *static_cast<RacingRelease*>(user_data);
   racing.completion_status = result->status;
   const auto sync =
-    mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE, 1};
+    mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE, 1, 0};
   racing.release_status =
     mln_acquired_frame_release(racing.frame, &sync, nullptr);
   if (racing.release_status == MLN_STATUS_OK) racing.frame = MLN_HANDLE_NULL;
@@ -1635,7 +1635,8 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
     const auto fenced = mln_gpu_sync{
       .size = sizeof(mln_gpu_sync),
       .kind = MLN_GPU_SYNC_OPEN_GL_FENCE,
-      .handle = 1
+      .handle = 1,
+      .value = 0,
     };
     MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
     MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
@@ -1700,7 +1701,8 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
   const auto fenced = mln_gpu_sync{
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_OPEN_GL_FENCE,
-    .handle = 1
+    .handle = 1,
+    .value = 0,
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
   MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));

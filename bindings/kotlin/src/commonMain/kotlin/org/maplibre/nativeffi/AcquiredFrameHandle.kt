@@ -68,7 +68,7 @@ internal constructor(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(16, w(8, 8, 4))
+        val out = sized(24, w(8, 8, 4))
         check(C.mln_acquired_frame_get_producer_sync(handle, out, diagnostic))
         block(readGpuSync(out, scope))
       }

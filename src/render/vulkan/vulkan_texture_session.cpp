@@ -1,8 +1,10 @@
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <utility>
 #include <vector>
 
+#include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/util/size.hpp>
 
@@ -112,6 +114,35 @@ auto validate_vulkan_handles(
   return MLN_STATUS_OK;
 }
 
+// Whether the host's device takes timeline semaphores: its physical device
+// supports them, and the device resolves their commands, which it does once
+// the host enables Vulkan 1.2 or VK_KHR_timeline_semaphore. Whether the host
+// enabled the feature is its own contract.
+auto vulkan_supports_timelines(const mln_vulkan_context_descriptor& context)
+  -> bool {
+  auto dispatcher = mln::core::vulkan_dispatch_loader(context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, context);
+  if (dispatcher.vkGetPhysicalDeviceFeatures2 == nullptr) return false;
+  mln::core::vulkan_init_device_dispatch(
+    dispatcher, static_cast<VkDevice>(context.device), context
+  );
+  if (dispatcher.vkGetSemaphoreCounterValue == nullptr) return false;
+  auto timeline = VkPhysicalDeviceTimelineSemaphoreFeatures{
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+    .pNext = nullptr,
+    .timelineSemaphore = VK_FALSE,
+  };
+  auto features = VkPhysicalDeviceFeatures2{
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext = &timeline,
+    .features = {},
+  };
+  dispatcher.vkGetPhysicalDeviceFeatures2(
+    static_cast<VkPhysicalDevice>(context.physical_device), &features
+  );
+  return timeline.timelineSemaphore == VK_TRUE;
+}
+
 class VulkanTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
@@ -134,8 +165,29 @@ class VulkanTextureSessionBackend final
 
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
-  void set_queue_ordered(bool queue_ordered) {
-    backend_.set_queue_ordered(queue_ordered);
+  void set_producer_sync_kind(mln_gpu_sync_kind kind) {
+    backend_.set_producer_sync_kind(kind);
+  }
+
+  auto producer_sync() const -> mln_gpu_sync override {
+    return backend_.producer_sync();
+  }
+
+  auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
+    if (sync.kind != MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
+      return MLN_STATUS_UNSUPPORTED;
+    try {
+      auto guard = mln::gfx::BackendScope{backend_};
+      backend_.wait_timeline(
+        mln::core::vulkan_handle_from_abi<VkSemaphore>(sync.handle), sync.value
+      );
+      return MLN_STATUS_OK;
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("waiting for the consumer semaphore failed");
+    }
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   [[nodiscard]] auto allows_off_thread_teardown() const noexcept
@@ -257,6 +309,11 @@ auto vulkan_owned_texture_attach_start(
   session->texture.mode = TextureSessionMode::Owned;
   session->accepts_queue_lock = true;
   session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  session->probe_sync_kinds = [context = descriptor->context] {
+    return vulkan_supports_timelines(context)
+             ? MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
+             : 0U;
+  };
   const auto copied = *descriptor;
   const auto ring_depth = attach_ring_depth(options);
   session->initialize_backend =
@@ -269,9 +326,7 @@ auto vulkan_owned_texture_attach_start(
         copied, mln::Size{target.physical_width, target.physical_height},
         ring_depth, target.queue_lock
       );
-      backend->set_queue_ordered(
-        target.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
-      );
+      backend->set_producer_sync_kind(target.producer_sync_kind);
       target.texture.backend = std::move(backend);
       return MLN_STATUS_OK;
     };
@@ -323,6 +378,11 @@ auto vulkan_borrowed_texture_attach_start(
   session->texture.mode = TextureSessionMode::Borrowed;
   session->accepts_queue_lock = true;
   session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  session->probe_sync_kinds = [context = descriptor->context] {
+    return vulkan_supports_timelines(context)
+             ? MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
+             : 0U;
+  };
   session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
@@ -339,9 +399,7 @@ auto vulkan_borrowed_texture_attach_start(
       target, mln::Size{live.physical_width, live.physical_height},
       live.queue_lock
     );
-    backend->set_queue_ordered(
-      live.producer_sync_kind == MLN_GPU_SYNC_QUEUE_ORDER
-    );
+    backend->set_producer_sync_kind(live.producer_sync_kind);
     live.texture.backend = std::move(backend);
     return MLN_STATUS_OK;
   };

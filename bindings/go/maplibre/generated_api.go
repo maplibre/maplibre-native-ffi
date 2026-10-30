@@ -238,6 +238,11 @@ const (
 	// session and the host share, which orders it before any work submitted there
 	// afterwards.
 	GpuSyncKindQueueOrder GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_QUEUE_ORDER)
+	// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+	// device, and the counter value that the work signals. handle is nonzero. The
+	// device must enable the timelineSemaphore feature, through Vulkan 1.2 or
+	// VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+	GpuSyncKindVulkanTimelineSemaphore GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
 )
 
 func (value GpuSyncKind) String() string {
@@ -248,6 +253,8 @@ func (value GpuSyncKind) String() string {
 		return "GpuSyncKindOpenGlFence"
 	case 2:
 		return "GpuSyncKindQueueOrder"
+	case 3:
+		return "GpuSyncKindVulkanTimelineSemaphore"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
 }
@@ -260,15 +267,16 @@ func (value GpuSyncKind) String() string {
 type GpuSyncKindFlag uint32
 
 const (
-	GpuSyncKindFlagCpuComplete GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE)
-	GpuSyncKindFlagOpenGlFence GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE)
-	GpuSyncKindFlagQueueOrder  GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+	GpuSyncKindFlagCpuComplete             GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE)
+	GpuSyncKindFlagOpenGlFence             GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE)
+	GpuSyncKindFlagQueueOrder              GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+	GpuSyncKindFlagVulkanTimelineSemaphore GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE)
 )
 
 func (value GpuSyncKindFlag) Has(flags GpuSyncKindFlag) bool { return value&flags == flags }
 
 func (value GpuSyncKindFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}, {8, "GpuSyncKindFlagVulkanTimelineSemaphore"}})
 }
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
@@ -2339,14 +2347,17 @@ func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena)
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type GpuSync struct {
 	Kind GpuSyncKind
-	// Bit pattern of the GLsync pointer.
+	// Bit pattern of the GLsync pointer or the VkSemaphore handle.
 	Handle uint64
+	// Counter value of a timeline kind. Zero for other kinds.
+	Value uint64
 }
 
 func copyGpuSync(raw C.mln_gpu_sync) GpuSync {
 	var result GpuSync
 	result.Kind = GpuSyncKind(raw.kind)
 	result.Handle = uint64(raw.handle)
+	result.Value = uint64(raw.value)
 	return result
 }
 
@@ -2355,6 +2366,7 @@ func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.mln_gpu_sync_kind(input.Kind)
 	raw.handle = C.uint64_t(input.Handle)
+	raw.value = C.uint64_t(input.Value)
 	return raw
 }
 
@@ -3610,8 +3622,9 @@ type RenderSessionAttachOptions struct {
 	RequestedTextureRingDepth uint32
 	// Producer synchronization kinds that the host accepts for acquired texture
 	// frames. The session picks the first one its target supports in this order:
-	// GpuSyncKindQueueOrder, GpuSyncKindOpenGlFence, then GpuSyncKindCpuComplete.
-	// Its capabilities report the pick. Zero accepts GpuSyncKindCpuComplete, or
+	// GpuSyncKindQueueOrder, GpuSyncKindOpenGlFence,
+	// GpuSyncKindVulkanTimelineSemaphore, then GpuSyncKindCpuComplete. Its
+	// capabilities report the pick. Zero accepts GpuSyncKindCpuComplete, or
 	// GpuSyncKindQueueOrder on WebGPU, whose device has a single queue. A set that
 	// the target cannot satisfy fails the attach with StatusUnsupported.
 	ProducerSyncKinds GpuSyncKindFlag
@@ -5241,6 +5254,8 @@ func (view GpuSyncView) Handle() (uint64, error) {
 		return view.value.Handle
 	})
 }
+
+func (view GpuSyncView) Value() uint64 { return view.value.Value }
 
 type VulkanTextureFrameView struct {
 	value VulkanTextureFrame

@@ -29,4 +29,12 @@ public enum GpuSyncKind : uint
     /// submitted there afterwards.
     /// </summary>
     QueueOrder = 2,
+
+    /// <summary>
+    /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+    /// device, and the counter value that the work signals. handle is nonzero.
+    /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
+    /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+    /// </summary>
+    VulkanTimelineSemaphore = 3,
 }

@@ -601,9 +601,13 @@ export type GesturePhase =
 export interface GpuSync {
   kind?: GpuSyncKind;
   /**
-   * Bit pattern of the GLsync pointer.
+   * Bit pattern of the GLsync pointer or the VkSemaphore handle.
    */
   handle?: bigint;
+  /**
+   * Counter value of a timeline kind. Zero for other kinds.
+   */
+  value?: bigint;
 }
 
 /**
@@ -630,6 +634,13 @@ export const GpuSyncKind = {
    * there afterwards.
    */
   queueOrder: 2,
+  /**
+   * VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+   * device, and the counter value that the work signals. handle is nonzero. The
+   * device must enable the timelineSemaphore feature, through Vulkan 1.2 or
+   * VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+   */
+  vulkanTimelineSemaphore: 3,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
@@ -646,6 +657,7 @@ export const GpuSyncKindFlag = {
   cpuComplete: 1,
   openGlFence: 2,
   queueOrder: 4,
+  vulkanTimelineSemaphore: 8,
 } as const;
 /** A bitwise OR of GpuSyncKindFlag flags. */
 export type GpuSyncKindFlag = number;
@@ -1908,11 +1920,11 @@ export interface RenderSessionAttachOptions {
   /**
    * Producer synchronization kinds that the host accepts for acquired texture
    * frames. The session picks the first one its target supports in this order:
-   * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
-   * `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-   * `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-   * device has a single queue. A set that the target cannot satisfy fails the
-   * attach with `Status.unsupported`.
+   * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
+   * `GpuSyncKind.vulkanTimelineSemaphore`, then `GpuSyncKind.cpuComplete`. Its
+   * capabilities report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
+   * `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
+   * that the target cannot satisfy fails the attach with `Status.unsupported`.
    */
   producerSyncKinds?: GpuSyncKindFlag;
   /**

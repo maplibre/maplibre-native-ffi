@@ -596,7 +596,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static GpuSync CopyGpuSync(mln_gpu_sync value) =>
-        new((GpuSyncKind)value.kind, value.handle);
+        new((GpuSyncKind)value.kind, value.handle, value.value);
 
     internal static mln_gpu_sync NativeGpuSync(GpuSync value)
     {
@@ -604,6 +604,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_gpu_sync);
         native.kind = (mln_gpu_sync_kind)value.Kind;
         native.handle = value.Handle;
+        native.value = value.Value;
         return native;
     }
 

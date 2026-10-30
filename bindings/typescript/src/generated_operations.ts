@@ -4520,6 +4520,10 @@ export class ScopedGpuSync {
   get handle(): GpuSync["handle"] {
     return this.#scope.active(this.#value).handle;
   }
+
+  get value(): GpuSync["value"] {
+    return this.#value.value;
+  }
 }
 
 /**

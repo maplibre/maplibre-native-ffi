@@ -239,6 +239,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
       0u -> "CPU_COMPLETE"
       1u -> "OPEN_GL_FENCE"
       2u -> "QUEUE_ORDER"
+      3u -> "VULKAN_TIMELINE_SEMAPHORE"
       else -> "GpuSyncKind($rawValue)"
     }
 
@@ -259,6 +260,13 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * which orders it before any work submitted there afterwards.
      */
     public val QUEUE_ORDER: GpuSyncKind = GpuSyncKind(2u)
+    /**
+     * VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's device, and the
+     * counter value that the work signals. handle is nonzero. The device must enable the
+     * timelineSemaphore feature, through Vulkan 1.2 or VK_KHR_timeline_semaphore, for a host to
+     * accept or pass this kind.
+     */
+    public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(3u)
   }
 }
 
@@ -285,7 +293,12 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
     flagLabel(
       rawValue.toULong(),
       "NONE",
-      listOf(1uL to "CPU_COMPLETE", 2uL to "OPEN_GL_FENCE", 4uL to "QUEUE_ORDER"),
+      listOf(
+        1uL to "CPU_COMPLETE",
+        2uL to "OPEN_GL_FENCE",
+        4uL to "QUEUE_ORDER",
+        8uL to "VULKAN_TIMELINE_SEMAPHORE",
+      ),
     )
 
   public companion object {
@@ -294,6 +307,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
     public val CPU_COMPLETE: GpuSyncKindFlag = GpuSyncKindFlag(1u)
     public val OPEN_GL_FENCE: GpuSyncKindFlag = GpuSyncKindFlag(2u)
     public val QUEUE_ORDER: GpuSyncKindFlag = GpuSyncKindFlag(4u)
+    public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag = GpuSyncKindFlag(8u)
   }
 }
 
@@ -1729,8 +1743,10 @@ public class OpenGlTextureFrame(
  */
 public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
-  /** Bit pattern of the GLsync pointer. */
+  /** Bit pattern of the GLsync pointer or the VkSemaphore handle. */
   handle: ULong = 0uL,
+  /** Counter value of a timeline kind. Zero for other kinds. */
+  public val value: ULong = 0uL,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedHandle: ULong = handle
@@ -2289,10 +2305,10 @@ public data class RenderSessionAttachOptions(
   /**
    * Producer synchronization kinds that the host accepts for acquired texture frames. The session
    * picks the first one its target supports in this order: `GpuSyncKind.QUEUE_ORDER`,
-   * `GpuSyncKind.OPEN_GL_FENCE`, then `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick.
-   * Zero accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device
-   * has a single queue. A set that the target cannot satisfy fails the attach with
-   * `Status.UNSUPPORTED`.
+   * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, then
+   * `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single
+   * queue. A set that the target cannot satisfy fails the attach with `Status.UNSUPPORTED`.
    */
   public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */

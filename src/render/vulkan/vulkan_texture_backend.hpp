@@ -68,8 +68,16 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   void activate() override;
   void deactivate() override;
 
-  // Makes a frame acquirable once submitted rather than once complete.
-  void set_queue_ordered(bool queue_ordered) { queue_ordered_ = queue_ordered; }
+  // Selects how each frame is handed over. Any kind but CPU completion makes
+  // a frame acquirable once submitted rather than once complete.
+  void set_producer_sync_kind(mln_gpu_sync_kind kind) {
+    producer_sync_kind_ = kind;
+  }
+  // The synchronization of the last frame rendered.
+  [[nodiscard]] auto producer_sync() const -> mln_gpu_sync;
+  // Makes the session's later work on its queue wait for `semaphore`, a
+  // timeline semaphore on the device, to reach `value`.
+  void wait_timeline(VkSemaphore semaphore, uint64_t value);
   void prepareRenderResources();
   auto frame_resources() -> VulkanTextureFrameResources;
   auto select_slot(std::size_t slot) -> bool;
@@ -91,7 +99,17 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // The caller's image for each slot, or empty for a session-owned ring.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
-  bool queue_ordered_ = false;
+  mln_gpu_sync_kind producer_sync_kind_ = MLN_GPU_SYNC_CPU_COMPLETE;
+  // The producer timeline, made when the first frame signals it, and the value
+  // its last frame signaled.
+  vk::UniqueSemaphore timeline_;
+  uint64_t timeline_value_ = 0;
+  // A command buffer holding one global barrier, so that a semaphore wait
+  // submitted with it orders every later submission on the queue.
+  vk::UniqueCommandPool wait_pool_;
+  vk::CommandBuffer wait_barrier_;
+
+  void signal_timeline();
   std::size_t slot_count_;
   std::size_t selected_slot_ = 0;
   // Set by select_slot() and set_borrowed_target(), so the next

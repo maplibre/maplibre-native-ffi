@@ -735,7 +735,7 @@ class OpenGLTextureSessionBackend final
       mln::platform::glFlush();
       producer_sync_ = mln_gpu_sync{
         sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE,
-        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence))
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence)), 0
       };
     } else {
       backend_.finish_rendering();
@@ -764,7 +764,7 @@ class OpenGLTextureSessionBackend final
   OpenGLTextureBackend backend_;
   mln_gpu_sync_kind producer_sync_kind_;
   mln_gpu_sync producer_sync_{
-    sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0
+    sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0
   };
   std::array<mln::platform::GLsync, mln::core::max_texture_ring_depth>
     producer_fences_{};

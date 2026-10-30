@@ -434,6 +434,8 @@ final class mln_gpu_sync extends Struct {
   external int kind;
   @Uint64()
   external int handle;
+  @Uint64()
+  external int value;
 }
 
 final class mln_graphics_device_options extends Struct {
@@ -1743,11 +1745,13 @@ const MLN_GESTURE_PHASE_CANCEL = 4;
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
 const MLN_GPU_SYNC_OPEN_GL_FENCE = 1;
 const MLN_GPU_SYNC_QUEUE_ORDER = 2;
+const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3;
 
 // mln_gpu_sync_kind_flag
 const MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1;
 const MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 2;
 const MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 4;
+const MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 8;
 
 // mln_graphics_device_option_field
 const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1;

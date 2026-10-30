@@ -864,6 +864,10 @@ napi_value mln_ts_read_gpu_sync(
         env, result, "handle", mln_ts_u64(env, (uint64_t)(source->handle))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "value", mln_ts_u64(env, (uint64_t)(source->value))
+      ))
+    return NULL;
   return result;
 }
 
@@ -3782,6 +3786,15 @@ bool mln_ts_write_gpu_sync(
       uint64_t number = 0;
       if (!mln_ts_read_u64(call, member, &number, child)) return false;
       out->handle = (uint64_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "value", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "value");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->value = (uint64_t)number;
     }
   }
   return true;

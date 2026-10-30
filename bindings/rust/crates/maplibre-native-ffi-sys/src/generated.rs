@@ -101,10 +101,12 @@ pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
 pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
 pub const MLN_GPU_SYNC_QUEUE_ORDER: mln_gpu_sync_kind = 2;
+pub const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE: mln_gpu_sync_kind = 3;
 pub type mln_gpu_sync_kind_flag = u32;
 pub const MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE: mln_gpu_sync_kind_flag = 1;
 pub const MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE: mln_gpu_sync_kind_flag = 2;
 pub const MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER: mln_gpu_sync_kind_flag = 4;
+pub const MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE: mln_gpu_sync_kind_flag = 8;
 pub type mln_graphics_device_option_field = u32;
 pub const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX: mln_graphics_device_option_field = 1;
 pub const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT: mln_graphics_device_option_field = 2;
@@ -721,6 +723,7 @@ pub struct mln_gpu_sync {
     pub size: u32,
     pub kind: mln_gpu_sync_kind,
     pub handle: u64,
+    pub value: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

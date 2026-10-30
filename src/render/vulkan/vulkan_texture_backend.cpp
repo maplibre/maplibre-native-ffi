@@ -149,9 +149,11 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     ) {
       restore_borrowed_initial_layout(initial_layout, final_layout);
     }
-    // A queue-ordered frame is acquirable once submitted. The next frame's
-    // begin waits for it, so one frame at most is in flight.
-    if (owner_.queue_ordered_) return;
+    if (owner_.producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
+      owner_.signal_timeline();
+    // Otherwise the frame is acquirable once submitted. The next frame's begin
+    // waits for it, so one frame at most is in flight.
+    if (owner_.producer_sync_kind_ != MLN_GPU_SYNC_CPU_COMPLETE) return;
     // This resource is only used by VulkanTextureBackend, so the downcast is
     // invariant within this file.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -507,6 +509,94 @@ void VulkanTextureBackend::set_borrowed_target(
     getResource<VulkanTextureRenderableResource>().drop_slots();
   }
   selection_pending_ = true;
+}
+
+auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
+  return mln_gpu_sync{
+    .size = sizeof(mln_gpu_sync),
+    .kind = producer_sync_kind_,
+    .handle =
+      timeline_
+        ? vulkan_handle_to_abi(static_cast<VkSemaphore>(timeline_.get()))
+        : 0,
+    .value = timeline_value_,
+  };
+}
+
+void VulkanTextureBackend::signal_timeline() {
+  if (!timeline_) {
+    auto type = vk::SemaphoreTypeCreateInfo()
+                  .setSemaphoreType(vk::SemaphoreType::eTimeline)
+                  .setInitialValue(0);
+    timeline_ = device->createSemaphoreUnique(
+      vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
+    );
+  }
+  // A signal's first scope holds everything submitted to the queue before it,
+  // so a submission without commands signals once the frame completes.
+  const auto value = timeline_value_ + 1;
+  const auto timeline =
+    vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
+  const auto semaphore = timeline_.get();
+  graphicsQueue.submit(
+    vk::SubmitInfo().setPNext(&timeline).setSignalSemaphores(semaphore),
+    nullptr, dispatcher
+  );
+  timeline_value_ = value;
+}
+
+void VulkanTextureBackend::wait_timeline(
+  VkSemaphore semaphore, uint64_t value
+) {
+  if (!wait_pool_) {
+    wait_pool_ = device->createCommandPoolUnique(
+      vk::CommandPoolCreateInfo().setQueueFamilyIndex(
+        static_cast<uint32_t>(graphicsQueueIndex)
+      ),
+      nullptr, dispatcher
+    );
+    wait_barrier_ = device
+                      ->allocateCommandBuffers(
+                        vk::CommandBufferAllocateInfo()
+                          .setCommandPool(wait_pool_.get())
+                          .setLevel(vk::CommandBufferLevel::ePrimary)
+                          .setCommandBufferCount(1),
+                        dispatcher
+                      )
+                      .front();
+    wait_barrier_.begin(
+      vk::CommandBufferBeginInfo().setFlags(
+        vk::CommandBufferUsageFlagBits::eSimultaneousUse
+      ),
+      dispatcher
+    );
+    const auto barrier = vk::MemoryBarrier()
+                           .setSrcAccessMask(vk::AccessFlagBits::eMemoryWrite)
+                           .setDstAccessMask(
+                             vk::AccessFlags{vk::AccessFlagBits::eMemoryRead} |
+                             vk::AccessFlagBits::eMemoryWrite
+                           );
+    wait_barrier_.pipelineBarrier(
+      vk::PipelineStageFlagBits::eAllCommands,
+      vk::PipelineStageFlagBits::eAllCommands, {}, barrier, {}, {}, dispatcher
+    );
+    wait_barrier_.end(dispatcher);
+  }
+  // A wait orders only its own batch, so the batch carries the barrier, which
+  // orders everything submitted after it.
+  const auto timeline =
+    vk::TimelineSemaphoreSubmitInfo().setWaitSemaphoreValues(value);
+  const auto waited = vk::Semaphore(semaphore);
+  const auto stage =
+    vk::PipelineStageFlags{vk::PipelineStageFlagBits::eAllCommands};
+  graphicsQueue.submit(
+    vk::SubmitInfo()
+      .setPNext(&timeline)
+      .setWaitSemaphores(waited)
+      .setWaitDstStageMask(stage)
+      .setCommandBuffers(wait_barrier_),
+    nullptr, dispatcher
+  );
 }
 
 auto VulkanTextureBackend::frame_layout() const -> VkImageLayout {

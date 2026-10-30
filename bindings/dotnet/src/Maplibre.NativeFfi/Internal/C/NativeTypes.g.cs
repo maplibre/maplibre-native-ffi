@@ -280,6 +280,7 @@ internal unsafe struct mln_gpu_sync
     public uint size;
     public mln_gpu_sync_kind kind;
     public ulong handle;
+    public ulong value;
 }
 
 internal unsafe struct mln_graphics_device_options
@@ -1442,6 +1443,7 @@ internal enum mln_gpu_sync_kind : uint
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
     MLN_GPU_SYNC_OPEN_GL_FENCE = 1,
     MLN_GPU_SYNC_QUEUE_ORDER = 2,
+    MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3,
 }
 
 internal enum mln_gpu_sync_kind_flag : uint
@@ -1449,6 +1451,7 @@ internal enum mln_gpu_sync_kind_flag : uint
     MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1,
     MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 2,
     MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 4,
+    MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 8,
 }
 
 internal enum mln_graphics_device_option_field : uint

@@ -460,7 +460,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or
- *   consumer_completion is undersized, or an OpenGL fence has a zero handle.
+ *   consumer_completion is undersized, or names an object with a zero
+ *   handle.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
  *   active.

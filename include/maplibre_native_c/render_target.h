@@ -163,6 +163,23 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * hazard tracking on.
    */
   MLN_GPU_SYNC_QUEUE_ORDER = 2U,
+  /**
+   * VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
+   * device, and the counter value that the work signals. handle is nonzero.
+   * The device must enable the timelineSemaphore feature, through Vulkan 1.2
+   * or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+   *
+   * A producer semaphore belongs to the session, which signals it after each
+   * frame's work on the context's graphics_queue, with a value larger than the
+   * last frame's. The host waits for value, on a queue of the device or on the
+   * CPU, before it reads the texture. The host never signals the semaphore,
+   * which stays valid until detach completes.
+   *
+   * A consumer semaphore belongs to the host, which signals value once its
+   * reads complete. The session's later work on its queue waits for it. The
+   * host keeps the semaphore valid until detach completes.
+   */
+  MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3U,
 } mln_gpu_sync_kind;
 
 /** A bit for each mln_gpu_sync_kind. */
@@ -170,6 +187,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
   MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1U << 0U,
   MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 1U << 1U,
   MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 1U << 2U,
+  MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 1U << 3U,
 } mln_gpu_sync_kind_flag;
 
 /** A set of mln_gpu_sync_kind_flag bits. */
@@ -202,8 +220,9 @@ typedef struct mln_render_session_attach_options {
   /**
    * Producer synchronization kinds that the host accepts for acquired texture
    * frames. The session picks the first one its target supports in this order:
-   * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE, then
-   * MLN_GPU_SYNC_CPU_COMPLETE. Its capabilities report the pick. Zero accepts
+   * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE,
+   * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, then MLN_GPU_SYNC_CPU_COMPLETE.
+   * Its capabilities report the pick. Zero accepts
    * MLN_GPU_SYNC_CPU_COMPLETE, or MLN_GPU_SYNC_QUEUE_ORDER on WebGPU, whose
    * device has a single queue. A set that the target cannot satisfy fails the
    * attach with MLN_STATUS_UNSUPPORTED.
@@ -263,12 +282,14 @@ typedef struct mln_gpu_sync {
   uint32_t size;
   mln_gpu_sync_kind kind;
   /**
-   * Bit pattern of the GLsync pointer.
+   * Bit pattern of the GLsync pointer or the VkSemaphore handle.
    *
-   * Zero when kind names no object. A producer fence that frame
-   * access copies is valid only until the frame's release or discard.
+   * Zero when kind names no object. A producer fence that frame access copies
+   * is valid only until the frame's release or discard.
    */
   uint64_t handle MLN_BINDING("lifetime=owner");
+  /** Counter value of a timeline kind. Zero for other kinds. */
+  uint64_t value;
 } mln_gpu_sync;
 
 /** Metal backend context fields shared by Metal render targets. */

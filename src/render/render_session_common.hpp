@@ -327,7 +327,7 @@ class TextureSessionBackend {
     return MLN_STATUS_UNSUPPORTED;
   }
   virtual auto producer_sync() const -> mln_gpu_sync {
-    return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
+    return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
   }
   // Whether a render returns before the GPU finishes its frame, where every
   // other backend's render waits for it. The session counts such frames, and
@@ -489,7 +489,8 @@ inline constexpr auto gpu_sync_kind_flag(mln_gpu_sync_kind kind) noexcept
 
 inline constexpr mln_gpu_sync_kind_flags known_gpu_sync_kinds =
   MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE |
-  MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER |
+  MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
 
 // Whether a sync kind hands over an object that the receiver must wait on.
 // The other kinds order the work before the handoff.
@@ -504,6 +505,7 @@ struct RenderTextureSlot {
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
     .handle = 0,
+    .value = 0,
   };
   // Recorded by the driver thread when the slot's frame is published. Empty
   // until then, which makes the slot unacquirable.
@@ -907,6 +909,10 @@ struct mln_render_session_object
   mln_gpu_sync_kind_flags producer_sync_kinds =
     MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
   mln_gpu_sync_kind producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE;
+  // Set before attach by a target whose sync kinds depend on the host's
+  // graphics objects. Attach calls it once the request is otherwise valid,
+  // and adds what it returns to the producer and consumer kinds.
+  std::function<mln_gpu_sync_kind_flags()> probe_sync_kinds;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
   bool scheduler_service_queued = false;

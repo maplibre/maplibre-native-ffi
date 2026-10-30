@@ -759,7 +759,8 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
 }
 
 // Takes the first physical device and queue family that accept a graphics
-// device, enabling VK_KHR_swapchain where the device has it.
+// device, enabling VK_KHR_swapchain and timeline semaphores where the device
+// has them.
 static bool vulkan_create_device(mln_test_graphics* graphics) {
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   PFN_vkEnumeratePhysicalDevices enumerate_devices =
@@ -777,6 +778,10 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
   PFN_vkEnumerateDeviceExtensionProperties enumerate_extensions =
     (PFN_vkEnumerateDeviceExtensionProperties)vulkan_proc(
       graphics, "vkEnumerateDeviceExtensionProperties"
+    );
+  PFN_vkGetPhysicalDeviceFeatures2 get_features2 =
+    (PFN_vkGetPhysicalDeviceFeatures2)vulkan_proc(
+      graphics, "vkGetPhysicalDeviceFeatures2"
     );
   PFN_vkCreateDevice create_device =
     (PFN_vkCreateDevice)vulkan_proc(graphics, "vkCreateDevice");
@@ -820,8 +825,24 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
     }
     get_queues(devices[d], &queue_count, queues);
     enumerate_extensions(devices[d], NULL, &extension_count, extensions);
-    const char* enabled[2];
+    const char* enabled[3];
     uint32_t enabled_count = 0;
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+    };
+    if (
+      get_features2 != NULL &&
+      has_extension(extensions, extension_count, "VK_KHR_timeline_semaphore")
+    ) {
+      VkPhysicalDeviceFeatures2 supported2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &timeline,
+      };
+      get_features2(devices[d], &supported2);
+      timeline.pNext = NULL;
+      if (timeline.timelineSemaphore)
+        enabled[enabled_count++] = "VK_KHR_timeline_semaphore";
+    }
     if (
       has_extension(extensions, extension_count, "VK_KHR_portability_subset")
     ) {
@@ -855,6 +876,7 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queue_info,
+        .pNext = timeline.timelineSemaphore ? &timeline : NULL,
         .enabledExtensionCount = enabled_count,
         .ppEnabledExtensionNames = enabled,
         .pEnabledFeatures = &features,

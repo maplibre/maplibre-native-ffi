@@ -313,6 +313,7 @@ fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyR
     let dict = PyDict::new(py);
     dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item("handle", generated_value(py, value.handle)?)?;
+    dict.set_item("value", generated_value(py, value.value)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2008,6 +2009,7 @@ fn generated_input_mln_gpu_sync<'py>(
     }
     raw.kind = value.getattr("kind")?.extract::<sys::mln_gpu_sync_kind>()?;
     raw.handle = value.getattr("handle")?.extract::<u64>()?;
+    raw.value = value.getattr("value")?.extract::<u64>()?;
     Ok(raw)
 }
 

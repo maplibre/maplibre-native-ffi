@@ -15,4 +15,5 @@ public sealed class GpuSyncView
 
     public GpuSyncKind Kind => value.Kind;
     public ulong Handle => scope.Active(value).Handle;
+    public ulong Value => value.Value;
 }
