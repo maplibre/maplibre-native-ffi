@@ -390,15 +390,6 @@ operations = ["package"]
 status = "path-known"
 reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
 
-[[entry]]
-bindings = ["c"]
-platforms = ["macos"]
-archs = ["x64"]
-backends = ["metal"]
-operations = ["xcframework"]
-status = "path-known"
-reason = "The XCFramework ships ARM64 macOS alone. Combine the x64 and ARM64 frameworks into one universal macOS slice before adding Intel macOS; the per-target native archives already ship both."
-
 # Missing test devices apply to native and binding suites alike. Packages are
 # still built and published; a simulator is a distinct execution target.
 

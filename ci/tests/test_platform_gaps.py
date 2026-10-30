@@ -165,13 +165,12 @@ class PlatformGapsTest(unittest.TestCase):
         ):
             plan.dotnet_runtime_target("futureos-x64-vulkan")
 
-    def test_xcframework_gap_preserves_the_per_target_native_archive(self):
-        target = self.targets["macos-x64-metal"]
-        self.assertFalse(gaps.supported("c", target, "xcframework"))
-        self.assertTrue(gaps.supported("c", target, "package"))
-        self.assertNotIn(
-            target, plan.consumed("apple-xcframework", list(self.targets.values()))
-        )
+    def test_xcframework_includes_both_macos_archives(self):
+        inputs = plan.consumed("apple-xcframework", list(self.targets.values()))
+        for arch in ("arm64", "x64"):
+            target = self.targets[f"macos-{arch}-metal"]
+            self.assertTrue(gaps.supported("c", target, "package"))
+            self.assertIn(target, inputs)
 
     def test_no_gap_means_every_binding_runs_on_every_runner_family(self):
         names = (
