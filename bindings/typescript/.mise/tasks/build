@@ -38,7 +38,7 @@ case "$usage_preset" in
     ;;
 esac
 case "$usage_preset" in
-  linux-* | ohos-*)
+  linux-* | freebsd-* | ohos-*)
     exported="$("$nm" -D --defined-only "$addon" | awk '{print $3}' | sort -u)"
     ;;
   macos-*)

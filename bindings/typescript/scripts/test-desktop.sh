@@ -17,6 +17,13 @@ case "$preset" in
       exit 2
     fi
     ;;
+  freebsd-*)
+    read -r -a runtimes <<<"${2:-node}"
+    if [[ "${runtimes[*]}" != node ]]; then
+      echo "error: FreeBSD runs the suite on its packaged Node.js" >&2
+      exit 2
+    fi
+    ;;
   linux-musl-*)
     read -r -a runtimes <<<"${2:-node bun}"
     if [[ "${runtimes[0]}" == deno ]]; then
@@ -49,6 +56,9 @@ case "$preset" in
   *-riscv64-*) install_args+=(--cpu=riscv64 --force) ;;
   *-loongarch64-*) install_args+=(--cpu=loong64 --force) ;;
 esac
+if [[ "$preset" == freebsd-* ]]; then
+  install_args+=(--os=freebsd --force)
+fi
 if [[ "$preset" == linux-musl-* ]]; then
   install_args+=(--libc=musl --force)
 fi
@@ -57,6 +67,16 @@ pnpm exec tsc -p "$consumer"
 export MAPLIBRE_NATIVE_FFI_TEST_CONSUMER="$consumer"
 
 case "$preset" in
+  freebsd-*)
+    host=$("$MISE_MONOREPO_ROOT/tools/devices/freebsd-host")
+    ssh -o BatchMode=yes "$host" pkg install --yes --quiet node26 >&2
+    "$MISE_MONOREPO_ROOT/scripts/run-freebsd-test.sh" "$preset" env \
+      MAPLIBRE_NATIVE_FFI_ADDON="$MAPLIBRE_NATIVE_FFI_ADDON" \
+      MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS="$MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS" \
+      MAPLIBRE_NATIVE_FFI_TEST_CONSUMER="$consumer" \
+      node --expose-gc --test --test-isolation=none --test-timeout=300000 \
+      "$PWD/test/run/node.ts"
+    ;;
   linux-gnu-riscv64-* | linux-gnu-loongarch64-*)
     architecture=${preset#linux-gnu-}
     root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" gnu "${architecture%%-*}")

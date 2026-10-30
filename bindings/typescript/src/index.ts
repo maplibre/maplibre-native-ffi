@@ -3,7 +3,7 @@
  *
  * The desktop binding supports Linux with glibc on Node.js, Bun, and Deno,
  * Linux with musl on Node.js and Bun, and macOS on all three runtimes.
- * The GNU RISC-V and LoongArch64 addons support Node.js.
+ * The GNU RISC-V, LoongArch64, and FreeBSD x64 addons support Node.js.
  *
  * Every callback reaches the realm's event loop after the native call that
  * raised it has returned, so native code answers each synchronous decision

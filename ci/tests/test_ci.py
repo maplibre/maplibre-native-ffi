@@ -182,7 +182,7 @@ class SuitesTest(unittest.TestCase):
     def setUpClass(cls):
         cls.targets = targets()
 
-    def test_typescript_linux_suites_publish_their_tested_addons(self):
+    def test_typescript_linux_and_freebsd_suites_publish_their_tested_addons(self):
         expected = {
             f"linux-{libc}-{arch}-{backend}"
             for libc, architectures in (
@@ -191,11 +191,11 @@ class SuitesTest(unittest.TestCase):
             )
             for arch in architectures
             for backend in ("egl", "vulkan")
-        }
+        } | {"freebsd-x64-egl", "freebsd-x64-vulkan"}
         tested = {
             name
             for name, target in self.targets.items()
-            if target.platform.startswith("linux-")
+            if (target.platform.startswith("linux-") or target.platform == "freebsd")
             and any(
                 suite.task == "//bindings/typescript:test"
                 for suite in suites.target_suites(target)

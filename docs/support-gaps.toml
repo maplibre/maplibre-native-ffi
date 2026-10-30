@@ -186,13 +186,6 @@ status = "path-known"
 reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
 
 [[entry]]
-bindings = ["typescript"]
-platforms = ["freebsd"]
-status = "blocked"
-reason = "Node supports FreeBSD x64 as experimental but ships no official binaries. Bun and Deno publish no FreeBSD runtime either."
-link = "https://github.com/nodejs/node/blob/main/BUILDING.md#platform-list"
-
-[[entry]]
 bindings = [
   "dotnet",
   "dart",

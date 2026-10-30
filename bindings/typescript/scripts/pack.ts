@@ -59,6 +59,7 @@ const platforms: Record<string, { os: string; libc?: string }> = {
   "linux-gnu": { os: "linux", libc: "glibc" },
   "linux-musl": { os: "linux", libc: "musl" },
   macos: { os: "darwin" },
+  freebsd: { os: "freebsd" },
 };
 const titles: Record<string, string> = {
   opengl: "OpenGL",
@@ -99,12 +100,12 @@ function addonOf(preset: string): Addon {
     };
   }
   const match =
-    /^(linux-gnu|linux-musl|macos)-(x64|arm64|riscv64|loongarch64)-(egl|metal|vulkan)$/.exec(
+    /^(linux-gnu|linux-musl|macos|freebsd)-(x64|arm64|riscv64|loongarch64)-(egl|metal|vulkan)$/.exec(
       preset,
     );
   if (match === null) {
     throw new Error(
-      `${preset} has no addon package; only the Linux, macOS, and Emscripten presets do`,
+      `${preset} has no addon package; only the Linux, macOS, FreeBSD, and Emscripten presets do`,
     );
   }
   const { os, libc } = platforms[match[1]!]!;

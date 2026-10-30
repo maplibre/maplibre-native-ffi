@@ -209,9 +209,13 @@ def addon(target: Target) -> str:
     # The npm packages carry the addon that the TypeScript suite built against
     # the packaged native artifact and tested, for each preset that
     # bindings/typescript/scripts/pack.ts packs.
-    if target.platform in {"linux-gnu", "linux-musl", "macos", "emscripten"} and (
-        "//bindings/typescript:test" in tasks
-    ):
+    if target.platform in {
+        "linux-gnu",
+        "linux-musl",
+        "macos",
+        "freebsd",
+        "emscripten",
+    } and ("//bindings/typescript:test" in tasks):
         return "typescript"
     # The OHPM packages carry the addon that each OpenHarmony job built against
     # the packaged native artifact. npm packing downloads every
