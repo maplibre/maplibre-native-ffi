@@ -21,7 +21,11 @@ final class TestGraphics: @unchecked Sendable {
     } else if backends.contains(.vulkan) {
       MLN_TEST_GRAPHICS_BACKEND_VULKAN
     } else {
-      MLN_TEST_GRAPHICS_BACKEND_EGL
+      #if os(Windows)
+        MLN_TEST_GRAPHICS_BACKEND_WGL
+      #else
+        MLN_TEST_GRAPHICS_BACKEND_EGL
+      #endif
     }
     guard let graphics = mln_test_graphics_create(UInt32(backend)) else {
       throw FixtureError(String(cString: mln_test_graphics_last_error()))
@@ -37,10 +41,12 @@ final class TestGraphics: @unchecked Sendable {
 
   deinit { mln_test_graphics_destroy(graphics) }
 
-  /// Makes an EGL context current on the calling thread, which then drives a
+  /// Makes an EGL or WGL context current on the calling thread, which then
+  /// drives a
   /// shared session. Metal and Vulkan have no current context.
   func makeCurrentIfNeeded() throws {
-    guard backend == MLN_TEST_GRAPHICS_BACKEND_EGL else { return }
+    guard backend == MLN_TEST_GRAPHICS_BACKEND_EGL ||
+      backend == MLN_TEST_GRAPHICS_BACKEND_WGL else { return }
     guard mln_test_graphics_make_current(graphics) else {
       throw FixtureError(String(cString: mln_test_graphics_last_error()))
     }
@@ -73,7 +79,7 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      #if os(Android) || os(Linux) || os(macOS)
+      #if os(Android) || os(Linux) || os(macOS) || os(Windows)
         return try map.attachVulkanOwnedTexture(
           descriptor: VulkanOwnedTextureDescriptor(
             extent: extent,
@@ -91,8 +97,25 @@ final class TestGraphics: @unchecked Sendable {
           options: options
         )
       #else
-        throw FixtureError("a Vulkan backend needs Android, Linux, or macOS")
+        throw FixtureError(
+          "a Vulkan backend needs Android, Linux, macOS, or Windows"
+        )
       #endif
+    case MLN_TEST_GRAPHICS_BACKEND_WGL:
+      let dedicated = options.driver == .coreWorker
+      return try map.attachOpenGlOwnedTexture(
+        descriptor: OpenGlOwnedTextureDescriptor(
+          extent: extent,
+          context: OpenGlContextDescriptor(
+            ownership: dedicated ? .dedicated : .shared,
+            data: .wgl(WglContextDescriptor(
+              deviceContext: pointer(context.wgl_device_context),
+              shareContext: dedicated ? .null : pointer(context.wgl_context)
+            ))
+          )
+        ),
+        options: options
+      )
     default:
       let dedicated = options.driver == .coreWorker
       return try map.attachOpenGlOwnedTexture(
@@ -126,10 +149,12 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      #if os(Android) || os(Linux) || os(macOS)
+      #if os(Android) || os(Linux) || os(macOS) || os(Windows)
         try frame.withVulkanTexture { try body($0) }
       #else
-        throw FixtureError("a Vulkan backend needs Android, Linux, or macOS")
+        throw FixtureError(
+          "a Vulkan backend needs Android, Linux, macOS, or Windows"
+        )
       #endif
     default:
       try frame.withOpenGlTexture { try body($0) }

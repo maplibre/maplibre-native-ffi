@@ -8,6 +8,10 @@ set -euo pipefail
 source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 case "$usage_preset" in
+  windows-* | mingw-*)
+    source "$MISE_MONOREPO_ROOT/tools/env/swift-windows-env.sh"
+    exec swift build --target MaplibreNativeFFI "${swift_windows_args[@]}"
+    ;;
   android-*)
     source "$MISE_MONOREPO_ROOT/tools/env/swift-android-env.sh"
     # Build the tests as well, so ARM presets prove the same code the x64

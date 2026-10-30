@@ -1,0 +1,15 @@
+# core:swift resolves Windows releases but cannot install the executable yet.
+# Run the official installer into mise's own prefix instead.
+[tools."http:swift-windows"]
+version = "{{vars.swift_version}}"
+bin = "swift-installer.exe"
+bin_path = "Toolchains/{{ version }}+Asserts/usr/bin"
+postinstall = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{{config_root}}/../../tools/deps/install-swift-windows.ps1"'
+
+[tools."http:swift-windows".platforms]
+windows-x64 = { url = "https://download.swift.org/swift-{{ version }}-release/windows10/swift-{{ version }}-RELEASE/swift-{{ version }}-RELEASE-windows10.exe", checksum = "sha256:9382e14919eeae5e7b5dbfe0575452fe2154178e089a595c8b44d03960d91d59" }
+windows-arm64 = { url = "https://download.swift.org/swift-{{ version }}-release/windows10-arm64/swift-{{ version }}-RELEASE/swift-{{ version }}-RELEASE-windows10-arm64.exe", checksum = "sha256:faff6a12cdae099d76372ca971b0c83b13280ad704e1022faa599dbe0b146e64" }
+
+[env]
+SDKROOT = { value = "{% if 'http:swift-windows' in tools %}{{tools['http:swift-windows'].path}}/Platforms/{{vars.swift_version}}/Windows.platform/Developer/SDKs/Windows.sdk{% endif %}", tools = true }
+_.path = { path = "{% if 'http:swift-windows' in tools %}{{tools['http:swift-windows'].path}}/Runtimes/{{vars.swift_version}}/usr/bin{% endif %}", tools = true }

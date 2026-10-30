@@ -100,7 +100,7 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  #if os(Android) || os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
     /// Starts attachment of a ring of caller-owned Vulkan images.
     ///
     /// See `mln_map_attach_vulkan_borrowed_texture` in the
@@ -125,7 +125,7 @@ public extension MapHandle {
     }
   #endif
 
-  #if os(Android) || os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
     /// Starts attachment of a session-owned Vulkan texture ring.
     ///
     /// See `mln_map_attach_vulkan_owned_texture` in the

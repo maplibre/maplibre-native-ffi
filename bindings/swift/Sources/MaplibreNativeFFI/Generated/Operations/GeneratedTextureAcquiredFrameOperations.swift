@@ -62,7 +62,7 @@ public extension AcquiredFrameHandle {
     )) }
   }
 
-  #if os(Android) || os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
     /// Copies Vulkan-native metadata from an acquired frame.
     ///
     /// See `mln_acquired_frame_get_vulkan_texture` in the

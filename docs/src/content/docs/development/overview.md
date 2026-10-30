@@ -134,6 +134,16 @@ MINGW64 `bin` directory on `PATH` for its C++ runtime. Rust uses the matching
 Kotlin/Native's older MinGW sysroot and C++ runtime are a separate compatibility
 requirement.
 
+Swift's Windows tasks install the pinned official toolchain through mise. They
+need Visual Studio's C++ tools and Windows SDK for both the MSVC and MinGW
+presets; the Swift compiler uses Microsoft's SDK even when the C DLL was built
+with MinGW.
+
+```powershell
+mise run //bindings/swift:test windows-x64-vulkan
+mise -E msys2 run //bindings/swift:test mingw-x64-wgl
+```
+
 ## Windows on Linux
 
 The Windows presets also cross-compile on a Linux host, with LLVM's `clang-cl`,

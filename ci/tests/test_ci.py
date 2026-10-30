@@ -238,6 +238,24 @@ class SuitesTest(unittest.TestCase):
                 ("mise", "run", f"//bindings/dart:{action}", preset), commands
             )
 
+    def test_swift_runs_on_windows_msvc_and_mingw(self):
+        for preset in (
+            "windows-x64-wgl",
+            "windows-x64-vulkan",
+            "windows-arm64-wgl",
+            "windows-arm64-vulkan",
+            "mingw-x64-wgl",
+            "mingw-x64-vulkan",
+        ):
+            with self.subTest(preset=preset):
+                commands = [
+                    suite.command
+                    for suite in suites.target_suites(self.targets[preset])
+                ]
+                self.assertIn(
+                    ("mise", "run", "//bindings/swift:test", preset), commands
+                )
+
     def test_swift_builds_android_arm_targets_and_tests_x64(self):
         for architecture in ("arm", "arm64", "x64", "x86"):
             for backend in ("egl", "vulkan"):

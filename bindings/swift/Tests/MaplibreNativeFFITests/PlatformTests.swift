@@ -4,7 +4,7 @@ import Testing
 
 // Exit tests run their body in a child process, which the simulator and Mac
 // Catalyst runners cannot spawn.
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(Windows)
   /// A process exits cleanly with its runtime and map live, its resource
   /// provider and log callback installed, and a style request in flight. The C
   /// API lets a host exit at any point, so nothing is closed first.

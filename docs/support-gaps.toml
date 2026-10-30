@@ -257,13 +257,6 @@ platforms = ["windows-mingw"]
 status = "path-known"
 reason = "The PyO3 extension embeds the C archive through the Rust sys crate. Add its MinGW artifact selection and linkage, build the extension for GNU-target Rust, package runtime DLL dependencies, and test the wheel with Windows CPython."
 
-[[entry]]
-bindings = ["swift"]
-platforms = ["windows", "windows-mingw"]
-status = "path-known"
-reason = "Swift.org ships a Windows toolchain. Add generated Windows platform coverage, SwiftPM import-library discovery and Windows test flags, consume each preset's C DLL, and run the suite with its dependencies on PATH."
-link = "https://www.swift.org/install/windows/"
-
 # No supported toolchain or ABI. Unrejected upstream support work is blocked instead.
 
 [[entry]]

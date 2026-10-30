@@ -56,7 +56,7 @@ public extension RenderSessionHandle {
     }
   }
 
-  #if os(Android) || os(Linux) || os(macOS)
+  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
     /// Starts an ordered replacement of every image of a caller-owned Vulkan
     /// ring.
     ///

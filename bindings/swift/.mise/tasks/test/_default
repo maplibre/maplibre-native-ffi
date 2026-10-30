@@ -14,6 +14,10 @@ set -euo pipefail
 source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 case "$usage_preset" in
+  windows-* | mingw-*)
+    source "$MISE_MONOREPO_ROOT/tools/env/swift-windows-env.sh"
+    exec swift test -c "$usage_configuration" "${swift_windows_args[@]}"
+    ;;
   android-*)
     source "$MISE_MONOREPO_ROOT/tools/env/swift-android-env.sh"
     swift build --product MaplibreNativeFFIDeviceTests \

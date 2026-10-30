@@ -39,7 +39,11 @@ let targets: [Target] = [
         "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"
       ),
     ],
-    linkerSettings: [.linkedLibrary("dl", .when(platforms: [.android, .linux]))]
+    linkerSettings: [
+      .linkedLibrary("dl", .when(platforms: [.android, .linux])),
+      .linkedLibrary("user32", .when(platforms: [.windows])),
+      .linkedLibrary("gdi32", .when(platforms: [.windows])),
+    ]
   ),
   .systemLibrary(
     name: "MaplibreNativeC",

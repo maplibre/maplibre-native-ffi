@@ -57,7 +57,7 @@ void mln_lease_close(mln_lease lease);
 
 
 class SwiftEmitterTests(unittest.TestCase):
-    def test_android_exposes_initialization_and_vulkan_operations(self):
+    def test_android_initialization_and_vulkan_platforms(self):
         outputs = emitted(swift, real_api())
         android = outputs[
             "Generated/Operations/GeneratedAndroidGlobalsOperations.swift"
@@ -74,7 +74,9 @@ class SwiftEmitterTests(unittest.TestCase):
             operations = outputs[
                 f"Generated/Operations/Generated{group}Operations.swift"
             ]
-            self.assertIn("#if os(Android) || os(Linux) || os(macOS)", operations)
+            self.assertIn(
+                "#if os(Android) || os(Linux) || os(macOS) || os(Windows)", operations
+            )
 
     def test_every_owner_has_the_same_handle_members(self):
         owners = emitted(swift, parse(EVENT_SOURCE_AND_LEASE))[

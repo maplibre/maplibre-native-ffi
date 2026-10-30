@@ -21,6 +21,7 @@ PLATFORMS = {
     "macos": "os(macOS)",
     "tvos": "os(tvOS)",
     "visionos": "os(visionOS)",
+    "windows": "os(Windows)",
 }
 DIRECTORY = "bindings/swift/Sources/MaplibreNativeFFI"
 
