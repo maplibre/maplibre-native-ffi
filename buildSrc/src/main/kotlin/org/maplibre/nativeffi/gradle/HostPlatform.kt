@@ -29,7 +29,9 @@ class HostPlatform private constructor(osName: String, arch: String) {
 
   /** The native target platform that the JVM on this host loads. */
   val targetPlatform: String
-    get() = JVM_TARGET_PLATFORMS.getValue(maplibreNativeClassifier)
+    get() =
+      if (isMac) "macos-${if (isArm64) "arm64" else "x64"}"
+      else JVM_TARGET_PLATFORMS.getValue(maplibreNativeClassifier)
 
   val androidNdkPrebuiltTag: String
     get() =
