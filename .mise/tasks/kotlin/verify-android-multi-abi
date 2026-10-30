@@ -37,13 +37,12 @@ for preset in "${presets[@]}"; do
   archive_root="maplibre-native-c-${preset}"
   (
     cd "$build_root"
-    # The AAR contains the native notices and the Prefab headers, and its build
-    # fails for an install without them, so extract both with the library.
+    # The AAR contains native metadata and Prefab headers, so extract them
+    # with the library.
     cmake -E tar xzf "$archive" -- \
       "${archive_root}/include" \
       "${archive_root}/lib/libmaplibre-native-c.so" \
-      "${archive_root}/share/maplibre-native-c/artifact.json" \
-      "${archive_root}/share/maplibre-native-c/licenses"
+      "${archive_root}/share/maplibre-native-c"
   )
 done
 
