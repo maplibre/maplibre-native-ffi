@@ -23,7 +23,7 @@ public sealed class CallbackLifetimeTests
 
         // Native validates the zoom range before it takes the registration.
         var rejected = Gc.OnThread(() => AddRejectedCapturingSource(fixture.Map));
-        Assert.False(Gc.IsAlive(rejected));
+        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -78,7 +78,7 @@ public sealed class CallbackLifetimeTests
         Gc.CollectUntilReclaimed("the completed camera end handler", captured);
 
         var rejected = Gc.OnThread(() => ApplyRejectedCapturingDelta(fixture.Map));
-        Assert.False(Gc.IsAlive(rejected));
+        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

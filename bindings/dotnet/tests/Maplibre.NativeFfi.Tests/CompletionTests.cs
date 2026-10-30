@@ -112,7 +112,7 @@ public sealed class CompletionTests
     public void ARejectedSubmissionFreesItsCompletionState()
     {
         var captured = Gc.OnThread(SubmitRejected);
-        Assert.False(Gc.IsAlive(captured));
+        Gc.CollectUntilReclaimed("the rejected completion capture", captured);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

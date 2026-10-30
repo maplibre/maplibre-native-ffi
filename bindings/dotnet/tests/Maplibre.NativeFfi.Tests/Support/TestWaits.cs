@@ -86,12 +86,13 @@ internal static class Gc
             return true;
         });
 
-    internal static bool IsAlive(WeakReference value) =>
-        OnThread(() =>
-        {
-            Collect();
-            return value.IsAlive;
-        });
+    internal static bool IsAlive(WeakReference value)
+    {
+        // Collect before starting the probe: its OS stack may reuse a former probe's
+        // stale target pointer, which Mono would conservatively mark during collection.
+        Collect();
+        return OnThread(() => value.IsAlive);
+    }
 
     /// <summary>
     /// Collects until every value is reclaimed, failing the test at the shared deadline.

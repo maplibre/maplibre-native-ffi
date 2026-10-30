@@ -10,6 +10,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Mono LLVM AOT intermittently corrupts xUnit's generic async state machines. -->
     <MtouchUseLlvm>false</MtouchUseLlvm>
+    <!-- Interpret xUnit to avoid Mono's shared generic initialization assertion. -->
+    <MtouchInterpreter Condition="'$(MaplibreApplePlatform)' == 'maccatalyst'">-all,xunit.v3.core,xunit.v3.common,xunit.v3.runner.common,xunit.v3.assert</MtouchInterpreter>
     <CodesignKey>-</CodesignKey>
     <CodesignRequireProvisioningProfile>false</CodesignRequireProvisioningProfile>
     <EnableCodeSigning Condition="'$(RuntimeIdentifier)' == 'ios-arm64' Or '$(RuntimeIdentifier)' == 'tvos-arm64'">false</EnableCodeSigning>

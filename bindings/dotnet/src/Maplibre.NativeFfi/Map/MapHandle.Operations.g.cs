@@ -25,14 +25,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     internal MapHandle(RuntimeHandle parent, MlnMap handle, Task completion)
     {
+        // Mono may retain a completed continuation on its worker stack.
+        // Clear its holder so it no longer roots this handle.
         Ready = completion
             .ContinueWith(
                 static (finished, retained) =>
                 {
-                    GC.KeepAlive(retained);
+                    ((System.Runtime.CompilerServices.StrongBox<object?>)retained!).Value = null;
                     return finished;
                 },
-                this,
+                new System.Runtime.CompilerServices.StrongBox<object?>(this),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default
