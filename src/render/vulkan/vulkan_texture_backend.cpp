@@ -419,8 +419,9 @@ VulkanTextureBackend::~VulkanTextureBackend() {
   if (graphicsQueue) {
     try {
       graphicsQueue.waitIdle(dispatcher);
-    } catch (...) {
-      // A lost device has finished every submission.
+    } catch (const vk::DeviceLostError&) {
+      // A lost device has finished every submission. Any other failure leaves
+      // work in flight, so it ends the process, as mbgl's teardown does.
     }
   }
   auto guard = mln::gfx::BackendScope{*this};
