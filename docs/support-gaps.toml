@@ -167,7 +167,7 @@ reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the
 link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
-bindings = ["kotlin-jvm", "kotlin-native", "python"]
+bindings = ["kotlin-jvm", "kotlin-native"]
 platforms = ["macos"]
 archs = ["x64"]
 status = "path-known"
@@ -179,13 +179,6 @@ platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
 reason = "Debian and Alpine package OpenJDK for both architectures. Package the binding's native part for them, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
-
-[[entry]]
-bindings = ["python"]
-platforms = ["linux-gnu", "linux-musl"]
-archs = ["riscv64"]
-status = "path-known"
-reason = "Debian and Alpine package Python for RISC-V. Package the binding's native extension for it, and run the suite with the distribution's runtime under QEMU's user-mode emulator."
 
 [[entry]]
 bindings = ["kotlin-jvm"]

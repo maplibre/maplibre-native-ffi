@@ -306,7 +306,7 @@ class PresetTest(unittest.TestCase):
 
     def test_pypi_selects_runtime_wheel_producers_including_android(self):
         matrix = plan.plan(self.presets, False, ["pypi"])["matrix"]
-        self.assertEqual(len(matrix), 19)
+        self.assertEqual(len(matrix), 24)
         self.assertTrue(all(row["python_wheel"] for row in matrix))
         self.assertEqual(
             {row["preset"] for row in matrix if row["preset"].startswith("android-")},
