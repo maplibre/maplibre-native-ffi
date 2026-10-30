@@ -41,11 +41,13 @@ if [[ "$preset" == android-x64-egl ]]; then
 fi
 serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
 adb="$ANDROID_HOME/platform-tools/adb"
-"$adb" -s "$serial" logcat -c
+# API 26's logd can reject clearing its buffers. Read only this invocation's
+# output using the device's clock instead.
+started=$("$adb" -s "$serial" shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
 dotnet build "${arguments[@]}" -t:Run "-p:AdbTarget=-s $serial"
 # Only the app's test output travels through logcat. A crash or a hang cannot
 # count as success: the host must receive the runner's terminal status.
-python - "$adb" "$serial" <<'PY'
+python - "$adb" "$serial" "$started" <<'PY'
 import signal
 import subprocess
 import sys
@@ -53,7 +55,7 @@ import sys
 signal.signal(signal.SIGALRM, lambda *_: sys.exit("Android test app timed out"))
 signal.alarm(300)
 with subprocess.Popen(
-    [sys.argv[1], "-s", sys.argv[2], "logcat", "-v", "raw", "-s", "MaplibreDotnetTests:I"],
+    [sys.argv[1], "-s", sys.argv[2], "logcat", "-T", sys.argv[3], "-v", "raw", "-s", "MaplibreDotnetTests:I"],
     stdout=subprocess.PIPE,
     text=True,
 ) as log:
