@@ -400,9 +400,10 @@ link = "https://docs.blacksmith.sh/blacksmith-runners/overview"
 bindings = ["c"]
 platforms = ["android"]
 archs = ["x86"]
+backends = ["vulkan"]
 operations = ["test"]
-status = "path-known"
-reason = "CI cross-builds Android x86 but runs the x64 emulator alone. Add an x86 emulator to run the suites."
+status = "blocked"
+reason = "The API 30 x86 emulator aborts during Vulkan process cleanup with `Failed to unbox VkInstance`, including emulator 37.3.6 after the Kotlin suite passes all 86 tests."
 
 [[entry]]
 bindings = ["c"]

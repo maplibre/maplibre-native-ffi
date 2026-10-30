@@ -43,7 +43,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
         self.assertEqual(
             [row["preset"] for row in self.matrix if row["emulator_logs"]],
-            ["android-x64-egl", "android-x64-vulkan"],
+            [
+                "android-x86-egl",
+                "android-x64-egl",
+                "android-x64-vulkan",
+            ],
         )
 
     def test_the_target_job_runs_its_suites_after_build_and_boot(self):
@@ -137,7 +141,7 @@ class VendorTest(unittest.TestCase):
                 self.assertIn(target.runner, labels)
 
     def test_each_device_target_boots_its_device(self):
-        android = "tools/devices/android-serial x86_64"
+        android = "tools/devices/android-serial"
         freebsd = ("FreeBSD virtual machine", "tools/devices/freebsd-host")
         self.assertEqual(
             {
@@ -157,10 +161,9 @@ class VendorTest(unittest.TestCase):
                     "visionOS simulator",
                     "devices-cli get visionos",
                 ),
-                # The EGL target's suites run on API 26, as the root `test`
-                # task and the device test scripts ask for it.
-                "android-x64-egl": ("Android emulator", f"{android} --api 26"),
-                "android-x64-vulkan": ("Android emulator", android),
+                "android-x86-egl": ("Android emulator", f"{android} android-x86-egl"),
+                "android-x64-egl": ("Android emulator", f"{android} android-x64-egl"),
+                "android-x64-vulkan": ("Android emulator", f"{android} x86_64"),
                 "ohos-x64-egl": ("OpenHarmony emulator", "tools/devices/ohos-key"),
                 "ohos-x64-vulkan": ("OpenHarmony emulator", "tools/devices/ohos-key"),
                 # Each emulated libc and architecture has a root of its own.
@@ -280,7 +283,7 @@ class SuitesTest(unittest.TestCase):
             ("android-arm-vulkan", "build"),
             ("android-arm64-egl", "build"),
             ("android-arm64-vulkan", "build"),
-            ("android-x86-egl", "build"),
+            ("android-x86-egl", "test"),
             ("android-x86-vulkan", "build"),
             ("android-x64-egl", "test"),
             ("android-x64-vulkan", "test"),
@@ -313,7 +316,7 @@ class SuitesTest(unittest.TestCase):
             ("android-arm-vulkan", "build"),
             ("android-arm64-egl", "build"),
             ("android-arm64-vulkan", "build"),
-            ("android-x86-egl", "build"),
+            ("android-x86-egl", "test"),
             ("android-x86-vulkan", "build"),
             ("android-x64-egl", "test"),
             ("android-x64-vulkan", "test"),

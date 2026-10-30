@@ -10,11 +10,7 @@ case "$preset" in
 esac
 
 mise run //:android-sdk-packages
-api=$MLN_FFI_ANDROID_EMULATOR_API
-if [[ "$preset" == android-x64-egl ]]; then
-  api=26
-fi
-serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$preset")
 
 prefix="$MISE_MONOREPO_ROOT/build/$preset/install"
 toolchain=$("$MISE_MONOREPO_ROOT/tools/env/android-ndk-prebuilt.sh")

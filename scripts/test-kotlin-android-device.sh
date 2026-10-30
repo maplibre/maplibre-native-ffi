@@ -12,6 +12,14 @@ case "$preset" in
     abi=arm64-v8a
     backend=vulkan
     ;;
+  android-x86-egl)
+    abi=x86
+    backend=opengl
+    ;;
+  android-x86-vulkan)
+    abi=x86
+    backend=vulkan
+    ;;
   android-x64-egl)
     abi=x86_64
     backend=opengl
@@ -28,11 +36,7 @@ esac
 
 mise run //:android-sdk-packages
 # Gradle tests on this device alone rather than on every connected device.
-api=$MLN_FFI_ANDROID_EMULATOR_API
-if [[ "$preset" == android-x64-egl ]]; then
-  api=26
-fi
-ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
+ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$preset")
 export ANDROID_SERIAL
 exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \

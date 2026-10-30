@@ -776,7 +776,15 @@
     {
       "name": "android-x86-egl",
       "displayName": "Android x86 EGL",
-      "inherits": ["_android-x86", "_egl"]
+      "inherits": ["_android-x86", "_egl"],
+      "vendor": {
+        "maplibre-native-ffi": {
+          "device": {
+            "name": "Android emulator",
+            "command": "tools/devices/android-serial android-x86-egl"
+          }
+        }
+      }
     },
     {
       "name": "android-x86-vulkan",
@@ -791,7 +799,7 @@
         "maplibre-native-ffi": {
           "device": {
             "name": "Android emulator",
-            "command": "tools/devices/android-serial x86_64 --api 26"
+            "command": "tools/devices/android-serial android-x64-egl"
           }
         }
       }

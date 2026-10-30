@@ -18,6 +18,7 @@ case "$usage_preset" in
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
     ;;
   android-arm64-*) kotlin_target=androidNativeArm64 ;;
+  android-x86-*) kotlin_target=androidNativeX86 ;;
   android-x64-*) kotlin_target=androidNativeX64 ;;
   ios-simulator-arm64-metal)
     kotlin_target=iosSimulatorArm64

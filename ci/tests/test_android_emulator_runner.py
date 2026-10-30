@@ -205,6 +205,22 @@ class AndroidSerialTest(unittest.TestCase):
             ["get", "android", "--api", "26", "--abi", "x86_64", "--"],
         )
 
+    def test_presets_select_their_image(self):
+        for preset, abi, api, variant in (
+            ("android-x86-egl", "x86", "30", ["--variant", "google_apis"]),
+            ("android-x86-vulkan", "x86", "30", ["--variant", "google_apis"]),
+            ("android-x64-egl", "x86_64", "26", []),
+            ("android-x64-vulkan", "x86_64", "36", []),
+        ):
+            with self.subTest(preset=preset):
+                result = self.serial(preset, FAKE_ABI=abi, FAKE_API=api)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                arguments = self.arguments.read_text().splitlines()
+                self.assertEqual(
+                    arguments[: 7 + len(variant)],
+                    ["get", "android", "--api", api, "--abi", abi, *variant, "--"],
+                )
+
     def test_an_sdk_without_the_emulator_installs_it_without_a_jdk(self):
         (self.sdk / "emulator/source.properties").unlink()
         (self.sdk / "cmdline-tools/latest/bin").mkdir(parents=True)

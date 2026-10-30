@@ -62,7 +62,7 @@ run = 'python scripts/hermes.py build "$usage_preset"'
 description = "Run the Hermes TypeScript suite, graphics readback, and runtime teardown."
 usage = '''
 arg "<preset>" {
-  choices "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-simulator-arm64-metal" "visionos-simulator-arm64-metal"
+  choices "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-simulator-arm64-metal" "visionos-simulator-arm64-metal"
 }
 '''
 depends = [{ task = ":build:hermes", args = ["{{usage.preset}}"] }]

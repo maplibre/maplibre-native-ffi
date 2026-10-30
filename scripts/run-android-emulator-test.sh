@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Runs native test executables on the Android device that
-# tools/devices/android-serial names for the ABI and API level.
+# tools/devices/android-serial names for the preset or ABI.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
+  echo "usage: $0 <timeout-seconds> <preset-or-abi> <native-library> [--api <api>] [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
-abi=$2
+target=$2
 native_library=$3
 shift 3
 emulator_api=
@@ -131,7 +131,7 @@ run_adb() {
   exit "$status"
 }
 
-serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" ${emulator_api:+--api "$emulator_api"})
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$target" ${emulator_api:+--api "$emulator_api"})
 avd_name=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n 's/\r$//;1p') || avd_name=
 
 remove_remote_dir() {

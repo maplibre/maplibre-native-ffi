@@ -35,11 +35,7 @@ if [[ ${2:-} == --build-only ]]; then
   exec dotnet build "${arguments[@]}"
 fi
 
-api=$MLN_FFI_ANDROID_EMULATOR_API
-if [[ "$preset" == android-x64-egl ]]; then
-  api=26
-fi
-serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$abi" --api "$api")
+serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$preset")
 adb="$ANDROID_HOME/platform-tools/adb"
 # API 26's logd can reject clearing its buffers. Read only this invocation's
 # output using the device's clock instead.

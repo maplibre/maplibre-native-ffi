@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
-# Prints the serial of the Android device that tests for an ABI and API level
-# run on.
-#
-#   tools/devices/android-serial <abi> [--api <api>]
-#
-# ANDROID_SERIAL wins when it is set. Otherwise devices-cli gives this worktree
-# its own emulator, booted on demand, which keeps running until
-# `devices-cli release`. Either way the device must run the ABI and API level,
-# or this fails naming what it runs. The API level defaults to
-# MLN_FFI_ANDROID_EMULATOR_API.
+# Prints the serial of a device matching an Android preset or ABI.
+# ANDROID_SERIAL wins; otherwise devices-cli boots this worktree's emulator.
 set -euo pipefail
 
-usage="usage: tools/devices/android-serial <abi> [--api <api>]"
-abi=${1:-}
+usage="usage: tools/devices/android-serial <preset-or-abi> [--api <api>]"
+target=${1:-}
 api=${MLN_FFI_ANDROID_EMULATOR_API:-}
+variant=()
+case "$target" in
+  android-arm-*) abi=armeabi-v7a ;;
+  android-arm64-*) abi=arm64-v8a ;;
+  android-x86-*) abi=x86 ;;
+  android-x64-*) abi=x86_64 ;;
+  *) abi=$target ;;
+esac
+# API 30 is the last Google APIs x86 image. The x64 EGL suite exercises
+# the library's oldest supported API; other targets use the shared level.
+if [[ "$abi" == x86 ]]; then
+  api=30
+  variant=(--variant google_apis)
+elif [[ "$target" == android-x64-egl ]]; then
+  api=26
+fi
 if (($# == 3)) && [[ "$2" == --api ]]; then
   api=$3
 elif (($# != 1)); then
@@ -63,7 +71,7 @@ else
   # runner without a GPU has. The emulator's renderer makes JIT code executable
   # in memory that its bundled tcmalloc takes with sbrk, which SELinux refuses
   # as execheap on Fedora; memory that tcmalloc maps instead needs only execmem.
-  serial=$(TCMALLOC_SKIP_SBRK=true devices-cli get android --api "$api" --abi "$abi" -- \
+  serial=$(TCMALLOC_SKIP_SBRK=true devices-cli get android --api "$api" --abi "$abi" ${variant[@]+"${variant[@]}"} -- \
     -gpu swiftshader -memory 4096 -camera-back none -camera-front none)
 fi
 

@@ -38,20 +38,13 @@ if [[ "$target_platform" == ohos-x64 && "$(field .backend)" == vulkan ]]; then
   ohos_libraries=(--library "$("$devices/ohos-vulkan-driver")")
 fi
 
-# The x64 OpenGL suites run on API 26, the oldest release the library
-# supports; the other Android targets run on the default API level.
-android_api=()
-if [[ "$target_platform" == android-x64 && "$(field .backend)" == opengl ]]; then
-  android_api=(--api 26)
-fi
-
 if [[ "$1" == --boot ]]; then
   if (($# != 1)); then
     echo "$usage" >&2
     exit 2
   fi
   case "$target_platform" in
-    android-*) "$devices/android-serial" "$(field .platform.android.abi)" ${android_api[@]+"${android_api[@]}"} >/dev/null ;;
+    android-*) "$devices/android-serial" "$artifact" >/dev/null ;;
     ohos-*) "$devices/ohos-key" >/dev/null ;;
     freebsd-*) "$devices/freebsd-host" >/dev/null ;;
     linux-*-riscv64 | linux-*-loongarch64)
@@ -79,8 +72,8 @@ done
 
 case "$target_platform" in
   android-*)
-    exec "$scripts/run-android-emulator-test.sh" "$timeout_seconds" "$(field .platform.android.abi)" \
-      "$install/lib/libmaplibre-native-c.so" ${android_api[@]+"${android_api[@]}"} \
+    exec "$scripts/run-android-emulator-test.sh" "$timeout_seconds" "$artifact" \
+      "$install/lib/libmaplibre-native-c.so" \
       ${library_arguments[@]+"${library_arguments[@]}"} "$@" -- "$executable"
     ;;
   ohos-*)

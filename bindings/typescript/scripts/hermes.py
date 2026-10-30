@@ -324,16 +324,8 @@ def build(preset):
 
 
 def run_android(preset, work):
-    abi = android_abi(preset)
     serial = subprocess.check_output(
-        [
-            str(ROOT / "tools/devices/android-serial"),
-            abi,
-            "--api",
-            "26"
-            if preset == "android-x64-egl"
-            else os.environ["MLN_FFI_ANDROID_EMULATOR_API"],
-        ],
+        [str(ROOT / "tools/devices/android-serial"), preset],
         text=True,
     ).strip()
     device = [
