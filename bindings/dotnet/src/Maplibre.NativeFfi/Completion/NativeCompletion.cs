@@ -165,6 +165,7 @@ internal static unsafe class NativeCompletion
         {
             if (status == mln_status.MLN_STATUS_OK)
                 return state.Task;
+            state.Release();
             root.Free();
             NativeStatus.Check(status, NativeDiagnostic.Current);
             throw new UnreachableException();
@@ -187,17 +188,20 @@ internal static unsafe class NativeCompletion
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Release(void* userData)
     {
-        GCHandle.FromIntPtr((nint)userData).Free();
+        var root = GCHandle.FromIntPtr((nint)userData);
+        ((StateBase)root.Target!).Release();
+        root.Free();
     }
 
     internal abstract class StateBase
     {
         internal abstract void Complete(mln_completion_result* result);
+        internal abstract void Release();
     }
 
     internal sealed class State<T> : StateBase
     {
-        private readonly CompletionConverter<T> convert;
+        private CompletionConverter<T>? convert;
         private readonly TaskCompletionSource<T> source = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -208,6 +212,10 @@ internal static unsafe class NativeCompletion
         }
 
         internal Task<T> Task => source.Task;
+
+        // Mono may retain this state after the GC handle is freed. Its converter
+        // must no longer root the host's captured objects once native releases it.
+        internal override void Release() => convert = null;
 
         internal override void Complete(mln_completion_result* result)
         {
@@ -220,7 +228,7 @@ internal static unsafe class NativeCompletion
                         ValueStructs.CopyUtf8View(result->diagnostic),
                         result->generation
                     );
-                value = convert(result);
+                value = convert!(result);
             }
             catch (Exception error)
             {
