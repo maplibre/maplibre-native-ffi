@@ -203,9 +203,10 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     runtimeSbom(
       "Android",
       "maplibre-native-ffi-runtime-${backend.id}-android",
-      androidTargets.map { target ->
-        requireNotNull(nativeInstall(target.targetPlatform, backend.id).prefix)
-          .resolve("share/maplibre-native-c/sbom.cdx.json")
+      androidTargets.mapNotNull { target ->
+        nativeInstall(target.targetPlatform, backend.id)
+          .prefix
+          ?.resolve("share/maplibre-native-c/sbom.cdx.json")
       },
     )
 
