@@ -291,14 +291,27 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         .setColorAttachmentCount(1)
         .setColorAttachments(color_attachment_ref)
         .setPDepthStencilAttachment(&depth_attachment_ref);
-    // The external dependencies span every stage, so they also order the
-    // host's reads that a queue-ordered frame shares the queue with: before
-    // the render overwrites the image, and after its writes and final layout.
+    // The external dependencies span every stage the queue runs, so they also
+    // order the host's reads that a queue-ordered frame shares the queue with:
+    // before the render overwrites the image, and after its writes and final
+    // layout. ALL_COMMANDS means only the graphics stages in a subpass
+    // dependency, so transfer and compute are named.
+    auto queue_stages =
+      vk::PipelineStageFlags{vk::PipelineStageFlagBits::eAllGraphics} |
+      vk::PipelineStageFlagBits::eTransfer;
+    const auto families =
+      backend.getPhysicalDevice().getQueueFamilyProperties(dispatcher);
+    if (
+      families.at(static_cast<std::size_t>(backend.getGraphicsQueueIndex()))
+        .queueFlags &
+      vk::QueueFlagBits::eCompute
+    )
+      queue_stages |= vk::PipelineStageFlagBits::eComputeShader;
     const std::array<vk::SubpassDependency, 3> dependencies = {
       vk::SubpassDependency()
         .setSrcSubpass(VK_SUBPASS_EXTERNAL)
         .setDstSubpass(0)
-        .setSrcStageMask(vk::PipelineStageFlagBits::eAllCommands)
+        .setSrcStageMask(queue_stages)
         .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
         .setSrcAccessMask({})
         .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite),
@@ -323,7 +336,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         .setSrcSubpass(0)
         .setDstSubpass(VK_SUBPASS_EXTERNAL)
         .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-        .setDstStageMask(vk::PipelineStageFlagBits::eAllCommands)
+        .setDstStageMask(queue_stages)
         .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
         .setDstAccessMask(vk::AccessFlagBits::eMemoryRead),
     };
