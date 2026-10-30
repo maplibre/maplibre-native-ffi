@@ -20,5 +20,7 @@ fi
 uv pip uninstall --quiet --python "$MISE_MONOREPO_ROOT/.venv" \
   maplibre-native-ffi-runtime-opengl \
   maplibre-native-ffi-runtime-metal \
-  maplibre-native-ffi-runtime-vulkan
+  maplibre-native-ffi-runtime-vulkan \
+  maplibre-native-ffi-runtime-opengl-mingw \
+  maplibre-native-ffi-runtime-vulkan-mingw
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index dist/*.whl

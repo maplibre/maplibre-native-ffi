@@ -179,12 +179,6 @@ platforms = ["windows-mingw"]
 status = "path-known"
 reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
 
-[[entry]]
-bindings = ["python"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "The PyO3 extension embeds the C archive through the Rust sys crate. Add its MinGW artifact selection and linkage, build the extension for GNU-target Rust, package runtime DLL dependencies, and test the wheel with Windows CPython."
-
 # No supported toolchain or ABI.
 
 [[entry]]

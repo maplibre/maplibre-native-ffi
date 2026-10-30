@@ -57,12 +57,16 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     backend = descriptor["backend"]
     if backend not in BACKENDS:
         raise SystemExit(f"no Python runtime serves the {backend} backend")
+    runtime = backend
+    if descriptor["platform"]["id"].startswith("windows-mingw-"):
+        runtime += "-mingw"
     # The wheel embeds the native library, so it carries the notices of the
     # third-party code in it.
     notices = next(prefix.glob("share/*/licenses"), None)
     if notices is None:
         raise SystemExit(f"{prefix} carries no licenses")
-    licenses = package / "runtimes" / backend / "licenses"
+    runtime_root = package / "runtimes" / runtime
+    licenses = runtime_root / "licenses"
     shutil.rmtree(licenses, ignore_errors=True)
     shutil.copytree(notices, licenses)
     shutil.copy2(LICENSE, licenses.parent / "LICENSE")
@@ -107,7 +111,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     )
     inventory = json.loads((prefix / "share/maplibre-native-c" / SBOM_NAME).read_text())
     result = package_inventory(
-        f"maplibre-native-ffi-runtime-{backend}",
+        f"maplibre-native-ffi-runtime-{runtime}",
         "0.0.0",
         "pypi",
         [without_native_rust(inventory), extension],

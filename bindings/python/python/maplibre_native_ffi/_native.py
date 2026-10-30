@@ -16,6 +16,8 @@ RUNTIMES = {
     "maplibre_native_ffi_runtime_opengl": "maplibre-native-ffi-runtime-opengl",
     "maplibre_native_ffi_runtime_metal": "maplibre-native-ffi-runtime-metal",
     "maplibre_native_ffi_runtime_vulkan": "maplibre-native-ffi-runtime-vulkan",
+    "maplibre_native_ffi_runtime_opengl_mingw": "maplibre-native-ffi-runtime-opengl-mingw",
+    "maplibre_native_ffi_runtime_vulkan_mingw": "maplibre-native-ffi-runtime-vulkan-mingw",
 }
 
 _installed = [module for module in RUNTIMES if find_spec(module) is not None]

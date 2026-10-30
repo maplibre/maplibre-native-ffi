@@ -1,0 +1,34 @@
+[build-system]
+requires = ["maturin>=1.15.0,<2"]
+build-backend = "maturin"
+
+# CI builds the extension once; packaging stamps the wheel version and API pin.
+# The build copies the license notices of the native library that it embeds.
+[project]
+name = "maplibre-native-ffi-runtime-vulkan-mingw"
+version = "0.0.0"
+description = "MinGW Vulkan runtime for the maplibre-native-ffi Python binding"
+requires-python = ">=3.12"
+license = "BSD-2-Clause"
+license-files = ["LICENSE", "licenses/*"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Rust",
+]
+dependencies = ["maplibre-native-ffi==0.0.0"]
+
+[project.urls]
+Homepage = "https://maplibre.org/maplibre-native-ffi/"
+Documentation = "https://maplibre.org/maplibre-native-ffi/reference/python/"
+Repository = "https://github.com/maplibre/maplibre-native-ffi"
+Issues = "https://github.com/maplibre/maplibre-native-ffi/issues"
+
+[tool.maturin]
+manifest-path = "../../Cargo.toml"
+module-name = "maplibre_native_ffi_runtime_vulkan_mingw._native"
+python-source = "python"
+features = ["pyo3/extension-module"]

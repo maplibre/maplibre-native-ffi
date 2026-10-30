@@ -79,6 +79,45 @@ class PythonReleaseTest(unittest.TestCase):
 
 
 class RuntimeWheelTest(unittest.TestCase):
+    def test_mingw_and_msvc_wheels_with_the_same_tags_remain_distinct(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            inputs, output = root / "inputs", root / "output"
+            inputs.mkdir()
+            tags = "cp312-abi3-win_amd64"
+            names = (
+                "maplibre_native_ffi_runtime_opengl",
+                "maplibre_native_ffi_runtime_opengl_mingw",
+            )
+            for name in names:
+                stem = f"{name}-0.0.0"
+                path = inputs / f"{stem}-{tags}.whl"
+                with WheelFile(path, "w") as wheel:
+                    wheel.writestr(f"{name}/_native.pyd", name)
+                    wheel.writestr(
+                        f"{stem}.dist-info/METADATA",
+                        f"Name: {name.replace('_', '-')}\nVersion: 0.0.0\n"
+                        "Requires-Dist: maplibre-native-ffi==0.0.0\n",
+                    )
+                inventory = package_inventory(
+                    name.replace("_", "-"), "0.0.0", "pypi", []
+                )
+                inventory["metadata"]["component"]["properties"] = [
+                    {"name": "maplibre:source-commit", "value": "abc123"}
+                ]
+                embed_wheel(path, inventory)
+
+            pack(inputs, output, "0.202610.3")
+
+            self.assertEqual(len(list(output.glob("*.whl"))), 2)
+            for name in names:
+                with WheelFile(output / f"{name}-0.202610.3-{tags}.whl") as wheel:
+                    self.assertEqual(wheel.read(f"{name}/_native.pyd"), name.encode())
+                    metadata = wheel.read(f"{name}-0.202610.3.dist-info/METADATA")
+                    self.assertIn(
+                        f"Name: {name.replace('_', '-')}\n".encode(), metadata
+                    )
+
     def test_versions_metadata_preserving_the_extension_tags_and_licenses(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
