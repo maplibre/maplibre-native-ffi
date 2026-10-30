@@ -344,20 +344,28 @@ File _libraryFile(Uri prefix, OS targetOS) {
   );
 }
 
-/// Lists the other shared libraries installed beside [library], leaving out the
-/// test graphics fixtures that a build tree's install also holds.
+/// Lists runtime libraries in the install, leaving out its test graphics fixtures.
 Iterable<File> _siblingLibraries(File library, OS targetOS) {
   final extension = switch (targetOS) {
     OS.macOS || OS.iOS => '.dylib',
     OS.windows => '.dll',
     _ => '.so',
   };
-  return library.parent.listSync().whereType<File>().where(
-    (file) =>
-        file.path != library.path &&
-        file.path.endsWith(extension) &&
-        !file.uri.pathSegments.last.contains('mln_test_graphics'),
-  );
+  final directories = [
+    library.parent,
+    if (targetOS == OS.windows)
+      Directory.fromUri(library.parent.uri.resolve('../lib/')),
+  ];
+  return directories
+      .where((directory) => directory.existsSync())
+      .expand((directory) => directory.listSync())
+      .whereType<File>()
+      .where(
+        (file) =>
+            file.path != library.path &&
+            file.path.endsWith(extension) &&
+            !file.uri.pathSegments.last.contains('mln_test_graphics'),
+      );
 }
 
 // Flutter treats declared assets as generated outputs and deletes stale ones.
