@@ -1,0 +1,113 @@
+Rejects a GeoJSON geometry whose type is not a string, a point coordinate that
+is not a number, and a MultiLineString line that is not an array, instead of
+reading each value as that type. A type of 1, null, true, or [] crashed the
+conversion with libc++, whether the GeoJSON came from a host, a style, or a
+source URL (https://github.com/maplibre/maplibre-native-ffi/issues/1434).
+Upstream: not proposed; MapLibre Native vendors the archived mapbox/geojson-cpp
+
+diff --git a/vendor/maplibre-native-base/deps/geojson.hpp/include/mapbox/geojson_impl.hpp b/vendor/maplibre-native-base/deps/geojson.hpp/include/mapbox/geojson_impl.hpp
+index 621a86c..c795821 100644
+--- a/vendor/maplibre-native-base/deps/geojson.hpp/include/mapbox/geojson_impl.hpp
++++ b/vendor/maplibre-native-base/deps/geojson.hpp/include/mapbox/geojson_impl.hpp
+@@ -34,6 +34,10 @@ void validatePolygon(const rapidjson_value &json) {
+ }
+ 
+ void validateLineString(const rapidjson_value &json) {
++    // this check is required in case of multilinestring validation
++    if (!json.IsArray()) {
++        throw error("Coordinates must be nested more deeply.");
++    }
+     if (json.GetArray().Size() < 2) {
+         throw error("A line string must have two or more coordinate points.");
+     }
+@@ -49,6 +53,8 @@ point convert<point>(const rapidjson_value &json) {
+     }
+     if (json.Size() < 2)
+         throw error("coordinates array must have at least 2 numbers");
++    if (!json[0].IsNumber() || !json[1].IsNumber())
++        throw error("coordinates array must contain numbers");
+ 
+     return point{ json[0].GetDouble(), json[1].GetDouble() };
+ }
+@@ -84,6 +90,8 @@ geometry convert<geometry>(const rapidjson_value &json) {
+         throw error("Geometry must have a type property");
+ 
+     const auto &type = type_itr->value;
++    if (!type.IsString())
++        throw error("Geometry type must be a string");
+ 
+     if (type == "GeometryCollection") {
+         const auto &geometries_itr = json.FindMember("geometries");
+diff --git a/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-geometry-type.json b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-geometry-type.json
+new file mode 100644
+index 0000000..ad39905
+--- /dev/null
++++ b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-geometry-type.json
+@@ -0,0 +1,7 @@
++{
++    "type": "Feature",
++    "properties": {},
++    "geometry": {
++        "type": 1
++    }
++}
+diff --git a/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-multi-line-string-2.json b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-multi-line-string-2.json
+new file mode 100644
+index 0000000..ecdf42c
+--- /dev/null
++++ b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-multi-line-string-2.json
+@@ -0,0 +1,8 @@
++{
++    "type": "Feature",
++    "properties": {},
++    "geometry": {
++        "type": "MultiLineString",
++        "coordinates": [30, 40]
++    }
++}
+diff --git a/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-point.json b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-point.json
+new file mode 100644
+index 0000000..a812ebf
+--- /dev/null
++++ b/vendor/maplibre-native-base/deps/geojson.hpp/test/fixtures/invalid-point.json
+@@ -0,0 +1,8 @@
++{
++    "type": "Feature",
++    "properties": {},
++    "geometry": {
++        "type": "Point",
++        "coordinates": ["30", "40"]
++    }
++}
+diff --git a/vendor/maplibre-native-base/deps/geojson.hpp/test/test.cpp b/vendor/maplibre-native-base/deps/geojson.hpp/test/test.cpp
+index 2906e0a..5bd778a 100644
+--- a/vendor/maplibre-native-base/deps/geojson.hpp/test/test.cpp
++++ b/vendor/maplibre-native-base/deps/geojson.hpp/test/test.cpp
+@@ -290,6 +290,27 @@ static void testParseErrorHandling() {
+     } catch (const std::runtime_error& err) {
+         assert(std::string(err.what()).find("two or more") != std::string::npos);
+     }
++
++    try {
++        readGeoJSON("test/fixtures/invalid-multi-line-string-2.json", false);
++        assert(false && "Should have thrown an error");
++    } catch (const std::runtime_error& err) {
++        assert(std::string(err.what()).find("nested more deeply") != std::string::npos);
++    }
++
++    try {
++        readGeoJSON("test/fixtures/invalid-point.json", false);
++        assert(false && "Should have thrown an error");
++    } catch (const std::runtime_error& err) {
++        assert(std::string(err.what()).find("must contain numbers") != std::string::npos);
++    }
++
++    try {
++        readGeoJSON("test/fixtures/invalid-geometry-type.json", false);
++        assert(false && "Should have thrown an error");
++    } catch (const std::runtime_error& err) {
++        assert(std::string(err.what()).find("type must be a string") != std::string::npos);
++    }
+ }
+ 
+ void testAll(bool use_convert) {

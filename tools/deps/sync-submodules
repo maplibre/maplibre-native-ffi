@@ -85,13 +85,16 @@ mln_synced() {
 
 # Runs on a worktree the forced checkout below just reset, so every patch goes
 # on in order. The checkout leaves a file that a patch adds in place, so remove
-# those before the patch goes back on.
+# those before the patch goes back on. The clean runs from the file's directory,
+# because one run from the parent stops at a nested submodule's boundary.
 apply_mln_patches() {
   local patch path
   for patch in "${mln_patches[@]}"; do
     git -C "$mln_path" apply --numstat "$patch" | cut -f3 |
       while read -r path; do
-        git -C "$mln_path" clean -fq -- "$path"
+        if [[ -d "$mln_path/$(dirname "$path")" ]]; then
+          git -C "$mln_path/$(dirname "$path")" clean -fq -- "$(basename "$path")"
+        fi
       done
     git -C "$mln_path" apply "$patch"
   done
