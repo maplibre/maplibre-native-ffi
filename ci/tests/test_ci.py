@@ -161,8 +161,8 @@ class VendorTest(unittest.TestCase):
                 # task and the device test scripts ask for it.
                 "android-x64-egl": ("Android emulator", f"{android} --api 26"),
                 "android-x64-vulkan": ("Android emulator", android),
-                # Only x64 EGL runs on the OpenHarmony emulator.
                 "ohos-x64-egl": ("OpenHarmony emulator", "tools/devices/ohos-key"),
+                "ohos-x64-vulkan": ("OpenHarmony emulator", "tools/devices/ohos-key"),
                 # Each emulated libc and architecture has a root of its own.
                 **{
                     f"linux-{libc}-{arch}-{backend}": (
