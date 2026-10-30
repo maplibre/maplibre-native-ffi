@@ -30,7 +30,6 @@ PLATFORM_LABELS = {
     "visionos": "visionOS",
     "ohos": "OpenHarmony",
     "emscripten": "Web (Emscripten)",
-    "wasi": "WASI",
 }
 PLATFORM_ORDER = list(PLATFORM_LABELS)
 # Apple mobile platforms list device and simulator rows separately.

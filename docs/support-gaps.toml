@@ -3,15 +3,6 @@ issue = 936
 # Upstream bugs, pending support proposals or releases, and registry restrictions.
 
 [[entry]]
-bindings = ["c"]
-platforms = ["wasi"]
-archs = ["wasm32"]
-backends = ["webgpu"]
-status = "blocked"
-reason = "WASI has no graphics API yet. `wasi:webgpu`, which brings WebGPU to WASI, is a Phase 2 proposal."
-link = "https://github.com/WebAssembly/wasi-gfx"
-
-[[entry]]
 bindings = ["dotnet"]
 platforms = ["ohos"]
 status = "blocked"
@@ -354,7 +345,7 @@ link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_as
 
 [[entry]]
 bindings = ["dart"]
-platforms = ["emscripten", "wasi"]
+platforms = ["emscripten"]
 status = "not-applicable"
 reason = "`dart:ffi` serves the Dart Native platform alone, and dart2wasm forbids user imports of it."
 link = "https://dart.dev/interop/c-interop"
@@ -368,22 +359,14 @@ link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os
 
 [[entry]]
 bindings = ["go"]
-platforms = ["emscripten", "wasi"]
+platforms = ["emscripten"]
 status = "not-applicable"
 reason = "Go's WebAssembly ports, `js/wasm` and `wasip1/wasm`, have no cgo ABI."
 link = "https://github.com/golang/go/issues/55351"
 
 [[entry]]
 bindings = ["kotlin-jvm"]
-platforms = [
-  "ios",
-  "ios-maccatalyst",
-  "tvos",
-  "visionos",
-  "ohos",
-  "emscripten",
-  "wasi",
-]
+platforms = ["ios", "ios-maccatalyst", "tvos", "visionos", "ohos", "emscripten"]
 status = "not-applicable"
 reason = "No JVM runs on these platforms."
 
