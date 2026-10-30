@@ -267,6 +267,7 @@ kotlin {
       }
     if (graphicsCompiler != null) {
       val linksDl = name.startsWith("linux")
+      val linksGdi = name == "mingwX64"
       val vulkanHeaders =
         rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
       val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
@@ -297,6 +298,7 @@ kotlin {
         }
         linkerOpts(objectFile.get().asFile.absolutePath)
         if (linksDl) linkerOpts("-ldl")
+        if (linksGdi) linkerOpts("-lgdi32")
       }
     }
   }
