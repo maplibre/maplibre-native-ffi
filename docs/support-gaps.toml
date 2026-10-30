@@ -258,12 +258,12 @@ status = "path-known"
 reason = "Swift.org ships a Windows toolchain. Add generated Windows platform coverage, SwiftPM import-library discovery and Windows test flags, consume each preset's C DLL, and run the suite with its dependencies on PATH."
 link = "https://www.swift.org/install/windows/"
 
-# No supported toolchain or ABI. Unrejected upstream support work is blocked instead.
+# No supported toolchain or ABI.
 
 [[entry]]
 bindings = ["dotnet"]
 platforms = ["freebsd"]
-status = "not-applicable"
+status = "blocked"
 reason = "Microsoft ships no FreeBSD SDK for the binding's `net10.0`; upstream declined the request for official .NET 10 support."
 link = "https://github.com/dotnet/runtime/issues/122058"
 
@@ -271,7 +271,7 @@ link = "https://github.com/dotnet/runtime/issues/122058"
 bindings = ["dart"]
 platforms = ["android"]
 archs = ["x86"]
-status = "not-applicable"
+status = "blocked"
 reason = "Flutter supports Android ARMv7, ARM64, and x64, but has no x86 target."
 link = "https://docs.flutter.dev/reference/supported-platforms"
 
@@ -279,42 +279,42 @@ link = "https://docs.flutter.dev/reference/supported-platforms"
 bindings = ["swift"]
 platforms = ["android"]
 archs = ["x86"]
-status = "not-applicable"
+status = "blocked"
 reason = "The Swift Android SDK has no x86 target."
 link = "https://www.swift.org/documentation/articles/swift-sdk-for-android-getting-started.html"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["freebsd"]
-status = "not-applicable"
+status = "blocked"
 reason = "Dart has no supported FreeBSD SDK; upstream declined first-party BSD support."
 link = "https://github.com/dart-lang/sdk/issues/52374"
 
 [[entry]]
 bindings = ["swift"]
 platforms = ["ohos"]
-status = "not-applicable"
+status = "blocked"
 reason = "Swift has no supported OpenHarmony target. The community toolchain uses Swift 6.0.3, older than the package's required Swift tools 6.2."
 link = "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["ohos"]
-status = "not-applicable"
+status = "blocked"
 reason = "Dart has no supported OpenHarmony target; the available SDK belongs to a community Flutter fork."
 link = "https://gitcode.com/openharmony-sig/flutter_flutter"
 
 [[entry]]
 bindings = ["kotlin-native"]
 platforms = ["ohos"]
-status = "not-applicable"
+status = "blocked"
 reason = "Kotlin/Native has no OpenHarmony target. Upstream has no plans for it; available targets are community forks."
 link = "https://youtrack.jetbrains.com/issue/KT-63976"
 
 [[entry]]
 bindings = ["python"]
 platforms = ["ohos"]
-status = "not-applicable"
+status = "blocked"
 reason = "CPython has no supported OpenHarmony target; the available runtime is a community port."
 link = "https://gitcode.com/ai_model_sig/ohos_python"
 
@@ -322,55 +322,55 @@ link = "https://gitcode.com/ai_model_sig/ohos_python"
 bindings = ["dart"]
 platforms = ["linux-gnu"]
 archs = ["loongarch64"]
-status = "not-applicable"
+status = "blocked"
 reason = "Dart has no supported LoongArch SDK; upstream explicitly has no plans to support it."
 link = "https://github.com/dart-lang/sdk/issues/53480"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["tvos"]
-status = "not-applicable"
+status = "blocked"
 reason = "Dart's build hooks, which deliver the binding's native library, target no such OS."
 link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/os.dart"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["ios-maccatalyst"]
-status = "not-applicable"
+status = "blocked"
 reason = "Dart's build hooks build iOS code only for the device and simulator."
 link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_assets/lib/src/code_assets/ios_sdk.dart"
 
 [[entry]]
 bindings = ["dart"]
 platforms = ["emscripten"]
-status = "not-applicable"
+status = "blocked"
 reason = "`dart:ffi` serves the Dart Native platform alone, and dart2wasm forbids user imports of it."
 link = "https://dart.dev/interop/c-interop"
 
 [[entry]]
 bindings = ["dotnet"]
 platforms = ["visionos"]
-status = "not-applicable"
+status = "blocked"
 reason = ".NET's Apple workloads cover iOS, tvOS, Mac Catalyst, and macOS, but not visionOS."
 link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md"
 
 [[entry]]
 bindings = ["go"]
 platforms = ["emscripten"]
-status = "not-applicable"
+status = "blocked"
 reason = "Go's WebAssembly ports, `js/wasm` and `wasip1/wasm`, have no cgo ABI."
 link = "https://github.com/golang/go/issues/55351"
 
 [[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["ios", "ios-maccatalyst", "tvos", "visionos", "ohos", "emscripten"]
-status = "not-applicable"
+status = "blocked"
 reason = "No JVM runs on these platforms."
 
 [[entry]]
 bindings = ["kotlin-native"]
 platforms = ["linux-musl", "freebsd", "ios-maccatalyst", "visionos"]
-status = "not-applicable"
+status = "blocked"
 reason = "Kotlin/Native has no supported target for these platforms. Upstream currently declines new targets, including the visionOS contribution; Catalyst has only an unsupported experimental flag."
 link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 
@@ -378,7 +378,7 @@ link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 bindings = ["kotlin-native"]
 platforms = ["linux-gnu"]
 archs = ["riscv64", "loongarch64"]
-status = "not-applicable"
+status = "blocked"
 reason = "Kotlin/Native has no target for these architectures, and upstream currently declines new targets."
 link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 
@@ -386,7 +386,7 @@ link = "https://github.com/JetBrains/kotlin/pull/7797#issuecomment-5513371617"
 bindings = ["swift"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
-status = "not-applicable"
+status = "blocked"
 reason = "Swift has no LoongArch target, and no community toolchain adds one."
 link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/swift_build_support/targets.py"
 
@@ -394,14 +394,14 @@ link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/s
 bindings = ["swift"]
 platforms = ["linux-musl"]
 archs = ["riscv64"]
-status = "not-applicable"
+status = "blocked"
 reason = "Swift's static Linux SDK, its only musl target, covers x86_64 and aarch64 alone."
 link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/swift_build_support/targets.py"
 
 [[entry]]
 bindings = ["swift"]
 platforms = ["emscripten"]
-status = "not-applicable"
+status = "blocked"
 reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
 link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
 
@@ -439,7 +439,7 @@ reason = "Zig 0.17.0's native ARM64 compiler fails to load build.zig, and its x6
 bindings = ["python"]
 platforms = ["android"]
 archs = ["arm", "x86"]
-status = "not-applicable"
+status = "blocked"
 reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
 
 [[entry]]

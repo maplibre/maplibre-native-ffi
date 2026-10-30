@@ -15,7 +15,6 @@ ICONS = {
     "path-known": "⬜",
     "blocked": "⛔",
     "not-investigated": "❓",
-    "not-applicable": "➖",
 }
 # A platform shows the furthest status any of its rows reached.
 PRECEDENCE = [
@@ -24,7 +23,6 @@ PRECEDENCE = [
     "path-known",
     "blocked",
     "not-investigated",
-    "not-applicable",
 ]
 
 
