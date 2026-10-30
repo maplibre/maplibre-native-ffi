@@ -28,6 +28,8 @@ case "$usage_preset" in
   macos-*) export MACOSX_DEPLOYMENT_TARGET=14.3 ;;
   linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
   linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
+  linux-gnu-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-gnu) ;;
+  linux-musl-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-musl) ;;
 esac
 wheel_output=$(mktemp -d)
 trap 'rm -rf "$wheel_output"' EXIT
