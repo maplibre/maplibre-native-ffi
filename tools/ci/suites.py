@@ -106,7 +106,7 @@ SUITES: list[dict] = [
     # A Linux runner cross-builds the FreeBSD suite, which runs in the FreeBSD
     # virtual machine.
     {
-        "platforms": ["linux-gnu", "macos", "freebsd", "windows-mingw"],
+        "platforms": ["linux-gnu", "macos", "freebsd", "windows", "windows-mingw"],
         "commands": [{"task": "//bindings/go:test"}],
     },
     # One target runs the suite again on the oldest supported Python.

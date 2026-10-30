@@ -231,13 +231,6 @@ reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, 
 
 [[entry]]
 bindings = ["go"]
-platforms = ["windows"]
-status = "path-known"
-reason = "cgo's GNU-style compiler can consume the MSVC-built C DLL. Configure import-library discovery and Windows platform generation, then run the suite on the Windows runners."
-link = "https://pkg.go.dev/cmd/cgo#hdr-Using_cgo_with_the_go_command"
-
-[[entry]]
-bindings = ["go"]
 platforms = ["ios-maccatalyst"]
 status = "path-known"
 reason = "Upstream gomobile already builds for Mac Catalyst. Add its iOS target, Catalyst build tag, SDK and macabi triple, link the native artifact, and run the binding suite."

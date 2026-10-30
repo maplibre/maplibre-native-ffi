@@ -61,11 +61,19 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$compiler" CXX="$compiler_cxx"
     ;;
-  mingw-x64-*)
-    # Match the native build rather than a standalone LLVM or MSVC on PATH.
-    export GOOS=windows GOARCH=amd64 CGO_ENABLED=1
+  windows-x64-* | windows-arm64-* | mingw-x64-*)
+    if [[ "$1" == windows-arm64-* ]]; then
+      goarch=arm64
+    else
+      goarch=amd64
+    fi
+    # cgo takes GNU-style compiler flags, including when it links an MSVC DLL.
+    export GOOS=windows GOARCH="$goarch" CGO_ENABLED=1
     export CC="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
     export CXX="$MLN_FFI_MSYS2_ROOT/bin/clang++.exe"
+    export PKG_CONFIG="$MLN_FFI_MSYS2_ROOT/bin/pkgconf.exe"
+    msys2_bin_dir="$(cygpath -u "$MLN_FFI_MSYS2_ROOT/bin")"
+    export PATH="$msys2_bin_dir${PATH:+:$PATH}"
     ;;
   macos-x64-*)
     export GOARCH=amd64 CGO_ENABLED=1

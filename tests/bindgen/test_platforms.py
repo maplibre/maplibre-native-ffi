@@ -138,7 +138,15 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertNotIn("attachCanvas", source)
 
     def test_go_builds_a_function_only_for_the_platforms_it_serves(self):
-        generated = emitted(go, api())
+        parsed = parse(
+            PLATFORM_LIMITED
+            + """
+BIND("platforms=windows")
+mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
+"""
+        )
+        validate(parsed)
+        generated = emitted(go, parsed)
         self.assertNotIn("UseMetal", generated["generated_api.go"])
         self.assertIn(
             "func (receiver *MapHandle) Redraw(", generated["generated_api.go"]
@@ -152,6 +160,9 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         self.assertIn("func (receiver *MapHandle) UseMetal(", darwin)
         self.assertIn("//go:build android\n", generated["generated_api_android.go"])
         self.assertNotIn("AttachCanvas", "".join(generated.values()))
+        self.assertIn("//go:build windows\n", generated["generated_api_windows.go"])
+        self.assertIn("func WindowsStart(", generated["generated_api_windows.go"])
+        self.assertNotIn("WindowsStart", generated["generated_api.go"])
 
     def test_dotnet_marks_the_platforms_that_a_function_serves(self):
         generated = "\n".join(emitted(dotnet, api()).values())

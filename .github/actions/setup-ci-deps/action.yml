@@ -105,25 +105,28 @@ runs:
         fi
 
     - name: Install MSYS2 MinGW toolchain
-      if: ${{ runner.os == 'Windows' && inputs.mise-env == 'msys2' }}
+      if: ${{ runner.os == 'Windows' }}
       id: msys2
       uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
       with:
-        msystem: MINGW64
+        msystem: ${{ runner.arch == 'ARM64' && 'CLANGARM64' || 'MINGW64' }}
         path-type: inherit
         update: true
-        install:
-          mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64-pkgconf
+        pacboy: clang:p llvm:p pkgconf:p
 
     - name: Select MSYS2 prefix
-      if: ${{ runner.os == 'Windows' && inputs.mise-env == 'msys2' }}
+      if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       env:
         MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+        MSYS2_PREFIX: ${{ runner.arch == 'ARM64' && 'clangarm64' || 'mingw64' }}
+        MISE_CONFIGURATION: ${{ inputs.mise-env }}
       run: |
-        $prefix = (Join-Path $env:MSYS2_LOCATION "mingw64") -replace '\\', '/'
+        $prefix = (Join-Path $env:MSYS2_LOCATION $env:MSYS2_PREFIX) -replace '\\', '/'
         "MLN_FFI_MSYS2_ROOT=$prefix" >> $env:GITHUB_ENV
-        "MISE_ENV=msys2" >> $env:GITHUB_ENV
+        if ($env:MISE_CONFIGURATION -eq "msys2") {
+          "MISE_ENV=msys2" >> $env:GITHUB_ENV
+        }
 
     # Each job asks for the SDK its target builds with, and every other job installs
     # none. No Windows target cross-compiles. Android reuses the SDK the runner image

@@ -96,6 +96,13 @@ MINGW64 shell:
 pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64-pkgconf
 ```
 
+For Go on Windows ARM64, install Clang, LLVM, and pkgconf in the CLANGARM64
+shell instead:
+
+```bash
+pacman -S --needed mingw-w64-clang-aarch64-clang mingw-w64-clang-aarch64-llvm mingw-w64-clang-aarch64-pkgconf
+```
+
 Then, from PowerShell, build and test the C library with:
 
 ```powershell
@@ -110,11 +117,22 @@ mise -E msys2 run //bindings/zig:test mingw-x64-vulkan
 ```
 
 Set `MLN_FFI_MSYS2_ROOT` if the MINGW64 prefix is somewhere other than
-`C:/msys64/mingw64`. The Vulkan tests also need the Vulkan SDK from setup.
-Applications loading the DLL need the MINGW64 `bin` directory on `PATH` for its
-C++ runtime. Rust uses the matching `x86_64-pc-windows-gnu` target, and Zig uses
-`x86_64-windows-gnu`. Kotlin/Native's older MinGW sysroot and C++ runtime are a
-separate compatibility requirement.
+`C:/msys64/mingw64` (`C:/msys64/clangarm64` for Go on ARM64). The Go binding
+also links MSVC presets through the same MSYS2 compiler:
+
+```powershell
+mise run //bindings/go:test windows-x64-wgl
+mise run //bindings/go:test windows-x64-vulkan
+mise run //bindings/go:test windows-arm64-wgl
+mise run //bindings/go:test windows-arm64-vulkan
+```
+
+Run each architecture's tests on its matching Windows host. The Vulkan tests
+also need the Vulkan SDK from setup. Applications loading the DLL need the
+MINGW64 `bin` directory on `PATH` for its C++ runtime. Rust uses the matching
+`x86_64-pc-windows-gnu` target, and Zig uses `x86_64-windows-gnu`.
+Kotlin/Native's older MinGW sysroot and C++ runtime are a separate compatibility
+requirement.
 
 ## Windows on Linux
 

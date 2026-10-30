@@ -14,6 +14,7 @@ PLATFORMS = {
     "linux": "linux && !android",
     "macos": "darwin",
     "ohos": "linux && !android",
+    "windows": "windows",
 }
 TARGETS = frozenset(PLATFORMS)
 DIRECTORY = "bindings/go/maplibre"

@@ -11,5 +11,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/native-env.sh" "$1"
 # key also omits the headers outside the package, so a C struct that changes
 # size would keep packages compiled against its old layout; a checksum of the
 # installed headers in CGO_CPPFLAGS rebuilds them.
-headers_cksum="$(find "$native_install_dir/include" -type f -name '*.h' | LC_ALL=C sort | xargs cat | cksum)"
+headers_cksum="$(
+  find "$native_install_dir/include" -type f -name '*.h' | LC_ALL=C sort |
+    while IFS= read -r header; do
+      cat "$header"
+    done | cksum
+)"
 export CGO_CPPFLAGS="-I$native_install_dir/include -DMLN_HEADERS_CKSUM=${headers_cksum%% *}${CGO_CPPFLAGS:+ $CGO_CPPFLAGS}"
