@@ -9,6 +9,15 @@ set -euo pipefail
 if [[ "$usage_preset" == android-* ]]; then
   exec mise run :_test-android "$usage_preset"
 fi
+if [[ "$usage_preset" == macos-x64-* ]]; then
+  python=$(MISE_ARCH=x64 mise exec python -- python -c 'import sys; print(sys.executable)')
+  venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-test"
+  uv venv --quiet --allow-existing --python "$python" "$venv"
+  uv pip install --quiet --python "$venv" 'pytest>=9,<10'
+  uv pip install --quiet --python "$venv" --reinstall --no-index dist/*.whl
+  MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+    exec "$venv/bin/python" -m pytest
+fi
 if [[ "$usage_preset" == linux-*-riscv64-* ]]; then
   target=${usage_preset#linux-}
   root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "${target%%-*}" riscv64)
