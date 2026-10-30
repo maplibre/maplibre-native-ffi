@@ -60,6 +60,7 @@ const platforms: Record<string, { os: string; libc?: string }> = {
   "linux-musl": { os: "linux", libc: "musl" },
   macos: { os: "darwin" },
   freebsd: { os: "freebsd" },
+  windows: { os: "win32" },
 };
 const titles: Record<string, string> = {
   opengl: "OpenGL",
@@ -70,6 +71,7 @@ const titles: Record<string, string> = {
 // WebGL is the OpenGL backend with the browser's context provider.
 const backends: Record<string, string> = {
   egl: "opengl",
+  wgl: "opengl",
   metal: "metal",
   vulkan: "vulkan",
   webgl: "opengl",
@@ -100,12 +102,12 @@ function addonOf(preset: string): Addon {
     };
   }
   const match =
-    /^(linux-gnu|linux-musl|macos|freebsd)-(x64|arm64|riscv64|loongarch64)-(egl|metal|vulkan)$/.exec(
+    /^(linux-gnu|linux-musl|macos|freebsd|windows)-(x64|arm64|riscv64|loongarch64)-(egl|wgl|metal|vulkan)$/.exec(
       preset,
     );
   if (match === null) {
     throw new Error(
-      `${preset} has no addon package; only the Linux, macOS, FreeBSD, and Emscripten presets do`,
+      `${preset} has no addon package; only the Linux, macOS, FreeBSD, Windows, and Emscripten presets do`,
     );
   }
   const { os, libc } = platforms[match[1]!]!;
@@ -120,9 +122,11 @@ function addonOf(preset: string): Addon {
     // The addon links the shared C library, which loads from beside it.
     files: [
       "maplibre_native_ffi.node",
-      os === "darwin"
-        ? "libmaplibre-native-c.dylib"
-        : "libmaplibre-native-c.so",
+      os === "win32"
+        ? "maplibre-native-c.dll"
+        : os === "darwin"
+          ? "libmaplibre-native-c.dylib"
+          : "libmaplibre-native-c.so",
     ],
   };
 }
@@ -273,6 +277,7 @@ for (const name of [
   "runtime.c",
   "runtime.h",
   "realm.c",
+  "mutex.h",
   "hermes",
 ]) {
   cpSync(join(binding, "native", name), join(facade, "native", name), {

@@ -44,6 +44,9 @@ case "$usage_preset" in
   macos-*)
     exported="$(nm -gU "$addon" | awk '{print $3}' | sed 's/^_//' | sort -u)"
     ;;
+  windows-*)
+    exported="$(llvm-readobj --coff-exports "$addon" | awk '/Name:/ {print $2}' | sort -u)"
+    ;;
 esac
 if [[ "$exported" != napi_register_module_v1 ]]; then
   echo "error: $addon exports more than napi_register_module_v1:" >&2

@@ -45,7 +45,7 @@ endif()
 
 find_library(
   MLN_FFI_NATIVE_LIBRARY
-  NAMES libmaplibre-native-c.so libmaplibre-native-c.dylib
+  NAMES maplibre-native-c libmaplibre-native-c.so libmaplibre-native-c.dylib
   PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
   REQUIRED)
 
@@ -62,6 +62,25 @@ endif()
 
 if(OHOS)
   find_library(MLN_FFI_ACE_NAPI NAMES ace_napi.z REQUIRED)
+endif()
+
+if(WIN32)
+  set(MLN_FFI_NODE_IMPORT_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/node_api.lib")
+  set(MLN_FFI_NODE_DEF "${MLN_FFI_NODE_API_HEADERS}/../def/node_api.def")
+  add_custom_command(
+    OUTPUT "${MLN_FFI_NODE_IMPORT_LIBRARY}"
+    COMMAND
+      "${CMAKE_AR}" "/def:${MLN_FFI_NODE_DEF}"
+      "/machine:${MLN_FFI_TARGET_ARCHITECTURE}"
+      "/out:${MLN_FFI_NODE_IMPORT_LIBRARY}"
+    DEPENDS "${MLN_FFI_NODE_DEF}"
+    VERBATIM)
+  add_custom_target(node_api_import DEPENDS "${MLN_FFI_NODE_IMPORT_LIBRARY}")
+  find_file(
+    MLN_FFI_NATIVE_DLL
+    NAMES maplibre-native-c.dll
+    PATHS "${MLN_FFI_NATIVE_PREFIX}/bin" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+    REQUIRED)
 endif()
 
 function(mln_ffi_node_module target)
@@ -84,8 +103,22 @@ function(mln_ffi_node_module target)
       PROPERTIES PREFIX "" SUFFIX ".node" C_VISIBILITY_PRESET hidden)
   endif()
   target_include_directories(${target} PRIVATE "${MLN_FFI_NODE_API_HEADERS}")
-  target_compile_options(${target} PRIVATE -Wall -Wextra -Wno-unused-parameter)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 /clang:-Wno-unused-parameter)
+  else()
+    target_compile_options(
+      ${target}
+      PRIVATE -Wall -Wextra -Wno-unused-parameter)
+  endif()
+  if(WIN32)
+    add_dependencies(${target} node_api_import)
+    target_sources(${target} PRIVATE windows_delay_load.c)
+    target_compile_definitions(${target} PRIVATE BUILDING_NODE_EXTENSION)
+    target_link_libraries(
+      ${target}
+      PRIVATE "${MLN_FFI_NODE_IMPORT_LIBRARY}" delayimp)
+    target_link_options(${target} PRIVATE "/DELAYLOAD:node.exe")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # The host executable supplies the Node-API symbols at load.
     target_link_options(
       ${target}
@@ -126,12 +159,16 @@ if(APPLE)
 else()
   set_target_properties(maplibre_native_ffi PROPERTIES INSTALL_RPATH "$ORIGIN")
 endif()
-if(NOT ANDROID AND NOT OHOS)
+if(NOT ANDROID AND NOT OHOS AND NOT WIN32)
   find_package(Threads REQUIRED)
   target_link_libraries(maplibre_native_ffi PRIVATE Threads::Threads)
 endif()
-install(TARGETS maplibre_native_ffi LIBRARY DESTINATION .)
-install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
+install(TARGETS maplibre_native_ffi LIBRARY DESTINATION . RUNTIME DESTINATION .)
+if(WIN32)
+  install(FILES "${MLN_FFI_NATIVE_DLL}" DESTINATION .)
+else()
+  install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
+endif()
 # The addon package ships the licenses of the native library it carries, so the
 # install prefix alone is enough to pack it.
 install(
@@ -169,6 +206,19 @@ if(MLN_FFI_TEST_GRAPHICS_LIBRARY)
   target_link_libraries(
     maplibre_native_ffi_test_graphics
     PRIVATE "${MLN_FFI_TEST_GRAPHICS_LIBRARY}")
+  if(WIN32)
+    # The host loads the test addon by path; Windows searches beside that
+    # addon for its graphics DLL and the C DLL that it shares with the binding.
+    add_custom_command(
+      TARGET maplibre_native_ffi_test_graphics
+      POST_BUILD
+      COMMAND
+        "${CMAKE_COMMAND}" -E copy_if_different
+        "${MLN_FFI_NATIVE_PREFIX}/bin/mln_test_graphics.dll"
+        "${MLN_FFI_NATIVE_DLL}"
+        "$<TARGET_FILE_DIR:maplibre_native_ffi_test_graphics>"
+      VERBATIM)
+  endif()
   set_target_properties(
     maplibre_native_ffi_test_graphics
     PROPERTIES BUILD_RPATH "${MLN_FFI_NATIVE_PREFIX}/lib")

@@ -37,6 +37,8 @@ interface GraphicsContext {
   readonly eglDisplay: bigint;
   readonly eglConfig: bigint;
   readonly eglContext: bigint;
+  readonly wglDeviceContext: bigint;
+  readonly wglContext: bigint;
   readonly getProcAddress: bigint;
   readonly vulkanInstance: bigint;
   readonly vulkanPhysicalDevice: bigint;
@@ -71,7 +73,14 @@ const addon = capabilities.testGraphics() as GraphicsAddon;
  * The browser's test graphics create a WebGL context or import a WebGPU
  * device from the page for the browser's two.
  */
-const backends = { metal: 1, vulkan: 2, egl: 3, webgl: 5, webgpu: 6 } as const;
+const backends = {
+  metal: 1,
+  vulkan: 2,
+  egl: 3,
+  wgl: 4,
+  webgl: 5,
+  webgpu: 6,
+} as const;
 export type Backend = keyof typeof backends;
 
 function buildBackend(): Backend {
@@ -86,6 +95,12 @@ function buildBackend(): Backend {
     return "webgpu";
   }
   const providers = openGlSupportedContextProviderMask();
+  if (
+    (mask & RenderBackendFlag.openGl) !== 0 &&
+    (providers & OpenGlContextProviderFlag.wgl) !== 0
+  ) {
+    return "wgl";
+  }
   if (
     (mask & RenderBackendFlag.openGl) !== 0 &&
     (providers & OpenGlContextProviderFlag.webGl) !== 0
@@ -193,6 +208,27 @@ function attachOwnedTexture(
     );
   }
   const dedicated = options.driver === RenderDriverKind.coreWorker;
+  if (backend === "wgl") {
+    return map.attachOpenGlOwnedTexture(
+      {
+        extent,
+        context: {
+          ownership: dedicated
+            ? OpenGlContextOwnership.dedicated
+            : OpenGlContextOwnership.shared,
+          data: {
+            kind: "wgl",
+            value: {
+              deviceContext: context.wglDeviceContext,
+              shareContext: dedicated ? undefined : context.wglContext,
+              getProcAddress: context.getProcAddress,
+            },
+          },
+        },
+      },
+      options,
+    );
+  }
   return map.attachOpenGlOwnedTexture(
     {
       extent,
@@ -411,7 +447,7 @@ export class TestSession {
     const serviced = driver === "caller" || browser;
     if (
       serviced &&
-      (backend === "egl" || backend === "webgl") &&
+      (backend === "egl" || backend === "wgl" || backend === "webgl") &&
       !addon.makeCurrent(context.graphics)
     ) {
       throw new Error("the test graphics context could not be made current");

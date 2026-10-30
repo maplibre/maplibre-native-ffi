@@ -108,7 +108,7 @@ async function frameSession(map: MapHandle) {
   // session that shares the host's context exposes them.
   const attached = await TestSession.attach(
     map,
-    backend === "egl" ? "caller" : "worker",
+    backend === "egl" || backend === "wgl" ? "caller" : "worker",
   );
   await attached.renderFrame();
   return attached.session;

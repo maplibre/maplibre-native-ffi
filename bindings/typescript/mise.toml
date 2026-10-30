@@ -41,8 +41,8 @@ hide = true
 usage = 'arg "<preset>"'
 run = '''
 case "$usage_preset" in
-  windows-*)
-    echo "error: the TypeScript binding does not support Windows yet" >&2
+  mingw-*)
+    echo "error: the TypeScript binding does not support MinGW yet" >&2
     exit 2
     ;;
 esac

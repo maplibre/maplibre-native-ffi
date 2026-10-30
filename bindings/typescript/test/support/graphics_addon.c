@@ -76,6 +76,10 @@ static napi_value create(napi_env env, napi_callback_info info) {
   set(env, object, "eglDisplay", address(env, context.egl_display));
   set(env, object, "eglConfig", address(env, context.egl_config));
   set(env, object, "eglContext", address(env, context.egl_context));
+  set(
+    env, object, "wglDeviceContext", address(env, context.wgl_device_context)
+  );
+  set(env, object, "wglContext", address(env, context.wgl_context));
   set(env, object, "getProcAddress", address(env, context.get_proc_address));
   set(env, object, "vulkanInstance", address(env, context.vulkan_instance));
   set(

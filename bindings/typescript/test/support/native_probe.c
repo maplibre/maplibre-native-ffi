@@ -8,13 +8,14 @@
 // module link the same probe.
 
 #include <node_api.h>
-#include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "native_probe.h"
+
+#include "../../native/mutex.h"
 
 static napi_value address(napi_env env, const void* pointer) {
   napi_value value = NULL;
@@ -34,7 +35,7 @@ static void set(
  * The function's finalizer and the release each hold a reference.
  */
 typedef struct probe {
-  pthread_mutex_t lock;
+  mln_ts_mutex lock;
   bool open;
   napi_threadsafe_function function;
   atomic_uint references;
@@ -47,14 +48,14 @@ static void probe_unref(probe* context) {
     atomic_fetch_sub_explicit(&context->references, 1, memory_order_acq_rel) ==
     1
   ) {
-    pthread_mutex_destroy(&context->lock);
+    mln_ts_mutex_destroy(&context->lock);
     free(context);
   }
 }
 
 static void probe_post(void* user_data, uintptr_t event, bool release) {
   probe* context = user_data;
-  pthread_mutex_lock(&context->lock);
+  mln_ts_mutex_lock(&context->lock);
   if (context->open) {
     napi_call_threadsafe_function(
       context->function, (void*)event, napi_tsfn_nonblocking
@@ -63,7 +64,7 @@ static void probe_post(void* user_data, uintptr_t event, bool release) {
       napi_release_threadsafe_function(context->function, napi_tsfn_release);
     }
   }
-  pthread_mutex_unlock(&context->lock);
+  mln_ts_mutex_unlock(&context->lock);
 }
 
 static void probe_wake(void* user_data) { probe_post(user_data, 0, false); }
@@ -95,9 +96,9 @@ static void probe_finalize(napi_env env, void* data, void* hint) {
   (void)env;
   (void)hint;
   probe* context = data;
-  pthread_mutex_lock(&context->lock);
+  mln_ts_mutex_lock(&context->lock);
   context->open = false;
-  pthread_mutex_unlock(&context->lock);
+  mln_ts_mutex_unlock(&context->lock);
   probe_unref(context);
 }
 
@@ -118,7 +119,7 @@ napi_value mln_ts_test_native_probe(napi_env env, napi_callback_info info) {
     napi_throw_error(env, NULL, "native probe allocation failed");
     return NULL;
   }
-  pthread_mutex_init(&context->lock, NULL);
+  mln_ts_mutex_init(&context->lock);
   atomic_init(&context->references, 2);
   napi_value name = NULL;
   napi_create_string_utf8(env, "native_probe", NAPI_AUTO_LENGTH, &name);
@@ -128,7 +129,7 @@ napi_value mln_ts_test_native_probe(napi_env env, napi_callback_info info) {
       probe_receive, &context->function
     ) != napi_ok
   ) {
-    pthread_mutex_destroy(&context->lock);
+    mln_ts_mutex_destroy(&context->lock);
     free(context);
     napi_throw_error(env, NULL, "native probe function creation failed");
     return NULL;

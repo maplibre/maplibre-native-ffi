@@ -14,13 +14,19 @@
 #define _DARWIN_C_SOURCE
 #endif
 
-#include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "mutex.h"
 #include "runtime.h"
+
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <pthread.h>
+#endif
 
 #ifdef __APPLE__
 #include <dlfcn.h>
@@ -42,7 +48,7 @@ enum {
  * reference.
  */
 typedef struct mln_ts_shim {
-  pthread_mutex_t lock;
+  mln_ts_mutex lock;
   bool open;
   napi_threadsafe_function function;
   atomic_uint references;
@@ -97,7 +103,7 @@ struct mln_ts_realm {
   bool cleaned;
   // The owners whose tokens this realm's teardown finalizes. The exit path
   // reads them from another thread, so they are guarded.
-  pthread_mutex_t owners_lock;
+  mln_ts_mutex owners_lock;
   mln_ts_owner* owners;
   mln_ts_realm* next_realm;
 };
@@ -116,7 +122,7 @@ struct mln_ts_owner {
 };
 
 // The realms that the exit path visits.
-static pthread_mutex_t registry_lock = PTHREAD_MUTEX_INITIALIZER;
+static mln_ts_mutex registry_lock = MLN_TS_MUTEX_INITIALIZER;
 static mln_ts_realm* registry;
 
 mln_ts_realm* mln_ts_realm_of(napi_env env) {
@@ -167,7 +173,7 @@ static void shim_release(mln_ts_shim* shim) {
   if (
     atomic_fetch_sub_explicit(&shim->references, 1, memory_order_acq_rel) == 1
   ) {
-    pthread_mutex_destroy(&shim->lock);
+    mln_ts_mutex_destroy(&shim->lock);
     free(shim);
   }
 }
@@ -175,22 +181,22 @@ static void shim_release(mln_ts_shim* shim) {
 /** Posts one message, and reports whether the realm will receive it. */
 static bool shim_post(mln_ts_shim* shim, void* data) {
   bool posted = false;
-  pthread_mutex_lock(&shim->lock);
+  mln_ts_mutex_lock(&shim->lock);
   if (shim->open) {
     posted = napi_call_threadsafe_function(
                shim->function, data, napi_tsfn_nonblocking
              ) == napi_ok;
   }
-  pthread_mutex_unlock(&shim->lock);
+  mln_ts_mutex_unlock(&shim->lock);
   return posted;
 }
 
 /** Closes the shim, and returns its function if this call closed it. */
 static napi_threadsafe_function shim_close(mln_ts_shim* shim) {
-  pthread_mutex_lock(&shim->lock);
+  mln_ts_mutex_lock(&shim->lock);
   napi_threadsafe_function function = shim->open ? shim->function : NULL;
   shim->open = false;
-  pthread_mutex_unlock(&shim->lock);
+  mln_ts_mutex_unlock(&shim->lock);
   return function;
 }
 
@@ -213,7 +219,11 @@ static void thread_start_abandon(mln_ts_thread_start* start) {
   free(start);
 }
 
+#ifdef _WIN32
+static unsigned __stdcall thread_start_main(void* argument) {
+#else
 static void* thread_start_main(void* argument) {
+#endif
   mln_ts_thread_start* start = argument;
   start->diagnostic.size = sizeof start->diagnostic;
   start->diagnostic.message[0] = '\0';
@@ -227,7 +237,11 @@ static void* thread_start_main(void* argument) {
     thread_start_abandon(start);
   }
   shim_release(shim);
+#ifdef _WIN32
+  return 0;
+#else
   return NULL;
+#endif
 }
 
 bool mln_ts_start_thread(
@@ -254,12 +268,20 @@ bool mln_ts_start_thread(
   call->allocations = NULL;
   // Nothing joins the thread, so a browser page that never blocks can start
   // it. It runs once a pool worker takes it.
+#ifdef _WIN32
+  uintptr_t thread = _beginthreadex(NULL, 0, thread_start_main, start, 0, NULL);
+  int result = thread == 0;
+  if (thread != 0) {
+    CloseHandle((HANDLE)thread);
+  }
+#else
   pthread_attr_t attributes;
   pthread_attr_init(&attributes);
   pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
   pthread_t thread;
   int result = pthread_create(&thread, &attributes, thread_start_main, start);
   pthread_attr_destroy(&attributes);
+#endif
   if (result != 0) {
     call->allocations = start->allocations;
     shim_release(start->shim);
@@ -664,7 +686,7 @@ bool mln_ts_read_completion(
 
 static void owner_unlink(mln_ts_owner* owner) {
   mln_ts_realm* realm = owner->realm;
-  pthread_mutex_lock(&realm->owners_lock);
+  mln_ts_mutex_lock(&realm->owners_lock);
   if (owner->linked) {
     *(owner->previous ? &owner->previous->next : &realm->owners) = owner->next;
     if (owner->next != NULL) {
@@ -672,7 +694,7 @@ static void owner_unlink(mln_ts_owner* owner) {
     }
     owner->linked = false;
   }
-  pthread_mutex_unlock(&realm->owners_lock);
+  mln_ts_mutex_unlock(&realm->owners_lock);
 }
 
 /**
@@ -763,14 +785,14 @@ static napi_value owner_token_create(napi_env env, napi_callback_info info) {
     free(owner);
     return mln_ts_end(&call);
   }
-  pthread_mutex_lock(&call.realm->owners_lock);
+  mln_ts_mutex_lock(&call.realm->owners_lock);
   owner->next = call.realm->owners;
   if (owner->next != NULL) {
     owner->next->previous = owner;
   }
   call.realm->owners = owner;
   owner->linked = true;
-  pthread_mutex_unlock(&call.realm->owners_lock);
+  mln_ts_mutex_unlock(&call.realm->owners_lock);
   call.result = external;
   return mln_ts_end(&call);
 }
@@ -781,7 +803,7 @@ static napi_value owner_token_create(napi_env env, napi_callback_info info) {
  * is mid-frame ends before this returns.
  */
 static void realm_abandon_sessions(mln_ts_realm* realm) {
-  pthread_mutex_lock(&realm->owners_lock);
+  mln_ts_mutex_lock(&realm->owners_lock);
   for (mln_ts_owner* owner = realm->owners; owner != NULL;
        owner = owner->next) {
     mln_render_abandon_result result = {.size = sizeof result};
@@ -794,14 +816,14 @@ static void realm_abandon_sessions(mln_ts_realm* realm) {
       owner_end(owner, false);
     }
   }
-  pthread_mutex_unlock(&realm->owners_lock);
+  mln_ts_mutex_unlock(&realm->owners_lock);
 }
 
 // ---------------------------------------------------------------------------
 // Realm teardown and process exit
 
 static void registry_remove(mln_ts_realm* realm) {
-  pthread_mutex_lock(&registry_lock);
+  mln_ts_mutex_lock(&registry_lock);
   for (mln_ts_realm** link = &registry; *link != NULL;
        link = &(*link)->next_realm) {
     if (*link == realm) {
@@ -809,7 +831,7 @@ static void registry_remove(mln_ts_realm* realm) {
       break;
     }
   }
-  pthread_mutex_unlock(&registry_lock);
+  mln_ts_mutex_unlock(&registry_lock);
 }
 
 static void realm_cleanup(void* data) {
@@ -832,7 +854,7 @@ static void realm_cleanup(void* data) {
     realm->queue = MLN_HANDLE_NULL;
   }
   realm_abandon_sessions(realm);
-  pthread_mutex_lock(&realm->owners_lock);
+  mln_ts_mutex_lock(&realm->owners_lock);
   while (realm->owners != NULL) {
     // The external's own finalizer, if the host still runs it, frees the
     // owner and finds no token. Bun 1.4.3 and Deno 2.9.7 never run it for an
@@ -842,7 +864,7 @@ static void realm_cleanup(void* data) {
     owner->linked = false;
     owner_end(owner, true);
   }
-  pthread_mutex_unlock(&realm->owners_lock);
+  mln_ts_mutex_unlock(&realm->owners_lock);
   // OpenHarmony runs instance-data finalizers after it disposed the realm's
   // VM, where deleting a reference crashes, so the hook deletes them.
   napi_ref* references[] = {
@@ -862,7 +884,7 @@ static void realm_finalize(napi_env env, void* data, void* hint) {
   mln_ts_realm* realm = data;
   realm_cleanup(realm);
   shim_release(realm->shim);
-  pthread_mutex_destroy(&realm->owners_lock);
+  mln_ts_mutex_destroy(&realm->owners_lock);
   free(realm);
 }
 
@@ -878,13 +900,13 @@ static void realm_finalize(napi_env env, void* data, void* hint) {
 static napi_value shutdown_at_exit(napi_env env, napi_callback_info info) {
   (void)env;
   (void)info;
-  pthread_mutex_lock(&registry_lock);
+  mln_ts_mutex_lock(&registry_lock);
   for (mln_ts_realm* realm = registry; realm != NULL;
        realm = realm->next_realm) {
     shim_close(realm->shim);
     realm_abandon_sessions(realm);
   }
-  pthread_mutex_unlock(&registry_lock);
+  mln_ts_mutex_unlock(&registry_lock);
   return NULL;
 }
 
@@ -932,13 +954,13 @@ static napi_value set_referenced(napi_env env, napi_callback_info info) {
   ) {
     // The exit path closes every realm's shim from the main thread, so the
     // flag is read under the lock.
-    pthread_mutex_lock(&shim->lock);
+    mln_ts_mutex_lock(&shim->lock);
     if (shim->open) {
       (referenced ? napi_ref_threadsafe_function
                   : napi_unref_threadsafe_function)(env, shim->function);
       call.realm->referenced = referenced;
     }
-    pthread_mutex_unlock(&shim->lock);
+    mln_ts_mutex_unlock(&shim->lock);
   }
   return mln_ts_end(&call);
 }
@@ -958,13 +980,19 @@ static void define(
 
 // Native threads of the C library outlive any one realm, so the module
 // never unloads. ELF builds link with -z nodelete, and Darwin builds mark the
-// loaded image when the first realm initializes.
+// loaded image when the first realm initializes. Windows pins its module.
 static void pin_module(void) {
   static atomic_flag pinned = ATOMIC_FLAG_INIT;
   if (atomic_flag_test_and_set(&pinned)) {
     return;
   }
-#ifdef __APPLE__
+#ifdef _WIN32
+  HMODULE module;
+  GetModuleHandleExW(
+    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+    (LPCWSTR)(uintptr_t)&pin_module, &module
+  );
+#elif defined(__APPLE__)
   Dl_info info;
   if (dladdr((void*)&pin_module, &info) != 0 && info.dli_fname != NULL) {
     dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
@@ -984,12 +1012,12 @@ napi_value mln_ts_module_init(
     napi_throw_error(env, NULL, "realm allocation failed");
     return NULL;
   }
-  pthread_mutex_init(&shim->lock, NULL);
+  mln_ts_mutex_init(&shim->lock);
   // One reference for the realm and one for the function's finalizer.
   atomic_init(&shim->references, 2);
   realm->env = env;
   realm->shim = shim;
-  pthread_mutex_init(&realm->owners_lock, NULL);
+  mln_ts_mutex_init(&realm->owners_lock);
   napi_value name;
   napi_create_string_utf8(env, "maplibre_native_ffi", NAPI_AUTO_LENGTH, &name);
   if (
@@ -998,8 +1026,8 @@ napi_value mln_ts_module_init(
       &shim->function
     ) != napi_ok
   ) {
-    pthread_mutex_destroy(&shim->lock);
-    pthread_mutex_destroy(&realm->owners_lock);
+    mln_ts_mutex_destroy(&shim->lock);
+    mln_ts_mutex_destroy(&realm->owners_lock);
     free(shim);
     free(realm);
     return NULL;
@@ -1014,10 +1042,10 @@ napi_value mln_ts_module_init(
   // Registered after the function, so it runs before the host's own cleanup
   // of the function on hosts that run hooks in reverse order.
   napi_add_env_cleanup_hook(env, realm_cleanup, realm);
-  pthread_mutex_lock(&registry_lock);
+  mln_ts_mutex_lock(&registry_lock);
   realm->next_realm = registry;
   registry = realm;
-  pthread_mutex_unlock(&registry_lock);
+  mln_ts_mutex_unlock(&registry_lock);
   static const mln_ts_export runtime_exports[] = {
     {"install", install},
     {"setReferenced", set_referenced},

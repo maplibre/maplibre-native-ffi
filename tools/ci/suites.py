@@ -127,12 +127,9 @@ SUITES: list[dict] = [
         "commands": [{"task": "//bindings/dart:test"}],
     },
     # The TypeScript suite loads the packages it packs and installs under Node,
-    # Bun, and Deno (Node and Bun on musl, packaged Node on FreeBSD). The binding
-    # does not support Windows yet:
-    # on Windows x64, the addon's first double in a process reached JavaScript as a
-    # heap address, for a reason that is unknown.
+    # Bun, and Deno (Node and Bun on musl, packaged Node on FreeBSD).
     {
-        "platforms": ["linux-gnu", "linux-musl", "macos", "freebsd"],
+        "platforms": ["linux-gnu", "linux-musl", "macos", "freebsd", "windows"],
         "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/typescript:test"}],
     },
