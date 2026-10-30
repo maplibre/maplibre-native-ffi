@@ -145,6 +145,27 @@ mln_test_graphics_metal_command_queue(
   mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics
 );
 
+// Creates a timeline VkSemaphore at zero on a Vulkan graphics object's device,
+// which the device must have enabled, and returns its handle's bit pattern, or
+// zero on failure. Destroy it with mln_test_graphics_vulkan_timeline_destroy().
+MLN_TEST_GRAPHICS_API uint64_t mln_test_graphics_vulkan_timeline_create(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics
+);
+MLN_TEST_GRAPHICS_API void mln_test_graphics_vulkan_timeline_destroy(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint64_t semaphore
+);
+// Signals `value` on a timeline semaphore of the device from the CPU.
+MLN_TEST_GRAPHICS_API bool mln_test_graphics_vulkan_timeline_signal(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint64_t semaphore,
+  uint64_t value
+);
+// Waits on the CPU for a timeline semaphore of the device to reach `value`.
+// Returns 1 once it has, 0 when the timeout passes first, and -1 on failure.
+MLN_TEST_GRAPHICS_API int mln_test_graphics_vulkan_timeline_wait(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint64_t semaphore,
+  uint64_t value, uint64_t timeout_nanoseconds
+);
+
 // Makes the EGL or WGL context current on the calling thread, as a host that
 // drives a session on its own graphics thread would. Fails for Metal and
 // Vulkan, which have no current context.

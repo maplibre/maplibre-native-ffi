@@ -387,25 +387,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
     MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE,
     capabilities.consumer_sync_kinds
   );
-  mln_test_graphics_context context;
-  TEST_ASSERT_TRUE(mln_test_graphics_get_context(
-    mln_test_render_fixture_graphics(&fixture), &context
-  ));
-  const VkDevice device = context.vulkan_device;
-  const PFN_vkGetDeviceProcAddr proc =
-    (PFN_vkGetDeviceProcAddr)context.vulkan_get_device_proc_addr;
-  const PFN_vkCreateSemaphore create_semaphore =
-    (PFN_vkCreateSemaphore)proc(device, "vkCreateSemaphore");
-  const PFN_vkDestroySemaphore destroy_semaphore =
-    (PFN_vkDestroySemaphore)proc(device, "vkDestroySemaphore");
-  const PFN_vkWaitSemaphoresKHR wait_semaphores =
-    (PFN_vkWaitSemaphoresKHR)proc(device, "vkWaitSemaphoresKHR");
-  const PFN_vkSignalSemaphoreKHR signal_semaphore =
-    (PFN_vkSignalSemaphoreKHR)proc(device, "vkSignalSemaphoreKHR");
-  TEST_ASSERT_NOT_NULL(create_semaphore);
-  TEST_ASSERT_NOT_NULL(destroy_semaphore);
-  TEST_ASSERT_NOT_NULL(wait_semaphores);
-  TEST_ASSERT_NOT_NULL(signal_semaphore);
+  mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
 
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
@@ -419,36 +401,29 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.handle);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.value);
-  const VkSemaphore produced = (VkSemaphore)(uintptr_t)producer.handle;
+  const uint64_t produced = producer.handle;
   const uint64_t first_value = producer.value;
-  VkSemaphoreWaitInfo wait = {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-    .semaphoreCount = 1,
-    .pSemaphores = &produced,
-    .pValues = &first_value,
-  };
-  TEST_ASSERT_EQUAL_INT(VK_SUCCESS, wait_semaphores(device, &wait, UINT64_MAX));
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    1,
+    mln_test_graphics_vulkan_timeline_wait(
+      graphics, produced, first_value, UINT64_MAX
+    ),
+    mln_test_graphics_last_error()
+  );
   expect_texture_color(
     mln_test_render_fixture_texture(&fixture, 0), red,
     "the first timeline frame's texture"
   );
 
   // The host's timeline is still at zero when it releases the frame.
-  const VkSemaphoreTypeCreateInfo type = {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-    .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
-  };
-  const VkSemaphoreCreateInfo semaphore_info = {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = &type
-  };
-  VkSemaphore consumed = VK_NULL_HANDLE;
-  TEST_ASSERT_EQUAL_INT(
-    VK_SUCCESS, create_semaphore(device, &semaphore_info, NULL, &consumed)
+  const uint64_t consumed = mln_test_graphics_vulkan_timeline_create(graphics);
+  TEST_ASSERT_NOT_EQUAL_UINT64_MESSAGE(
+    0, consumed, mln_test_graphics_last_error()
   );
   const mln_gpu_sync consumer = {
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
-    .handle = (uint64_t)(uintptr_t)consumed,
+    .handle = consumed,
     .value = 1,
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &consumer, NULL));
@@ -460,19 +435,23 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
-  TEST_ASSERT_EQUAL_UINT64((uint64_t)(uintptr_t)produced, producer.handle);
+  TEST_ASSERT_EQUAL_UINT64(produced, producer.handle);
   TEST_ASSERT_GREATER_THAN_UINT64(first_value, producer.value);
-  const uint64_t second_value = producer.value;
-  wait.pValues = &second_value;
   // The second frame waits for the host's semaphore.
-  TEST_ASSERT_EQUAL_INT(VK_TIMEOUT, wait_semaphores(device, &wait, 0));
-  const VkSemaphoreSignalInfo signal = {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
-    .semaphore = consumed,
-    .value = 1,
-  };
-  TEST_ASSERT_EQUAL_INT(VK_SUCCESS, signal_semaphore(device, &signal));
-  TEST_ASSERT_EQUAL_INT(VK_SUCCESS, wait_semaphores(device, &wait, UINT64_MAX));
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_graphics_vulkan_timeline_wait(
+         graphics, produced, producer.value, 0
+       )
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_graphics_vulkan_timeline_signal(graphics, consumed, 1),
+    mln_test_graphics_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_graphics_vulkan_timeline_wait(
+         graphics, produced, producer.value, UINT64_MAX
+       )
+  );
   expect_texture_color(
     mln_test_render_fixture_texture(&fixture, 0), blue,
     "the reused texture after the host's timeline"
@@ -483,7 +462,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
     MLN_STATUS_OK, &fixture,
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
   );
-  destroy_semaphore(device, consumed, NULL);
+  mln_test_graphics_vulkan_timeline_destroy(graphics, consumed);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

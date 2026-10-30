@@ -2182,6 +2182,102 @@ void* mln_test_graphics_metal_command_queue(mln_test_graphics* graphics) {
   return NULL;
 }
 
+// The device function `name` of a Vulkan graphics object, or null with the
+// reason recorded.
+static PFN_vkVoidFunction vulkan_device_proc(
+  mln_test_graphics* graphics, const char* name
+) {
+#if !defined(__EMSCRIPTEN__)
+  if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
+    PFN_vkVoidFunction proc = graphics->vk.get_device_proc_addr(
+      (VkDevice)graphics->context.vulkan_device, name
+    );
+    if (proc == NULL) set_error("the Vulkan device lacks %s", name);
+    return proc;
+  }
+#else
+  (void)name;
+#endif
+  set_error("only a Vulkan graphics object has timeline semaphores");
+  return NULL;
+}
+
+uint64_t mln_test_graphics_vulkan_timeline_create(mln_test_graphics* graphics) {
+  PFN_vkCreateSemaphore create =
+    (PFN_vkCreateSemaphore)vulkan_device_proc(graphics, "vkCreateSemaphore");
+  if (create == NULL) return 0;
+  const VkSemaphoreTypeCreateInfo type = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+    .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+  };
+  const VkSemaphoreCreateInfo info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = &type
+  };
+  VkSemaphore semaphore = VK_NULL_HANDLE;
+  const VkResult result =
+    create((VkDevice)graphics->context.vulkan_device, &info, NULL, &semaphore);
+  if (result != VK_SUCCESS) {
+    set_error("vkCreateSemaphore failed with %d", (int)result);
+    return 0;
+  }
+  return (uint64_t)(uintptr_t)semaphore;
+}
+
+void mln_test_graphics_vulkan_timeline_destroy(
+  mln_test_graphics* graphics, uint64_t semaphore
+) {
+  PFN_vkDestroySemaphore destroy =
+    (PFN_vkDestroySemaphore)vulkan_device_proc(graphics, "vkDestroySemaphore");
+  if (destroy == NULL || semaphore == 0) return;
+  destroy(
+    (VkDevice)graphics->context.vulkan_device,
+    (VkSemaphore)(uintptr_t)semaphore, NULL
+  );
+}
+
+bool mln_test_graphics_vulkan_timeline_signal(
+  mln_test_graphics* graphics, uint64_t semaphore, uint64_t value
+) {
+  PFN_vkSignalSemaphoreKHR signal = (PFN_vkSignalSemaphoreKHR)
+    vulkan_device_proc(graphics, "vkSignalSemaphoreKHR");
+  if (signal == NULL) return false;
+  const VkSemaphoreSignalInfo info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
+    .semaphore = (VkSemaphore)(uintptr_t)semaphore,
+    .value = value,
+  };
+  const VkResult result =
+    signal((VkDevice)graphics->context.vulkan_device, &info);
+  if (result != VK_SUCCESS) {
+    set_error("vkSignalSemaphore failed with %d", (int)result);
+    return false;
+  }
+  return true;
+}
+
+int mln_test_graphics_vulkan_timeline_wait(
+  mln_test_graphics* graphics, uint64_t semaphore, uint64_t value,
+  uint64_t timeout_nanoseconds
+) {
+  PFN_vkWaitSemaphoresKHR wait = (PFN_vkWaitSemaphoresKHR)vulkan_device_proc(
+    graphics, "vkWaitSemaphoresKHR"
+  );
+  if (wait == NULL) return -1;
+  const VkSemaphore waited = (VkSemaphore)(uintptr_t)semaphore;
+  const VkSemaphoreWaitInfo info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+    .semaphoreCount = 1,
+    .pSemaphores = &waited,
+    .pValues = &value,
+  };
+  const VkResult result =
+    wait((VkDevice)graphics->context.vulkan_device, &info, timeout_nanoseconds);
+  if (result == VK_SUCCESS) return 1;
+  if (result == VK_TIMEOUT) return 0;
+  set_error("vkWaitSemaphores failed with %d", (int)result);
+  return -1;
+}
+
 bool mln_test_graphics_make_current(mln_test_graphics* graphics) {
   if (graphics == NULL) {
     set_error("null argument");
