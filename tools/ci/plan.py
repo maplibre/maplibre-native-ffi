@@ -82,8 +82,7 @@ JOBS = {
             and gaps.supported("kotlin-jvm", target, "package")
         ),
     ),
-    # Every Metal preset is an Apple one, and each contributes one XCFramework
-    # slice.
+    # Apple Metal archives supply the XCFramework's slices.
     "apple-xcframework": (
         "swiftpm",
         lambda target: (

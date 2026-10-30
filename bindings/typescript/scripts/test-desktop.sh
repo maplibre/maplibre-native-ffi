@@ -53,6 +53,7 @@ echo '{ "private": true }' > "$consumer/package.json"
 # local addon tarball needs --force when the host and target differ.
 install_args=(--offline --no-audit --no-fund)
 case "$preset" in
+  macos-x64-*) install_args+=(--cpu=x64 --force) ;;
   *-riscv64-*) install_args+=(--cpu=riscv64 --force) ;;
   *-loongarch64-*) install_args+=(--cpu=loong64 --force) ;;
 esac
@@ -99,6 +100,11 @@ case "$preset" in
       MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS="$MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS" \
       MAPLIBRE_NATIVE_FFI_TEST_CONSUMER="$consumer" \
       sh "$PWD/scripts/test-musl.sh" "$(bun --version)" "${runtimes[@]}"
+    ;;
+  macos-x64-*)
+    MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
+      MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps node bun deno -- \
+      scripts/run-desktop.sh "${runtimes[@]}"
     ;;
   *) scripts/run-desktop.sh "${runtimes[@]}" ;;
 esac

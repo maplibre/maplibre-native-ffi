@@ -167,13 +167,6 @@ reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the
 link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
-bindings = ["dart", "typescript"]
-platforms = ["macos"]
-archs = ["x64"]
-status = "path-known"
-reason = "CI builds the x64 library and runs these suites on arm64 alone. Package the binding for x64 where it needs one, and run its suite under an x64 runtime on the arm64 runners, which Rosetta runs."
-
-[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
@@ -382,15 +375,6 @@ platforms = ["windows-mingw"]
 operations = ["package"]
 status = "path-known"
 reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
-
-[[entry]]
-bindings = ["c"]
-platforms = ["macos"]
-archs = ["x64"]
-backends = ["metal"]
-operations = ["xcframework"]
-status = "path-known"
-reason = "The XCFramework ships ARM64 macOS alone. Combine the x64 and ARM64 frameworks into one universal macOS slice before adding Intel macOS; the per-target native archives already ship both."
 
 # Missing test devices apply to native and binding suites alike. Packages are
 # still built and published; a simulator is a distinct execution target.

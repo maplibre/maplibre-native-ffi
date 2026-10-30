@@ -80,6 +80,9 @@ depends = [
   ":check-publish",
 ]
 run = '''
+if [[ "$usage_preset" == macos-x64-* ]]; then
+  exec mise run :_test-macos-x64
+fi
 if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
   # Build hooks strip QEMU's loader environment, so run inside the target OS.
   exec docker run --rm --platform linux/riscv64 \
@@ -104,3 +107,9 @@ run_windows = '''
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
 '''
+
+# A separate tool name keeps the Intel SDK apart from the HTTP backend's host install.
+[tasks._test-macos-x64]
+hide = true
+tools = { "http:dart-x64" = { version = "{{vars.dart_version}}", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{vars.dart_version}}/sdk/dartsdk-macos-x64-release.zip", checksum_url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{vars.dart_version}}/sdk/dartsdk-macos-x64-release.zip.sha256sum" } }
+run = "dart test"
