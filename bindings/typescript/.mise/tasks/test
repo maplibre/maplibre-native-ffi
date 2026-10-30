@@ -8,16 +8,7 @@
 #USAGE }
 set -euo pipefail
 
-# The preset selects the host: OpenHarmony presets run the suite on ArkTS from
-# a signed HAP on the emulator, Emscripten presets run it as a page in headless
-# Chromium, and desktop presets run it in one process per runtime, after
-# packing the preset's packages as the pack task does.
 case "$usage_preset" in
-  macos-x64-*)
-    MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
-      MISE_ARCH=x64 MISE_NO_HOOKS=1 exec mise exec --no-deps node bun deno -- \
-      scripts/test-desktop.sh "$usage_preset" "${usage_runtime:-}"
-    ;;
   ohos-*)
     if [[ -n "${usage_runtime:-}" ]]; then
       echo "error: an OpenHarmony preset runs the suite on ArkTS, not $usage_runtime" >&2
