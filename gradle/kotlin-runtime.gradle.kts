@@ -133,11 +133,13 @@ fun configureJvmRuntimeArtifacts(backend: String, classifiers: Map<String, Strin
       destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
       if (install != null) {
-        val resourcePath = "META-INF/maplibre-native-ffi/$classifier"
+        // Both Windows toolchains serve the same JVM; the classifier selects one.
+        val resourcePath =
+          "META-INF/maplibre-native-ffi/${classifier.replace("windows-mingw-", "windows-")}"
         // A build tree's install also holds the test graphics fixtures, which the
         // runtime leaves out.
         from(install.resolve("lib")) {
-          include("*.so", "*.so.*", "*.dylib")
+          include("*.so", "*.so.*", "*.dylib", "*.dll")
           exclude("*mln_test_graphics*")
           into(resourcePath)
         }

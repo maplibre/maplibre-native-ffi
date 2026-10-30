@@ -417,7 +417,12 @@ tasks.configureEach {
   if (name == "mergeAndroidMainJniLibFolders") dependsOn("packageAndroidBindingLibraries")
 }
 
-val jvmInstall = nativeInstall(hostPlatform.targetPlatform)
+val jvmInstall =
+  nativeInstall(hostPlatform.targetPlatform).let { install ->
+    if (install.prefix == null && hostPlatform.isWindows) {
+      nativeInstall(hostPlatform.targetPlatform.replaceFirst("windows-", "windows-mingw-"))
+    } else install
+  }
 val verifyJvmLocalBuild = registerLocalBuildVerification("verifyJvmLocalBuild", jvmInstall)
 
 class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :

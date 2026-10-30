@@ -192,8 +192,10 @@ dependencies {
 }
 ```
 
-Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl.
-Android and Kotlin/Native targets need no classifier.
+Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl. On
+Windows, choose `natives-windows-<arch>` for MSVC or
+`natives-windows-mingw-<arch>` for MinGW. Include only one for each
+architecture. Android and Kotlin/Native targets need no classifier.
 
 On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.

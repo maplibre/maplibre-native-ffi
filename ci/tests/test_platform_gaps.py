@@ -64,6 +64,15 @@ class PlatformGapsTest(unittest.TestCase):
         self.assertEqual(runtimes["metal"]["natives-macos-x64"], "macos-x64")
         self.assertNotIn("natives-macos-x64", runtimes["opengl"])
         self.assertNotIn("natives-macos-x64", runtimes["vulkan"])
+        for backend in ("opengl", "vulkan"):
+            for arch in ("x64", "arm64"):
+                self.assertEqual(
+                    runtimes[backend][f"natives-windows-{arch}"], f"windows-{arch}"
+                )
+                self.assertEqual(
+                    runtimes[backend][f"natives-windows-mingw-{arch}"],
+                    f"windows-mingw-{arch}",
+                )
         entry = gaps.Entry(
             0,
             {

@@ -164,12 +164,6 @@ archs = ["loongarch64"]
 status = "blocked"
 reason = "Debian and Alpine's Java 25 Zero/libffi runtimes pass 76 of 77 binding tests under QEMU, but hang when a render-completion callback exits the JVM. Their shutdown stack traces omit the callback frames that the binding uses to avoid deadlocking session abandonment."
 
-[[entry]]
-bindings = ["kotlin-jvm"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
-
 # No supported toolchain or ABI.
 
 [[entry]]
