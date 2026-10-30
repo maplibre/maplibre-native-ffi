@@ -1,0 +1,5 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/v3.28.6/Help/manual/presets/schema.json",
+  "version": 8,
+  "include": ["../../../../CMakePresets.json"]
+}

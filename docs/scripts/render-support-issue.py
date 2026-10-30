@@ -108,7 +108,8 @@ def render(matrix: dict[str, Any]) -> str:
         (
             "A cell shows the furthest status of any architecture and backend on "
             "its platform. TypeScript runs under Node, Bun, and Deno, in ArkTS "
-            "apps on OpenHarmony, and in the browser."
+            "apps on OpenHarmony, in the browser, and in embedded Hermes on "
+            "Android, iOS, Mac Catalyst, tvOS, and visionOS."
         ),
         "",
         *binding_grid(matrix),

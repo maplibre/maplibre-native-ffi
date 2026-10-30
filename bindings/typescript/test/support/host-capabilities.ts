@@ -13,13 +13,7 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-export type Host =
-  | "node"
-  | "bun"
-  | "deno"
-  | "arkts"
-  | "browser"
-  | "react-native";
+export type Host = "node" | "bun" | "deno" | "arkts" | "browser" | "hermes";
 
 export type Capability =
   | "httpOrigin"

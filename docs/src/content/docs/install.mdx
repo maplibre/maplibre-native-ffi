@@ -564,28 +564,23 @@ await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
 const runtime = await RuntimeHandle.create();
 ```
 
-In React Native 0.88, use the New Architecture and the bundled Hermes engine.
-Install the facade alone; autolinking defaults to Metal on iOS and OpenGL on
-Android:
+For an embedded Hermes runtime on Android, iOS, Mac Catalyst, tvOS, or visionOS,
+install the facade and import its Hermes entry:
 
-```bash frame="terminal"
-npm install @maplibre/native-ffi
+```ts
+import { RuntimeHandle } from "@maplibre/native-ffi/hermes";
 ```
 
-On iOS, use the app's dependency manager: run `pod install` for CocoaPods, or
-React Native's `setup-apple-spm.js` for SwiftPM. To migrate the standard React
-Native template to SwiftPM:
+The native host links the C library and the package's `native/hermes` CMake
+target against the matching Hermes JSI library. It installs
+`mln::hermes::Module` before loading JavaScript and supplies a scheduler for the
+runtime thread. See the entry's package documentation and `module.h` for the
+host's threading and lifetime requirements. On Android, initialize the C API's
+platform services with the application context. The host supplies graphics
+objects and the surface for presentation.
 
-```bash frame="terminal"
-cd ios
-node ../node_modules/react-native/scripts/setup-apple-spm.js add --deintegrate
-```
-
-To select Vulkan on Android, set `maplibre.android.backend=vulkan` in
-`android/gradle.properties`.
-
-Import from `@maplibre/native-ffi` as on Node. The binding creates no native
-view; the host supplies the graphics objects and surface for presentation.
+Meta's official Hermes artifacts include Android and all four Apple mobile
+targets; no app framework is required.
 
 npm has no snapshot channel. To try `main`, pack the packages for your preset in
 a checkout of this repository, then install the tarballs:

@@ -1,0 +1,19 @@
+{
+  "version": "260318099.0.5",
+  "source": {
+    "url": "https://codeload.github.com/meta/hermes/tar.gz/9a115f15785851f4ff2747ebb090ddd066fc8ad2",
+    "sha256": "3bbd89338df21d42ecf16912ae507d4cdfc147bf4afd31a02dddc792d24f0b30"
+  },
+  "apple": {
+    "url": "https://repo1.maven.org/maven2/com/facebook/hermes/hermes-ios/260318099.0.5/hermes-ios-260318099.0.5-hermes-ios-release.tar.gz",
+    "sha256": "4e137490ffdf5b145bd629c5cabdfe9aee54573308d7c357bc3300ac78d64507"
+  },
+  "android": {
+    "url": "https://repo1.maven.org/maven2/com/facebook/hermes/hermes-android/260318099.0.5/hermes-android-260318099.0.5-release.aar",
+    "sha256": "1c171d2ace4057127a91ee543c3fd17206fce5053c2ea85aa9376473f1e200eb"
+  },
+  "fbjni": {
+    "url": "https://repo1.maven.org/maven2/com/facebook/fbjni/fbjni/0.7.0/fbjni-0.7.0.aar",
+    "sha256": "7e319ae110ac5e5ef18904170aea5c3e753e915d196699d7fd39d36c8e1dfe36"
+  }
+}

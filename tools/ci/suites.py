@@ -263,7 +263,7 @@ def android_commands(target: Target, abi: str) -> list[str]:
         if abi != "x86":
             commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     action = "test" if target.device else "build"
-    commands.append(f"mise run //bindings/typescript:{action}:react-native {preset}")
+    commands.append(f"mise run //bindings/typescript:{action}:hermes {preset}")
     return commands
 
 
@@ -287,7 +287,7 @@ def apple_commands(target: Target) -> list[str]:
             f"mise run //bindings/swift:build {preset}",
             f"mise run //bindings/dart:build:mobile {preset}",
             f"mise run //bindings/rust:build {preset}",
-            f"mise run //bindings/typescript:build:react-native {preset}",
+            f"mise run //bindings/typescript:build:hermes {preset}",
         ]
     if target_platform == "ios-simulator":
         return [
@@ -295,7 +295,7 @@ def apple_commands(target: Target) -> list[str]:
             f"mise run //bindings/swift:test {preset}",
             f"mise run //bindings/dart:test:ios {preset}",
             f"mise run //bindings/rust:test {preset}",
-            f"mise run //bindings/typescript:test:react-native {preset}",
+            f"mise run //bindings/typescript:test:hermes {preset}",
         ]
     if target_platform == "ios-maccatalyst":
         # Kotlin/Native has no Mac Catalyst target.
@@ -303,24 +303,28 @@ def apple_commands(target: Target) -> list[str]:
             f"mise run //bindings/swift:test {preset}",
             f"mise run //bindings/rust:test {preset}",
             f"mise run //bindings/zig:test {preset}",
+            f"mise run //bindings/typescript:test:hermes {preset}",
         ]
     if target_platform == "tvos":
         return [
             f"mise run //bindings/kotlin:ios-build {preset}",
             f"mise run //bindings/swift:build {preset}",
             f"mise run //bindings/rust:build {preset}",
+            f"mise run //bindings/typescript:build:hermes {preset}",
         ]
     if target_platform == "tvos-simulator":
         return [
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/swift:test {preset}",
             f"mise run //bindings/rust:test {preset}",
+            f"mise run //bindings/typescript:test:hermes {preset}",
         ]
     if target_platform in {"visionos", "visionos-simulator"}:
         action = "test" if target_platform == "visionos-simulator" else "build"
         return [
             f"mise run //bindings/swift:{action} {preset}",
             f"mise run //bindings/rust:{action} {preset}",
+            f"mise run //bindings/typescript:{action}:hermes {preset}",
         ]
     return []
 

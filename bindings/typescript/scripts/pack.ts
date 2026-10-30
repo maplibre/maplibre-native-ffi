@@ -128,7 +128,7 @@ function addonOf(preset: string): Addon {
 
 // Mobile hosts compile the addon from the facade's sources.
 const addons = presets
-  .filter((preset) => !/^(android|ios)-/.test(preset))
+  .filter((preset) => !/^(android|ios|tvos|visionos)-/.test(preset))
   .map(addonOf);
 
 function pack(
@@ -181,7 +181,7 @@ function pack(
 }
 
 // Node strips types only outside node_modules, so the published facade is the
-// bundle rather than the sources: entries for Node, browser, and React Native
+// bundle rather than the sources: entries for Node, browser, and Hermes
 // share their chunks. The browser entry bundles emnapi's
 // runtime, a development dependency, so the facade depends on nothing.
 const dist = join(binding, "build", "dist");
@@ -194,7 +194,7 @@ execFileSync(
     "pack",
     "src/index.ts",
     "src/browser.ts",
-    "src/react-native.ts",
+    "src/hermes.ts",
     "--no-config",
     // The browser entry runs where no require() exists, which the node
     // platform would bring through node:module.
@@ -202,8 +202,6 @@ execFileSync(
     "neutral",
     "--target",
     "es2021",
-    "--external",
-    "react-native",
     "--fixed-extension",
     "--dts",
     "--out-dir",
@@ -266,17 +264,7 @@ for (const backend of new Set(addons.map((addon) => addon.backend))) {
 const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
-// Metro consumes JavaScript; codegen separately reads the TurboModule spec.
-// Keep C sources separate from C++ so SwiftPM and CMake compile them as C11.
-for (const name of [
-  "android",
-  "Package.swift",
-  "MaplibreNativeFfi.podspec",
-  "react-native.config.cjs",
-  "src/specs",
-]) {
-  cpSync(join(binding, name), join(facade, name), { recursive: true });
-}
+// Keep C sources separate from C++ for native embedding hosts.
 for (const name of [
   "generated_addon.c",
   "generated_values.c",
@@ -284,7 +272,7 @@ for (const name of [
   "runtime.c",
   "runtime.h",
   "realm.c",
-  "react-native",
+  "hermes",
 ]) {
   cpSync(join(binding, "native", name), join(facade, "native", name), {
     recursive: true,
@@ -348,35 +336,23 @@ pack(
     // and Deno take the default.
     exports: {
       ".": {
-        "react-native": {
-          types: "./dist/react-native.d.mts",
-          default: "./dist/react-native.mjs",
-        },
         browser: {
           types: "./dist/browser.d.mts",
           default: "./dist/browser.mjs",
         },
         default: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
       },
+      "./hermes": {
+        types: "./dist/hermes.d.mts",
+        default: "./dist/hermes.mjs",
+      },
     },
     engines: source.engines,
-    peerDependencies: { ...backendPeers, ...source.peerDependencies },
+    peerDependencies: backendPeers,
     peerDependenciesMeta: Object.fromEntries(
-      Object.keys({ ...backendPeers, ...source.peerDependencies }).map(
-        (name) => [name, { optional: true }],
-      ),
+      Object.keys(backendPeers).map((name) => [name, { optional: true }]),
     ),
-    codegenConfig: source.codegenConfig,
-    swiftpmConfig: source.swiftpmConfig,
-    files: [
-      "dist",
-      "src/specs",
-      "native",
-      "android",
-      "Package.swift",
-      "MaplibreNativeFfi.podspec",
-      "react-native.config.cjs",
-    ],
+    files: ["dist", "native"],
   },
   facadeInventories,
   [

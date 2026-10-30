@@ -8,7 +8,7 @@
 description = "Generate the TypeScript API reference HTML with TypeDoc."
 run = '''
 rm -rf build/typedoc
-pnpm exec typedoc --entryPoints src/index.ts src/browser.ts --excludeInternal --out build/typedoc \
+pnpm exec typedoc --entryPoints src/index.ts src/browser.ts src/hermes.ts --excludeInternal --out build/typedoc \
   --name @maplibre/native-ffi --readme none
 '''
 
@@ -59,24 +59,23 @@ cmake --build "native/build/$usage_preset" --target maplibre_native_ffi_test_gra
 scripts/test-arkts.sh "$usage_preset"
 '''
 
-[tasks."build:react-native"]
-description = "Build the React Native release app with the shared TypeScript suite and reload probe."
+[tasks."build:hermes"]
+description = "Build the shared TypeScript suite and lifecycle probe with official Hermes."
 usage = '''
 arg "<preset>" {
-  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal"
+  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-arm64-metal" "tvos-simulator-arm64-metal" "visionos-arm64-metal" "visionos-simulator-arm64-metal"
 }
 '''
-tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
-env = { MLN_RN_JAVA_BUILD_VERSION = "{{vars.java_version}}" }
+tools = { "core:java" = "{{vars.java_version}}" }
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = 'bash scripts/build-react-native.sh "$usage_preset"'
+run = 'python scripts/hermes.py build "$usage_preset"'
 
-[tasks."test:react-native"]
-description = "Run the React Native TypeScript suite, graphics readback and runtime reload."
+[tasks."test:hermes"]
+description = "Run the Hermes TypeScript suite, graphics readback, and runtime teardown."
 usage = '''
 arg "<preset>" {
-  choices "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal"
+  choices "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-simulator-arm64-metal" "visionos-simulator-arm64-metal"
 }
 '''
-depends = [{ task = ":build:react-native", args = ["{{usage.preset}}"] }]
-run = 'python scripts/run-react-native.py "$usage_preset"'
+depends = [{ task = ":build:hermes", args = ["{{usage.preset}}"] }]
+run = 'python scripts/hermes.py test "$usage_preset"'

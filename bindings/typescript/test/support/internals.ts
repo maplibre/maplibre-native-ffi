@@ -58,7 +58,7 @@ export function captureLeaks(): string[] {
   if (
     capabilities.host === "arkts" ||
     capabilities.host === "browser" ||
-    capabilities.host === "react-native"
+    capabilities.host === "hermes"
   ) {
     return captureConsole("warn");
   }
@@ -93,7 +93,7 @@ export function captureReportedErrors(): string[] {
   const scope = globalThis as { reportError?: (error: unknown) => void };
   const errors: string[] = [];
   if (typeof scope.reportError !== "function") {
-    if (capabilities.host === "arkts" || capabilities.host === "react-native") {
+    if (capabilities.host === "arkts" || capabilities.host === "hermes") {
       return captureConsole("error");
     }
     process.setUncaughtExceptionCaptureCallback((error) =>

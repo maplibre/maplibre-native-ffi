@@ -92,9 +92,7 @@ JOBS = {
         "npm",
         lambda target: (
             addon(target) == "typescript"
-            or any(
-                suite.task.endswith(":react-native") for suite in target_suites(target)
-            )
+            or any(suite.task.endswith(":hermes") for suite in target_suites(target))
         ),
     ),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
