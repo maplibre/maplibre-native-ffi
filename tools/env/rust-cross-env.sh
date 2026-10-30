@@ -34,6 +34,8 @@ esac
 
 case "$1" in
   mingw-*)
+    # Cargo builds its host-side dependencies with the MSVC Rust toolchain.
+    source "$MISE_MONOREPO_ROOT/tools/env/windows-msvc-env.sh"
     target_env="${cargo_target//-/_}"
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
     export "CC_$target_env=$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
