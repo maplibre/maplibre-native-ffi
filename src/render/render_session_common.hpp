@@ -490,7 +490,19 @@ inline constexpr auto gpu_sync_kind_flag(mln_gpu_sync_kind kind) noexcept
 inline constexpr mln_gpu_sync_kind_flags known_gpu_sync_kinds =
   MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE |
   MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER |
-  MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
+  MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE |
+  MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+
+// The sync kinds a target can produce and consume beyond those it always can.
+struct GpuSyncSupport {
+  mln_gpu_sync_kind_flags producer = 0;
+  mln_gpu_sync_kind_flags consumer = 0;
+};
+
+// Closes a file descriptor that the session owns; -1 has nothing to close.
+void close_fd(int fd) noexcept;
+// Closes a sync file descriptor that the session took and cannot wait on.
+void close_sync_fd(const mln_gpu_sync& sync) noexcept;
 
 // Whether a sync kind hands over an object that the receiver must wait on.
 // The other kinds order the work before the handoff.
@@ -912,7 +924,7 @@ struct mln_render_session_object
   // Set before attach by a target whose sync kinds depend on the host's
   // graphics objects. Attach calls it once the request is otherwise valid,
   // and adds what it returns to the producer and consumer kinds.
-  std::function<mln_gpu_sync_kind_flags()> probe_sync_kinds;
+  std::function<mln::core::GpuSyncSupport()> probe_sync_kinds;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
   bool scheduler_service_queued = false;

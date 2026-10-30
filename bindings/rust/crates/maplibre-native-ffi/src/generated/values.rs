@@ -1167,7 +1167,8 @@ impl Default for GesturePhase {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct GpuSync {
     pub kind: GpuSyncKind,
-    /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
+    /// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+    /// descriptor.
     pub handle: u64,
     /// Counter value of a timeline kind. Zero for other kinds.
     pub value: u64,
@@ -1214,6 +1215,11 @@ pub enum GpuSyncKind: u32 {
     /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
     /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
     VulkanTimelineSemaphore = 3,
+    /// A Linux sync file descriptor, which handle holds as an int64_t bit
+    /// pattern. -1 is a fence that has already signaled. Vulkan supports it
+    /// once the device enables VK_KHR_external_semaphore_fd, and EGL where the
+    /// display has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+    SyncFd = 4,
 } Unknown
 }
 impl Default for GpuSyncKind {
@@ -1232,6 +1238,7 @@ pub struct GpuSyncKindFlag: u32 {
     const OPEN_GL_FENCE = 2;
     const QUEUE_ORDER = 4;
     const VULKAN_TIMELINE_SEMAPHORE = 8;
+    const SYNC_FD = 16;
 }
 }
 
@@ -3261,11 +3268,11 @@ pub struct RenderSessionAttachOptions {
     /// Producer synchronization kinds that the host accepts for acquired
     /// texture frames. The session picks the first one its target supports in
     /// this order: `GpuSyncKind::QueueOrder`, `GpuSyncKind::OpenGlFence`,
-    /// `GpuSyncKind::VulkanTimelineSemaphore`, then `GpuSyncKind::CpuComplete`.
-    /// Its capabilities report the pick. Zero accepts
-    /// `GpuSyncKind::CpuComplete`, or `GpuSyncKind::QueueOrder` on WebGPU,
-    /// whose device has a single queue. A set that the target cannot satisfy
-    /// fails the attach with `Status::Unsupported`.
+    /// `GpuSyncKind::VulkanTimelineSemaphore`, `GpuSyncKind::SyncFd`, then
+    /// `GpuSyncKind::CpuComplete`. Its capabilities report the pick. Zero
+    /// accepts `GpuSyncKind::CpuComplete`, or `GpuSyncKind::QueueOrder` on
+    /// WebGPU, whose device has a single queue. A set that the target cannot
+    /// satisfy fails the attach with `Status::Unsupported`.
     pub producer_sync_kinds: GpuSyncKindFlag,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,

@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Handle">
-/// Bit pattern of the GLsync pointer or the VkSemaphore handle.
+/// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+/// descriptor.
 /// </param>
 /// <param name="Value">
 /// Counter value of a timeline kind. Zero for other kinds.

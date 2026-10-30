@@ -601,7 +601,8 @@ export type GesturePhase =
 export interface GpuSync {
   kind?: GpuSyncKind;
   /**
-   * Bit pattern of the GLsync pointer or the VkSemaphore handle.
+   * Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+   * descriptor.
    */
   handle?: bigint;
   /**
@@ -641,6 +642,13 @@ export const GpuSyncKind = {
    * VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
    */
   vulkanTimelineSemaphore: 3,
+  /**
+   * A Linux sync file descriptor, which handle holds as an int64_t bit pattern.
+   * -1 is a fence that has already signaled. Vulkan supports it once the device
+   * enables VK_KHR_external_semaphore_fd, and EGL where the display has
+   * EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+   */
+  syncFd: 4,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
@@ -658,6 +666,7 @@ export const GpuSyncKindFlag = {
   openGlFence: 2,
   queueOrder: 4,
   vulkanTimelineSemaphore: 8,
+  syncFd: 16,
 } as const;
 /** A bitwise OR of GpuSyncKindFlag flags. */
 export type GpuSyncKindFlag = number;
@@ -1921,10 +1930,11 @@ export interface RenderSessionAttachOptions {
    * Producer synchronization kinds that the host accepts for acquired texture
    * frames. The session picks the first one its target supports in this order:
    * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-   * `GpuSyncKind.vulkanTimelineSemaphore`, then `GpuSyncKind.cpuComplete`. Its
-   * capabilities report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
-   * `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
-   * that the target cannot satisfy fails the attach with `Status.unsupported`.
+   * `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.syncFd`, then
+   * `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+   * device has a single queue. A set that the target cannot satisfy fails the
+   * attach with `Status.unsupported`.
    */
   producerSyncKinds?: GpuSyncKindFlag;
   /**

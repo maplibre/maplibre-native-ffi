@@ -37,4 +37,12 @@ public enum GpuSyncKind : uint
     /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
     /// </summary>
     VulkanTimelineSemaphore = 3,
+
+    /// <summary>
+    /// A Linux sync file descriptor, which handle holds as an int64_t bit
+    /// pattern. -1 is a fence that has already signaled. Vulkan supports it
+    /// once the device enables VK_KHR_external_semaphore_fd, and EGL where the
+    /// display has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+    /// </summary>
+    SyncFd = 4,
 }

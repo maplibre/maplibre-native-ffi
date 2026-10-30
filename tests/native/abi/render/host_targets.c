@@ -9,6 +9,11 @@
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #include <vulkan/vulkan_core.h>
 #endif
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <poll.h>
+#include <unistd.h>
+#endif
 
 #include "support/frames.h"
 #include "support/host_graphics.h"
@@ -549,6 +554,107 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
 }
 #endif
 
+#if !defined(_WIN32) && \
+  (defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL))
+// Builds whose CI drivers hand out sync files: Android's for Vulkan, and Mesa's
+// with udmabuf on the Linux hosts that run their suites natively.
+#if (defined(__ANDROID__) && defined(MLN_FFI_TEST_BACKEND_VULKAN)) ||   \
+  (defined(__linux__) && !defined(__ANDROID__) && defined(__GLIBC__) && \
+   (defined(__x86_64__) || defined(__aarch64__)))
+#define SYNC_FILES_REQUIRED 1
+#else
+#define SYNC_FILES_REQUIRED 0
+#endif
+
+// Sync files hand frames over where the driver supports them, and a target
+// whose driver does not refuses them. The host polls the producer's file
+// before it reads, and releases with a duplicate of it, which the session
+// takes, or with -1, a fence that has signaled. A release the session refuses
+// leaves the host its file.
+static void sync_files_order_frame_reads_and_slot_reuse(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_synced(
+      map, &fixture, true,
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_SYNC_FD
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  if (capabilities.producer_sync_kind != MLN_GPU_SYNC_SYNC_FD) {
+    TEST_ASSERT_FALSE_MESSAGE(
+      SYNC_FILES_REQUIRED, "this target's driver hands out no sync files"
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_GPU_SYNC_CPU_COMPLETE, capabilities.producer_sync_kind
+    );
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_render_fixture fallback = {0};
+    TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
+      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_SYNC_FD
+    ));
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    return;
+  }
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_SYNC_FD, capabilities.consumer_sync_kinds
+  );
+
+  const uint8_t* const colors[] = {red, blue};
+  for (uint64_t index = 0; index < 2; index += 1) {
+    if (index == 1) paint_background_blue(runtime, map);
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+    );
+    mln_acquired_frame frame = MLN_HANDLE_NULL;
+    MLN_TEST_OK(
+      mln_render_session_acquire_frame(fixture.session, &frame, NULL)
+    );
+    mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+    MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
+    TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_SYNC_FD, producer.kind);
+    const int produced = (int)(int64_t)producer.handle;
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(0, produced);
+    struct pollfd signaled = {.fd = produced, .events = POLLIN};
+    TEST_ASSERT_EQUAL_INT(1, poll(&signaled, 1, 10000));
+    expect_texture_color(
+      mln_test_render_fixture_texture(&fixture, 0), colors[index],
+      "the sync file frame's texture"
+    );
+    mln_gpu_sync consumer = {
+      .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_SYNC_FD
+    };
+    if (index == 0) {
+      consumer.handle = (uint64_t)(int64_t)dup(produced);
+      void* scope = NULL;
+      MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scope, NULL));
+      MLN_TEST_STATUS(
+        MLN_STATUS_BUSY, mln_acquired_frame_release(frame, &consumer, NULL)
+      );
+      mln_acquired_frame_view_end(scope);
+      TEST_ASSERT_NOT_EQUAL_INT(
+        -1, fcntl((int)(int64_t)consumer.handle, F_GETFD)
+      );
+    } else {
+      consumer.handle = (uint64_t)(int64_t)-1;
+    }
+    MLN_TEST_OK(mln_acquired_frame_release(frame, &consumer, NULL));
+  }
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
 static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   bool borrowed
@@ -767,6 +873,10 @@ MLN_TEST_GROUP {
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(vulkan_timelines_order_frame_reads_and_slot_reuse);
   RUN_TEST(vulkan_images_go_to_their_owner_between_frames);
+#endif
+#if !defined(_WIN32) && \
+  (defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL))
+  RUN_TEST(sync_files_order_frame_reads_and_slot_reuse);
 #endif
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);

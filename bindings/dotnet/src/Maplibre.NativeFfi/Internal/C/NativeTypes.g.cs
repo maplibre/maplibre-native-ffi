@@ -1445,6 +1445,7 @@ internal enum mln_gpu_sync_kind : uint
     MLN_GPU_SYNC_OPEN_GL_FENCE = 1,
     MLN_GPU_SYNC_QUEUE_ORDER = 2,
     MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3,
+    MLN_GPU_SYNC_SYNC_FD = 4,
 }
 
 internal enum mln_gpu_sync_kind_flag : uint
@@ -1453,6 +1454,7 @@ internal enum mln_gpu_sync_kind_flag : uint
     MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 2,
     MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 4,
     MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 8,
+    MLN_GPU_SYNC_KIND_FLAG_SYNC_FD = 16,
 }
 
 internal enum mln_graphics_device_option_field : uint

@@ -114,19 +114,25 @@ auto validate_vulkan_handles(
   return MLN_STATUS_OK;
 }
 
-// Whether the host's device takes timeline semaphores: its physical device
-// supports them, and the device resolves their commands, which it does once
-// the host enables Vulkan 1.2 or VK_KHR_timeline_semaphore. Whether the host
-// enabled the feature is its own contract.
-auto vulkan_supports_timelines(const mln_vulkan_context_descriptor& context)
-  -> bool {
+// The sync kinds that the host's device adds. A device resolves an
+// extension's commands only once the host enables it, which tells the session
+// what the host enabled; whether it enabled the timelineSemaphore feature that
+// Vulkan 1.2 or VK_KHR_timeline_semaphore offers is the host's own contract.
+auto vulkan_sync_support(const mln_vulkan_context_descriptor& context)
+  -> mln::core::GpuSyncSupport {
+  auto support = mln::core::GpuSyncSupport{};
   auto dispatcher = mln::core::vulkan_dispatch_loader(context);
   mln::core::vulkan_init_instance_dispatch(dispatcher, context);
-  if (dispatcher.vkGetPhysicalDeviceFeatures2 == nullptr) return false;
+  if (
+    dispatcher.vkGetPhysicalDeviceFeatures2 == nullptr ||
+    dispatcher.vkGetPhysicalDeviceExternalSemaphoreProperties == nullptr
+  )
+    return support;
   mln::core::vulkan_init_device_dispatch(
     dispatcher, static_cast<VkDevice>(context.device), context
   );
-  if (dispatcher.vkGetSemaphoreCounterValue == nullptr) return false;
+  auto* const physical_device =
+    static_cast<VkPhysicalDevice>(context.physical_device);
   auto timeline = VkPhysicalDeviceTimelineSemaphoreFeatures{
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
     .pNext = nullptr,
@@ -137,10 +143,42 @@ auto vulkan_supports_timelines(const mln_vulkan_context_descriptor& context)
     .pNext = &timeline,
     .features = {},
   };
-  dispatcher.vkGetPhysicalDeviceFeatures2(
-    static_cast<VkPhysicalDevice>(context.physical_device), &features
+  dispatcher.vkGetPhysicalDeviceFeatures2(physical_device, &features);
+  if (
+    timeline.timelineSemaphore == VK_TRUE &&
+    dispatcher.vkGetSemaphoreCounterValue != nullptr
+  ) {
+    support.producer |= MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
+    support.consumer |= MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE;
+  }
+  const auto sync_fd = VkPhysicalDeviceExternalSemaphoreInfo{
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
+    .pNext = nullptr,
+    .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
+  };
+  auto properties = VkExternalSemaphoreProperties{
+    .sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES,
+    .pNext = nullptr,
+    .exportFromImportedHandleTypes = 0,
+    .compatibleHandleTypes = 0,
+    .externalSemaphoreFeatures = 0,
+  };
+  dispatcher.vkGetPhysicalDeviceExternalSemaphoreProperties(
+    physical_device, &sync_fd, &properties
   );
-  return timeline.timelineSemaphore == VK_TRUE;
+  if (
+    (properties.externalSemaphoreFeatures &
+     VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) != 0 &&
+    dispatcher.vkGetSemaphoreFdKHR != nullptr
+  )
+    support.producer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+  if (
+    (properties.externalSemaphoreFeatures &
+     VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) != 0 &&
+    dispatcher.vkImportSemaphoreFdKHR != nullptr
+  )
+    support.consumer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+  return support;
 }
 
 class VulkanTextureSessionBackend final
@@ -174,13 +212,18 @@ class VulkanTextureSessionBackend final
   }
 
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
-    if (sync.kind != MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
-      return MLN_STATUS_UNSUPPORTED;
     try {
       auto guard = mln::gfx::BackendScope{backend_};
-      backend_.wait_timeline(
-        mln::core::vulkan_handle_from_abi<VkSemaphore>(sync.handle), sync.value
-      );
+      if (sync.kind == MLN_GPU_SYNC_SYNC_FD) {
+        backend_.wait_sync_fd(
+          static_cast<int>(static_cast<int64_t>(sync.handle))
+        );
+      } else {
+        backend_.wait_timeline(
+          mln::core::vulkan_handle_from_abi<VkSemaphore>(sync.handle),
+          sync.value
+        );
+      }
       return MLN_STATUS_OK;
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
@@ -310,9 +353,7 @@ auto vulkan_owned_texture_attach_start(
   session->accepts_queue_lock = true;
   session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   session->probe_sync_kinds = [context = descriptor->context] {
-    return vulkan_supports_timelines(context)
-             ? MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
-             : 0U;
+    return vulkan_sync_support(context);
   };
   const auto copied = *descriptor;
   const auto ring_depth = attach_ring_depth(options);
@@ -379,9 +420,7 @@ auto vulkan_borrowed_texture_attach_start(
   session->accepts_queue_lock = true;
   session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   session->probe_sync_kinds = [context = descriptor->context] {
-    return vulkan_supports_timelines(context)
-             ? MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
-             : 0U;
+    return vulkan_sync_support(context);
   };
   session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live

@@ -204,12 +204,19 @@ final class GpuSyncKind extends _Enum {
   /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
   /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
   static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(3);
+
+  /// A Linux sync file descriptor, which handle holds as an int64_t bit
+  /// pattern. -1 is a fence that has already signaled. Vulkan supports it once
+  /// the device enables VK_KHR_external_semaphore_fd, and EGL where the display
+  /// has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+  static const syncFd = GpuSyncKind.fromRawValue(4);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
     1 => 'GpuSyncKind.openGlFence',
     2 => 'GpuSyncKind.queueOrder',
     3 => 'GpuSyncKind.vulkanTimelineSemaphore',
+    4 => 'GpuSyncKind.syncFd',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -224,6 +231,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
   static const openGlFence = GpuSyncKindFlag.fromRawValue(2);
   static const queueOrder = GpuSyncKindFlag.fromRawValue(4);
   static const vulkanTimelineSemaphore = GpuSyncKindFlag.fromRawValue(8);
+  static const syncFd = GpuSyncKindFlag.fromRawValue(16);
 
   /// No flags.
   static const none = GpuSyncKindFlag.fromRawValue(0);
@@ -236,6 +244,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
     2: 'openGlFence',
     4: 'queueOrder',
     8: 'vulkanTimelineSemaphore',
+    16: 'syncFd',
   });
 }
 
@@ -1499,7 +1508,8 @@ final class GpuSync extends _Value {
   });
   final GpuSyncKind kind;
 
-  /// Bit pattern of the GLsync pointer or the VkSemaphore handle.
+  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+  /// descriptor.
   final int handle;
 
   /// Counter value of a timeline kind. Zero for other kinds.
@@ -2648,10 +2658,11 @@ final class RenderSessionAttachOptions extends _Value {
   /// Producer synchronization kinds that the host accepts for acquired texture
   /// frames. The session picks the first one its target supports in this order:
   /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-  /// `GpuSyncKind.vulkanTimelineSemaphore`, then `GpuSyncKind.cpuComplete`. Its
-  /// capabilities report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
-  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
-  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
+  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.syncFd`, then
+  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+  /// device has a single queue. A set that the target cannot satisfy fails the
+  /// attach with `Status.unsupported`.
   final GpuSyncKindFlag producerSyncKinds;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.

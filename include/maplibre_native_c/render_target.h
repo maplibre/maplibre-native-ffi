@@ -181,6 +181,22 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * host keeps the semaphore valid until detach completes.
    */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3U,
+  /**
+   * A Linux sync file descriptor, which handle holds as an int64_t bit
+   * pattern. -1 is a fence that has already signaled. Vulkan supports it once
+   * the device enables VK_KHR_external_semaphore_fd, and EGL where the display
+   * has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+   *
+   * A producer fd belongs to the session, which closes it. The host borrows it
+   * until it releases or discards the frame, so a host that passes it to an
+   * API that takes ownership, such as ASurfaceTransaction_setBuffer(),
+   * duplicates it first.
+   *
+   * A consumer fd signals once the host's reads complete. A successful release
+   * takes ownership of it, and the session's later GPU work waits for it; a
+   * failed release leaves it with the host.
+   */
+  MLN_GPU_SYNC_SYNC_FD = 4U,
 } mln_gpu_sync_kind;
 
 /** A bit for each mln_gpu_sync_kind. */
@@ -189,6 +205,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
   MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 1U << 1U,
   MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 1U << 2U,
   MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 1U << 3U,
+  MLN_GPU_SYNC_KIND_FLAG_SYNC_FD = 1U << 4U,
 } mln_gpu_sync_kind_flag;
 
 /** A set of mln_gpu_sync_kind_flag bits. */
@@ -222,7 +239,8 @@ typedef struct mln_render_session_attach_options {
    * Producer synchronization kinds that the host accepts for acquired texture
    * frames. The session picks the first one its target supports in this order:
    * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE,
-   * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, then MLN_GPU_SYNC_CPU_COMPLETE.
+   * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, MLN_GPU_SYNC_SYNC_FD, then
+   * MLN_GPU_SYNC_CPU_COMPLETE.
    * Its capabilities report the pick. Zero accepts
    * MLN_GPU_SYNC_CPU_COMPLETE, or MLN_GPU_SYNC_QUEUE_ORDER on WebGPU, whose
    * device has a single queue. A set that the target cannot satisfy fails the
@@ -283,7 +301,8 @@ typedef struct mln_gpu_sync {
   uint32_t size;
   mln_gpu_sync_kind kind;
   /**
-   * Bit pattern of the GLsync pointer or the VkSemaphore handle.
+   * Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+   * descriptor.
    *
    * Zero when kind names no object. A producer fence that frame access copies
    * is valid only until the frame's release or discard.

@@ -30,6 +30,7 @@
 #include <Windows.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
 #include <emscripten/threading.h>
@@ -57,6 +58,107 @@ constexpr auto opengl_pixel_format = uint32_t{GL_RGBA};
 constexpr auto opengl_pixel_type = uint32_t{GL_UNSIGNED_BYTE};
 
 using mln::core::OpenGLBorrowedTarget;
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+// The EGL_ANDROID_native_fence_sync entry points of a display that also has
+// EGL_KHR_wait_sync, through which a session hands sync files over.
+struct EglNativeFences {
+  EGLDisplay display = EGL_NO_DISPLAY;
+  PFNEGLCREATESYNCKHRPROC create_sync = nullptr;
+  PFNEGLDESTROYSYNCKHRPROC destroy_sync = nullptr;
+  PFNEGLWAITSYNCKHRPROC wait_sync = nullptr;
+  PFNEGLDUPNATIVEFENCEFDANDROIDPROC dup_fd = nullptr;
+
+  static auto load(const mln_egl_context_descriptor& egl)
+    -> std::optional<EglNativeFences> {
+    auto fences =
+      EglNativeFences{.display = static_cast<EGLDisplay>(egl.display)};
+    const auto* list = eglQueryString(fences.display, EGL_EXTENSIONS);
+    if (list == nullptr) return std::nullopt;
+    const auto has = [extensions =
+                        std::string_view{list}](std::string_view name) {
+      for (auto rest = extensions; !rest.empty();) {
+        const auto end = rest.find(' ');
+        if (rest.substr(0, end) == name) return true;
+        if (end == std::string_view::npos) break;
+        rest.remove_prefix(end + 1);
+      }
+      return false;
+    };
+    if (!has("EGL_ANDROID_native_fence_sync") || !has("EGL_KHR_wait_sync"))
+      return std::nullopt;
+    const auto proc = [&egl](const char* name) {
+      return mln::core::opengl::get_egl_proc_address(egl, name, EGL_NONE);
+    };
+    // EGL hands out extension functions as untyped procedure pointers.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    fences.create_sync =
+      reinterpret_cast<PFNEGLCREATESYNCKHRPROC>(proc("eglCreateSyncKHR"));
+    fences.destroy_sync =
+      reinterpret_cast<PFNEGLDESTROYSYNCKHRPROC>(proc("eglDestroySyncKHR"));
+    fences.wait_sync =
+      reinterpret_cast<PFNEGLWAITSYNCKHRPROC>(proc("eglWaitSyncKHR"));
+    fences.dup_fd = reinterpret_cast<PFNEGLDUPNATIVEFENCEFDANDROIDPROC>(
+      proc("eglDupNativeFenceFDANDROID")
+    );
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (
+      fences.create_sync == nullptr || fences.destroy_sync == nullptr ||
+      fences.wait_sync == nullptr || fences.dup_fd == nullptr
+    )
+      return std::nullopt;
+    return fences;
+  }
+
+  // Inserts a fence after the context's work so far, and returns its sync
+  // file, or -1 on failure. The context is current.
+  [[nodiscard]] auto export_fd() const -> int {
+    const EGLint attributes[] = {
+      EGL_SYNC_NATIVE_FENCE_FD_ANDROID, EGL_NO_NATIVE_FENCE_FD_ANDROID, EGL_NONE
+    };
+    auto* const sync =
+      create_sync(display, EGL_SYNC_NATIVE_FENCE_ANDROID, attributes);
+    if (sync == EGL_NO_SYNC_KHR) return -1;
+    // The fence has a sync file only once the context flushes it.
+    mln::platform::glFlush();
+    const auto fd = dup_fd(display, sync);
+    destroy_sync(display, sync);
+    return fd;
+  }
+
+  // Makes the context's later work wait for `fd`, which this takes ownership
+  // of. The context is current.
+  [[nodiscard]] auto wait_fd(int fd) const -> bool {
+    const EGLint attributes[] = {
+      EGL_SYNC_NATIVE_FENCE_FD_ANDROID, fd, EGL_NONE
+    };
+    auto* const sync =
+      create_sync(display, EGL_SYNC_NATIVE_FENCE_ANDROID, attributes);
+    if (sync == EGL_NO_SYNC_KHR) {
+      mln::core::close_fd(fd);
+      return false;
+    }
+    // The sync owns the descriptor from here on.
+    const auto waited = wait_sync(display, sync, 0) == EGL_TRUE;
+    destroy_sync(display, sync);
+    return waited;
+  }
+};
+
+// The sync kinds that the shared EGL context's display adds.
+auto opengl_sync_support(const mln_open_gl_context_descriptor& context)
+  -> mln::core::GpuSyncSupport {
+  if (
+    context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_EGL ||
+    !EglNativeFences::load(context.data.egl)
+  )
+    return {};
+  return {
+    .producer = MLN_GPU_SYNC_KIND_FLAG_SYNC_FD,
+    .consumer = MLN_GPU_SYNC_KIND_FLAG_SYNC_FD,
+  };
+}
+#endif
 
 [[noreturn]] void throw_opengl_framebuffer_error() {
   switch (mln::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
@@ -620,6 +722,7 @@ class OpenGLTextureSessionBackend final
       : backend_(target, size), producer_sync_kind_(producer_sync_kind) {}
 
   ~OpenGLTextureSessionBackend() noexcept override {
+    for (const auto fd : producer_fds_) mln::core::close_fd(fd);
     try {
       if (has_producer_fences_) {
         auto guard = mln::gfx::BackendScope{backend_};
@@ -635,6 +738,17 @@ class OpenGLTextureSessionBackend final
   }
 
   auto initialize_sync() -> mln_status {
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    if (
+      const auto& context = backend_.context_descriptor();
+      context.platform == MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
+    )
+      native_fences_ = EglNativeFences::load(context.data.egl);
+    if (producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD && !native_fences_) {
+      mln::core::set_thread_error("EGL display does not export sync files");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+#endif
     fence_sync_supported_ = backend_.supports_fence_sync();
     if (
       producer_sync_kind_ == MLN_GPU_SYNC_OPEN_GL_FENCE &&
@@ -653,6 +767,9 @@ class OpenGLTextureSessionBackend final
   }
 
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    if (sync.kind == MLN_GPU_SYNC_SYNC_FD) return wait_sync_fd(sync);
+#endif
     if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE || !fence_sync_supported_)
       return MLN_STATUS_UNSUPPORTED;
     try {
@@ -737,6 +854,21 @@ class OpenGLTextureSessionBackend final
         sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE,
         static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence)), 0
       };
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    } else if (producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD) {
+      const auto fd = native_fences_->export_fd();
+      if (fd < 0) {
+        mln::core::set_thread_error("exporting the producer sync file failed");
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      auto& slot_fd = producer_fds_.at(frame.slot);
+      mln::core::close_fd(slot_fd);
+      slot_fd = fd;
+      producer_sync_ = mln_gpu_sync{
+        sizeof(mln_gpu_sync), MLN_GPU_SYNC_SYNC_FD,
+        static_cast<uint64_t>(static_cast<int64_t>(fd)), 0
+      };
+#endif
     } else {
       backend_.finish_rendering();
     }
@@ -761,6 +893,33 @@ class OpenGLTextureSessionBackend final
   }
 
  private:
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  auto wait_sync_fd(const mln_gpu_sync& sync) -> mln_status {
+    const auto fd = static_cast<int>(static_cast<int64_t>(sync.handle));
+    if (fd < 0) return MLN_STATUS_OK;
+    if (!native_fences_) {
+      mln::core::close_fd(fd);
+      mln::core::set_thread_error("EGL display does not import sync files");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    auto taken = false;
+    try {
+      auto guard = mln::gfx::BackendScope{backend_};
+      taken = true;
+      if (native_fences_->wait_fd(fd)) return MLN_STATUS_OK;
+      mln::core::set_thread_error("waiting for the consumer sync file failed");
+      return MLN_STATUS_NATIVE_ERROR;
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("waiting for the consumer sync file failed");
+    }
+    if (!taken) mln::core::close_fd(fd);
+    return MLN_STATUS_TARGET_LOST;
+  }
+
+  std::optional<EglNativeFences> native_fences_;
+#endif
   OpenGLTextureBackend backend_;
   mln_gpu_sync_kind producer_sync_kind_;
   mln_gpu_sync producer_sync_{
@@ -770,6 +929,12 @@ class OpenGLTextureSessionBackend final
     producer_fences_{};
   bool has_producer_fences_ = false;
   bool fence_sync_supported_ = false;
+  // The sync file each slot's last frame exported, or -1.
+  std::array<int, mln::core::max_texture_ring_depth> producer_fds_ = [] {
+    auto fds = std::array<int, mln::core::max_texture_ring_depth>{};
+    fds.fill(-1);
+    return fds;
+  }();
 };
 
 }  // namespace
@@ -825,6 +990,13 @@ auto opengl_owned_texture_attach_start(
     descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
   if (fences)
     session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  if (fences) {
+    session->probe_sync_kinds = [context = descriptor->context] {
+      return opengl_sync_support(context);
+    };
+  }
+#endif
   auto copied = *descriptor;
   const auto private_target =
     copied.context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
@@ -926,6 +1098,11 @@ auto opengl_borrowed_texture_attach_start(
     descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
   if (fences)
     session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  session->probe_sync_kinds = [context = descriptor->context] {
+    return opengl_sync_support(context);
+  };
+#endif
   session->initialize_backend = [target = OpenGLBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {

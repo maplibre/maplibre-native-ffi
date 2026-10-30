@@ -759,8 +759,8 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
 }
 
 // Takes the first physical device and queue family that accept a graphics
-// device, enabling VK_KHR_swapchain and timeline semaphores where the device
-// has them.
+// device, enabling VK_KHR_swapchain, timeline semaphores, and sync file
+// semaphores where the device has them.
 static bool vulkan_create_device(mln_test_graphics* graphics) {
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   PFN_vkEnumeratePhysicalDevices enumerate_devices =
@@ -825,8 +825,13 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
     }
     get_queues(devices[d], &queue_count, queues);
     enumerate_extensions(devices[d], NULL, &extension_count, extensions);
-    const char* enabled[3];
+    const char* enabled[4];
     uint32_t enabled_count = 0;
+    if (
+      has_extension(extensions, extension_count, "VK_KHR_external_semaphore_fd")
+    ) {
+      enabled[enabled_count++] = "VK_KHR_external_semaphore_fd";
+    }
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
     };

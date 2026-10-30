@@ -48,11 +48,12 @@ public readonly partial record struct RenderSessionAttachOptions
     /// texture frames. The session picks the first one its target supports in
     /// this order: <c>GpuSyncKind.QueueOrder</c>,
     /// <c>GpuSyncKind.OpenGlFence</c>,
-    /// <c>GpuSyncKind.VulkanTimelineSemaphore</c>, then
-    /// <c>GpuSyncKind.CpuComplete</c>. Its capabilities report the pick. Zero
-    /// accepts <c>GpuSyncKind.CpuComplete</c>, or <c>GpuSyncKind.QueueOrder</c>
-    /// on WebGPU, whose device has a single queue. A set that the target cannot
-    /// satisfy fails the attach with <c>Status.Unsupported</c>.
+    /// <c>GpuSyncKind.VulkanTimelineSemaphore</c>, <c>GpuSyncKind.SyncFd</c>,
+    /// then <c>GpuSyncKind.CpuComplete</c>. Its capabilities report the pick.
+    /// Zero accepts <c>GpuSyncKind.CpuComplete</c>, or
+    /// <c>GpuSyncKind.QueueOrder</c> on WebGPU, whose device has a single
+    /// queue. A set that the target cannot satisfy fails the attach with
+    /// <c>Status.Unsupported</c>.
     /// </summary>
     public GpuSyncKindFlag ProducerSyncKinds { get; init; }
 

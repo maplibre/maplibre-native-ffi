@@ -426,6 +426,7 @@ VulkanTextureBackend::VulkanTextureBackend(
       mln::gfx::HeadlessBackend(size),
       descriptor_(descriptor),
       slot_count_(ring_depth) {
+  slot_fds_.fill(-1);
   initSharedDevice();
 }
 
@@ -441,6 +442,7 @@ VulkanTextureBackend::VulkanTextureBackend(
       borrowed_images_(target.textures),
       uses_borrowed_texture_(true),
       slot_count_(target.textures.size()) {
+  slot_fds_.fill(-1);
   initSharedDevice();
 }
 
@@ -454,6 +456,9 @@ VulkanTextureBackend::~VulkanTextureBackend() {
       // A lost device has finished every submission. Any other failure leaves
       // work in flight, so it ends the process, as mbgl's teardown does.
     }
+  }
+  for (const auto fd : slot_fds_) {
+    close_fd(fd);
   }
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
@@ -524,6 +529,16 @@ void VulkanTextureBackend::set_borrowed_target(
 }
 
 auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
+  if (producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD) {
+    return mln_gpu_sync{
+      .size = sizeof(mln_gpu_sync),
+      .kind = producer_sync_kind_,
+      .handle = static_cast<uint64_t>(
+        static_cast<int64_t>(slot_fds_.at(selected_slot_))
+      ),
+      .value = 0,
+    };
+  }
   return mln_gpu_sync{
     .size = sizeof(mln_gpu_sync),
     .kind = producer_sync_kind_,
@@ -598,10 +613,11 @@ auto VulkanTextureBackend::record_release(vk::Image image)
 }
 
 void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
-  const auto signals =
+  const auto timeline_signal =
     producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
-  if (!release && !signals) return;
-  if (signals && !timeline_) {
+  const auto exports = producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD;
+  if (!release && !timeline_signal && !exports) return;
+  if (timeline_signal && !timeline_) {
     auto type = vk::SemaphoreTypeCreateInfo()
                   .setSemaphoreType(vk::SemaphoreType::eTimeline)
                   .setInitialValue(0);
@@ -609,39 +625,105 @@ void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
       vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
     );
   }
+  if (exports && !exported_) {
+    auto exportable = vk::ExportSemaphoreCreateInfo().setHandleTypes(
+      vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd
+    );
+    exported_ = device->createSemaphoreUnique(
+      vk::SemaphoreCreateInfo().setPNext(&exportable), nullptr, dispatcher
+    );
+  }
   // A signal's first scope holds everything submitted to the queue before it,
   // so this batch signals once the frame and the release complete.
   const auto value = timeline_value_ + 1;
   const auto timeline =
     vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
-  const auto semaphore = timeline_.get();
+  const auto signaled = timeline_signal ? timeline_.get() : exported_.get();
   auto submit = vk::SubmitInfo();
   if (release) submit.setCommandBuffers(release);
-  if (signals) submit.setPNext(&timeline).setSignalSemaphores(semaphore);
+  if (timeline_signal) submit.setPNext(&timeline);
+  if (timeline_signal || exports) submit.setSignalSemaphores(signaled);
   graphicsQueue.submit(submit, nullptr, dispatcher);
-  if (signals) timeline_value_ = value;
+  if (timeline_signal) timeline_value_ = value;
+  if (exports) {
+    // Exporting a sync file unsignals the semaphore, so the next frame can
+    // signal it again.
+    const auto fd = device->getSemaphoreFdKHR(
+      vk::SemaphoreGetFdInfoKHR()
+        .setSemaphore(exported_.get())
+        .setHandleType(vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd),
+      dispatcher
+    );
+    auto& slot_fd = slot_fds_.at(selected_slot_);
+    close_fd(slot_fd);
+    slot_fd = fd;
+  }
   // A frame that completes on the CPU completes with its release.
   if (producer_sync_kind_ == MLN_GPU_SYNC_CPU_COMPLETE)
     graphicsQueue.waitIdle(dispatcher);
 }
 
-void VulkanTextureBackend::wait_timeline(
-  VkSemaphore semaphore, uint64_t value
+void VulkanTextureBackend::submit_wait(
+  vk::Semaphore semaphore, const void* timeline, vk::Fence fence
 ) {
   // A wait's second scope holds every later submission to the queue, so a
   // batch without commands orders the session's later work.
-  const auto timeline =
-    vk::TimelineSemaphoreSubmitInfo().setWaitSemaphoreValues(value);
-  const auto waited = vk::Semaphore(semaphore);
   const auto stage =
     vk::PipelineStageFlags{vk::PipelineStageFlagBits::eAllCommands};
   graphicsQueue.submit(
     vk::SubmitInfo()
-      .setPNext(&timeline)
-      .setWaitSemaphores(waited)
+      .setPNext(timeline)
+      .setWaitSemaphores(semaphore)
       .setWaitDstStageMask(stage),
-    nullptr, dispatcher
+    fence, dispatcher
   );
+}
+
+void VulkanTextureBackend::wait_timeline(VkSemaphore semaphore, uint64_t value) {
+  const auto timeline =
+    vk::TimelineSemaphoreSubmitInfo().setWaitSemaphoreValues(value);
+  submit_wait(vk::Semaphore(semaphore), &timeline, nullptr);
+}
+
+void VulkanTextureBackend::wait_sync_fd(int fd) {
+  if (fd < 0) return;
+  auto* reusable = static_cast<ImportedWait*>(nullptr);
+  try {
+    for (auto& candidate : imported_) {
+      if (
+        device->getFenceStatus(candidate.fence.get(), dispatcher) ==
+        vk::Result::eSuccess
+      ) {
+        reusable = &candidate;
+        break;
+      }
+    }
+    if (reusable == nullptr) {
+      imported_.push_back(
+        ImportedWait{
+          .semaphore = device->createSemaphoreUnique({}, nullptr, dispatcher),
+          .fence = device->createFenceUnique({}, nullptr, dispatcher),
+        }
+      );
+      reusable = &imported_.back();
+    } else {
+      (void)device->resetFences(reusable->fence.get(), dispatcher);
+    }
+    // A sync file imports only as a temporary payload, which the wait
+    // consumes. A successful import owns the descriptor.
+    device->importSemaphoreFdKHR(
+      vk::ImportSemaphoreFdInfoKHR()
+        .setSemaphore(reusable->semaphore.get())
+        .setFlags(vk::SemaphoreImportFlagBits::eTemporary)
+        .setHandleType(vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd)
+        .setFd(fd),
+      dispatcher
+    );
+  } catch (...) {
+    close_fd(fd);
+    throw;
+  }
+  submit_wait(reusable->semaphore.get(), nullptr, reusable->fence.get());
 }
 
 auto VulkanTextureBackend::frame_layout() const -> VkImageLayout {

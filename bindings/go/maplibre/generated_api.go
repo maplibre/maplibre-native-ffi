@@ -243,6 +243,11 @@ const (
 	// device must enable the timelineSemaphore feature, through Vulkan 1.2 or
 	// VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
 	GpuSyncKindVulkanTimelineSemaphore GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
+	// A Linux sync file descriptor, which handle holds as an int64_t bit pattern.
+	// -1 is a fence that has already signaled. Vulkan supports it once the device
+	// enables VK_KHR_external_semaphore_fd, and EGL where the display has
+	// EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+	GpuSyncKindSyncFd GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_SYNC_FD)
 )
 
 func (value GpuSyncKind) String() string {
@@ -255,6 +260,8 @@ func (value GpuSyncKind) String() string {
 		return "GpuSyncKindQueueOrder"
 	case 3:
 		return "GpuSyncKindVulkanTimelineSemaphore"
+	case 4:
+		return "GpuSyncKindSyncFd"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
 }
@@ -271,12 +278,13 @@ const (
 	GpuSyncKindFlagOpenGlFence             GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE)
 	GpuSyncKindFlagQueueOrder              GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
 	GpuSyncKindFlagVulkanTimelineSemaphore GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE)
+	GpuSyncKindFlagSyncFd                  GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_SYNC_FD)
 )
 
 func (value GpuSyncKindFlag) Has(flags GpuSyncKindFlag) bool { return value&flags == flags }
 
 func (value GpuSyncKindFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}, {8, "GpuSyncKindFlagVulkanTimelineSemaphore"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}, {8, "GpuSyncKindFlagVulkanTimelineSemaphore"}, {16, "GpuSyncKindFlagSyncFd"}})
 }
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
@@ -2377,7 +2385,8 @@ func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena)
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type GpuSync struct {
 	Kind GpuSyncKind
-	// Bit pattern of the GLsync pointer or the VkSemaphore handle.
+	// Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file
+	// descriptor.
 	Handle uint64
 	// Counter value of a timeline kind. Zero for other kinds.
 	Value uint64
@@ -3653,10 +3662,11 @@ type RenderSessionAttachOptions struct {
 	// Producer synchronization kinds that the host accepts for acquired texture
 	// frames. The session picks the first one its target supports in this order:
 	// GpuSyncKindQueueOrder, GpuSyncKindOpenGlFence,
-	// GpuSyncKindVulkanTimelineSemaphore, then GpuSyncKindCpuComplete. Its
-	// capabilities report the pick. Zero accepts GpuSyncKindCpuComplete, or
-	// GpuSyncKindQueueOrder on WebGPU, whose device has a single queue. A set that
-	// the target cannot satisfy fails the attach with StatusUnsupported.
+	// GpuSyncKindVulkanTimelineSemaphore, GpuSyncKindSyncFd, then
+	// GpuSyncKindCpuComplete. Its capabilities report the pick. Zero accepts
+	// GpuSyncKindCpuComplete, or GpuSyncKindQueueOrder on WebGPU, whose device has
+	// a single queue. A set that the target cannot satisfy fails the attach with
+	// StatusUnsupported.
 	ProducerSyncKinds GpuSyncKindFlag
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake

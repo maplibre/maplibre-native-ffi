@@ -19,6 +19,9 @@
 #if defined(__ANDROID__) && defined(MLN_RENDER_BACKEND_OPENGL)
 #include <sys/system_properties.h>
 #endif
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
 
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/renderer_backend.hpp>
@@ -1560,6 +1563,7 @@ constexpr std::array producer_sync_preference = {
   MLN_GPU_SYNC_QUEUE_ORDER,
   MLN_GPU_SYNC_OPEN_GL_FENCE,
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
+  MLN_GPU_SYNC_SYNC_FD,
   MLN_GPU_SYNC_CPU_COMPLETE,
 };
 
@@ -1627,8 +1631,8 @@ auto start_attach_render_session(
   auto consumer_sync_kinds = capabilities.consumer_sync_kinds;
   if (session->probe_sync_kinds) {
     const auto probed = session->probe_sync_kinds();
-    session->producer_sync_kinds |= probed;
-    consumer_sync_kinds |= probed;
+    session->producer_sync_kinds |= probed.producer;
+    consumer_sync_kinds |= probed.consumer;
   }
   const auto producer_sync_kind = pick_producer_sync_kind(
     options->producer_sync_kinds, session->producer_sync_kinds
@@ -3686,6 +3690,19 @@ auto acquired_frame_get_producer_sync(
   return MLN_STATUS_OK;
 }
 
+void close_fd(int fd) noexcept {
+#if !defined(_WIN32)
+  if (fd >= 0) (void)::close(fd);
+#else
+  (void)fd;
+#endif
+}
+
+void close_sync_fd(const mln_gpu_sync& sync) noexcept {
+  if (sync.kind == MLN_GPU_SYNC_SYNC_FD)
+    close_fd(static_cast<int>(static_cast<int64_t>(sync.handle)));
+}
+
 auto acquired_frame_release(
   mln_acquired_frame frame, const mln_gpu_sync* consumer_completion
 ) -> mln_status {
@@ -3703,7 +3720,8 @@ auto acquired_frame_release(
   }
   if (
     (known_gpu_sync_kinds & gpu_sync_kind_flag(copied.kind)) != 0 &&
-    gpu_sync_names_object(copied.kind) && copied.handle == 0
+    gpu_sync_names_object(copied.kind) && copied.kind != MLN_GPU_SYNC_SYNC_FD &&
+    copied.handle == 0
   ) {
     set_thread_error("consumer synchronization must have a nonzero handle");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3727,6 +3745,9 @@ auto acquired_frame_release(
       status = backend->release_consumer_sync(copied);
       if (status == MLN_STATUS_TARGET_LOST)
         fail_session(consumed->session, status, thread_last_error_message());
+    } else {
+      // The release took the host's fd, which no backend waits on now.
+      close_sync_fd(copied);
     }
     {
       auto wakes = DeferredWakes{};

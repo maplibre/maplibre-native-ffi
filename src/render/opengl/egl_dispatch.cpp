@@ -159,6 +159,12 @@ EGLBoolean eglQueryContext(
   return fn == nullptr ? EGL_FALSE : fn(display, context, attribute, value);
 }
 
+const char* eglQueryString(EGLDisplay display, EGLint name) {
+  static const auto fn =
+    egl_proc<const char* (*)(EGLDisplay, EGLint)>("eglQueryString");
+  return fn == nullptr ? nullptr : fn(display, name);
+}
+
 EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
   static const auto fn =
     egl_proc<EGLBoolean (*)(EGLDisplay, EGLSurface)>("eglSwapBuffers");

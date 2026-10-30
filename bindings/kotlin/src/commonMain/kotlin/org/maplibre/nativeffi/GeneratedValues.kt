@@ -240,6 +240,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
       1u -> "OPEN_GL_FENCE"
       2u -> "QUEUE_ORDER"
       3u -> "VULKAN_TIMELINE_SEMAPHORE"
+      4u -> "SYNC_FD"
       else -> "GpuSyncKind($rawValue)"
     }
 
@@ -267,6 +268,13 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * accept or pass this kind.
      */
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(3u)
+    /**
+     * A Linux sync file descriptor, which handle holds as an int64_t bit pattern. -1 is a fence
+     * that has already signaled. Vulkan supports it once the device enables
+     * VK_KHR_external_semaphore_fd, and EGL where the display has EGL_ANDROID_native_fence_sync and
+     * EGL_KHR_wait_sync.
+     */
+    public val SYNC_FD: GpuSyncKind = GpuSyncKind(4u)
   }
 }
 
@@ -298,6 +306,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
         2uL to "OPEN_GL_FENCE",
         4uL to "QUEUE_ORDER",
         8uL to "VULKAN_TIMELINE_SEMAPHORE",
+        16uL to "SYNC_FD",
       ),
     )
 
@@ -308,6 +317,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
     public val OPEN_GL_FENCE: GpuSyncKindFlag = GpuSyncKindFlag(2u)
     public val QUEUE_ORDER: GpuSyncKindFlag = GpuSyncKindFlag(4u)
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag = GpuSyncKindFlag(8u)
+    public val SYNC_FD: GpuSyncKindFlag = GpuSyncKindFlag(16u)
   }
 }
 
@@ -1774,7 +1784,7 @@ public class OpenGlTextureFrame(
  */
 public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
-  /** Bit pattern of the GLsync pointer or the VkSemaphore handle. */
+  /** Bit pattern of the GLsync pointer, the VkSemaphore handle, or the file descriptor. */
   handle: ULong = 0uL,
   /** Counter value of a timeline kind. Zero for other kinds. */
   public val value: ULong = 0uL,
@@ -2336,8 +2346,8 @@ public data class RenderSessionAttachOptions(
   /**
    * Producer synchronization kinds that the host accepts for acquired texture frames. The session
    * picks the first one its target supports in this order: `GpuSyncKind.QUEUE_ORDER`,
-   * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, then
-   * `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`, `GpuSyncKind.SYNC_FD`,
+   * then `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero accepts
    * `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single
    * queue. A set that the target cannot satisfy fails the attach with `Status.UNSUPPORTED`.
    */

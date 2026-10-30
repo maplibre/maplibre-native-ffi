@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -79,6 +80,9 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Makes the session's later work on its queue wait for `semaphore`, a
   // timeline semaphore on the device, to reach `value`.
   void wait_timeline(VkSemaphore semaphore, uint64_t value);
+  // Makes the session's later work on its queue wait for a sync file, which
+  // this takes ownership of, even when it throws. -1 has signaled already.
+  void wait_sync_fd(int fd);
   void prepareRenderResources();
   auto frame_resources() -> VulkanTextureFrameResources;
   auto select_slot(std::size_t slot) -> bool;
@@ -105,6 +109,22 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // its last frame signaled.
   vk::UniqueSemaphore timeline_;
   uint64_t timeline_value_ = 0;
+  // The producer semaphore that each frame signals and exports a sync file
+  // from, and the file each slot's last frame exported, or -1.
+  vk::UniqueSemaphore exported_;
+  std::array<int, max_texture_ring_depth> slot_fds_{};
+  // Semaphores that consumer sync files are imported into, each with the
+  // fence of its last wait: Vulkan forbids a new import while one is pending.
+  struct ImportedWait {
+    vk::UniqueSemaphore semaphore;
+    vk::UniqueFence fence;
+  };
+  std::vector<ImportedWait> imported_;
+
+  // Submits a wait on `semaphore`, signaling `fence`.
+  void submit_wait(
+    vk::Semaphore semaphore, const void* timeline, vk::Fence fence
+  );
   // The pool of each slot's handoff commands.
   vk::UniqueCommandPool sync_pool_;
 
