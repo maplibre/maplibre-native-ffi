@@ -80,6 +80,9 @@ depends = [
   ":check-publish",
 ]
 run = '''
+if [[ "$usage_preset" == macos-x64-* ]]; then
+  MISE_ARCH=x64 exec mise exec dart -- dart test
+fi
 if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
   # Build hooks strip QEMU's loader environment, so run inside the target OS.
   exec docker run --rm --platform linux/riscv64 \
