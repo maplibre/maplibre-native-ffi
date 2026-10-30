@@ -54,14 +54,18 @@ if [[ ! -x "$vswhere" ]]; then
 fi
 
 vs_query() {
-  "$vswhere" -latest -version '[17.0,18.0)' -products '*' \
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+  local component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+  if [[ "$msvc_arch" == arm64 ]]; then
+    component=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+  fi
+  "$vswhere" -latest -version '[17.0,)' -products '*' \
+    -requires "$component" \
     -property "$1" | tr -d '\r' | sed -n '1p'
 }
 
 vs_install="$(vs_query installationPath)"
 if [[ -z "$vs_install" ]]; then
-  echo "Visual Studio 2022 with the Desktop development with C++ workload was not found" >&2
+  echo "Visual Studio 2022 or later with C++ tools for $msvc_arch was not found" >&2
   return 1
 fi
 

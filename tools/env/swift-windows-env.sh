@@ -9,6 +9,8 @@ if [[ -f "$native_install_dir/lib/libmaplibre-native-c.dll.a" ]]; then
   swift_windows_import_dir="$MISE_MONOREPO_ROOT/.build/$usage_preset/import"
   mkdir -p "$swift_windows_import_dir"
   cp "$native_install_dir/lib/libmaplibre-native-c.dll.a" "$swift_windows_import_dir/maplibre-native-c.lib"
+  # pkg-config also names the Rust platform archive installed beside the DLL.
+  cp "$native_install_dir/lib/libmln_ffi_platform.a" "$swift_windows_import_dir/mln_ffi_platform.lib"
 fi
 swift_windows_args=(
   --scratch-path ".build/$usage_preset"
