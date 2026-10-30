@@ -480,6 +480,10 @@ runs:
       shell: bash
       run: |
         prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        # A restored Swift install does not rerun mise's postinstall hook.
+        if [[ '${{ runner.os }}' == Windows ]]; then
+          prefix+="-${{ hashFiles('tools/deps/install-swift-windows.ps1') }}"
+        fi
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
         echo "key=${prefix}-${{ hashFiles('**/mise*.toml', '**/mise*.lock', '!third_party/**') }}" >> "$GITHUB_OUTPUT"
 
