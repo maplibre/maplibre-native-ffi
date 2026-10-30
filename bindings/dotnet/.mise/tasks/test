@@ -12,12 +12,25 @@ case "$usage_preset" in
   ios-* | tvos-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-dotnet-apple.sh" "$usage_preset"
     ;;
+  macos-x64-*)
+    if [[ $(uname -m) == arm64 ]]; then
+      version=$(dotnet --version)
+      sdk="$MISE_MONOREPO_ROOT/build/tools/dotnet/$version/x64"
+      if [[ ! -x "$sdk/dotnet" ]]; then
+        scratch=$(mktemp -d)
+        trap 'rm -rf "$scratch"' EXIT
+        curl --fail --location https://dot.net/v1/dotnet-install.sh -o "$scratch/install.sh"
+        bash "$scratch/install.sh" --version "$version" --architecture x64 --install-dir "$sdk" --no-path
+      fi
+      export DOTNET_ROOT="$sdk"
+      export PATH="$sdk:$PATH"
+    fi
+    ;;
 esac
 if [[ "$usage_preset" == linux-musl-* ]]; then
   exec python3 tools/release/dotnet_release.py smoke-musl "$usage_preset"
 fi
 
-# The same Release and Any CPU settings as the build task, for the same reasons.
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
