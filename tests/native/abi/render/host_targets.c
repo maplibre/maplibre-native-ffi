@@ -521,16 +521,7 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
       continue;
     }
     TEST_ASSERT_TRUE_MESSAGE(attached, mln_test_graphics_last_error());
-    mln_test_graphics_context context;
-    TEST_ASSERT_TRUE(mln_test_graphics_get_context(
-      mln_test_render_fixture_graphics(&fixture), &context
-    ));
-    const VkDevice device = context.vulkan_device;
-    const PFN_vkWaitSemaphoresKHR wait_semaphores =
-      (PFN_vkWaitSemaphoresKHR)((
-                                  PFN_vkGetDeviceProcAddr
-      )context.vulkan_get_device_proc_addr)(device, "vkWaitSemaphoresKHR");
-    TEST_ASSERT_NOT_NULL(wait_semaphores);
+    mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
     for (uint64_t index = 0; index < 2; index += 1) {
       TEST_ASSERT_EQUAL_UINT32(
         MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
@@ -541,15 +532,10 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
       );
       mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
       MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
-      const VkSemaphore semaphore = (VkSemaphore)(uintptr_t)producer.handle;
-      const VkSemaphoreWaitInfo wait = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-        .semaphoreCount = 1,
-        .pSemaphores = &semaphore,
-        .pValues = &producer.value,
-      };
       TEST_ASSERT_EQUAL_INT(
-        VK_SUCCESS, wait_semaphores(device, &wait, UINT64_MAX)
+        1, mln_test_graphics_vulkan_timeline_wait(
+             graphics, producer.handle, producer.value, UINT64_MAX
+           )
       );
       mln_test_render_release_frame(&frame);
     }
