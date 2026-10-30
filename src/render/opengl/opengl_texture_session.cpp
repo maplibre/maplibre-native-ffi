@@ -172,7 +172,10 @@ struct EglMetalEvents {
     -> std::optional<EglMetalEvents> {
     auto events =
       EglMetalEvents{.display = static_cast<EGLDisplay>(egl.display)};
-    if (!egl_has_extension(events.display, "EGL_ANGLE_metal_shared_event_sync"))
+    if (
+      !egl_has_extension(events.display, "EGL_ANGLE_metal_shared_event_sync") ||
+      !egl_has_extension(events.display, "EGL_KHR_wait_sync")
+    )
       return std::nullopt;
     const auto proc = [&egl](const char* name) {
       return mln::core::opengl::get_egl_proc_address(egl, name, EGL_NONE);
@@ -200,16 +203,18 @@ struct EglMetalEvents {
   // A null event makes ANGLE create one, which this returns retained for the
   // caller to release. Returns null on failure. The context is current.
   [[nodiscard]] auto signal(void* event, uint64_t value) const -> void* {
-    const EGLAttrib attributes[] = {
-      event_object,
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-      reinterpret_cast<EGLAttrib>(event),
-      value_low,
-      static_cast<EGLAttrib>(value & 0xFFFFFFFFU),
-      value_high,
-      static_cast<EGLAttrib>(value >> 32U),
+    EGLAttrib attributes[] = {
+      value_low,  static_cast<EGLAttrib>(value & 0xFFFFFFFFU),
+      value_high, static_cast<EGLAttrib>(value >> 32U),
+      EGL_NONE,   0,
       EGL_NONE,
     };
+    // ANGLE rejects a null event object, so the first frame names none.
+    if (event != nullptr) {
+      attributes[4] = event_object;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      attributes[5] = reinterpret_cast<EGLAttrib>(event);
+    }
     auto* const sync = create_sync(display, sync_type, attributes);
     if (sync == EGL_NO_SYNC) return nullptr;
     auto* const signaled = event != nullptr ? event : copy_event(display, sync);
