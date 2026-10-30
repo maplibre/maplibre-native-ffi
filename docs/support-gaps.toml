@@ -201,13 +201,6 @@ status = "path-known"
 reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
 
 [[entry]]
-bindings = ["go"]
-platforms = ["ios"]
-status = "path-known"
-reason = "Go ships `GOOS=ios` with cgo. Cross-compile with Apple Clang and the iOS SDK, link the native artifact, and run the suite through the simulator runner, which `simctl spawn` already drives."
-link = "https://github.com/golang/go/blob/master/misc/ios/README"
-
-[[entry]]
 bindings = ["python"]
 platforms = ["windows-mingw"]
 status = "path-known"

@@ -75,14 +75,18 @@ case "$1" in
     export GOARCH=amd64 CGO_ENABLED=1
     export CC="clang -arch x86_64" CXX="clang++ -arch x86_64"
     ;;
-  ios-maccatalyst-arm64-*)
-    # Match gomobile's Catalyst runtime and compiler target.
+  ios-arm64-* | ios-simulator-arm64-* | ios-maccatalyst-arm64-*)
     goos=ios
-    sdk=$(xcrun --sdk macosx --show-sdk-path)
-    target_flags="-target arm64-apple-ios15.0-macabi -isysroot $sdk"
+    case "$1" in
+      ios-simulator-*) sdk_name=iphonesimulator; target=arm64-apple-ios15.0-simulator ;;
+      ios-maccatalyst-*) sdk_name=macosx; target=arm64-apple-ios15.0-macabi ;;
+      *) sdk_name=iphoneos; target=arm64-apple-ios15.0 ;;
+    esac
+    sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
+    target_flags="-target $target -isysroot $sdk"
     export GOOS="$goos" GOARCH=arm64 CGO_ENABLED=1
-    CC="$(xcrun --sdk macosx --find clang) $target_flags"
-    CXX="$(xcrun --sdk macosx --find clang++) $target_flags"
+    CC="$(xcrun --sdk "$sdk_name" --find clang) $target_flags"
+    CXX="$(xcrun --sdk "$sdk_name" --find clang++) $target_flags"
     export CC CXX
     ;;
   ohos-arm64-* | ohos-x64-*)

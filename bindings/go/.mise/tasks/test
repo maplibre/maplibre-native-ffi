@@ -32,7 +32,7 @@ if [[ -n "$goos" ]]; then
   export MLN_FFI_DEVICE_INSTALL="$native_install_dir"
   export MLN_FFI_DEVICE_TIMEOUT=300
   case "$usage_preset" in
-    ios-maccatalyst-*) export MLN_FFI_DEVICE_LIBRARIES="$native_install_dir/lib/libmln_test_graphics.dylib" ;;
+    ios-*) export MLN_FFI_DEVICE_LIBRARIES="$native_install_dir/lib/libmln_test_graphics.dylib" ;;
     *) export MLN_FFI_DEVICE_LIBRARIES="$native_install_dir/lib/libmln_test_graphics.so" ;;
   esac
   # Alpine and the FreeBSD virtual machine see only the repository, so the
