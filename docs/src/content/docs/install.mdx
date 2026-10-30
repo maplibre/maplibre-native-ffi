@@ -351,6 +351,11 @@ cgo finds the C library through pkg-config. Unpack the release's
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 ```
 
+On Windows x64, use the `mingw-x64-wgl` or `mingw-x64-vulkan` C library with
+MSYS2's MINGW64 Clang. Set `CC` to the MINGW64 `bin/clang.exe`, install
+pkg-config, and put the C library's `bin` directory and MINGW64's `bin`
+directory on `PATH`.
+
 For the snapshot channel, take the module from `main` and the C library from the
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
 

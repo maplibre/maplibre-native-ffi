@@ -93,7 +93,7 @@ On Windows x64, install [MSYS2](https://www.msys2.org/) and run this in its
 MINGW64 shell:
 
 ```bash
-pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm
+pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64-pkgconf
 ```
 
 Then, from PowerShell, build and test the C library with:
@@ -103,6 +103,8 @@ mise -E msys2 run test mingw-x64-wgl
 mise -E msys2 run test mingw-x64-vulkan
 mise -E msys2 run //bindings/rust:test mingw-x64-wgl
 mise -E msys2 run //bindings/rust:test mingw-x64-vulkan
+mise -E msys2 run //bindings/go:test mingw-x64-wgl
+mise -E msys2 run //bindings/go:test mingw-x64-vulkan
 mise -E msys2 run //bindings/zig:test mingw-x64-wgl
 mise -E msys2 run //bindings/zig:test mingw-x64-vulkan
 ```

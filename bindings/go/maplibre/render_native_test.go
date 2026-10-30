@@ -1,4 +1,4 @@
-//go:build mlntest && cgo && (mln_metal || mln_vulkan || mln_egl)
+//go:build mlntest && cgo && (mln_metal || mln_vulkan || mln_egl || mln_wgl)
 
 package maplibre
 

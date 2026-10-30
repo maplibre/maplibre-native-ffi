@@ -112,7 +112,8 @@ runs:
         msystem: MINGW64
         path-type: inherit
         update: true
-        install: mingw-w64-x86_64-clang mingw-w64-x86_64-llvm
+        install:
+          mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64-pkgconf
 
     - name: Select MSYS2 prefix
       if: ${{ runner.os == 'Windows' && inputs.mise-env == 'msys2' }}

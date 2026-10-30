@@ -5,10 +5,8 @@
 #
 # The render tests, which LIFE-03, VIEW-01, REND-01, and REND-02 name, build
 # with the backend tag that `mise run //bindings/go:test` passes for every EGL,
-# Metal, and Vulkan preset, including the Android and OpenHarmony emulator
-# presets, whose runners push tests/graphics beside the test binaries. WGL
-# presets build no render tests, since the Go wrapper of tests/graphics has no
-# WGL context.
+# Metal, Vulkan, and WGL preset, including the Android and OpenHarmony emulator
+# presets, whose runners push tests/graphics beside the test binaries.
 #
 # CB-04: the Go binding contains a callback's panic and logs it through the
 # default slog logger. The callback returns its declared failure value to

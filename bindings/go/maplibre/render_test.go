@@ -1,4 +1,4 @@
-//go:build cgo && (mln_metal || mln_vulkan || mln_egl)
+//go:build cgo && (mln_metal || mln_vulkan || mln_egl || mln_wgl)
 
 package maplibre
 
@@ -43,7 +43,7 @@ type renderFixture struct {
 // with the caller driver and a device or context from tests/graphics. The test
 // goroutine is the graphics thread. It stays locked to its OS thread through
 // the cleanups, which run on it last-first, so the session detaches there and
-// an EGL context is never left current on a thread that Go reuses.
+// an OpenGL context is never left current on a thread that Go reuses.
 func newRenderFixture(t *testing.T) *renderFixture {
 	t.Helper()
 	r := newGraphicsFixture(t)
@@ -61,7 +61,7 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 		t.Fatalf("testsupport.NewGraphics: %v", err)
 	}
 	t.Cleanup(graphics.Close)
-	if graphicsBackend == testsupport.BackendEgl {
+	if graphicsBackend == testsupport.BackendEgl || graphicsBackend == testsupport.BackendWgl {
 		if err := graphics.MakeCurrent(); err != nil {
 			t.Fatalf("Graphics.MakeCurrent: %v", err)
 		}

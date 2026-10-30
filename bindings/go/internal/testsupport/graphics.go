@@ -1,4 +1,4 @@
-//go:build cgo && (mln_metal || mln_vulkan || mln_egl)
+//go:build cgo && (mln_metal || mln_vulkan || mln_egl || mln_wgl)
 
 package testsupport
 
@@ -25,6 +25,7 @@ const (
 	BackendMetal  Backend = C.MLN_TEST_GRAPHICS_BACKEND_METAL
 	BackendVulkan Backend = C.MLN_TEST_GRAPHICS_BACKEND_VULKAN
 	BackendEgl    Backend = C.MLN_TEST_GRAPHICS_BACKEND_EGL
+	BackendWgl    Backend = C.MLN_TEST_GRAPHICS_BACKEND_WGL
 )
 
 // Context holds the handles that a backend's context descriptor takes. Only
@@ -42,6 +43,8 @@ type Context struct {
 	EglDisplay                uintptr
 	EglConfig                 uintptr
 	EglContext                uintptr
+	WglDeviceContext          uintptr
+	WglContext                uintptr
 }
 
 // Graphics is a device or context that stands in for the host's. The handles
@@ -86,12 +89,14 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 			EglDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
 			EglConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
 			EglContext:                uintptr(unsafe.Pointer(context.egl_context)),
+			WglDeviceContext:          uintptr(unsafe.Pointer(context.wgl_device_context)),
+			WglContext:                uintptr(unsafe.Pointer(context.wgl_context)),
 		},
 	}, nil
 }
 
-// MakeCurrent makes an EGL context current on the calling OS thread, which the
-// caller locks for as long as it drives sessions there.
+// MakeCurrent makes an EGL or WGL context current on the calling OS thread.
+// The caller locks that thread for as long as it drives sessions there.
 func (g *Graphics) MakeCurrent() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()

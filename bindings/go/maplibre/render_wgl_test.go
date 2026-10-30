@@ -1,0 +1,38 @@
+//go:build cgo && mln_wgl
+
+package maplibre
+
+import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport"
+
+const (
+	buildBackend    = RenderBackendFlagOpenGl
+	graphicsBackend = testsupport.BackendWgl
+	// Only Vulkan sessions take a queue lock.
+	queueLockSupported = false
+)
+
+// A shared WGL context takes the caller driver, which runs on the thread the
+// fixture made that context current on.
+func attachOwnedTexture(
+	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
+) (*RenderSessionHandle, *Future[struct{}], error) {
+	return m.AttachOpenGlOwnedTexture(OpenGlOwnedTextureDescriptor{
+		Extent: extent,
+		Context: OpenGlContextDescriptor{
+			Ownership: OpenGlContextOwnershipShared,
+			Data: OpenGlContextDescriptorDataWglVariant{Value: WglContextDescriptor{
+				DeviceContext: context.WglDeviceContext,
+				ShareContext:  context.WglContext,
+			}},
+		},
+	}, options)
+}
+
+func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
+	return frame.WithOpenGlTexture(func(view OpenGlTextureFrameView) error { return use(view) })
+}
+
+func readTexture(view frameView) error {
+	_, err := view.(OpenGlTextureFrameView).Texture()
+	return err
+}

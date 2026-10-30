@@ -343,9 +343,10 @@ ci:
     mingw:
       covers: >-
         Windows x64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
-        MINGW64 environment. Runs the C, C#, Dart, and Rust suites and verifies
-        shared and static C package consumers. Catches MinGW headers, libstdc++,
-        GNU archive and import library handling, and MSYS2 toolchain setup.
+        MINGW64 environment. Runs the C, C#, Dart, Go, Rust, and TypeScript
+        suites and verifies shared and static C package consumers. Catches MinGW
+        headers, libstdc++, GNU archive and import library handling, and MSYS2
+        toolchain setup.
       rules:
         - if:
             files:
