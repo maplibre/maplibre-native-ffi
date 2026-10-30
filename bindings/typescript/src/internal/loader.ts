@@ -13,7 +13,7 @@ import process from "node:process";
 import type { Addon } from "./addon.ts";
 
 const SCOPE = "@maplibre/native-ffi";
-const BACKENDS = ["opengl", "metal", "vulkan"];
+const BACKENDS = ["opengl", "metal", "vulkan", "opengl-mingw", "vulkan-mingw"];
 
 /** The addon package of a backend for this platform and architecture. */
 function addonPackage(backend: string): string {

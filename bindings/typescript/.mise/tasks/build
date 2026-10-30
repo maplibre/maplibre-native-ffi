@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."
 #MISE extends="ffi:preset"
-# mise stops the native build when the preset check fails, so an unsupported
-# preset fails before the native library builds.
-#MISE depends=[{ task = ":_check-preset", args = ["{{usage.preset}}"] }, { task = "//:build", args = ["{{usage.preset}}"] }]
+#MISE depends=[{ task = "//:build", args = ["{{usage.preset}}"] }]
 #MISE env={ MLN_FFI_GLIBC_FLOOR = '{{ vars.glibc_floor | default(value="") }}' }
 #MISE env={ MLN_FFI_GLIBC_FLOOR_RISCV64 = '{{ vars.glibc_floor_riscv64 | default(value="") }}', MLN_FFI_GLIBC_FLOOR_LOONGARCH64 = '{{ vars.glibc_floor_loongarch64 | default(value="") }}' }
 #MISE shell="bash"
@@ -44,7 +42,7 @@ case "$usage_preset" in
   macos-*)
     exported="$(nm -gU "$addon" | awk '{print $3}' | sed 's/^_//' | sort -u)"
     ;;
-  windows-*)
+  windows-* | mingw-*)
     exported="$(llvm-readobj --coff-exports "$addon" | awk '/Name:/ {print $2}' | sort -u)"
     ;;
 esac

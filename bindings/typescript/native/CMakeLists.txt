@@ -65,22 +65,46 @@ if(OHOS)
 endif()
 
 if(WIN32)
-  set(MLN_FFI_NODE_IMPORT_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/node_api.lib")
   set(MLN_FFI_NODE_DEF "${MLN_FFI_NODE_API_HEADERS}/../def/node_api.def")
-  add_custom_command(
-    OUTPUT "${MLN_FFI_NODE_IMPORT_LIBRARY}"
-    COMMAND
-      "${CMAKE_AR}" "/def:${MLN_FFI_NODE_DEF}"
-      "/machine:${MLN_FFI_TARGET_ARCHITECTURE}"
-      "/out:${MLN_FFI_NODE_IMPORT_LIBRARY}"
-    DEPENDS "${MLN_FFI_NODE_DEF}"
-    VERBATIM)
+  if(MINGW)
+    find_program(MLN_FFI_DLLTOOL NAMES llvm-dlltool REQUIRED)
+    set(MLN_FFI_NODE_IMPORT_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libnode_api.a")
+    add_custom_command(
+      OUTPUT "${MLN_FFI_NODE_IMPORT_LIBRARY}"
+      COMMAND
+        "${MLN_FFI_DLLTOOL}"
+        -m
+        i386:x86-64
+        -d
+        "${MLN_FFI_NODE_DEF}"
+        -l
+        "${MLN_FFI_NODE_IMPORT_LIBRARY}"
+      DEPENDS "${MLN_FFI_NODE_DEF}"
+      VERBATIM)
+  else()
+    set(MLN_FFI_NODE_IMPORT_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/node_api.lib")
+    add_custom_command(
+      OUTPUT "${MLN_FFI_NODE_IMPORT_LIBRARY}"
+      COMMAND
+        "${CMAKE_AR}" "/def:${MLN_FFI_NODE_DEF}"
+        "/machine:${MLN_FFI_TARGET_ARCHITECTURE}"
+        "/out:${MLN_FFI_NODE_IMPORT_LIBRARY}"
+      DEPENDS "${MLN_FFI_NODE_DEF}"
+      VERBATIM)
+  endif()
   add_custom_target(node_api_import DEPENDS "${MLN_FFI_NODE_IMPORT_LIBRARY}")
   find_file(
     MLN_FFI_NATIVE_DLL
     NAMES maplibre-native-c.dll
     PATHS "${MLN_FFI_NATIVE_PREFIX}/bin" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
     REQUIRED)
+  set(MLN_FFI_WINDOWS_DLLS "${MLN_FFI_NATIVE_DLL}")
+  if(MINGW)
+    list(
+      APPEND MLN_FFI_WINDOWS_DLLS "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
+      "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
+      "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
+  endif()
 endif()
 
 function(mln_ffi_node_module target)
@@ -117,7 +141,13 @@ function(mln_ffi_node_module target)
     target_link_libraries(
       ${target}
       PRIVATE "${MLN_FFI_NODE_IMPORT_LIBRARY}" delayimp)
-    target_link_options(${target} PRIVATE "/DELAYLOAD:node.exe")
+    if(MINGW)
+      # Let LLD emit the delay thunks: dlltool's delay-import thunks do not
+      # preserve floating-point arguments on the first call.
+      target_link_options(${target} PRIVATE "LINKER:--delayload=node.exe")
+    else()
+      target_link_options(${target} PRIVATE "/DELAYLOAD:node.exe")
+    endif()
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # The host executable supplies the Node-API symbols at load.
     target_link_options(
@@ -165,7 +195,14 @@ if(NOT ANDROID AND NOT OHOS AND NOT WIN32)
 endif()
 install(TARGETS maplibre_native_ffi LIBRARY DESTINATION . RUNTIME DESTINATION .)
 if(WIN32)
-  install(FILES "${MLN_FFI_NATIVE_DLL}" DESTINATION .)
+  install(FILES ${MLN_FFI_WINDOWS_DLLS} DESTINATION .)
+  if(MINGW)
+    install(
+      DIRECTORY "${MLN_FFI_MSYS2_ROOT}/share/licenses/libgcc"
+      "${MLN_FFI_MSYS2_ROOT}/share/licenses/libstdc++"
+      "${MLN_FFI_MSYS2_ROOT}/share/licenses/libwinpthread"
+      DESTINATION licenses)
+  endif()
 else()
   install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
 endif()
@@ -215,7 +252,7 @@ if(MLN_FFI_TEST_GRAPHICS_LIBRARY)
       COMMAND
         "${CMAKE_COMMAND}" -E copy_if_different
         "${MLN_FFI_NATIVE_PREFIX}/bin/mln_test_graphics.dll"
-        "${MLN_FFI_NATIVE_DLL}"
+        ${MLN_FFI_WINDOWS_DLLS}
         "$<TARGET_FILE_DIR:maplibre_native_ffi_test_graphics>"
       VERBATIM)
   endif()

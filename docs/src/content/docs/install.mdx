@@ -540,6 +540,10 @@ The backend package installs the C library for the host. Use Node.js 24.11, Bun
 1.4.3, Deno 2.9.7, or later. Deno imports the package as
 `npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
 
+On Windows, the default backend packages use MSVC. For a MinGW host on x64,
+install `@maplibre/native-ffi-opengl-mingw` or
+`@maplibre/native-ffi-vulkan-mingw` instead.
+
 In a browser, `@maplibre/native-ffi-opengl` renders with WebGL 2 and
 `@maplibre/native-ffi-webgpu` with WebGPU. Serve `maplibre_native_ffi.mjs` and
 `maplibre_native_ffi.wasm` from the backend's `-wasm32` package as static files,

@@ -129,7 +129,14 @@ SUITES: list[dict] = [
     # The TypeScript suite loads the packages it packs and installs under Node,
     # Bun, and Deno (Node and Bun on musl, packaged Node on FreeBSD).
     {
-        "platforms": ["linux-gnu", "linux-musl", "macos", "freebsd", "windows"],
+        "platforms": [
+            "linux-gnu",
+            "linux-musl",
+            "macos",
+            "freebsd",
+            "windows",
+            "windows-mingw",
+        ],
         "exclude": MACOS_X64,
         "commands": [{"task": "//bindings/typescript:test"}],
     },

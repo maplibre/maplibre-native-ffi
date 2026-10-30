@@ -167,6 +167,30 @@ test(
       await load(),
       /^@maplibre\/native-ffi-opengl and @maplibre\/native-ffi-vulkan are installed; install exactly one backend package$/m,
     );
+    rmSync(join(root, "node_modules", "@maplibre/native-ffi-vulkan"), {
+      recursive: true,
+    });
+    const mingw = join(
+      root,
+      "node_modules",
+      "@maplibre/native-ffi-opengl-mingw",
+    );
+    mkdirSync(mingw, { recursive: true });
+    writeFileSync(
+      join(mingw, "package.json"),
+      JSON.stringify({ name: "@maplibre/native-ffi-opengl-mingw" }),
+    );
+    assert.match(
+      await load(),
+      /^@maplibre\/native-ffi-opengl and @maplibre\/native-ffi-opengl-mingw are installed; install exactly one backend package$/m,
+    );
+    rmSync(join(root, "node_modules", "@maplibre/native-ffi-opengl"), {
+      recursive: true,
+    });
+    assert.match(
+      await load(),
+      /^@maplibre\/native-ffi-opengl-mingw has no addon for /m,
+    );
   },
   { needs: ["childProcess"] },
 );

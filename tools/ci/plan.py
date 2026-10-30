@@ -215,6 +215,7 @@ def addon(target: Target) -> str:
         "macos",
         "freebsd",
         "windows",
+        "windows-mingw",
         "emscripten",
     } and ("//bindings/typescript:test" in tasks):
         return "typescript"

@@ -36,18 +36,6 @@ rm -rf build/ohpm
 scripts/pack-ohpm.sh --version "$usage_version" build/ohpm "$usage_preset"
 '''
 
-[tasks._check-preset]
-hide = true
-usage = 'arg "<preset>"'
-run = '''
-case "$usage_preset" in
-  mingw-*)
-    echo "error: the TypeScript binding does not support MinGW yet" >&2
-    exit 2
-    ;;
-esac
-'''
-
 # The test task builds the addon first.
 [tasks._test-arkts]
 hide = true

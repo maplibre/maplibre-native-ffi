@@ -61,12 +61,15 @@ const platforms: Record<string, { os: string; libc?: string }> = {
   macos: { os: "darwin" },
   freebsd: { os: "freebsd" },
   windows: { os: "win32" },
+  mingw: { os: "win32" },
 };
 const titles: Record<string, string> = {
   opengl: "OpenGL",
   metal: "Metal",
   vulkan: "Vulkan",
   webgpu: "WebGPU",
+  "opengl-mingw": "OpenGL (MinGW)",
+  "vulkan-mingw": "Vulkan (MinGW)",
 };
 // WebGL is the OpenGL backend with the browser's context provider.
 const backends: Record<string, string> = {
@@ -102,7 +105,7 @@ function addonOf(preset: string): Addon {
     };
   }
   const match =
-    /^(linux-gnu|linux-musl|macos|freebsd|windows)-(x64|arm64|riscv64|loongarch64)-(egl|wgl|metal|vulkan)$/.exec(
+    /^(linux-gnu|linux-musl|macos|freebsd|windows|mingw)-(x64|arm64|riscv64|loongarch64)-(egl|wgl|metal|vulkan)$/.exec(
       preset,
     );
   if (match === null) {
@@ -111,7 +114,8 @@ function addonOf(preset: string): Addon {
     );
   }
   const { os, libc } = platforms[match[1]!]!;
-  const backend = backends[match[3]!]!;
+  const mingw = match[1] === "mingw";
+  const backend = `${backends[match[3]!]!}${mingw ? "-mingw" : ""}`;
   const cpu = match[2] === "loongarch64" ? "loong64" : match[2]!;
   const suffix = libc === undefined ? "" : libc === "musl" ? "-musl" : "-gnu";
   return {
@@ -127,6 +131,9 @@ function addonOf(preset: string): Addon {
         : os === "darwin"
           ? "libmaplibre-native-c.dylib"
           : "libmaplibre-native-c.so",
+      ...(mingw
+        ? ["libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll"]
+        : []),
     ],
   };
 }

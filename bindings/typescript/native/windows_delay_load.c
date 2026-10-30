@@ -15,7 +15,11 @@ static FARPROC WINAPI load_host(unsigned event, PDelayLoadInfo info) {
   return NULL;
 }
 
+#ifdef _MSC_VER
 const PfnDliHook __pfnDliNotifyHook2 = load_host;
+#else
+PfnDliHook __pfnDliNotifyHook2 = load_host;
+#endif
 
 // Older LLD delay thunks let the resolver overwrite saved floating-point
 // arguments. Resolve imports first; the name must match node_api.def exactly.
