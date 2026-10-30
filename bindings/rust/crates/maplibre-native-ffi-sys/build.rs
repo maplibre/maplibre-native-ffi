@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!(
         "cargo:rustc-link-lib=static={}",
-        static_archive(&link_dir, &target_os)?
+        static_archive(&link_dir, &target_os, &target_env)?
     );
     // The `links` key passes these to the crates that depend on this one as
     // DEP_MAPLIBRE_NATIVE_C_PREFIX and DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND.
@@ -210,11 +210,15 @@ fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
 
 /// The complete static archive's library name.
 ///
-/// Every format but COFF lets the file extension separate the archive from the
-/// shared library. COFF cannot, because the shared build's import library
-/// already holds that name, so there the archive carries a `-static` suffix.
-fn static_archive(link_dir: &Path, target_os: &str) -> Result<String, Box<dyn Error>> {
-    let (name, file) = if target_os == "windows" {
+/// MSVC's shared build uses `.lib` for its import library too, so its static
+/// archive carries a `-static` suffix. MinGW uses `.dll.a` for imports and the
+/// usual `.a` for the static archive.
+fn static_archive(
+    link_dir: &Path,
+    target_os: &str,
+    target_env: &str,
+) -> Result<String, Box<dyn Error>> {
+    let (name, file) = if target_os == "windows" && target_env == "msvc" {
         let name = format!("{LIBRARY_NAME}-static");
         let file = format!("{name}.lib");
         (name, file)

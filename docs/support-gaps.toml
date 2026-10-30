@@ -179,13 +179,6 @@ reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the s
 link = "https://github.com/maplibre/maplibre-native-ffi/pull/1380"
 
 [[entry]]
-bindings = ["rust"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "Select target-matched MinGW artifacts in the sys crate's build script, starting with the current `x86_64-pc-windows-gnu` preset and its MSVCRT dependencies. GNU LLVM targets need UCRT artifacts instead. Link the runtime dependencies and run the suite on the Windows runners."
-link = "https://github.com/rust-lang/rust/blob/1.99.1/src/doc/rustc/src/platform-support/windows-gnullvm.md"
-
-[[entry]]
 bindings = ["swift"]
 platforms = ["android"]
 archs = ["arm", "arm64", "x64"]

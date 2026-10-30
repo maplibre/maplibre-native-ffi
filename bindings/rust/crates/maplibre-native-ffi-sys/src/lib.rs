@@ -23,6 +23,10 @@
 //! `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix from
 //! `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
 //!
+//! On `x86_64-pc-windows-gnu`, link with MSYS2's MINGW64 Clang and LLD
+//! (`-C link-arg=-fuse-ld=lld`). Its MSVCRT and libstdc++ must match the native
+//! artifact. Keep MINGW64's `bin` directory on `PATH` for the runtime DLLs.
+//!
 //! In the browser, the library uses shared memory, so the final module needs a
 //! standard library built with atomics: `-C target-feature=+atomics,+bulk-memory`
 //! and `-Zbuild-std=std,panic_abort`. It also needs the link options listed in

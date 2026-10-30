@@ -22,7 +22,7 @@ OPT_IN_ARCHITECTURES = {"riscv64", "loongarch64"}
 
 SUITES: list[dict] = [
     {
-        "platforms": ["linux-gnu", "macos", "windows"],
+        "platforms": ["linux-gnu", "macos", "windows", "windows-mingw"],
         "commands": [
             {"task": "//bindings/rust:test", "exclude": ["linux-gnu-x64-vulkan"]},
             {

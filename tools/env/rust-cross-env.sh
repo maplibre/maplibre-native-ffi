@@ -1,6 +1,6 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
 # $1. Maps musl, FreeBSD, Android, iOS, tvOS, visionOS, Mac Catalyst, macOS
-# x64, and OpenHarmony presets to their Cargo target. Exports the
+# x64, MinGW, and OpenHarmony presets to their Cargo target. Exports the
 # cross-compilation environment (CC/CXX, linker) from the Zig and Rust
 # toolchains, Android NDK, or OpenHarmony SDK, and for targets that run off the
 # host, tools/devices/run as Cargo's runner, which it also names in
@@ -24,6 +24,7 @@ case "$1" in
   ios-maccatalyst-arm64-*) cargo_target=aarch64-apple-ios-macabi ;;
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
   macos-x64-*) cargo_target=x86_64-apple-darwin ;;
+  mingw-x64-*) cargo_target=x86_64-pc-windows-gnu ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
   freebsd-x64-*) cargo_target=x86_64-unknown-freebsd ;;
@@ -32,6 +33,16 @@ case "$1" in
 esac
 
 case "$1" in
+  mingw-x64-*)
+    # Match the native build's MINGW64 compiler and MSVCRT runtime, even when
+    # Cargo itself runs on the MSVC host. LLD resolves the references between
+    # the native archive and Cargo's Rust platform layer in either order.
+    export CC_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
+    export CXX_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/clang++.exe"
+    export AR_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/llvm-ar.exe"
+    export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
+    export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS:+$CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS }-C link-arg=-fuse-ld=lld"
+    ;;
   linux-musl-*64-*)
     target_env="${cargo_target//-/_}"
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
