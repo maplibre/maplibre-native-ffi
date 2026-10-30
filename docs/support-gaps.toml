@@ -167,14 +167,7 @@ reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the
 link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
-bindings = [
-  "dart",
-  "kotlin-jvm",
-  "kotlin-native",
-  "python",
-  "swift",
-  "typescript",
-]
+bindings = ["dart", "kotlin-jvm", "kotlin-native", "python", "typescript"]
 platforms = ["macos"]
 archs = ["x64"]
 status = "path-known"

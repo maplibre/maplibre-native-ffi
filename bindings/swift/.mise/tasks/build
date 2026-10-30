@@ -69,5 +69,8 @@ esac
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 # Swift Build crashes on Linux; see the api task.
-case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
+case "$usage_preset" in
+  linux-*) swift_args+=(--build-system native) ;;
+  macos-x64-*) swift_args+=(--arch x86_64) ;;
+esac
 swift build --target MaplibreNativeFFI "${swift_args[@]}"
