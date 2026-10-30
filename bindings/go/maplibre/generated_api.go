@@ -227,13 +227,17 @@ func (value GesturePhase) String() string {
 type GpuSyncKind uint32
 
 const (
-	// The host needs no synchronization object. The work completed, or on WebGPU
-	// was submitted to the device's queue, before the frame became acquirable or
-	// before the release call.
+	// The host needs no synchronization object. The work completed before the frame
+	// became acquirable or before the release call.
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
 	// GLsync in the shared EGL or WGL context's share group, used only by a
 	// caller-graphics-thread driver. handle is nonzero.
 	GpuSyncKindOpenGlFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPEN_GL_FENCE)
+	// The host needs no synchronization object. The work was submitted, before the
+	// frame became acquirable or before the release call, to the queue that the
+	// session and the host share, which orders it before any work submitted there
+	// afterwards. WebGPU supports it.
+	GpuSyncKindQueueOrder GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_QUEUE_ORDER)
 )
 
 func (value GpuSyncKind) String() string {
@@ -242,8 +246,29 @@ func (value GpuSyncKind) String() string {
 		return "GpuSyncKindCpuComplete"
 	case 1:
 		return "GpuSyncKindOpenGlFence"
+	case 2:
+		return "GpuSyncKindQueueOrder"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
+}
+
+// GpuSyncKindFlag corresponds to mln_gpu_sync_kind_flag. A bit for each
+// GpuSyncKind.
+//
+// See mln_gpu_sync_kind_flag in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type GpuSyncKindFlag uint32
+
+const (
+	GpuSyncKindFlagCpuComplete GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE)
+	GpuSyncKindFlagOpenGlFence GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE)
+	GpuSyncKindFlagQueueOrder  GpuSyncKindFlag = GpuSyncKindFlag(C.MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+)
+
+func (value GpuSyncKindFlag) Has(flags GpuSyncKindFlag) bool { return value&flags == flags }
+
+func (value GpuSyncKindFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GpuSyncKindFlagCpuComplete"}, {2, "GpuSyncKindFlagOpenGlFence"}, {4, "GpuSyncKindFlagQueueOrder"}})
 }
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
@@ -695,7 +720,6 @@ type RenderSessionCapabilityFlag uint32
 const (
 	RenderSessionCapabilityFlagFrameAcquisition RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(C.MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION)
 	RenderSessionCapabilityFlagReadback         RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(C.MLN_RENDER_SESSION_CAPABILITY_READBACK)
-	RenderSessionCapabilityFlagConsumerSync     RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(C.MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC)
 	RenderSessionCapabilityFlagPresentation     RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(C.MLN_RENDER_SESSION_CAPABILITY_PRESENTATION)
 )
 
@@ -704,7 +728,7 @@ func (value RenderSessionCapabilityFlag) Has(flags RenderSessionCapabilityFlag) 
 }
 
 func (value RenderSessionCapabilityFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderSessionCapabilityFlagFrameAcquisition"}, {2, "RenderSessionCapabilityFlagReadback"}, {4, "RenderSessionCapabilityFlagConsumerSync"}, {8, "RenderSessionCapabilityFlagPresentation"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderSessionCapabilityFlagFrameAcquisition"}, {2, "RenderSessionCapabilityFlagReadback"}, {4, "RenderSessionCapabilityFlagPresentation"}})
 }
 
 // RenderSessionState corresponds to mln_render_session_state. Render-session
@@ -3572,11 +3596,13 @@ type RenderSessionAttachOptions struct {
 	// borrowed texture ring's depth is its texture count, so borrowed and other
 	// targets ignore this value.
 	RequestedTextureRingDepth uint32
-	// Producer synchronization for acquired texture frames. GpuSyncKindOpenGlFence
-	// requires a shared EGL or WGL texture target and a caller-graphics-thread
-	// driver. Other targets support only CPU completion and fail an unsupported
-	// request.
-	ProducerSyncKind GpuSyncKind
+	// Producer synchronization kinds that the host accepts for acquired texture
+	// frames. The session picks the first one its target supports in this order:
+	// GpuSyncKindQueueOrder, GpuSyncKindOpenGlFence, then GpuSyncKindCpuComplete.
+	// Its capabilities report the pick. Zero accepts GpuSyncKindCpuComplete, or
+	// GpuSyncKindQueueOrder on WebGPU, whose device has a single queue. A set that
+	// the target cannot satisfy fails the attach with StatusUnsupported.
+	ProducerSyncKinds GpuSyncKindFlag
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake
 	// Wakes the graphics receiver when caller-driver work is available, including
@@ -3593,7 +3619,7 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.driver = C.mln_render_driver_kind(input.Driver)
 	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
-	raw.producer_sync_kind = C.mln_gpu_sync_kind(input.ProducerSyncKind)
+	raw.producer_sync_kinds = C.mln_gpu_sync_kind_flags(input.ProducerSyncKinds)
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
 	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
@@ -3611,6 +3637,13 @@ type RenderSessionCapabilities struct {
 	// texture count of a borrowed one. Zero for a surface.
 	TextureRingDepth uint32
 	Flags            RenderSessionCapabilityFlag
+	// Producer synchronization of acquired frames, picked from the attach options'
+	// producer_sync_kinds. GpuSyncKindCpuComplete for a target without frame
+	// acquisition.
+	ProducerSyncKind GpuSyncKind
+	// Consumer synchronization kinds that AcquiredFrameHandle.Close() accepts.
+	// Empty for a target without frame acquisition.
+	ConsumerSyncKinds GpuSyncKindFlag
 }
 
 func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) RenderSessionCapabilities {
@@ -3618,6 +3651,8 @@ func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) Render
 	result.Driver = RenderDriverKind(raw.driver)
 	result.TextureRingDepth = uint32(raw.texture_ring_depth)
 	result.Flags = RenderSessionCapabilityFlag(raw.flags)
+	result.ProducerSyncKind = GpuSyncKind(raw.producer_sync_kind)
+	result.ConsumerSyncKinds = GpuSyncKindFlag(raw.consumer_sync_kinds)
 	return result
 }
 

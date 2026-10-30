@@ -536,7 +536,9 @@ auto opengl_surface_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = 0,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = 0,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,

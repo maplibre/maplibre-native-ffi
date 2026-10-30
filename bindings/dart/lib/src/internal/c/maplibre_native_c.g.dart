@@ -926,7 +926,7 @@ final class mln_render_session_attach_options extends Struct {
   @Uint32()
   external int requested_texture_ring_depth;
   @Uint32()
-  external int producer_sync_kind;
+  external int producer_sync_kinds;
   external mln_wake frame_wake;
   external mln_wake driver_work_wake;
   external mln_queue_lock queue_lock;
@@ -941,6 +941,10 @@ final class mln_render_session_capabilities extends Struct {
   external int texture_ring_depth;
   @Uint32()
   external int flags;
+  @Uint32()
+  external int producer_sync_kind;
+  @Uint32()
+  external int consumer_sync_kinds;
 }
 
 final class mln_render_session_snapshot extends Struct {
@@ -1736,6 +1740,12 @@ const MLN_GESTURE_PHASE_CANCEL = 4;
 // mln_gpu_sync_kind
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
 const MLN_GPU_SYNC_OPEN_GL_FENCE = 1;
+const MLN_GPU_SYNC_QUEUE_ORDER = 2;
+
+// mln_gpu_sync_kind_flag
+const MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1;
+const MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 2;
+const MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 4;
 
 // mln_graphics_device_option_field
 const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1;
@@ -1875,8 +1885,7 @@ const MLN_RENDER_RESULT_FAILED = 4;
 // mln_render_session_capability_flag
 const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
 const MLN_RENDER_SESSION_CAPABILITY_READBACK = 2;
-const MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 4;
-const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 8;
+const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 4;
 
 // mln_render_session_state
 const MLN_RENDER_SESSION_STATE_ATTACHING = 1;

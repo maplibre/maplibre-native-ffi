@@ -50,8 +50,7 @@ typedef enum MLN_BINDING(
 ) mln_render_session_capability_flag : uint32_t {
   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1U << 0U,
   MLN_RENDER_SESSION_CAPABILITY_READBACK = 1U << 1U,
-  MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 1U << 2U,
-  MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 3U,
+  MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 2U,
 } mln_render_session_capability_flag;
 
 /** A set of mln_render_session_capability_flag bits. */
@@ -108,19 +107,15 @@ typedef struct mln_queue_lock {
 /** Synchronization payload kind for acquired texture frames. */
 typedef enum mln_gpu_sync_kind : uint32_t {
   /**
-   * The host needs no synchronization object. The work completed, or on WebGPU
-   * was submitted to the device's queue, before the frame became acquirable or
-   * before the release call.
+   * The host needs no synchronization object. The work completed before the
+   * frame became acquirable or before the release call.
    *
-   * As producer synchronization of an acquired frame: on Metal, Vulkan, and
-   * OpenGL, the producer's GPU writes to the frame's texture completed before
-   * the frame became acquirable. On OpenGL, a host that samples the texture
-   * from another context of the share group binds it again after acquisition.
-   * On WebGPU, the writes were submitted to the device's queue, which orders
-   * them before any work that the host submits afterwards.
+   * As producer synchronization of an acquired frame, the producer's GPU writes
+   * to the frame's texture completed. On OpenGL, a host that samples the
+   * texture from another context of the share group binds it again after
+   * acquisition.
    *
-   * As consumer synchronization: the host's GPU reads completed before the
-   * release call, or on WebGPU were submitted to the device's queue before it.
+   * As consumer synchronization, the host's GPU reads completed.
    */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
   /**
@@ -148,7 +143,28 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * The host finishes its GPU reads before destroying borrowed textures.
    */
   MLN_GPU_SYNC_OPEN_GL_FENCE = 1U,
+  /**
+   * The host needs no synchronization object. The work was submitted, before
+   * the frame became acquirable or before the release call, to the queue that
+   * the session and the host share, which orders it before any work submitted
+   * there afterwards. WebGPU supports it.
+   *
+   * As producer synchronization, the host submits its reads of the frame's
+   * texture to that queue. As consumer synchronization, the host submitted its
+   * reads there before the release call.
+   */
+  MLN_GPU_SYNC_QUEUE_ORDER = 2U,
 } mln_gpu_sync_kind;
+
+/** A bit for each mln_gpu_sync_kind. */
+typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
+  MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1U << 0U,
+  MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 1U << 1U,
+  MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 1U << 2U,
+} mln_gpu_sync_kind_flag;
+
+/** A set of mln_gpu_sync_kind_flag bits. */
+typedef uint32_t mln_gpu_sync_kind_flags;
 
 /**
  * Common attachment policy copied before an attach call returns.
@@ -175,12 +191,18 @@ typedef struct mln_render_session_attach_options {
    */
   uint32_t requested_texture_ring_depth;
   /**
-   * Producer synchronization for acquired texture frames.
+   * Producer synchronization kinds that the host accepts for acquired texture
+   * frames. The session picks the first one its target supports in this order:
+   * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE, then
+   * MLN_GPU_SYNC_CPU_COMPLETE. Its capabilities report the pick. Zero accepts
+   * MLN_GPU_SYNC_CPU_COMPLETE, or MLN_GPU_SYNC_QUEUE_ORDER on WebGPU, whose
+   * device has a single queue. A set that the target cannot satisfy fails the
+   * attach with MLN_STATUS_UNSUPPORTED.
+   *
    * MLN_GPU_SYNC_OPEN_GL_FENCE requires a shared EGL or WGL texture target and
-   * a caller-graphics-thread driver. Other targets support only CPU completion
-   * and fail an unsupported request.
+   * a caller-graphics-thread driver.
    */
-  mln_gpu_sync_kind producer_sync_kind;
+  mln_gpu_sync_kind_flags producer_sync_kinds;
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
   /**
@@ -210,6 +232,17 @@ typedef struct mln_render_session_capabilities {
    */
   uint32_t texture_ring_depth;
   mln_render_session_capability_flags flags;
+  /**
+   * Producer synchronization of acquired frames, picked from the attach
+   * options' producer_sync_kinds. MLN_GPU_SYNC_CPU_COMPLETE for a target
+   * without frame acquisition.
+   */
+  mln_gpu_sync_kind producer_sync_kind;
+  /**
+   * Consumer synchronization kinds that mln_acquired_frame_release() accepts.
+   * Empty for a target without frame acquisition.
+   */
+  mln_gpu_sync_kind_flags consumer_sync_kinds;
 } mln_render_session_capabilities;
 
 /**
@@ -223,7 +256,7 @@ typedef struct mln_gpu_sync {
   /**
    * Bit pattern of the GLsync pointer.
    *
-   * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE. A producer fence that frame
+   * Zero when kind names no object. A producer fence that frame
    * access copies is valid only until the frame's release or discard.
    */
   uint64_t handle MLN_BINDING("lifetime=owner");

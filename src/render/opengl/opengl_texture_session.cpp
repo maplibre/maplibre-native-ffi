@@ -649,13 +649,12 @@ class OpenGLTextureSessionBackend final
   }
 
   auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool override {
-    return kind == MLN_GPU_SYNC_CPU_COMPLETE ||
-           (kind == MLN_GPU_SYNC_OPEN_GL_FENCE && fence_sync_supported_);
+    return kind != MLN_GPU_SYNC_OPEN_GL_FENCE || fence_sync_supported_;
   }
 
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
-    if (sync.kind == MLN_GPU_SYNC_CPU_COMPLETE) return MLN_STATUS_OK;
-    if (!supports_consumer_sync(sync.kind)) return MLN_STATUS_UNSUPPORTED;
+    if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE || !fence_sync_supported_)
+      return MLN_STATUS_UNSUPPORTED;
     try {
       auto guard = mln::gfx::BackendScope{backend_};
       auto* fence = reinterpret_cast<mln::platform::GLsync>(
@@ -821,14 +820,11 @@ auto opengl_owned_texture_attach_start(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Owned;
-  if (
-    options != nullptr &&
+  const auto fences =
     descriptor->context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED &&
-    descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL &&
-    options->producer_sync_kind == MLN_GPU_SYNC_OPEN_GL_FENCE
-  ) {
-    session->producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
-  }
+    descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+  if (fences)
+    session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   auto copied = *descriptor;
   const auto private_target =
     copied.context.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
@@ -870,10 +866,14 @@ auto opengl_owned_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = ring_depth,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK |
-             (private_target ? 0u
-                             : MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-                                 MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC)
+    .flags =
+      MLN_RENDER_SESSION_CAPABILITY_READBACK |
+      (private_target ? 0u : MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION),
+    .producer_sync_kind = {},
+    .consumer_sync_kinds =
+      private_target ? 0u
+                     : MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                         (fences ? MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE : 0u),
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -922,13 +922,10 @@ auto opengl_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
-  if (
-    options != nullptr &&
-    descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL &&
-    options->producer_sync_kind == MLN_GPU_SYNC_OPEN_GL_FENCE
-  ) {
-    session->producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
-  }
+  const auto fences =
+    descriptor->context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+  if (fences)
+    session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   session->initialize_backend = [target = OpenGLBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
@@ -944,8 +941,10 @@ auto opengl_borrowed_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           (fences ? MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE : 0u),
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,

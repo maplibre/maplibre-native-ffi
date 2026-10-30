@@ -136,7 +136,7 @@ MLN_API void mln_graphics_device_release(
  * - MLN_STATUS_INVALID_STATE when map or device has been released, or the
  *   map's creation has not succeeded.
  * - MLN_STATUS_UNSUPPORTED when the driver is not the core worker, options
- *   enable a queue lock, or options request a producer sync kind other than
+ *   enable a queue lock, or options' producer_sync_kinds exclude
  *   MLN_GPU_SYNC_CPU_COMPLETE.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *

@@ -614,9 +614,8 @@ export interface GpuSync {
  */
 export const GpuSyncKind = {
   /**
-   * The host needs no synchronization object. The work completed, or on WebGPU
-   * was submitted to the device's queue, before the frame became acquirable or
-   * before the release call.
+   * The host needs no synchronization object. The work completed before the
+   * frame became acquirable or before the release call.
    */
   cpuComplete: 0,
   /**
@@ -624,11 +623,32 @@ export const GpuSyncKind = {
    * caller-graphics-thread driver. handle is nonzero.
    */
   openGlFence: 1,
+  /**
+   * The host needs no synchronization object. The work was submitted, before
+   * the frame became acquirable or before the release call, to the queue that
+   * the session and the host share, which orders it before any work submitted
+   * there afterwards. WebGPU supports it.
+   */
+  queueOrder: 2,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
   | (typeof GpuSyncKind)[keyof typeof GpuSyncKind]
   | (number & {});
+
+/**
+ * A bit for each `GpuSyncKind`.
+ *
+ * See `mln_gpu_sync_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const GpuSyncKindFlag = {
+  cpuComplete: 1,
+  openGlFence: 2,
+  queueOrder: 4,
+} as const;
+/** A bitwise OR of GpuSyncKindFlag flags. */
+export type GpuSyncKindFlag = number;
 
 /**
  * Options for creating a graphics device.
@@ -1871,12 +1891,15 @@ export interface RenderSessionAttachOptions {
    */
   requestedTextureRingDepth?: number;
   /**
-   * Producer synchronization for acquired texture frames.
-   * `GpuSyncKind.openGlFence` requires a shared EGL or WGL texture target and a
-   * caller-graphics-thread driver. Other targets support only CPU completion
-   * and fail an unsupported request.
+   * Producer synchronization kinds that the host accepts for acquired texture
+   * frames. The session picks the first one its target supports in this order:
+   * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
+   * `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+   * device has a single queue. A set that the target cannot satisfy fails the
+   * attach with `Status.unsupported`.
    */
-  producerSyncKind?: GpuSyncKind;
+  producerSyncKinds?: GpuSyncKindFlag;
   /**
    * Wakes the receiver when the frame-result queue becomes nonempty.
    */
@@ -1908,6 +1931,17 @@ export interface RenderSessionCapabilities {
    */
   readonly textureRingDepth: number;
   readonly flags: RenderSessionCapabilityFlag;
+  /**
+   * Producer synchronization of acquired frames, picked from the attach
+   * options' producer_sync_kinds. `GpuSyncKind.cpuComplete` for a target
+   * without frame acquisition.
+   */
+  readonly producerSyncKind: GpuSyncKind;
+  /**
+   * Consumer synchronization kinds that `AcquiredFrameHandle.release()`
+   * accepts. Empty for a target without frame acquisition.
+   */
+  readonly consumerSyncKinds: GpuSyncKindFlag;
 }
 
 /**
@@ -1919,8 +1953,7 @@ export interface RenderSessionCapabilities {
 export const RenderSessionCapabilityFlag = {
   frameAcquisition: 1,
   readback: 2,
-  consumerSync: 4,
-  presentation: 8,
+  presentation: 4,
 } as const;
 /** A bitwise OR of RenderSessionCapabilityFlag flags. */
 export type RenderSessionCapabilityFlag = number;

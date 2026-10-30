@@ -691,7 +691,7 @@ internal unsafe struct mln_render_session_attach_options
     public uint size;
     public mln_render_driver_kind driver;
     public uint requested_texture_ring_depth;
-    public mln_gpu_sync_kind producer_sync_kind;
+    public uint producer_sync_kinds;
     public mln_wake frame_wake;
     public mln_wake driver_work_wake;
     public mln_queue_lock queue_lock;
@@ -703,6 +703,8 @@ internal unsafe struct mln_render_session_capabilities
     public mln_render_driver_kind driver;
     public uint texture_ring_depth;
     public uint flags;
+    public mln_gpu_sync_kind producer_sync_kind;
+    public uint consumer_sync_kinds;
 }
 
 internal unsafe struct mln_render_session_snapshot
@@ -1437,6 +1439,14 @@ internal enum mln_gpu_sync_kind : uint
 {
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
     MLN_GPU_SYNC_OPEN_GL_FENCE = 1,
+    MLN_GPU_SYNC_QUEUE_ORDER = 2,
+}
+
+internal enum mln_gpu_sync_kind_flag : uint
+{
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1,
+    MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 2,
+    MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER = 4,
 }
 
 internal enum mln_graphics_device_option_field : uint
@@ -1624,8 +1634,7 @@ internal enum mln_render_session_capability_flag : uint
 {
     MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1,
     MLN_RENDER_SESSION_CAPABILITY_READBACK = 2,
-    MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 4,
-    MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 8,
+    MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 4,
 }
 
 internal enum mln_render_session_state : uint

@@ -314,6 +314,9 @@ void install_frame_failure(
         session.texture.backend = std::make_unique<FailingFrameBackend>(
           std::move(session.texture.backend), failure, session.scheduler, before
         );
+        const auto lock = std::scoped_lock{session.control_mutex};
+        session.capabilities.consumer_sync_kinds |=
+          MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
         return MLN_STATUS_OK;
       },
       &install.descriptor,
@@ -454,6 +457,8 @@ void a_failed_release_submission_preserves_the_acquired_frame() {
   session->texture.slots.resize(1);
   session->texture.slots[0].acquired = true;
   session->acquired_frame_count = 1;
+  session->capabilities.consumer_sync_kinds =
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   frame->slot = 0;
@@ -1457,24 +1462,29 @@ void release_with_a_gpu_wait(
 ) {
   auto& racing = *static_cast<RacingRelease*>(user_data);
   racing.completion_status = result->status;
-  auto sync = mln_gpu_sync{};
-  sync.size = sizeof(mln_gpu_sync);
-  sync.kind = static_cast<mln_gpu_sync_kind>(UINT32_MAX);
+  const auto sync =
+    mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPEN_GL_FENCE, 1};
   racing.release_status =
     mln_acquired_frame_release(racing.frame, &sync, nullptr);
   if (racing.release_status == MLN_STATUS_OK) racing.frame = MLN_HANDLE_NULL;
 }
 
 // A frame release can reach a session after abandon took its backend and
-// before abandon decides what to keep, when no backend checks the release's
-// sync kind. Native never runs the GPU wait that such a release hands over,
-// so the host's GPU may still read the slot, and abandon keeps the ring. The
-// blocked driver keeps the operation queued until abandon discards it, which
-// no public fence reaches.
+// before abandon decides what to keep. Native never runs the GPU wait that
+// such a release hands over, so the host's GPU may still read the slot, and
+// abandon keeps the ring. The blocked driver keeps the operation queued until
+// abandon discards it, which no public fence reaches.
 void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
   create_fixture(fixture);
+  {
+    // The session accepts the fence that the racing release hands over.
+    const auto live = mln::core::lease_render_session(fixture.render.session);
+    const auto lock = std::scoped_lock{live->control_mutex};
+    live->capabilities.consumer_sync_kinds |=
+      MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
+  }
   auto racing =
     RacingRelease{.frame = mln_test_render_and_acquire(&fixture.render, 142)};
   auto blocker = DriverBlocker{};

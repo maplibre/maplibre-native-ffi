@@ -13,6 +13,5 @@ public enum RenderSessionCapabilityFlag : uint
 {
     FrameAcquisition = 1,
     Readback = 2,
-    ConsumerSync = 4,
-    Presentation = 8,
+    Presentation = 4,
 }

@@ -279,7 +279,7 @@ internal fun NativeCall.putRenderSessionAttachOptions(
   writeU32(target, w(80, 112, 72).toUInt())
   writeU32(target + 4, value.driver.rawValue)
   writeU32(target + 8, value.requestedTextureRingDepth)
-  writeU32(target + 12, value.producerSyncKind.rawValue)
+  writeU32(target + 12, value.producerSyncKinds.rawValue)
   putWake(target + 16, value.frameWake)
   putWake(target + w(40, 48, 36), value.driverWorkWake)
   putQueueLock(target + w(64, 80, 56), value.queueLock)
@@ -1252,6 +1252,8 @@ internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilit
     driver = RenderDriverKind(readU32(source + 4)),
     textureRingDepth = readU32(source + 8),
     flags = RenderSessionCapabilityFlag(readU32(source + 12)),
+    producerSyncKind = GpuSyncKind(readU32(source + 16)),
+    consumerSyncKinds = GpuSyncKindFlag(readU32(source + 20)),
   )
 
 internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =

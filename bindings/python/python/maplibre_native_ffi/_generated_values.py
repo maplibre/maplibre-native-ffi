@@ -300,6 +300,19 @@ class GpuSyncKind(UnknownIntEnum):
 
     CPU_COMPLETE = 0
     OPEN_GL_FENCE = 1
+    QUEUE_ORDER = 2
+
+
+class GpuSyncKindFlag(IntFlag):
+    """A bit for each `GpuSyncKind`.
+
+    See `mln_gpu_sync_kind_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    CPU_COMPLETE = 1
+    OPEN_GL_FENCE = 2
+    QUEUE_ORDER = 4
 
 
 class LogEvent(UnknownIntEnum):
@@ -510,8 +523,7 @@ class RenderSessionCapabilityFlag(IntFlag):
 
     FRAME_ACQUISITION = 1
     READBACK = 2
-    CONSUMER_SYNC = 4
-    PRESENTATION = 8
+    PRESENTATION = 4
 
 
 class RenderSessionState(UnknownIntEnum):
@@ -2729,11 +2741,16 @@ class RenderSessionAttachOptions:
     targets ignore this value.
     """
 
-    producer_sync_kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
-    """Producer synchronization for acquired texture frames.
-    `GpuSyncKind.OPEN_GL_FENCE` requires a shared EGL or WGL texture target
-    and a caller-graphics-thread driver. Other targets support only CPU
-    completion and fail an unsupported request.
+    producer_sync_kinds: GpuSyncKindFlag = field(
+        default_factory=lambda: GpuSyncKindFlag(0)
+    )
+    """Producer synchronization kinds that the host accepts for acquired texture
+    frames. The session picks the first one its target supports in this
+    order: `GpuSyncKind.QUEUE_ORDER`, `GpuSyncKind.OPEN_GL_FENCE`, then
+    `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero
+    accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on
+    WebGPU, whose device has a single queue. A set that the target cannot
+    satisfy fails the attach with `Status.UNSUPPORTED`.
     """
 
     frame_wake: Wake | NativeWake = field(default_factory=lambda: Wake())
@@ -2755,7 +2772,7 @@ class RenderSessionAttachOptions:
         return cls(
             driver=RenderDriverKind(raw["driver"]),
             requested_texture_ring_depth=raw["requested_texture_ring_depth"],
-            producer_sync_kind=GpuSyncKind(raw["producer_sync_kind"]),
+            producer_sync_kinds=GpuSyncKindFlag(raw["producer_sync_kinds"]),
             frame_wake=Wake(),
             driver_work_wake=Wake(),
             queue_lock=QueueLock(),
@@ -2779,12 +2796,25 @@ class RenderSessionCapabilities:
 
     flags: RenderSessionCapabilityFlag
 
+    producer_sync_kind: GpuSyncKind
+    """Producer synchronization of acquired frames, picked from the attach
+    options' producer_sync_kinds. `GpuSyncKind.CPU_COMPLETE` for a target
+    without frame acquisition.
+    """
+
+    consumer_sync_kinds: GpuSyncKindFlag
+    """Consumer synchronization kinds that `AcquiredFrameHandle.close()`
+    accepts. Empty for a target without frame acquisition.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             driver=RenderDriverKind(raw["driver"]),
             texture_ring_depth=raw["texture_ring_depth"],
             flags=RenderSessionCapabilityFlag(raw["flags"]),
+            producer_sync_kind=GpuSyncKind(raw["producer_sync_kind"]),
+            consumer_sync_kinds=GpuSyncKindFlag(raw["consumer_sync_kinds"]),
         )
 
 

@@ -11,9 +11,8 @@ namespace Maplibre.NativeFfi;
 public enum GpuSyncKind : uint
 {
     /// <summary>
-    /// The host needs no synchronization object. The work completed, or on
-    /// WebGPU was submitted to the device's queue, before the frame became
-    /// acquirable or before the release call.
+    /// The host needs no synchronization object. The work completed before the
+    /// frame became acquirable or before the release call.
     /// </summary>
     CpuComplete = 0,
 
@@ -22,4 +21,12 @@ public enum GpuSyncKind : uint
     /// caller-graphics-thread driver. handle is nonzero.
     /// </summary>
     OpenGlFence = 1,
+
+    /// <summary>
+    /// The host needs no synchronization object. The work was submitted, before
+    /// the frame became acquirable or before the release call, to the queue
+    /// that the session and the host share, which orders it before any work
+    /// submitted there afterwards. WebGPU supports it.
+    /// </summary>
+    QueueOrder = 2,
 }

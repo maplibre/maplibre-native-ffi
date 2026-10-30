@@ -185,20 +185,49 @@ final class GesturePhase extends _Enum {
 final class GpuSyncKind extends _Enum {
   const GpuSyncKind.fromRawValue(super.rawValue);
 
-  /// The host needs no synchronization object. The work completed, or on WebGPU
-  /// was submitted to the device's queue, before the frame became acquirable or
-  /// before the release call.
+  /// The host needs no synchronization object. The work completed before the
+  /// frame became acquirable or before the release call.
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
   /// GLsync in the shared EGL or WGL context's share group, used only by a
   /// caller-graphics-thread driver. handle is nonzero.
   static const openGlFence = GpuSyncKind.fromRawValue(1);
+
+  /// The host needs no synchronization object. The work was submitted, before
+  /// the frame became acquirable or before the release call, to the queue that
+  /// the session and the host share, which orders it before any work submitted
+  /// there afterwards. WebGPU supports it.
+  static const queueOrder = GpuSyncKind.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
     1 => 'GpuSyncKind.openGlFence',
+    2 => 'GpuSyncKind.queueOrder',
     _ => 'GpuSyncKind($rawValue)',
   };
+}
+
+/// A bit for each `GpuSyncKind`.
+///
+/// See `mln_gpu_sync_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
+  const GpuSyncKindFlag.fromRawValue(super.rawValue);
+  static const cpuComplete = GpuSyncKindFlag.fromRawValue(1);
+  static const openGlFence = GpuSyncKindFlag.fromRawValue(2);
+  static const queueOrder = GpuSyncKindFlag.fromRawValue(4);
+
+  /// No flags.
+  static const none = GpuSyncKindFlag.fromRawValue(0);
+  @override
+  GpuSyncKindFlag _of(int rawValue) => GpuSyncKindFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('GpuSyncKindFlag', const {
+    0: 'none',
+    1: 'cpuComplete',
+    2: 'openGlFence',
+    4: 'queueOrder',
+  });
 }
 
 /// Log event categories emitted by MapLibre Native.
@@ -598,8 +627,7 @@ final class RenderSessionCapabilityFlag
   const RenderSessionCapabilityFlag.fromRawValue(super.rawValue);
   static const frameAcquisition = RenderSessionCapabilityFlag.fromRawValue(1);
   static const readback = RenderSessionCapabilityFlag.fromRawValue(2);
-  static const consumerSync = RenderSessionCapabilityFlag.fromRawValue(4);
-  static const presentation = RenderSessionCapabilityFlag.fromRawValue(8);
+  static const presentation = RenderSessionCapabilityFlag.fromRawValue(4);
 
   /// No flags.
   static const none = RenderSessionCapabilityFlag.fromRawValue(0);
@@ -611,8 +639,7 @@ final class RenderSessionCapabilityFlag
     0: 'none',
     1: 'frameAcquisition',
     2: 'readback',
-    4: 'consumerSync',
-    8: 'presentation',
+    4: 'presentation',
   });
 }
 
@@ -2555,7 +2582,7 @@ final class RenderSessionAttachOptions extends _Value {
   const RenderSessionAttachOptions({
     required this.driver,
     this.requestedTextureRingDepth = 0,
-    this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
+    this.producerSyncKinds = GpuSyncKindFlag.none,
     this.frameWake = const Wake(),
     this.driverWorkWake = const Wake(),
     this.queueLock,
@@ -2576,11 +2603,14 @@ final class RenderSessionAttachOptions extends _Value {
   /// targets ignore this value.
   final int requestedTextureRingDepth;
 
-  /// Producer synchronization for acquired texture frames.
-  /// `GpuSyncKind.openGlFence` requires a shared EGL or WGL texture target and
-  /// a caller-graphics-thread driver. Other targets support only CPU completion
-  /// and fail an unsupported request.
-  final GpuSyncKind producerSyncKind;
+  /// Producer synchronization kinds that the host accepts for acquired texture
+  /// frames. The session picks the first one its target supports in this order:
+  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
+  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+  /// device has a single queue. A set that the target cannot satisfy fails the
+  /// attach with `Status.unsupported`.
+  final GpuSyncKindFlag producerSyncKinds;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   final Wake frameWake;
@@ -2598,7 +2628,7 @@ final class RenderSessionAttachOptions extends _Value {
   RenderSessionAttachOptions copyWith({
     RenderDriverKind? driver,
     int? requestedTextureRingDepth,
-    GpuSyncKind? producerSyncKind,
+    GpuSyncKindFlag? producerSyncKinds,
     Wake? frameWake,
     Wake? driverWorkWake,
     QueueLock? queueLock,
@@ -2606,7 +2636,7 @@ final class RenderSessionAttachOptions extends _Value {
     driver: driver ?? this.driver,
     requestedTextureRingDepth:
         requestedTextureRingDepth ?? this.requestedTextureRingDepth,
-    producerSyncKind: producerSyncKind ?? this.producerSyncKind,
+    producerSyncKinds: producerSyncKinds ?? this.producerSyncKinds,
     frameWake: frameWake ?? this.frameWake,
     driverWorkWake: driverWorkWake ?? this.driverWorkWake,
     queueLock: queueLock ?? this.queueLock,
@@ -2616,7 +2646,7 @@ final class RenderSessionAttachOptions extends _Value {
   List<Object?> get _members => [
     driver,
     requestedTextureRingDepth,
-    producerSyncKind,
+    producerSyncKinds,
     frameWake,
     driverWorkWake,
     queueLock,
@@ -2625,7 +2655,7 @@ final class RenderSessionAttachOptions extends _Value {
   String toString() => _describe('RenderSessionAttachOptions', const [
     'driver',
     'requestedTextureRingDepth',
-    'producerSyncKind',
+    'producerSyncKinds',
     'frameWake',
     'driverWorkWake',
     'queueLock',
@@ -4426,6 +4456,8 @@ final class RenderSessionCapabilities extends _Value {
     required this.driver,
     this.textureRingDepth = 0,
     this.flags = RenderSessionCapabilityFlag.none,
+    this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
+    this.consumerSyncKinds = GpuSyncKindFlag.none,
   });
   final RenderDriverKind driver;
 
@@ -4434,13 +4466,30 @@ final class RenderSessionCapabilities extends _Value {
   final int textureRingDepth;
   final RenderSessionCapabilityFlag flags;
 
+  /// Producer synchronization of acquired frames, picked from the attach
+  /// options' producer_sync_kinds. `GpuSyncKind.cpuComplete` for a target
+  /// without frame acquisition.
+  final GpuSyncKind producerSyncKind;
+
+  /// Consumer synchronization kinds that `AcquiredFrameHandle.release()`
+  /// accepts. Empty for a target without frame acquisition.
+  final GpuSyncKindFlag consumerSyncKinds;
+
   @override
-  List<Object?> get _members => [driver, textureRingDepth, flags];
+  List<Object?> get _members => [
+    driver,
+    textureRingDepth,
+    flags,
+    producerSyncKind,
+    consumerSyncKinds,
+  ];
   @override
   String toString() => _describe('RenderSessionCapabilities', const [
     'driver',
     'textureRingDepth',
     'flags',
+    'producerSyncKind',
+    'consumerSyncKinds',
   ]);
 }
 

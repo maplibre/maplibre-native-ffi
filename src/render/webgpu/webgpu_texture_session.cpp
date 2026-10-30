@@ -1279,6 +1279,7 @@ auto webgpu_owned_texture_attach_start(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Owned;
+  session->producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   const auto copied = *descriptor;
   const auto ring_depth = attach_ring_depth(options);
   session->initialize_backend =
@@ -1294,8 +1295,10 @@ auto webgpu_owned_texture_attach_start(
     .driver = {},
     .texture_ring_depth = ring_depth,
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+             MLN_RENDER_SESSION_CAPABILITY_READBACK,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds =
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -1346,6 +1349,7 @@ auto webgpu_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
+  session->producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
   session->initialize_backend = [target = WebGPUBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
@@ -1363,8 +1367,10 @@ auto webgpu_borrowed_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds =
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -1456,7 +1462,9 @@ auto webgpu_surface_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = 0,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = 0,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,

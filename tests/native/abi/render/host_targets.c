@@ -146,9 +146,13 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(2, capabilities.texture_ring_depth);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-      MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC,
-    capabilities.flags
+    MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION, capabilities.flags
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_GPU_SYNC_CPU_COMPLETE, capabilities.producer_sync_kind
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE, capabilities.consumer_sync_kinds
   );
 
   TEST_ASSERT_EQUAL_UINT32(

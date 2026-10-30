@@ -409,6 +409,26 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     mln_acquired_frame_release(frame, &refused, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "gpu sync kind"));
+  // A known kind outside the session's consumer kinds is refused the same way.
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE, capabilities.consumer_sync_kinds
+  );
+  refused.kind =
+    (capabilities.consumer_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER) == 0
+      ? MLN_GPU_SYNC_QUEUE_ORDER
+      : MLN_GPU_SYNC_OPEN_GL_FENCE;
+  refused.handle = 1;
+  TEST_ASSERT_BITS_LOW(1U << refused.kind, capabilities.consumer_sync_kinds);
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED,
+    mln_acquired_frame_release(frame, &refused, MLN_TEST_DIAGNOSTIC)
+  );
   // The host still owns the frame and its accessors still answer.
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};

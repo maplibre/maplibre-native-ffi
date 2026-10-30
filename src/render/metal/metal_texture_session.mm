@@ -274,8 +274,9 @@ auto metal_owned_texture_attach_start(
     .driver = {},
     .texture_ring_depth = ring_depth,
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+             MLN_RENDER_SESSION_CAPABILITY_READBACK,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -319,8 +320,9 @@ auto metal_borrowed_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,

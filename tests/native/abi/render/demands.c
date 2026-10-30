@@ -134,7 +134,13 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   mln_acquired_frame second = mln_test_render_and_acquire(&fixture, 202);
   mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
-  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(capabilities.producer_sync_kind, producer.kind);
 
   mln_test_render_request_forced(&fixture, 203);
   mln_test_completion barrier = mln_test_completion_default(0);

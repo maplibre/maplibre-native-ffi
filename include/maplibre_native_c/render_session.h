@@ -425,9 +425,10 @@ MLN_API mln_status mln_acquired_frame_get_result(
  * The synchronization states when the producer's GPU writes to the frame's
  * texture are complete, for frames of session-owned and borrowed rings alike.
  * The host waits on it before it reads the texture. See mln_gpu_sync_kind for
- * what each kind promises. Attachment selects the producer kind through
- * mln_render_session_attach_options.producer_sync_kind; acquisition never
- * changes it. A failed session returns its saved failure and diagnostic.
+ * what each kind promises. Attachment picks the producer kind from
+ * mln_render_session_attach_options.producer_sync_kinds, and the session's
+ * capabilities report it; acquisition never changes it. A failed session
+ * returns its saved failure and diagnostic.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -448,8 +449,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  *
  * consumer_completion states when that work completes, as mln_gpu_sync_kind
  * describes. Null means MLN_GPU_SYNC_CPU_COMPLETE: the host's GPU reads
- * completed before this call. The call consumes frame on success. A
- * synchronization kind the backend does not support fails with
+ * completed before this call. The call consumes frame on success. A kind
+ * outside the session's consumer_sync_kinds capability fails with
  * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
  * frame ownership. After session failure or abandonment the call closes the
  * handle without graphics work. When the driver fails to wait for the consumer
@@ -463,7 +464,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
  *   active.
- * - MLN_STATUS_UNSUPPORTED when the backend does not support the named
+ * - MLN_STATUS_UNSUPPORTED when the session does not accept the named
  *   mln_gpu_sync_kind. The handle is not consumed.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */

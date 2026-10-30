@@ -313,15 +313,18 @@ class TextureSessionBackend {
     out_rendered = true;
     return MLN_STATUS_OK;
   }
-  // Rejecting a sync kind here keeps the release synchronous and all-or-
-  // nothing: the caller keeps frame ownership instead of losing the handle to
-  // a release whose wait can never run.
+  // Narrows the session's consumer_sync_kinds to what the backend found at
+  // initialization. Rejecting a sync kind here keeps the release synchronous
+  // and all-or-nothing: the caller keeps frame ownership instead of losing the
+  // handle to a release whose wait can never run.
   virtual auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool {
-    return kind == MLN_GPU_SYNC_CPU_COMPLETE;
+    (void)kind;
+    return true;
   }
+  // Waits for a consumer sync that names an object, on the driver.
   virtual auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status {
-    return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
-                                                  : MLN_STATUS_UNSUPPORTED;
+    (void)sync;
+    return MLN_STATUS_UNSUPPORTED;
   }
   virtual auto producer_sync() const -> mln_gpu_sync {
     return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
@@ -477,6 +480,23 @@ struct RenderSurfaceState {
 
 inline constexpr std::size_t max_texture_ring_depth =
   MLN_TEXTURE_RING_MAX_DEPTH;
+
+inline constexpr auto gpu_sync_kind_flag(mln_gpu_sync_kind kind) noexcept
+  -> mln_gpu_sync_kind_flags {
+  const auto bit = static_cast<uint32_t>(kind);
+  return bit < 32U ? 1U << bit : 0U;
+}
+
+inline constexpr mln_gpu_sync_kind_flags known_gpu_sync_kinds =
+  MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE |
+  MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+
+// Whether a sync kind hands over an object that the receiver must wait on.
+// The other kinds order the work before the handoff.
+inline constexpr auto gpu_sync_names_object(mln_gpu_sync_kind kind) noexcept
+  -> bool {
+  return kind != MLN_GPU_SYNC_CPU_COMPLETE && kind != MLN_GPU_SYNC_QUEUE_ORDER;
+}
 
 struct RenderTextureSlot {
   mln_render_frame_result result{};
@@ -882,7 +902,10 @@ struct mln_render_session_object
   // Set before attach by a backend whose driver takes queue_lock. Attach
   // rejects an enabled lock on any other backend.
   bool accepts_queue_lock = false;
-  // Selected by an attachment that supports GPU producer synchronization.
+  // The producer synchronization kinds the target supports, set before
+  // attach, and the one attach picks from them.
+  mln_gpu_sync_kind_flags producer_sync_kinds =
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
   mln_gpu_sync_kind producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;

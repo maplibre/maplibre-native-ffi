@@ -109,20 +109,42 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The host needs no synchronization object. The work completed, or on WebGPU
-  /// was submitted to the device's queue, before the frame became acquirable or
-  /// before the release call.
+  /// The host needs no synchronization object. The work completed before the
+  /// frame became acquirable or before the release call.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
   /// GLsync in the shared EGL or WGL context's share group, used only by a
   /// caller-graphics-thread driver. handle is nonzero.
   public static let openGlFence: GpuSyncKind = .init(rawValue: 1)
+  /// The host needs no synchronization object. The work was submitted, before
+  /// the frame became acquirable or before the release call, to the queue that
+  /// the session and the host share, which orders it before any work submitted
+  /// there afterwards. WebGPU supports it.
+  public static let queueOrder: GpuSyncKind = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
     case 0: return "cpuComplete"
     case 1: return "openGlFence"
+    case 2: return "queueOrder"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
+}
+
+/// A bit for each `GpuSyncKind`.
+///
+/// See `mln_gpu_sync_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public struct GpuSyncKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let cpuComplete: GpuSyncKindFlag = .init(rawValue: 1)
+  public static let openGlFence: GpuSyncKindFlag = .init(rawValue: 2)
+  public static let queueOrder: GpuSyncKindFlag = .init(rawValue: 4)
 }
 
 /// Metal backend context fields shared by Metal render targets.
@@ -378,11 +400,14 @@ public struct RenderSessionAttachOptions: Sendable {
   /// borrowed texture ring's depth is its texture count, so borrowed and other
   /// targets ignore this value.
   public var requestedTextureRingDepth: UInt32
-  /// Producer synchronization for acquired texture frames.
-  /// `GpuSyncKind.openGlFence` requires a shared EGL or WGL texture target and
-  /// a caller-graphics-thread driver. Other targets support only CPU completion
-  /// and fail an unsupported request.
-  public var producerSyncKind: GpuSyncKind
+  /// Producer synchronization kinds that the host accepts for acquired texture
+  /// frames. The session picks the first one its target supports in this order:
+  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`, then
+  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+  /// device has a single queue. A set that the target cannot satisfy fails the
+  /// attach with `Status.unsupported`.
+  public var producerSyncKinds: GpuSyncKindFlag
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
   /// Wakes the graphics receiver when caller-driver work is available,
@@ -395,14 +420,14 @@ public struct RenderSessionAttachOptions: Sendable {
   public init(
     driver: RenderDriverKind,
     requestedTextureRingDepth: UInt32 = 0,
-    producerSyncKind: GpuSyncKind = .init(rawValue: 0),
+    producerSyncKinds: GpuSyncKindFlag = .init(rawValue: 0),
     frameWake: Wake = .init(),
     driverWorkWake: Wake = .init(),
     queueLock: QueueLock = .init()
   ) {
     self.driver = driver
     self.requestedTextureRingDepth = requestedTextureRingDepth
-    self.producerSyncKind = producerSyncKind
+    self.producerSyncKinds = producerSyncKinds
     self.frameWake = frameWake
     self.driverWorkWake = driverWorkWake
     self.queueLock = queueLock
@@ -414,7 +439,7 @@ public struct RenderSessionAttachOptions: Sendable {
   ) throws {
     driver = RenderDriverKind(rawValue: raw.driver.rawValue)
     requestedTextureRingDepth = raw.requested_texture_ring_depth
-    producerSyncKind = GpuSyncKind(rawValue: raw.producer_sync_kind.rawValue)
+    producerSyncKinds = GpuSyncKindFlag(rawValue: raw.producer_sync_kinds)
     frameWake = Wake()
     driverWorkWake = Wake()
     queueLock = QueueLock()
@@ -427,9 +452,7 @@ public struct RenderSessionAttachOptions: Sendable {
     raw.size = UInt32(MemoryLayout<mln_render_session_attach_options>.size)
     raw.driver = mln_render_driver_kind(rawValue: driver.rawValue)
     raw.requested_texture_ring_depth = requestedTextureRingDepth
-    raw
-      .producer_sync_kind = mln_gpu_sync_kind(rawValue: producerSyncKind
-        .rawValue)
+    raw.producer_sync_kinds = producerSyncKinds.rawValue
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
     raw.queue_lock = try queueLock.nativeValue(arena: arena)
@@ -447,20 +470,33 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   /// texture count of a borrowed one. Zero for a surface.
   public var textureRingDepth: UInt32
   public var flags: RenderSessionCapabilityFlag
+  /// Producer synchronization of acquired frames, picked from the attach
+  /// options' producer_sync_kinds. `GpuSyncKind.cpuComplete` for a target
+  /// without frame acquisition.
+  public var producerSyncKind: GpuSyncKind
+  /// Consumer synchronization kinds that `AcquiredFrameHandle.release()`
+  /// accepts. Empty for a target without frame acquisition.
+  public var consumerSyncKinds: GpuSyncKindFlag
   public init(
     driver: RenderDriverKind = .init(rawValue: 0),
     textureRingDepth: UInt32 = 0,
-    flags: RenderSessionCapabilityFlag = .init(rawValue: 0)
+    flags: RenderSessionCapabilityFlag = .init(rawValue: 0),
+    producerSyncKind: GpuSyncKind = .init(rawValue: 0),
+    consumerSyncKinds: GpuSyncKindFlag = .init(rawValue: 0)
   ) {
     self.driver = driver
     self.textureRingDepth = textureRingDepth
     self.flags = flags
+    self.producerSyncKind = producerSyncKind
+    self.consumerSyncKinds = consumerSyncKinds
   }
 
   init(raw: mln_render_session_capabilities) {
     driver = RenderDriverKind(rawValue: raw.driver.rawValue)
     textureRingDepth = raw.texture_ring_depth
     flags = RenderSessionCapabilityFlag(rawValue: raw.flags)
+    producerSyncKind = GpuSyncKind(rawValue: raw.producer_sync_kind.rawValue)
+    consumerSyncKinds = GpuSyncKindFlag(rawValue: raw.consumer_sync_kinds)
   }
 }
 
@@ -480,10 +516,8 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
   public static let frameAcquisition: RenderSessionCapabilityFlag =
     .init(rawValue: 1)
   public static let readback: RenderSessionCapabilityFlag = .init(rawValue: 2)
-  public static let consumerSync: RenderSessionCapabilityFlag =
-    .init(rawValue: 4)
   public static let presentation: RenderSessionCapabilityFlag =
-    .init(rawValue: 8)
+    .init(rawValue: 4)
 }
 
 /// Vulkan backend context fields shared by Vulkan render targets.

@@ -238,13 +238,14 @@ public value class GpuSyncKind(public val rawValue: UInt) {
     when (rawValue) {
       0u -> "CPU_COMPLETE"
       1u -> "OPEN_GL_FENCE"
+      2u -> "QUEUE_ORDER"
       else -> "GpuSyncKind($rawValue)"
     }
 
   public companion object {
     /**
-     * The host needs no synchronization object. The work completed, or on WebGPU was submitted to
-     * the device's queue, before the frame became acquirable or before the release call.
+     * The host needs no synchronization object. The work completed before the frame became
+     * acquirable or before the release call.
      */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
     /**
@@ -252,6 +253,47 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * driver. handle is nonzero.
      */
     public val OPEN_GL_FENCE: GpuSyncKind = GpuSyncKind(1u)
+    /**
+     * The host needs no synchronization object. The work was submitted, before the frame became
+     * acquirable or before the release call, to the queue that the session and the host share,
+     * which orders it before any work submitted there afterwards. WebGPU supports it.
+     */
+    public val QUEUE_ORDER: GpuSyncKind = GpuSyncKind(2u)
+  }
+}
+
+/**
+ * A bit for each `GpuSyncKind`.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_gpu_sync_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+@JvmInline
+public value class GpuSyncKindFlag(public val rawValue: UInt) {
+  public infix fun or(other: GpuSyncKindFlag): GpuSyncKindFlag =
+    GpuSyncKindFlag(rawValue or other.rawValue)
+
+  public infix fun and(other: GpuSyncKindFlag): GpuSyncKindFlag =
+    GpuSyncKindFlag(rawValue and other.rawValue)
+
+  public operator fun contains(other: GpuSyncKindFlag): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(1uL to "CPU_COMPLETE", 2uL to "OPEN_GL_FENCE", 4uL to "QUEUE_ORDER"),
+    )
+
+  public companion object {
+    /** No flags. */
+    public val NONE: GpuSyncKindFlag = GpuSyncKindFlag(0u)
+    public val CPU_COMPLETE: GpuSyncKindFlag = GpuSyncKindFlag(1u)
+    public val OPEN_GL_FENCE: GpuSyncKindFlag = GpuSyncKindFlag(2u)
+    public val QUEUE_ORDER: GpuSyncKindFlag = GpuSyncKindFlag(4u)
   }
 }
 
@@ -771,12 +813,7 @@ public value class RenderSessionCapabilityFlag(public val rawValue: UInt) {
     flagLabel(
       rawValue.toULong(),
       "NONE",
-      listOf(
-        1uL to "FRAME_ACQUISITION",
-        2uL to "READBACK",
-        4uL to "CONSUMER_SYNC",
-        8uL to "PRESENTATION",
-      ),
+      listOf(1uL to "FRAME_ACQUISITION", 2uL to "READBACK", 4uL to "PRESENTATION"),
     )
 
   public companion object {
@@ -784,8 +821,7 @@ public value class RenderSessionCapabilityFlag(public val rawValue: UInt) {
     public val NONE: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(0u)
     public val FRAME_ACQUISITION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(1u)
     public val READBACK: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(2u)
-    public val CONSUMER_SYNC: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(4u)
-    public val PRESENTATION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(8u)
+    public val PRESENTATION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(4u)
   }
 }
 
@@ -2251,11 +2287,14 @@ public data class RenderSessionAttachOptions(
    */
   public val requestedTextureRingDepth: UInt = 0u,
   /**
-   * Producer synchronization for acquired texture frames. `GpuSyncKind.OPEN_GL_FENCE` requires a
-   * shared EGL or WGL texture target and a caller-graphics-thread driver. Other targets support
-   * only CPU completion and fail an unsupported request.
+   * Producer synchronization kinds that the host accepts for acquired texture frames. The session
+   * picks the first one its target supports in this order: `GpuSyncKind.QUEUE_ORDER`,
+   * `GpuSyncKind.OPEN_GL_FENCE`, then `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick.
+   * Zero accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device
+   * has a single queue. A set that the target cannot satisfy fails the attach with
+   * `Status.UNSUPPORTED`.
    */
-  public val producerSyncKind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
+  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   public val frameWake: Wake = Wake(),
   /**
@@ -3147,6 +3186,16 @@ public data class RenderSessionCapabilities(
    */
   public val textureRingDepth: UInt,
   public val flags: RenderSessionCapabilityFlag,
+  /**
+   * Producer synchronization of acquired frames, picked from the attach options'
+   * producer_sync_kinds. `GpuSyncKind.CPU_COMPLETE` for a target without frame acquisition.
+   */
+  public val producerSyncKind: GpuSyncKind,
+  /**
+   * Consumer synchronization kinds that `AcquiredFrameHandle.release()` accepts. Empty for a target
+   * without frame acquisition.
+   */
+  public val consumerSyncKinds: GpuSyncKindFlag,
 )
 
 /**

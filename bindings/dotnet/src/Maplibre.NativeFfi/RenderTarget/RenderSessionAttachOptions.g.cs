@@ -15,7 +15,7 @@ public readonly partial record struct RenderSessionAttachOptions
     public RenderSessionAttachOptions(
         RenderDriverKind Driver,
         uint RequestedTextureRingDepth,
-        GpuSyncKind ProducerSyncKind,
+        GpuSyncKindFlag ProducerSyncKinds,
         Wake FrameWake,
         Wake DriverWorkWake,
         QueueLock QueueLock
@@ -23,7 +23,7 @@ public readonly partial record struct RenderSessionAttachOptions
     {
         this.Driver = Driver;
         this.RequestedTextureRingDepth = RequestedTextureRingDepth;
-        this.ProducerSyncKind = ProducerSyncKind;
+        this.ProducerSyncKinds = ProducerSyncKinds;
         this.FrameWake = FrameWake;
         this.DriverWorkWake = DriverWorkWake;
         this.QueueLock = QueueLock;
@@ -44,12 +44,16 @@ public readonly partial record struct RenderSessionAttachOptions
     public uint RequestedTextureRingDepth { get; init; }
 
     /// <summary>
-    /// Producer synchronization for acquired texture frames.
-    /// <c>GpuSyncKind.OpenGlFence</c> requires a shared EGL or WGL texture
-    /// target and a caller-graphics-thread driver. Other targets support only
-    /// CPU completion and fail an unsupported request.
+    /// Producer synchronization kinds that the host accepts for acquired
+    /// texture frames. The session picks the first one its target supports in
+    /// this order: <c>GpuSyncKind.QueueOrder</c>,
+    /// <c>GpuSyncKind.OpenGlFence</c>, then <c>GpuSyncKind.CpuComplete</c>. Its
+    /// capabilities report the pick. Zero accepts
+    /// <c>GpuSyncKind.CpuComplete</c>, or <c>GpuSyncKind.QueueOrder</c> on
+    /// WebGPU, whose device has a single queue. A set that the target cannot
+    /// satisfy fails the attach with <c>Status.Unsupported</c>.
     /// </summary>
-    public GpuSyncKind ProducerSyncKind { get; init; }
+    public GpuSyncKindFlag ProducerSyncKinds { get; init; }
 
     /// <summary>
     /// Wakes the receiver when the frame-result queue becomes nonempty.

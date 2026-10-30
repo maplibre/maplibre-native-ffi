@@ -1194,19 +1194,35 @@ native_enum! {
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum GpuSyncKind: u32 {
-    /// The host needs no synchronization object. The work completed, or on
-    /// WebGPU was submitted to the device's queue, before the frame became
-    /// acquirable or before the release call.
+    /// The host needs no synchronization object. The work completed before the
+    /// frame became acquirable or before the release call.
     CpuComplete = 0,
     /// GLsync in the shared EGL or WGL context's share group, used only by a
     /// caller-graphics-thread driver. handle is nonzero.
     OpenGlFence = 1,
+    /// The host needs no synchronization object. The work was submitted, before
+    /// the frame became acquirable or before the release call, to the queue
+    /// that the session and the host share, which orders it before any work
+    /// submitted there afterwards. WebGPU supports it.
+    QueueOrder = 2,
 } Unknown
 }
 impl Default for GpuSyncKind {
     fn default() -> Self {
         Self::CpuComplete
     }
+}
+
+native_flags! {
+/// A bit for each `GpuSyncKind`.
+///
+/// See `mln_gpu_sync_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub struct GpuSyncKindFlag: u32 {
+    const CPU_COMPLETE = 1;
+    const OPEN_GL_FENCE = 2;
+    const QUEUE_ORDER = 4;
+}
 }
 
 /// Options for creating a graphics device.
@@ -3217,11 +3233,14 @@ pub struct RenderSessionAttachOptions {
     /// value. A borrowed texture ring's depth is its texture count, so borrowed
     /// and other targets ignore this value.
     pub requested_texture_ring_depth: u32,
-    /// Producer synchronization for acquired texture frames.
-    /// `GpuSyncKind::OpenGlFence` requires a shared EGL or WGL texture target
-    /// and a caller-graphics-thread driver. Other targets support only CPU
-    /// completion and fail an unsupported request.
-    pub producer_sync_kind: GpuSyncKind,
+    /// Producer synchronization kinds that the host accepts for acquired
+    /// texture frames. The session picks the first one its target supports in
+    /// this order: `GpuSyncKind::QueueOrder`, `GpuSyncKind::OpenGlFence`, then
+    /// `GpuSyncKind::CpuComplete`. Its capabilities report the pick. Zero
+    /// accepts `GpuSyncKind::CpuComplete`, or `GpuSyncKind::QueueOrder` on
+    /// WebGPU, whose device has a single queue. A set that the target cannot
+    /// satisfy fails the attach with `Status::Unsupported`.
+    pub producer_sync_kinds: GpuSyncKindFlag,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,
     /// Wakes the graphics receiver when caller-driver work is available,
@@ -3237,7 +3256,7 @@ impl RenderSessionAttachOptions {
         Self {
             driver,
             requested_texture_ring_depth: Default::default(),
-            producer_sync_kind: Default::default(),
+            producer_sync_kinds: Default::default(),
             frame_wake: Default::default(),
             driver_work_wake: Default::default(),
             queue_lock: Default::default(),
@@ -3250,7 +3269,7 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
         raw.size = std::mem::size_of::<sys::mln_render_session_attach_options>() as _;
         raw.driver = to_native(&self.driver, arena)?;
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
-        raw.producer_sync_kind = to_native(&self.producer_sync_kind, arena)?;
+        raw.producer_sync_kinds = to_native(&self.producer_sync_kinds, arena)?;
         raw.frame_wake = to_native(&self.frame_wake, arena)?;
         raw.driver_work_wake = to_native(&self.driver_work_wake, arena)?;
         raw.queue_lock = to_native(&self.queue_lock, arena)?;
@@ -3269,6 +3288,13 @@ pub struct RenderSessionCapabilities {
     /// the texture count of a borrowed one. Zero for a surface.
     pub texture_ring_depth: u32,
     pub flags: RenderSessionCapabilityFlag,
+    /// Producer synchronization of acquired frames, picked from the attach
+    /// options' producer_sync_kinds. `GpuSyncKind::CpuComplete` for a target
+    /// without frame acquisition.
+    pub producer_sync_kind: GpuSyncKind,
+    /// Consumer synchronization kinds that `AcquiredFrameHandle::release()`
+    /// accepts. Empty for a target without frame acquisition.
+    pub consumer_sync_kinds: GpuSyncKindFlag,
 }
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
     unsafe fn from_native(raw: sys::mln_render_session_capabilities) -> Result<Self> {
@@ -3276,6 +3302,8 @@ impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilit
             driver: RenderDriverKind::from_raw(raw.driver),
             texture_ring_depth: raw.texture_ring_depth,
             flags: RenderSessionCapabilityFlag::from_bits_retain(raw.flags),
+            producer_sync_kind: GpuSyncKind::from_raw(raw.producer_sync_kind),
+            consumer_sync_kinds: GpuSyncKindFlag::from_bits_retain(raw.consumer_sync_kinds),
         })
     }
 }
@@ -3288,8 +3316,7 @@ native_flags! {
 pub struct RenderSessionCapabilityFlag: u32 {
     const FRAME_ACQUISITION = 1;
     const READBACK = 2;
-    const CONSUMER_SYNC = 4;
-    const PRESENTATION = 8;
+    const PRESENTATION = 4;
 }
 }
 

@@ -555,6 +555,8 @@ auto attach_fake_texture_session(mln_map map) -> FakeTextureSession {
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 1;
+  session->capabilities.consumer_sync_kinds =
+    MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
   MLN_TEST_OK(
     mln::core::map_attach_render_target_session(
       map, session.get(), session->map_object

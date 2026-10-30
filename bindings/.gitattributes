@@ -85,6 +85,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/EglContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSync.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKind.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKindFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/MetalContextDescriptor.g.cs linguist-generated=true

@@ -13,8 +13,19 @@ namespace Maplibre.NativeFfi;
 /// Granted texture ring depth: the slot count of a session-owned ring, or the
 /// texture count of a borrowed one. Zero for a surface.
 /// </param>
+/// <param name="ProducerSyncKind">
+/// Producer synchronization of acquired frames, picked from the attach options'
+/// producer_sync_kinds. <c>GpuSyncKind.CpuComplete</c> for a target without
+/// frame acquisition.
+/// </param>
+/// <param name="ConsumerSyncKinds">
+/// Consumer synchronization kinds that <c>AcquiredFrameHandle.Release()</c>
+/// accepts. Empty for a target without frame acquisition.
+/// </param>
 public readonly partial record struct RenderSessionCapabilities(
     RenderDriverKind Driver,
     uint TextureRingDepth,
-    RenderSessionCapabilityFlag Flags
+    RenderSessionCapabilityFlag Flags,
+    GpuSyncKind ProducerSyncKind,
+    GpuSyncKindFlag ConsumerSyncKinds
 );

@@ -1675,6 +1675,16 @@ napi_value mln_ts_read_render_session_capabilities(
         env, result, "flags", mln_ts_number(env, (double)(source->flags))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "producerSyncKind",
+        mln_ts_number(env, (double)(source->producer_sync_kind))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "consumerSyncKinds",
+        mln_ts_number(env, (double)(source->consumer_sync_kinds))
+      ))
+    return NULL;
   return result;
 }
 
@@ -5247,14 +5257,14 @@ bool mln_ts_write_render_session_attach_options(
       out->requested_texture_ring_depth = (uint32_t)number;
     }
   }
-  if (!mln_ts_member(call, value, "producerSyncKind", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "producerSyncKind");
+  if (!mln_ts_member(call, value, "producerSyncKinds", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "producerSyncKinds");
   if (!mln_ts_is_absent(call, member)) {
     {
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->producer_sync_kind = (mln_gpu_sync_kind)number;
+      out->producer_sync_kinds = (mln_gpu_sync_kind_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "frameWake", &member)) return false;

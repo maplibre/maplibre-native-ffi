@@ -164,7 +164,7 @@ internal constructor(
    */
   public fun getCapabilities(): RenderSessionCapabilities =
     nativeCall(this, binding) {
-      val out = sized(16, 4)
+      val out = sized(24, 4)
       check(C.mln_render_session_get_capabilities(handle, out, diagnostic))
       readRenderSessionCapabilities(out)
     }

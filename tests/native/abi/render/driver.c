@@ -56,9 +56,7 @@ static void an_attached_session_holds_its_map(void) {
   TEST_ASSERT_EQUAL_UINT32(fixture.driver, capabilities.driver);
   TEST_ASSERT_EQUAL_UINT32(2, capabilities.texture_ring_depth);
   TEST_ASSERT_BITS_HIGH(
-    MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-      MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC,
-    capabilities.flags
+    MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION, capabilities.flags
   );
   // A caller driver attaches only when the host services it, so the session
   // is still attaching after submission and has published driver work.
@@ -875,6 +873,63 @@ static void attach_checks_the_queue_lock(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Attach picks the producer sync kind that waits least from the kinds the host
+// accepts and the target supports, rejects a kind it does not know, and
+// refuses a set that the target cannot satisfy. Zero accepts the target's
+// default.
+static void attach_picks_a_producer_sync_kind(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  options.producer_sync_kinds = 1U << 31U;
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
+                                   map, &options, &attach.descriptor, &fixture
+                                 )
+  );
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  const mln_gpu_sync_kind expected = MLN_GPU_SYNC_QUEUE_ORDER;
+  options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
+#else
+  const mln_gpu_sync_kind expected = MLN_GPU_SYNC_CPU_COMPLETE;
+  options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+#endif
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED, mln_test_render_fixture_start_attach(
+                              map, &options, &attach.descriptor, &fixture
+                            )
+  );
+  const mln_gpu_sync_kind_flags accepted[] = {
+    0, MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
+  };
+  for (size_t index = 0; index < 2; index += 1) {
+    options.producer_sync_kinds = accepted[index];
+    mln_test_completion attached = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_test_render_fixture_start_attach(
+      map, &options, &attached.descriptor, &fixture
+    ));
+    mln_render_session_capabilities capabilities = {
+      .size = sizeof(mln_render_session_capabilities)
+    };
+    MLN_TEST_OK(
+      mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+    );
+    TEST_ASSERT_EQUAL_UINT32(expected, capabilities.producer_sync_kind);
+    MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attached));
+    mln_test_completion_destroy(&attached);
+    mln_test_render_fixture_destroy(&fixture);
+  }
+  mln_test_completion_reject(&attach);
+  mln_test_completion_destroy(&attach);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A host whose wakes call back into the session instead of scheduling. It has
 // file scope because a wake fired on another thread can outlast the case.
 typedef struct reentrant_host {
@@ -1082,5 +1137,6 @@ MLN_TEST_GROUP {
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);
+  RUN_TEST(attach_picks_a_producer_sync_kind);
   RUN_TEST(a_target_scale_that_differs_from_the_map_attaches_with_a_warning);
 }

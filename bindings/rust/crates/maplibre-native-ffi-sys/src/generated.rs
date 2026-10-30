@@ -100,6 +100,11 @@ pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
 pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
 pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
+pub const MLN_GPU_SYNC_QUEUE_ORDER: mln_gpu_sync_kind = 2;
+pub type mln_gpu_sync_kind_flag = u32;
+pub const MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE: mln_gpu_sync_kind_flag = 1;
+pub const MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE: mln_gpu_sync_kind_flag = 2;
+pub const MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER: mln_gpu_sync_kind_flag = 4;
 pub type mln_graphics_device_option_field = u32;
 pub const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX: mln_graphics_device_option_field = 1;
 pub const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT: mln_graphics_device_option_field = 2;
@@ -215,8 +220,7 @@ pub const MLN_RENDER_RESULT_FAILED: mln_render_result = 4;
 pub type mln_render_session_capability_flag = u32;
 pub const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION: mln_render_session_capability_flag = 1;
 pub const MLN_RENDER_SESSION_CAPABILITY_READBACK: mln_render_session_capability_flag = 2;
-pub const MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC: mln_render_session_capability_flag = 4;
-pub const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION: mln_render_session_capability_flag = 8;
+pub const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION: mln_render_session_capability_flag = 4;
 pub type mln_render_session_state = u32;
 pub const MLN_RENDER_SESSION_STATE_ATTACHING: mln_render_session_state = 1;
 pub const MLN_RENDER_SESSION_STATE_ATTACHED: mln_render_session_state = 2;
@@ -1107,7 +1111,7 @@ pub struct mln_render_session_attach_options {
     pub size: u32,
     pub driver: mln_render_driver_kind,
     pub requested_texture_ring_depth: u32,
-    pub producer_sync_kind: mln_gpu_sync_kind,
+    pub producer_sync_kinds: mln_gpu_sync_kind_flags,
     pub frame_wake: mln_wake,
     pub driver_work_wake: mln_wake,
     pub queue_lock: mln_queue_lock,
@@ -1119,6 +1123,8 @@ pub struct mln_render_session_capabilities {
     pub driver: mln_render_driver_kind,
     pub texture_ring_depth: u32,
     pub flags: mln_render_session_capability_flags,
+    pub producer_sync_kind: mln_gpu_sync_kind,
+    pub consumer_sync_kinds: mln_gpu_sync_kind_flags,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1698,6 +1704,7 @@ pub type mln_free_camera_option_fields = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_geo_json_source_data(pub u64);
 pub type mln_geo_json_source_option_fields = u32;
+pub type mln_gpu_sync_kind_flags = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_graphics_device(pub u64);

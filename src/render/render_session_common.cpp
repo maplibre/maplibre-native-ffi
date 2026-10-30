@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1546,15 +1547,38 @@ auto validate_render_session_attach_request(
     set_thread_error("render driver kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    options->producer_sync_kind != MLN_GPU_SYNC_CPU_COMPLETE &&
-    options->producer_sync_kind != MLN_GPU_SYNC_OPEN_GL_FENCE
-  ) {
-    set_thread_error("producer synchronization kind is invalid");
+  if ((options->producer_sync_kinds & ~known_gpu_sync_kinds) != 0) {
+    set_thread_error("producer synchronization kinds are invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
 }
+
+namespace {
+// Attach prefers the kinds that wait least.
+constexpr std::array producer_sync_preference = {
+  MLN_GPU_SYNC_QUEUE_ORDER,
+  MLN_GPU_SYNC_OPEN_GL_FENCE,
+  MLN_GPU_SYNC_CPU_COMPLETE,
+};
+
+// Picks the producer kind from the kinds the host accepts and the target
+// supports. Zero accepts CPU completion, or queue order on a target that
+// cannot complete on the CPU.
+auto pick_producer_sync_kind(
+  mln_gpu_sync_kind_flags accepted, mln_gpu_sync_kind_flags supported
+) -> std::optional<mln_gpu_sync_kind> {
+  if (accepted == 0) {
+    accepted = (supported & MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE) != 0
+                 ? MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE
+                 : MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
+  }
+  for (const auto kind : producer_sync_preference) {
+    if ((accepted & supported & gpu_sync_kind_flag(kind)) != 0) return kind;
+  }
+  return std::nullopt;
+}
+}  // namespace
 
 auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
@@ -1573,8 +1597,13 @@ auto start_attach_render_session(
   if (request_status != MLN_STATUS_OK) {
     return request_status;
   }
-  if (options->producer_sync_kind != session->producer_sync_kind) {
-    set_thread_error("render target does not support this producer sync kind");
+  const auto producer_sync_kind = pick_producer_sync_kind(
+    options->producer_sync_kinds, session->producer_sync_kinds
+  );
+  if (!producer_sync_kind) {
+    set_thread_error(
+      "render target supports none of the requested producer sync kinds"
+    );
     return MLN_STATUS_UNSUPPORTED;
   }
   if (capabilities.size < sizeof(mln_render_session_capabilities)) {
@@ -1620,6 +1649,8 @@ auto start_attach_render_session(
   }
   session->kind = kind;
   session->capabilities = capabilities;
+  session->producer_sync_kind = *producer_sync_kind;
+  session->capabilities.producer_sync_kind = *producer_sync_kind;
   if (kind == RenderSessionKind::Texture) {
     // A borrowed ring's depth is the texture count its descriptor validated.
     const auto depth = session->texture.mode == TextureSessionMode::Owned
@@ -3054,7 +3085,7 @@ auto run_frame_demand(
     auto view = mln_map_view{};
     auto metadata = std::any{};
     auto producer_sync =
-      mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
+      mln_gpu_sync{sizeof(mln_gpu_sync), session->producer_sync_kind, 0};
     // One backend scope spans the render and the frame's metadata, so the
     // scopes they open themselves nest in it and activate the backend once.
     auto scope = std::optional<mln::gfx::BackendScope>{};
@@ -3121,7 +3152,8 @@ auto run_frame_demand(
           publish_frame_result(session, result);
           return;
         }
-        producer_sync = session->texture.backend->producer_sync();
+        if (gpu_sync_names_object(session->producer_sync_kind))
+          producer_sync = session->texture.backend->producer_sync();
       }
       scope.reset();
       if (selected_slot) {
@@ -3728,8 +3760,10 @@ auto acquired_frame_release(
     // A valid frame keeps detach from destroying the backend. Reject an
     // unsupported sync before consuming the handle, so the host keeps it.
     if (
-      live->session->texture.backend &&
-      !live->session->texture.backend->supports_consumer_sync(copied.kind)
+      (live->session->capabilities.consumer_sync_kinds &
+       gpu_sync_kind_flag(copied.kind)) == 0 ||
+      (live->session->texture.backend &&
+       !live->session->texture.backend->supports_consumer_sync(copied.kind))
     ) {
       set_thread_error("render backend does not support this gpu sync kind");
       return MLN_STATUS_UNSUPPORTED;
@@ -3737,8 +3771,8 @@ auto acquired_frame_release(
     release_immediately =
       live->session->state == MLN_RENDER_SESSION_STATE_ABANDONED ||
       live->session->state == MLN_RENDER_SESSION_STATE_FAILED;
-    const auto queue_release =
-      copied.kind != MLN_GPU_SYNC_CPU_COMPLETE && !release_immediately;
+    const auto waits = gpu_sync_names_object(copied.kind);
+    const auto queue_release = waits && !release_immediately;
     // Allocate the wait's work before consuming the frame, so a failed
     // submission leaves the host's handle and synchronization untouched.
     if (queue_release)
@@ -3753,7 +3787,7 @@ auto acquired_frame_release(
       set_thread_error("acquired frame was already released");
       return MLN_STATUS_INVALID_STATE;
     }
-    if (copied.kind == MLN_GPU_SYNC_CPU_COMPLETE) {
+    if (!waits) {
       auto& session = *live->session;
       if (live->slot < session.texture.slots.size())
         session.texture.slots[live->slot].acquired = false;
@@ -3770,7 +3804,7 @@ auto acquired_frame_release(
     set_thread_error("acquired frame was already released");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (copied.kind == MLN_GPU_SYNC_CPU_COMPLETE) return MLN_STATUS_OK;
+  if (!gpu_sync_names_object(copied.kind)) return MLN_STATUS_OK;
   if (release_immediately) release();
   return MLN_STATUS_OK;
 }

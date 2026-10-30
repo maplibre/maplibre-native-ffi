@@ -1455,7 +1455,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_render_session_attach_options);
         native.driver = (mln_render_driver_kind)value.Driver;
         native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
-        native.producer_sync_kind = (mln_gpu_sync_kind)value.ProducerSyncKind;
+        native.producer_sync_kinds = (uint)value.ProducerSyncKinds;
         native.frame_wake = NativeWake(value.FrameWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
         native.queue_lock = NativeQueueLock(value.QueueLock, scope);
@@ -1468,7 +1468,9 @@ internal static unsafe class GeneratedValues
         new(
             (RenderDriverKind)value.driver,
             value.texture_ring_depth,
-            (RenderSessionCapabilityFlag)value.flags
+            (RenderSessionCapabilityFlag)value.flags,
+            (GpuSyncKind)value.producer_sync_kind,
+            (GpuSyncKindFlag)value.consumer_sync_kinds
         );
 
     internal static RenderSessionSnapshot CopyRenderSessionSnapshot(

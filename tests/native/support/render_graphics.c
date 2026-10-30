@@ -229,7 +229,8 @@ bool mln_test_backend_attach(
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
+  if (attach_fence_sync)
+    attach.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   *out_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -384,7 +385,8 @@ static bool attach_borrowed_texture(
   );
 #else
   mln_render_session_attach_options attach = *options;
-  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPEN_GL_FENCE;
+  if (attach_fence_sync)
+    attach.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE;
   *out_status = mln_map_attach_open_gl_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );

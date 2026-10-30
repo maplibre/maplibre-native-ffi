@@ -807,6 +807,14 @@ fn generated_copy_mln_render_session_capabilities(
         generated_value(py, value.texture_ring_depth)?,
     )?;
     dict.set_item("flags", generated_value(py, value.flags)?)?;
+    dict.set_item(
+        "producer_sync_kind",
+        generated_value(py, value.producer_sync_kind)?,
+    )?;
+    dict.set_item(
+        "consumer_sync_kinds",
+        generated_value(py, value.consumer_sync_kinds)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2562,9 +2570,9 @@ fn generated_input_mln_render_session_attach_options<'py>(
     raw.requested_texture_ring_depth = value
         .getattr("requested_texture_ring_depth")?
         .extract::<u32>()?;
-    raw.producer_sync_kind = value
-        .getattr("producer_sync_kind")?
-        .extract::<sys::mln_gpu_sync_kind>()?;
+    raw.producer_sync_kinds = value
+        .getattr("producer_sync_kinds")?
+        .extract::<sys::mln_gpu_sync_kind_flags>()?;
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
     raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;

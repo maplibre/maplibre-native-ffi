@@ -817,7 +817,7 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
     0,
     4294967295,
   );
-  result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
+  result.ref.producer_sync_kinds = value.producerSyncKinds.rawValue;
   result.ref.frame_wake = registrations
       .add(_prepareWake(value.frameWake, registrations.roots))
       .ref;
@@ -1760,6 +1760,8 @@ RenderSessionCapabilities _readRenderSessionCapabilities(
   driver: RenderDriverKind.fromRawValue(source.driver),
   textureRingDepth: source.texture_ring_depth,
   flags: RenderSessionCapabilityFlag.fromRawValue(source.flags),
+  producerSyncKind: GpuSyncKind.fromRawValue(source.producer_sync_kind),
+  consumerSyncKinds: GpuSyncKindFlag.fromRawValue(source.consumer_sync_kinds),
 );
 
 RenderSessionSnapshot _readRenderSessionSnapshot(

@@ -86,6 +86,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/EglContextDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSync.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKind.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKindFlag.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncView.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/MaplibreNative.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/MetalContextDescriptor.g.cs",
