@@ -143,12 +143,6 @@ status = "not-investigated"
 reason = "A browser WebAssembly host needs native archives linked through `NativeFileReference` with matching Emscripten flags, and browser tests."
 
 [[entry]]
-bindings = ["go"]
-platforms = ["ios"]
-status = "not-investigated"
-reason = "A cgo or gomobile build needs an app or framework and a simulator test host."
-
-[[entry]]
 bindings = ["python"]
 platforms = ["ios"]
 status = "not-investigated"
@@ -221,6 +215,13 @@ bindings = ["kotlin-jvm"]
 platforms = ["windows-mingw"]
 status = "path-known"
 reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
+
+[[entry]]
+bindings = ["go"]
+platforms = ["ios"]
+status = "path-known"
+reason = "Go ships `GOOS=ios` with cgo. Cross-compile with Apple Clang and the iOS SDK, link the native artifact, and run the suite through the simulator runner, which `simctl spawn` already drives."
+link = "https://github.com/golang/go/blob/master/misc/ios/README"
 
 [[entry]]
 bindings = ["go"]
@@ -339,6 +340,13 @@ reason = "Go's WebAssembly ports, `js/wasm` and `wasip1/wasm`, have no cgo ABI."
 link = "https://github.com/golang/go/issues/55351"
 
 [[entry]]
+bindings = ["go"]
+platforms = ["tvos", "visionos"]
+status = "blocked"
+reason = "Go's ports are `darwin` and `ios`. Its linker can stamp a tvOS c-archive when cgo supplies a tvOS object, but it has no visionOS platform and no runtime for either OS. The request to add them to gomobile is still open."
+link = "https://github.com/golang/go/issues/65251"
+
+[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["ios", "ios-maccatalyst", "tvos", "visionos", "ohos", "emscripten"]
 status = "blocked"
@@ -411,12 +419,6 @@ platforms = ["android"]
 archs = ["arm", "x86"]
 status = "blocked"
 reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
-
-[[entry]]
-bindings = ["go"]
-platforms = ["tvos", "visionos"]
-status = "not-investigated"
-reason = "The binding has no Go app host or cross-compilation runner for these Apple targets."
 
 [[entry]]
 bindings = ["dotnet"]
