@@ -171,13 +171,6 @@ reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the
 link = "https://www.msys2.org/docs/environments/"
 
 [[entry]]
-bindings = ["go"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "cgo builds with a MinGW Clang or GCC. Link the MinGW DLL and run the suite on the Windows runners."
-link = "https://github.com/maplibre/maplibre-native-ffi/pull/1380"
-
-[[entry]]
 bindings = [
   "dotnet",
   "dart",
