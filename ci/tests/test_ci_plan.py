@@ -193,6 +193,7 @@ class PresetTest(unittest.TestCase):
             "android": "cache",
             "ios-maccatalyst": "cache",
             "windows": "cache",
+            "windows-mingw": "cache",
             "freebsd": "cache",
         }
         expected = {}

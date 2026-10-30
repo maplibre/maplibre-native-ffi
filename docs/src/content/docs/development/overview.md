@@ -103,14 +103,16 @@ mise -E msys2 run test mingw-x64-wgl
 mise -E msys2 run test mingw-x64-vulkan
 mise -E msys2 run //bindings/rust:test mingw-x64-wgl
 mise -E msys2 run //bindings/rust:test mingw-x64-vulkan
+mise -E msys2 run //bindings/zig:test mingw-x64-wgl
+mise -E msys2 run //bindings/zig:test mingw-x64-vulkan
 ```
 
 Set `MLN_FFI_MSYS2_ROOT` if the MINGW64 prefix is somewhere other than
 `C:/msys64/mingw64`. The Vulkan tests also need the Vulkan SDK from setup.
 Applications loading the DLL need the MINGW64 `bin` directory on `PATH` for its
-C++ runtime. Rust uses the matching `x86_64-pc-windows-gnu` target.
-Kotlin/Native's older MinGW sysroot and C++ runtime are a separate compatibility
-requirement.
+C++ runtime. Rust uses the matching `x86_64-pc-windows-gnu` target, and Zig uses
+`x86_64-windows-gnu`. Kotlin/Native's older MinGW sysroot and C++ runtime are a
+separate compatibility requirement.
 
 ## Windows on Linux
 

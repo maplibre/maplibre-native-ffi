@@ -340,7 +340,10 @@ fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: BuildO
     const prefix = options.native.prefix;
     addMaplibreNativeIncludes(b, module, target, options.optimize, options.include_dirs, options.system_root, options.libc_file);
     if (target.result.os.tag == .windows) {
-        module.addObjectFile(prefix.path(b, "lib/maplibre-native-c.lib"));
+        module.addObjectFile(prefix.path(b, if (target.result.abi == .gnu)
+            "lib/libmaplibre-native-c.dll.a"
+        else
+            "lib/maplibre-native-c.lib"));
     } else {
         const lib_dir = prefix.path(b, "lib");
         module.addLibraryPath(lib_dir);
@@ -414,7 +417,10 @@ fn addTestGraphics(b: *std.Build, module: *std.Build.Module, options: BuildOptio
         .libc_file = options.libc_file,
     }));
     if (options.native.target.result.os.tag == .windows) {
-        module.addObjectFile(options.native.prefix.path(b, "lib/mln_test_graphics.lib"));
+        module.addObjectFile(options.native.prefix.path(b, if (options.native.target.result.abi == .gnu)
+            "lib/libmln_test_graphics.dll.a"
+        else
+            "lib/mln_test_graphics.lib"));
     } else {
         module.linkSystemLibrary("mln_test_graphics", .{ .use_pkg_config = .no });
     }

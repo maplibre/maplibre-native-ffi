@@ -238,12 +238,6 @@ status = "path-known"
 reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
 
 [[entry]]
-bindings = ["zig"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "Zig supports Windows GNU targets. Select MinGW import libraries instead of MSVC `.lib` names for the C library and test graphics helper, and run the suite on the Windows runners."
-
-[[entry]]
 bindings = ["go"]
 platforms = ["windows"]
 status = "path-known"

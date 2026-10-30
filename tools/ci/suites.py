@@ -66,9 +66,9 @@ SUITES: list[dict] = [
         "platforms": ["freebsd"],
         "commands": [{"task": "//bindings/zig:test"}, {"task": "//bindings/rust:test"}],
     },
-    # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
+    # Zig is unavailable on Windows ARM64; see the `core:zig` note in .config/mise.toml.
     {
-        "platforms": ["linux-gnu", "macos", "windows"],
+        "platforms": ["linux-gnu", "macos", "windows", "windows-mingw"],
         "exclude": ["windows-arm64-wgl", "windows-arm64-vulkan"],
         "commands": [
             {
