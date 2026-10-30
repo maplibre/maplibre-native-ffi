@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import os
 import pathlib
+import plistlib
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 
 from binding_sbom import PACKAGE_SBOM
 from binding_sbom import package as package_inventory
@@ -33,6 +35,7 @@ PACKAGE_SMOKE_PROJECT = (
 )
 MUSL_SMOKE_VERSION = "0.0.0-musl-ci"
 ANDROID_SMOKE_VERSION = "0.0.0-android-ci"
+APPLE_SMOKE_VERSION = "0.0.0-apple-ci"
 MUSL_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22"
 
 
@@ -75,6 +78,55 @@ def dynamic_libraries(directory: pathlib.Path) -> list[pathlib.Path]:
         and "mln_test_graphics" not in path.name
         and not any(part.endswith(".dSYM") for part in path.parts)
     ]
+
+
+def copy_apple_framework(
+    source: pathlib.Path, destination: pathlib.Path, preset: str
+) -> None:
+    """Keep a framework's symlinks intact in the SDK's compressed XCFramework format."""
+    platform, arch, _ = preset.rsplit("-", 2)
+    os_name = "tvos" if platform.startswith("tvos") else "ios"
+    variant = (
+        "simulator"
+        if platform.endswith("simulator")
+        else "maccatalyst"
+        if platform.endswith("maccatalyst")
+        else None
+    )
+    identifier = f"{os_name}-{arch}" + (f"-{variant}" if variant else "")
+    framework = next(source.glob("**/Frameworks/MaplibreNativeC.framework"))
+    library = {
+        "LibraryIdentifier": identifier,
+        "LibraryPath": framework.name,
+        "SupportedArchitectures": [arch],
+        "SupportedPlatform": os_name,
+    }
+    if variant:
+        library["SupportedPlatformVariant"] = variant
+    destination.mkdir(parents=True, exist_ok=True)
+    root = "MaplibreNativeC.xcframework"
+    with zipfile.ZipFile(
+        destination / f"{root}.zip", "w", zipfile.ZIP_DEFLATED
+    ) as archive:
+        archive.writestr(
+            f"{root}/Info.plist",
+            plistlib.dumps(
+                {
+                    "CFBundlePackageType": "XFWK",
+                    "XCFrameworkFormatVersion": "1.0",
+                    "AvailableLibraries": [library],
+                }
+            ),
+        )
+        for path in [framework, *framework.rglob("*")]:
+            name = f"{root}/{identifier}/{path.relative_to(framework.parent)}"
+            if path.is_symlink():
+                info = zipfile.ZipInfo(name)
+                info.create_system = 3
+                info.external_attr = path.lstat().st_mode << 16
+                archive.writestr(info, os.readlink(path))
+            else:
+                archive.write(path, name)
 
 
 def copy_runtime_assets(
@@ -137,11 +189,15 @@ def package(args: argparse.Namespace) -> None:
         for backend, presets in runtime_targets().items():
             assets = staging / backend
             inventories = []
+            frameworks = staging / "frameworks" / backend
             for preset, rid in presets.items():
                 extracted = staging / "extract" / preset
                 with tarfile.open(archive(args.input, preset)) as tar:
                     tar.extractall(extracted, filter="data")
-                copy_runtime_assets(extracted, assets / rid / "native", preset)
+                if rid.startswith(("ios", "tvos", "maccatalyst")):
+                    copy_apple_framework(extracted, frameworks / rid, preset)
+                else:
+                    copy_runtime_assets(extracted, assets / rid / "native", preset)
                 inventories.append(
                     next(extracted.glob("*/share/maplibre-native-c/sbom.cdx.json"))
                 )
@@ -153,6 +209,7 @@ def package(args: argparse.Namespace) -> None:
                 inventories=inventories,
                 RenderBackend=backend,
                 NativeAssetsDir=assets,
+                AppleFrameworksDir=frameworks,
                 BaseOutputPath=f"{base_output}/",
             )
 
@@ -251,6 +308,34 @@ def prepare_android(args: argparse.Namespace) -> None:
     )
 
 
+def prepare_apple(args: argparse.Namespace) -> None:
+    target = runtime_target(args.preset)
+    if target is None or not args.preset.startswith(("ios-", "tvos-")):
+        raise SystemExit(f"the Apple package test cannot build {args.preset}")
+    backend, rid = target
+    work = ROOT / "build" / args.preset / "dotnet-apple-test"
+    install = ROOT / "build" / args.preset / "install"
+    if work.exists():
+        shutil.rmtree(work)
+    packages = work / "packages"
+    packages.mkdir(parents=True)
+    frameworks = work / "frameworks"
+    base_output = ROOT / "build" / "dotnet" / args.preset
+    copy_apple_framework(install, frameworks / rid, args.preset)
+    pack(
+        MANAGED_PROJECT, packages, APPLE_SMOKE_VERSION, BaseOutputPath=f"{base_output}/"
+    )
+    pack(
+        RUNTIME_PROJECT,
+        packages,
+        APPLE_SMOKE_VERSION,
+        inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
+        RenderBackend=backend,
+        AppleFrameworksDir=frameworks,
+        BaseOutputPath=f"{base_output}/",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -262,11 +347,14 @@ def main() -> None:
     smoke_parser.add_argument("preset")
     android_parser = commands.add_parser("prepare-android")
     android_parser.add_argument("preset")
+    apple_parser = commands.add_parser("prepare-apple")
+    apple_parser.add_argument("preset")
     args = parser.parse_args()
     {
         "package": package,
         "smoke-musl": smoke_musl,
         "prepare-android": prepare_android,
+        "prepare-apple": prepare_apple,
     }[args.command](args)
 
 

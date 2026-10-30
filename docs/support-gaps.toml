@@ -138,12 +138,6 @@ status = "not-investigated"
 
 [[entry]]
 bindings = ["dotnet"]
-platforms = ["ios"]
-status = "not-investigated"
-reason = "A `net10.0-ios` host needs native asset packaging and binding tests on the simulator."
-
-[[entry]]
-bindings = ["dotnet"]
 platforms = ["emscripten"]
 status = "not-investigated"
 reason = "A browser WebAssembly host needs native archives linked through `NativeFileReference` with matching Emscripten flags, and browser tests."
@@ -447,12 +441,6 @@ platforms = ["android"]
 archs = ["arm", "x86"]
 status = "not-applicable"
 reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["ios-maccatalyst", "tvos"]
-status = "not-investigated"
-reason = "The binding has no Apple app host for these .NET targets. Add native asset packaging and a runnable binding suite."
 
 [[entry]]
 bindings = ["go"]

@@ -450,10 +450,11 @@ ci:
     nuget:
       covers: >-
         Packs the .NET NuGet packages from the native artifacts of every Linux,
-        macOS, Windows, and Android target, so it runs those targets. Only
-        changes to what the packages contain or how they are packed need it: the
-        package projects and their metadata, and the packing script. Ordinary
-        .NET binding changes and one platform's native packaging don't.
+        macOS, Windows, Android, and supported Apple mobile target, so it runs
+        those targets. Only changes to what the packages contain or how they are
+        packed need it: the package projects and their metadata, and the packing
+        script. Ordinary .NET binding changes and one platform's native
+        packaging don't.
       rules:
         - if:
             files:

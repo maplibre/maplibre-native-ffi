@@ -155,12 +155,20 @@ public sealed class RenderTests
                 }
                 switch (backend)
                 {
-                    case TestGraphicsBackend.Metal when OperatingSystem.IsMacOS():
+                    case TestGraphicsBackend.Metal
+                        when OperatingSystem.IsMacOS()
+                            || OperatingSystem.IsIOS()
+                            || OperatingSystem.IsTvOS()
+                            || OperatingSystem.IsMacCatalyst():
                         frame.WithMetalTexture(view =>
                             Inside(() => view.Width, () => _ = view.Texture)
                         );
                         break;
-                    case TestGraphicsBackend.Vulkan:
+                    case TestGraphicsBackend.Vulkan
+                        when OperatingSystem.IsAndroid()
+                            || OperatingSystem.IsLinux()
+                            || OperatingSystem.IsMacOS()
+                            || OperatingSystem.IsWindows():
                         frame.WithVulkanTexture(view =>
                             Inside(() => view.Width, () => _ = view.Image)
                         );

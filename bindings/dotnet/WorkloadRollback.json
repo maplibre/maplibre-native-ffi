@@ -1,0 +1,7 @@
+{
+  "microsoft.net.sdk.ios": "26.4.10259/10.0.100",
+  "microsoft.net.sdk.tvos": "26.4.10259/10.0.100",
+  "microsoft.net.sdk.maccatalyst": "26.4.10259/10.0.100",
+  "microsoft.net.workload.mono.toolchain.current": "10.0.113/10.0.100",
+  "microsoft.net.workload.emscripten.current": "10.0.113/10.0.100"
+}

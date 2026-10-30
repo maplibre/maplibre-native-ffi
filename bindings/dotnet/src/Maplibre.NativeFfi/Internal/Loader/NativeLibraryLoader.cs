@@ -8,6 +8,11 @@ internal static class NativeLibraryLoader
 {
     internal const uint ExpectedAbiVersion = NativeMethods.MLN_C_VERSION;
 
+    private static string DefaultLibraryName =>
+        OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()
+            ? "@rpath/MaplibreNativeC.framework/MaplibreNativeC"
+            : NativeMethods.LibraryName;
+
     private static readonly object Gate = new();
     private static bool installed;
     private static bool abiValidated;
@@ -70,7 +75,7 @@ internal static class NativeLibraryLoader
             if (
                 resolvedHandle == 0
                 && NativeLibrary.TryLoad(
-                    NativeMethods.LibraryName,
+                    DefaultLibraryName,
                     typeof(NativeMethods).Assembly,
                     null,
                     out var handle
@@ -100,7 +105,7 @@ internal static class NativeLibraryLoader
                 return resolvedHandle;
             }
 
-            if (NativeLibrary.TryLoad(libraryName, assembly, searchPath, out var handle))
+            if (NativeLibrary.TryLoad(DefaultLibraryName, assembly, searchPath, out var handle))
             {
                 return ValidateAndCacheResolvedHandle(handle);
             }

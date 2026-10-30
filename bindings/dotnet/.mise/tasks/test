@@ -10,8 +10,7 @@ case "$usage_preset" in
     exec mise run //bindings/dotnet:_android "$usage_preset"
     ;;
   ios-* | tvos-*)
-    echo "The .NET binding has no iOS or tvOS target." >&2
-    exit 2
+    exec "$MISE_MONOREPO_ROOT/scripts/test-dotnet-apple.sh" "$usage_preset"
     ;;
 esac
 if [[ "$usage_preset" == linux-musl-* ]]; then

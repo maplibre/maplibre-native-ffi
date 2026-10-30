@@ -21,7 +21,7 @@ public sealed class LeakReportTests
     {
         using var reports = new LeakCapture();
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var (map, mapId, undisposable) = Abandon(runtime);
+        var (map, mapId, undisposable) = Gc.OnThread(() => Abandon(runtime));
 
         Gc.CollectUntilReclaimed("the abandoned handles", map, undisposable);
 
@@ -59,7 +59,7 @@ public sealed class LeakReportTests
     public void UnreachableHandlesAreReclaimedAndReported()
     {
         using var reports = new LeakCapture();
-        var (runtime, runtimeId, map, mapId) = CreateUnreachableRuntimeAndMap();
+        var (runtime, runtimeId, map, mapId) = Gc.OnThread(CreateUnreachableRuntimeAndMap);
 
         // The map's finalizer lets the runtime finish disposing, so a later pass collects it.
         Gc.CollectUntilReclaimed("the unreachable runtime and map", runtime, map);

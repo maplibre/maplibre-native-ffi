@@ -57,7 +57,12 @@ def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
         "windows": "win",
         "windows-mingw": "win",
         "android": "android",
+        "ios": "ios",
+        "ios-maccatalyst": "maccatalyst",
+        "tvos": "tvos",
     }[target.platform]
+    if target.simulator:
+        rid_platform += "simulator"
     package_backend = {"opengl": "OpenGL", "metal": "Metal", "vulkan": "Vulkan"}[
         target.backend
     ]

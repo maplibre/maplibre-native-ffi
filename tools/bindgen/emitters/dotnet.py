@@ -34,10 +34,12 @@ from .dotnet_values import (
 
 # The platform analyzer's name for each platform that the package serves.
 PLATFORMS = {
-    "android": "android",
-    "linux": "linux",
-    "macos": "macos",
-    "windows": "windows",
+    "android": ("android",),
+    "linux": ("linux",),
+    "macos": ("macos",),
+    "ios": ("ios", "maccatalyst"),
+    "tvos": ("tvos",),
+    "windows": ("windows",),
 }
 TARGETS = frozenset(PLATFORMS)
 DIRECTORY = "bindings/dotnet/src/Maplibre.NativeFfi"
@@ -49,8 +51,9 @@ def supported_platforms(plan: OperationPlan, indent: str = "    ") -> str:
     if platforms is None:
         return ""
     return "".join(
-        f'{indent}[global::System.Runtime.Versioning.SupportedOSPlatform("{PLATFORMS[name]}")]\n'
+        f'{indent}[global::System.Runtime.Versioning.SupportedOSPlatform("{platform}")]\n'
         for name in sorted(platforms)
+        for platform in PLATFORMS[name]
     )
 
 

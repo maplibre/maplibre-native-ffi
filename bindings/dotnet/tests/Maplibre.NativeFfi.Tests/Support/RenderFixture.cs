@@ -230,7 +230,11 @@ internal sealed class RenderFixture : IDisposable
         var context = Graphics.Context;
         return Backend switch
         {
-            TestGraphicsBackend.Metal when OperatingSystem.IsMacOS() => Map.AttachMetalOwnedTexture(
+            TestGraphicsBackend.Metal
+                when OperatingSystem.IsMacOS()
+                    || OperatingSystem.IsIOS()
+                    || OperatingSystem.IsTvOS()
+                    || OperatingSystem.IsMacCatalyst() => Map.AttachMetalOwnedTexture(
                 new MetalOwnedTextureDescriptor
                 {
                     Extent = extent,
@@ -240,7 +244,11 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Vulkan => Map.AttachVulkanOwnedTexture(
+            TestGraphicsBackend.Vulkan
+                when OperatingSystem.IsAndroid()
+                    || OperatingSystem.IsLinux()
+                    || OperatingSystem.IsMacOS()
+                    || OperatingSystem.IsWindows() => Map.AttachVulkanOwnedTexture(
                 new VulkanOwnedTextureDescriptor
                 {
                     Extent = extent,

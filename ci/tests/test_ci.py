@@ -274,6 +274,21 @@ class SuitesTest(unittest.TestCase):
                 ("mise", "run", f"//bindings/dotnet:{action}", preset), commands
             )
 
+    def test_dotnet_apple_builds_devices_and_tests_simulators_and_catalyst(self):
+        for preset, action in (
+            ("ios-arm64-metal", "build"),
+            ("ios-simulator-arm64-metal", "test"),
+            ("ios-maccatalyst-arm64-metal", "test"),
+            ("tvos-arm64-metal", "build"),
+            ("tvos-simulator-arm64-metal", "test"),
+        ):
+            commands = [
+                suite.command for suite in suites.target_suites(self.targets[preset])
+            ]
+            self.assertIn(
+                ("mise", "run", f"//bindings/dotnet:{action}", preset), commands
+            )
+
     def test_hermes_builds_mobile_hosts_and_tests_device_targets(self):
         for preset, action in (
             ("android-arm-egl", "build"),

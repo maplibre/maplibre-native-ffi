@@ -111,14 +111,12 @@ public sealed class CompletionTests
     [Fact]
     public void ARejectedSubmissionFreesItsCompletionState()
     {
-        var (error, captured) = Gc.OnThread(SubmitRejected);
-
-        Assert.IsType<MaplibreException>(error);
+        var captured = Gc.OnThread(SubmitRejected);
         Assert.False(Gc.IsAlive(captured));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static unsafe (Exception? Error, WeakReference Captured) SubmitRejected()
+    private static unsafe WeakReference SubmitRejected()
     {
         var captured = new object();
         var error = Record.Exception(() =>
@@ -135,7 +133,8 @@ public sealed class CompletionTests
             );
             _ = pending.Submitted(mln_status.MLN_STATUS_INVALID_ARGUMENT);
         });
-        return (error, new WeakReference(captured));
+        Assert.IsType<MaplibreException>(error);
+        return new WeakReference(captured);
     }
 
     // Native fails a command it accepted, and the test plays native's part for a cancelled one,
