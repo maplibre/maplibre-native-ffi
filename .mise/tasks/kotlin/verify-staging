@@ -101,8 +101,10 @@ NATIVE_TARGETS = {
 JVM_CLASSIFIERS = {
     "natives-linux-x64",
     "natives-linux-arm64",
+    "natives-linux-riscv64",
     "natives-linux-musl-x64",
     "natives-linux-musl-arm64",
+    "natives-linux-musl-riscv64",
     "natives-freebsd-x64",
     "natives-macos-arm64",
     "natives-windows-x64",
