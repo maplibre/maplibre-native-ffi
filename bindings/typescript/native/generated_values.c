@@ -6194,6 +6194,16 @@ bool mln_ts_write_vulkan_borrowed_texture_descriptor(
       return false;
     out->final_layout = (uint32_t)number;
   }
+  if (!mln_ts_member(call, value, "owner", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "owner");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->owner = (mln_vulkan_image_owner)number;
+    }
+  }
   return true;
 }
 

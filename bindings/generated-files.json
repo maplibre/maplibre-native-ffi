@@ -202,6 +202,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/TextureReadbackResult.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanBorrowedTexture.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanBorrowedTextureDescriptor.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanImageOwner.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanOwnedTextureDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrame.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrameView.g.cs",

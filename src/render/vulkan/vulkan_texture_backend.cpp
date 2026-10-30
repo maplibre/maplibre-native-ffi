@@ -129,6 +129,11 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   // next selected. The caller has waited for the GPU to finish with them.
   void drop_slots() {
     for (auto& slot : slots_) {
+      if (slot.release) {
+        backend.getDevice()->freeCommandBuffers(
+          owner_.sync_pool_.get(), slot.release, backend.getDispatcher()
+        );
+      }
       slot = Slot{};
     }
   }
@@ -149,8 +154,16 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     ) {
       restore_borrowed_initial_layout(initial_layout, final_layout);
     }
-    if (owner_.producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
-      owner_.signal_timeline();
+    // A discarded render publishes no frame, so its image stays.
+    auto release = vk::CommandBuffer{};
+    if (!mln::core::discard_renderable_present && owner_.handoff_family()) {
+      auto& current = slots_.at(selected_);
+      if (!current.release) {
+        current.release = owner_.record_release(current.image);
+      }
+      release = current.release;
+    }
+    owner_.submit_after_frame(release);
     // Otherwise the frame is acquirable once submitted. The next frame's begin
     // waits for it, so one frame at most is in flight.
     if (owner_.producer_sync_kind_ != MLN_GPU_SYNC_CPU_COMPLETE) return;
@@ -182,6 +195,9 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     vk::UniqueFramebuffer framebuffer;
     // What the image and framebuffer were built at; zero until built.
     vk::Extent2D extent;
+    // A borrowed image's release to its owner, recorded on first use. Each
+    // render takes the image back without a transfer, since it clears it.
+    vk::CommandBuffer release;
   };
 
   // Every slot's framebuffer names the depth attachment, so replacing it drops
@@ -475,10 +491,12 @@ auto VulkanTextureBackend::matches_borrowed_target(
     return true;
   }
   // The ring's pass was built around these, and mbgl keys its pipelines on the
-  // pass, so a replacement keeps them to keep those pipelines usable.
+  // pass, so a replacement keeps them to keep those pipelines usable. It keeps
+  // the owner too, since the outgoing images may still be with it.
   return descriptor.format == borrowed_descriptor_.format &&
          descriptor.initial_layout == borrowed_descriptor_.initial_layout &&
-         descriptor.final_layout == borrowed_descriptor_.final_layout;
+         descriptor.final_layout == borrowed_descriptor_.final_layout &&
+         descriptor.owner == borrowed_descriptor_.owner;
 }
 
 void VulkanTextureBackend::set_borrowed_target(
@@ -488,16 +506,10 @@ void VulkanTextureBackend::set_borrowed_target(
     target.descriptor.physical_width, target.descriptor.physical_height
   };
   // Once this wait returns, the session is done with the outgoing images, and
-  // the host may destroy them when set_target completes. With one frame in
-  // flight, the frame fence covers the session's last frame, and every other
-  // submission waits on its own fence before returning. swap() already waits
-  // on the frame fence, so this wait only keeps the guarantee local. A device
-  // wait would also need the host's queues, which the session must not touch.
-  if (context) {
-    // VulkanTextureBackend always constructs a Vulkan renderer context.
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    wait_frame(static_cast<mln::vulkan::Context&>(*context));
-  }
+  // the host may destroy them when set_target completes. The queue drains past
+  // the session's last frame and the handoffs that follow it. A device wait
+  // would also need the host's other queues, which the session must not touch.
+  if (context) graphicsQueue.waitIdle(dispatcher);
   borrowed_descriptor_ = target.descriptor;
   borrowed_images_ = target.textures;
   setRenderableSize(new_size);
@@ -523,8 +535,73 @@ auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
   };
 }
 
-void VulkanTextureBackend::signal_timeline() {
-  if (!timeline_) {
+auto VulkanTextureBackend::begin_sync_commands() -> vk::CommandBuffer {
+  if (!sync_pool_) {
+    sync_pool_ = device->createCommandPoolUnique(
+      vk::CommandPoolCreateInfo().setQueueFamilyIndex(
+        static_cast<uint32_t>(graphicsQueueIndex)
+      ),
+      nullptr, dispatcher
+    );
+  }
+  auto commands = device
+                    ->allocateCommandBuffers(
+                      vk::CommandBufferAllocateInfo()
+                        .setCommandPool(sync_pool_.get())
+                        .setLevel(vk::CommandBufferLevel::ePrimary)
+                        .setCommandBufferCount(1),
+                      dispatcher
+                    )
+                    .front();
+  commands.begin(
+    vk::CommandBufferBeginInfo().setFlags(
+      vk::CommandBufferUsageFlagBits::eSimultaneousUse
+    ),
+    dispatcher
+  );
+  return commands;
+}
+
+auto VulkanTextureBackend::handoff_family() const -> std::optional<uint32_t> {
+  if (!uses_borrowed_texture_) return std::nullopt;
+  switch (borrowed_descriptor_.owner) {
+    case MLN_VULKAN_IMAGE_OWNER_EXTERNAL:
+      return VK_QUEUE_FAMILY_EXTERNAL;
+    case MLN_VULKAN_IMAGE_OWNER_FOREIGN:
+      return VK_QUEUE_FAMILY_FOREIGN_EXT;
+    default:
+      return std::nullopt;
+  }
+}
+
+auto VulkanTextureBackend::record_release(vk::Image image)
+  -> vk::CommandBuffer {
+  const auto graphics = static_cast<uint32_t>(graphicsQueueIndex);
+  const auto layout = static_cast<vk::ImageLayout>(frame_layout());
+  const auto barrier =
+    vk::ImageMemoryBarrier()
+      .setImage(image)
+      .setOldLayout(layout)
+      .setNewLayout(layout)
+      .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+      .setSrcQueueFamilyIndex(graphics)
+      .setDstQueueFamilyIndex(handoff_family().value_or(graphics))
+      .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+  auto commands = begin_sync_commands();
+  commands.pipelineBarrier(
+    vk::PipelineStageFlagBits::eAllCommands,
+    vk::PipelineStageFlagBits::eBottomOfPipe, {}, nullptr, nullptr, barrier,
+    dispatcher
+  );
+  commands.end(dispatcher);
+  return commands;
+}
+
+void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
+  const auto signals =
+    producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+  if (!release && !signals) return;
+  if (signals && !timeline_) {
     auto type = vk::SemaphoreTypeCreateInfo()
                   .setSemaphoreType(vk::SemaphoreType::eTimeline)
                   .setInitialValue(0);
@@ -533,16 +610,19 @@ void VulkanTextureBackend::signal_timeline() {
     );
   }
   // A signal's first scope holds everything submitted to the queue before it,
-  // so a submission without commands signals once the frame completes.
+  // so this batch signals once the frame and the release complete.
   const auto value = timeline_value_ + 1;
   const auto timeline =
     vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
   const auto semaphore = timeline_.get();
-  graphicsQueue.submit(
-    vk::SubmitInfo().setPNext(&timeline).setSignalSemaphores(semaphore),
-    nullptr, dispatcher
-  );
-  timeline_value_ = value;
+  auto submit = vk::SubmitInfo();
+  if (release) submit.setCommandBuffers(release);
+  if (signals) submit.setPNext(&timeline).setSignalSemaphores(semaphore);
+  graphicsQueue.submit(submit, nullptr, dispatcher);
+  if (signals) timeline_value_ = value;
+  // A frame that completes on the CPU completes with its release.
+  if (producer_sync_kind_ == MLN_GPU_SYNC_CPU_COMPLETE)
+    graphicsQueue.waitIdle(dispatcher);
 }
 
 void VulkanTextureBackend::wait_timeline(

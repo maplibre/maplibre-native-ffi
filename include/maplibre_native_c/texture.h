@@ -146,6 +146,22 @@ typedef struct mln_vulkan_borrowed_texture {
   mln_vulkan_non_dispatchable_handle image_view MLN_BINDING("required=true");
 } mln_vulkan_borrowed_texture;
 
+/** The queue family that holds a borrowed Vulkan image between frames. */
+typedef enum mln_vulkan_image_owner : uint32_t {
+  /** The context's graphics queue family keeps the image. */
+  MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0U,
+  /**
+   * VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+   * image's memory.
+   */
+  MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1U,
+  /**
+   * VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+   * VK_EXT_queue_family_foreign.
+   */
+  MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2U,
+} mln_vulkan_image_owner;
+
 /** Vulkan attachment options for a borrowed texture target. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t size;
@@ -168,7 +184,8 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * must stay valid: until set_target replaces them, until detach completes,
    * or until abandon returns. The images are distinct, and each image must be
    * usable on context.graphics_queue's family without an ownership transfer
-   * (VK_SHARING_MODE_EXCLUSIVE on that family, or CONCURRENT).
+   * (VK_SHARING_MODE_EXCLUSIVE on that family, or CONCURRENT), apart from the
+   * transfers that owner names.
    *
    * The caller must guarantee that each image's dimensions equal physical_width
    * and physical_height. The session does not validate those dimensions.
@@ -205,6 +222,15 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
   uint32_t final_layout MLN_BINDING("required=true");
+  /**
+   * The queue family that owns each image while the host holds its frame.
+   * Unless it is the graphics queue's family, the session releases a frame's
+   * image to it in final_layout, before the frame's producer synchronization,
+   * and takes the image back without a transfer before it renders into it
+   * again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
+   * keeps the owner the session attached with.
+   */
+  mln_vulkan_image_owner owner;
 } mln_vulkan_borrowed_texture_descriptor;
 
 /** Vulkan frame acquired from a texture ring. */

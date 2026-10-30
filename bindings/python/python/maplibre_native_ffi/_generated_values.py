@@ -866,6 +866,18 @@ class ViewportMode(UnknownIntEnum):
     FLIPPED_Y = 1
 
 
+class VulkanImageOwner(UnknownIntEnum):
+    """The queue family that holds a borrowed Vulkan image between frames.
+
+    See `mln_vulkan_image_owner` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    GRAPHICS_QUEUE = 0
+    EXTERNAL = 1
+    FOREIGN = 2
+
+
 class WebGlContextKind(UnknownIntEnum):
     """WebGL context placement.
 
@@ -4158,6 +4170,15 @@ class VulkanBorrowedTextureDescriptor:
     initial_layout: int = 0
     """Backend-native VkImageLayout value expected at render-pass begin."""
 
+    owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE
+    """The queue family that owns each image while the host holds its frame.
+    Unless it is the graphics queue's family, the session releases a frame's
+    image to it in final_layout, before the frame's producer synchronization,
+    and takes the image back without a transfer before it renders into it
+    again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
+    keeps the owner the session attached with.
+    """
+
     def __post_init__(self):
         object.__setattr__(self, "textures", _sequence(self.textures))
 
@@ -4174,6 +4195,7 @@ class VulkanBorrowedTextureDescriptor:
             format=raw["format"],
             initial_layout=raw["initial_layout"],
             final_layout=raw["final_layout"],
+            owner=VulkanImageOwner(raw["owner"]),
         )
 
 

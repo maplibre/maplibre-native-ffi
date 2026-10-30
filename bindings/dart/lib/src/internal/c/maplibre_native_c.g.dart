@@ -1485,6 +1485,8 @@ final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   external int initial_layout;
   @Uint32()
   external int final_layout;
+  @Uint32()
+  external int owner;
 }
 
 final class mln_vulkan_context_descriptor extends Struct {
@@ -2164,6 +2166,11 @@ const MLN_URL_MATCH_GLOB = 1;
 // mln_viewport_mode
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
 const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
+
+// mln_vulkan_image_owner
+const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0;
+const MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1;
+const MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2;
 
 // mln_web_gl_context_kind
 const MLN_WEB_GL_CONTEXT_EXISTING = 0;

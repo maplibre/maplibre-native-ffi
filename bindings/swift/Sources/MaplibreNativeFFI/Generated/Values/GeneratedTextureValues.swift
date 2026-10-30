@@ -515,6 +515,13 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
   /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
   public var finalLayout: UInt32
+  /// The queue family that owns each image while the host holds its frame.
+  /// Unless it is the graphics queue's family, the session releases a frame's
+  /// image to it in final_layout, before the frame's producer synchronization,
+  /// and takes the image back without a transfer before it renders into it
+  /// again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
+  /// keeps the owner the session attached with.
+  public var owner: VulkanImageOwner
   public init(
     extent: LogicalExtent,
     physicalWidth: UInt32,
@@ -523,7 +530,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     textures: [VulkanBorrowedTexture],
     format: UInt32,
     initialLayout: UInt32 = 0,
-    finalLayout: UInt32
+    finalLayout: UInt32,
+    owner: VulkanImageOwner = .init(rawValue: 0)
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
@@ -533,6 +541,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.format = format
     self.initialLayout = initialLayout
     self.finalLayout = finalLayout
+    self.owner = owner
   }
 
   init(
@@ -550,6 +559,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     format = raw.format
     initialLayout = raw.initial_layout
     finalLayout = raw.final_layout
+    owner = VulkanImageOwner(rawValue: raw.owner.rawValue)
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -566,7 +576,38 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.format = format
     raw.initial_layout = initialLayout
     raw.final_layout = finalLayout
+    raw.owner = mln_vulkan_image_owner(rawValue: owner.rawValue)
     return raw
+  }
+}
+
+/// The queue family that holds a borrowed Vulkan image between frames.
+///
+/// See `mln_vulkan_image_owner` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The context's graphics queue family keeps the image.
+  public static let graphicsQueue: VulkanImageOwner = .init(rawValue: 0)
+  /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+  /// image's memory.
+  public static let external: VulkanImageOwner = .init(rawValue: 1)
+  /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+  /// VK_EXT_queue_family_foreign.
+  public static let foreign: VulkanImageOwner = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "graphicsQueue"
+    case 1: return "external"
+    case 2: return "foreign"
+    default: return "VulkanImageOwner(\(rawValue))"
+    }
   }
 }
 

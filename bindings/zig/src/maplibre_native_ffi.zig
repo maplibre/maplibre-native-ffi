@@ -6319,6 +6319,14 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
     /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     final_layout: u32,
+    /// The queue family that owns each image while the host holds its frame.
+    /// Unless it is the graphics queue's family, the session releases a frame's
+    /// image to it in final_layout, before the frame's producer
+    /// synchronization, and takes the image back without a transfer before it
+    /// renders into it again, so initial_layout must be
+    /// VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the session
+    /// attached with.
+    owner: VulkanImageOwner = .graphics_queue,
     pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_descriptor);
@@ -6335,6 +6343,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
         raw.format = self.format;
         raw.initial_layout = self.initial_layout;
         raw.final_layout = self.final_layout;
+        raw.owner = self.owner.toNative();
         return raw;
     }
 
@@ -6352,6 +6361,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
             .format = raw.format,
             .initial_layout = raw.initial_layout,
             .final_layout = raw.final_layout,
+            .owner = VulkanImageOwner.fromNative(raw.owner),
         };
     }
 };
@@ -6399,6 +6409,24 @@ pub const VulkanContextDescriptor = struct {
             .get_device_proc_addr = raw.get_device_proc_addr,
         };
     }
+};
+
+/// The queue family that holds a borrowed Vulkan image between frames.
+///
+/// See `mln_vulkan_image_owner` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const VulkanImageOwner = enum(u32) {
+    /// The context's graphics queue family keeps the image.
+    graphics_queue = 0,
+    /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+    /// image's memory.
+    external = 1,
+    /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must
+    /// enable VK_EXT_queue_family_foreign.
+    foreign = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// Vulkan attachment options for an owned texture target.

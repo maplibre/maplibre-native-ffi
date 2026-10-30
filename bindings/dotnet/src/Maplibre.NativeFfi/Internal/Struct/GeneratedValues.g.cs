@@ -2328,6 +2328,7 @@ internal static unsafe class GeneratedValues
         native.format = value.Format;
         native.initial_layout = value.InitialLayout;
         native.final_layout = value.FinalLayout;
+        native.owner = (mln_vulkan_image_owner)value.Owner;
         return native;
     }
 

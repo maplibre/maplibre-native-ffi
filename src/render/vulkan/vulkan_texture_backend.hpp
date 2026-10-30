@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <mln/gfx/headless_backend.hpp>
@@ -104,8 +105,20 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // its last frame signaled.
   vk::UniqueSemaphore timeline_;
   uint64_t timeline_value_ = 0;
+  // The pool of each slot's handoff commands.
+  vk::UniqueCommandPool sync_pool_;
 
-  void signal_timeline();
+  // Allocates a command buffer that may be submitted while it is pending, and
+  // begins recording it.
+  auto begin_sync_commands() -> vk::CommandBuffer;
+  // The queue family a borrowed image goes to between frames, unless it stays
+  // with the graphics queue's.
+  [[nodiscard]] auto handoff_family() const -> std::optional<uint32_t>;
+  // Records the release of `image` to the owner, in the frame's layout.
+  auto record_release(vk::Image image) -> vk::CommandBuffer;
+  // Submits what follows a frame: the release of its image, if any, and the
+  // timeline signal. Waits for it when frames complete on the CPU.
+  void submit_after_frame(vk::CommandBuffer release);
   std::size_t slot_count_;
   std::size_t selected_slot_ = 0;
   // Set by select_slot() and set_borrowed_target(), so the next

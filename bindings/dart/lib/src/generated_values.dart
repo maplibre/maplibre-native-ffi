@@ -1285,6 +1285,32 @@ final class ViewportMode extends _Enum {
   };
 }
 
+/// The queue family that holds a borrowed Vulkan image between frames.
+///
+/// See `mln_vulkan_image_owner` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class VulkanImageOwner extends _Enum {
+  const VulkanImageOwner.fromRawValue(super.rawValue);
+
+  /// The context's graphics queue family keeps the image.
+  static const graphicsQueue = VulkanImageOwner.fromRawValue(0);
+
+  /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+  /// image's memory.
+  static const external = VulkanImageOwner.fromRawValue(1);
+
+  /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+  /// VK_EXT_queue_family_foreign.
+  static const foreign = VulkanImageOwner.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'VulkanImageOwner.graphicsQueue',
+    1 => 'VulkanImageOwner.external',
+    2 => 'VulkanImageOwner.foreign',
+    _ => 'VulkanImageOwner($rawValue)',
+  };
+}
+
 /// WebGL context placement.
 ///
 /// See `mln_web_gl_context_kind` in the
@@ -3364,6 +3390,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     required this.format,
     this.initialLayout = 0,
     required this.finalLayout,
+    this.owner = const VulkanImageOwner.fromRawValue(0),
   }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. Required. physical_width and physical_height give
@@ -3395,6 +3422,14 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
   final int finalLayout;
 
+  /// The queue family that owns each image while the host holds its frame.
+  /// Unless it is the graphics queue's family, the session releases a frame's
+  /// image to it in final_layout, before the frame's producer synchronization,
+  /// and takes the image back without a transfer before it renders into it
+  /// again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
+  /// keeps the owner the session attached with.
+  final VulkanImageOwner owner;
+
   /// A copy of this value with the given members replaced.
   VulkanBorrowedTextureDescriptor copyWith({
     LogicalExtent? extent,
@@ -3405,6 +3440,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     int? format,
     int? initialLayout,
     int? finalLayout,
+    VulkanImageOwner? owner,
   }) => VulkanBorrowedTextureDescriptor(
     extent: extent ?? this.extent,
     physicalWidth: physicalWidth ?? this.physicalWidth,
@@ -3414,6 +3450,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     format: format ?? this.format,
     initialLayout: initialLayout ?? this.initialLayout,
     finalLayout: finalLayout ?? this.finalLayout,
+    owner: owner ?? this.owner,
   );
 
   @override
@@ -3426,6 +3463,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     format,
     initialLayout,
     finalLayout,
+    owner,
   ];
   @override
   String toString() => _describe('VulkanBorrowedTextureDescriptor', const [
@@ -3437,6 +3475,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     'format',
     'initialLayout',
     'finalLayout',
+    'owner',
   ]);
 }
 

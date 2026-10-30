@@ -1618,6 +1618,37 @@ public value class ViewportMode(public val rawValue: UInt) {
 }
 
 /**
+ * The queue family that holds a borrowed Vulkan image between frames.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_vulkan_image_owner` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+@JvmInline
+public value class VulkanImageOwner(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "GRAPHICS_QUEUE"
+      1u -> "EXTERNAL"
+      2u -> "FOREIGN"
+      else -> "VulkanImageOwner($rawValue)"
+    }
+
+  public companion object {
+    /** The context's graphics queue family keeps the image. */
+    public val GRAPHICS_QUEUE: VulkanImageOwner = VulkanImageOwner(0u)
+    /** VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the image's memory. */
+    public val EXTERNAL: VulkanImageOwner = VulkanImageOwner(1u)
+    /**
+     * VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+     * VK_EXT_queue_family_foreign.
+     */
+    public val FOREIGN: VulkanImageOwner = VulkanImageOwner(2u)
+  }
+}
+
+/**
  * WebGL context placement.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -2670,6 +2701,14 @@ public data class VulkanBorrowedTextureDescriptor(
    * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
   public val finalLayout: UInt,
+  /**
+   * The queue family that owns each image while the host holds its frame. Unless it is the graphics
+   * queue's family, the session releases a frame's image to it in final_layout, before the frame's
+   * producer synchronization, and takes the image back without a transfer before it renders into it
+   * again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the
+   * session attached with.
+   */
+  public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
 )
 
 /**

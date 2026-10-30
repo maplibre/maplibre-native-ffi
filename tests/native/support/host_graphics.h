@@ -89,6 +89,14 @@ bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   const mln_test_render_fixture* share, const mln_queue_lock* queue_lock
 );
 
+// Attaches a borrowed ring of one Vulkan image whose frames go to `owner`
+// between renders and come back in `initial_layout`, with timeline producer
+// synchronization.
+bool mln_test_render_fixture_create_vulkan_handoff_ring(
+  mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner,
+  uint32_t initial_layout
+);
+
 // mln_test_render_fixture_create() for a session whose context names
 // `wrap`'s vkGetDeviceProcAddr, when `wrap` is non-null, and with the host
 // queue lock `queue_lock`, when that is non-null.

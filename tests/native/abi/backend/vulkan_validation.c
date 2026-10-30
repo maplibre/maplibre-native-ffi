@@ -61,6 +61,10 @@ static void borrowed_without_format(void* call) {
 static void borrowed_without_final_layout(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.final_layout = 0;
 }
+static void borrowed_with_unknown_owner(void* call) {
+  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.owner =
+    (mln_vulkan_image_owner)99;
+}
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_vulkan_surface)
 MLN_TEST_ATTACH_SUBMITTER(
@@ -179,6 +183,8 @@ static void vulkan_attach_rejects_malformed_calls(void) {
      "format and final_layout"},
     {"zero final layout", borrowed_without_final_layout,
      MLN_STATUS_INVALID_ARGUMENT, "format and final_layout"},
+    {"unknown owner", borrowed_with_unknown_owner, MLN_STATUS_INVALID_ARGUMENT,
+     "owner is invalid"},
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
     {"a well-formed descriptor with high handles", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},

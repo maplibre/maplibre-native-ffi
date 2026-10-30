@@ -5316,6 +5316,14 @@ pub struct VulkanBorrowedTextureDescriptor {
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
     /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     pub final_layout: u32,
+    /// The queue family that owns each image while the host holds its frame.
+    /// Unless it is the graphics queue's family, the session releases a frame's
+    /// image to it in final_layout, before the frame's producer
+    /// synchronization, and takes the image back without a transfer before it
+    /// renders into it again, so initial_layout must be
+    /// VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the session
+    /// attached with.
+    pub owner: VulkanImageOwner,
 }
 impl VulkanBorrowedTextureDescriptor {
     pub fn new(
@@ -5336,6 +5344,7 @@ impl VulkanBorrowedTextureDescriptor {
             format,
             initial_layout: Default::default(),
             final_layout,
+            owner: Default::default(),
         }
     }
 }
@@ -5355,6 +5364,7 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
         raw.format = self.format;
         raw.initial_layout = self.initial_layout;
         raw.final_layout = self.final_layout;
+        raw.owner = to_native(&self.owner, arena)?;
         Ok(raw)
     }
 }
@@ -5411,6 +5421,28 @@ impl ToNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
         raw.get_instance_proc_addr = self.get_instance_proc_addr;
         raw.get_device_proc_addr = self.get_device_proc_addr;
         Ok(raw)
+    }
+}
+
+native_enum! {
+/// The queue family that holds a borrowed Vulkan image between frames.
+///
+/// See `mln_vulkan_image_owner` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub enum VulkanImageOwner: u32 {
+    /// The context's graphics queue family keeps the image.
+    GraphicsQueue = 0,
+    /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+    /// image's memory.
+    External = 1,
+    /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must
+    /// enable VK_EXT_queue_family_foreign.
+    Foreign = 2,
+} Unknown
+}
+impl Default for VulkanImageOwner {
+    fn default() -> Self {
+        Self::GraphicsQueue
     }
 }
 

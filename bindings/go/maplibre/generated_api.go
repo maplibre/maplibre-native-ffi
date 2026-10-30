@@ -1536,6 +1536,36 @@ func (value ViewportMode) String() string {
 	return fmt.Sprintf("ViewportMode(%d)", value)
 }
 
+// VulkanImageOwner corresponds to mln_vulkan_image_owner. The queue family that
+// holds a borrowed Vulkan image between frames.
+//
+// See mln_vulkan_image_owner in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type VulkanImageOwner uint32
+
+const (
+	// The context's graphics queue family keeps the image.
+	VulkanImageOwnerGraphicsQueue VulkanImageOwner = VulkanImageOwner(C.MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE)
+	// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+	// image's memory.
+	VulkanImageOwnerExternal VulkanImageOwner = VulkanImageOwner(C.MLN_VULKAN_IMAGE_OWNER_EXTERNAL)
+	// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+	// VK_EXT_queue_family_foreign.
+	VulkanImageOwnerForeign VulkanImageOwner = VulkanImageOwner(C.MLN_VULKAN_IMAGE_OWNER_FOREIGN)
+)
+
+func (value VulkanImageOwner) String() string {
+	switch value {
+	case 0:
+		return "VulkanImageOwnerGraphicsQueue"
+	case 1:
+		return "VulkanImageOwnerExternal"
+	case 2:
+		return "VulkanImageOwnerForeign"
+	}
+	return fmt.Sprintf("VulkanImageOwner(%d)", value)
+}
+
 // WebGlContextKind corresponds to mln_web_gl_context_kind. WebGL context
 // placement.
 //
@@ -4923,6 +4953,13 @@ type VulkanBorrowedTextureDescriptor struct {
 	// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
 	// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
 	FinalLayout uint32
+	// The queue family that owns each image while the host holds its frame. Unless
+	// it is the graphics queue's family, the session releases a frame's image to it
+	// in final_layout, before the frame's producer synchronization, and takes the
+	// image back without a transfer before it renders into it again, so
+	// initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the
+	// owner the session attached with.
+	Owner VulkanImageOwner
 }
 
 func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor, arena *bindingArena) C.mln_vulkan_borrowed_texture_descriptor {
@@ -4943,6 +4980,7 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 	raw.format = C.uint32_t(input.Format)
 	raw.initial_layout = C.uint32_t(input.InitialLayout)
 	raw.final_layout = C.uint32_t(input.FinalLayout)
+	raw.owner = C.mln_vulkan_image_owner(input.Owner)
 	return raw
 }
 

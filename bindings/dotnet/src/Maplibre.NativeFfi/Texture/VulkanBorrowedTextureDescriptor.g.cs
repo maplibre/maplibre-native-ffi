@@ -20,7 +20,8 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor
         ImmutableArray<VulkanBorrowedTexture> Textures,
         uint Format,
         uint InitialLayout,
-        uint FinalLayout
+        uint FinalLayout,
+        VulkanImageOwner Owner
     )
     {
         this.Extent = Extent;
@@ -31,6 +32,7 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor
         this.Format = Format;
         this.InitialLayout = InitialLayout;
         this.FinalLayout = FinalLayout;
+        this.Owner = Owner;
     }
 
     /// <summary>
@@ -82,4 +84,15 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor
     /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     /// </summary>
     public required uint FinalLayout { get; init; }
+
+    /// <summary>
+    /// The queue family that owns each image while the host holds its frame.
+    /// Unless it is the graphics queue's family, the session releases a frame's
+    /// image to it in final_layout, before the frame's producer
+    /// synchronization, and takes the image back without a transfer before it
+    /// renders into it again, so initial_layout must be
+    /// VK_IMAGE_LAYOUT_UNDEFINED. A replacement keeps the owner the session
+    /// attached with.
+    /// </summary>
+    public VulkanImageOwner Owner { get; init; }
 }

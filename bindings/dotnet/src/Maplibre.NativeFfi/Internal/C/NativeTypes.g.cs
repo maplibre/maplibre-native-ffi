@@ -1167,6 +1167,7 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
     public uint format;
     public uint initial_layout;
     public uint final_layout;
+    public mln_vulkan_image_owner owner;
 }
 
 internal unsafe struct mln_vulkan_context_descriptor
@@ -1984,6 +1985,13 @@ internal enum mln_viewport_mode : uint
 {
     MLN_VIEWPORT_MODE_DEFAULT = 0,
     MLN_VIEWPORT_MODE_FLIPPED_Y = 1,
+}
+
+internal enum mln_vulkan_image_owner : uint
+{
+    MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0,
+    MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1,
+    MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2,
 }
 
 internal enum mln_web_gl_context_kind : uint

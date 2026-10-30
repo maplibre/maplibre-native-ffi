@@ -465,6 +465,10 @@ pub const MLN_URL_MATCH_GLOB: mln_url_match_flag = 1;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
+pub type mln_vulkan_image_owner = u32;
+pub const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE: mln_vulkan_image_owner = 0;
+pub const MLN_VULKAN_IMAGE_OWNER_EXTERNAL: mln_vulkan_image_owner = 1;
+pub const MLN_VULKAN_IMAGE_OWNER_FOREIGN: mln_vulkan_image_owner = 2;
 pub type mln_web_gl_context_kind = u32;
 pub const MLN_WEB_GL_CONTEXT_EXISTING: mln_web_gl_context_kind = 0;
 pub const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: mln_web_gl_context_kind = 1;
@@ -1558,6 +1562,7 @@ pub struct mln_vulkan_borrowed_texture_descriptor {
     pub format: u32,
     pub initial_layout: u32,
     pub final_layout: u32,
+    pub owner: mln_vulkan_image_owner,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

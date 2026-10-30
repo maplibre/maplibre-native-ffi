@@ -3436,6 +3436,15 @@ export interface VulkanBorrowedTextureDescriptor {
    * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
   finalLayout: number;
+  /**
+   * The queue family that owns each image while the host holds its frame.
+   * Unless it is the graphics queue's family, the session releases a frame's
+   * image to it in final_layout, before the frame's producer synchronization,
+   * and takes the image back without a transfer before it renders into it
+   * again, so initial_layout must be VK_IMAGE_LAYOUT_UNDEFINED. A replacement
+   * keeps the owner the session attached with.
+   */
+  owner?: VulkanImageOwner;
 }
 
 /**
@@ -3476,6 +3485,33 @@ export interface VulkanContextDescriptor {
    */
   getDeviceProcAddr?: bigint;
 }
+
+/**
+ * The queue family that holds a borrowed Vulkan image between frames.
+ *
+ * See `mln_vulkan_image_owner` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export const VulkanImageOwner = {
+  /**
+   * The context's graphics queue family keeps the image.
+   */
+  graphicsQueue: 0,
+  /**
+   * VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
+   * image's memory.
+   */
+  external: 1,
+  /**
+   * VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
+   * VK_EXT_queue_family_foreign.
+   */
+  foreign: 2,
+} as const;
+/** One of the VulkanImageOwner values, or a value this binding does not know. */
+export type VulkanImageOwner =
+  | (typeof VulkanImageOwner)[keyof typeof VulkanImageOwner]
+  | (number & {});
 
 /**
  * Vulkan attachment options for an owned texture target.

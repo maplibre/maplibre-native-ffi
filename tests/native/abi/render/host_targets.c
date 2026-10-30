@@ -497,6 +497,69 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
 }
 #endif
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// A ring whose image goes to another owner between frames hands each frame
+// over, and the session takes the image back to render into it again. Only an
+// image without contents to keep can have another owner.
+static void vulkan_images_go_to_their_owner_between_frames(void) {
+  const uint32_t layouts[] = {
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED
+  };
+  for (size_t layout = 0; layout < 2; layout += 1) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+    mln_test_render_fixture fixture = {0};
+    const bool attached = mln_test_render_fixture_create_vulkan_handoff_ring(
+      map, &fixture, MLN_VULKAN_IMAGE_OWNER_EXTERNAL, layouts[layout]
+    );
+    if (layouts[layout] != VK_IMAGE_LAYOUT_UNDEFINED) {
+      TEST_ASSERT_FALSE(attached);
+      TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "initial_layout"));
+      mln_test_destroy_map(map);
+      mln_test_destroy_runtime(runtime);
+      continue;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(attached, mln_test_graphics_last_error());
+    mln_test_graphics_context context;
+    TEST_ASSERT_TRUE(mln_test_graphics_get_context(
+      mln_test_render_fixture_graphics(&fixture), &context
+    ));
+    const VkDevice device = context.vulkan_device;
+    const PFN_vkWaitSemaphoresKHR wait_semaphores =
+      (PFN_vkWaitSemaphoresKHR)((
+                                  PFN_vkGetDeviceProcAddr
+      )context.vulkan_get_device_proc_addr)(device, "vkWaitSemaphoresKHR");
+    TEST_ASSERT_NOT_NULL(wait_semaphores);
+    for (uint64_t index = 0; index < 2; index += 1) {
+      TEST_ASSERT_EQUAL_UINT32(
+        MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+      );
+      mln_acquired_frame frame = MLN_HANDLE_NULL;
+      MLN_TEST_OK(
+        mln_render_session_acquire_frame(fixture.session, &frame, NULL)
+      );
+      mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+      MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
+      const VkSemaphore semaphore = (VkSemaphore)(uintptr_t)producer.handle;
+      const VkSemaphoreWaitInfo wait = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+        .semaphoreCount = 1,
+        .pSemaphores = &semaphore,
+        .pValues = &producer.value,
+      };
+      TEST_ASSERT_EQUAL_INT(
+        VK_SUCCESS, wait_semaphores(device, &wait, UINT64_MAX)
+      );
+      mln_test_render_release_frame(&frame);
+    }
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+}
+#endif
+
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
 static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   bool borrowed
@@ -714,6 +777,7 @@ MLN_TEST_GROUP {
 #endif
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(vulkan_timelines_order_frame_reads_and_slot_reuse);
+  RUN_TEST(vulkan_images_go_to_their_owner_between_frames);
 #endif
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
