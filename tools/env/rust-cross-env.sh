@@ -1,11 +1,6 @@
-# Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, RISC-V, LoongArch, FreeBSD, Android, iOS, tvOS, visionOS,
-# Mac Catalyst, macOS x64, MinGW, and OpenHarmony presets to their Cargo target.
-# Exports the cross-compilation environment (CC/CXX, linker) from Zig and Rust
-# toolchains, Android NDK, or OpenHarmony SDK, and for targets that run off the
-# host, tools/devices/run as Cargo's runner, which it also names in
-# `cargo_runner`. Leaves `cargo_target` and `cargo_runner` empty for host
-# presets, where Cargo picks its own target and toolchain.
+# Sourced with a native preset as $1. Exports Cargo's cross-compilation and
+# device-runner settings. Leaves `cargo_target` and `cargo_runner` empty for
+# host presets.
 # shellcheck shell=bash
 
 cargo_target=
