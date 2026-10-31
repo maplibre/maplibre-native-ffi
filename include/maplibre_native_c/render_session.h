@@ -550,6 +550,41 @@ MLN_API mln_status mln_render_session_resize(
 ) MLN_NOEXCEPT;
 
 /**
+ * Starts releasing the session's surface or borrowed texture ring while
+ * keeping its renderer.
+ *
+ * The release runs in order with the session's other driver work. Its
+ * completion means that the session no longer presents to, renders into, or
+ * reads the target, so the host may destroy it. Until the backend's set_target
+ * function hands over another target, every frame demand finishes with
+ * MLN_RENDER_RESULT_TARGET_NOT_READY, and the renderer keeps what it built for
+ * the map, such as its tiles and symbol placement. Frames of a borrowed ring
+ * can no longer be acquired from this call's return.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the release is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
+ * - MLN_STATUS_UNSUPPORTED when the session renders into a session-owned
+ *   texture ring.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the session no longer uses the target.
+ * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas, which its
+ *   context carries.
+ * - MLN_STATUS_NATIVE_ERROR with the saved diagnostic when the session fails.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ */
+MLN_BINDING("execution=operation")
+MLN_API mln_status mln_render_session_release_target(
+  mln_render_session session, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Ends every frame demand that has not started with MLN_RENDER_RESULT_NO_UPDATE
  * and completes after earlier driver work has finished. A running demand
  * finishes its attempt and ends any wait for a map update or a free slot.

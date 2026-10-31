@@ -316,6 +316,22 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       init(size.width, size.height);
     }
 
+    // Stops presenting, so the host may destroy its surface. The render pass
+    // stays for the next surface, which set_surface() takes from here.
+    void release_surface() {
+      backend.getDevice()->waitIdle(backend.getDispatcher());
+      swapchainFramebuffers.clear();
+      swapchainImageViews.clear();
+      swapchainImages.clear();
+      acquireSemaphores.clear();
+      presentSemaphores.clear();
+      readTexture.reset();
+      // The swapchain goes before the surface it was created from.
+      swapchain.reset();
+      static_cast<void>(surface.release());
+      borrowed_surface = VK_NULL_HANDLE;
+    }
+
    private:
     VkSurfaceKHR borrowed_surface = VK_NULL_HANDLE;
   };
@@ -405,6 +421,11 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     descriptor_.surface = descriptor.surface;
     mln::vulkan::Renderable::setSize(new_size);
     adopt_swapchain_extent();
+  }
+
+  void release_surface() {
+    getResource<VulkanSurfaceRenderableResource>().release_surface();
+    descriptor_.surface = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
   }
 
   [[nodiscard]] auto context_descriptor() const
@@ -562,6 +583,11 @@ class VulkanSurfaceSessionBackend final
       );
     }
     backend_.set_surface(descriptor);
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    backend_.release_surface();
     return MLN_STATUS_OK;
   }
 

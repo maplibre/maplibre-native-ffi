@@ -337,6 +337,11 @@ class VulkanTextureSessionBackend final
     return MLN_STATUS_OK;
   }
 
+  auto release_borrowed_target() -> mln_status override {
+    backend_.release_borrowed_target();
+    return MLN_STATUS_OK;
+  }
+
   void prepare_render_resources() override {
     // Renderer::render creates the Vulkan context before requesting the default
     // renderable, so shared-device resources must be ready first.

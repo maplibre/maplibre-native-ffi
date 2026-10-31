@@ -1,13 +1,15 @@
 // Retargeting a session: a borrowed texture or surface that the host replaces
 // through its backend's set_target, which sizes the map to the replacement,
 // and the replacements a session refuses. Every refusal leaves the session
-// rendering into its old target.
+// rendering into its old target. A session can also release its target and
+// keep its renderer until set_target hands over the next one.
 //
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
 
 #include "support/frames.h"
 #include "support/host_graphics.h"
+#include "support/style.h"
 #include "support/test_support.h"
 
 #if !defined(__EMSCRIPTEN__)
@@ -800,6 +802,255 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
     release_replacement(&made);
   }
 }
+
+// Runs a target release to completion and expects `expected`.
+static void release_target(
+  const mln_test_render_fixture* fixture, mln_status expected
+) {
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_render_session_release_target(
+      fixture->session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, expected, "the release");
+}
+
+// Once a release completes, the host may destroy the target, and the session
+// renders nothing until set_target hands over another target, which the next
+// frame renders into.
+static void a_released_target_can_be_destroyed_before_the_next(
+  enum target_kind kind
+) {
+  retarget_map map = {0};
+  open_map(kind, &map);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
+  const uint32_t flags = kind == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
+
+  // A target that the case owns, so that it can destroy it.
+  mln_test_graphics_texture* texture = NULL;
+  mln_test_graphics_surface* surface = NULL;
+  mln_test_completion completion = mln_test_completion_default(0);
+  if (kind == TARGET_SURFACE) {
+    surface = mln_test_graphics_surface_create(
+      graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+    );
+    TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_surface(
+        fixture, graphics, surface, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  } else {
+    texture = mln_test_graphics_texture_create(
+      graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+    );
+    TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_textures(
+        fixture, graphics, &texture, 1, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  }
+  finish(fixture, &completion, MLN_STATUS_OK, "the first replacement");
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
+  );
+
+  release_target(fixture, MLN_STATUS_OK);
+  mln_test_graphics_surface_destroy(surface);
+  mln_test_graphics_texture_destroy(texture);
+  restore_fixture_context(fixture);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, render_frame(fixture, flags)
+  );
+
+  completion = mln_test_completion_default(0);
+  mln_test_graphics_texture* next_texture = NULL;
+  if (kind == TARGET_SURFACE) {
+    mln_test_graphics_surface* next =
+      mln_test_render_fixture_new_surface(fixture);
+    TEST_ASSERT_NOT_NULL_MESSAGE(next, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_surface(
+        fixture, graphics, next, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  } else {
+    next_texture = mln_test_render_fixture_new_texture(fixture);
+    TEST_ASSERT_NOT_NULL_MESSAGE(next_texture, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_textures(
+        fixture, graphics, &next_texture, 1, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  }
+  finish(fixture, &completion, MLN_STATUS_OK, "the next target");
+  paint_background_blue(map.map);
+  MLN_TEST_OK(mln_test_map_fence(map.map));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
+  );
+  if (next_texture != NULL) {
+    expect_texture_color(fixture, next_texture, blue, "the next texture");
+  }
+  close_map(&map);
+}
+
+static void a_released_texture_can_be_destroyed_before_the_next(void) {
+  a_released_target_can_be_destroyed_before_the_next(TARGET_BORROWED);
+}
+
+static void a_released_surface_can_be_destroyed_before_the_next(void) {
+  a_released_target_can_be_destroyed_before_the_next(TARGET_SURFACE);
+}
+
+// One point at the center of the map, drawn as a circle.
+static const char center_point_style_json[] =
+  "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"Feature\",\"properties\":{},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]}}}},"
+  "\"layers\":[{\"id\":\"circle\",\"type\":\"circle\",\"source\":\"point\","
+  "\"paint\":{\"circle-radius\":4}}]}";
+
+static bool renders_one_feature(void* context) {
+  const mln_test_feature_list list = mln_test_style_query_rendered(context);
+  return list.status == MLN_STATUS_OK && list.count == 1;
+}
+
+// The renderer outlives the target: what it rendered stays queryable while no
+// target is set, and a resize meanwhile applies to the map alone. A detach
+// tears down a session that holds no target.
+static void a_released_target_keeps_the_renderer(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(center_point_style_json)
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_surface(map, &fixture),
+    mln_test_graphics_last_error()
+  );
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, renders_one_feature, (void*)&fixture, "the point to render"
+  ));
+
+  release_target(&fixture, MLN_STATUS_OK);
+  const mln_test_feature_list list = mln_test_style_query_rendered(&fixture);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, list.status);
+  TEST_ASSERT_EQUAL_size_t(1, list.count);
+
+  const mln_logical_extent extent = {
+    .width = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .height = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .scale_factor = 1.0,
+  };
+  mln_test_completion resized = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, extent, &resized.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
+  finish(&fixture, &resized, MLN_STATUS_OK, "the resize");
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY,
+    render_frame(&fixture, MLN_FRAME_DEMAND_PRESENT)
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A demand waiting for a map update finishes when the target goes, rather than
+// waiting for an update that no target can take.
+static void a_release_finishes_a_waiting_demand(void) {
+  retarget_map map = {0};
+  open_map(TARGET_BORROWED, &map);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  mln_test_render_until_idle(map.runtime, map.map, fixture);
+
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.token = 4000;
+  MLN_TEST_OK(
+    mln_render_session_request_frame(fixture->session, &demand, NULL)
+  );
+  // The fence runs after the driver evaluated the demand, which then waits.
+  mln_test_completion fence = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_dump_debug_logs(
+    fixture->session, &fence.descriptor, NULL
+  ));
+  finish(fixture, &fence, MLN_STATUS_OK, "the fence");
+
+  release_target(fixture, MLN_STATUS_OK);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+  );
+  close_map(&map);
+}
+
+// A session-owned ring has no target of the host's to release. A borrowed
+// ring refuses a release while the host holds one of its frames, and once the
+// release is accepted, no frame rendered before it can be acquired.
+static void releases_that_a_ring_refuses(void) {
+  retarget_map owned = {0};
+  open_map(TARGET_OWNED, &owned);
+  mln_test_completion refused = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_render_session_release_target(
+      owned.fixture.session, &refused.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "session-owned"), mln_test_last_error()
+  );
+  mln_test_completion_reject(&refused);
+  mln_test_completion_destroy(&refused);
+  close_map(&owned);
+
+  retarget_map map = {0};
+  open_borrowed_ring(&map, MLN_TEST_PRESET_DRIVER);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
+  );
+  mln_acquired_frame held = MLN_HANDLE_NULL;
+  MLN_TEST_OK(acquire(fixture, &held));
+  refused = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_release_target(
+      fixture->session, &refused.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  mln_test_completion_reject(&refused);
+  mln_test_completion_destroy(&refused);
+  release(&held);
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
+  );
+  release_target(fixture, MLN_STATUS_OK);
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
+  close_map(&map);
+}
 #endif
 
 MLN_TEST_GROUP {
@@ -812,5 +1063,10 @@ MLN_TEST_GROUP {
   RUN_TEST(a_borrowed_retarget_sizes_the_map);
   RUN_TEST(a_surface_retarget_sizes_the_map);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);
+  RUN_TEST(a_released_texture_can_be_destroyed_before_the_next);
+  RUN_TEST(a_released_surface_can_be_destroyed_before_the_next);
+  RUN_TEST(a_released_target_keeps_the_renderer);
+  RUN_TEST(a_release_finishes_a_waiting_demand);
+  RUN_TEST(releases_that_a_ring_refuses);
 #endif
 }

@@ -60,6 +60,9 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) const -> bool;
   void set_borrowed_target(const VulkanBorrowedTarget& target);
+  // Lets go of the borrowed images, keeping the render pass for the ring that
+  // set_borrowed_target() hands over next.
+  void release_borrowed_target();
   [[nodiscard]] auto frame_layout() const -> VkImageLayout;
   [[nodiscard]] auto context_descriptor() const
     -> const mln_vulkan_context_descriptor& {

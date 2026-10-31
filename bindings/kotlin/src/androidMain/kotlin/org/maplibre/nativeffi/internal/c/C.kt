@@ -1103,6 +1103,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_render_session_release_target(
+    session: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_render_session_request_frame(
     session: Long,
     demand: Long,

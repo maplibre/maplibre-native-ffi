@@ -2701,6 +2701,11 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_render_session_release_target(
+        session: mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_render_session_request_frame(
         session: mln_render_session,
         demand: *const mln_frame_demand,

@@ -154,6 +154,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     // session's GL context was created from it, and WGL context creation still
     // reads its device_context.
     descriptor_.surface = descriptor.surface;
+    fallback_drawable_ = false;
     setRenderableSize(
       mln::Size{
         mln::core::physical_dimension(
@@ -164,6 +165,24 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
         )
       }
     );
+  }
+
+  // Stops presenting through the host surface, so the host may destroy it.
+  // The context moves to the drawable it was created from, which a dedicated
+  // context stays current on between renders, and set_surface() moves it back.
+  // Reports false for a WebGL context, which carries its canvas.
+  [[nodiscard]] auto release_surface() -> bool {
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    return false;
+#else
+    descriptor_.surface = nullptr;
+    fallback_drawable_ = true;
+    if (has_native_context()) {
+      // Activating makes the context current on that drawable instead.
+      const auto guard = mln::gfx::BackendScope{*this};
+    }
+    return true;
+#endif
   }
 
   [[nodiscard]] auto context_descriptor() const
@@ -421,8 +440,9 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 #endif
 
   mln_open_gl_surface_descriptor descriptor_{};
-  // Set once teardown has found the session's surface unusable, so activate()
-  // reaches for the drawable the context was created from instead.
+  // Set while the session has no surface to use, because the host released it
+  // or teardown found it unusable, so activate() reaches for the drawable the
+  // context was created from instead.
   bool fallback_drawable_ = false;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -464,6 +484,15 @@ class OpenGLSurfaceSessionBackend final
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     backend_.set_surface(descriptor);
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    if (!backend_.release_surface()) {
+      return mln::core::unsupported_retarget(
+        "a WebGL context carries its canvas, so its session cannot release it"
+      );
+    }
     return MLN_STATUS_OK;
   }
 

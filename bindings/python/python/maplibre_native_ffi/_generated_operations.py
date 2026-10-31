@@ -1518,6 +1518,15 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.reduce_memory_use()
 
+    def release_target(self) -> Future[None]:
+        """Starts releasing the session's surface or borrowed texture ring while
+        keeping its renderer.
+
+        See `mln_render_session_release_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native.release_target()
+
     def request_frame(self, demand: FrameDemand) -> None:
         """Requests a frame without waiting. Every accepted demand produces one
         terminal result record. Caller-driver sessions require service on the

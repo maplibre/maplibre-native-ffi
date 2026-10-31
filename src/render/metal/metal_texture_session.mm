@@ -195,6 +195,11 @@ class MetalTextureSessionBackend final
     return MLN_STATUS_OK;
   }
 
+  auto release_borrowed_target() -> mln_status override {
+    backend_.release_borrowed_textures();
+    return MLN_STATUS_OK;
+  }
+
   auto after_render(mln_render_session_object&, bool& out_rendered)
     -> mln_status override {
     if (auto failure = backend_.take_command_buffer_failure()) {

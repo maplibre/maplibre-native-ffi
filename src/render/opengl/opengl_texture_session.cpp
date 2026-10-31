@@ -790,6 +790,20 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     resource_size_ = {};
   }
 
+  // Lets go of the borrowed textures. Unlike a replacement, this deletes the
+  // framebuffers over them at once rather than on the next render, which may
+  // be far off: a framebuffer that still attaches a texture keeps its storage
+  // alive after the host deletes it.
+  void release_borrowed_textures() {
+    // Nothing was built before the first render made the GL context.
+    auto guard = std::optional<mln::gfx::BackendScope>{};
+    if (context) guard.emplace(*this);
+    resource.reset();
+    ring_.reset(borrowed_textures_.size());
+    resource_size_ = {};
+    if (context) getContext<mln::gl::Context>().performCleanup();
+  }
+
   [[nodiscard]] auto context_descriptor() const
     -> const mln_open_gl_context_descriptor& {
     return context_;
@@ -1157,6 +1171,11 @@ class OpenGLTextureSessionBackend final
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     backend_.set_borrowed_textures(target);
+    return MLN_STATUS_OK;
+  }
+
+  auto release_borrowed_target() -> mln_status override {
+    backend_.release_borrowed_textures();
     return MLN_STATUS_OK;
   }
 

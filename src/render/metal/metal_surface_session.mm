@@ -76,6 +76,16 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
       setSize(size_);
     }
 
+    // Lets go of the layer, so the host may destroy it. set_layer() takes the
+    // next one.
+    void release_layer() {
+      finish_committed();
+      commandBuffer.reset();
+      renderPassDescriptor.reset();
+      drawable.reset();
+      layer.reset();
+    }
+
     // A minimized or occluded layer may have no drawable. Check before bind(),
     // which requires one.
     auto try_bind() -> bool {
@@ -276,6 +286,10 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     getResource<MetalSurfaceRenderableResource>().set_layer(layer_, size_);
   }
 
+  void release_layer() {
+    getResource<MetalSurfaceRenderableResource>().release_layer();
+  }
+
   auto try_bind() -> bool {
     return getResource<MetalSurfaceRenderableResource>().try_bind();
   }
@@ -339,6 +353,11 @@ class MetalSurfaceSessionBackend final
         )
       }
     );
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    backend_.release_layer();
     return MLN_STATUS_OK;
   }
 

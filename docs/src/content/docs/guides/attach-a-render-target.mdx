@@ -91,6 +91,13 @@ window or view.
   title="render-target.c"
 />
 
+When the host loses its surface or ring for a while, such as a mobile app's
+surface while the app is in the background, release the target with
+`mln_render_session_release_target()` instead of detaching. Once the release
+completes, the host may destroy the target. The session keeps its renderer, so
+the map's tiles and labels are ready when `set_target` hands over the next
+target.
+
 To shut down, release acquired frames, detach the session, and keep servicing a
 caller driver until detach completes. Then dispose the session, and destroy the
 host's graphics resources once its completion runs. Disposing an attached

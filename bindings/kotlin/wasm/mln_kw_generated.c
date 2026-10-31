@@ -1432,6 +1432,15 @@ int32_t mln_kw_mln_render_session_reduce_memory_use(
   );
 }
 
+int32_t mln_kw_mln_render_session_release_target(
+  int64_t session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_release_target(
+    (mln_render_session)session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_render_session_request_frame(
   int64_t session, uintptr_t demand, uintptr_t out_diagnostic
 ) {

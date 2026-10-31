@@ -252,6 +252,10 @@ struct CompletionResult<&mln_render_session_reduce_memory_use> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_render_session_release_target> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_render_session_set_metal_borrowed_texture_target> {
   static constexpr bool has_value = false;
 };

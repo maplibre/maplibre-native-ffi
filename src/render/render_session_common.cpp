@@ -2010,6 +2010,7 @@ auto render_session_set_target(
   if (replace_status != MLN_STATUS_OK) {
     return replace_status;
   }
+  live->target_released = false;
 
   // Land the session's own bookkeeping before anything that can fail again, so
   // a later failure leaves only a session waiting for the map to catch up.
@@ -2148,6 +2149,100 @@ auto enqueue_surface_retarget(
       );
     },
     completion, valueless, {}
+  );
+}
+
+namespace {
+
+// Releases the session's target on the driver. A backend releases before the
+// session records anything, so a reported failure leaves the session on its
+// target.
+auto render_session_release_target(mln_render_session_object& live)
+  -> mln_status {
+  mln_render_session_object* checked = nullptr;
+  const auto status = validate_live_attached_render_session(live.self, checked);
+  if (status != MLN_STATUS_OK) return status;
+  if (!live.target_released) {
+    const auto released = live.kind == RenderSessionKind::Surface
+                            ? live.surface.backend->release_target()
+                            : live.texture.backend->release_borrowed_target();
+    if (released != MLN_STATUS_OK) return released;
+    live.target_released = true;
+  }
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{live.control_mutex};
+  live.pending_changes = true;
+  live.rendered_update_generation = 0;
+  live.rendered_target_generation = 0;
+  // No frame is acquired, which the submission's check and its hold on
+  // acquisition ensure. The ring's textures are no longer the session's, so
+  // no slot holds a frame, and none stays quarantined over a texture that the
+  // session will not render into again.
+  for (auto& slot : live.texture.slots) slot = RenderTextureSlot{};
+  // A demand waiting for an update finishes now rather than waiting for one
+  // that no target can take.
+  resume_update_waiting_demands_locked(live, wakes);
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto render_session_release_target_start(
+  mln_render_session session, const mln_completion* completion
+) -> mln_status {
+  auto [deliver, make_work] = valueless_driver_work(
+    [](mln_render_session_object& live) {
+      if (live.kind != RenderSessionKind::Texture)
+        return render_session_release_target(live);
+      // Acquisition resumes once the release has run, whatever it reported,
+      // as it does after a replacement of the ring.
+      struct Settle {
+        mln_render_session_object& session;
+        explicit Settle(mln_render_session_object& target) : session(target) {}
+        Settle(const Settle&) = delete;
+        Settle(Settle&&) = delete;
+        auto operator=(const Settle&) -> Settle& = delete;
+        auto operator=(Settle&&) -> Settle& = delete;
+        ~Settle() {
+          const auto lock = std::scoped_lock{session.control_mutex};
+          --session.texture.pending_retargets;
+        }
+      } settle{live};
+      return render_session_release_target(live);
+    },
+    valueless_completion<&mln_render_session_release_target>()
+  );
+  return submit_driver_work(
+    session, completion, std::move(deliver), make_work,
+    RenderDriverAdmission{
+      .check =
+        [](const mln_render_session_object& live) {
+          if (
+            live.kind == RenderSessionKind::Texture &&
+            live.texture.mode != TextureSessionMode::Borrowed
+          ) {
+            set_thread_error(
+              "a session-owned texture ring has no target for the host to "
+              "release"
+            );
+            return MLN_STATUS_UNSUPPORTED;
+          }
+          if (live.acquired_frame_count != 0) {
+            set_thread_error(
+              "cannot release the render target while a texture frame is "
+              "acquired"
+            );
+            return MLN_STATUS_INVALID_STATE;
+          }
+          return MLN_STATUS_OK;
+        },
+      .commit =
+        [](mln_render_session_object& live) {
+          if (live.kind != RenderSessionKind::Texture) return;
+          invalidate_unacquired_texture_frames_locked(live);
+          ++live.texture.pending_retargets;
+        },
+    }
   );
 }
 
@@ -2986,6 +3081,16 @@ auto run_frame_demand(
     .view = {},
     .mode = MLN_RENDER_MODE_PARTIAL,
   };
+  if (session->target_released) {
+    // No target can take the frame. Tile and placement results still reach
+    // the renderer, so it has the map ready for the next target.
+    const auto status = deliver_pending_session_work(session);
+    result.disposition = finish_failed_attempt(
+      session, status == MLN_STATUS_OK ? MLN_STATUS_NOT_READY : status
+    );
+    publish_frame_result(session, result);
+    return;
+  }
   const auto waits_for_update =
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
   auto rendered_map_generation = result.map_update_generation;
@@ -3892,10 +3997,14 @@ auto make_ordered_resize_work(
       const auto width = physical_dimension(extent.width, extent.scale_factor);
       const auto height =
         physical_dimension(extent.height, extent.scale_factor);
-      if (session->kind == RenderSessionKind::Surface)
-        session->surface.backend->resize(width, height);
-      else
-        session->texture.backend->resize({width, height});
+      // A released target has nothing to resize. The next target brings its
+      // own extent.
+      if (!session->target_released) {
+        if (session->kind == RenderSessionKind::Surface)
+          session->surface.backend->resize(width, height);
+        else
+          session->texture.backend->resize({width, height});
+      }
       {
         auto wakes = DeferredWakes{};
         const auto lock = std::scoped_lock{session->control_mutex};

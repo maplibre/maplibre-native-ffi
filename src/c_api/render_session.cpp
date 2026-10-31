@@ -101,6 +101,15 @@ auto mln_render_session_resize(
   });
 }
 
+auto mln_render_session_release_target(
+  mln_render_session session, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::render_session_release_target_start(session, completion);
+  });
+}
+
 auto mln_render_session_barrier(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

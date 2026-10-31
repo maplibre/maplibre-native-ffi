@@ -2874,8 +2874,8 @@ public data class WebGpuSurfaceDescriptor(
   /** Borrowed WebGPU context. device is required. */
   public val context: WebGpuContextDescriptor,
   /**
-   * Borrowed WGPUSurface. Required, and must stay alive for the session. The session configures it
-   * for this device and extent, and unconfigures it when the session ends.
+   * Borrowed WGPUSurface. Required, and must stay alive until the session ends, replaces it, or
+   * releases it. The session configures it for this device and extent, and unconfigures it then.
    */
   public val surface: NativePointer,
   /**

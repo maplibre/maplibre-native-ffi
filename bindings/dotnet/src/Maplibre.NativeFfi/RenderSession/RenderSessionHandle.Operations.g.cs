@@ -491,6 +491,26 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Starts releasing the session's surface or borrowed texture ring while
+    /// keeping its renderer.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_release_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task ReleaseTargetAsync()
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_release_target(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Requests a frame without waiting. Every accepted demand produces one
     /// terminal result record. Caller-driver sessions require service on the
     /// graphics thread. Core-worker sessions need no host service.

@@ -5910,6 +5910,19 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
+  /// Starts releasing the session's surface or borrowed texture ring while
+  /// keeping its renderer.
+  ///
+  /// See `mln_render_session_release_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  Future<void> releaseTarget() => _run(
+    (arena, completion) => raw.mln_render_session_release_target(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Requests a frame without waiting. Every accepted demand produces one
   /// terminal result record. Caller-driver sessions require service on the
   /// graphics thread. Core-worker sessions need no host service.
