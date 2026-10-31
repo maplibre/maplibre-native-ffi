@@ -1,0 +1,125 @@
+Fails to parse JSON whose arrays and objects nest more than 256 deep, with
+kParseErrorDepth. The recursive parser uses about 66 bytes of stack per level,
+so a deeply nested document overflowed the thread's stack and crashed: a
+128 KB musl thread held about 1,900 levels. The limit also bounds everything
+that walks a parsed document recursively afterwards, such as converting it to
+a value or a GeoJSON geometry, and freeing it
+(https://github.com/maplibre/maplibre-native-ffi/issues/1475).
+Upstream: not proposed
+
+diff --git a/vendor/rapidjson/include/rapidjson/reader.h b/vendor/rapidjson/include/rapidjson/reader.h
+index 5554660..7b9d270 100644
+--- a/vendor/rapidjson/include/rapidjson/reader.h
++++ b/vendor/rapidjson/include/rapidjson/reader.h
+@@ -140,6 +140,18 @@ RAPIDJSON_NAMESPACE_BEGIN
+ #define RAPIDJSON_PARSE_DEFAULT_FLAGS kParseNoFlags
+ #endif
+ 
++/*! \def RAPIDJSON_PARSE_MAX_DEPTH
++    \ingroup RAPIDJSON_CONFIG
++    \brief User-defined limit on how deeply arrays and objects nest.
++
++    The recursive parser uses stack at each level, so a deeper document fails
++    with \c kParseErrorDepth rather than overflowing the stack. The iterative
++    parser does not recurse and ignores the limit.
++*/
++#ifndef RAPIDJSON_PARSE_MAX_DEPTH
++#define RAPIDJSON_PARSE_MAX_DEPTH 256
++#endif
++
+ //! Combination of parseFlags
+ /*! \see Reader::Parse, Document::Parse, Document::ParseInsitu, Document::ParseStream
+  */
+@@ -545,7 +557,7 @@ public:
+         \param stackCapacity stack capacity in bytes for storing a single decoded string.  (Only use for non-destructive parsing)
+     */
+     GenericReader(StackAllocator* stackAllocator = 0, size_t stackCapacity = kDefaultStackCapacity) :
+-        stack_(stackAllocator, stackCapacity), parseResult_(), state_(IterativeParsingStartState) {}
++        stack_(stackAllocator, stackCapacity), parseResult_(), state_(IterativeParsingStartState), depth_(0) {}
+ 
+     //! Parse JSON text.
+     /*! \tparam parseFlags Combination of \ref ParseFlag.
+@@ -561,6 +573,7 @@ public:
+             return IterativeParse<parseFlags>(is, handler);
+ 
+         parseResult_.Clear();
++        depth_ = 0;
+ 
+         ClearStackOnExit scope(*this);
+ 
+@@ -1755,8 +1768,17 @@ private:
+             case 't': ParseTrue  <parseFlags>(is, handler); break;
+             case 'f': ParseFalse <parseFlags>(is, handler); break;
+             case '"': ParseString<parseFlags>(is, handler); break;
+-            case '{': ParseObject<parseFlags>(is, handler); break;
+-            case '[': ParseArray <parseFlags>(is, handler); break;
++            case '{':
++            case '[':
++                if (RAPIDJSON_UNLIKELY(depth_ >= RAPIDJSON_PARSE_MAX_DEPTH))
++                    RAPIDJSON_PARSE_ERROR(kParseErrorDepth, is.Tell());
++                ++depth_;
++                if (is.Peek() == '{')
++                    ParseObject<parseFlags>(is, handler);
++                else
++                    ParseArray<parseFlags>(is, handler);
++                --depth_;
++                break;
+             default :
+                       ParseNumber<parseFlags>(is, handler);
+                       break;
+@@ -2227,6 +2249,7 @@ private:
+     internal::Stack<StackAllocator> stack_;  //!< A stack for storing decoded string temporarily during non-destructive parsing.
+     ParseResult parseResult_;
+     IterativeParsingState state_;
++    unsigned depth_; //!< How many arrays and objects the recursive parser is inside.
+ }; // class GenericReader
+ 
+ //! Reader with UTF8 encoding and default allocator.
+diff --git a/vendor/rapidjson/include/rapidjson/error/error.h b/vendor/rapidjson/include/rapidjson/error/error.h
+index 6270da1..32bdbed 100644
+--- a/vendor/rapidjson/include/rapidjson/error/error.h
++++ b/vendor/rapidjson/include/rapidjson/error/error.h
+@@ -86,7 +86,9 @@ enum ParseErrorCode {
+     kParseErrorNumberMissExponent,              //!< Miss exponent in number.
+ 
+     kParseErrorTermination,                     //!< Parsing was terminated.
+-    kParseErrorUnspecificSyntaxError            //!< Unspecific syntax error.
++    kParseErrorUnspecificSyntaxError,           //!< Unspecific syntax error.
++
++    kParseErrorDepth                            //!< Arrays and objects nest deeper than RAPIDJSON_PARSE_MAX_DEPTH.
+ };
+ 
+ //! Result of parsing (wraps ParseErrorCode)
+diff --git a/vendor/rapidjson/include/rapidjson/error/en.h b/vendor/rapidjson/include/rapidjson/error/en.h
+index 5d2e57b..ad20fc3 100644
+--- a/vendor/rapidjson/include/rapidjson/error/en.h
++++ b/vendor/rapidjson/include/rapidjson/error/en.h
+@@ -61,6 +61,8 @@ inline const RAPIDJSON_ERROR_CHARTYPE* GetParseError_En(ParseErrorCode parseErro
+         case kParseErrorTermination:                    return RAPIDJSON_ERROR_STRING("Terminate parsing due to Handler error.");
+         case kParseErrorUnspecificSyntaxError:          return RAPIDJSON_ERROR_STRING("Unspecific syntax error.");
+ 
++        case kParseErrorDepth:                          return RAPIDJSON_ERROR_STRING("Arrays and objects nest too deeply.");
++
+         default:                                        return RAPIDJSON_ERROR_STRING("Unknown error.");
+     }
+ }
+diff --git a/test/style/style_parser.test.cpp b/test/style/style_parser.test.cpp
+index 5fd1778..a86ddac 100644
+--- a/test/style/style_parser.test.cpp
++++ b/test/style/style_parser.test.cpp
+@@ -314,3 +314,15 @@ TEST(StyleParser, ZoomCurve) {
+     ASSERT_TRUE(expr2);
+     ASSERT_TRUE(findZoomCurveChecked(*expr2).is<std::nullptr_t>());
+ }
++
++TEST(StyleParser, NestingDepthLimit) {
++    const auto parse = [](std::size_t depth) {
++        style::Parser parser;
++        return util::toString(parser.parse(std::string(depth, '[') + std::string(depth, ']')));
++    };
++
++    EXPECT_EQ(parse(256), "style must be an object");
++    EXPECT_EQ(parse(257), "Arrays and objects nest too deeply. at offset 256");
++    // Deep enough to overflow the stack if the parser recursed through it all.
++    EXPECT_EQ(parse(1000000), "Arrays and objects nest too deeply. at offset 256");
++}
