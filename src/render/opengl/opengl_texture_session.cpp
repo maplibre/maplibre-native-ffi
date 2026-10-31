@@ -264,8 +264,8 @@ void release_metal_event(void* event) noexcept {
 
 // Whether the display exports the sync files it advertises. The OpenHarmony
 // emulator's advertises EGL_ANDROID_native_fence_sync but refuses to create
-// such a fence. Nothing is current at attach, so this exports one from a
-// context of its own.
+// such a fence. The session's context does not exist yet at attach, so this
+// exports one from a context of its own and restores the thread's.
 auto exports_sync_files(
   const mln_open_gl_context_descriptor& context, const EglNativeFences& fences
 ) -> bool {
