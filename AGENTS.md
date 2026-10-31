@@ -43,18 +43,14 @@ environment rather than skip a test.
 
 ## Documentation
 
-The docs site introduces concepts and tasks at a high level. Contracts belong in
-doc comments: the C headers and each binding's package docs. No doc narrates how
-the code is implemented; a comment inside the code explains a non-obvious choice
-where it is made. The site's Development section holds only what maintainers
-need and the code cannot say:
+Follow the documentation section of the
+[Guidelines](docs/src/content/docs/development/guidelines.md). The site's
+Development section holds:
 
 - [Overview](docs/src/content/docs/development/overview.md): machine setup,
   cross-compilation, and debugging on a CI runner.
-- [C API guidelines](docs/src/content/docs/development/c-api-guidelines.md):
-  read before you change a C declaration.
-- [Releases and snapshots](docs/src/content/docs/development/versioning.md):
-  versions, tags, snapshot publishing, and registry setup.
+- [Guidelines](docs/src/content/docs/development/guidelines.md): read before you
+  change the public API or documentation.
 
 ## Issues and pull requests
 
