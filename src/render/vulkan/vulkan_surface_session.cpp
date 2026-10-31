@@ -275,7 +275,11 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       const auto candidate_transform =
         candidate_capabilities.supportedTransforms !=
         vk::SurfaceTransformFlagBitsKHR::eIdentity;
-      if (candidate_transform != hasSurfaceTransformSupport()) {
+      // mbgl reports no transform support without a surface, so a released
+      // session compares against what it recorded when it let go.
+      const auto compiled_transform =
+        surface ? hasSurfaceTransformSupport() : released_transform_support;
+      if (candidate_transform != compiled_transform) {
         return false;
       }
 
@@ -326,6 +330,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       acquireSemaphores.clear();
       presentSemaphores.clear();
       readTexture.reset();
+      released_transform_support = hasSurfaceTransformSupport();
       // The swapchain goes before the surface it was created from.
       swapchain.reset();
       static_cast<void>(surface.release());
@@ -334,6 +339,9 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
 
    private:
     VkSurfaceKHR borrowed_surface = VK_NULL_HANDLE;
+    // Whether the shaders were compiled for a pre-rotated surface, recorded by
+    // release_surface().
+    bool released_transform_support = false;
   };
 
  public:
