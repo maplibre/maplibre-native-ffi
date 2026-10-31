@@ -152,7 +152,8 @@ function(mln_ffi_configure_platform target)
   # oldest supported OS. This covers MapLibre Native's core and the platform
   # sources that this target compiles.
   set(MLN_FFI_APPLE_AVAILABILITY_ERROR
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-Werror=unguarded-availability-new>)
+      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-Werror=unguarded-availability-new>
+  )
   target_compile_options(
     mbgl-compiler-options
     INTERFACE ${MLN_FFI_APPLE_AVAILABILITY_ERROR})
@@ -162,6 +163,7 @@ function(mln_ffi_configure_platform target)
     set_target_properties(
       ${target}
       PROPERTIES
-        BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "${PROJECT_BINARY_DIR}")
+        BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "${PROJECT_BINARY_DIR}"
+    )
   endif()
 endfunction()

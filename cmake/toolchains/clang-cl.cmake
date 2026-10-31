@@ -14,11 +14,13 @@ if(CMAKE_HOST_WIN32)
 endif()
 
 set(MLN_FFI_WINSYSROOT "$ENV{MLN_FFI_WINSYSROOT}"
-    CACHE PATH "MSVC runtime and Windows SDK in the clang-cl /winsysroot layout")
+    CACHE PATH "MSVC runtime and Windows SDK in the clang-cl /winsysroot layout"
+)
 if(NOT IS_DIRECTORY "${MLN_FFI_WINSYSROOT}/VC/Tools/MSVC")
   message(
     FATAL_ERROR
-      "Cross-compiling for Windows needs MLN_FFI_WINSYSROOT to name a /winsysroot tree; install one with `mise -E msvc install`")
+      "Cross-compiling for Windows needs MLN_FFI_WINSYSROOT to name a /winsysroot tree; install one with `mise -E msvc install`"
+  )
 endif()
 
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MLN_FFI_TARGET_ARCHITECTURE

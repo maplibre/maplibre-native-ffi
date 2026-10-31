@@ -32,7 +32,8 @@ set(MLN_NATIVE_BROWSER_SHARDS
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.
-set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten icu)
+set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten icu
+)
 
 function(mln_native_active_file_tags out_var)
   set(tags ${MLN_FFI_RENDER_BACKEND})
@@ -573,7 +574,8 @@ function(mln_native_bound_test test_name target timeout)
   endif()
   set_target_properties(
     ${target}
-    PROPERTIES CROSSCOMPILING_EMULATOR "${PROJECT_SOURCE_DIR}/tools/devices/run")
+    PROPERTIES CROSSCOMPILING_EMULATOR "${PROJECT_SOURCE_DIR}/tools/devices/run"
+  )
   math(EXPR deadline "${timeout} - 30")
   set(environment "MLN_FFI_DEVICE_INSTALL=${CMAKE_INSTALL_PREFIX}"
       "MLN_FFI_DEVICE_TIMEOUT=${deadline}")

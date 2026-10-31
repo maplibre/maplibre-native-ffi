@@ -117,7 +117,7 @@ link = "https://github.com/python/cpython/issues/98297"
 bindings = ["python"]
 platforms = ["tvos", "visionos"]
 status = "blocked"
-reason = "CPython's tvOS and visionOS support has landed in its 3.16 development branch, but no released runtime supports them, including the project's pinned Python 3.15.1."
+reason = "CPython's tvOS and visionOS support has landed in its 3.16 development branch, but no released runtime supports them, including the project's pinned Python 3.15.2."
 link = "https://github.com/python/cpython/pull/159944"
 
 [[entry]]

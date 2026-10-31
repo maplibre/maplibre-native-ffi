@@ -42,8 +42,10 @@ set(_mln_pool_transport 1)
 set(_mln_pool_per_runtime 8)
 # Each render session's core worker.
 set(_mln_pool_per_session 1)
-math(EXPR _mln_pool_default
-     "${_mln_pool_host} + ${_mln_pool_maplibre_workers} + ${_mln_pool_maplibre_sequenced} + ${_mln_pool_lanes} + ${_mln_pool_transport} + ${_mln_pool_per_runtime} + ${_mln_pool_per_session}")
+math(
+  EXPR _mln_pool_default
+  "${_mln_pool_host} + ${_mln_pool_maplibre_workers} + ${_mln_pool_maplibre_sequenced} + ${_mln_pool_lanes} + ${_mln_pool_transport} + ${_mln_pool_per_runtime} + ${_mln_pool_per_session}"
+)
 set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "${_mln_pool_default}"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
@@ -83,6 +85,7 @@ if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
   set(MLN_WEBGPU_EMDAWN_SUSPEND "-sJSPI"
       CACHE
         STRING
-        "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)")
+        "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)"
+  )
 endif()
 add_compile_options(-fwasm-exceptions)

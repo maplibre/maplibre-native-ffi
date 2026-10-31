@@ -8,8 +8,9 @@ project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
   # The OHOS SDK toolchain injects --gcc-toolchain, which clang reports as
   # unused. Keep the warning non-fatal without weakening other platforms.
-  add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-unused-command-line-argument>
-                      $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-command-line-argument>)
+  add_compile_options(
+    $<$<COMPILE_LANGUAGE:C>:-Wno-unused-command-line-argument>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-command-line-argument>)
   # The toolchain appends OHOS_COMPATIBLE_SDK_VERSION to the target triple, and
   # the SDK headers mark each declaration with the API that introduced it.
   # Clang checks a call against that floor only when this warning is enabled.
@@ -82,7 +83,8 @@ if(MLN_FFI_ARTIFACT_NAME)
   set(CPACK_GENERATOR TGZ)
   set(CPACK_PACKAGE_NAME maplibre-native-c)
   set(CPACK_PACKAGE_FILE_NAME "maplibre-native-c-${MLN_FFI_ARTIFACT_NAME}")
-  set(CPACK_PACKAGE_DIRECTORY "${PROJECT_SOURCE_DIR}/build/packages/native/dist")
+  set(CPACK_PACKAGE_DIRECTORY "${PROJECT_SOURCE_DIR}/build/packages/native/dist"
+  )
   set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
   set(CPACK_MONOLITHIC_INSTALL ON)
   # Apple packages keep the stripped symbols in a dSYM beside each binary.

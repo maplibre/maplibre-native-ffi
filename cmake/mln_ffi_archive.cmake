@@ -67,7 +67,8 @@ function(mln_ffi_bundle_clang_cxx_runtime target notice)
       # The second rename is the compiler-generated reference to the first and
       # has to move with it.
       MLN_FFI_ARCHIVE_RENAME_SYMBOLS
-      "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0")
+      "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
+  )
 endfunction()
 
 set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES

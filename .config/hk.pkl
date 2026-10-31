@@ -2,9 +2,9 @@
 // Repository-wide tools are installed at the root. Language-specific steps
 // enter their binding's mise context and install that toolchain on demand.
 
-amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Config.pkl"
 
-import "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Builtins.pkl"
 
 steps {
   ["dprint"] = (Builtins.dprint) {
@@ -83,7 +83,7 @@ steps {
   }
   ["ty"] {
     glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
-    check = "uv run --no-sync ty check --error-on-warning --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable {{files}}"
+    check = "uv run --no-sync ty check --error-on-warning {{files}}"
   }
   // The generator ignores no diagnostic. The Python emitters wait for their
   // rewrite onto the safe Rust crate.

@@ -6,7 +6,8 @@ function(mln_ffi_link_rust_platform target)
   if(NOT rust_target)
     message(
       FATAL_ERROR
-        "Rust platform support needs MLN_FFI_RUST_TARGET, which the preset sets")
+        "Rust platform support needs MLN_FFI_RUST_TARGET, which the preset sets"
+    )
   endif()
 
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/target"
@@ -15,10 +16,12 @@ function(mln_ffi_link_rust_platform target)
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
   if(MSVC)
     set(rust_library
-        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/mln_ffi_platform.lib")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/mln_ffi_platform.lib"
+    )
   else()
     set(rust_library
-        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/libmln_ffi_platform.a")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/libmln_ffi_platform.a"
+    )
   endif()
   file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
        "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
@@ -47,7 +50,8 @@ function(mln_ffi_link_rust_platform target)
     else()
       message(
         FATAL_ERROR
-          "Android Rust platform builds support armv7-linux-androideabi, aarch64-linux-android, i686-linux-android, and x86_64-linux-android; got ${rust_target}")
+          "Android Rust platform builds support armv7-linux-androideabi, aarch64-linux-android, i686-linux-android, and x86_64-linux-android; got ${rust_target}"
+      )
     endif()
     set(android_cc "${rust_compiler_dir}/${android_tool_prefix}-clang")
     set(android_cxx "${rust_compiler_dir}/${android_tool_prefix}-clang++")
@@ -58,7 +62,8 @@ function(mln_ffi_link_rust_platform target)
     else()
       message(
         FATAL_ERROR
-          "Android Rust build requires target-prefixed NDK compilers: ${android_cc} and ${android_cxx}")
+          "Android Rust build requires target-prefixed NDK compilers: ${android_cc} and ${android_cxx}"
+      )
     endif()
   endif()
 
@@ -73,8 +78,9 @@ function(mln_ffi_link_rust_platform target)
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
   if(MSVC)
-    list(APPEND rust_environment
-         "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
+    list(
+      APPEND rust_environment
+      "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
   endif()
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std

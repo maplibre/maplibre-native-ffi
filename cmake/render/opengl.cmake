@@ -53,7 +53,8 @@ function(mln_ffi_configure_render_dependencies target)
             MLN_FFI_INSTALL_LOADER_FILES
             "${MLN_FFI_EGL_LIBRARY};${MLN_FFI_GLES_LIBRARY}"
             MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
-            "${MLN_FFI_EGL_INCLUDE_DIRS}/EGL;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES2;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES3;${MLN_FFI_EGL_INCLUDE_DIRS}/KHR")
+            "${MLN_FFI_EGL_INCLUDE_DIRS}/EGL;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES2;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES3;${MLN_FFI_EGL_INCLUDE_DIRS}/KHR"
+        )
       endif()
     elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS)$")
       find_library(MLN_FFI_EGL_LIBRARY NAMES EGL REQUIRED)
@@ -193,7 +194,8 @@ function(mln_ffi_configure_renderer target)
       ${MLN_FFI_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp
       PROPERTIES
         COMPILE_OPTIONS
-        "${force_include}${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;${force_include}${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
+        "${force_include}${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;${force_include}${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h"
+    )
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     target_compile_definitions(
@@ -207,7 +209,8 @@ function(mln_ffi_configure_renderer target)
   else()
     message(
       FATAL_ERROR
-        "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
+        "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
+    )
   endif()
 
   # An OpenGL surface descriptor names a context and the surface to present to

@@ -19,8 +19,10 @@ function(mln_ffi_install_package_config target)
   separate_arguments(archives NATIVE_COMMAND "${MLN_FFI_PKG_CONFIG_ARCHIVES}")
   foreach(archive IN LISTS archives)
     string(REGEX REPLACE "^-l" "" library "${archive}")
-    list(APPEND MLN_FFI_CMAKE_LIBRARIES
-         "\${PACKAGE_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${library}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    list(
+      APPEND MLN_FFI_CMAKE_LIBRARIES
+      "\${PACKAGE_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${library}${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
   endforeach()
   get_target_property(libraries mln_ffi_platform_dependencies
                       MLN_FFI_PKG_CONFIG_LIBS)

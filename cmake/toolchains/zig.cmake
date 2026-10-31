@@ -134,7 +134,8 @@ foreach(MLN_FFI_LLVM_TOOL ar nm objcopy objdump strip)
   if(NOT EXISTS "${MLN_FFI_LLVM_TOOLS}/llvm-${MLN_FFI_LLVM_TOOL}")
     message(
       FATAL_ERROR
-        "The Rust toolchain has no llvm-${MLN_FFI_LLVM_TOOL}; add its llvm-tools component")
+        "The Rust toolchain has no llvm-${MLN_FFI_LLVM_TOOL}; add its llvm-tools component"
+    )
   endif()
   string(TOUPPER "${MLN_FFI_LLVM_TOOL}" MLN_FFI_LLVM_VARIABLE)
   set(CMAKE_${MLN_FFI_LLVM_VARIABLE}

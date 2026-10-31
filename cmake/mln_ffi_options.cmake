@@ -58,7 +58,8 @@ function(mln_ffi_configure_options)
     if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(egl|wgl|webgl)$")
       message(
         FATAL_ERROR
-          "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
+          "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
+      )
     endif()
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl" AND NOT WIN32)
       message(FATAL_ERROR "OpenGL WGL builds require Windows")
@@ -124,7 +125,8 @@ function(mln_ffi_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     message(
       STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
+        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
+    )
   else()
     message(
       STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")

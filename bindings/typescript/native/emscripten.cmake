@@ -26,7 +26,8 @@ endblock()
 # The settings that every module linking the archives must share, such as
 # pthreads, the heap size, and the exception model.
 set(MLN_FFI_LINK_FLAGS_FILE
-    "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/emscripten-link-flags.txt")
+    "${MLN_FFI_NATIVE_PREFIX}/share/maplibre-native-c/emscripten-link-flags.txt"
+)
 file(STRINGS "${MLN_FFI_LINK_FLAGS_FILE}" MLN_FFI_LINK_FLAGS)
 list(FILTER MLN_FFI_LINK_FLAGS EXCLUDE REGEX "^[ \t]*$")
 # The browser entry passes the pool size that its caller asks for as

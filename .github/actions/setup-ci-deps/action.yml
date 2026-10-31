@@ -519,7 +519,7 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       with:
         # Match `min_version` in .config/mise.toml.
-        version: 2026.10.19
+        version: 2026.10.24
         cache: false
         bootstrap: true
         # The files phase installs Linux packages. Skip it on Windows so

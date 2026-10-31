@@ -10,7 +10,7 @@ sidebar:
 
 Install the platform prerequisites:
 
-- On macOS Apple Silicon, install Homebrew and Xcode 26.0.1.
+- On macOS Apple Silicon, install Homebrew and Xcode 26.4.1.
 - On Linux, mise bootstrap installs the development libraries on Ubuntu and
   Fedora. On other distributions, install the packages that
   `.config/mise.linux.toml` lists.

@@ -19,7 +19,8 @@ endfunction()
 
 function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_WEBGPU=1)
-  mln_ffi_target_project_sources(${target}
-                                 ${PROJECT_SOURCE_DIR}/src/render/webgpu/webgpu_texture_session.cpp)
+  mln_ffi_target_project_sources(
+    ${target} ${PROJECT_SOURCE_DIR}/src/render/webgpu/webgpu_texture_session.cpp
+  )
   target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
 endfunction()

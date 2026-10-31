@@ -14,8 +14,9 @@ function(mln_ffi_configure_linux_archive_contents target)
   # directories, and the paths differ per optimization level, so ask a release
   # link which ones it resolves rather than guessing the layout.
   set(probe_source "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe.cpp")
-  file(WRITE "${probe_source}"
-       "#include <stdexcept>\nint main() { try { throw std::runtime_error(\"\"); } catch (...) { return 1; } }\n"
+  file(
+    WRITE "${probe_source}"
+    "#include <stdexcept>\nint main() { try { throw std::runtime_error(\"\"); } catch (...) { return 1; } }\n"
   )
   separate_arguments(probe_flags NATIVE_COMMAND "${CMAKE_CXX_FLAGS_RELEASE}")
   execute_process(
