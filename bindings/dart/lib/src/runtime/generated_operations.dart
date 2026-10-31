@@ -2748,6 +2748,21 @@ final _resultTextureReadbackResult = _CompletionValue(
   ),
 );
 
+/// Initializes Android platform services.
+///
+/// See `mln_android_init` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+void initAndroid(NativePointer jniEnv, NativePointer context) {
+  ensureAbiVersion();
+  return _check(
+    raw.mln_android_init(
+      Pointer<Void>.fromAddress(jniEnv.address).cast(),
+      Pointer<Void>.fromAddress(context.address).cast(),
+      nativeDiagnostic,
+    ),
+  );
+}
+
 /// Reports the C ABI contract version. The value is 0 while the ABI is
 /// unstable, and will increment on each SemVer major release.
 ///

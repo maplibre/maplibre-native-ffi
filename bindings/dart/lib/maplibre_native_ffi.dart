@@ -32,11 +32,9 @@
 /// Returned JSON is the value that `jsonDecode` reads, and absent JSON is
 /// `null`, as JSON null is. A value compares its JSON members by content.
 ///
-/// On Android, the app's host code must call `mln_android_init` with a
-/// `JNIEnv*` and a `Context` before Dart creates a runtime, for example from a
-/// JNI function that the Flutter activity calls in `onCreate`. The binding has
-/// no Dart form of that call, because an isolate cannot safely obtain either
-/// pointer.
+/// On Android, call [initAndroid] before you create a runtime, with the
+/// calling thread's `JNIEnv*` and an Android `Context`, which `package:jni`
+/// and `package:jni_flutter` can provide.
 ///
 /// A pending completion keeps its isolate alive, and a callback registration
 /// does not. To wait for a callback, keep the isolate alive yourself, for

@@ -6,5 +6,5 @@ native library. Most applications depend on
 [`maplibre-native-ffi`](https://crates.io/crates/maplibre-native-ffi), the
 low-level safe binding, instead.
 
-- [Install](https://maplibre.org/maplibre-native-ffi/install/#rust)
+- [Install](https://maplibre.org/maplibre-native-ffi/install/rust/)
 - [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/)

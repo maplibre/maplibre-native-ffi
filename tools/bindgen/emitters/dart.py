@@ -30,10 +30,6 @@ from .dart_values import (
     variant_name,
 )
 
-# Functions that only host platform code can call. `mln_android_init` takes a
-# `JNIEnv*` and a `Context`, which an isolate has no safe way to obtain, so a
-# Flutter app's Android host code calls it before the isolate starts.
-HOST_ONLY = {"mln_android_init"}
 # The platforms that the package builds for. Its library serves them all, so it
 # leaves out only what none of them can use.
 TARGETS = frozenset({"android", "ios", "linux", "macos", "windows"})
@@ -138,11 +134,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             return None
 
     def operation(plan: OperationPlan) -> str | None:
-        if (
-            plan.name in HOST_ONLY
-            or plan.name in bound.unsupported
-            or plan.scoped_receiver
-        ):
+        if plan.name in bound.unsupported or plan.scoped_receiver:
             return None
         name = method_name(plan, bound)
         if plan.view:
@@ -212,8 +204,6 @@ def _lower(api: Api | BoundApi):
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     for plan in bound.operations:
-        if plan.name in HOST_ONLY:
-            continue
         try:
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)

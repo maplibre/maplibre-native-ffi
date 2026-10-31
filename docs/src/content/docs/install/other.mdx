@@ -1,14 +1,9 @@
 ---
-title: Install
-description: Add a language binding and its native library to a project.
+title: Other languages
+description: Setup for the languages whose pages aren't written yet.
+sidebar:
+  order: 99
 ---
-
-Choose a render backend first. Prefer Metal for Apple platforms, OpenGL for
-emulators and virtual machines, and Vulkan for other platforms. Then install the
-C library, a binding for your language, or both. Each section covers its tagged
-releases, where they exist, and its snapshot channel. See the
-[support matrix](/maplibre-native-ffi/#status) for platform, architecture, and
-backend coverage.
 
 ## C library
 
@@ -136,6 +131,29 @@ The recipe links the complete static library through the
 add `-o "maplibre-native-c/*:libc=musl"` for musl. On Windows, pass
 `-s compiler.runtime=static`.
 
+### Link from Android native code
+
+An Android app's native code can link the C library from a Kotlin runtime AAR
+through [Prefab](https://developer.android.com/build/native-dependencies), with
+CMake or ndk-build:
+
+```kotlin title="build.gradle.kts"
+android {
+  buildFeatures {
+    prefab = true
+  }
+}
+
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:{{version}}")
+}
+```
+
+```cmake title="CMakeLists.txt"
+find_package(maplibre-native-c REQUIRED CONFIG)
+target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
+```
+
 ### Add the XCFramework to an Apple app
 
 `MaplibreNativeC.xcframework.zip` holds the framework `MaplibreNativeC` for
@@ -158,72 +176,6 @@ Swift imports the module `MaplibreNativeC`, and C includes
 
 Each binding wraps the C library in one language. Most carry or download the C
 library, and the sections that need an installed prefix say so.
-
-### Kotlin
-
-Add Maven Central, the binding, and the runtime for your backend. On the JVM,
-the binding needs JDK 25 or later.
-
-```kotlin title="build.gradle.kts"
-repositories {
-  mavenCentral()
-}
-
-dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi:{{version}}")
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{version}}")
-}
-```
-
-Take one runtime module:
-
-- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl`
-- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
-- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
-- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-webgpu`
-
-On the JVM, the runtime's native library comes in a separate JAR for each
-platform. Add the JAR of each platform the application runs on, by its
-classifier:
-
-```kotlin title="build.gradle.kts"
-dependencies {
-  runtimeOnly("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-jvm:{{version}}:natives-linux-x64")
-}
-```
-
-Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl. On
-Windows, choose `natives-windows-<arch>` for MSVC or
-`natives-windows-mingw-<arch>` for MinGW. Include only one for each
-architecture. Android and Kotlin/Native targets need no classifier.
-
-On Android, initialize platform services before you create a runtime, as
-[Android](#android) describes.
-
-For Kotlin/Wasm, add the binding and either the OpenGL runtime (WebGL) or the
-WebGPU runtime to `wasmJsMain`. Before using the binding, await
-`loadWasmModule()`. The browser bundle includes the selected runtime. The page
-must be cross-origin isolated; the
-[API reference](https://maplibre.org/maplibre-native-ffi/reference/kotlin/)
-describes the hosting requirements.
-
-For the snapshot channel, add the Maven snapshot repository and take the
-snapshot version of both modules. The runtime modules and Android initialization
-match the release.
-
-```kotlin title="build.gradle.kts"
-repositories {
-  maven("https://central.sonatype.com/repository/maven-snapshots/") {
-    content { includeGroup("org.maplibre.nativeffi") }
-  }
-  mavenCentral()
-}
-
-dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.1.0-SNAPSHOT")
-}
-```
 
 ### .NET
 
@@ -431,68 +383,6 @@ maplibre-native-ffi-runtime-vulkan = { index = "maplibre-snapshots" }
 The snapshot release holds only the latest wheels, so a lockfile that names an
 older snapshot fails to install once the snapshot moves on.
 
-### Rust
-
-Add the crate from [crates.io](https://crates.io/crates/maplibre-native-ffi).
-
-```bash frame="terminal"
-cargo add maplibre-native-ffi
-```
-
-The build script downloads the C library for the target. A browser build also
-needs a standard library built with atomics and the C library's link options,
-which the `maplibre-native-ffi-sys` documentation lists.
-
-To override the default backend, enable one feature: `opengl`, `metal`,
-`vulkan`, or `webgpu`. A feature on a target-specific dependency applies to that
-target alone.
-
-```toml title="Cargo.toml"
-[dependencies]
-maplibre-native-ffi = "{{version}}"
-
-[target.'cfg(target_os = "android")'.dependencies]
-maplibre-native-ffi = { version = "{{version}}", features = ["vulkan"] }
-```
-
-To build against your own copy of the [C library](#build-against-a-prefix), set
-`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` to the absolute path of its install prefix,
-which serves the one target it was built for. A Git or path dependency on the
-crate needs a local build.
-
-```toml title=".cargo/config.toml"
-[env]
-MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "../maplibre-native-ffi/build/macos-arm64-metal/install", relative = true }
-```
-
-For the snapshot channel, depend on the crate from Git at `main`. Cargo also
-fetches the repository's submodules, which takes a while the first time.
-Download `maplibre-native-c-<preset>.tar.gz` for your target from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
-unpack it in the workspace, and name the unpacked prefix in
-`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD`.
-
-```bash frame="terminal"
-curl -L https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz | tar -xz
-```
-
-```toml title="Cargo.toml"
-[dependencies]
-maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", branch = "main" }
-```
-
-```toml title=".cargo/config.toml"
-[env]
-MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "maplibre-native-c-linux-gnu-x64-vulkan", relative = true }
-```
-
-The snapshot rebuilds `main` once a day. If `main` has moved past it, replace
-`branch` with a `rev` set to the commit that the release names.
-
-To download through a mirror, set `MAPLIBRE_NATIVE_FFI_RELEASE_URL` to its base
-URL. The mirror serves each release tag as a directory that holds that release's
-archives.
-
 ### Swift
 
 Add the package from its
@@ -676,58 +566,3 @@ const maplibre = b.dependency("maplibre_native_ffi", .{
     .@"local-build" = b.option(std.Build.LazyPath, "local-build", "MapLibre Native C library build"),
 });
 ```
-
-## Platforms
-
-### macOS
-
-Apple provides neither Vulkan nor EGL, so a host that chooses one of those
-backends loads [MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
-[ANGLE](https://chromium.googlesource.com/angle/angle) itself.
-
-### Android
-
-An Android app using Kotlin/JVM depends on a Kotlin runtime AAR, which carries
-the native library for every ABI.
-
-```kotlin title="build.gradle.kts"
-implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{version}}")
-```
-
-A Kotlin/Native target gets the native library from its runtime KLIB, and the
-app packages nothing else for it.
-
-An app's native code, built with CMake or ndk-build, links the runtime AAR's
-library through
-[Prefab](https://developer.android.com/build/native-dependencies). The app can
-use any `ANDROID_STL`.
-
-```kotlin title="build.gradle.kts"
-android {
-  buildFeatures {
-    prefab = true
-  }
-}
-
-dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:{{version}}")
-}
-```
-
-```cmake title="CMakeLists.txt"
-find_package(maplibre-native-c REQUIRED CONFIG)
-target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
-```
-
-Android platform initialization is required once per process, before creating a
-runtime. Pass an `android.content.Context`; every binding exposes this call
-under its own name.
-
-### Web
-
-The WebGPU backend needs JSPI: Chrome 137 or Firefox 139 and later, not Safari.
-
-A page that loads a browser module must be cross-origin isolated: serve it with
-the `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp` headers. The module reserves a
-fixed 512 MB heap.

@@ -49,8 +49,11 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Overview", link: "/" },
-        { label: "Install", slug: "install" },
         { label: "Concepts", slug: "concepts" },
+        {
+          label: "Install",
+          items: [{ autogenerate: { directory: "install" } }],
+        },
         { label: "Examples", slug: "examples" },
         {
           label: "Guides",

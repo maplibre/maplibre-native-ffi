@@ -1066,6 +1066,7 @@ swift_platform = "ubuntu24.04"
 url = "https://download.swift.org/swift-6.4.2-release/ubuntu2404-aarch64/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE-ubuntu24.04-aarch64.tar.gz"
 
 [tools.swift."platforms.linux-x64"]
+checksum = "blake3:0e60554d242f44166ae70d868b3cece857b322d33b5369f6650a5007832ecd8d"
 url = "https://download.swift.org/swift-6.4.2-release/ubuntu2404/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE-ubuntu24.04.tar.gz"
 
 [[tools.zig]]

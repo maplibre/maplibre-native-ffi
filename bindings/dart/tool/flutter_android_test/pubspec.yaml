@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  jni: ^1.1.1
+  jni_flutter: ^1.0.4
   maplibre_native_ffi:
     path: ../..
 

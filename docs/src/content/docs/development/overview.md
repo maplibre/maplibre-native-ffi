@@ -3,13 +3,10 @@ title: Overview
 description: Set up a machine, build and test, and work on other targets.
 sidebar:
   order: 1
+# Scope: what a maintainer runs or installs by hand to set up, build, test,
+# change the engine, use CI, and release. Leave out what the tooling does on its
+# own, uncommon cases, and commands that upstream projects document.
 ---
-
-<!--
-Scope: what a maintainer runs or installs by hand to set up, build, test,
-change the engine, use CI, and release. Leave out what the tooling does on its
-own, uncommon cases, and commands that upstream projects document.
--->
 
 ## Set up
 

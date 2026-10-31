@@ -9,7 +9,6 @@ GENERATOR = ROOT / "tools/bindgen"
 
 # Per-binding policy tables keyed by C name, by file and assignment target.
 POLICY_TABLES = {
-    "emitters/dart.py": {"HOST_ONLY"},
     "emitters/dart_values.py": {"NOTES"},
     "emitters/dotnet.py": {"NOTES"},
     "emitters/kotlin.py": {"HANDWRITTEN"},
