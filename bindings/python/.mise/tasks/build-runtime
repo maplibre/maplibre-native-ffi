@@ -8,15 +8,17 @@ if [[ "$usage_preset" == android-* ]]; then
   exec "$MISE_MONOREPO_ROOT/scripts/build-python-android-wheel.sh" "$usage_preset"
 fi
 
-# The extension embeds the native archive, so a wheel carries one binary and
-# needs no repair. On Linux the link goes through zig: the archive is built
-# against the glibc in cmake/toolchains/zig.cmake, and the host's linker
-# would bind its libm references to the build machine's glibc instead.
+# Zig preserves the glibc floor from cmake/toolchains/zig.cmake; the host linker
+# would bind libm references to the build machine's newer glibc.
 install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 backend=$(jq -r .backend "$install_dir/share/maplibre-native-c/artifact.json")
 if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
   echo "No Python runtime serves the backend of $usage_preset." >&2
   exit 2
+fi
+runtime=$backend
+if [[ "$usage_preset" == mingw-* ]]; then
+  runtime+=-mingw
 fi
 python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" metadata . "$install_dir"
 maturin_flags=()
@@ -35,11 +37,15 @@ case "$usage_preset" in
   linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
   linux-gnu-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-gnu) ;;
   linux-musl-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-musl) ;;
+  mingw-*)
+    source "$MISE_MONOREPO_ROOT/tools/env/rust-cross-env.sh" "$usage_preset"
+    maturin_flags+=(--target "$cargo_target" --auditwheel repair)
+    ;;
 esac
 wheel_output=$(mktemp -d)
 trap 'rm -rf "$wheel_output"' EXIT
 mkdir -p dist
-cd "runtimes/$backend"
+cd "runtimes/$runtime"
 MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$install_dir" \
   uv run --project ../.. --no-sync maturin build --release --out "$wheel_output" \
   ${maturin_flags[@]+"${maturin_flags[@]}"}

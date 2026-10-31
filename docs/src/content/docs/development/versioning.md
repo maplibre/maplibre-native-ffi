@@ -32,6 +32,15 @@ annotated, and its message below the title line becomes the release notes. The
 The Publish snapshots workflow publishes every snapshot channel from `main`
 daily. Dispatch it to publish now.
 
+## PyPI publishers
+
+Before a distribution's first release, register its pending trusted publisher on
+PyPI for owner `maplibre`, repository `maplibre-native-ffi`, and workflow
+`release.yml`. Use the GitHub environment listed beside that distribution in the
+workflow's Python publication matrix. New runtime flavors need their own
+publishers and environments before release; snapshots use GitHub release assets
+instead.
+
 ## Documentation hosting
 
 GitHub Pages serves the documentation from the latest release at

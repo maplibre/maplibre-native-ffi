@@ -172,21 +172,38 @@ void main() {
         defaultBackend: 'vulkan',
         libraries: [
           'maplibre-native-c.dll',
-          'libstdc++-6.dll',
-          'libwinpthread-1.dll',
+          if (architecture == 'arm64') ...[
+            'libc++.dll',
+            'libunwind.dll',
+          ] else ...[
+            'libgcc_s_seh-1.dll',
+            'libstdc++-6.dll',
+            'libwinpthread-1.dll',
+          ],
         ],
       );
     }
 
-    for (final backend in ['opengl', 'vulkan']) {
-      test('serves the $backend prefix and its runtime DLLs', () async {
-        mingw(backend);
-        final output = await runHook(_windows, {
-          'local_build': 'build/mingw-x64-$backend/install',
-        });
-        expect(await bundled(output), 'windows-mingw-x64-$backend');
-        expect(output.assets.code, hasLength(3));
-      });
+    for (final architecture in [Architecture.x64, Architecture.arm64]) {
+      for (final backend in ['opengl', 'vulkan']) {
+        test(
+          'serves the $architecture $backend prefix and its runtime DLLs',
+          () async {
+            final arch = architecture == Architecture.arm64 ? 'arm64' : 'x64';
+            mingw(backend, architecture: arch);
+            final output = await runHook(
+              CodeAssetExtension(
+                targetArchitecture: architecture,
+                targetOS: OS.windows,
+                linkModePreference: LinkModePreference.dynamic,
+              ),
+              {'local_build': 'build/mingw-$arch-$backend/install'},
+            );
+            expect(await bundled(output), 'windows-mingw-$arch-$backend');
+            expect(output.assets.code, hasLength(arch == 'arm64' ? 3 : 4));
+          },
+        );
+      }
     }
 
     test('selects the default or requested backend in a build root', () async {
@@ -338,7 +355,7 @@ List<File> _writePrefix(
     ),
     for (final library in libraries)
       write(
-        '${platform.startsWith('windows-') ? 'bin' : 'lib'}/$library',
+        '${platform.startsWith('windows-') && library == 'maplibre-native-c.dll' ? 'bin' : 'lib'}/$library',
         '$platform-$backend',
       ),
   ];

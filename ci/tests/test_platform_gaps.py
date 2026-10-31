@@ -64,6 +64,15 @@ class PlatformGapsTest(unittest.TestCase):
         self.assertEqual(runtimes["metal"]["natives-macos-x64"], "macos-x64")
         self.assertNotIn("natives-macos-x64", runtimes["opengl"])
         self.assertNotIn("natives-macos-x64", runtimes["vulkan"])
+        for backend in ("opengl", "vulkan"):
+            for arch in ("x64", "arm64"):
+                self.assertEqual(
+                    runtimes[backend][f"natives-windows-{arch}"], f"windows-{arch}"
+                )
+                self.assertEqual(
+                    runtimes[backend][f"natives-windows-mingw-{arch}"],
+                    f"windows-mingw-{arch}",
+                )
         entry = gaps.Entry(
             0,
             {
@@ -124,7 +133,9 @@ class PlatformGapsTest(unittest.TestCase):
             "//bindings/dotnet:test",
             {suite.task for suite in suites.target_suites(target)},
         )
-        self.assertIsNone(plan.dotnet_runtime_target("mingw-x64-vulkan"))
+        self.assertEqual(
+            plan.dotnet_runtime_target("mingw-x64-vulkan"), ("Vulkan.MinGW", "win-x64")
+        )
         self.assertIn(
             "//bindings/dotnet:test",
             {

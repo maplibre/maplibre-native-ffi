@@ -20,6 +20,7 @@ case "$1" in
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
   macos-x64-*) cargo_target=x86_64-apple-darwin ;;
   mingw-x64-*) cargo_target=x86_64-pc-windows-gnu ;;
+  mingw-arm64-*) cargo_target=aarch64-pc-windows-gnullvm ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
   linux-gnu-riscv64-*) cargo_target=riscv64gc-unknown-linux-gnu ;;
@@ -32,15 +33,18 @@ case "$1" in
 esac
 
 case "$1" in
-  mingw-x64-*)
-    # Match the native build's MINGW64 compiler and MSVCRT runtime, even when
-    # Cargo itself runs on the MSVC host. LLD resolves the references between
-    # the native archive and Cargo's Rust platform layer in either order.
-    export CC_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
-    export CXX_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/clang++.exe"
-    export AR_x86_64_pc_windows_gnu="$MLN_FFI_MSYS2_ROOT/bin/llvm-ar.exe"
-    export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
-    export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS:+$CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS }-C link-arg=-fuse-ld=lld"
+  mingw-*)
+    # Cargo builds its host-side dependencies with the MSVC Rust toolchain.
+    source "$MISE_MONOREPO_ROOT/tools/env/windows-msvc-env.sh"
+    target_env="${cargo_target//-/_}"
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    export "CC_$target_env=$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
+    export "CXX_$target_env=$MLN_FFI_MSYS2_ROOT/bin/clang++.exe"
+    export "AR_$target_env=$MLN_FFI_MSYS2_ROOT/bin/llvm-ar.exe"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
+    rustflags_variable="CARGO_TARGET_${target_env_upper}_RUSTFLAGS"
+    rustflags=${!rustflags_variable:-}
+    export "$rustflags_variable=${rustflags:+$rustflags }-C link-arg=-fuse-ld=lld"
     ;;
   linux-musl-*64-*)
     target_env="${cargo_target//-/_}"

@@ -192,8 +192,10 @@ dependencies {
 }
 ```
 
-Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl.
-Android and Kotlin/Native targets need no classifier.
+Classifiers have the form `natives-<os>-<arch>`, with `linux-musl` for musl. On
+Windows, choose `natives-windows-<arch>` for MSVC or
+`natives-windows-mingw-<arch>` for MinGW. Include only one for each
+architecture. Android and Kotlin/Native targets need no classifier.
 
 On Android, initialize platform services before you create a runtime, as
 [Android](#android) describes.
@@ -239,6 +241,10 @@ Take one runtime package:
 - `Maplibre.NativeFfi.Runtime.OpenGL`
 - `Maplibre.NativeFfi.Runtime.Metal`
 - `Maplibre.NativeFfi.Runtime.Vulkan`
+
+For Windows with MinGW, take `Maplibre.NativeFfi.Runtime.OpenGL.MinGW` or
+`Maplibre.NativeFfi.Runtime.Vulkan.MinGW` instead. These alternatives carry
+Windows assets only; the packages above use MSVC on Windows.
 
 For the snapshot channel, download the packages from the
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
@@ -379,6 +385,10 @@ Take one runtime distribution. Importing `maplibre_native_ffi` raises
 - `maplibre-native-ffi-runtime-opengl`
 - `maplibre-native-ffi-runtime-metal`
 - `maplibre-native-ffi-runtime-vulkan`
+
+Windows also offers `maplibre-native-ffi-runtime-opengl-mingw` and
+`maplibre-native-ffi-runtime-vulkan-mingw`, built with MinGW and bundled with
+its runtime DLLs. Choose one instead of the corresponding MSVC runtime.
 
 Use Python 3.12 or later. To choose the runtime by platform, add an environment
 marker to each:

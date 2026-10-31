@@ -541,6 +541,10 @@ jobs:
             environment: pypi-runtime-metal
           - distribution: maplibre-native-ffi-runtime-vulkan
             environment: pypi-runtime-vulkan
+          - distribution: maplibre-native-ffi-runtime-opengl-mingw
+            environment: pypi-runtime-opengl-mingw
+          - distribution: maplibre-native-ffi-runtime-vulkan-mingw
+            environment: pypi-runtime-vulkan-mingw
     environment:
       name: ${{ matrix.environment }}
       url:

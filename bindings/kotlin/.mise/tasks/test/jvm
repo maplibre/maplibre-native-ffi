@@ -39,7 +39,7 @@ case "$usage_preset" in
       -Dorg.maplibre.nativeffi.test.classpath="$classpath" \
       org.maplibre.nativeffi.DeviceSuite "$suite/classes"
     ;;
-  linux-* | macos-* | windows-*) ;;
+  linux-* | macos-* | windows-* | mingw-*) ;;
   *)
     echo "The Kotlin/JVM suite tests host and FreeBSD presets only, got: $usage_preset" >&2
     exit 2

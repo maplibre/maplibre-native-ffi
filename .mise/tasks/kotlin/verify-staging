@@ -135,6 +135,12 @@ def native_licenses(backend: str, target: str) -> set[str]:
         )
     if backend == "opengl" and target.startswith("macos-"):
         licenses.add("angle.txt")
+    if target.startswith("windows-mingw-"):
+        licenses.update(
+            {"libc++.txt", "libunwind.txt"}
+            if target.endswith("-arm64")
+            else {"libstdc++.txt", "libgcc.txt", "libwinpthread.txt"}
+        )
     return licenses
 
 
@@ -423,7 +429,8 @@ def verify_jvm(root: pathlib.Path) -> None:
             )
             with zipfile.ZipFile(runtime) as jar:
                 verify_sbom(jar, "META-INF/sbom/maplibre-native-ffi.cdx.json")
-                prefix = f"META-INF/maplibre-native-ffi/{classifier}/"
+                resource_classifier = classifier.replace("windows-mingw-", "windows-")
+                prefix = f"META-INF/maplibre-native-ffi/{resource_classifier}/"
                 license_prefix = "META-INF/licenses/maplibre-native-c/"
                 native_libraries = [
                     name

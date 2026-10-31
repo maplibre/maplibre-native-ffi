@@ -158,32 +158,11 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 # Medium integration work with an established toolchain and approach.
 
 [[entry]]
-bindings = ["c"]
-platforms = ["windows-mingw"]
-archs = ["arm64"]
-backends = ["vulkan", "opengl"]
-status = "path-known"
-reason = "MSYS2's CLANGARM64 environment supplies an ARM64 toolchain. Extend the MSYS2 presets and runtime dependency handling for its UCRT and libc++, select Rust's matching `aarch64-pc-windows-gnullvm` target, and run the C suites on the Windows ARM64 runners."
-link = "https://www.msys2.org/docs/environments/"
-
-[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
 status = "blocked"
 reason = "Debian and Alpine's Java 25 Zero/libffi runtimes pass 76 of 77 binding tests under QEMU, but hang when a render-completion callback exits the JVM. Their shutdown stack traces omit the callback frames that the binding uses to avoid deadlocking session abandonment."
-
-[[entry]]
-bindings = ["kotlin-jvm"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "The JVM binding can load the MinGW C DLL. Select its native artifact, bundle or preload the MSYS2 runtime DLL dependencies, and run the suite on the Windows runners."
-
-[[entry]]
-bindings = ["python"]
-platforms = ["windows-mingw"]
-status = "path-known"
-reason = "The PyO3 extension embeds the C archive through the Rust sys crate. Add its MinGW artifact selection and linkage, build the extension for GNU-target Rust, package runtime DLL dependencies, and test the wheel with Windows CPython."
 
 # No supported toolchain or ABI.
 
@@ -360,7 +339,7 @@ link = "https://youtrack.jetbrains.com/issue/KT-73917"
 
 [[entry]]
 bindings = ["zig"]
-platforms = ["windows"]
+platforms = ["windows", "windows-mingw"]
 archs = ["arm64"]
 status = "blocked"
 reason = "Zig 0.17.0's native ARM64 compiler fails to load build.zig, and its x64 compiler hangs under emulation."
@@ -371,13 +350,6 @@ platforms = ["android"]
 archs = ["arm", "x86"]
 status = "blocked"
 reason = "CPython publishes Android runtimes for ARM64 and x64, not 32-bit Android targets."
-
-[[entry]]
-bindings = ["dotnet"]
-platforms = ["windows-mingw"]
-operations = ["package"]
-status = "path-known"
-reason = "MSVC and MinGW share NuGet's win-x64 runtime identifier and native DLL asset path. The runtime package currently ships MSVC. Define a distinct package flavor for the tested MinGW alternative before publishing both."
 
 [[entry]]
 bindings = ["c"]

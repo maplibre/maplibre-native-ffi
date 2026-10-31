@@ -3,7 +3,9 @@
 The ``maplibre-native-ffi`` distribution holds this package, and a runtime
 distribution holds the native extension for one render backend:
 ``maplibre-native-ffi-runtime-opengl``, ``maplibre-native-ffi-runtime-metal``,
-or ``maplibre-native-ffi-runtime-vulkan``. Importing the package raises
+or ``maplibre-native-ffi-runtime-vulkan``. Windows also offers the MinGW
+flavors ``maplibre-native-ffi-runtime-opengl-mingw`` and
+``maplibre-native-ffi-runtime-vulkan-mingw``. Importing the package raises
 ``ImportError`` unless exactly one runtime is installed.
 
 Commands and ordered queries return ``concurrent.futures.Future`` objects.

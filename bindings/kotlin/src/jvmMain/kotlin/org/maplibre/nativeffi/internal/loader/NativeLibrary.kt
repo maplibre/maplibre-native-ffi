@@ -239,7 +239,12 @@ internal object NativeLibrary {
 
   private fun loadRuntimeDependencies(directory: Path) {
     runtimeDependencyFileNames().forEach { fileName ->
-      val path = directory.resolve(fileName)
+      val path =
+        directory.resolve(fileName).let {
+          if (!Files.isRegularFile(it) && directory.fileName.toString() == "bin") {
+            directory.resolveSibling("lib").resolve(fileName)
+          } else it
+        }
       if (!Files.isRegularFile(path)) {
         return@forEach
       }
@@ -275,7 +280,18 @@ internal object NativeLibrary {
     val osName = System.getProperty("os.name").lowercase()
     return when {
       osName.contains("windows") ->
-        listOf("vulkan-1.dll", "libEGL.dll", "libGLESv2.dll", "EGL.dll", "GLESv2.dll")
+        listOf(
+          "libwinpthread-1.dll",
+          "libgcc_s_seh-1.dll",
+          "libstdc++-6.dll",
+          "libunwind.dll",
+          "libc++.dll",
+          "vulkan-1.dll",
+          "libEGL.dll",
+          "libGLESv2.dll",
+          "EGL.dll",
+          "GLESv2.dll",
+        )
       osName.contains("mac") ->
         listOf("libvulkan.1.dylib", "libvulkan.dylib", "libEGL.dylib", "libGLESv2.dylib")
       else ->

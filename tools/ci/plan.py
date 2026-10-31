@@ -55,7 +55,7 @@ def package_platforms(binding: str, all_targets: list[Target]) -> set[str]:
 
 
 def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
-    """The NuGet backend and RID, shared with the packager that consumes it."""
+    """The NuGet runtime package suffix and RID, shared with its packager."""
     target = gaps.target_from_name(preset)
     if gaps.gap("dotnet", target, "package"):
         return None
@@ -75,6 +75,8 @@ def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
     package_backend = {"opengl": "OpenGL", "metal": "Metal", "vulkan": "Vulkan"}[
         target.backend
     ]
+    if target.platform == "windows-mingw":
+        package_backend += ".MinGW"
     return package_backend, f"{rid_platform}-{target.arch}"
 
 
