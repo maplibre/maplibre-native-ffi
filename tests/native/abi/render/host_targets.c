@@ -3,6 +3,9 @@
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
 
+// OpenHarmony's fortified poll.h uses size_t without declaring it.
+#include <stddef.h>
+
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
 #include <EGL/egl.h>
 #endif

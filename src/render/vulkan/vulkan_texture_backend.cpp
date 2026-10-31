@@ -604,7 +604,7 @@ void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
       auto event = VkExportMetalSharedEventInfoEXT{
         .sType = VK_STRUCTURE_TYPE_EXPORT_METAL_SHARED_EVENT_INFO_EXT,
         .pNext = nullptr,
-        .semaphore = timeline_.get(),
+        .semaphore = static_cast<VkSemaphore>(timeline_.get()),
         .event = VK_NULL_HANDLE,
         .mtlSharedEvent = nullptr,
       };
@@ -728,7 +728,7 @@ void VulkanTextureBackend::wait_metal_event(void* event, uint64_t value) {
     );
     found = std::prev(imported_events_.end());
   }
-  wait_timeline(found->second.get(), value);
+  wait_timeline(static_cast<VkSemaphore>(found->second.get()), value);
 }
 
 void VulkanTextureBackend::wait_sync_fd(int fd) {
