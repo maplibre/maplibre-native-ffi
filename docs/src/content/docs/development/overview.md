@@ -5,6 +5,12 @@ sidebar:
   order: 1
 ---
 
+<!--
+Scope: what a maintainer runs or installs by hand to set up, build, test,
+change the engine, use CI, and release. Leave out what the tooling does on its
+own, uncommon cases, and commands that upstream projects document.
+-->
+
 ## Set up
 
 Most development happens on Linux and macOS. CI tests Windows, but the local

@@ -5,6 +5,12 @@ sidebar:
   order: 2
 ---
 
+<!--
+Scope: rules for changing the public API and documentation. Each section
+introduces its concept, shows an example, then states rules for how things
+should be, not how they are. Delete a rule once a tool enforces it.
+-->
+
 Follow these guidelines when you change the public API or documentation.
 
 If a rule doesn't fit a case, change the rule in the same PR instead of making

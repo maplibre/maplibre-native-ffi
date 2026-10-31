@@ -3,7 +3,7 @@ title: Examples
 description: Projects that use MapLibre Native FFI.
 ---
 
-See how other projects use MapLibre Native FFI to integrate maps into their UI:
+Projects that use MapLibre Native FFI:
 
 - [MapLibre Compose](https://github.com/maplibre/maplibre-compose) brings maps
   to Compose Multiplatform.
