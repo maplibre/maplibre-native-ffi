@@ -47,8 +47,8 @@ Follow the documentation section of the
 [Guidelines](docs/src/content/docs/development/guidelines.md). The site's
 Development section holds:
 
-- [Overview](docs/src/content/docs/development/overview.md): machine setup,
-  cross-compilation, and debugging on a CI runner.
+- [Overview](docs/src/content/docs/development/overview.md): setup, everyday
+  commands, other targets, engine patches, CI, and releases.
 - [Guidelines](docs/src/content/docs/development/guidelines.md): read before you
   change the public API or documentation.
 

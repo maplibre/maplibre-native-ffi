@@ -173,9 +173,8 @@ jobs:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ inputs.sha }}
           name:
-            ${{ inputs.release && format('MapLibre Native FFI {0}',
-            inputs.version) || format('Native package snapshot {0}',
-            steps.publish.outputs.timestamp) }}
+            ${{ inputs.release && inputs.tag || format('Native package snapshot
+            {0}', steps.publish.outputs.timestamp) }}
           body_path: build/packages/native/release/RELEASE_NOTES.md
           draft: ${{ inputs.release }}
           prerelease: ${{ !inputs.release }}
@@ -277,7 +276,7 @@ jobs:
           release="$(gh release view "$PUBLISH_TAG" --json isDraft,isPrerelease,url)"
           jq -e '(.isDraft | not) and (.isPrerelease | not)' <<<"$release" >/dev/null
           {
-            echo "### MapLibre Native FFI $PUBLISH_VERSION"
+            echo "### $PUBLISH_TAG"
             echo
             echo "Published $(jq -r '.url' <<<"$release")."
           } >> "$GITHUB_STEP_SUMMARY"

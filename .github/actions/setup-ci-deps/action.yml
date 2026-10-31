@@ -522,9 +522,6 @@ runs:
         version: 2026.10.19
         cache: false
         bootstrap: true
-        # The files phase installs Linux packages. Skip it on Windows so
-        # bootstrap does not validate an empty Unix-only config.
-        bootstrap_skip: ${{ runner.os == 'Windows' && 'files' || '' }}
 
     # `mise deps --monorepo` installs tools and fetches packages for every
     # `[monorepo].config_roots` entry. Download failures during setup qualify

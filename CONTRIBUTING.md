@@ -5,9 +5,9 @@ Discuss changes in `#maplibre` on the
 
 [`AGENTS.md`](./AGENTS.md) states the project's priorities and rules. The
 [development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
-covers machine setup, cross-compilation, and CI. Read
-[Concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before you change
-behavior, and the
+covers setup, everyday commands, other targets, engine patches, and releases.
+Read [Concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before you
+change behavior, and the
 [guidelines](https://maplibre.org/maplibre-native-ffi/development/guidelines/)
 before you change the public API or documentation.
 

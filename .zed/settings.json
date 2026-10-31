@@ -3,7 +3,15 @@
   "formatter": {
     "external": {
       "command": "mise",
-      "arguments": ["x", "--", "dprint", "fmt", "--stdin", "{buffer_path}"]
+      "arguments": [
+        "x",
+        "--no-deps",
+        "--",
+        "dprint",
+        "fmt",
+        "--stdin",
+        "{buffer_path}"
+      ]
     }
   }
 }

@@ -1,20 +1,20 @@
 ---
 title: Overview
-description:
-  Set up a development machine, build for other targets, and debug on CI.
+description: Set up a machine, build and test, and work on other targets.
 sidebar:
   order: 1
 ---
 
 ## Set up
 
-Install the platform prerequisites:
+Most development happens on Linux and macOS. CI tests Windows, but the local
+Windows setup gets little use and may be broken.
 
-- On macOS Apple Silicon, install Homebrew and Xcode 26.0.1.
-- On Linux, mise bootstrap installs the development libraries on Ubuntu and
-  Fedora. On other distributions, install the packages that
-  `.config/mise.linux.toml` lists.
-- On Windows, run these commands from PowerShell. Project tasks run in Git Bash.
+[mise](https://mise.jdx.dev/) manages the toolchain. Install it, then run
+`mise trust` and `mise bootstrap --yes`. On Ubuntu and Fedora, bootstrap also
+installs the system packages. On other Linux distributions, install the
+equivalents of the packages in `.config/mise.linux.toml`. On macOS, install
+Xcode 26. On Windows, install these first:
 
 ```powershell
 winget install --exact --id Git.Git
@@ -23,161 +23,122 @@ winget install --exact --id LLVM.LLVM
 winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Tools.ARM64"
 ```
 
-Install [`mise`](https://mise.jdx.dev/), then run `mise trust` and
-`mise bootstrap --yes`. On Windows, add `--skip files`.
+## Everyday commands
 
-## Cross-compilation SDKs
+`mise run test` builds the native library for this machine and runs its C tests.
+`mise run //bindings/<lang>:test` tests one binding against that build. Pass a
+preset name to build for another target, such as `linux-gnu-x64-vulkan` or
+`macos-arm64-metal`. `CMakePresets.json` lists them.
 
-The Android, Emscripten, and OpenHarmony SDKs are several gigabytes each, so
-mise installs one only on request, under the mise environment of the same name:
+After you change a header, run `mise run bindings:generate`. `mise run check`
+runs the linters, and `mise run fix` fixes what it can; the pre-commit hook does
+the same for staged files. `mise run //docs:dev` serves this site.
+`mise tasks --all` lists everything else.
 
-```bash
-mise -E android install
-```
+## Other targets
 
-Pass the same `-E` to every later command for that target, or set `MISE_ENV` for
-the shell. After an NDK change, run `mise run clean <preset>` for each Android
-preset, because CMake caches the compiler path.
+### Android, OpenHarmony, and Emscripten
 
-The Swift Android tasks install the matching Swift SDK on demand. They need the
-open-source Linux host compiler at the version pinned by mise. ARMv7, ARM64, and
-x64 are supported:
+These SDKs are large, so they're opt-in. Install one with
+`mise -E android install`, `-E ohos`, or `-E emscripten`, and pass the same `-E`
+to every later command, or set `MISE_ENV`. After an NDK update, run
+`mise run clean <preset>` for each Android preset.
 
-```bash
-mise -E android run //bindings/swift:build android-arm64-egl
-mise -E android run //bindings/swift:test android-x64-egl
-```
+### Emulators and simulators
 
-`mise run test` boots an Android or OpenHarmony emulator on demand and leaves it
-running. An emulator boots in minutes under KVM on Linux. Without KVM it runs in
-software, which takes an hour or more on Linux, but the OpenHarmony emulator
-boots in under a minute on an Apple silicon Mac.
+Tests that need a device get one from
+[devices-cli](https://github.com/sargunv/devices-cli), which mise installs.
+`mise run test` boots an emulator or simulator for Android, OpenHarmony, iOS,
+tvOS, and visionOS, or a virtual machine for FreeBSD, and leaves it running.
+`devices-cli release` stops this worktree's devices. Android emulators need KVM.
+To test on your own Android device, set `ANDROID_SERIAL`.
 
-Device tests get a device from
-[devices-cli](https://github.com/sargunv/devices-cli), which gives each worktree
-its own Android emulator for the ABI and API level they need, its own iOS, tvOS,
-or visionOS simulator on the newest installed runtime, or its own OpenHarmony
-emulator on the Oniro image mise installed; run `devices-cli release` to stop
-the worktree's devices. Set `ANDROID_SERIAL` to use your own Android device
-instead, which must run the same ABI and API level.
+### Windows from Linux
 
-## FreeBSD
+The Windows presets build on Linux. `mise -E msvc install` downloads the MSVC
+runtime and the Windows SDK, and accepts
+[Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them.
+Set `WINE` to a Wine executable, then run tests with
+`mise -E msvc run test windows-x64-vulkan`. Wine isn't Windows: when results
+differ, Windows CI is right.
 
-The FreeBSD presets cross-compile on a Linux host. `mise run test` runs their
-suites in the worktree's FreeBSD virtual machine from devices-cli, which boots
-it with [anyvm](https://github.com/anyvm-org/anyvm) and mounts the worktree at
-the same path. The machine needs QEMU, OVMF, and access to `/dev/kvm`; on
-Ubuntu, install `qemu-system-x86`, `qemu-utils`, and `ovmf`. It boots from a
-snapshot, so what it installs goes away when `devices-cli release` stops it.
+### MinGW
 
-## RISC-V and LoongArch
-
-The Linux RISC-V and LoongArch presets cross-compile on any Linux host. Their
-test harness links Debian's graphics loaders for the target architecture, which
-the first configure downloads into `build/sysroot` with Docker or Podman.
-`mise run test` runs their suites under QEMU's user-mode emulator, against a
-root of Debian or Alpine packages that it lays out in `build/roots`. Ubuntu and
-Fedora package the emulator as `qemu-user`.
-
-Suites that start child processes, including TypeScript, need registered
-emulators. Install and register the emulators CI uses before running them;
-Ubuntu 24.04's older QEMU corrupts Node's base64 decoding on LoongArch:
-
-```bash
-bash scripts/setup-qemu.sh
-```
-
-## MSYS2
-
-On Windows x64, install [MSYS2](https://www.msys2.org/) and run this in its
-MINGW64 shell:
+On Windows, install [MSYS2](https://www.msys2.org/) and run this in its MINGW64
+shell:
 
 ```bash
 pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64-pkgconf
 ```
 
-For Go on Windows ARM64, install Clang, LLVM, and pkgconf in the CLANGARM64
-shell instead:
+Then run tasks from PowerShell with `-E msys2`, such as
+`mise -E msys2 run test mingw-x64-wgl`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
+prefix isn't `C:/msys64/mingw64`.
+
+### FreeBSD
+
+The FreeBSD presets build on Linux, and their tests run in a virtual machine.
+Install QEMU and OVMF, and make sure you can access `/dev/kvm`.
+
+### RISC-V and LoongArch
+
+These presets build on any Linux host, and their tests run under QEMU. Install
+Docker, then run `bash scripts/setup-qemu.sh` to install and register the
+emulators. Run it again after a reboot.
+
+## Change the engine
+
+Each patch in `patches/maplibre-native/` is a change we also send upstream.
+Start it with why it's needed and a link to the upstream issue. Once you open
+the upstream pull request, add `Upstream:` and its link.
+
+`mise deps` resets the submodule and applies the patches in filename order. Any
+edit in the submodule that isn't in a patch is lost.
+
+To add a patch, commit the patched submodule, make your change, and save the
+diff:
 
 ```bash
-pacman -S --needed mingw-w64-clang-aarch64-clang mingw-w64-clang-aarch64-llvm mingw-w64-clang-aarch64-pkgconf
+mise deps
+git -C third_party/maplibre-native add -A
+git -C third_party/maplibre-native commit -m baseline
+# edit third_party/maplibre-native
+git -C third_party/maplibre-native diff --ignore-submodules \
+  > patches/maplibre-native/0067-short-name.patch
+# write the header above the diff
+mise deps
 ```
 
-Then, from PowerShell, build and test the C library with:
+To edit an existing patch:
 
-```powershell
-mise -E msys2 run test mingw-x64-wgl
-mise -E msys2 run test mingw-x64-vulkan
-mise -E msys2 run //bindings/rust:test mingw-x64-wgl
-mise -E msys2 run //bindings/rust:test mingw-x64-vulkan
-mise -E msys2 run //bindings/go:test mingw-x64-wgl
-mise -E msys2 run //bindings/go:test mingw-x64-vulkan
-mise -E msys2 run //bindings/zig:test mingw-x64-wgl
-mise -E msys2 run //bindings/zig:test mingw-x64-vulkan
-```
+1. Reset the submodule to its pin, and apply only the patches before it with
+   `git apply`.
+2. Commit, then apply the patch you're editing.
+3. Make your change, and save the diff over the patch.
+4. Run `mise deps` to check that the later patches still apply.
 
-Set `MLN_FFI_MSYS2_ROOT` if the MINGW64 prefix is somewhere other than
-`C:/msys64/mingw64` (`C:/msys64/clangarm64` for Go on ARM64). The Go binding
-also links MSVC presets through the same MSYS2 compiler:
+Test a patch with upstream's tests in its `test/` tree. Build and run them as
+the
+[MapLibre Native docs](https://maplibre.org/maplibre-native/docs/book/platforms/linux/index.html)
+explain, after you initialize the submodules they need, such as `googletest`,
+which `mise deps` skips. CI doesn't run these tests, so list the ones you ran in
+the pull request.
 
-```powershell
-mise run //bindings/go:test windows-x64-wgl
-mise run //bindings/go:test windows-x64-vulkan
-mise run //bindings/go:test windows-arm64-wgl
-mise run //bindings/go:test windows-arm64-vulkan
-```
+## CI
 
-Run each architecture's tests on its matching Windows host. The Vulkan tests
-also need the Vulkan SDK from setup. Applications loading the DLL need the
-MINGW64 `bin` directory on `PATH` for its C++ runtime. Rust uses the matching
-`x86_64-pc-windows-gnu` target, and Zig uses `x86_64-windows-gnu`.
-Kotlin/Native's older MinGW sysroot and C++ runtime are a separate compatibility
-requirement.
-
-Swift's Windows tasks install the pinned official toolchain through mise. They
-need Visual Studio's C++ tools and Windows SDK for both the MSVC and MinGW
-presets; the Swift compiler uses Microsoft's SDK even when the C DLL was built
-with MinGW.
-
-```powershell
-mise run //bindings/swift:test windows-x64-vulkan
-mise -E msys2 run //bindings/swift:test mingw-x64-wgl
-```
-
-## Windows on Linux
-
-The Windows presets also cross-compile on a Linux host, with LLVM's `clang-cl`,
-`lld-link`, `llvm-lib`, `llvm-rc`, and `llvm-mt` from `PATH`. The `msvc` mise
-environment downloads the MSVC runtime and the Windows SDK from Microsoft with
-[xwin](https://github.com/Jake-Shadle/xwin). Installing it accepts
-[Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them:
+[Rubberstamp](https://github.com/apps/rubberstamp-bot) labels each pull request
+and picks which CI units it runs, from `.config/rubberstamp.yml`. `main` runs
+every unit after merge. To run a unit that a pull request skipped, start a
+manual run and list it by its name under `ci.units`:
 
 ```bash
-mise -E msvc install
-```
-
-`mise run test` runs the suites under the Wine executable that `WINE` names,
-such as `files/bin/wine` in Steam's Proton, with a prefix under
-`build/wine-prefix`. An x64 host runs only the x64 presets. Wine implements WGL
-over the host's OpenGL and Vulkan over the host's Vulkan driver, so Windows CI
-remains the authority on Windows behavior.
-
-## Run selected CI units
-
-Manual CI runs accept a JSON array of units from `ci.units` in
-`.config/rubberstamp.yml`. For example, run the MSYS2 C suites on a branch:
-
-```sh
 gh workflow run CI --ref <branch> -f 'units=["mingw"]'
 ```
 
-Leave `units` unset to run every unit. Hygiene runs with every selection.
-
-## Debug on a CI runner
-
-[Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox) runs
-commands against local changes on a Linux runner with CI's dependencies. Your
-Blacksmith account needs access to the MapLibre organization.
+To debug on a CI runner, use a
+[Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox). Your
+Blacksmith account needs access to the MapLibre organization. Run these from the
+repository root, since the testbox copies the current directory.
 
 ```bash
 blacksmith auth login
@@ -185,14 +146,16 @@ blacksmith testbox warmup .github/workflows/blacksmith-testbox-linux-x64.yml --j
 blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
 ```
 
-For an ARM64 runner, warm up
-`.github/workflows/blacksmith-testbox-linux-arm64.yml` with `--job linux-arm64`
-instead.
+Builds fail on the testbox unless you prefix them with
+`env -u SCCACHE_BUCKET -u SCCACHE_ENDPOINT -u SCCACHE_REGION -u SCCACHE_S3_USE_SSL`.
 
-Run `blacksmith testbox run` from the repository root, because rsync mirrors the
-current directory with `--delete`.
+## Releases
 
-The testbox shell has the workflow's sccache settings but not its S3
-credentials, so builds fail until you prefix the command with
-`env -u SCCACHE_BUCKET -u SCCACHE_ENDPOINT -u SCCACHE_REGION -u SCCACHE_S3_USE_SSL`,
-which makes sccache use the testbox's local disk.
+`mise run ci:release-version --next` prints the next version. To release, push a
+signed, annotated tag on a `main` commit whose CI passed. Its message is
+`MapLibre Native FFI <version>`, a blank line, and the release notes. The
+`release` agent skill can draft the notes.
+
+Snapshots publish from `main` daily. To publish one now, run the Publish
+snapshots workflow. Before a new PyPI distribution's first release, register its
+pending trusted publisher on PyPI.
