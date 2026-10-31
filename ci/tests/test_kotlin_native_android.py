@@ -15,7 +15,7 @@ class KotlinNativeAndroidTest(unittest.TestCase):
                 " ".join(command) for command in consumer_commands(found[preset])
             ]
             self.assertIn(f"mise run //bindings/kotlin:test:native {preset}", commands)
-            self.assertIn(f"mise run //bindings/kotlin:test {preset}", commands)
+            self.assertIn(f"mise run //bindings/kotlin:test:android {preset}", commands)
             arm = [
                 " ".join(command)
                 for command in consumer_commands(found[f"android-arm64-{backend}"])

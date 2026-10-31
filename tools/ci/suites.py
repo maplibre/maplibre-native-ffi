@@ -51,7 +51,9 @@ def binding_command(binding: str, target: Target) -> list[str]:
     language = binding.split("-", 1)[0]
     if binding == "kotlin-jvm":
         if platform == "android":
-            if not runnable:
+            if runnable:
+                action = "test:android"
+            else:
                 action = "android-build"
                 backend = "opengl" if target.backend == "egl" else target.backend
                 abi = {
@@ -122,11 +124,11 @@ def command_support(command: str) -> list[tuple[str, str]]:
         return []
     binding, action = match.groups()
     if binding == "kotlin":
-        if (
-            action == "android-build"
-            or action == "test"
-            or action in {"test:jvm", "build:jvm"}
-        ):
+        if action == "android-build" or action in {
+            "test:android",
+            "test:jvm",
+            "build:jvm",
+        }:
             binding = "kotlin-jvm"
         else:
             binding = "kotlin-native"

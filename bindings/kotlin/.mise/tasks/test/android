@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Run the Kotlin Android suite in an emulator that matches a native preset."
+#MISE extends="ffi:preset"
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"
