@@ -262,12 +262,35 @@ void release_metal_event(void* event) noexcept {
 }
 #endif
 
+// Whether the display exports the sync files it advertises. The OpenHarmony
+// emulator's advertises EGL_ANDROID_native_fence_sync but refuses to create
+// such a fence. Nothing is current at attach, so this exports one from a
+// context of its own.
+auto exports_sync_files(
+  const mln_open_gl_context_descriptor& context, const EglNativeFences& fences
+) -> bool {
+  try {
+    auto probe =
+      mln::core::opengl::EglSharedContext{context.data.egl, context.ownership};
+    probe.activate_pbuffer();
+    const auto fd = fences.export_fd();
+    probe.deactivate();
+    mln::core::close_fd(fd);
+    return fd >= 0;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
 // The sync kinds that the shared EGL context's display adds.
 auto opengl_sync_support(const mln_open_gl_context_descriptor& context)
   -> mln::core::GpuSyncSupport {
   auto support = mln::core::GpuSyncSupport{};
   if (context.platform != MLN_OPEN_GL_CONTEXT_PLATFORM_EGL) return support;
-  if (EglNativeFences::load(context.data.egl)) {
+  if (
+    const auto fences = EglNativeFences::load(context.data.egl);
+    fences && exports_sync_files(context, *fences)
+  ) {
     support.producer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
     support.consumer |= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
   }
