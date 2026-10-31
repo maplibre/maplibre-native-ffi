@@ -1762,6 +1762,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_render_session_release_target(
+    session: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_release_target(
+      session.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_render_session_request_frame(
     session: Long,
     demand: Long,

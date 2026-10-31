@@ -334,6 +334,21 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Starts releasing the session's surface or borrowed texture ring while
+    /// keeping its renderer.
+    ///
+    /// See `mln_render_session_release_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn release_target(&self) -> Result<NativeFuture<()>> {
+        let call = self.inner.call();
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_release_target(session, completion, out_diagnostic)
+            },
+            completion::unit,
+        )
+    }
+
     /// Requests a frame without waiting. Every accepted demand produces one
     /// terminal result record. Caller-driver sessions require service on the
     /// graphics thread. Core-worker sessions need no host service.

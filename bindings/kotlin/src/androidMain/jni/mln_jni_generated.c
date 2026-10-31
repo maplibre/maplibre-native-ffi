@@ -1636,6 +1636,17 @@ static jint mln_render_session_reduce_memory_use_jni(
   );
 }
 
+static jint mln_render_session_release_target_jni(
+  JNIEnv* env, jclass type, jlong session, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_render_session_release_target(
+    (mln_render_session)session,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_render_session_request_frame_jni(
   JNIEnv* env, jclass type, jlong session, jlong demand, jlong out_diagnostic
 ) {
@@ -2419,6 +2430,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_read_texture_jni},
   {"mln_render_session_reduce_memory_use", "(JJJ)I",
    (void*)mln_render_session_reduce_memory_use_jni},
+  {"mln_render_session_release_target", "(JJJ)I",
+   (void*)mln_render_session_release_target_jni},
   {"mln_render_session_request_frame", "(JJJ)I",
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
@@ -2781,6 +2794,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_read_texture_jni},
   {"mln_render_session_reduce_memory_use", "(JJJ)I",
    (void*)mln_render_session_reduce_memory_use_jni},
+  {"mln_render_session_release_target", "(JJJ)I",
+   (void*)mln_render_session_release_target_jni},
   {"mln_render_session_request_frame", "(JJJ)I",
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",

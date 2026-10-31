@@ -177,6 +177,15 @@ class SurfaceSessionBackend {
       "session does not render through a WebGPU surface"
     );
   }
+
+  // Stops presenting through the host surface, keeping the graphics context
+  // and every resource the renderer holds against it, so the host may destroy
+  // the surface. The session calls neither resize() nor prepare_frame() again
+  // until a set_*_target call hands over another surface, which a backend
+  // takes as it takes a replacement.
+  virtual auto release_target() -> mln_status {
+    return unsupported_retarget("session cannot release its surface");
+  }
 };
 
 // What an acquirable frame's metadata takes from the session rather than from
@@ -288,6 +297,15 @@ class TextureSessionBackend {
     (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned WebGPU texture"
+    );
+  }
+  // Stops rendering into the caller-owned ring, keeping the graphics context
+  // and every resource the renderer holds against it, so the host may destroy
+  // the textures. The session renders nothing until a set_*_borrowed_target
+  // call hands over another ring.
+  virtual auto release_borrowed_target() -> mln_status {
+    return unsupported_retarget(
+      "session does not render into a caller-owned texture"
     );
   }
 
@@ -874,6 +892,9 @@ struct mln_render_session_object
   bool disposal_keeps_graphics = false;
   bool destruction_started = false;
   bool attached = false;
+  // Set by a target release and cleared by the next target replacement. Read
+  // and written only by driver work, which runs one item at a time.
+  bool target_released = false;
   std::vector<mln_render_frame_result> frame_results;
   // Every accepted demand reserves its result before it can reach the driver.
   std::size_t unfinished_demands = 0;
@@ -1306,6 +1327,9 @@ auto acquired_frame_release(
 auto render_session_resize_start(
   mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion
+) -> mln_status;
+auto render_session_release_target_start(
+  mln_render_session session, const mln_completion* completion
 ) -> mln_status;
 auto render_session_barrier_start(
   mln_render_session session, const mln_completion* completion

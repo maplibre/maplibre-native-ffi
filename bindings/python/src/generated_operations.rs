@@ -7172,6 +7172,20 @@ impl RenderSessionHandle {
             )
         }
     }
+    #[pyo3(signature = ())]
+    fn release_target(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let convert = py_none;
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_release_target(handle, completion, diagnostic)
+                },
+                convert,
+            )
+        }
+    }
     #[pyo3(signature = (demand))]
     fn request_frame(&self, py: Python<'_>, demand: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);

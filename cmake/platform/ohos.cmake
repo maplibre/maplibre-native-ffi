@@ -56,8 +56,8 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/logging_hilog.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
-  mln_ffi_target_project_sources(${target}
-                                 ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
+  mln_ffi_target_project_sources(
+    ${target} ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
 
   # Only Native's bidi and character classes use the ICU it vendors. Its headers
   # rename every symbol for ICU 61, so they reach only those sources and do not

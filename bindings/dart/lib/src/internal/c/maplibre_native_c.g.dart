@@ -4189,6 +4189,19 @@ external int mln_render_session_reduce_memory_use(
 @Native<
   Int32 Function(
     mln_render_session,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_release_target(
+  int session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
     Pointer<mln_frame_demand>,
     Pointer<mln_diagnostic>,
   )

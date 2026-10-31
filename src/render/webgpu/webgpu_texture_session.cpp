@@ -369,6 +369,18 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     release_slots(outgoing);
   }
 
+  // Drops the session's references to the borrowed textures, keeping one empty
+  // slot each until set_borrowed_target() hands over the next ring.
+  void release_borrowed_target() {
+    auto outgoing = std::move(slots_);
+    outgoing.push_back(ColorSlot{texture_, color_view_, color_texture_size_});
+    texture_ = nullptr;
+    color_view_ = nullptr;
+    color_texture_size_ = {};
+    slots_.assign(outgoing.size() - 1, ColorSlot{});
+    release_slots(outgoing);
+  }
+
  protected:
   void activate() override {
     ensureColorTexture();
@@ -943,6 +955,17 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     configureSurface();
   }
 
+  // Unconfigures and lets go of the surface, so the host may destroy it.
+  // set_surface() takes the next one.
+  void release_surface() {
+    releaseFrame();
+    if (surface_ != nullptr) {
+      wgpuSurfaceUnconfigure(surface_);
+      wgpuSurfaceRelease(surface_);
+      surface_ = nullptr;
+    }
+  }
+
  protected:
   void activate() override { ensureDepthStencilTexture(); }
 
@@ -1133,6 +1156,11 @@ class WebGPUSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
+  auto release_target() -> mln_status override {
+    backend_.release_surface();
+    return MLN_STATUS_OK;
+  }
+
  private:
   WebGPUSurfaceBackend backend_;
 };
@@ -1187,6 +1215,11 @@ class WebGPUTextureSessionBackend final
       );
     }
     backend_.set_borrowed_target(target);
+    return MLN_STATUS_OK;
+  }
+
+  auto release_borrowed_target() -> mln_status override {
+    backend_.release_borrowed_target();
     return MLN_STATUS_OK;
   }
 

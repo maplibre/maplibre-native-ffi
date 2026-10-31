@@ -7317,6 +7317,17 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 	}, completionUnit)
 }
 
+// ReleaseTarget starts releasing the session's surface or borrowed texture ring
+// while keeping its renderer.
+//
+// See mln_render_session_release_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_release_target(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
+}
+
 // RequestFrame requests a frame without waiting. Every accepted demand produces
 // one terminal result record. Caller-driver sessions require service on the
 // graphics thread. Core-worker sessions need no host service.

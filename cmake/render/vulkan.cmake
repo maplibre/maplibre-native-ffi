@@ -38,7 +38,8 @@ function(mln_ffi_configure_render_dependencies target)
   if(TARGET SPIRV-Tools-opt)
     message(
       FATAL_ERROR
-        "glslang now links SPIRV-Tools; register its license notice and add the archives here")
+        "glslang now links SPIRV-Tools; register its license notice and add the archives here"
+    )
   endif()
 
   get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
@@ -48,7 +49,8 @@ function(mln_ffi_configure_render_dependencies target)
     PROPERTIES
       MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}"
       MLN_FFI_STATIC_ARCHIVES
-      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen")
+      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen"
+  )
 
   # The loader belongs to the test harness, which drives Vulkan directly the way
   # a host does. The library resolves it at runtime, so build-host loader paths
@@ -130,7 +132,8 @@ function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_VULKAN=1)
 
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/vulkan/headless_backend.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/vulkan/headless_backend.cpp
+  )
   set(MLN_FFI_VULKAN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_d3d12_fence.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp

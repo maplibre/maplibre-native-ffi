@@ -5843,9 +5843,9 @@ pub struct WebGpuSurfaceDescriptor {
     pub extent: LogicalExtent,
     /// Borrowed WebGPU context. device is required.
     pub context: WebGpuContextDescriptor,
-    /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
-    /// session configures it for this device and extent, and unconfigures it
-    /// when the session ends.
+    /// Borrowed WGPUSurface. Required, and must stay alive until the session
+    /// ends, replaces it, or releases it. The session configures it for this
+    /// device and extent, and unconfigures it then.
     pub surface: *mut std::ffi::c_void,
     /// WGPUTextureFormat to configure the surface with. Required. A browser
     /// host takes it from navigator.gpu.getPreferredCanvasFormat().

@@ -91,7 +91,38 @@ static void dedicated_egl_surfaces_share_one_graphics_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A dedicated context stays current between renders, so releasing the target
+// moves the context off the surface that the host may then destroy. The
+// context itself stays current for the session's next render.
+static void a_release_moves_a_dedicated_context_off_its_surface(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_dedicated_egl_surface_create(map, &fixture));
+  MLN_TEST_OK(
+    mln_test_map_set_style_json(map, mln_test_red_background_style_json)
+  );
+  MLN_TEST_OK(mln_test_map_fence(map));
+  render_dedicated_frame(&fixture);
+  TEST_ASSERT_TRUE(mln_test_dedicated_egl_surface_is_current(&fixture));
+
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_release_target(
+    fixture.session, &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &completion));
+  mln_test_completion_destroy(&completion);
+  TEST_ASSERT_FALSE(mln_test_dedicated_egl_surface_is_current(&fixture));
+  TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
+
+  mln_test_dedicated_egl_surface_destroy(&fixture);
+  TEST_ASSERT_FALSE(mln_test_egl_context_is_current());
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(dedicated_egl_surface_renders_and_keeps_its_context_current);
   RUN_TEST(dedicated_egl_surfaces_share_one_graphics_thread);
+  RUN_TEST(a_release_moves_a_dedicated_context_off_its_surface);
 }

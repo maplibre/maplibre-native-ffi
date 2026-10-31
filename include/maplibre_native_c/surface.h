@@ -59,9 +59,9 @@ typedef struct mln_web_gpu_surface_descriptor {
   /** Borrowed WebGPU context. device is required. */
   mln_web_gpu_context_descriptor context;
   /**
-   * Borrowed WGPUSurface. Required, and must stay alive for the session. The
-   * session configures it for this device and extent, and unconfigures it when
-   * the session ends.
+   * Borrowed WGPUSurface. Required, and must stay alive until the session ends,
+   * replaces it, or releases it. The session configures it for this device and
+   * extent, and unconfigures it then.
    */
   void* surface MLN_BINDING("required=true");
   /**

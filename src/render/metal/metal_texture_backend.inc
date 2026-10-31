@@ -74,6 +74,9 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void set_borrowed_textures(
     std::vector<MTL::Texture*> textures, mln::Size new_size
   );
+  // Lets go of the borrowed textures until set_borrowed_textures() hands over
+  // the next ring.
+  void release_borrowed_textures();
   // The failure of the last command buffer a render submitted, if it failed,
   // which the next call no longer returns.
   auto take_command_buffer_failure() -> std::optional<CommandBufferFailure>;

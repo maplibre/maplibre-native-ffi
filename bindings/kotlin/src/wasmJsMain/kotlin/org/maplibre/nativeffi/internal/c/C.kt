@@ -1440,6 +1440,12 @@ internal actual object C {
   ): Int =
     mln_kw_mln_render_session_reduce_memory_use(session, word(completion), word(outDiagnostic))
 
+  actual fun mln_render_session_release_target(
+    session: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_render_session_release_target(session, word(completion), word(outDiagnostic))
+
   actual fun mln_render_session_request_frame(
     session: Long,
     demand: Long,
@@ -2956,6 +2962,11 @@ private fun mln_kw_mln_render_session_read_texture(p0: Long, p1: Int, p2: Int): 
 private fun mln_kw_mln_render_session_reduce_memory_use(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_reduce_memory_use(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_render_session_release_target(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_release_target(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_request_frame(p0: Long, p1: Int, p2: Int): Int =

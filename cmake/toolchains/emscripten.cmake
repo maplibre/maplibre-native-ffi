@@ -8,4 +8,4 @@ if(DEFINED ENV{EMSDK_NODE})
 endif()
 
 include(
-        "$ENV{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")
+  "$ENV{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")

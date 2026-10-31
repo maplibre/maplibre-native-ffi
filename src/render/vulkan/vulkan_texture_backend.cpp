@@ -483,6 +483,17 @@ void VulkanTextureBackend::set_borrowed_target(
   selection_pending_ = true;
 }
 
+void VulkanTextureBackend::release_borrowed_target() {
+  // As in set_borrowed_target(), the queue drains past the session's last use
+  // of the images.
+  if (context) graphicsQueue.waitIdle(dispatcher);
+  borrowed_images_.clear();
+  if (resource) {
+    getResource<VulkanTextureRenderableResource>().drop_slots();
+  }
+  selection_pending_ = true;
+}
+
 auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
   if (
     producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT ||

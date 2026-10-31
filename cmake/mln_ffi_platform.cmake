@@ -12,12 +12,14 @@ function(mln_ffi_validate_platform)
   else()
     message(
       FATAL_ERROR
-        "Unsupported ${CMAKE_SYSTEM_NAME} architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+        "Unsupported ${CMAKE_SYSTEM_NAME} architecture: ${CMAKE_SYSTEM_PROCESSOR}"
+    )
   endif()
   if(NOT MLN_FFI_TARGET_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
     message(
       FATAL_ERROR
-        "${CMAKE_SYSTEM_NAME} preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+        "${CMAKE_SYSTEM_NAME} preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})"
+    )
   endif()
   if(MLN_FFI_RUST_TARGET MATCHES "^x86_64-")
     set(MLN_FFI_RUST_ARCHITECTURE x64)
@@ -35,7 +37,8 @@ function(mln_ffi_validate_platform)
   if(NOT MLN_FFI_RUST_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
     message(
       FATAL_ERROR
-        "${CMAKE_SYSTEM_NAME} preset targets Rust ${MLN_FFI_RUST_TARGET}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+        "${CMAKE_SYSTEM_NAME} preset targets Rust ${MLN_FFI_RUST_TARGET}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})"
+    )
   endif()
 endfunction()
 
@@ -106,15 +109,20 @@ function(mln_ffi_configure_platform_support target)
     list(
       APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/asset_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_source.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_source.cpp
+    )
   endif()
 
   if(MLN_WITH_PMTILES)
-    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source.cpp)
+    list(
+      APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source.cpp
+    )
   else()
-    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source_stub.cpp)
+    list(
+      APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source_stub.cpp
+    )
   endif()
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_PLATFORM_SOURCES})

@@ -959,6 +959,8 @@ internal actual object C {
     Ffm.downcall("mln_render_session_read_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_reduce_memory_use =
     Ffm.downcall("mln_render_session_reduce_memory_use", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_release_target =
+    Ffm.downcall("mln_render_session_release_target", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_request_frame =
     Ffm.downcall("mln_render_session_request_frame", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_resize =
@@ -2737,6 +2739,12 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_reduce_memory_use.invokeExact(session, completion, outDiagnostic) as Int
+
+  actual fun mln_render_session_release_target(
+    session: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int = mln_render_session_release_target.invokeExact(session, completion, outDiagnostic) as Int
 
   actual fun mln_render_session_request_frame(
     session: Long,

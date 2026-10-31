@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <new>
@@ -370,6 +371,16 @@ auto MetalTextureBackend::has_borrowed_pixel_format(
   // so a replacement in another format would be drawn with a pipeline built for
   // the old one.
   return format == borrowed_pixel_format_;
+}
+
+void MetalTextureBackend::release_borrowed_textures() {
+  finish_frame();
+  // The session never retained the textures, so it keeps no pointer to one
+  // that the host may destroy.
+  std::fill(borrowed_textures_.begin(), borrowed_textures_.end(), nullptr);
+  auto guard = mln::gfx::BackendScope{*this};
+  resource.reset();
+  ring_.reset(borrowed_textures_.size());
 }
 
 void MetalTextureBackend::set_borrowed_textures(
