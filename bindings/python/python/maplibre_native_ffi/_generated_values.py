@@ -304,6 +304,7 @@ class GpuSyncKind(UnknownIntEnum):
     VULKAN_TIMELINE_SEMAPHORE = 3
     SYNC_FD = 4
     METAL_SHARED_EVENT = 5
+    D3D12_FENCE = 6
 
 
 class GpuSyncKindFlag(IntFlag):
@@ -319,6 +320,7 @@ class GpuSyncKindFlag(IntFlag):
     VULKAN_TIMELINE_SEMAPHORE = 8
     SYNC_FD = 16
     METAL_SHARED_EVENT = 32
+    D3D12_FENCE = 64
 
 
 class LogEvent(UnknownIntEnum):
@@ -1513,7 +1515,7 @@ class GpuSync:
 
     handle: int = 0
     """Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-    descriptor, or the MTLSharedEvent pointer.
+    descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
     """
 
     value: int = 0
@@ -2790,11 +2792,12 @@ class RenderSessionAttachOptions:
     frames. The session picks the first one its target supports in this
     order: `GpuSyncKind.QUEUE_ORDER`, `GpuSyncKind.OPEN_GL_FENCE`,
     `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`,
-    `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.SYNC_FD`, then
-    `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero
-    accepts `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on
-    WebGPU, whose device has a single queue. A set that the target cannot
-    satisfy fails the attach with `Status.UNSUPPORTED`.
+    `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.D3D12_FENCE`,
+    `GpuSyncKind.SYNC_FD`, then `GpuSyncKind.CPU_COMPLETE`. Its capabilities
+    report the pick. Zero accepts `GpuSyncKind.CPU_COMPLETE`, or
+    `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single queue. A
+    set that the target cannot satisfy fails the attach with
+    `Status.UNSUPPORTED`.
     """
 
     frame_wake: Wake | NativeWake = field(default_factory=lambda: Wake())

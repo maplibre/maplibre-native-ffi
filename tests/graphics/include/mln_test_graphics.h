@@ -164,6 +164,21 @@ MLN_TEST_GRAPHICS_API int mln_test_graphics_vulkan_timeline_wait(
   uint64_t value, uint64_t timeout_nanoseconds
 );
 
+// Creates a timeline VkSemaphore at zero that a Vulkan graphics object's
+// device shares as a D3D12 fence, stores the fence's NT handle in *out_handle,
+// and returns the semaphore's handle's bit pattern, or zero on failure. Close
+// the fence handle with mln_test_graphics_d3d12_fence_close().
+MLN_TEST_GRAPHICS_API uint64_t mln_test_graphics_vulkan_d3d12_fence_create(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics,
+  uint64_t* MLN_TEST_GRAPHICS_NONNULL out_handle
+);
+// Imports a D3D12 fence's NT handle, which stays the caller's, into a new
+// timeline VkSemaphore of the device, or returns zero on failure.
+MLN_TEST_GRAPHICS_API uint64_t mln_test_graphics_vulkan_d3d12_fence_import(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint64_t handle
+);
+MLN_TEST_GRAPHICS_API void mln_test_graphics_d3d12_fence_close(uint64_t handle);
+
 // Creates an id<MTLSharedEvent> on the system's default Metal device, which a
 // case uses as a host's own event whatever its backend, or returns null where
 // Metal is unavailable. The caller releases it with

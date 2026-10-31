@@ -602,7 +602,7 @@ export interface GpuSync {
   kind?: GpuSyncKind;
   /**
    * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-   * descriptor, or the MTLSharedEvent pointer.
+   * descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
    */
   handle?: bigint;
   /**
@@ -657,6 +657,16 @@ export const GpuSyncKind = {
    * feature.
    */
   metalSharedEvent: 5,
+  /**
+   * An NT HANDLE to a shared ID3D12Fence, and the value that the work signals.
+   * handle is nonzero. Vulkan supports it once the device enables
+   * VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
+   * the driver shares timeline semaphores as D3D12 fences. WGL supports it for
+   * borrowed textures, where the context imports D3D12 fences through
+   * GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
+   * device of the context's adapter.
+   */
+  d3d12Fence: 6,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
@@ -676,6 +686,7 @@ export const GpuSyncKindFlag = {
   vulkanTimelineSemaphore: 8,
   syncFd: 16,
   metalSharedEvent: 32,
+  d3d12Fence: 64,
 } as const;
 /** A bitwise OR of GpuSyncKindFlag flags. */
 export type GpuSyncKindFlag = number;
@@ -1940,10 +1951,11 @@ export interface RenderSessionAttachOptions {
    * frames. The session picks the first one its target supports in this order:
    * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
    * `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
-   * `GpuSyncKind.syncFd`, then `GpuSyncKind.cpuComplete`. Its capabilities
-   * report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
-   * `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
-   * that the target cannot satisfy fails the attach with `Status.unsupported`.
+   * `GpuSyncKind.d3d12Fence`, `GpuSyncKind.syncFd`, then
+   * `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+   * device has a single queue. A set that the target cannot satisfy fails the
+   * attach with `Status.unsupported`.
    */
   producerSyncKinds?: GpuSyncKindFlag;
   /**

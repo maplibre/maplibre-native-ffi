@@ -17,4 +17,5 @@ public enum GpuSyncKindFlag : uint
     VulkanTimelineSemaphore = 8,
     SyncFd = 16,
     MetalSharedEvent = 32,
+    D3d12Fence = 64,
 }

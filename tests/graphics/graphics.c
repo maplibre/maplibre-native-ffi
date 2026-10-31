@@ -18,6 +18,9 @@
 
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
+#if defined(_WIN32)
+#include <vulkan/vulkan_win32.h>
+#endif
 
 #if defined(__APPLE__)
 #define MLN_TG_HAS_METAL 1
@@ -759,8 +762,8 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
 }
 
 // Takes the first physical device and queue family that accept a graphics
-// device, enabling VK_KHR_swapchain, timeline semaphores, sync file
-// semaphores, and Metal object export where the device has them.
+// device, enabling VK_KHR_swapchain, timeline semaphores, sync file and
+// Win32 semaphores, and Metal object export where the device has them.
 static bool vulkan_create_device(mln_test_graphics* graphics) {
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   PFN_vkEnumeratePhysicalDevices enumerate_devices =
@@ -825,7 +828,7 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
     }
     get_queues(devices[d], &queue_count, queues);
     enumerate_extensions(devices[d], NULL, &extension_count, extensions);
-    const char* enabled[5];
+    const char* enabled[6];
     uint32_t enabled_count = 0;
     if (has_extension(extensions, extension_count, "VK_EXT_metal_objects")) {
       enabled[enabled_count++] = "VK_EXT_metal_objects";
@@ -834,6 +837,13 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
       has_extension(extensions, extension_count, "VK_KHR_external_semaphore_fd")
     ) {
       enabled[enabled_count++] = "VK_KHR_external_semaphore_fd";
+    }
+    if (
+      has_extension(
+        extensions, extension_count, "VK_KHR_external_semaphore_win32"
+      )
+    ) {
+      enabled[enabled_count++] = "VK_KHR_external_semaphore_win32";
     }
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
@@ -2273,12 +2283,17 @@ static PFN_vkVoidFunction vulkan_device_proc(
   return NULL;
 }
 
-uint64_t mln_test_graphics_vulkan_timeline_create(mln_test_graphics* graphics) {
+// Creates a timeline semaphore at zero, which `export_info` may make
+// exportable, or zero with the reason recorded.
+static VkSemaphore vulkan_timeline_create_with(
+  mln_test_graphics* graphics, const void* export_info
+) {
   PFN_vkCreateSemaphore create =
     (PFN_vkCreateSemaphore)vulkan_device_proc(graphics, "vkCreateSemaphore");
-  if (create == NULL) return 0;
+  if (create == NULL) return VK_NULL_HANDLE;
   const VkSemaphoreTypeCreateInfo type = {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+    .pNext = export_info,
     .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
   };
   const VkSemaphoreCreateInfo info = {
@@ -2287,11 +2302,13 @@ uint64_t mln_test_graphics_vulkan_timeline_create(mln_test_graphics* graphics) {
   VkSemaphore semaphore = VK_NULL_HANDLE;
   const VkResult result =
     create((VkDevice)graphics->context.vulkan_device, &info, NULL, &semaphore);
-  if (result != VK_SUCCESS) {
+  if (result != VK_SUCCESS)
     set_error("vkCreateSemaphore failed with %d", (int)result);
-    return 0;
-  }
-  return (uint64_t)(uintptr_t)semaphore;
+  return semaphore;
+}
+
+uint64_t mln_test_graphics_vulkan_timeline_create(mln_test_graphics* graphics) {
+  return (uint64_t)(uintptr_t)vulkan_timeline_create_with(graphics, NULL);
 }
 
 void mln_test_graphics_vulkan_timeline_destroy(
@@ -2348,6 +2365,94 @@ int mln_test_graphics_vulkan_timeline_wait(
   set_error("vkWaitSemaphores failed with %d", (int)result);
   return -1;
 }
+
+#if defined(_WIN32)
+uint64_t mln_test_graphics_vulkan_d3d12_fence_create(
+  mln_test_graphics* graphics, uint64_t* out_handle
+) {
+  *out_handle = 0;
+  PFN_vkGetSemaphoreWin32HandleKHR get_handle =
+    (PFN_vkGetSemaphoreWin32HandleKHR)vulkan_device_proc(
+      graphics, "vkGetSemaphoreWin32HandleKHR"
+    );
+  if (get_handle == NULL) return 0;
+  const VkExportSemaphoreCreateInfo exportable = {
+    .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
+    .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT,
+  };
+  VkSemaphore semaphore = vulkan_timeline_create_with(graphics, &exportable);
+  if (semaphore == VK_NULL_HANDLE) return 0;
+  const VkSemaphoreGetWin32HandleInfoKHR info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR,
+    .semaphore = semaphore,
+    .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT,
+  };
+  HANDLE handle = NULL;
+  const VkResult result =
+    get_handle((VkDevice)graphics->context.vulkan_device, &info, &handle);
+  if (result != VK_SUCCESS) {
+    set_error("vkGetSemaphoreWin32HandleKHR failed with %d", (int)result);
+    mln_test_graphics_vulkan_timeline_destroy(
+      graphics, (uint64_t)(uintptr_t)semaphore
+    );
+    return 0;
+  }
+  *out_handle = (uint64_t)(uintptr_t)handle;
+  return (uint64_t)(uintptr_t)semaphore;
+}
+
+uint64_t mln_test_graphics_vulkan_d3d12_fence_import(
+  mln_test_graphics* graphics, uint64_t handle
+) {
+  PFN_vkImportSemaphoreWin32HandleKHR import =
+    (PFN_vkImportSemaphoreWin32HandleKHR)vulkan_device_proc(
+      graphics, "vkImportSemaphoreWin32HandleKHR"
+    );
+  if (import == NULL) return 0;
+  VkSemaphore semaphore = vulkan_timeline_create_with(graphics, NULL);
+  if (semaphore == VK_NULL_HANDLE) return 0;
+  const VkImportSemaphoreWin32HandleInfoKHR info = {
+    .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR,
+    .semaphore = semaphore,
+    .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT,
+    .handle = (HANDLE)(uintptr_t)handle,
+  };
+  const VkResult result =
+    import((VkDevice)graphics->context.vulkan_device, &info);
+  if (result != VK_SUCCESS) {
+    set_error("vkImportSemaphoreWin32HandleKHR failed with %d", (int)result);
+    mln_test_graphics_vulkan_timeline_destroy(
+      graphics, (uint64_t)(uintptr_t)semaphore
+    );
+    return 0;
+  }
+  return (uint64_t)(uintptr_t)semaphore;
+}
+
+void mln_test_graphics_d3d12_fence_close(uint64_t handle) {
+  if (handle != 0) CloseHandle((HANDLE)(uintptr_t)handle);
+}
+#else
+uint64_t mln_test_graphics_vulkan_d3d12_fence_create(
+  mln_test_graphics* graphics, uint64_t* out_handle
+) {
+  (void)graphics;
+  *out_handle = 0;
+  set_error("D3D12 fences exist only on Windows");
+  return 0;
+}
+
+uint64_t mln_test_graphics_vulkan_d3d12_fence_import(
+  mln_test_graphics* graphics, uint64_t handle
+) {
+  (void)graphics;
+  (void)handle;
+  set_error("D3D12 fences exist only on Windows");
+  return 0;
+}
+
+void mln_test_graphics_d3d12_fence_close(uint64_t handle) { (void)handle; }
+#endif
 
 bool mln_test_graphics_make_current(mln_test_graphics* graphics) {
   if (graphics == NULL) {

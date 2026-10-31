@@ -132,6 +132,7 @@ function(mln_ffi_configure_renderer target)
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_d3d12_fence.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_graphics_device.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_queue_access.cpp

@@ -217,6 +217,15 @@ final class GpuSyncKind extends _Enum {
   /// once the device enables VK_EXT_metal_objects and the timelineSemaphore
   /// feature.
   static const metalSharedEvent = GpuSyncKind.fromRawValue(5);
+
+  /// An NT HANDLE to a shared ID3D12Fence, and the value that the work signals.
+  /// handle is nonzero. Vulkan supports it once the device enables
+  /// VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
+  /// the driver shares timeline semaphores as D3D12 fences. WGL supports it for
+  /// borrowed textures, where the context imports D3D12 fences through
+  /// GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
+  /// device of the context's adapter.
+  static const d3d12Fence = GpuSyncKind.fromRawValue(6);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
@@ -225,6 +234,7 @@ final class GpuSyncKind extends _Enum {
     3 => 'GpuSyncKind.vulkanTimelineSemaphore',
     4 => 'GpuSyncKind.syncFd',
     5 => 'GpuSyncKind.metalSharedEvent',
+    6 => 'GpuSyncKind.d3d12Fence',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -241,6 +251,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
   static const vulkanTimelineSemaphore = GpuSyncKindFlag.fromRawValue(8);
   static const syncFd = GpuSyncKindFlag.fromRawValue(16);
   static const metalSharedEvent = GpuSyncKindFlag.fromRawValue(32);
+  static const d3d12Fence = GpuSyncKindFlag.fromRawValue(64);
 
   /// No flags.
   static const none = GpuSyncKindFlag.fromRawValue(0);
@@ -255,6 +266,7 @@ final class GpuSyncKindFlag extends _Flags<GpuSyncKindFlag> {
     8: 'vulkanTimelineSemaphore',
     16: 'syncFd',
     32: 'metalSharedEvent',
+    64: 'd3d12Fence',
   });
 }
 
@@ -1519,7 +1531,7 @@ final class GpuSync extends _Value {
   final GpuSyncKind kind;
 
   /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-  /// descriptor, or the MTLSharedEvent pointer.
+  /// descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
   final int handle;
 
   /// Counter value of a timeline kind. Zero for other kinds.
@@ -2669,10 +2681,11 @@ final class RenderSessionAttachOptions extends _Value {
   /// frames. The session picks the first one its target supports in this order:
   /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
   /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
-  /// `GpuSyncKind.syncFd`, then `GpuSyncKind.cpuComplete`. Its capabilities
-  /// report the pick. Zero accepts `GpuSyncKind.cpuComplete`, or
-  /// `GpuSyncKind.queueOrder` on WebGPU, whose device has a single queue. A set
-  /// that the target cannot satisfy fails the attach with `Status.unsupported`.
+  /// `GpuSyncKind.d3d12Fence`, `GpuSyncKind.syncFd`, then
+  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
+  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
+  /// device has a single queue. A set that the target cannot satisfy fails the
+  /// attach with `Status.unsupported`.
   final GpuSyncKindFlag producerSyncKinds;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.

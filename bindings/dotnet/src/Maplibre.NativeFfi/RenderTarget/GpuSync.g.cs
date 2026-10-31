@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Handle">
 /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-/// descriptor, or the MTLSharedEvent pointer.
+/// descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
 /// </param>
 /// <param name="Value">
 /// Counter value of a timeline kind. Zero for other kinds.

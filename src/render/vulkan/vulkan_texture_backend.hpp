@@ -89,6 +89,9 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Makes the session's later work wait for a host's MTLSharedEvent to reach
   // `value`. Only MoltenVK, with VK_EXT_metal_objects, takes one.
   void wait_metal_event(void* event, uint64_t value);
+  // Makes the session's later work wait for a host's D3D12 fence, which
+  // `handle` names, to reach `value`.
+  void wait_d3d12_fence(void* handle, uint64_t value);
   void prepareRenderResources();
   auto frame_resources() -> VulkanTextureFrameResources;
   auto select_slot(std::size_t slot) -> bool;
@@ -126,10 +129,11 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
     vk::UniqueFence fence;
   };
   std::vector<ImportedWait> imported_;
-  // The producer timeline's MTLSharedEvent, when frames hand over as one, and
-  // each consumer event imported once into a timeline semaphore.
-  void* metal_event_ = nullptr;
-  std::vector<std::pair<void*, vk::UniqueSemaphore>> imported_events_;
+  // The MTLSharedEvent or the D3D12 fence handle that the producer timeline
+  // is shared as, when frames hand over as one, and each consumer event or
+  // fence handle imported once into a timeline semaphore.
+  void* shared_timeline_ = nullptr;
+  std::vector<std::pair<void*, vk::UniqueSemaphore>> imported_timelines_;
 
   // Submits a wait on `semaphore`, signaling `fence`.
   void submit_wait(

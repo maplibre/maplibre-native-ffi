@@ -648,6 +648,146 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
 }
 #endif
 
+#if defined(_WIN32) && defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// No CI driver shares a timeline as a D3D12 fence: lavapipe has no Win32
+// semaphores. Under Wine, winevulkan shares them over a hardware driver.
+#define D3D12_FENCES_REQUIRED 0
+
+// A D3D12 fence frame is acquirable once submitted: the session signals its
+// fence after the frame, and the host waits for the frame's value before it
+// reads. The host releases the frame with its own fence, and the session's
+// next frame waits until the host signals it. The host opens each fence's
+// handle as a timeline semaphore of its own device, as D3D12 would open it as
+// an ID3D12Fence. A driver without D3D12 fences refuses them.
+static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_synced(
+      map, &fixture, true,
+      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  if (capabilities.producer_sync_kind != MLN_GPU_SYNC_D3D12_FENCE) {
+    TEST_ASSERT_FALSE_MESSAGE(
+      D3D12_FENCES_REQUIRED, "this target's driver shares no D3D12 fences"
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_GPU_SYNC_CPU_COMPLETE, capabilities.producer_sync_kind
+    );
+    TEST_ASSERT_BITS_LOW(
+      MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE, capabilities.consumer_sync_kinds
+    );
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_render_fixture fallback = {0};
+    TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
+      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE
+    ));
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    return;
+  }
+  TEST_ASSERT_BITS_HIGH(
+    MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE, capabilities.consumer_sync_kinds
+  );
+  mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+  );
+  mln_acquired_frame first = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
+  mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_D3D12_FENCE, producer.kind);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.handle);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, producer.value);
+  const uint64_t produced_handle = producer.handle;
+  const uint64_t first_value = producer.value;
+  const uint64_t produced =
+    mln_test_graphics_vulkan_d3d12_fence_import(graphics, produced_handle);
+  TEST_ASSERT_NOT_EQUAL_UINT64_MESSAGE(
+    0, produced, mln_test_graphics_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    1,
+    mln_test_graphics_vulkan_timeline_wait(
+      graphics, produced, first_value, UINT64_MAX
+    ),
+    mln_test_graphics_last_error()
+  );
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, 0), red,
+    "the first D3D12 fence frame's texture"
+  );
+
+  // The host's fence is still at zero when it releases the frame.
+  uint64_t consumed_handle = 0;
+  const uint64_t consumed =
+    mln_test_graphics_vulkan_d3d12_fence_create(graphics, &consumed_handle);
+  TEST_ASSERT_NOT_EQUAL_UINT64_MESSAGE(
+    0, consumed, mln_test_graphics_last_error()
+  );
+  const mln_gpu_sync consumer = {
+    .size = sizeof(mln_gpu_sync),
+    .kind = MLN_GPU_SYNC_D3D12_FENCE,
+    .handle = consumed_handle,
+    .value = 1,
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(first, &consumer, NULL));
+
+  paint_background_blue(runtime, map);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+  );
+  mln_acquired_frame second = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT64(produced_handle, producer.handle);
+  TEST_ASSERT_GREATER_THAN_UINT64(first_value, producer.value);
+  // The second frame waits for the host's fence.
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_graphics_vulkan_timeline_wait(
+         graphics, produced, producer.value, 0
+       )
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_graphics_vulkan_timeline_signal(graphics, consumed, 1),
+    mln_test_graphics_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_graphics_vulkan_timeline_wait(
+         graphics, produced, producer.value, UINT64_MAX
+       )
+  );
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, 0), blue,
+    "the reused texture after the host's fence"
+  );
+  mln_test_render_release_frame(&second);
+  // The host's fence handle stays open until detach completes.
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_test_graphics_d3d12_fence_close(consumed_handle);
+  mln_test_graphics_vulkan_timeline_destroy(graphics, consumed);
+  mln_test_graphics_vulkan_timeline_destroy(graphics, produced);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 #if defined(__APPLE__)
 typedef struct event_target {
   void* event;
@@ -983,6 +1123,9 @@ MLN_TEST_GROUP {
 #if !defined(_WIN32) && \
   (defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL))
   RUN_TEST(sync_files_order_frame_reads_and_slot_reuse);
+#endif
+#if defined(_WIN32) && defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  RUN_TEST(d3d12_fences_order_frame_reads_and_slot_reuse);
 #endif
 #if defined(__APPLE__)
   RUN_TEST(metal_shared_events_order_frame_reads_and_slot_reuse);

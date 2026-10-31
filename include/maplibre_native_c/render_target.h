@@ -214,6 +214,27 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * valid until detach completes.
    */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 5U,
+  /**
+   * An NT HANDLE to a shared ID3D12Fence, and the value that the work
+   * signals. handle is nonzero. Vulkan supports it once the device enables
+   * VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
+   * the driver shares timeline semaphores as D3D12 fences. WGL supports it for
+   * borrowed textures, where the context imports D3D12 fences through
+   * GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
+   * device of the context's adapter.
+   *
+   * A producer handle belongs to the session, which signals the fence after
+   * each frame's work with a value larger than the last frame's. The host
+   * opens the handle, for example with ID3D12Device::OpenSharedHandle(), and
+   * waits for value before it reads the texture. The host never signals the
+   * fence, and never closes the handle, which stays open until detach
+   * completes.
+   *
+   * A consumer handle belongs to the host, which signals value once its reads
+   * complete. The session's later work waits for it. The host keeps the handle
+   * open until detach completes.
+   */
+  MLN_GPU_SYNC_D3D12_FENCE = 6U,
 } mln_gpu_sync_kind;
 
 /** A bit for each mln_gpu_sync_kind. */
@@ -224,6 +245,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
   MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE = 1U << 3U,
   MLN_GPU_SYNC_KIND_FLAG_SYNC_FD = 1U << 4U,
   MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT = 1U << 5U,
+  MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE = 1U << 6U,
 } mln_gpu_sync_kind_flag;
 
 /** A set of mln_gpu_sync_kind_flag bits. */
@@ -258,7 +280,8 @@ typedef struct mln_render_session_attach_options {
    * frames. The session picks the first one its target supports in this order:
    * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE,
    * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, MLN_GPU_SYNC_METAL_SHARED_EVENT,
-   * MLN_GPU_SYNC_SYNC_FD, then MLN_GPU_SYNC_CPU_COMPLETE.
+   * MLN_GPU_SYNC_D3D12_FENCE, MLN_GPU_SYNC_SYNC_FD, then
+   * MLN_GPU_SYNC_CPU_COMPLETE.
    * Its capabilities report the pick. Zero accepts
    * MLN_GPU_SYNC_CPU_COMPLETE, or MLN_GPU_SYNC_QUEUE_ORDER on WebGPU, whose
    * device has a single queue. A set that the target cannot satisfy fails the
@@ -320,7 +343,7 @@ typedef struct mln_gpu_sync {
   mln_gpu_sync_kind kind;
   /**
    * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-   * descriptor, or the MTLSharedEvent pointer.
+   * descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
    *
    * Zero when kind names no object. A producer fence that frame access copies
    * is valid only until the frame's release or discard.

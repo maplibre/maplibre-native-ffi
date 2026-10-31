@@ -9,6 +9,8 @@
 #include <mln/gl/defines.hpp>
 #include <mln/platform/gl_functions.hpp>
 
+#include "maplibre_native_c/render_target.h"
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -38,6 +40,23 @@ inline auto get_opengl32_proc_address(const char* name) -> PROC {
     return nullptr;
   }
   return reinterpret_cast<PROC>(GetProcAddress(module, name));
+}
+
+// A GL entry point of the current context, from the host's loader, WGL, or
+// opengl32 itself.
+inline auto get_wgl_proc_address(
+  const mln_wgl_context_descriptor& wgl, const char* name
+) -> PROC {
+  using Loader = PROC(WINAPI*)(LPCSTR);
+  if (auto* loader = reinterpret_cast<Loader>(wgl.get_proc_address)) {
+    if (auto* proc = loader(name); is_valid_wgl_proc_address(proc)) {
+      return proc;
+    }
+  }
+  if (auto* proc = wglGetProcAddress(name); is_valid_wgl_proc_address(proc)) {
+    return proc;
+  }
+  return get_opengl32_proc_address(name);
 }
 
 // Called with a current context, before any session uses the platform table.

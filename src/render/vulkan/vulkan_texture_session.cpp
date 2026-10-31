@@ -162,6 +162,47 @@ auto vulkan_sync_support(const mln_vulkan_context_descriptor& context)
       support.consumer |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
     }
 #endif
+#if defined(_WIN32)
+    // A driver may share a timeline as a D3D12 fence, once the host enables
+    // VK_KHR_external_semaphore_win32.
+    auto type = VkSemaphoreTypeCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+      .pNext = nullptr,
+      .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+      .initialValue = 0,
+    };
+    const auto fence = VkPhysicalDeviceExternalSemaphoreInfo{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
+      .pNext = &type,
+      .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT,
+    };
+    auto shared = VkExternalSemaphoreProperties{
+      .sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES,
+      .pNext = nullptr,
+      .exportFromImportedHandleTypes = 0,
+      .compatibleHandleTypes = 0,
+      .externalSemaphoreFeatures = 0,
+    };
+    dispatcher.vkGetPhysicalDeviceExternalSemaphoreProperties(
+      physical_device, &fence, &shared
+    );
+    auto* const device = static_cast<VkDevice>(context.device);
+    if (
+      (shared.externalSemaphoreFeatures &
+       VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) != 0 &&
+      dispatcher.vkGetDeviceProcAddr(device, "vkGetSemaphoreWin32HandleKHR") !=
+        nullptr
+    )
+      support.producer |= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+    if (
+      (shared.externalSemaphoreFeatures &
+       VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) != 0 &&
+      dispatcher.vkGetDeviceProcAddr(
+        device, "vkImportSemaphoreWin32HandleKHR"
+      ) != nullptr
+    )
+      support.consumer |= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+#endif
   }
   const auto sync_fd = VkPhysicalDeviceExternalSemaphoreInfo{
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
@@ -229,6 +270,13 @@ class VulkanTextureSessionBackend final
       if (sync.kind == MLN_GPU_SYNC_SYNC_FD) {
         backend_.wait_sync_fd(
           static_cast<int>(static_cast<int64_t>(sync.handle))
+        );
+      } else if (sync.kind == MLN_GPU_SYNC_D3D12_FENCE) {
+        backend_.wait_d3d12_fence(
+          // The C ABI carries the handle as its bit pattern.
+          // NOLINTNEXTLINE(performance-no-int-to-ptr)
+          reinterpret_cast<void*>(static_cast<uintptr_t>(sync.handle)),
+          sync.value
         );
       } else if (sync.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT) {
         backend_.wait_metal_event(

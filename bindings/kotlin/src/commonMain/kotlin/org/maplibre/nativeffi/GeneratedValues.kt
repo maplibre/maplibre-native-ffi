@@ -242,6 +242,7 @@ public value class GpuSyncKind(public val rawValue: UInt) {
       3u -> "VULKAN_TIMELINE_SEMAPHORE"
       4u -> "SYNC_FD"
       5u -> "METAL_SHARED_EVENT"
+      6u -> "D3D12_FENCE"
       else -> "GpuSyncKind($rawValue)"
     }
 
@@ -283,6 +284,15 @@ public value class GpuSyncKind(public val rawValue: UInt) {
      * VK_EXT_metal_objects and the timelineSemaphore feature.
      */
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(5u)
+    /**
+     * An NT HANDLE to a shared ID3D12Fence, and the value that the work signals. handle is nonzero.
+     * Vulkan supports it once the device enables VK_KHR_external_semaphore_win32 and the
+     * timelineSemaphore feature, where the driver shares timeline semaphores as D3D12 fences. WGL
+     * supports it for borrowed textures, where the context imports D3D12 fences through
+     * GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12 device of the
+     * context's adapter.
+     */
+    public val D3D12_FENCE: GpuSyncKind = GpuSyncKind(6u)
   }
 }
 
@@ -316,6 +326,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
         8uL to "VULKAN_TIMELINE_SEMAPHORE",
         16uL to "SYNC_FD",
         32uL to "METAL_SHARED_EVENT",
+        64uL to "D3D12_FENCE",
       ),
     )
 
@@ -328,6 +339,7 @@ public value class GpuSyncKindFlag(public val rawValue: UInt) {
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag = GpuSyncKindFlag(8u)
     public val SYNC_FD: GpuSyncKindFlag = GpuSyncKindFlag(16u)
     public val METAL_SHARED_EVENT: GpuSyncKindFlag = GpuSyncKindFlag(32u)
+    public val D3D12_FENCE: GpuSyncKindFlag = GpuSyncKindFlag(64u)
   }
 }
 
@@ -1795,8 +1807,8 @@ public class OpenGlTextureFrame(
 public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
   /**
-   * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file descriptor, or the
-   * MTLSharedEvent pointer.
+   * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file descriptor, the
+   * MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
    */
   handle: ULong = 0uL,
   /** Counter value of a timeline kind. Zero for other kinds. */
@@ -2360,10 +2372,10 @@ public data class RenderSessionAttachOptions(
    * Producer synchronization kinds that the host accepts for acquired texture frames. The session
    * picks the first one its target supports in this order: `GpuSyncKind.QUEUE_ORDER`,
    * `GpuSyncKind.OPEN_GL_FENCE`, `GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE`,
-   * `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.SYNC_FD`, then `GpuSyncKind.CPU_COMPLETE`. Its
-   * capabilities report the pick. Zero accepts `GpuSyncKind.CPU_COMPLETE`, or
-   * `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single queue. A set that the target
-   * cannot satisfy fails the attach with `Status.UNSUPPORTED`.
+   * `GpuSyncKind.METAL_SHARED_EVENT`, `GpuSyncKind.D3D12_FENCE`, `GpuSyncKind.SYNC_FD`, then
+   * `GpuSyncKind.CPU_COMPLETE`. Its capabilities report the pick. Zero accepts
+   * `GpuSyncKind.CPU_COMPLETE`, or `GpuSyncKind.QUEUE_ORDER` on WebGPU, whose device has a single
+   * queue. A set that the target cannot satisfy fails the attach with `Status.UNSUPPORTED`.
    */
   public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */

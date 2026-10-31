@@ -2636,7 +2636,7 @@ pub const GesturePhase = enum(u32) {
 pub const GpuSync = struct {
     kind: GpuSyncKind = .cpu_complete,
     /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-    /// descriptor, or the MTLSharedEvent pointer.
+    /// descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
     handle: u64 = 0,
     /// Counter value of a timeline kind. Zero for other kinds.
     value: u64 = 0,
@@ -2689,6 +2689,14 @@ pub const GpuSyncKind = enum(u32) {
     /// MoltenVK once the device enables VK_EXT_metal_objects and the
     /// timelineSemaphore feature.
     metal_shared_event = 5,
+    /// An NT HANDLE to a shared ID3D12Fence, and the value that the work
+    /// signals. handle is nonzero. Vulkan supports it once the device enables
+    /// VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
+    /// the driver shares timeline semaphores as D3D12 fences. WGL supports it
+    /// for borrowed textures, where the context imports D3D12 fences through
+    /// GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
+    /// device of the context's adapter.
+    d3d12_fence = 6,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2705,8 +2713,9 @@ pub const GpuSyncKindFlag = struct {
     vulkan_timeline_semaphore: bool = false,
     sync_fd: bool = false,
     metal_shared_event: bool = false,
+    d3d12_fence: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4396,11 +4405,12 @@ pub const RenderSessionAttachOptions = struct {
     /// texture frames. The session picks the first one its target supports in
     /// this order: `GpuSyncKind.queue_order`, `GpuSyncKind.open_gl_fence`,
     /// `GpuSyncKind.vulkan_timeline_semaphore`,
-    /// `GpuSyncKind.metal_shared_event`, `GpuSyncKind.sync_fd`, then
-    /// `GpuSyncKind.cpu_complete`. Its capabilities report the pick. Zero
-    /// accepts `GpuSyncKind.cpu_complete`, or `GpuSyncKind.queue_order` on
-    /// WebGPU, whose device has a single queue. A set that the target cannot
-    /// satisfy fails the attach with `error.Unsupported`.
+    /// `GpuSyncKind.metal_shared_event`, `GpuSyncKind.d3d12_fence`,
+    /// `GpuSyncKind.sync_fd`, then `GpuSyncKind.cpu_complete`. Its capabilities
+    /// report the pick. Zero accepts `GpuSyncKind.cpu_complete`, or
+    /// `GpuSyncKind.queue_order` on WebGPU, whose device has a single queue. A
+    /// set that the target cannot satisfy fails the attach with
+    /// `error.Unsupported`.
     producer_sync_kinds: GpuSyncKindFlag = .{},
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     frame_wake: Wake = .{},

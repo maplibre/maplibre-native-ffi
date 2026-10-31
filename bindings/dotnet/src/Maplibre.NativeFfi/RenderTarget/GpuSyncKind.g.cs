@@ -54,4 +54,15 @@ public enum GpuSyncKind : uint
     /// device enables VK_EXT_metal_objects and the timelineSemaphore feature.
     /// </summary>
     MetalSharedEvent = 5,
+
+    /// <summary>
+    /// An NT HANDLE to a shared ID3D12Fence, and the value that the work
+    /// signals. handle is nonzero. Vulkan supports it once the device enables
+    /// VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
+    /// the driver shares timeline semaphores as D3D12 fences. WGL supports it
+    /// for borrowed textures, where the context imports D3D12 fences through
+    /// GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
+    /// device of the context's adapter.
+    /// </summary>
+    D3d12Fence = 6,
 }

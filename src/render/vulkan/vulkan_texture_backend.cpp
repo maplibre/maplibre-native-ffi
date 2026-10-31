@@ -32,6 +32,7 @@
 
 #include "maplibre_native_c/texture.h"
 #include "render/discard_present.hpp"
+#include "render/vulkan/vulkan_d3d12_fence.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
@@ -413,6 +414,8 @@ VulkanTextureBackend::~VulkanTextureBackend() {
     }
   }
   close_sync_files();
+  if (producer_sync_kind_ == MLN_GPU_SYNC_D3D12_FENCE)
+    close_d3d12_fence(shared_timeline_);
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   getThreadPool().runRenderJobs(true);
@@ -481,12 +484,15 @@ void VulkanTextureBackend::set_borrowed_target(
 }
 
 auto VulkanTextureBackend::producer_sync() const -> mln_gpu_sync {
-  if (producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT) {
+  if (
+    producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT ||
+    producer_sync_kind_ == MLN_GPU_SYNC_D3D12_FENCE
+  ) {
     return mln_gpu_sync{
       .size = sizeof(mln_gpu_sync),
       .kind = producer_sync_kind_,
       .handle =
-        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(metal_event_)),
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(shared_timeline_)),
       .value = timeline_value_,
     };
   }
@@ -576,8 +582,10 @@ auto VulkanTextureBackend::record_release(vk::Image image)
 void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
   // A Metal event frame signals a timeline that MoltenVK backs with the event.
   const auto metal = producer_sync_kind_ == MLN_GPU_SYNC_METAL_SHARED_EVENT;
+  const auto d3d12 = producer_sync_kind_ == MLN_GPU_SYNC_D3D12_FENCE;
   const auto timeline_signal =
-    metal || producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+    metal || d3d12 ||
+    producer_sync_kind_ == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
   const auto exports = producer_sync_kind_ == MLN_GPU_SYNC_SYNC_FD;
   if (!release && !timeline_signal && !exports) return;
   if (timeline_signal && !timeline_) {
@@ -587,13 +595,27 @@ void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
       .exportObjectType =
         VK_EXPORT_METAL_OBJECT_TYPE_METAL_SHARED_EVENT_BIT_EXT,
     };
+    auto fence = vk::ExportSemaphoreCreateInfo().setHandleTypes(
+      vk::ExternalSemaphoreHandleTypeFlagBits::eD3D12Fence
+    );
     auto type = vk::SemaphoreTypeCreateInfo()
                   .setSemaphoreType(vk::SemaphoreType::eTimeline)
-                  .setInitialValue(0)
-                  .setPNext(metal ? &exportable : nullptr);
+                  .setInitialValue(0);
+    if (metal) type.setPNext(&exportable);
+    if (d3d12) type.setPNext(&fence);
     timeline_ = device->createSemaphoreUnique(
       vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
     );
+    if (d3d12) {
+      shared_timeline_ = export_d3d12_fence(
+        device.get(), dispatcher.vkGetDeviceProcAddr,
+        static_cast<VkSemaphore>(timeline_.get())
+      );
+      if (shared_timeline_ == nullptr) {
+        timeline_.reset();
+        throw std::runtime_error("exporting the producer D3D12 fence failed");
+      }
+    }
     if (metal) {
       // The extension's commands are outside vulkan.hpp's dispatcher, which
       // this build makes without the Metal platform.
@@ -617,7 +639,7 @@ void VulkanTextureBackend::submit_after_frame(vk::CommandBuffer release) {
         timeline_.reset();
         throw std::runtime_error("exporting the producer Metal event failed");
       }
-      metal_event_ = event.mtlSharedEvent;
+      shared_timeline_ = event.mtlSharedEvent;
     }
   }
   if (exports && !exported_) {
@@ -691,10 +713,10 @@ void VulkanTextureBackend::close_sync_files() noexcept {
 
 void VulkanTextureBackend::wait_metal_event(void* event, uint64_t value) {
   auto found = std::find_if(
-    imported_events_.begin(), imported_events_.end(),
+    imported_timelines_.begin(), imported_timelines_.end(),
     [event](const auto& imported) { return imported.first == event; }
   );
-  if (found == imported_events_.end()) {
+  if (found == imported_timelines_.end()) {
     // MoltenVK resets an imported event to the semaphore's initial value, so
     // the import starts from the value the event has.
     auto initial = uint64_t{0};
@@ -721,12 +743,35 @@ void VulkanTextureBackend::wait_metal_event(void* event, uint64_t value) {
                   .setSemaphoreType(vk::SemaphoreType::eTimeline)
                   .setInitialValue(initial)
                   .setPNext(&imported);
-    imported_events_.emplace_back(
+    imported_timelines_.emplace_back(
       event, device->createSemaphoreUnique(
                vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
              )
     );
-    found = std::prev(imported_events_.end());
+    found = std::prev(imported_timelines_.end());
+  }
+  wait_timeline(static_cast<VkSemaphore>(found->second.get()), value);
+}
+
+void VulkanTextureBackend::wait_d3d12_fence(void* handle, uint64_t value) {
+  auto found = std::find_if(
+    imported_timelines_.begin(), imported_timelines_.end(),
+    [handle](const auto& imported) { return imported.first == handle; }
+  );
+  if (found == imported_timelines_.end()) {
+    auto type = vk::SemaphoreTypeCreateInfo().setSemaphoreType(
+      vk::SemaphoreType::eTimeline
+    );
+    auto semaphore = device->createSemaphoreUnique(
+      vk::SemaphoreCreateInfo().setPNext(&type), nullptr, dispatcher
+    );
+    if (!import_d3d12_fence(
+          device.get(), dispatcher.vkGetDeviceProcAddr,
+          static_cast<VkSemaphore>(semaphore.get()), handle
+        ))
+      throw std::runtime_error("importing the consumer D3D12 fence failed");
+    imported_timelines_.emplace_back(handle, std::move(semaphore));
+    found = std::prev(imported_timelines_.end());
   }
   wait_timeline(static_cast<VkSemaphore>(found->second.get()), value);
 }

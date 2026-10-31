@@ -1,11 +1,15 @@
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -28,6 +32,9 @@
 #define WIN32_LEAN_AND_MEAN 1
 #endif
 #include <Windows.h>
+// d3d12.h and dxgi1_4.h name types that Windows.h declares.
+#include <d3d12.h>
+#include <dxgi1_4.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -301,6 +308,216 @@ auto opengl_sync_support(const mln_open_gl_context_descriptor& context)
   }
 #endif
   return support;
+}
+#endif
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+// Makes a shared fence on a D3D12 device of the adapter that `luid` names,
+// and returns its NT handle, or null on failure. The handle keeps the fence
+// alive, so the device and the fence are released here.
+auto create_shared_d3d12_fence(const LUID& luid) -> HANDLE {
+  auto* const dxgi = LoadLibraryA("dxgi.dll");
+  auto* const d3d12 = LoadLibraryA("d3d12.dll");
+  if (dxgi == nullptr || d3d12 == nullptr) return nullptr;
+  using CreateFactory = HRESULT(WINAPI*)(REFIID, void**);
+  using CreateDevice =
+    HRESULT(WINAPI*)(IUnknown*, D3D_FEATURE_LEVEL, REFIID, void**);
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto create_factory =
+    reinterpret_cast<CreateFactory>(GetProcAddress(dxgi, "CreateDXGIFactory1"));
+  const auto create_device =
+    reinterpret_cast<CreateDevice>(GetProcAddress(d3d12, "D3D12CreateDevice"));
+  // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+  if (create_factory == nullptr || create_device == nullptr) return nullptr;
+  IDXGIFactory4* factory = nullptr;
+  IDXGIAdapter1* adapter = nullptr;
+  ID3D12Device* device = nullptr;
+  ID3D12Fence* fence = nullptr;
+  HANDLE handle = nullptr;
+  if (
+    SUCCEEDED(create_factory(IID_PPV_ARGS(&factory))) &&
+    SUCCEEDED(factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(&adapter))) &&
+    SUCCEEDED(
+      create_device(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))
+    ) &&
+    SUCCEEDED(
+      device->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&fence))
+    ) &&
+    FAILED(
+      device->CreateSharedHandle(fence, nullptr, GENERIC_ALL, nullptr, &handle)
+    )
+  )
+    handle = nullptr;
+  if (fence != nullptr) fence->Release();
+  if (device != nullptr) device->Release();
+  if (adapter != nullptr) adapter->Release();
+  if (factory != nullptr) factory->Release();
+  return handle;
+}
+
+// GL_EXT_semaphore_win32, through which a WGL session hands frames over as
+// D3D12 fence signals. GL imports a fence but cannot make one, so the
+// producer fence comes from a D3D12 device on the context's adapter. Each
+// call needs the context current.
+struct WglD3D12Fences {
+  static constexpr auto extensions = uint32_t{0x1F03};
+  static constexpr auto num_extensions = uint32_t{0x821D};
+  static constexpr auto layout_general = uint32_t{0x958D};
+  static constexpr auto handle_type = uint32_t{0x9594};
+  static constexpr auto fence_value = uint32_t{0x9595};
+  static constexpr auto device_luid = uint32_t{0x9599};
+  using Barrier = void(WINAPI*)(
+    uint32_t, uint32_t, const uint32_t*, uint32_t, const uint32_t*,
+    const uint32_t*
+  );
+
+  void(WINAPI* gen_semaphores)(int, uint32_t*) = nullptr;
+  void(WINAPI* delete_semaphores)(int, const uint32_t*) = nullptr;
+  void(WINAPI* import_handle)(uint32_t, uint32_t, void*) = nullptr;
+  void(WINAPI* set_value)(uint32_t, uint32_t, const uint64_t*) = nullptr;
+  Barrier signal_semaphore = nullptr;
+  Barrier wait_semaphore = nullptr;
+  void(WINAPI* get_unsigned_bytes)(uint32_t, unsigned char*) = nullptr;
+  void(WINAPI* flush)() = nullptr;
+  uint32_t(WINAPI* get_error)() = nullptr;
+  // The producer fence's NT handle and semaphore, which the first signal
+  // makes, and each consumer handle imported once.
+  HANDLE producer = nullptr;
+  uint32_t producer_semaphore = 0;
+  std::vector<std::pair<void*, uint32_t>> imported;
+
+  static auto load(const mln_wgl_context_descriptor& wgl)
+    -> std::optional<WglD3D12Fences> {
+    const auto proc = [&wgl](auto& out, const char* name) {
+      // WGL hands out its functions as untyped procedure pointers.
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      out = reinterpret_cast<std::remove_reference_t<decltype(out)>>(
+        mln::core::opengl::get_wgl_proc_address(wgl, name)
+      );
+      return out != nullptr;
+    };
+    void(WINAPI * get_integer)(uint32_t, int*) = nullptr;
+    const unsigned char*(WINAPI * get_string)(uint32_t, uint32_t) = nullptr;
+    if (
+      !proc(get_integer, "glGetIntegerv") || !proc(get_string, "glGetStringi")
+    )
+      return std::nullopt;
+    auto count = 0;
+    get_integer(num_extensions, &count);
+    auto advertised = false;
+    for (auto index = 0; index < count && !advertised; ++index) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      const auto* name = reinterpret_cast<const char*>(
+        get_string(extensions, static_cast<uint32_t>(index))
+      );
+      advertised =
+        name != nullptr && std::string_view{name} == "GL_EXT_semaphore_win32";
+    }
+    auto fences = WglD3D12Fences{};
+    if (
+      !advertised || !proc(fences.gen_semaphores, "glGenSemaphoresEXT") ||
+      !proc(fences.delete_semaphores, "glDeleteSemaphoresEXT") ||
+      !proc(fences.import_handle, "glImportSemaphoreWin32HandleEXT") ||
+      !proc(fences.set_value, "glSemaphoreParameterui64vEXT") ||
+      !proc(fences.signal_semaphore, "glSignalSemaphoreEXT") ||
+      !proc(fences.wait_semaphore, "glWaitSemaphoreEXT") ||
+      !proc(fences.get_unsigned_bytes, "glGetUnsignedBytevEXT") ||
+      !proc(fences.flush, "glFlush") || !proc(fences.get_error, "glGetError")
+    )
+      return std::nullopt;
+    return fences;
+  }
+
+  // Deletes the semaphores and closes the producer fence's handle.
+  void release() noexcept {
+    if (producer_semaphore != 0) delete_semaphores(1, &producer_semaphore);
+    for (const auto& [handle, semaphore] : imported)
+      delete_semaphores(1, &semaphore);
+    if (producer != nullptr) CloseHandle(producer);
+    *this = WglD3D12Fences{};
+  }
+
+  // A new semaphore holding the fence that `handle` names, or 0.
+  [[nodiscard]] auto import(void* handle) const -> uint32_t {
+    // An earlier error would read as this import's.
+    for (auto drained = 0; drained < 8 && get_error() != 0; ++drained) {
+    }
+    auto semaphore = uint32_t{0};
+    gen_semaphores(1, &semaphore);
+    if (semaphore == 0) return 0;
+    import_handle(semaphore, handle_type, handle);
+    if (get_error() == 0) return semaphore;
+    delete_semaphores(1, &semaphore);
+    return 0;
+  }
+
+  // Makes the producer fence on the context's adapter, unless it exists.
+  [[nodiscard]] auto create_producer() -> bool {
+    if (producer_semaphore != 0) return true;
+    if (producer == nullptr) {
+      auto bytes = std::array<unsigned char, sizeof(LUID)>{};
+      get_unsigned_bytes(device_luid, bytes.data());
+      if (get_error() != 0) return false;
+      auto luid = LUID{};
+      std::memcpy(&luid, bytes.data(), sizeof(luid));
+      producer = create_shared_d3d12_fence(luid);
+      if (producer == nullptr) return false;
+    }
+    producer_semaphore = import(producer);
+    return producer_semaphore != 0;
+  }
+
+  // Signals the producer fence with `value` once the context's work so far,
+  // including its writes to `texture`, which listing it makes visible to D3D.
+  [[nodiscard]] auto signal(uint32_t texture, uint64_t value) -> bool {
+    if (!create_producer()) return false;
+    set_value(producer_semaphore, fence_value, &value);
+    signal_semaphore(
+      producer_semaphore, 0, nullptr, 1, &texture, &layout_general
+    );
+    flush();
+    return get_error() == 0;
+  }
+
+  // Makes the context's later work wait for the fence that `handle` names to
+  // reach `value`.
+  [[nodiscard]] auto wait(void* handle, uint64_t value) -> bool {
+    auto found = std::find_if(
+      imported.begin(), imported.end(),
+      [handle](const auto& entry) { return entry.first == handle; }
+    );
+    if (found == imported.end()) {
+      const auto semaphore = import(handle);
+      if (semaphore == 0) return false;
+      imported.emplace_back(handle, semaphore);
+      found = std::prev(imported.end());
+    }
+    set_value(found->second, fence_value, &value);
+    wait_semaphore(found->second, 0, nullptr, 0, nullptr, nullptr);
+    return get_error() == 0;
+  }
+};
+
+// Whether a WGL context on the descriptor's HDC imports D3D12 fences.
+// Advertising GL_EXT_semaphore_win32 is not enough: Wine's rejects the D3D12
+// fence handle type. The session's context does not exist yet at attach, so
+// this imports one into a context of its own and restores the thread's.
+auto wgl_imports_d3d12_fences(const mln_wgl_context_descriptor& wgl) -> bool {
+  auto* const device_context = static_cast<HDC>(wgl.device_context);
+  auto* const previous_device_context = wglGetCurrentDC();
+  auto* const previous_render_context = wglGetCurrentContext();
+  auto* const probe = wglCreateContext(device_context);
+  if (probe == nullptr) return false;
+  auto imports = false;
+  if (wglMakeCurrent(device_context, probe) != 0) {
+    if (auto fences = WglD3D12Fences::load(wgl)) {
+      imports = fences->create_producer();
+      fences->release();
+    }
+  }
+  (void)wglMakeCurrent(previous_device_context, previous_render_context);
+  wglDeleteContext(probe);
+  return imports;
 }
 #endif
 
@@ -598,22 +815,8 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   auto getExtensionFunctionPointer(const char* name)
     -> mln::gl::ProcAddress override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
-    using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
-    auto* loader = reinterpret_cast<GetProcAddressFunction>(
-      context_.data.wgl.get_proc_address
-    );
-    if (loader != nullptr) {
-      auto* proc = loader(name);
-      if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-        return reinterpret_cast<mln::gl::ProcAddress>(proc);
-      }
-    }
-    auto* proc = wglGetProcAddress(name);
-    if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-      return reinterpret_cast<mln::gl::ProcAddress>(proc);
-    }
     return reinterpret_cast<mln::gl::ProcAddress>(
-      mln::core::opengl::get_opengl32_proc_address(name)
+      mln::core::opengl::get_wgl_proc_address(context_.data.wgl, name)
     );
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     return reinterpret_cast<mln::gl::ProcAddress>(
@@ -844,6 +1047,12 @@ class OpenGLTextureSessionBackend final
           if (fence != nullptr) mln::platform::glDeleteSync(fence);
         }
       }
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+      if (d3d12_fences_) {
+        auto guard = mln::gfx::BackendScope{backend_};
+        d3d12_fences_->release();
+      }
+#endif
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
     } catch (...) {
@@ -894,6 +1103,9 @@ class OpenGLTextureSessionBackend final
     if (sync.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT)
       return wait_metal_event(sync);
 #endif
+#endif
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    if (sync.kind == MLN_GPU_SYNC_D3D12_FENCE) return wait_d3d12_fence(sync);
 #endif
     if (sync.kind != MLN_GPU_SYNC_OPEN_GL_FENCE) return MLN_STATUS_UNSUPPORTED;
     try {
@@ -1009,6 +1221,26 @@ class OpenGLTextureSessionBackend final
       };
 #endif
 #endif
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    } else if (producer_sync_kind_ == MLN_GPU_SYNC_D3D12_FENCE) {
+      if (
+        !load_d3d12_fences() ||
+        !d3d12_fences_->signal(texture, d3d12_value_ + 1)
+      ) {
+        mln::core::set_thread_error(
+          "signaling the producer D3D12 fence failed"
+        );
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      ++d3d12_value_;
+      producer_sync_ = mln_gpu_sync{
+        sizeof(mln_gpu_sync), MLN_GPU_SYNC_D3D12_FENCE,
+        static_cast<uint64_t>(
+          reinterpret_cast<uintptr_t>(d3d12_fences_->producer)
+        ),
+        d3d12_value_
+      };
+#endif
     } else {
       backend_.finish_rendering();
     }
@@ -1033,6 +1265,42 @@ class OpenGLTextureSessionBackend final
   }
 
  private:
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  // Loads the context's D3D12 fence entry points once. The context is current.
+  auto load_d3d12_fences() -> bool {
+    if (!d3d12_fences_)
+      d3d12_fences_ =
+        WglD3D12Fences::load(backend_.context_descriptor().data.wgl);
+    return d3d12_fences_.has_value();
+  }
+
+  auto wait_d3d12_fence(const mln_gpu_sync& sync) -> mln_status {
+    try {
+      auto guard = mln::gfx::BackendScope{backend_};
+      // The C ABI carries the handle as its bit pattern.
+      // NOLINTNEXTLINE(performance-no-int-to-ptr)
+      auto* const handle =
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sync.handle));
+      if (load_d3d12_fences() && d3d12_fences_->wait(handle, sync.value))
+        return MLN_STATUS_OK;
+      mln::core::set_thread_error(
+        "waiting for the consumer D3D12 fence failed"
+      );
+      return MLN_STATUS_NATIVE_ERROR;
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error(
+        "waiting for the consumer D3D12 fence failed"
+      );
+    }
+    return MLN_STATUS_TARGET_LOST;
+  }
+
+  std::optional<WglD3D12Fences> d3d12_fences_;
+  // The value the last frame signaled on the producer fence.
+  uint64_t d3d12_value_ = 0;
+#endif
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   auto wait_sync_fd(const mln_gpu_sync& sync) -> mln_status {
     const auto fd = static_cast<int>(static_cast<int64_t>(sync.handle));
@@ -1270,6 +1538,17 @@ auto opengl_borrowed_texture_attach_start(
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   session->probe_sync_kinds = [context = descriptor->context] {
     return opengl_sync_support(context);
+  };
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  // Only a texture whose memory D3D shares can be read there, so owned rings
+  // hand no frames over this way.
+  session->probe_sync_kinds = [context = descriptor->context] {
+    auto support = mln::core::GpuSyncSupport{};
+    if (wgl_imports_d3d12_fences(context.data.wgl)) {
+      support.producer |= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+      support.consumer |= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+    }
+    return support;
   };
 #endif
   session->initialize_backend = [target = OpenGLBorrowedTarget{*descriptor}](
