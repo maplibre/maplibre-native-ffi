@@ -379,3 +379,16 @@ index 8bf99e8..8855da3 100644
  class ExpressionEqualityTest : public ::testing::TestWithParam<std::string> {};
  
  TEST_P(ExpressionEqualityTest, ExpressionEquality) {
+diff --git a/test/fixtures/style_parser/expressions.info.json b/test/fixtures/style_parser/expressions.info.json
+index a37cc2a..9c71fa1 100644
+--- a/test/fixtures/style_parser/expressions.info.json
++++ b/test/fixtures/style_parser/expressions.info.json
+@@ -2,7 +2,7 @@
+     "default": {
+         "log": [
+             [1, "WARNING", "ParseStyle", "Expected color but found number instead."],
+-            [1, "WARNING", "ParseStyle", "Expected arguments of type (number, number, number, number), but found (number, string, number, number) instead."],
++            [1, "WARNING", "ParseStyle", "[2]: Expected number but found string instead."],
+             [1, "WARNING", "ParseStyle", "\"zoom\" expression may only be used as input to a top-level \"step\" or \"interpolate\" expression."],
+             [1, "WARNING", "ParseStyle", "value must be a string"],
+             [1, "WARNING", "ParseStyle", "Expected string but found boolean instead."],
