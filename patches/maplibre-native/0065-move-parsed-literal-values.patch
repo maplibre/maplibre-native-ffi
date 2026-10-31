@@ -1,0 +1,89 @@
+Moves each parsed array and object member into its parent instead of copying
+it, when parsing a literal value or serializing a legacy filter. A copy at
+every level made parsing a nested literal take time proportional to its size
+times its depth: a 2 MB literal 63 arrays deep took 1.3 s instead of 38 ms
+(https://github.com/maplibre/maplibre-native-ffi/issues/1432).
+Upstream: not proposed
+
+diff --git a/src/mln/style/expression/literal.cpp b/src/mln/style/expression/literal.cpp
+index ffb6a80..648efb9 100644
+--- a/src/mln/style/expression/literal.cpp
++++ b/src/mln/style/expression/literal.cpp
+@@ -31,14 +31,14 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx, s
+                        if (!error) {
+                            std::optional<Value> memberValue = parseValue(v, ctx, depth + 1);
+                            if (memberValue) {
+-                               result.emplace(k, *memberValue);
++                               result.emplace(k, std::move(*memberValue));
+                            } else {
+                                error = true;
+                            }
+                        }
+                        return {};
+                    });
+-        return error ? std::optional<Value>() : std::optional<Value>(result);
++        return error ? std::optional<Value>() : std::optional<Value>(std::move(result));
+     }
+ 
+     if (isArray(value)) {
+@@ -47,12 +47,12 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx, s
+         for (std::size_t i = 0; i < length; i++) {
+             std::optional<Value> item = parseValue(arrayMember(value, i), ctx, depth + 1);
+             if (item) {
+-                result.emplace_back(*item);
++                result.emplace_back(std::move(*item));
+             } else {
+                 return std::optional<Value>();
+             }
+         }
+-        return std::optional<Value>(result);
++        return std::optional<Value>(std::move(result));
+     }
+ 
+     std::optional<mln::Value> v = toValue(value);
+diff --git a/src/mln/style/conversion/filter.cpp b/src/mln/style/conversion/filter.cpp
+index b8750cc..0ccdbdd 100644
+--- a/src/mln/style/conversion/filter.cpp
++++ b/src/mln/style/conversion/filter.cpp
+@@ -265,12 +265,12 @@ std::optional<mln::Value> serializeLegacyFilter(const Convertible& values) {
+         for (std::size_t i = 0; i < arrayLength(values); ++i) {
+             auto arrayValue = serializeLegacyFilter(arrayMember(values, i));
+             if (arrayValue) {
+-                result.push_back(*arrayValue);
++                result.push_back(std::move(*arrayValue));
+             } else {
+                 result.emplace_back(NullValue());
+             }
+         }
+-        return mln::Value(result);
++        return mln::Value(std::move(result));
+     }
+     return toValue(values);
+ }
+diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
+index 3ae4a96..7641219 100644
+--- a/test/style/expression/expression.test.cpp
++++ b/test/style/expression/expression.test.cpp
+@@ -75,6 +75,22 @@ TEST(Expression, ParsingLimitsNestingDepth) {
+     EXPECT_NE(errors(R"(["literal", )" + nest(64, "[", "", "]") + "]").find(tooDeep), std::string::npos);
+ }
+ 
++TEST(Expression, LiteralKeepsNestedValues) {
++    const std::string json = R"(["literal",{"a":[1,[2,{"b":"c"}]],"d":[[],{}]}])";
++    JSDocument document;
++    document.Parse<0>(json);
++    const JSValue* expression = &document;
++    expression::ParsingContext ctx;
++    auto parsed = ctx.parseExpression(conversion::Convertible(expression));
++    ASSERT_TRUE(parsed);
++
++    const mln::Value expected = std::vector<mln::Value>{
++        std::string("literal"),
++        PropertyMap{{"a", std::vector<mln::Value>{1.0, std::vector<mln::Value>{2.0, PropertyMap{{"b", std::string("c")}}}}},
++                    {"d", std::vector<mln::Value>{std::vector<mln::Value>{}, PropertyMap{}}}}};
++    EXPECT_EQ((*parsed)->serialize(), expected);
++}
++
+ class ExpressionEqualityTest : public ::testing::TestWithParam<std::string> {};
+ 
+ TEST_P(ExpressionEqualityTest, ExpressionEquality) {

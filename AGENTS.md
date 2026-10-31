@@ -24,10 +24,13 @@ anything, since plain `git submodule update` skips this submodule, and read
 
 ## Tests
 
-Native behavior is tested once, in C, under `tests/native`. A binding suite
-tests only what its binding adds: its runtime, its generated shapes, and its
-platform integration. Before you delete a binding test, check that a C test
-asserts what it checked.
+Native behavior is tested once, in C, under `tests/native`. A patch to MapLibre
+Native is the exception: it stands for an upstream pull request, filed or not,
+so it carries its own tests in upstream's `test/` tree. CI doesn't build them,
+so run them by hand and say so in the pull request. A binding suite tests only
+what its binding adds: its runtime, its generated shapes, and its platform
+integration. Before you delete a binding test, check that a C test asserts what
+it checked.
 
 A Linux host can run the Windows and FreeBSD suites locally, under Wine and in a
 virtual machine, as the

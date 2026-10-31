@@ -1,0 +1,312 @@
+Rejects an expression that nests more than 64 arrays or objects, counting
+those in its literal values and in a legacy filter. Parsing recurses at each
+level, about 1.3 KB of stack apiece, so a deeply nested expression overflowed a
+thread's stack and crashed instead of failing to parse; a 128 KB musl thread
+held about 95 levels
+(https://github.com/maplibre/maplibre-native-ffi/issues/1432).
+Upstream: not proposed
+
+diff --git a/include/mln/style/expression/parsing_context.hpp b/include/mln/style/expression/parsing_context.hpp
+index 25929ec..38aa8f9 100644
+--- a/include/mln/style/expression/parsing_context.hpp
++++ b/include/mln/style/expression/parsing_context.hpp
+@@ -4,6 +4,7 @@
+ #include <mln/style/expression/type.hpp>
+ #include <mln/style/conversion.hpp>
+ 
++#include <cstddef>
+ #include <iterator>
+ #include <map>
+ #include <memory>
+@@ -74,6 +75,13 @@ enum class TypeAnnotationOption {
+     omit
+ };
+ 
++/**
++    The most arrays and objects an expression nests, counting those in its
++    literal values. Parsing recurses at each level, so deeper nesting could
++    otherwise exhaust a thread's stack.
++*/
++constexpr std::size_t maxExpressionDepth = 64;
++
+ class ParsingContext {
+ public:
+     ParsingContext()
+@@ -91,6 +99,7 @@ public:
+ 
+     std::string getKey() const { return key; }
+     std::optional<type::Type> getExpected() const { return expected; }
++    std::size_t getDepth() const noexcept { return depth; }
+     const std::vector<ParsingError>& getErrors() const noexcept { return *errors; }
+     std::string getCombinedErrors() const;
+ 
+@@ -156,11 +165,13 @@ private:
+     ParsingContext(std::string key_,
+                    std::shared_ptr<std::vector<ParsingError>> errors_,
+                    std::optional<type::Type> expected_,
+-                   std::shared_ptr<detail::Scope> scope_)
++                   std::shared_ptr<detail::Scope> scope_,
++                   std::size_t depth_)
+         : key(std::move(key_)),
+           expected(std::move(expected_)),
+           scope(std::move(scope_)),
+-          errors(std::move(errors_)) {}
++          errors(std::move(errors_)),
++          depth(depth_) {}
+ 
+     /**
+         Parse the given style-spec JSON value into an Expression object.
+@@ -175,6 +186,7 @@ private:
+     std::optional<type::Type> expected;
+     std::shared_ptr<detail::Scope> scope;
+     std::shared_ptr<std::vector<ParsingError>> errors;
++    std::size_t depth = 0;
+ };
+ 
+ bool isExpression(const std::string&) noexcept;
+diff --git a/src/mln/style/expression/parsing_context.cpp b/src/mln/style/expression/parsing_context.cpp
+index aadb01f..8c7fa55 100644
+--- a/src/mln/style/expression/parsing_context.cpp
++++ b/src/mln/style/expression/parsing_context.cpp
+@@ -89,7 +89,7 @@ ParseResult ParsingContext::parse(const Convertible& value,
+                                   std::size_t index_,
+                                   std::optional<type::Type> expected_,
+                                   const std::optional<TypeAnnotationOption>& typeAnnotationOption) {
+-    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope);
++    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope, depth + 1);
+     return child.parse(value, typeAnnotationOption);
+ }
+ 
+@@ -100,7 +100,8 @@ ParseResult ParsingContext::parse(const Convertible& value,
+     ParsingContext child(key + "[" + util::toString(index_) + "]",
+                          errors,
+                          std::move(expected_),
+-                         std::make_shared<detail::Scope>(bindings, scope));
++                         std::make_shared<detail::Scope>(bindings, scope),
++                         depth + 1);
+     return child.parse(value);
+ }
+ 
+@@ -156,6 +157,11 @@ ParseResult ParsingContext::parse(const Convertible& value,
+     ParseResult parsed;
+ 
+     if (isArray(value)) {
++        if (depth >= maxExpressionDepth) {
++            error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
++            return ParseResult();
++        }
++
+         const std::size_t length = arrayLength(value);
+         if (length == 0) {
+             error(
+diff --git a/src/mln/style/expression/literal.cpp b/src/mln/style/expression/literal.cpp
+index 220d702..ffb6a80 100644
+--- a/src/mln/style/expression/literal.cpp
++++ b/src/mln/style/expression/literal.cpp
+@@ -16,8 +16,12 @@ std::optional<Value> checkNumber(T n) {
+ }
+ 
+ using namespace mln::style::conversion;
+-std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
++std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx, std::size_t depth) {
+     if (isUndefined(value)) return {Null};
++    if ((isObject(value) || isArray(value)) && depth >= maxExpressionDepth) {
++        ctx.error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
++        return std::nullopt;
++    }
+     if (isObject(value)) {
+         std::unordered_map<std::string, Value> result;
+         bool error = false;
+@@ -25,7 +29,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
+                    [&](const std::string& k,
+                        const mln::style::conversion::Convertible& v) -> std::optional<conversion::Error> {
+                        if (!error) {
+-                           std::optional<Value> memberValue = parseValue(v, ctx);
++                           std::optional<Value> memberValue = parseValue(v, ctx, depth + 1);
+                            if (memberValue) {
+                                result.emplace(k, *memberValue);
+                            } else {
+@@ -41,7 +45,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
+         std::vector<Value> result;
+         const auto length = arrayLength(value);
+         for (std::size_t i = 0; i < length; i++) {
+-            std::optional<Value> item = parseValue(arrayMember(value, i), ctx);
++            std::optional<Value> item = parseValue(arrayMember(value, i), ctx, depth + 1);
+             if (item) {
+                 result.emplace_back(*item);
+             } else {
+@@ -75,7 +79,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
+                 util::toString(arrayLength(value) - 1) + " instead.");
+             return ParseResult();
+         }
+-        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx);
++        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx, ctx.getDepth() + 1);
+         if (!parsedValue) {
+             return ParseResult();
+         }
+@@ -94,7 +98,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
+         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
+     } else {
+         // bare primitive value (string, number, boolean, null)
+-        const std::optional<Value> parsedValue = parseValue(value, ctx);
++        const std::optional<Value> parsedValue = parseValue(value, ctx, ctx.getDepth());
+         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
+     }
+ }
+diff --git a/src/mln/style/conversion/filter.cpp b/src/mln/style/conversion/filter.cpp
+index 4752c82..b8750cc 100644
+--- a/src/mln/style/conversion/filter.cpp
++++ b/src/mln/style/conversion/filter.cpp
+@@ -15,9 +15,9 @@ namespace conversion {
+ using namespace mln::style::expression;
+ 
+ namespace {
+-bool isExpression(const Convertible& filter);
++bool isExpression(const Convertible& filter, std::size_t depth = 0);
+ }
+-ParseResult convertLegacyFilter(const Convertible& values, Error& error);
++ParseResult convertLegacyFilter(const Convertible& values, Error& error, std::size_t depth = 0);
+ std::optional<mln::Value> serializeLegacyFilter(const Convertible& values);
+ 
+ std::optional<Filter> Converter<Filter>::operator()(const Convertible& value, Error& error) const {
+@@ -43,11 +43,17 @@ std::optional<Filter> Converter<Filter>::operator()(const Convertible& value, Er
+ // This is a port from
+ // https://github.com/mapbox/mapbox-gl-js/blob/master/src/style-spec/feature_filter/index.js
+ namespace {
+-bool isExpression(const Convertible& filter) {
++bool isExpression(const Convertible& filter, std::size_t depth) {
+     if (!isArray(filter) || arrayLength(filter) == 0) {
+         return false;
+     }
+ 
++    // Classify a filter too deep to inspect as an expression, which the
++    // expression parser then rejects.
++    if (depth >= maxExpressionDepth) {
++        return true;
++    }
++
+     auto op = toString(arrayMember(filter, 0));
+ 
+     if (!op) {
+@@ -72,7 +78,7 @@ bool isExpression(const Convertible& filter) {
+     } else if (*op == "any" || *op == "all") {
+         for (std::size_t i = 1; i < arrayLength(filter); i++) {
+             Convertible f = arrayMember(filter, i);
+-            if (!isExpression(f) && !toBool(f)) {
++            if (!isExpression(f, depth + 1) && !toBool(f)) {
+                 return false;
+             }
+         }
+@@ -194,11 +200,12 @@ ParseResult convertLegacyInFilter(const Convertible& values, Error& error) {
+ 
+ std::optional<std::vector<std::unique_ptr<Expression>>> convertLegacyFilterArray(const Convertible& input,
+                                                                                  Error& error,
+-                                                                                 std::size_t startIndex = 0) {
++                                                                                 std::size_t startIndex,
++                                                                                 std::size_t depth) {
+     std::vector<std::unique_ptr<Expression>> output;
+     output.reserve(arrayLength(input));
+     for (std::size_t i = startIndex; i < arrayLength(input); ++i) {
+-        auto child = convertLegacyFilter(arrayMember(input, i), error);
++        auto child = convertLegacyFilter(arrayMember(input, i), error, depth + 1);
+         if (!child) {
+             return std::nullopt;
+         }
+@@ -207,7 +214,7 @@ std::optional<std::vector<std::unique_ptr<Expression>>> convertLegacyFilterArray
+     return {std::move(output)};
+ }
+ 
+-ParseResult convertLegacyFilter(const Convertible& values, Error& error) {
++ParseResult convertLegacyFilter(const Convertible& values, Error& error, std::size_t depth) {
+     if (isUndefined(values)) {
+         return {std::make_unique<Literal>(true)};
+     }
+@@ -217,6 +224,11 @@ ParseResult convertLegacyFilter(const Convertible& values, Error& error) {
+         return std::nullopt;
+     }
+ 
++    if (depth >= maxExpressionDepth) {
++        error.message = "filter nests more than " + util::toString(maxExpressionDepth) + " levels deep";
++        return std::nullopt;
++    }
++
+     std::optional<std::string> op = toString(arrayMember(values, 0));
+ 
+     if (!op) {
+@@ -231,11 +243,11 @@ ParseResult convertLegacyFilter(const Convertible& values, Error& error) {
+         return {*op == "==" || *op == "<" || *op == ">" || *op == "<=" || *op == ">="
+                     ? convertLegacyComparisonFilter(values, error)
+                 : *op == "!="  ? createExpression("!", convertLegacyComparisonFilter(values, error, {"=="}), error)
+-                : *op == "any" ? createExpression("any", convertLegacyFilterArray(values, error, 1), error)
+-                : *op == "all" ? createExpression("all", convertLegacyFilterArray(values, error, 1), error)
++                : *op == "any" ? createExpression("any", convertLegacyFilterArray(values, error, 1, depth), error)
++                : *op == "all" ? createExpression("all", convertLegacyFilterArray(values, error, 1, depth), error)
+                 : *op == "none"
+                     ? createExpression(
+-                          "!", createExpression("any", convertLegacyFilterArray(values, error, 1), error), error)
++                          "!", createExpression("any", convertLegacyFilterArray(values, error, 1, depth), error), error)
+                 : *op == "in"   ? convertLegacyInFilter(values, error)
+                 : *op == "!in"  ? createExpression("!", convertLegacyInFilter(values, error), error)
+                 : *op == "has"  ? convertLegacyHasFilter(values, error)
+diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
+index 8855da3..3ae4a96 100644
+--- a/test/style/expression/expression.test.cpp
++++ b/test/style/expression/expression.test.cpp
+@@ -50,6 +50,31 @@ TEST(Expression, NestedOverloadFailureParsesEachLevelOnce) {
+     EXPECT_FALSE(parses(R"(["filter-id-<", )", R"(["filter-id-<"])", "]"));
+ }
+ 
++TEST(Expression, ParsingLimitsNestingDepth) {
++    const auto nest = [](std::size_t depth, const std::string& open, const std::string& inner, const std::string& close) {
++        std::string json;
++        for (std::size_t i = 0; i < depth; ++i) json += open;
++        json += inner;
++        for (std::size_t i = 0; i < depth; ++i) json += close;
++        return json;
++    };
++    const auto errors = [](const std::string& json) {
++        JSDocument document;
++        document.Parse<0>(json);
++        const JSValue* expression = &document;
++        expression::ParsingContext ctx;
++        return ctx.parseExpression(conversion::Convertible(expression)) ? std::string() : ctx.getCombinedErrors();
++    };
++    const std::string tooDeep = "Expression nests more than 64 levels deep.";
++
++    EXPECT_EQ(errors(nest(64, R"(["+", )", "1", ", 1]")), "");
++    EXPECT_NE(errors(nest(65, R"(["+", )", "1", ", 1]")).find(tooDeep), std::string::npos);
++
++    // The arrays of a literal value count toward the depth of the expression that holds it.
++    EXPECT_EQ(errors(R"(["literal", )" + nest(63, "[", "", "]") + "]"), "");
++    EXPECT_NE(errors(R"(["literal", )" + nest(64, "[", "", "]") + "]").find(tooDeep), std::string::npos);
++}
++
+ class ExpressionEqualityTest : public ::testing::TestWithParam<std::string> {};
+ 
+ TEST_P(ExpressionEqualityTest, ExpressionEquality) {
+diff --git a/test/style/filter.test.cpp b/test/style/filter.test.cpp
+index 26b0860..6ee9a7e 100644
+--- a/test/style/filter.test.cpp
++++ b/test/style/filter.test.cpp
+@@ -384,3 +384,21 @@ TEST(Filter, LegacyExpressionInvalidType) {
+     std::optional<Filter> result = conversion::convert<Filter>(conversion::Convertible(&value), error);
+     EXPECT_FALSE(result);
+ }
++
++TEST(Filter, LegacyFilterLimitsNestingDepth) {
++    const auto nest = [](std::size_t depth, const std::string& op) {
++        std::string json;
++        for (std::size_t i = 1; i < depth; ++i) json += R"([")" + op + R"(", )";
++        json += R"(["==", "a", 1])";
++        json += std::string(depth - 1, ']');
++        return json;
++    };
++
++    // "all" can be an expression or a legacy filter, and "none" is only a legacy filter.
++    for (const std::string op : {"all", "none"}) {
++        conversion::Error error;
++        EXPECT_TRUE(conversion::convertJSON<Filter>(nest(64, op), error)) << op;
++        EXPECT_FALSE(conversion::convertJSON<Filter>(nest(65, op), error)) << op;
++        EXPECT_NE(error.message.find("more than 64 levels deep"), std::string::npos) << op;
++    }
++}
