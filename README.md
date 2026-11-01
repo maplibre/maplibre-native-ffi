@@ -33,9 +33,9 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/maplibre/maplibre-native-ffi/bindings/go.svg)](https://pkg.go.dev/github.com/maplibre/maplibre-native-ffi/bindings/go)
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmaplibre%2Fmaplibre-native-ffi-distribution%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
 [![Swift platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmaplibre%2Fmaplibre-native-ffi-distribution%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
-[![vcpkg](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=vcpkg)](https://maplibre.org/maplibre-native-ffi/install/#vcpkg)
-[![Conan](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=Conan)](https://maplibre.org/maplibre-native-ffi/install/#conan)
-[![xmake](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=xmake)](https://maplibre.org/maplibre-native-ffi/install/#xmake)
+[![vcpkg](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=vcpkg)](https://maplibre.org/maplibre-native-ffi/install/c/#vcpkg)
+[![Conan](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=Conan)](https://maplibre.org/maplibre-native-ffi/install/c/#conan)
+[![xmake](https://img.shields.io/github/v/tag/maplibre/maplibre-native-ffi-distribution?label=xmake)](https://maplibre.org/maplibre-native-ffi/install/c/#xmake)
 [![C / Zig](https://img.shields.io/github/v/release/maplibre/maplibre-native-ffi?label=C%20%2F%20Zig)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
 
 This project provides an experimental C API for

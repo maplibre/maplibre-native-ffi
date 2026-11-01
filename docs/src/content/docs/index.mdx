@@ -1,36 +1,33 @@
 ---
 title: MapLibre Native FFI
 description:
-  A C API for direct host control of the MapLibre Native map and render session.
+  The MapLibre Native map engine as a C API, with bindings for nine languages.
+# Scope: what the library is, who it's for, where to start, and how stable it
+# is. Concepts explains how it works.
 ---
 
 import SupportMatrix from "../../components/SupportMatrix.astro";
 
-MapLibre Native FFI is a C API for
-[MapLibre Native](https://github.com/maplibre/maplibre-native), an engine that
-draws vector and raster maps from a MapLibre style document. It exposes MapLibre
-Native concepts directly across a C ABI and language bindings. Use it for SDKs
-and custom integrations that need direct control of the map and render session.
+MapLibre Native FFI is the
+[MapLibre Native](https://github.com/maplibre/maplibre-native) map engine as a C
+API, with bindings for Dart, Go, Kotlin, .NET, Python, Rust, Swift, TypeScript,
+and Zig. Use it to build map components for a UI framework, or to render maps on
+a server.
 
-The MapLibre [Android](https://maplibre.org/maplibre-native/android/api/) and
-[iOS](https://maplibre.org/maplibre-native/ios/latest/documentation/maplibre/)
-SDKs provide a map view that owns a window, a frame loop, and gesture handling.
-This API provides map state and rendering. The host supplies the graphics
-resources, connects events to its UI, and requests frames at its own cadence.
-Texture targets support image export and compositing into a host scene.
+To start, read the [concepts](/maplibre-native-ffi/concepts/), then
+[install](/maplibre-native-ffi/install/) the package for your language.
 
-[Install a binding](/maplibre-native-ffi/install/), read the
-[concepts](/maplibre-native-ffi/concepts/), then
-[create a map](/maplibre-native-ffi/guides/create-a-map/). The guides continue
-through loading a style, attaching a target, and rendering frames.
+## Projects
 
-See [Examples](/maplibre-native-ffi/examples/) for projects that use this API.
+- [MapLibre Compose](https://github.com/maplibre/maplibre-compose) brings maps
+  to Compose Multiplatform.
+- [MapLibre for Flutter](https://github.com/josxha/flutter-maplibre) brings maps
+  to Flutter.
 
 ## Status
 
-MapLibre Native FFI is pre-1.0. The C ABI is unstable while `mln_c_version()`
-returns `0`, and headers, package coordinates, and behavior change between
-snapshots.
+Until the first part of the version reaches 1, any release can break the API,
+the ABI, or documented behavior.
 
 <SupportMatrix />
 
@@ -40,7 +37,11 @@ CI is provided by [Blacksmith](https://www.blacksmith.sh/) under its open source
 program.
 
 <p>
-  <a href="https://www.blacksmith.sh/">
+  <a
+    href="https://www.blacksmith.sh/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
     <img
       src="https://github.com/user-attachments/assets/7d8455df-0b86-4676-9df8-fefe1f69ae4b"
       alt="CI powered by Blacksmith"

@@ -2,18 +2,24 @@
 title: Install
 description: Choose a backend, then add the package for your language.
 sidebar:
+  label: Overview
   order: 0
 # Scope: what every language shares when installing: the backend choice and the
 # platform requirements. Each language's setup lives on its own page.
 ---
 
-import { TabItem, Tabs } from "@astrojs/starlight/components";
-
 Add the package for your language:
 
+- [C](/maplibre-native-ffi/install/c/)
+- [Dart](/maplibre-native-ffi/install/dart/)
+- [.NET](/maplibre-native-ffi/install/dotnet/)
+- [Go](/maplibre-native-ffi/install/go/)
 - [Kotlin](/maplibre-native-ffi/install/kotlin/)
+- [Python](/maplibre-native-ffi/install/python/)
 - [Rust](/maplibre-native-ffi/install/rust/)
-- [C, Dart, Go, .NET, Python, Swift, TypeScript, and Zig](/maplibre-native-ffi/install/other/)
+- [Swift](/maplibre-native-ffi/install/swift/)
+- [TypeScript](/maplibre-native-ffi/install/typescript/)
+- [Zig](/maplibre-native-ffi/install/zig/)
 
 The [support matrix](/maplibre-native-ffi/#status) shows which platforms,
 architectures, and backends each language supports.
@@ -26,92 +32,13 @@ Android and OpenHarmony, WebGPU in browsers, and Vulkan elsewhere. Choose OpenGL
 in emulators and virtual machines, which often lack Vulkan, and choose the
 backend your application already uses if it draws its own graphics.
 
-## Android
-
-Before you create a runtime, initialize the library once per process, with the
-calling thread's JNI environment and an Android `Context`:
-
-<Tabs syncKey="language">
-<TabItem label="C">
-
-```c
-mln_android_init(jni_env, context, NULL);
-```
-
-</TabItem>
-<TabItem label="Dart">
-
-```dart
-initAndroid(NativePointer(jniEnv), NativePointer(context));
-```
-
-Get the JNI environment from [`package:jni`](https://pub.dev/packages/jni), and
-the application context from
-[`package:jni_flutter`](https://pub.dev/packages/jni_flutter).
-
-</TabItem>
-<TabItem label="Go">
-
-```go
-err := maplibre.InitAndroid(jniEnv, context)
-```
-
-</TabItem>
-<TabItem label="Kotlin">
-
-```kotlin
-initAndroid(context)
-```
-
-</TabItem>
-<TabItem label=".NET">
-
-```csharp
-MaplibreNative.InitAndroid(
-    NativePointer.FromBorrowedAddress(jniEnv),
-    NativePointer.FromBorrowedAddress(context));
-```
-
-</TabItem>
-<TabItem label="Python">
-
-```python
-maplibre_native_ffi.api.init_android(jni_env, context)
-```
-
-</TabItem>
-<TabItem label="Rust">
-
-```rust
-unsafe { maplibre_native_ffi::init_android(jni_env, context)? };
-```
-
-</TabItem>
-<TabItem label="Swift">
-
-```swift
-try initAndroid(
-  jniEnv: NativePointer(bitPattern: jniEnv),
-  context: NativePointer(bitPattern: context))
-```
-
-</TabItem>
-<TabItem label="Zig">
-
-```zig
-try maplibre.initAndroid(jni_env, context, null);
-```
-
-</TabItem>
-</Tabs>
-
 ## Web
 
 The library runs on several threads, which in a browser share memory, and
 browsers allow shared memory only on a cross-origin isolated page. Serve a page
 that loads the library with these headers, which make it isolated:
 
-```
+```text title="HTTP response headers"
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```

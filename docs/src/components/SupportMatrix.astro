@@ -95,7 +95,11 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
           <th scope="col">Backend</th>
           {supportMatrix.bindings.map((binding) => (
             <th scope="col" class="binding">
-              <a href={`${sourceRoot}/${binding.sourceDirectory}`}>
+              <a
+                href={`${sourceRoot}/${binding.sourceDirectory}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 {binding.label}
               </a>
             </th>
@@ -153,7 +157,8 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
               {gap.link && (
                 <>
                   {" "}
-                  <a href={gap.link}>Upstream</a>
+                  <a href={gap.link} target="_blank" rel="noopener noreferrer"
+                  >Upstream</a>
                 </>
               )}
             </li>
@@ -166,7 +171,11 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
     Hover a cell for details. TypeScript runs under Node, Bun, and Deno, in
     ArkTS apps on OpenHarmony, and in the browser. OpenGL uses WGL on Windows
     and EGL on other platforms. macOS EGL uses ANGLE.{" "}
-    <a href={`${issueRoot}/${supportMatrix.issue}`}>
+    <a
+      href={`${issueRoot}/${supportMatrix.issue}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
       Issue #{supportMatrix.issue}
     </a>{" "}
     tracks the gaps.

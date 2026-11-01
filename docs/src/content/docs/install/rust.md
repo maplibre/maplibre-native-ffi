@@ -1,8 +1,6 @@
 ---
 title: Rust
 description: Add the Rust crate to a project.
-sidebar:
-  order: 1
 ---
 
 ## Install
@@ -32,20 +30,27 @@ maplibre-native-ffi = "{{version}}"
 maplibre-native-ffi = { version = "{{version}}", features = ["vulkan"] }
 ```
 
-## Platforms
-
-### Windows with MinGW
+## Windows with MinGW
 
 For `x86_64-pc-windows-gnu`, link with MSYS2's MINGW64 Clang and LLD
 (`-C link-arg=-fuse-ld=lld`), and keep MINGW64's `bin` directory on `PATH` for
 its runtime DLLs.
 
-### Browser
+## Browser
 
 A browser build targets `wasm32-unknown-emscripten`. It needs nightly Rust to
 build the standard library with atomics, and link options from the C library.
 The [`maplibre-native-ffi-sys` docs](https://docs.rs/maplibre-native-ffi-sys)
 list them.
+
+## Android
+
+Initialize the library once per process, before you create a runtime, with the
+calling thread's JNI environment and an Android `Context`:
+
+```rust title="src/lib.rs"
+unsafe { maplibre_native_ffi::init_android(jni_env, context)? };
+```
 
 ## Snapshots
 

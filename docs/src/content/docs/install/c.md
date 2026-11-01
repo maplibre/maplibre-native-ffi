@@ -150,6 +150,15 @@ find_package(maplibre-native-c REQUIRED CONFIG)
 target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
 ```
 
+## Android
+
+Initialize the library once per process, before you create a runtime, with the
+calling thread's JNI environment and an Android `Context`:
+
+```c title="android.c"
+mln_android_init(jni_env, context, NULL);
+```
+
 ## Snapshots
 
 The

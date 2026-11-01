@@ -7,17 +7,22 @@ import starlightCopyButton from "starlight-copy-button";
 import starlightLinksValidator from "starlight-links-validator";
 import starlightLlmsTxt from "starlight-llms-txt";
 
+import { externalLinksPlugin } from "./src/integrations/external-links";
 import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
 import { versionsPlugin } from "./src/integrations/versions";
 
+const site = "https://maplibre.org";
 const base = "/maplibre-native-ffi";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://maplibre.org",
+  site,
   base,
   markdown: {
-    processor: satteri({ mdastPlugins: [versionsPlugin] }),
+    processor: satteri({
+      mdastPlugins: [versionsPlugin],
+      hastPlugins: [externalLinksPlugin(site + base)],
+    }),
   },
   integrations: [
     publicDirectoryIndex(base),
@@ -32,6 +37,10 @@ export default defineConfig({
           "https://github.com/maplibre/maplibre-native-ffi/edit/main/docs/",
       },
       routeMiddleware: "./src/banner.ts",
+      components: {
+        EditLink: "./src/components/EditLink.astro",
+        SocialIcons: "./src/components/SocialIcons.astro",
+      },
       customCss: ["./src/styles/custom.css"],
       plugins: [
         starlightCopyButton(),
@@ -54,7 +63,6 @@ export default defineConfig({
           label: "Install",
           items: [{ autogenerate: { directory: "install" } }],
         },
-        { label: "Examples", slug: "examples" },
         {
           label: "Guides",
           items: [{ autogenerate: { directory: "guides" } }],

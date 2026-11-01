@@ -1,8 +1,6 @@
 ---
 title: Kotlin
 description: Add the Kotlin Multiplatform library to a project.
-sidebar:
-  order: 1
 ---
 
 ## Install
@@ -40,7 +38,7 @@ androidMain.dependencies {
 
 Call `initAndroid(context)` once before you create a runtime.
 
-## Kotlin/Native
+## Native
 
 Add a runtime to the source set of each native target, such as Metal for Apple
 platforms and Vulkan for Linux:
@@ -71,7 +69,7 @@ jvmMain.dependencies {
 The binding calls native code through Java's foreign function API, so start the
 JVM with `--enable-native-access=ALL-UNNAMED`.
 
-## Kotlin/Wasm
+## Wasm
 
 Add the OpenGL runtime to `wasmJsMain` to render with WebGL, or the WebGPU
 runtime to render with WebGPU. Before you use the binding, call
