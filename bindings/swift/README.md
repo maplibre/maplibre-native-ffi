@@ -5,5 +5,5 @@
 the [MapLibre Native](https://github.com/maplibre/maplibre-native) map renderer.
 
 - [Install](https://maplibre.org/maplibre-native-ffi/install/swift/)
-- [Guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
+- [Guides](https://maplibre.org/maplibre-native-ffi/guides/getting-started/)
 - [API reference](https://maplibre.org/maplibre-native-ffi/reference/swift/documentation/maplibrenativeffi/)
