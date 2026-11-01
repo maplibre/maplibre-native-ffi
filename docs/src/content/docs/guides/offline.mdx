@@ -1,0 +1,68 @@
+---
+title: Offline
+description:
+  Set a cache file, manage the ambient cache, and download offline regions.
+# Scope: the cache file, the ambient cache, and offline regions.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+The library keeps resources in a cache, so maps load faster and work without a
+network. The ambient cache keeps what maps have loaded recently. An offline
+region keeps a whole area that you download on purpose.
+
+## Set a cache file
+
+Set a cache file path when you create the runtime. Without one, the cache lives
+in memory, and offline regions are lost when the runtime closes.
+
+<Snippet page="offline" region="cache-file" />
+
+## Manage the ambient cache
+
+Set the ambient cache's maximum size to bound its disk use. The library removes
+old resources to fit. Offline regions don't count toward it.
+
+Clear the ambient cache to free its space. When your tiles change, invalidate
+the cache instead. It keeps the data, but maps check each resource with the
+server before they use it.
+
+<Snippet page="offline" region="ambient" />
+
+## Download a region
+
+Define the region: the style URL, the bounds, the zoom range, and the pixel
+ratio. To follow a shape, give a GeoJSON geometry in place of the bounds. Each
+zoom level has four times the tiles of the one before.
+
+You can store your own bytes with the region as metadata, such as its name.
+
+Create the region, then set its download active. Maps on the runtime use the
+region's resources when they load the same style URL. They need no other setup.
+
+<Snippet page="offline" region="download" />
+
+## Track download progress
+
+Observe the region to receive its progress as events in your event handler. See
+[Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
+
+Each status event counts the completed and required resources, and says whether
+the download is complete. An error event reports a resource that failed to
+download.
+
+<Snippet page="offline" region="progress" />
+
+## Update and delete regions
+
+List the regions in the cache file. A download stops when the runtime closes.
+Set the download active again to resume it. It skips the resources it already
+has.
+
+When the server's data changes, invalidate the region. Maps then check each of
+its resources with the server before they use it.
+
+Delete a region you no longer need. Its resources that no other region uses move
+to the ambient cache.
+
+<Snippet page="offline" region="manage" />

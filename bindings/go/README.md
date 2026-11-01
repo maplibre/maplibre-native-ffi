@@ -6,5 +6,5 @@ Go binding for the C API of
 the [MapLibre Native](https://github.com/maplibre/maplibre-native) map renderer.
 
 - [Install](https://maplibre.org/maplibre-native-ffi/install/go/)
-- [Guides](https://maplibre.org/maplibre-native-ffi/guides/getting-started/)
+- [Guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
 - [API reference](https://maplibre.org/maplibre-native-ffi/reference/go/)

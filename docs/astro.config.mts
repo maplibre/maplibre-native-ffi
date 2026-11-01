@@ -77,7 +77,7 @@ export default defineConfig({
         {
           label: "Guides",
           items: [
-            "guides/getting-started",
+            "guides/create-a-map",
             {
               label: "Rendering",
               items: [

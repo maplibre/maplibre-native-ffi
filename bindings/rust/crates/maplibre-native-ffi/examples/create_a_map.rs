@@ -1,4 +1,4 @@
-//! Snippets for the docs site's Getting started page. They compile with the
+//! Snippets for the docs site's Create a map page. They compile with the
 //! tests, which never run them.
 
 use std::future::Future;
@@ -11,7 +11,7 @@ use maplibre_native_ffi::*;
 
 fn copy_pixels(_data: &[u8], _stride: u32) {}
 
-async fn getting_started() -> Result<()> {
+async fn create_a_map() -> Result<()> {
     // #region runtime
     let runtime = RuntimeHandle::create(&RuntimeOptions::default())?;
     // #endregion runtime
@@ -88,5 +88,5 @@ fn block_on<F: Future>(future: F) -> F::Output {
 }
 
 fn main() -> Result<()> {
-    block_on(getting_started())
+    block_on(create_a_map())
 }

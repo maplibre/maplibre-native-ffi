@@ -1,0 +1,40 @@
+---
+title: Query
+description: Find the features on the map or in a source.
+# Scope: querying rendered features and source features.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide finds the features that the map draws, or the features that a source
+has loaded.
+
+Query features through the map's render session. A rendered query reads the last
+frame. After a camera or style change, render a frame before you query.
+
+If the session's driver runs on your graphics thread, keep servicing driver work
+while you wait, or the query doesn't finish. See
+[Render to a window](/maplibre-native-ffi/guides/rendering/window/#render-on-your-graphics-thread).
+
+## Query rendered features
+
+Query rendered features at a screen point or in a box.
+[Camera](/maplibre-native-ffi/guides/camera/#convert-between-pixels-and-coordinates)
+covers screen points. Name the layers to query. Without them, the query covers
+every layer.
+
+Each result is a GeoJSON feature and the layer that drew it. A feature that
+several layers draw appears once for each layer.
+
+<Snippet page="query" region="rendered" />
+
+## Query source features
+
+Query a source's features by the source's ID. For a vector source, name the
+source layers. To keep only some features, pass a
+[filter](https://maplibre.org/maplibre-style-spec/expressions/).
+
+The result has only the features in tiles that the source loaded for the current
+view. A source loads tiles only while a visible layer uses it.
+
+<Snippet page="query" region="source" />

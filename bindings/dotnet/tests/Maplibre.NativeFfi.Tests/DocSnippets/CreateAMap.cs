@@ -1,11 +1,11 @@
-// Snippets for the docs site's Getting started page. They compile with the
+// Snippets for the docs site's Create a map page. They compile with the
 // tests, which never run them.
 
 using System.Collections.Immutable;
 
 namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
-internal static class GettingStarted
+internal static class CreateAMap
 {
     private static void CopyPixels(ImmutableArray<byte> data, uint stride) { }
 

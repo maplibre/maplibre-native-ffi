@@ -1,0 +1,71 @@
+---
+title: Render to a texture
+description: Share rendered frames with your own renderer.
+# Scope: owned and borrowed textures, and acquiring frames. Reading pixels back
+# belongs in Render images. Running driver work on your graphics thread belongs
+# in Render to a window.
+---
+
+import Snippet from "../../../../components/Snippet.astro";
+
+This guide renders a continuous map into textures that your own renderer draws,
+such as a UI framework, a game engine, or a compositor. It uses the frame loop
+from
+[Render to a window](/maplibre-native-ffi/guides/rendering/window/#render-frames).
+
+## Attach a texture ring
+
+The session renders into a ring of textures. Your renderer can draw one frame
+while the session renders the next.
+
+Let the session create the ring on your graphics device. If your framework hands
+you the textures to render into, attach those as a borrowed ring instead.
+
+Pass your graphics context, such as your device and queue. On Vulkan, if your
+renderer also submits to that queue, pass a lock. Take the same lock around your
+own calls on the queue.
+
+<Snippet page="texture" region="attach-owned" />
+
+For a borrowed ring, pass your textures and their size in device pixels.
+
+<Snippet page="texture" region="attach-borrowed" />
+
+## Draw each frame
+
+Render frames with the same loop as for a window, without asking to present.
+
+When a frame renders, acquire it, and get its texture for your backend. The
+frame's rendering has already finished, so your renderer can read the texture
+right away.
+
+Release the frame after your reads finish. The session renders into that texture
+again only after the release. To sync on the GPU instead, see the GPU sync kinds
+in the [API reference](/maplibre-native-ffi/reference/c/render__target_8h.html).
+
+Keep at most one frame acquired while the next renders. If every texture in the
+ring is acquired, the next frame waits.
+
+If your renderer already runs a loop every frame, as a game engine does, you can
+drain the frame results there instead of using the frame wake.
+
+<Snippet page="texture" region="acquire" />
+
+## Resize the textures
+
+Release every acquired frame first.
+
+For an owned ring, resize the session, as for a
+[window](/maplibre-native-ffi/guides/rendering/window/#resize-the-window).
+
+For a borrowed ring, create textures at the new size, and set them as the
+session's target. Destroy the old textures after that finishes.
+
+<Snippet page="texture" region="resize-borrowed" />
+
+## Close the session
+
+Release every acquired frame. Then close the session, as for a
+[window](/maplibre-native-ffi/guides/rendering/window/#close-the-session).
+
+Destroy a borrowed ring's textures after the session closes.

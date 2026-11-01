@@ -31,5 +31,5 @@ The headers are included with `#include <maplibre_native_c.h>`. Install only one
 backend package in an application.
 
 - [Install](https://maplibre.org/maplibre-native-ffi/install/typescript/#openharmony)
-- [Guides](https://maplibre.org/maplibre-native-ffi/guides/getting-started/)
+- [Guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
 - [API reference](https://maplibre.org/maplibre-native-ffi/reference/typescript/)

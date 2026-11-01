@@ -1,0 +1,38 @@
+---
+title: Create a map
+description: Create a runtime and a map, and close them.
+# Scope: creating the runtime and the map, and closing them in order. Render
+# targets belong in the Rendering guides.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+Every integration creates a runtime and a map, attaches the map to a render
+target, and closes them in order. This guide covers the runtime and the map.
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/)
+covers the target.
+
+## Create a runtime
+
+Create a runtime with the default options. One runtime can serve all your maps.
+To set a cache file, see [Offline](/maplibre-native-ffi/guides/offline/).
+
+<Snippet page="create-a-map" region="runtime" />
+
+## Create a map
+
+Create a map on the runtime. Give it a size in logical pixels, a scale factor,
+and a map mode. The scale factor and the mode can't change later. For the mode,
+see
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/#pick-a-map-mode).
+
+Wait for the map to be created before you attach a render target.
+
+<Snippet page="create-a-map" region="map" />
+
+## Close
+
+Close the render session, the map, and the runtime, in that order. Wait for the
+map and the runtime to close.
+
+<Snippet page="create-a-map" region="close" />

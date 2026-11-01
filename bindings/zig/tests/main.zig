@@ -17,7 +17,7 @@ comptime {
     _ = @import("callbacks.zig");
     _ = @import("values.zig");
     _ = @import("rendering.zig");
-    _ = @import("docsnippets/getting_started.zig");
+    _ = @import("docsnippets/create_a_map.zig");
 }
 
 // The suite links the library the way the package does, through build.zig, and

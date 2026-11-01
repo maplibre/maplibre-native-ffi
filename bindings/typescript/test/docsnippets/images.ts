@@ -1,25 +1,33 @@
-// Snippets for the docs site's Getting started page. They are type-checked
-// with the tests, which never run them.
+// Snippets for the docs site's Render images page. They are type-checked with
+// the tests, which never run them.
 
 import {
+  CameraUpdateMode,
   GraphicsDeviceHandle,
+  type LatLng,
   MapMode,
   RenderDriverKind,
   RuntimeHandle,
 } from "../../src/index.ts";
 
+// The center of tile z/x/y. The snippet leaves the tile math to the reader.
+function tileCenter(_z: number, _x: number, _y: number): LatLng {
+  return { latitude: 0, longitude: 0 };
+}
+
 function copyPixels(_data: Uint8Array, _stride: number): void {}
 
-export async function gettingStarted(): Promise<void> {
-  // #region runtime
-  const runtime = await RuntimeHandle.create();
-  // #endregion runtime
-
+export async function images(
+  runtime: RuntimeHandle,
+  z: number,
+  x: number,
+  y: number,
+): Promise<void> {
   // #region map
   const extent = { width: 512, height: 512, scaleFactor: 1 };
   const { map, ready: mapReady } = runtime.createMap({
     initialExtent: extent,
-    mapMode: MapMode.staticValue,
+    mapMode: MapMode.tile,
   });
   await mapReady;
   // #endregion map
@@ -40,22 +48,23 @@ export async function gettingStarted(): Promise<void> {
   await sessionReady;
   // #endregion attach
 
-  // #region render
+  // #region image
+  map.discarding.updateCamera({
+    mode: CameraUpdateMode.jump,
+    camera: { center: tileCenter(z, x, y), zoom: z },
+  });
+
   await map.requestStillImage();
-  // #endregion render
+  // #endregion image
 
-  // #region render
+  // #region read
   const image = await session.readTexture();
-  // #endregion render
-
-  // #region render
   copyPixels(image.data, image.info.stride);
-  // #endregion render
+  // #endregion read
 
   // #region close
   session.dispose();
   device.close();
   await map.close();
-  await runtime.close();
   // #endregion close
 }

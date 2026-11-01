@@ -1,0 +1,85 @@
+---
+title: Network
+description:
+  Change requests, serve resources and tiles from your code, and set the network
+  status.
+# Scope: transforming and serving requests, custom sources whose tiles your code
+# supplies, and the network status.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+The library downloads styles, tiles, fonts, and icons from the URLs in the
+style. This guide changes those requests, serves resources from your own code,
+and tells the library when the device is offline. Transforms and resource
+providers apply to every map on the runtime.
+
+## Add headers
+
+To add headers, such as an `Authorization` header, set a header transform.
+
+For fixed values, give the transform rules. Each rule matches a URL pattern and
+lists its headers. Match only URLs on your own server, so that your token
+doesn't go to other servers in the style.
+
+For values that change, such as a token that expires, give the transform a
+callback instead. The callback sets the headers of each request, and must return
+right away.
+
+The browser and OpenHarmony can't add headers. There, serve those requests with
+a resource provider instead.
+
+<Snippet page="network" region="headers" />
+
+## Rewrite URLs
+
+To change a request's URL, set a resource transform. Use it to add an API key,
+or to send requests to another server.
+
+The callback answers with the new URL, or releases the request to keep the old
+one. It can answer later, from any thread, such as after it signs the URL.
+
+<Snippet page="network" region="rewrite" />
+
+## Serve resources from your code
+
+First check whether you need code. The library reads `file://` URLs, bundled
+files through `asset://` URLs and the runtime's asset path, and tile archives
+through `pmtiles://` and `mbtiles://` URLs. Point the style at those.
+
+For anything else, set a resource provider. Give your URLs a custom scheme in
+the style, such as `app://tiles/{z}/{x}/{y}.pbf`. Give the provider a route that
+matches that scheme. Requests that match no route skip the provider.
+
+Answer each request with its bytes, or with no content for a tile that has no
+data. Answer later, from any thread, if loading takes time. To let the library
+download a request, pass it through.
+
+<Snippet page="network" region="provider" />
+
+## Supply tiles from your code
+
+For tiles that have no URL, such as data that your code computes for an area,
+add a custom source. It asks your code for each tile it needs, by zoom, x, and
+y. A custom geometry source takes GeoJSON for each tile. A custom vector source
+takes encoded vector tiles.
+
+Add the source to a map after its style loads, then add a layer that draws it.
+See [Style](/maplibre-native-ffi/guides/style/).
+
+Answer each request with the tile's data, or with an error. Answer later, from
+any thread, if it takes time. When your data for a tile changes, invalidate the
+tile, and the map asks for it again.
+
+<Snippet page="network" region="custom-source" />
+
+## Set the network status
+
+When the device loses its connection, set the network status to offline. The
+library stops starting network requests and loads what it can from its cache.
+See [Offline](/maplibre-native-ffi/guides/offline/). Set the status to online
+when the connection returns.
+
+The status covers every runtime in the process.
+
+<Snippet page="network" region="status" />

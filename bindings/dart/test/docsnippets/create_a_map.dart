@@ -1,4 +1,4 @@
-// Snippets for the docs site's Getting started page. They are analyzed with
+// Snippets for the docs site's Create a map page. They are analyzed with
 // the tests, which never run them.
 import 'dart:typed_data';
 
@@ -6,7 +6,7 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
 void copyPixels(Uint8List data, int stride) {}
 
-Future<void> gettingStarted() async {
+Future<void> createAMap() async {
   // #region runtime
   final runtime = RuntimeHandle.create(const RuntimeOptions());
   // #endregion runtime

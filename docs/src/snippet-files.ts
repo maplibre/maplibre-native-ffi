@@ -1,7 +1,7 @@
 /**
  * Each language's snippet files, beside its tests, where its build compiles
- * them. A file is named after the page it serves: `getting_started.c` or
- * `GettingStarted.kt` for `getting-started`.
+ * them. A file is named after the page it serves: `create_a_map.c` or
+ * `CreateAMap.kt` for `create-a-map`.
  */
 
 type Files = Record<string, string>;
@@ -66,7 +66,7 @@ export function snippetSource(
   )?.[1];
 }
 
-/** `getting-started`, `getting_started_test.go`, and `GettingStarted.kt` match. */
+/** `create-a-map`, `create_a_map_test.go`, and `CreateAMap.kt` match. */
 function key(name: string): string {
   return name
     .replace(/^.*\//, "")

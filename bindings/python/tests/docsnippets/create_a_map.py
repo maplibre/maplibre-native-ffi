@@ -1,4 +1,4 @@
-# Snippets for the docs site's Getting started page. They are type-checked with
+# Snippets for the docs site's Create a map page. They are type-checked with
 # the tests, which never run them.
 
 import maplibre_native_ffi as mln
@@ -8,7 +8,7 @@ def copy_pixels(data: bytes, stride: int) -> None:
     pass
 
 
-def getting_started() -> None:
+def create_a_map() -> None:
     # #region runtime
     runtime = mln.RuntimeHandle.create()
     # #endregion runtime

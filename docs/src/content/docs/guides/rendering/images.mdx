@@ -1,0 +1,69 @@
+---
+title: Render images
+description: Render still images and tiles, and read their pixels.
+# Scope: static and tile modes, still image requests, and reading pixels back.
+---
+
+import Snippet from "../../../../components/Snippet.astro";
+
+This guide renders images of any view, or map tiles, and reads their pixels. It
+needs no window. It starts with a runtime from
+[Create a map](/maplibre-native-ffi/guides/create-a-map/).
+
+## Create the map
+
+Create a map in static mode for images of any view, or in tile mode for map
+tiles. Make a tile map 512 by 512, the size of one tile. For high-density tiles,
+raise the scale factor instead of the size.
+
+<Snippet page="images" region="map" />
+
+## Load a style
+
+Set the style URL. You don't need to wait for the style to load. The image
+request waits for it. To load style JSON, see
+[Style](/maplibre-native-ffi/guides/style/).
+
+<Snippet page="images" region="style" />
+
+## Attach a texture
+
+Create a graphics device. The library creates the device for its graphics
+backend, so you write no graphics code. Attach a texture on the device to the
+map, at the map's size. The attach call returns a render session. Wait for the
+attach to finish.
+
+<Snippet page="images" region="attach" />
+
+## Render an image
+
+Jump the camera to the view you want. For a tile, jump to the tile's center at
+the tile's zoom. See
+[Move the camera](/maplibre-native-ffi/guides/camera/#move-the-camera).
+
+To change the image size, resize the render session. It resizes the map too.
+
+Request a still image, and wait for it. You don't need to wait for the camera or
+the resize first.
+
+A map renders one image at a time. Request the next image after this one
+finishes.
+
+<Snippet page="images" region="image" />
+
+## Read the pixels
+
+Read the session's texture after the image finishes. The result has RGBA pixels,
+row by row. The stride is the number of bytes in each row.
+
+To use the images on the GPU instead, see
+[Render to a texture](/maplibre-native-ffi/guides/rendering/texture/).
+
+<Snippet page="images" region="read" />
+
+## Close
+
+Close the render session and the graphics device, then the map. Close the
+runtime as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#close).
+
+<Snippet page="images" region="close" />
