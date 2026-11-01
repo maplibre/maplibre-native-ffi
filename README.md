@@ -25,8 +25,7 @@
 [![Documentation](https://img.shields.io/badge/Documentation-blue?logo=astro&logoColor=white)](https://maplibre.org/maplibre-native-ffi/)
 [![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=white)](https://slack.openstreetmap.us/)
 
-[![C](https://img.shields.io/badge/C-GitHub%20Releases-00599C?logo=c&logoColor=white)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
-[![C package managers](https://img.shields.io/badge/C-vcpkg%20%C2%B7%20Conan%20%C2%B7%20xmake-00599C?logo=c&logoColor=white)](https://github.com/maplibre/maplibre-native-ffi-distribution)
+[![C](https://img.shields.io/badge/C-vcpkg%20%C2%B7%20Conan%20%C2%B7%20xmake-00599C?logo=c&logoColor=white)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
 [![Dart](https://img.shields.io/badge/Dart-pub.dev-0175C2?logo=dart&logoColor=white)](https://pub.dev/packages/maplibre_native_ffi)
 [![.NET](https://img.shields.io/badge/.NET-NuGet-512BD4?logo=dotnet&logoColor=white)](https://www.nuget.org/packages/Maplibre.NativeFfi)
 [![Go](https://img.shields.io/badge/Go-pkg.go.dev-00ADD8?logo=go&logoColor=white)](https://pkg.go.dev/github.com/maplibre/maplibre-native-ffi/bindings/go)
