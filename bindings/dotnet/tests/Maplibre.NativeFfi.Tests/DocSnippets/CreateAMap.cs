@@ -1,59 +1,35 @@
 // Snippets for the docs site's Create a map page. They compile with the
 // tests, which never run them.
 
-using System.Collections.Immutable;
-
 namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
 internal static class CreateAMap
 {
-    private static void CopyPixels(ImmutableArray<byte> data, uint stride) { }
+    // Attaches a render target, as the Rendering guides show.
+    private static Task<RenderSessionHandle> AttachTarget(MapHandle map) =>
+        throw new NotImplementedException();
 
-    private static async Task Run()
+    internal static async Task Run()
     {
         // #region runtime
         var runtime = RuntimeHandle.Create(new RuntimeOptions());
         // #endregion runtime
 
         // #region map
-        var extent = new LogicalExtent(512, 512, 1);
         var map = runtime.CreateMap(
-            new MapOptions { InitialExtent = extent, MapMode = MapMode.Static }
+            new MapOptions
+            {
+                InitialExtent = new LogicalExtent(800, 600, 2),
+                MapMode = MapMode.Continuous,
+            }
         );
         await map.Ready;
         // #endregion map
 
-        // #region style
-        map.Discarding.SetStyleUrl("https://demotiles.maplibre.org/style.json");
-        // #endregion style
-
-        // #region attach
-        var device = GraphicsDeviceHandle.Create();
-
-        var session = map.AttachGraphicsDeviceTexture(
-            device,
-            new GraphicsDeviceTextureDescriptor(extent),
-            // The library renders on its own thread.
-            new RenderSessionAttachOptions { Driver = RenderDriverKind.CoreWorker }
-        );
-        await session.Ready;
-        // #endregion attach
-
-        // #region render
-        await map.RequestStillImageAsync();
-        // #endregion render
-
-        // #region render
-        var readback = await session.ReadTextureAsync();
-        // #endregion render
-
-        // #region render
-        CopyPixels(readback.Data, readback.Info.Stride);
-        // #endregion render
+        var session = await AttachTarget(map);
 
         // #region close
         session.Dispose();
-        device.Dispose();
         await map.CloseAsync();
         await runtime.CloseAsync();
         // #endregion close

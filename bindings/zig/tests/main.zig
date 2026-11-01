@@ -18,6 +18,15 @@ comptime {
     _ = @import("values.zig");
     _ = @import("rendering.zig");
     _ = @import("docsnippets/create_a_map.zig");
+    _ = @import("docsnippets/camera.zig");
+    _ = @import("docsnippets/events_and_logs.zig");
+    _ = @import("docsnippets/images.zig");
+    _ = @import("docsnippets/network.zig");
+    _ = @import("docsnippets/offline.zig");
+    _ = @import("docsnippets/query.zig");
+    _ = @import("docsnippets/style.zig");
+    _ = @import("docsnippets/texture.zig");
+    _ = @import("docsnippets/window.zig");
 }
 
 // The suite links the library the way the package does, through build.zig, and

@@ -8,84 +8,62 @@ import (
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
+// Attaches a render target, as the Rendering guides show.
+func attachTarget(m *maplibre.MapHandle) (*maplibre.RenderSessionHandle, error) {
+	return nil, nil
 }
 
-func copyPixels(data []byte, stride uint32) {}
-
-// An example without an output comment compiles but never runs.
-func Example_createAMap() {
-	ctx := context.Background()
-
+func createAMap(ctx context.Context) error {
 	// #region runtime
 	runtime, err := maplibre.NewRuntime(maplibre.RuntimeOptions{})
-	check(err)
+	if err != nil {
+		return err
+	}
 	// #endregion runtime
 
 	// #region map
-	mapOptions := maplibre.MapOptions{
-		InitialExtent: maplibre.LogicalExtent{Width: 512, Height: 512, ScaleFactor: 1},
-		MapMode:       maplibre.MapModeStatic,
+	m, created, err := runtime.CreateMap(maplibre.MapOptions{
+		InitialExtent: maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
+		MapMode:       maplibre.MapModeContinuous,
+	})
+	if err != nil {
+		return err
 	}
-
-	m, created, err := runtime.CreateMap(mapOptions)
-	check(err)
-	_, err = created.Await(ctx)
-	check(err)
+	if _, err := created.Await(ctx); err != nil {
+		return err
+	}
 	// #endregion map
 
-	// #region style
-	check(m.Discarding().SetStyleUrl("https://demotiles.maplibre.org/style.json"))
-	// #endregion style
-
-	// #region attach
-	// nil selects the default adapter.
-	device, err := maplibre.NewGraphicsDevice(nil)
-	check(err)
-
-	texture := maplibre.GraphicsDeviceTextureDescriptor{Extent: mapOptions.InitialExtent}
-	// The library renders on its own thread.
-	attachOptions := maplibre.RenderSessionAttachOptions{Driver: maplibre.RenderDriverKindCoreWorker}
-
-	session, attached, err := m.AttachGraphicsDeviceTexture(device, texture, attachOptions)
-	check(err)
-	_, err = attached.Await(ctx)
-	check(err)
-	// #endregion attach
-
-	// #region render
-	rendered, err := m.RequestStillImage()
-	check(err)
-	_, err = rendered.Await(ctx)
-	check(err)
-	// #endregion render
-
-	// #region render
-	read, err := session.ReadTexture()
-	check(err)
-	image, err := read.Await(ctx)
-	check(err)
-	// #endregion render
-
-	// #region render
-	copyPixels(image.Data, image.Info.Stride)
-	// #endregion render
+	session, err := attachTarget(m)
+	if err != nil {
+		return err
+	}
 
 	// #region close
-	check(session.Dispose())
-	check(device.Close())
+	if err := session.Dispose(); err != nil {
+		return err
+	}
 
 	mapClosed, err := m.Close()
-	check(err)
-	_, err = mapClosed.Await(ctx)
-	check(err)
+	if err != nil {
+		return err
+	}
+	if _, err := mapClosed.Await(ctx); err != nil {
+		return err
+	}
 
 	runtimeClosed, err := runtime.Close()
-	check(err)
-	_, err = runtimeClosed.Await(ctx)
-	check(err)
+	if err != nil {
+		return err
+	}
+	if _, err := runtimeClosed.Await(ctx); err != nil {
+		return err
+	}
 	// #endregion close
+	return nil
+}
+
+// An example without an output comment compiles but never runs.
+func Example_createAMap() {
+	_ = createAMap(context.Background())
 }

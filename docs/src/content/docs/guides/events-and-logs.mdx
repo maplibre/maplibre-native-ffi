@@ -36,11 +36,8 @@ reference lists them.
 The handler runs on a library thread, where it must return quickly. See
 [Concepts](/maplibre-native-ffi/concepts/#threads-and-callbacks).
 
-To run it on your thread instead, create a delivery queue with a wake. The wake
-posts a task to your event loop. Name the queue in the handler. The task
-dispatches the queue, and the queue runs the handler.
-
-A binding that queues every call does this for you.
+To handle events on your application's thread, hand them to your event loop. A
+binding that queues every call already runs the handler on your thread.
 
 <Snippet page="events-and-logs" region="queue" />
 
@@ -49,7 +46,7 @@ A binding that queues every call does this for you.
 Set a log callback to send the library's logs to your own logger. One callback
 receives the logs of every runtime in the process.
 
-The callback runs on a library thread, and it can't call the library. To run it
-on your thread, name a delivery queue, as for events.
+The callback runs on a library thread, and it can't call the library. To handle
+logs on your thread, hand them to your event loop, as for events.
 
 <Snippet page="events-and-logs" region="logs" />

@@ -4,8 +4,9 @@
 import maplibre_native_ffi as mln
 
 
-def copy_pixels(data: bytes, stride: int) -> None:
-    pass
+# Attaches a render target, as the Rendering guides show.
+def attach_target(map_handle: mln.MapHandle) -> mln.RenderSessionHandle:
+    raise NotImplementedError
 
 
 def create_a_map() -> None:
@@ -14,44 +15,19 @@ def create_a_map() -> None:
     # #endregion runtime
 
     # #region map
-    extent = mln.LogicalExtent(width=512, height=512, scale_factor=1.0)
     map_handle, ready = runtime.create_map(
-        mln.MapOptions(initial_extent=extent, map_mode=mln.MapMode.STATIC)
+        mln.MapOptions(
+            initial_extent=mln.LogicalExtent(width=800, height=600, scale_factor=2.0),
+            map_mode=mln.MapMode.CONTINUOUS,
+        )
     )
     ready.result()
     # #endregion map
 
-    # #region style
-    map_handle.discarding.set_style_url("https://demotiles.maplibre.org/style.json")
-    # #endregion style
-
-    # #region attach
-    device = mln.GraphicsDeviceHandle.create()
-
-    session, ready = map_handle.attach_graphics_device_texture(
-        device,
-        mln.GraphicsDeviceTextureDescriptor(extent=extent),
-        # The library renders on its own thread.
-        mln.RenderSessionAttachOptions(driver=mln.RenderDriverKind.CORE_WORKER),
-    )
-    ready.result()
-    # #endregion attach
-
-    # #region render
-    map_handle.request_still_image().result()
-    # #endregion render
-
-    # #region render
-    image = session.read_texture().result()
-    # #endregion render
-
-    # #region render
-    copy_pixels(image.data, image.info.stride)
-    # #endregion render
+    session = attach_target(map_handle)
 
     # #region close
     session.dispose()
-    device.close()
     map_handle.close().result()
     runtime.close().result()
     # #endregion close
