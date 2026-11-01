@@ -67,6 +67,9 @@ RULES = ("sleep", "network-host")
 
 def is_test_path(path: str) -> bool:
     *directories, name = path.split("/")
+    # Docs snippets compile with the tests but never run, and show real hosts.
+    if any(part.lower() == "docsnippets" for part in directories):
+        return False
     return any(TEST_DIRECTORY.match(part) for part in directories) or bool(
         TEST_FILE.search(name)
     )

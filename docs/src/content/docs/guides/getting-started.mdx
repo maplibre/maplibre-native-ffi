@@ -1,0 +1,63 @@
+---
+title: Getting started
+description: Render a map and read its pixels.
+sidebar:
+  order: 1
+# Scope: one short program, start to finish, that renders a map and reads its
+# pixels, without a window. Each step names the choice it makes and links the
+# page that covers the alternatives.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide renders a map into a texture and reads its pixels. It uses no window,
+so it runs on every platform.
+
+## Create a runtime
+
+Create a runtime with the default options. To set a cache file, see
+[Network](/maplibre-native-ffi/guides/network/).
+
+<Snippet page="getting-started" region="runtime" />
+
+## Create a map
+
+Create a map in static mode. Make it the size of the image you want. A static
+map renders one image for each request. Wait for the map to be created. For the
+other modes, see [Rendering](/maplibre-native-ffi/guides/rendering/).
+
+<Snippet page="getting-started" region="map" />
+
+## Load a style
+
+Set the style URL. This guide uses the MapLibre demo tiles style. You don't need
+to wait for the style to load. The image request waits for it. To load style
+JSON or change the style, see [Style](/maplibre-native-ffi/guides/style/).
+
+<Snippet page="getting-started" region="style" />
+
+## Attach a texture
+
+Create a graphics device. The library creates the device for its graphics
+backend, so you write no graphics code. Attach a texture on the device to the
+map. Make the texture the same size as the map. The attach call returns a render
+session. The session draws the map into the texture. Wait for the attach to
+finish. To render to a window, or to a texture you own, see
+[Rendering](/maplibre-native-ffi/guides/rendering/).
+
+<Snippet page="getting-started" region="attach" />
+
+## Render an image
+
+Request a still image, and wait for it. Then read the texture's pixels. The
+result has RGBA pixels, row by row. The stride is the number of bytes in each
+row.
+
+<Snippet page="getting-started" region="render" />
+
+## Close
+
+Close the render session, the graphics device, the map, and the runtime, in that
+order. Wait for the map and the runtime to close.
+
+<Snippet page="getting-started" region="close" />

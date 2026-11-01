@@ -34,3 +34,85 @@
   font-family: "Alata", var(--sl-font-system);
   font-weight: 400;
 }
+
+/* The language picker in a snippet's header, after the file name tab. */
+.language-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-inline-start: auto;
+  padding-inline: 0.5rem;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-2);
+}
+
+.language-picker img {
+  width: 1rem;
+  height: 1rem;
+}
+
+.language-picker select {
+  field-sizing: content;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Rust's logo is black. */
+:root[data-theme="dark"] .language-picker img[data-logo="rust"] {
+  filter: invert(1);
+}
+
+/* Where the browser can style a select, its options show their logos, so the
+   logo beside it goes. */
+@supports (appearance: base-select) {
+  .language-picker .fallback-logo {
+    display: none;
+  }
+
+  .language-picker select,
+  .language-picker ::picker(select) {
+    appearance: base-select;
+  }
+
+  .language-picker selectedcontent {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .language-picker select::picker-icon {
+    color: var(--sl-color-gray-3);
+  }
+
+  .language-picker ::picker(select) {
+    margin-block-start: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background-color: var(--sl-color-bg-nav);
+    box-shadow: var(--sl-shadow-md);
+  }
+
+  .language-picker option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+
+  .language-picker option:hover,
+  .language-picker option:checked {
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-white);
+  }
+
+  .language-picker option::checkmark {
+    display: none;
+  }
+}

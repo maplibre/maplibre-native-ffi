@@ -76,7 +76,11 @@ steps {
     fix = "uv run --no-sync ruff check --fix {{files}}"
   }
   ["ty"] {
-    glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
+    glob = List(
+      "bindings/python/python/**/*.py",
+      "bindings/python/tests/docsnippets/**/*.py",
+      "docs/scripts/**/*.py",
+    )
     check = "uv run --no-sync ty check --error-on-warning {{files}}"
   }
   // The generator ignores no diagnostic. The Python emitters wait for their
