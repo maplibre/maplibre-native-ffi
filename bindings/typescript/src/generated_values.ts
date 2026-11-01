@@ -896,7 +896,7 @@ export const LogSeverityFlag = {
   info: 2,
   warning: 4,
   error: 8,
-  defaultValue: 6,
+  default: 6,
   all: 14,
 } as const;
 /** A bitwise OR of LogSeverityFlag flags. */
@@ -955,7 +955,7 @@ export const MapMode = {
   /**
    * Produces one-off still images of an arbitrary viewport.
    */
-  staticValue: 1,
+  static: 1,
   /**
    * Produces one-off still images for a single tile.
    */
@@ -3319,7 +3319,7 @@ export interface TileId {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const TileLodMode = {
-  defaultValue: 0,
+  default: 0,
   distance: 1,
 } as const;
 /** One of the TileLodMode values, or a value this binding does not know. */
@@ -3342,7 +3342,7 @@ export const TileOperation = {
   endParse: 5,
   error: 6,
   cancelled: 7,
-  nullValue: 8,
+  null: 8,
 } as const;
 /** One of the TileOperation values, or a value this binding does not know. */
 export type TileOperation =
@@ -3397,7 +3397,7 @@ export interface Vec3 {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const ViewportMode = {
-  defaultValue: 0,
+  default: 0,
   flippedY: 1,
 } as const;
 /** One of the ViewportMode values, or a value this binding does not know. */

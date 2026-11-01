@@ -117,7 +117,7 @@ test("a wait that is abandoned leaves its completion to arrive later", async () 
   const fixture = await openRuntime();
   const map = await fixture.openMap({
     ...mapOptions,
-    mapMode: MapMode.staticValue,
+    mapMode: MapMode.static,
   });
   await bounded(map.setStyleJson(emptyStyle()), "a command");
 

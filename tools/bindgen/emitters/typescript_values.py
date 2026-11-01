@@ -232,11 +232,12 @@ def doc(
 
 
 def enum_members(value: ValuePlan) -> list[tuple[str, str, int]]:
-    """(member, constant, number) for each enum constant."""
+    """(member, constant, number) for each enum constant. A member is only ever
+    a property name, which a reserved word can be."""
     names = [name for name, _ in value.enum_values]
     prefix = enum_member_prefix(names, value.native)
     return [
-        (identifier(name.removeprefix(prefix).lower()), name, number)
+        (camel(name.removeprefix(prefix).lower()), name, number)
         for name, number in value.enum_values
     ]
 
@@ -261,17 +262,16 @@ def native_fields(public: str) -> str:
 
 
 def union_kinds(value: ValuePlan) -> list[tuple[str | None, str, str | None]]:
-    """(variant constant, kind, arm field) for each arm, then the empty one."""
+    """(variant constant, kind, arm field) for each arm, then the empty one. A
+    kind is only ever a string, which a reserved word can be."""
     result: list[tuple[str | None, str, str | None]] = [
-        (arm.presence.variant if arm.presence else None, identifier(arm.name), arm.name)
+        (arm.presence.variant if arm.presence else None, camel(arm.name), arm.name)
         for arm in value.fields
     ]
     if value.empty_variant:
         constant = value.empty_variant[0]
         prefix = enum_member_prefix([constant, *(variant for variant, _, _ in result)])
-        result.append(
-            (constant, identifier(constant.removeprefix(prefix).lower()), None)
-        )
+        result.append((constant, camel(constant.removeprefix(prefix).lower()), None))
     return result
 
 

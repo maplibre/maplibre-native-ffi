@@ -44,7 +44,7 @@ async function openLoggingMap(): Promise<MapHandle> {
   setLogAsyncSeverityMask(0);
   teardown(async () => {
     clearLogCallback();
-    setLogAsyncSeverityMask(LogSeverityFlag.defaultValue);
+    setLogAsyncSeverityMask(LogSeverityFlag.default);
     // The release arrives through the realm's queue; a later case that counts roots
     // must not see it.
     await released(() => liveRoots() === roots, "the log registration release");
