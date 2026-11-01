@@ -1,8 +1,6 @@
 ---
 title: Getting started
 description: Render a map and read its pixels.
-sidebar:
-  order: 1
 # Scope: one short program, start to finish, that renders a map and reads its
 # pixels, without a window. Each step names the choice it makes and links the
 # page that covers the alternatives.
@@ -24,7 +22,8 @@ Create a runtime with the default options. To set a cache file, see
 
 Create a map in static mode. Make it the size of the image you want. A static
 map renders one image for each request. Wait for the map to be created. For the
-other modes, see [Rendering](/maplibre-native-ffi/guides/rendering/).
+other modes, see
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/).
 
 <Snippet page="getting-started" region="map" />
 
@@ -42,8 +41,8 @@ Create a graphics device. The library creates the device for its graphics
 backend, so you write no graphics code. Attach a texture on the device to the
 map. Make the texture the same size as the map. The attach call returns a render
 session. The session draws the map into the texture. Wait for the attach to
-finish. To render to a window, or to a texture you own, see
-[Rendering](/maplibre-native-ffi/guides/rendering/).
+finish. To render to a window, see
+[Render to a window](/maplibre-native-ffi/guides/rendering/window/).
 
 <Snippet page="getting-started" region="attach" />
 

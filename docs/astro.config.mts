@@ -76,7 +76,26 @@ export default defineConfig({
         },
         {
           label: "Guides",
-          items: [{ autogenerate: { directory: "guides" } }],
+          items: [
+            "guides/getting-started",
+            {
+              label: "Rendering",
+              items: [
+                "guides/rendering/choose-a-target",
+                "guides/rendering/window",
+                "guides/rendering/texture",
+                "guides/rendering/images",
+              ],
+            },
+            "guides/input",
+            "guides/camera",
+            "guides/style",
+            "guides/data",
+            "guides/query",
+            "guides/events-and-logs",
+            "guides/network",
+            "guides/offline",
+          ],
         },
         {
           label: "Reference",
