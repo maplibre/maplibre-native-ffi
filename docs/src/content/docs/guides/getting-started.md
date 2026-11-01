@@ -50,9 +50,3 @@ Outline:
 - Close the render session, the graphics device, the map, and the runtime, in
   that order.
 - Wait for each to finish closing where the language makes closing asynchronous.
-
-## Next steps
-
-- [Rendering](/maplibre-native-ffi/guides/rendering/): pick the map mode,
-  target, and frame timing for your use case.
-- The feature pages: Camera, Style, Data, Query, Events and logs, Network.
