@@ -1,81 +1,81 @@
 # Repository guidance
 
-MapLibre Native FFI is a C API for MapLibre Native. A generator writes low-level
-bindings for nine languages from its headers, over a handwritten runtime in each
-binding. Mise provides every tool and task, and `mise tasks --all` lists them.
+MapLibre Native FFI is a C API for MapLibre Native. A generator writes bindings
+for nine languages from the C headers. Each binding also has a handwritten
+runtime. Mise provides every tool and task. Run `mise tasks --all` to list the
+tasks.
+
+Read these when the task needs them:
+
+- [Concepts](docs/src/content/docs/concepts.md): how the library works.
+- [Overview](docs/src/content/docs/development/overview.md): setup, everyday
+  commands, other targets such as Windows under Wine, engine patches, CI, and
+  releases.
+- [Guidelines](docs/src/content/docs/development/guidelines.md): read before you
+  change the public API or documentation.
 
 ## Priorities
 
-The project is prerelease. Make breaking changes rather than keep compatibility
+The project is prerelease. Make breaking changes instead of adding compatibility
 shims.
 
-Bindings stay low level and analogous to the C API and to each other: safety
-first, then similarity, then idioms. A binding adds a convenience API only when
-its language's safety or ergonomics strongly require one. It never repeats
-validation that native already does.
+Bindings are low level. Each one mirrors the C API and the other bindings. When
+these goals conflict, safety comes first, then similarity, then language idioms.
+Add a convenience API to a binding only when its language's safety or ergonomics
+require one. Don't repeat validation that native code already does.
 
-MapLibre behavior is whatever the pinned `third_party/maplibre-native` submodule
-does with the patches in `patches/maplibre-native/`. Answer questions about
-engine behavior from that source; `mise deps` checks it out and applies the
-patches if it is empty. After a rebase, run `mise deps` before you stage
-anything, since plain `git submodule update` skips this submodule, and read
-`git diff origin/main...HEAD --stat` before you push: a stale checkout staged by
-`git add -A` reverts the engine pin.
+The engine is the `third_party/maplibre-native` submodule at its pinned commit,
+with the patches in `patches/maplibre-native/` applied. Answer questions about
+engine behavior from that source. If the submodule is empty, run `mise deps` to
+check it out and apply the patches.
+
+After a rebase, run `mise deps` before you stage anything.
+`git submodule update` skips this submodule. Before you push, check
+`git diff origin/main...HEAD --stat`. If `git add -A` staged a stale checkout,
+the diff reverts the engine pin.
 
 ## Tests
 
-Native behavior is tested once, in C, under `tests/native`. A patch to MapLibre
-Native is the exception: it stands for an upstream pull request, filed or not,
-so it carries its own tests in upstream's `test/` tree. CI doesn't build them,
-so run them by hand and say so in the pull request. A binding suite tests only
-what its binding adds: its runtime, its generated shapes, and its platform
-integration. Before you delete a binding test, check that a C test asserts what
-it checked.
+Test native behavior once, in C, under `tests/native`. An engine patch is the
+exception: its tests go in upstream's `test/` tree. A binding's suite tests only
+what the binding adds: its runtime, its generated code, and its platform
+integration.
 
-A Linux host can run the Windows and FreeBSD suites locally, under Wine and in a
-virtual machine, as the
-[Overview](docs/src/content/docs/development/overview.md) describes.
+Test behavior that callers can observe, not implementation details. Add a test
+only when it would catch a regression in that behavior. Don't test what the
+compiler, the generator, or another test already checks. Keep tests fast and
+deterministic: wait for events instead of sleeping, and don't depend on timing
+or test order. Scratch checks that you ran while working don't need to be
+committed.
 
-GPU objects that a test creates as the host come from `tests/graphics`. A test
-that only renders and reads back may attach a graphics device texture instead.
-The target or the build decides a skip, never the environment, so fix the CI
-environment rather than skip a test.
-
-## Documentation
-
-Follow the documentation section of the
-[Guidelines](docs/src/content/docs/development/guidelines.md). The site's
-Development section holds:
-
-- [Overview](docs/src/content/docs/development/overview.md): setup, everyday
-  commands, other targets, engine patches, CI, and releases.
-- [Guidelines](docs/src/content/docs/development/guidelines.md): read before you
-  change the public API or documentation.
+Only the target or the build decides whether a test is skipped, never the
+environment. If a test fails in CI because of the environment, fix the
+environment instead of skipping the test.
 
 ## Issues and pull requests
 
 [Rubberstamp](https://github.com/apps/rubberstamp-bot) labels each new issue and
-pull request from `.config/rubberstamp.yml`. Don't label by hand; correct a
-wrong label instead, and leave GitHub's native issue type unset. The one
-exception is `upstream`, which Rubberstamp gives only to pull requests that
-change MapLibre Native's code: add it to an issue yourself when the engine
-causes the bug or lacks the capability.
+pull request, using the rules in `.config/rubberstamp.yml`. Don't add labels by
+hand. If a label is wrong, correct it. Leave GitHub's issue type unset.
 
-PR titles follow Conventional Commits, since they become the squash-merge commit
-message. Mark a title breaking only for a change to a user-facing contract,
-never for tooling, tests, or CI. Write a short title and description for a
-reviewer who will read the diff. Say what the diff, its doc comments, and CI
-can't:
+PR titles follow Conventional Commits, because the title becomes the
+squash-merge commit message. Mark a title as breaking only when the change
+breaks a user-facing contract. Changes to tooling, tests, or CI are never
+breaking.
+
+Write a short title and description for a reviewer who will read the diff. Say
+what the diff, its doc comments, and CI can't:
 
 - Open with the problem and what users can now do, or what maintainers gain.
 - Show one small example of new API, or a bug's trigger with before and after.
-- Add these only if they apply: what a host must adopt, measured numbers with a
-  one-line method, and validation that CI does not run.
+- For a breaking change, say what users must change.
+- List checks that CI can't run. Leave out the tests, builds, and checks that CI
+  runs, even if you also ran them locally.
 - Rewrite both when review changes the scope.
 
-When you post AI-contributed GitHub content, including a new Discussion or
-Issue, a reply, or a PR description or comment, append this disclosure:
+Append this disclosure to any AI-assisted content you post on GitHub, such as an
+issue, a discussion, a reply, or a PR description or comment:
 `*AI-assisted — Tool: <tool>; model: <provider>/<model>*`
 
-If Rubberstamp's CI plan skips a target unit that a change needs, ask before you
-run `gh workflow run CI --ref <branch>`: it runs every target.
+Rubberstamp also picks which CI units a pull request runs. If it skips a unit
+that the change needs, ask before you start a manual CI run.
