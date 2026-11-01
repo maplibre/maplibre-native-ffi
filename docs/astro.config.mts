@@ -10,6 +10,7 @@ import starlightLlmsTxt from "starlight-llms-txt";
 import { externalLinksPlugin } from "./src/integrations/external-links";
 import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
 import { versionsPlugin } from "./src/integrations/versions";
+import { languageStorageKey } from "./src/languages";
 
 const site = "https://maplibre.org";
 const base = "/maplibre-native-ffi";
@@ -42,6 +43,16 @@ export default defineConfig({
         SocialIcons: "./src/components/SocialIcons.astro",
       },
       customCss: ["./src/styles/custom.css"],
+      head: [
+        // Restores the reader's snippet language before the page draws.
+        {
+          tag: "script",
+          content: `try {
+  const language = localStorage.getItem(${JSON.stringify(languageStorageKey)});
+  if (language) document.documentElement.dataset.language = language;
+} catch {}`,
+        },
+      ],
       plugins: [
         starlightCopyButton(),
         starlightLlmsTxt({ exclude: ["reference/**"] }),
@@ -65,7 +76,24 @@ export default defineConfig({
         },
         {
           label: "Guides",
-          items: [{ autogenerate: { directory: "guides" } }],
+          items: [
+            "guides/create-a-map",
+            {
+              label: "Rendering",
+              items: [
+                "guides/rendering/choose-a-target",
+                "guides/rendering/window",
+                "guides/rendering/texture",
+                "guides/rendering/images",
+              ],
+            },
+            "guides/camera",
+            "guides/style",
+            "guides/query",
+            "guides/events-and-logs",
+            "guides/network",
+            "guides/offline",
+          ],
         },
         {
           label: "Reference",

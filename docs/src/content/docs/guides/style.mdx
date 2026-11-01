@@ -1,0 +1,67 @@
+---
+title: Style
+description: Load a style, and add and change its sources, layers, and images.
+# Scope: loading a style, and adding and changing its sources, layers, and
+# images. The style spec itself belongs in its own docs.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide loads a style and changes its sources, layers, and images. Sources
+and layers use the JSON of the
+[MapLibre style spec](https://maplibre.org/maplibre-style-spec/). For what a
+style is, see [Concepts](/maplibre-native-ffi/concepts/#styles).
+
+## Load a style
+
+Set the style by URL or by JSON.
+
+Loading a style removes the sources, layers, and images you added. Wait for the
+style-loaded event before you add or change them. To receive events, see
+[Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
+
+<Snippet page="style" region="load" />
+
+## Add a source and a layer
+
+Add a source with its ID and its JSON. The JSON is the object that a style puts
+under `sources`. See
+[Sources](https://maplibre.org/maplibre-style-spec/sources/) in the style spec.
+
+Add a layer with its JSON. To draw it under another layer, give that layer's ID.
+Give no ID to draw it on top. See
+[Layers](https://maplibre.org/maplibre-style-spec/layers/) in the style spec.
+
+<Snippet page="style" region="add" />
+
+For GeoJSON data in memory, prepare the data first. You can prepare it on any
+thread. Then add a GeoJSON source with the prepared data. To update the source,
+prepare new data with the same options, and set it on the source.
+
+<Snippet page="style" region="geojson" />
+
+To remove a source and its layers, remove the layers first, then the source.
+
+## Change a layer
+
+Set a layer property by its style-spec name and a JSON value. The same call sets
+`visibility` and `filter`. A JSON null restores the default. A value can be an
+[expression](https://maplibre.org/maplibre-style-spec/expressions/).
+
+Each change can show in its own frame. To show several changes in the same
+frame, send them between the start and the end of a command group.
+
+<Snippet page="style" region="set-property" />
+
+## Add an image
+
+Set a style image with an ID and premultiplied RGBA pixels. A symbol layer draws
+the image by that ID in `icon-image`.
+
+<Snippet page="style" region="image" />
+
+When a layer asks for an image that the style lacks, the map sends a
+missing-image event. The event's message is the image's ID. Set the image when
+the event arrives.
+
+<Snippet page="style" region="missing-image" />

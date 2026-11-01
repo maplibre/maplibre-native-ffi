@@ -629,6 +629,17 @@ function(mln_native_add_exit_tests out_tests)
   set(${out_tests} ${tests} PARENT_SCOPE)
 endfunction()
 
+# Compiles the C snippets that the docs site shows, so they keep up with the
+# headers. Nothing runs them.
+function(mln_native_add_doc_snippets)
+  file(GLOB sources CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/docsnippets/*.c")
+  add_library(mln_native_doc_snippets OBJECT ${sources})
+  set_target_properties(
+    mln_native_doc_snippets
+    PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+  target_link_libraries(mln_native_doc_snippets PRIVATE maplibre_native_c)
+endfunction()
+
 function(mln_ffi_add_native_tests)
   mln_ffi_add_test_graphics()
   get_target_property(test_supported mln_ffi_platform_dependencies
@@ -641,6 +652,7 @@ function(mln_ffi_add_native_tests)
   mln_native_add_test_plugin()
   mln_native_add_abi_suite(abi_sources)
   mln_native_add_internal_suite(internal_sources)
+  mln_native_add_doc_snippets()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
      AND MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")

@@ -30,8 +30,9 @@ so you can create and set up a map before any graphics exist.
 
 A **render session** draws one map into one target: either a surface that
 presents to a window or view, or a texture that your application composites or
-reads. Closing a session doesn't change the map. You can attach the map to a new
-target later, such as when your application returns from the background.
+reads. A session can release its target and take a new one later, such as when
+your application goes to the background and returns. Closing a session doesn't
+change the map.
 
 ## Styles
 

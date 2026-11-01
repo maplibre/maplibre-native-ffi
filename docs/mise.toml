@@ -5,43 +5,10 @@
 [tasks.install]
 run = "pnpm exec astro sync"
 
-# The guides embed these files verbatim, so a compiler decides whether a
-# documented snippet is valid rather than a reader or a review bot. Only the
-# public headers are needed, so this runs without building the library.
-[tasks."check-snippets"]
-description = "Syntax-check the C snippets the guides embed"
-dir = ".."
-run = '''
-compiler="${CC:-cc}"
-# GCC named this standard c2x until GCC 14, and CI runners still ship those.
-standard=""
-for candidate in c23 c2x; do
-  if "$compiler" "-std=$candidate" -fsyntax-only -x c /dev/null 2>/dev/null; then
-    standard="$candidate"
-    break
-  fi
-done
-if [ -z "$standard" ]; then
-  echo "$compiler supports neither -std=c23 nor -std=c2x" >&2
-  exit 1
-fi
-
-for file in docs/snippets/c/*.c; do
-  "$compiler" -fsyntax-only "-std=$standard" -Wall -Wextra -Iinclude "$file" ||
-    exit 1
-done
-'''
-
 # Everything the site reads besides its own sources.
 [tasks.prepare]
 hide = true
-depends = [
-  "api",
-  "install",
-  "generate-support-matrix",
-  "generate-versions",
-  "check-snippets",
-]
+depends = ["api", "install", "generate-support-matrix", "generate-versions"]
 
 [tasks.dev]
 depends = ["prepare"]

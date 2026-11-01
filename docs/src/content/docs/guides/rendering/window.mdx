@@ -1,0 +1,104 @@
+---
+title: Render to a window
+description: Present a map to a window or view.
+# Scope: surfaces, the frame loop, resizing, losing and restoring the surface,
+# such as when an app goes to the background, and running driver work on your
+# graphics thread.
+---
+
+import Snippet from "../../../../components/Snippet.astro";
+
+This guide presents a continuous map to a window or view that you create, and
+keeps it updated as the map changes. It starts from a runtime and a map in
+continuous mode. To create them, see
+[Create a map](/maplibre-native-ffi/guides/create-a-map/).
+
+## Attach a surface
+
+Create the window with your platform or windowing library. Then get its surface
+handle for your backend:
+
+- Metal: a
+  [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer)
+- Vulkan: a
+  [`VkSurfaceKHR`](https://registry.khronos.org/vulkan/specs/latest/man/html/VkSurfaceKHR.html)
+- OpenGL: an
+  [EGL window surface](https://registry.khronos.org/EGL/sdk/docs/man/html/eglCreateWindowSurface.xhtml),
+  or an `HDC` with WGL
+- WebGPU: a
+  [canvas](https://developer.mozilla.org/en-US/docs/Web/API/GPUCanvasContext)
+
+The snippets use Vulkan and start from that handle.
+
+Attach the surface to the map at the window's size and scale factor. Pass a
+frame wake. The next section uses it. Wait for the attach to finish.
+
+Use the library thread as the driver, unless your backend needs your graphics
+thread. See
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/#pick-a-driver).
+
+<Snippet page="window" region="attach" />
+
+## Render frames
+
+Ask for one frame at a time, starting after the attach finishes. Ask the frame
+to present, and to wait for the map's next update. An idle map then renders
+nothing.
+
+The frame wake can run on a library thread. Have it schedule a drain of the
+frame results on your event loop.
+
+<Snippet page="window" region="frame-wake" />
+
+When the result arrives, ask for the next frame at the next display refresh.
+This renders at most once per refresh, and shows every change made in between.
+
+When a frame fails, close the session and attach a new one.
+
+<Snippet page="window" region="frame-loop" />
+
+## Resize the window
+
+When the window's size changes, resize the session to the new width and height.
+The session resizes the map too. Keep asking for frames. Frames render at the
+new size once the map has applied it.
+
+To change the scale factor, or if the platform gives you a new surface for the
+new size, set the surface as the session's target instead. See the next section.
+
+<Snippet page="window" region="resize" />
+
+## Handle a lost surface
+
+When the platform takes the surface away, such as when your application goes to
+the background, stop asking for frames. Release the session's target, and wait
+for the release before the surface is destroyed. The session keeps its tiles and
+other renderer state.
+
+When the platform gives you a surface again, set it as the session's target.
+Wait for that to finish, then ask for a frame.
+
+<Snippet page="window" region="lost-surface" />
+
+## Render on your graphics thread
+
+With the graphics-thread driver, the session's graphics work runs only when you
+service the session on your graphics thread. Make the target's context current
+there first.
+
+Pass a driver work wake when you attach. Each time it fires, schedule a service
+of the session on your graphics thread, even while you ask for no frames.
+Attaching, detaching, and releasing the target finish only through service.
+
+<Snippet page="window" region="service" />
+
+## Close the session
+
+Stop asking for frames. Close the session, and wait for it to finish. With the
+graphics-thread driver, detach the session first, and keep servicing it until
+the detach finishes.
+
+Destroy the surface after the session closes. Then close the map and the
+runtime, as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#close).
+
+<Snippet page="window" region="close" />

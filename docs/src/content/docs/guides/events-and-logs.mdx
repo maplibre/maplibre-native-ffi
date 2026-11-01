@@ -1,0 +1,43 @@
+---
+title: Events and logs
+description: Receive map events and library logs.
+# Scope: choosing which events to receive, handling them, and capturing logs.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide receives map events and the library's logs. For what events are, see
+[Concepts](/maplibre-native-ffi/concepts/#changes-are-asynchronous).
+
+## Set an event handler
+
+Set one event handler on the runtime. It receives the events of every map on
+that runtime. Set it before you create a map, so that it receives the map's
+first events.
+
+Each event names its type and the map that sent it. Compare that map with the
+maps you hold.
+
+The handler runs on a library thread, where it must return quickly. See
+[Concepts](/maplibre-native-ffi/concepts/#threads-and-callbacks).
+
+<Snippet page="events-and-logs" region="handler" />
+
+## Choose the events a map sends
+
+A map sends every event by default. To send only the events you act on, set an
+event mask in the map options. You can change a map's mask later.
+
+Events report style and resource loading, rendering, and camera changes. The API
+reference lists them.
+
+<Snippet page="events-and-logs" region="mask" />
+
+## Capture logs
+
+Set a log callback to send the library's logs to your own logger. One callback
+receives the logs of every runtime in the process.
+
+The callback runs on a library thread, and it can't call the library.
+
+<Snippet page="events-and-logs" region="logs" />

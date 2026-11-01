@@ -1,50 +1,38 @@
 ---
 title: Create a map
-description: Create a runtime and map, then release both in order.
-sidebar:
-  order: 1
+description: Create a runtime and a map, and close them.
+# Scope: creating the runtime and the map, and closing them in order. Render
+# targets belong in the Rendering guides.
 ---
 
-import { Code } from "@astrojs/starlight/components";
-import { region } from "../../../snippets";
+import Snippet from "../../../components/Snippet.astro";
 
-import createMap from "../../../../snippets/c/create-map.c?raw";
+Every integration creates a runtime and a map, attaches the map to a render
+target, and closes them in order. This guide covers the runtime and the map.
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/)
+covers the target.
 
-A map belongs to a runtime. One runtime serves several maps and shares their
-scheduler, event handler, network services, and cache database.
+## Create a runtime
 
-Set an event handler to receive events from the runtime and its maps.
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes callback
-and delivery queue registration.
+Create a runtime with the default options. One runtime can serve all your maps.
+To set a cache file, see [Offline](/maplibre-native-ffi/guides/offline/).
 
-<Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
+<Snippet page="create-a-map" region="runtime" />
 
-A browser host creates the runtime on a Web Worker.
+## Create a map
 
-Map creation returns the map at once, and its completion reports when the map is
-ready. Commands sent before then run once the map is ready, but attaching a
-render target waits for the completion.
+Create a map on the runtime. Give it a size in logical pixels, a scale factor,
+and a map mode. The scale factor and the mode can't change later. For the mode,
+see
+[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/#pick-a-map-mode).
 
-## Choose the initial map state
+Wait for the map to be created before you attach a render target.
 
-Set the logical width, height, and display scale factor. The scale factor stays
-fixed for the map's lifetime.
+<Snippet page="create-a-map" region="map" />
 
-Use continuous mode for an interactive map, static mode for one image per
-request, and tile mode for an image of a single tile.
+## Close
 
-<Code code={region(createMap, "map")} lang="c" title="create-map.c" />
+Close the render session, the map, and the runtime, in that order. Wait for the
+map and the runtime to close.
 
-Enable FastPFOR decoding when your MapLibre Tiles sources use that encoding.
-
-## Release in order
-
-Detach any render session, then release the map and the runtime. Wait for the
-runtime's release to complete before you destroy state that its callbacks use.
-
-<Code code={region(createMap, "release")} lang="c" title="create-map.c" />
-
-The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) and
-[map reference](/maplibre-native-ffi/reference/c/map_8h.html) define creation
-and release contracts. Continue with
-[Load a style](/maplibre-native-ffi/guides/load-a-style/).
+<Snippet page="create-a-map" region="close" />

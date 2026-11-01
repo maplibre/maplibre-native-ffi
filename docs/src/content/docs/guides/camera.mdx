@@ -1,0 +1,85 @@
+---
+title: Camera
+description:
+  Move, animate, and fit the camera, apply gestures, and convert between pixels
+  and coordinates.
+# Scope: reading and changing the camera, animations, fitting bounds, limits,
+# applying gestures, and converting between screen pixels and coordinates.
+---
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide changes a map's camera, from your code and from gestures. A camera
+has a center, a zoom, a bearing, and a pitch.
+
+## Read the camera
+
+Read the camera from the map's snapshot. The read returns right away, but it can
+lag behind changes you just sent. To read the camera after your changes apply,
+query the camera instead, and wait for the result.
+[Concepts](/maplibre-native-ffi/concepts/#changes-are-asynchronous) explains
+why.
+
+<Snippet page="camera" region="read" />
+
+## Move the camera
+
+Send a camera update in jump mode. Set only the fields you want to change. The
+other fields keep their values.
+
+<Snippet page="camera" region="jump" />
+
+## Animate the camera
+
+Send a camera update in ease or fly mode, with a duration. Ease moves straight
+to the target. Fly zooms out, travels, and zooms back in.
+
+The update's completion reports that the animation started. To act when it ends,
+set an end handler. The handler reports whether the animation completed or was
+cancelled.
+
+A later camera change replaces the animation of each field that it sets. To stop
+an animation where it is, cancel the map's camera transitions.
+
+<Snippet page="camera" region="animate" />
+
+## Fit the camera to an area
+
+Query the camera that fits a bounding box. Then jump or animate to that camera.
+To fit a list of coordinates or a GeoJSON geometry instead, use the matching
+query.
+
+<Snippet page="camera" region="fit" />
+
+## Limit where the camera can go
+
+Set the map's bounds. They keep the center inside an area, and the zoom and
+pitch inside ranges. Limits that you leave out keep their current values.
+
+<Snippet page="camera" region="limit" />
+
+## Apply gestures
+
+Your code recognizes each gesture from its input events. Screen points are in
+logical pixels from the map's top-left corner.
+
+When a gesture starts, cancel the camera transitions. Then send a camera delta
+with the begin phase.
+
+For each movement, send a delta with the update phase. Pass the change since the
+last delta. For a drag, pass the movement as the offset. For a pinch, pass the
+scale and the pinch's center as the anchor.
+
+When the gesture ends, send a delta with the end phase. If the platform cancels
+the gesture, send the cancel phase instead.
+
+<Snippet page="camera" region="gesture" />
+
+## Convert between pixels and coordinates
+
+Create a projection from the snapshot's view. Use it to convert screen points to
+coordinates, and coordinates to screen points. A projection keeps the view it
+was created from. After the camera moves, create a new one. Close the projection
+when you're done.
+
+<Snippet page="camera" region="convert" />
