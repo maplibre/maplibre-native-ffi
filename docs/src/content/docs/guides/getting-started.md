@@ -1,17 +1,17 @@
 ---
 title: Getting started
-description: Render a map to an image file.
+description: Render a map and read its pixels.
 sidebar:
   order: 1
-# Scope: one short program, start to finish, that renders a map to an image
-# file without a window. Each step names the choice it makes and links the page
-# that covers the alternatives.
+# Scope: one short program, start to finish, that renders a map and reads its
+# pixels, without a window. Each step names the choice it makes and links the
+# page that covers the alternatives.
 ---
 
 Outline:
 
-- Intro: this program renders a map of the world to a PNG file. It needs no
-  window, so it works on every platform.
+- Intro: this program renders a map of the world and reads its pixels. It needs
+  no window, so it works on every platform.
   [Rendering](/maplibre-native-ffi/guides/rendering/) covers windows and other
   targets.
 
@@ -40,10 +40,10 @@ Outline:
 
 - Request a still image, and wait for it.
 
-## Save the image
+## Read the pixels
 
-- Read the texture's pixels back as RGBA.
-- Write them to a PNG file with the language's usual image library.
+- Read the texture's pixels back as RGBA. What the program does with them is up
+  to it.
 
 ## Close
 
