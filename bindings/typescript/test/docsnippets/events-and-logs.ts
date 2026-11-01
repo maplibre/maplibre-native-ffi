@@ -20,7 +20,6 @@ export async function eventsAndLogs(runtime: RuntimeHandle): Promise<void> {
   let map: MapHandle | undefined;
 
   // #region handler
-  // #region queue
   // The handler runs on this thread. The binding queues each call.
   runtime.discarding.setEventHandler((events) => {
     for (const event of events) {
@@ -36,7 +35,6 @@ export async function eventsAndLogs(runtime: RuntimeHandle): Promise<void> {
       }
     }
   });
-  // #endregion queue
   // #endregion handler
 
   // #region mask

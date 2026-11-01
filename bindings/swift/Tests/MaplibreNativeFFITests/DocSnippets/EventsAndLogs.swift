@@ -30,13 +30,11 @@ private func writeLog(_: LogSeverity, _: String) {}
 
 @MainActor private func eventsAndLogs(runtime: RuntimeHandle) async throws {
   // #region handler
-  // #region queue
   // The handler runs on a library thread. It hands each batch to the main
   // actor.
   try runtime.discarding.setEventHandler(RuntimeEventHandler { events in
     Task { @MainActor in handleEvents(events) }
   })
-  // #endregion queue
   // #endregion handler
 
   // #region mask

@@ -12,8 +12,6 @@ static void on_style_loaded(void) {}
 
 static void on_loading_failed(mln_buffer_view message) { (void)message; }
 
-static void post_to_event_loop(void (*task)(void)) { (void)task; }
-
 static void write_log(mln_log_severity severity, mln_buffer_view message) {
   (void)severity;
   (void)message;
@@ -64,38 +62,6 @@ void mln_doc_events_handler(mln_runtime runtime) {
   };
   mln_runtime_create_map(runtime, &map_options, &map, NULL, NULL);
   // #endregion mask
-}
-
-// #region queue
-static mln_delivery_queue queue = MLN_HANDLE_NULL;
-
-// Runs on your event loop.
-static void dispatch_queue(void) { mln_delivery_queue_dispatch(queue, NULL); }
-
-// Runs on a library thread. It posts a task and returns.
-static void on_wake(void* user_data) {
-  (void)user_data;
-  post_to_event_loop(dispatch_queue);
-}
-// #endregion queue
-
-void mln_doc_events_queue(mln_runtime runtime);
-
-void mln_doc_events_queue(mln_runtime runtime) {
-  // #region queue
-  mln_delivery_queue_options queue_options = {
-    .size = sizeof(mln_delivery_queue_options),
-    .wake = {.callback = on_wake},
-  };
-  mln_delivery_queue_create(&queue_options, &queue, NULL);
-
-  mln_runtime_event_handler handler = {
-    .size = sizeof(mln_runtime_event_handler),
-    .callback = on_events,
-    .queue = queue,
-  };
-  mln_runtime_set_event_handler(runtime, &handler, NULL, NULL);
-  // #endregion queue
 }
 
 // #region logs

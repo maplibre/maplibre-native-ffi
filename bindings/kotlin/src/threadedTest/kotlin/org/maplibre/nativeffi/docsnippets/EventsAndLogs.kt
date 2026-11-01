@@ -2,8 +2,6 @@
 // them.
 package org.maplibre.nativeffi.docsnippets
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.maplibre.nativeffi.LogHandler
 import org.maplibre.nativeffi.LogSeverity
 import org.maplibre.nativeffi.LogicalExtent
@@ -38,19 +36,11 @@ private fun handleEvents(events: List<RuntimeEvent>) {
 
 // #endregion handler
 
-// appScope runs coroutines on your application's thread, such as MainScope() on Android.
-private suspend fun eventsAndLogs(runtime: RuntimeHandle, appScope: CoroutineScope) {
+private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
   // #region handler
   // Runs on a library thread.
   runtime.discarding.setEventHandler(RuntimeEventHandler(::handleEvents))
   // #endregion handler
-
-  // #region queue
-  // The binding has no delivery queue. Post each batch to your thread, and return.
-  runtime.discarding.setEventHandler(
-    RuntimeEventHandler { events -> appScope.launch { handleEvents(events) } },
-  )
-  // #endregion queue
 
   // #region mask
   val (created, ready) =

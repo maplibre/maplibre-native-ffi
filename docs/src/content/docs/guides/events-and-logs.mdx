@@ -6,8 +6,7 @@ description: Receive map events and library logs.
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide receives map events and the library's logs, and runs your handlers on
-your application's thread. For what events are, see
+This guide receives map events and the library's logs. For what events are, see
 [Concepts](/maplibre-native-ffi/concepts/#changes-are-asynchronous).
 
 ## Set an event handler
@@ -18,6 +17,9 @@ first events.
 
 Each event names its type and the map that sent it. Compare that map with the
 maps you hold.
+
+The handler runs on a library thread, where it must return quickly. See
+[Concepts](/maplibre-native-ffi/concepts/#threads-and-callbacks).
 
 <Snippet page="events-and-logs" region="handler" />
 
@@ -31,22 +33,11 @@ reference lists them.
 
 <Snippet page="events-and-logs" region="mask" />
 
-## Handle events on your application's thread
-
-The handler runs on a library thread, where it must return quickly. See
-[Concepts](/maplibre-native-ffi/concepts/#threads-and-callbacks).
-
-To handle events on your application's thread, hand them to your event loop. A
-binding that queues every call already runs the handler on your thread.
-
-<Snippet page="events-and-logs" region="queue" />
-
 ## Capture logs
 
 Set a log callback to send the library's logs to your own logger. One callback
 receives the logs of every runtime in the process.
 
-The callback runs on a library thread, and it can't call the library. To handle
-logs on your thread, hand them to your event loop, as for events.
+The callback runs on a library thread, and it can't call the library.
 
 <Snippet page="events-and-logs" region="logs" />

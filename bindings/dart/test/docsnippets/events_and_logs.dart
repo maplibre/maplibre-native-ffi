@@ -13,7 +13,6 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
   MapHandle? map;
 
   // #region handler
-  // #region queue
   // The handler runs in this isolate. The binding queues each call.
   runtime.discarding.setEventHandler((events) {
     for (final event in events) {
@@ -27,7 +26,6 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
       }
     }
   });
-  // #endregion queue
   // #endregion handler
 
   // #region mask

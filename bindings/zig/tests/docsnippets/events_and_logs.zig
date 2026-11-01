@@ -1,24 +1,18 @@
 //! Snippets for the docs site's Events and logs page. They compile with the
 //! tests, which never run them.
 
-const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 comptime {
     _ = &eventsHandler;
-    _ = &eventsQueue;
     _ = &eventsLogs;
 }
-
-const allocator = std.heap.smp_allocator;
 
 var map: maplibre.Map = undefined;
 
 fn onStyleLoaded() void {}
 
 fn onLoadingFailed(_: []const u8) void {}
-
-fn postToEventLoop(_: maplibre.RuntimeEventType, _: []const u8) !void {}
 
 fn writeLog(_: maplibre.LogSeverity, _: []const u8) void {}
 
@@ -50,23 +44,6 @@ fn eventsHandler(runtime: maplibre.Runtime) !void {
     defer created.ready.deinit();
     map = created.map;
     // #endregion mask
-}
-
-// #region queue
-// Runs on a library thread. The binding has no delivery queue, so copy what
-// your event loop needs, post it there, and return.
-fn postEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void {
-    for (events) |event| {
-        if (event.source != map.id()) continue;
-        try postToEventLoop(event.type, try allocator.dupe(u8, event.message));
-    }
-}
-// #endregion queue
-
-fn eventsQueue(runtime: maplibre.Runtime) !void {
-    // #region queue
-    try runtime.discarding().setEventHandler(.{ .callback = postEvents }, null);
-    // #endregion queue
 }
 
 // #region logs

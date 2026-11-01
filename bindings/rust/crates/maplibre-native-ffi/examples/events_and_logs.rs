@@ -15,7 +15,6 @@ fn write_log(_severity: LogSeverity, _message: &str) {}
 
 async fn events_and_logs(runtime: &RuntimeHandle) -> Result<()> {
     // #region handler
-    // #region queue
     // The handler runs on a library thread. It sends the events to your thread.
     let (sender, batches) = mpsc::channel();
     runtime
@@ -23,7 +22,6 @@ async fn events_and_logs(runtime: &RuntimeHandle) -> Result<()> {
         .set_event_handler(RuntimeEventHandler::new(move |events| {
             let _ = sender.send(events);
         }))?;
-    // #endregion queue
     // #endregion handler
 
     // #region mask
@@ -36,7 +34,6 @@ async fn events_and_logs(runtime: &RuntimeHandle) -> Result<()> {
     created.await?;
 
     // #region handler
-    // #region queue
     // On your thread, such as on each turn of your event loop:
     for event in batches.try_iter().flatten() {
         if event.source != map.id() {
@@ -49,7 +46,6 @@ async fn events_and_logs(runtime: &RuntimeHandle) -> Result<()> {
             _ => {}
         }
     }
-    // #endregion queue
     // #endregion handler
 
     // #region logs

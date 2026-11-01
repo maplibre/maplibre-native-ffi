@@ -11,8 +11,6 @@ internal static class EventsAndLogs
 
     private static void OnLoadingFailed(string message) { }
 
-    private static void PostToEventLoop(Action task) { }
-
     private static void WriteLog(LogSeverity severity, string message) { }
 
     // #region handler
@@ -54,14 +52,6 @@ internal static class EventsAndLogs
         );
         // #endregion mask
         await map.Ready;
-
-        // #region queue
-        // This binding has no delivery queue. Post the events to your event
-        // loop instead.
-        runtime.Discarding.SetEventHandler(
-            new RuntimeEventHandler(events => PostToEventLoop(() => OnEvents(events)))
-        );
-        // #endregion queue
 
         // #region logs
         // Runs on a library thread, and can't call the library.

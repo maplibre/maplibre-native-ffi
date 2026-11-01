@@ -54,26 +54,6 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 		return err
 	}
 
-	// #region queue
-	// This binding has no delivery queue. A channel hands each batch to your
-	// goroutine instead.
-	batches := make(chan []maplibre.RuntimeEvent, 64)
-	err = runtime.Discarding().SetEventHandler(maplibre.RuntimeEventHandler{
-		// Runs on a library thread, and returns once the batch is queued.
-		Callback: func(events []maplibre.RuntimeEvent) { batches <- events },
-	})
-	if err != nil {
-		return err
-	}
-
-	// Your goroutine runs the handler.
-	go func() {
-		for events := range batches {
-			handleEvents(events)
-		}
-	}()
-	// #endregion queue
-
 	// #region logs
 	err = maplibre.SetLogCallback(maplibre.LogHandler{
 		// Runs on a library thread, and can't call the library.

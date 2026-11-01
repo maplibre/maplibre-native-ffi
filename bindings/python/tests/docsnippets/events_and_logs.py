@@ -1,8 +1,6 @@
 # Snippets for the docs site's Events and logs page. They are type-checked with
 # the tests, which never run them.
 
-from collections.abc import Callable
-
 import maplibre_native_ffi as mln
 
 
@@ -11,10 +9,6 @@ def on_style_loaded() -> None:
 
 
 def on_loading_failed(message: str) -> None:
-    pass
-
-
-def post_to_event_loop(task: Callable[[], None]) -> None:
     pass
 
 
@@ -51,15 +45,6 @@ def events_and_logs(runtime: mln.RuntimeHandle) -> None:
     )
     # #endregion mask
     ready.result()
-
-    # #region queue
-    # The handler runs on the binding's dispatcher thread. Post the events to
-    # your event loop.
-    def post_events(events: tuple[mln.RuntimeEvent, ...]) -> None:
-        post_to_event_loop(lambda: on_events(events))
-
-    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(post_events))
-    # #endregion queue
 
     # #region logs
     # The callback runs on the binding's dispatcher thread.
