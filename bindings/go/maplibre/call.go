@@ -13,60 +13,55 @@ import (
 
 // Input storage and callback roots remain live until the native call settles.
 
-type bindingAccess uint8
-
-const (
-	bindingGlobalAccess bindingAccess = iota
-	bindingOwnerAccess
-	// Native consumes the receiver when the call succeeds.
-	bindingCloseAccess
-	// The call answers the receiver, which native consumes when the call
-	// succeeds. A receiver already consumed reaches native, which reports it,
-	// where a repeated close does nothing.
-	bindingAnswerAccess
-	// Native always consumes the receiver.
-	bindingConsumeAccess
-	// The receiver is a response that is valid only inside its callback, on
-	// the callback's thread.
-	bindingScopedAccess
-)
-
+// bindingTarget describes how a native call treats its receiver.
 type bindingTarget struct {
+	// handle reports that the call passes owner's native id as its receiver.
+	// owner is nil for a nil receiver, which bindingRun reports.
+	handle bool
 	owner  *bindingOwner
-	access bindingAccess
-	scope  *bindingScope
+	// scope, when set, is the callback that the receiver is valid inside, on
+	// the callback's thread.
+	scope *bindingScope
+	// consumes reports that native consumes the receiver when the call
+	// succeeds.
+	consumes bool
+	// repeatReachesNative reports that a call on a receiver already consumed
+	// reaches native, which reports it, where a repeated close does nothing.
+	repeatReachesNative bool
 }
 
 func bindingGlobal() bindingTarget { return bindingTarget{} }
 func bindingOwned(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingOwnerAccess}
+	return bindingTarget{handle: true, owner: owner}
 }
 
 func bindingClosing(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingCloseAccess}
+	return bindingTarget{handle: true, owner: owner, consumes: true}
 }
 
 func bindingAnswering(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingAnswerAccess}
+	return bindingTarget{handle: true, owner: owner, consumes: true, repeatReachesNative: true}
 }
 
-func bindingConsuming(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingConsumeAccess}
-}
-
+// bindingScoped gives a nil response a scope that has already expired.
 func bindingScoped(scope *bindingScope) bindingTarget {
-	return bindingTarget{access: bindingScopedAccess, scope: scope}
+	if scope == nil {
+		scope = &bindingScope{}
+	}
+	return bindingTarget{scope: scope}
 }
 
 // bindingRun keeps owners reachable until outputs are copied and registrations
-// are rooted. Native leases each id for the duration of its call.
+// are rooted. Native leases each id for the duration of its call. A repeated
+// synchronous close returns the zero T; an async close has no zero future to
+// return, so a repeated one reaches native.
 func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T, synchronous bool) T {
 	arena := &bindingArena{}
 	defer arena.close()
-	if target.access == bindingScopedAccess {
+	if target.scope != nil {
 		target.scope.check()
 	}
-	if target.access == bindingGlobalAccess || target.access == bindingScopedAccess {
+	if !target.handle {
 		value := call(arena, 0)
 		arena.accept(nil)
 		return value
@@ -74,20 +69,14 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	owner := target.owner
 	state := bindingHandleState(owner)
 	defer runtime.KeepAlive(owner)
-	if target.access == bindingCloseAccess || target.access == bindingConsumeAccess || target.access == bindingAnswerAccess {
-		if synchronous && target.access != bindingAnswerAccess && state.released.Load() {
-			var zero T
-			return zero
-		}
-		if target.access == bindingConsumeAccess {
-			state.released.Store(true)
-		}
-		value := call(arena, state.raw)
-		state.released.Store(true)
-		arena.accept(owner)
-		return value
+	if target.consumes && synchronous && !target.repeatReachesNative && state.released.Load() {
+		var zero T
+		return zero
 	}
 	value := call(arena, state.raw)
+	if target.consumes {
+		state.released.Store(true)
+	}
 	arena.accept(owner)
 	return value
 }

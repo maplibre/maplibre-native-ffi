@@ -5774,7 +5774,7 @@ func NewGeoJsonSourceData(data string, options *GeoJsonSourceOptions) (*GeoJsonS
 // See mln_geo_json_source_data_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *GeoJsonSourceDataHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_geo_json_source_data_release(C.mln_geo_json_source_data(raw))
 		return struct{}{}
 	})
@@ -5809,7 +5809,7 @@ func NewGraphicsDevice(options *GraphicsDeviceOptions) (*GraphicsDeviceHandle, e
 // See mln_graphics_device_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
 func (receiver *GraphicsDeviceHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_graphics_device_release(C.mln_graphics_device(raw))
 		return struct{}{}
 	})
@@ -6806,7 +6806,7 @@ func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]S
 // See mln_map_projection_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_map_projection_release(C.mln_map_projection(raw))
 		return struct{}{}
 	})
@@ -7874,7 +7874,7 @@ func (receiver *ResourceRequestHandle) PassThrough() error {
 // See mln_resource_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_resource_request_release(C.mln_resource_request(raw))
 		return struct{}{}
 	})
@@ -7919,7 +7919,7 @@ func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
 // See mln_resource_transform_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceTransformRequestHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw))
 		return struct{}{}
 	})
@@ -8333,7 +8333,7 @@ func (receiver *StyleExpressionHandle) Info() (StyleExpressionInfo, error) {
 // See mln_style_expression_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
 func (receiver *StyleExpressionHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_style_expression_release(C.mln_style_expression(raw))
 		return struct{}{}
 	})

@@ -327,9 +327,7 @@ def operation(plan, values, *, discard=False, dispose=False):
                 if p.name == registration.accepted_unless
             )
             adoptions.append(f"if bool({declined}) {{ arena.decline() }}")
-    if plan.consumes == "always":
-        access = "Consuming"
-    elif plan.consumes:
+    if plan.consumes:
         access = "Closing" if plan.release else "Answering"
     elif borrows_receiver(plan):
         raise Unsupported(
