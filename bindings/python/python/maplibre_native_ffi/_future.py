@@ -17,6 +17,10 @@ _logger = logging.getLogger(__name__)
 class NativeFuture[T](Future[T]):
     """A native result that the binding's dispatcher thread resolves.
 
+    The future stays pending, never running, until its completion claims it,
+    so ``cancel()`` abandons the wait at any point before then. Native work
+    continues to its terminal disposition either way.
+
     Done callbacks for one future run in registration order on host worker
     threads, so a callback can wait for another binding future. Waiting for a
     pending future on the dispatcher thread, from a registered callback, raises
