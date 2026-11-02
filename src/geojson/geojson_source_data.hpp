@@ -37,8 +37,6 @@ auto to_native_geojson_source_options(
   const mln_geo_json_source_options& options
 ) -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>>;
 
-// Compares every scalar option; cluster_properties expressions carry no
-// equality, so they stay outside the comparison.
 auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& left,
   const mln::style::GeoJSONOptions& right

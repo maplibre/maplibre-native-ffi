@@ -303,6 +303,12 @@ class GesturePhase(UnknownIntEnum):
 class GpuSyncKind(UnknownIntEnum):
     """How one side waits for the other's GPU work on a shared texture.
 
+    A sync file descriptor or an OpenGL fence signals once, so when
+    `AcquiredFrameHandle.close()` succeeds, the session takes the one you
+    pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence
+    counts up with each frame, so the one you pass stays yours. Keep it valid
+    until a detach or disposal of the session completes.
+
     See `mln_gpu_sync_kind` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
@@ -2832,7 +2838,11 @@ class RenderSessionCapabilities:
     """The kind of `GpuSync` that `AcquiredFrameHandle.producer_sync()` reports."""
 
     consumer_sync_kinds: GpuSyncKindFlag
-    """The kinds of `GpuSync` that `AcquiredFrameHandle.close()` accepts."""
+    """The kinds of `GpuSync` that `AcquiredFrameHandle.close()` accepts.
+
+    They depend on the target and on what the device supports, so read this
+    field instead of assuming a kind.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3369,7 +3379,9 @@ class RuntimeEventOfflineRegionTileCountLimit:
     region_id: int
 
     limit: int
-    """The number of Mapbox tiles that offline regions may hold."""
+    """The number of demo server tiles that the cache file's offline regions may
+    hold together.
+    """
 
     @classmethod
     def _from_native(cls, raw):

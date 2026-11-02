@@ -222,6 +222,12 @@ func (value GesturePhase) String() string {
 // GpuSyncKind corresponds to mln_gpu_sync_kind. How one side waits for the
 // other's GPU work on a shared texture.
 //
+// A sync file descriptor or an OpenGL fence signals once, so when
+// AcquiredFrameHandle.Close() succeeds, the session takes the one you pass. A
+// Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up with
+// each frame, so the one you pass stays yours. Keep it valid until a detach or
+// disposal of the session completes.
+//
 // See mln_gpu_sync_kind in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type GpuSyncKind uint32
@@ -1105,8 +1111,12 @@ const (
 	RuntimeEventTypeOfflineRegionStatusChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	// A resource that the region needs failed to download.
 	RuntimeEventTypeOfflineRegionResponseError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
-	// The region stopped downloading Mapbox tiles because offline regions hold as
-	// many as the limit allows.
+	// The region's download became inactive because the cache file's offline
+	// regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+	//
+	// Only tiles of sources on the demo server count toward the limit: sources with
+	// a maplibre:// URL, which resolves to https://demotiles.maplibre.org. Tiles
+	// from other servers never count.
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	RuntimeEventTypeMapGlyphsRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
 	RuntimeEventTypeMapGlyphsLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
@@ -3684,6 +3694,9 @@ type RenderSessionCapabilities struct {
 	// The kind of GpuSync that AcquiredFrameHandle.WithProducerSync() reports.
 	ProducerSyncKind GpuSyncKind
 	// The kinds of GpuSync that AcquiredFrameHandle.Close() accepts.
+	//
+	// They depend on the target and on what the device supports, so read this field
+	// instead of assuming a kind.
 	ConsumerSyncKinds GpuSyncKindFlag
 }
 
@@ -4184,7 +4197,8 @@ func copyRuntimeEventOfflineRegionStatus(raw C.mln_runtime_event_offline_region_
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventOfflineRegionTileCountLimit struct {
 	RegionId int64
-	// The number of Mapbox tiles that offline regions may hold.
+	// The number of demo server tiles that the cache file's offline regions may
+	// hold together.
 	Limit uint64
 }
 
@@ -7107,8 +7121,9 @@ func (receiver *MapHandle) SetGeoJsonSourceUrl(sourceId string, url string) (*Fu
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidState when the style or one of its sources or sprites is
-//     still loading.
+//   - StatusInvalidState until the map has parsed its style, which
+//     RuntimeEventTypeMapStyleLoaded reports, and again while it loads a new
+//     style URL.
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
@@ -8097,6 +8112,9 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 // Errors:
 //   - StatusInvalidArgument when sideDatabasePath isn't a readable database
 //     file.
+//   - StatusNativeError when the merge would exceed the limit on tiles from
+//     MapLibre's demo tile server that
+//     RuntimeEventTypeOfflineRegionTileCountLimitExceeded describes.
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), bindingView(sideDatabasePath, arena), completion, diagnostic))

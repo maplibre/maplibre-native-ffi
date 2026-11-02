@@ -1177,6 +1177,12 @@ impl FromNative<sys::mln_gpu_sync> for GpuSync {
 native_enum! {
 /// How one side waits for the other's GPU work on a shared texture.
 ///
+/// A sync file descriptor or an OpenGL fence signals once, so when
+/// `AcquiredFrameHandle::release()` succeeds, the session takes the one you
+/// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
+/// up with each frame, so the one you pass stays yours. Keep it valid until a
+/// detach or disposal of the session completes.
+///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum GpuSyncKind: u32 {
@@ -3259,6 +3265,9 @@ pub struct RenderSessionCapabilities {
     /// reports.
     pub producer_sync_kind: GpuSyncKind,
     /// The kinds of `GpuSync` that `AcquiredFrameHandle::release()` accepts.
+    ///
+    /// They depend on the target and on what the device supports, so read this
+    /// field instead of assuming a kind.
     pub consumer_sync_kinds: GpuSyncKindFlag,
 }
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
@@ -4148,7 +4157,8 @@ impl FromNative<sys::mln_runtime_event_offline_region_status> for RuntimeEventOf
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionTileCountLimit {
     pub region_id: i64,
-    /// The number of Mapbox tiles that offline regions may hold.
+    /// The number of demo server tiles that the cache file's offline regions
+    /// may hold together.
     pub limit: u64,
 }
 impl FromNative<sys::mln_runtime_event_offline_region_tile_count_limit>
@@ -4315,8 +4325,13 @@ pub enum RuntimeEventType: u32 {
     OfflineRegionStatusChanged = 17,
     /// A resource that the region needs failed to download.
     OfflineRegionResponseError = 18,
-    /// The region stopped downloading Mapbox tiles because offline regions hold
-    /// as many as the limit allows.
+    /// The region's download became inactive because the cache file's offline
+    /// regions reached their limit of 6000 tiles from MapLibre's demo tile
+    /// server.
+    ///
+    /// Only tiles of sources on the demo server count toward the limit: sources
+    /// with a `maplibre://` URL, which resolves to
+    /// https://demotiles.maplibre.org. Tiles from other servers never count.
     OfflineRegionTileCountLimitExceeded = 19,
     MapGlyphsRequested = 20,
     MapGlyphsLoaded = 21,

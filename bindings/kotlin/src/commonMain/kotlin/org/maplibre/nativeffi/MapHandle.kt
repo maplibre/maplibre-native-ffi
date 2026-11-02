@@ -1475,7 +1475,8 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when the style or one of its sources or sprites is still loading.
+   * - `Status.INVALID_STATE` until the map has parsed its style, which
+   *   `RuntimeEventType.MAP_STYLE_LOADED` reports, and again while it loads a new style URL.
    */
   public fun setGlobalStateProperty(
     propertyName: String,

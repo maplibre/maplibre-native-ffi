@@ -167,6 +167,9 @@ public extension RuntimeHandle {
   ///
   /// - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
   ///   database file.
+  /// - `Status.nativeError` when the merge would exceed the limit on tiles from
+  ///   MapLibre's demo tile server that
+  ///   `RuntimeEventType.offlineRegionTileCountLimitExceeded` describes.
   func mergeOfflineRegions(sideDatabasePath bindingArg0: String) async throws
     -> [OfflineRegionInfo]
   {

@@ -97,6 +97,12 @@ public struct GpuSync: Equatable, Hashable, Sendable {
 
 /// How one side waits for the other's GPU work on a shared texture.
 ///
+/// A sync file descriptor or an OpenGL fence signals once, so when
+/// `AcquiredFrameHandle.release()` succeeds, the session takes the one you
+/// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
+/// up with each frame, so the one you pass stays yours. Keep it valid until a
+/// detach or disposal of the session completes.
+///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
@@ -474,6 +480,9 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   /// reports.
   public var producerSyncKind: GpuSyncKind
   /// The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
+  ///
+  /// They depend on the target and on what the device supports, so read this
+  /// field instead of assuming a kind.
   public var consumerSyncKinds: GpuSyncKindFlag
   public init(
     driver: RenderDriverKind = .init(rawValue: 0),

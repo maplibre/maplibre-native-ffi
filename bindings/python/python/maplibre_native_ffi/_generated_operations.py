@@ -1459,8 +1459,9 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_STATE` when the style or one of its sources or
-          sprites is still loading.
+        - `Status.INVALID_STATE` until the map has parsed its style, which
+          `RuntimeEventType.MAP_STYLE_LOADED` reports, and again while it
+          loads a new style URL.
         """
         return self._native.set_global_state_property(property_name, value)
 
@@ -2509,6 +2510,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_ARGUMENT` when `side_database_path` isn't a
           readable database file.
+        - `Status.NATIVE_ERROR` when the merge would exceed the limit on
+          tiles from MapLibre's demo tile server that
+          `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`
+          describes.
         """
         return map_future(
             self._native.merge_offline_regions(side_database_path),

@@ -64,11 +64,10 @@ static void on_events(
   void* user_data, const mln_event_batch_view* batch
 ) {
   (void)user_data;
-  const uint8_t* bytes = (const uint8_t*)batch->events;
   for (size_t i = 0; i < batch->event_count; i += 1) {
-    // Step by event_size, not by sizeof(mln_runtime_event).
-    const mln_runtime_event* event =
-      (const mln_runtime_event*)(bytes + i * batch->event_size);
+    const mln_runtime_event* event = MLN_STRIDED_AT(
+      mln_runtime_event, batch->events, batch->event_size, i
+    );
 
     if (
       event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
@@ -97,12 +96,10 @@ static void on_regions(
   void* user_data, const mln_completion_result* result
 ) {
   if (result->status == MLN_STATUS_OK) {
-    const uint8_t* bytes = result->value;
     for (size_t i = 0; i < result->value_count; i += 1) {
-      // Step by value_size, not by sizeof(mln_offline_region_info).
-      const mln_offline_region_info* region =
-        (const mln_offline_region_info*)(bytes +
-                                         i * result->value_size);
+      const mln_offline_region_info* region = MLN_STRIDED_AT(
+        mln_offline_region_info, result->value, result->value_size, i
+      );
       record_region(
         region->id, region->metadata, region->metadata_size
       );

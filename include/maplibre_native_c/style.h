@@ -26,8 +26,9 @@ extern "C" {
  * [expressions](https://maplibre.org/maplibre-style-spec/expressions/) read.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_STATE when the style or one of its sources or sprites is
- *   still loading.
+ * - MLN_STATUS_INVALID_STATE until the map has parsed its style, which
+ *   MLN_RUNTIME_EVENT_MAP_STYLE_LOADED reports, and again while it loads a new
+ *   style URL.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_global_state_property(

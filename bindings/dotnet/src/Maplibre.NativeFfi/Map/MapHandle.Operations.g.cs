@@ -2214,8 +2214,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when the style or one of
-    /// its sources or sprites is still loading.</description></item>
+    /// <item><description><c>Status.InvalidState</c> until the map has parsed
+    /// its style, which <c>RuntimeEventType.MapStyleLoaded</c> reports, and
+    /// again while it loads a new style URL.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetGlobalStatePropertyAsync(string propertyName, string value)

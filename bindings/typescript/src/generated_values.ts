@@ -600,6 +600,12 @@ export interface GpuSync {
 /**
  * How one side waits for the other's GPU work on a shared texture.
  *
+ * A sync file descriptor or an OpenGL fence signals once, so when
+ * `AcquiredFrameHandle.release()` succeeds, the session takes the one you pass.
+ * A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up
+ * with each frame, so the one you pass stays yours. Keep it valid until a
+ * detach or disposal of the session completes.
+ *
  * See `mln_gpu_sync_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -1804,6 +1810,9 @@ export interface RenderSessionCapabilities {
   readonly producerSyncKind: GpuSyncKind;
   /**
    * The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
+   *
+   * They depend on the target and on what the device supports, so read this
+   * field instead of assuming a kind.
    */
   readonly consumerSyncKinds: GpuSyncKindFlag;
 }
@@ -2370,7 +2379,8 @@ export interface RuntimeEventOfflineRegionStatus {
 export interface RuntimeEventOfflineRegionTileCountLimit {
   readonly regionId: bigint;
   /**
-   * The number of Mapbox tiles that offline regions may hold.
+   * The number of demo server tiles that the cache file's offline regions may
+   * hold together.
    */
   readonly limit: bigint;
 }
@@ -2516,8 +2526,12 @@ export const RuntimeEventType = {
    */
   offlineRegionResponseError: 18,
   /**
-   * The region stopped downloading Mapbox tiles because offline regions hold as
-   * many as the limit allows.
+   * The region's download became inactive because the cache file's offline
+   * regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+   *
+   * Only tiles of sources on the demo server count toward the limit: sources
+   * with a `maplibre://` URL, which resolves to https://demotiles.maplibre.org.
+   * Tiles from other servers never count.
    */
   offlineRegionTileCountLimitExceeded: 19,
   mapGlyphsRequested: 20,

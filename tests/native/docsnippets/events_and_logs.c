@@ -27,7 +27,6 @@ static void on_events(
 ) {
   (void)user_data;
   for (size_t i = 0; i < batch->event_count; i++) {
-    // Step by event_size, not by sizeof(mln_runtime_event).
     const mln_runtime_event* event = MLN_STRIDED_AT(
       mln_runtime_event, batch->events, batch->event_size, i
     );

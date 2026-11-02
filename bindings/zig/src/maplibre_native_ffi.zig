@@ -1174,8 +1174,9 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidState` when the style or one of its sources or sprites is
-    ///   still loading.
+    /// - `error.InvalidState` until the map has parsed its style, which
+    ///   `RuntimeEventType.map_style_loaded` reports, and again while it loads a
+    ///   new style URL.
     pub fn setGlobalStateProperty(self: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_global_state_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
@@ -2220,6 +2221,9 @@ pub const Runtime = struct {
     ///
     /// - `error.InvalidArgument` when `side_database_path` isn't a readable
     ///   database file.
+    /// - `error.NativeError` when the merge would exceed the limit on tiles from
+    ///   MapLibre's demo tile server that
+    ///   `RuntimeEventType.offline_region_tile_count_limit_exceeded` describes.
     pub fn mergeOfflineRegions(self: Runtime, allocator: std.mem.Allocator, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
         return call.submit("mln_runtime_merge_offline_regions", .handle, self, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{side_database_path});
     }
@@ -3348,6 +3352,12 @@ pub const GpuSync = struct {
 };
 
 /// How one side waits for the other's GPU work on a shared texture.
+///
+/// A sync file descriptor or an OpenGL fence signals once, so when
+/// `AcquiredFrame.release()` succeeds, the session takes the one you pass. A
+/// Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up with
+/// each frame, so the one you pass stays yours. Keep it valid until a detach or
+/// disposal of the session completes.
 ///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -5081,6 +5091,9 @@ pub const RenderSessionCapabilities = struct {
     /// The kind of `GpuSync` that `AcquiredFrame.getProducerSync()` reports.
     producer_sync_kind: GpuSyncKind = .cpu_complete,
     /// The kinds of `GpuSync` that `AcquiredFrame.release()` accepts.
+    ///
+    /// They depend on the target and on what the device supports, so read this
+    /// field instead of assuming a kind.
     consumer_sync_kinds: GpuSyncKindFlag = .{},
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
@@ -5945,7 +5958,8 @@ pub const RuntimeEventOfflineRegionStatus = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionTileCountLimit = struct {
     region_id: i64 = 0,
-    /// The number of Mapbox tiles that offline regions may hold.
+    /// The number of demo server tiles that the cache file's offline regions
+    /// may hold together.
     limit: u64 = 0,
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
         return .{
@@ -6085,8 +6099,13 @@ pub const RuntimeEventType = enum(u32) {
     offline_region_status_changed = 17,
     /// A resource that the region needs failed to download.
     offline_region_response_error = 18,
-    /// The region stopped downloading Mapbox tiles because offline regions hold
-    /// as many as the limit allows.
+    /// The region's download became inactive because the cache file's offline
+    /// regions reached their limit of 6000 tiles from MapLibre's demo tile
+    /// server.
+    ///
+    /// Only tiles of sources on the demo server count toward the limit: sources
+    /// with a `maplibre://` URL, which resolves to
+    /// https://demotiles.maplibre.org. Tiles from other servers never count.
     offline_region_tile_count_limit_exceeded = 19,
     map_glyphs_requested = 20,
     map_glyphs_loaded = 21,

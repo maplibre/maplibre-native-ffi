@@ -70,9 +70,9 @@ static void drain_frame_results(void) {
 
   bool failed = false;
   for (size_t i = 0; i < view.result_count; i++) {
-    // Step by result_size, not by the size of the struct.
-    const mln_render_frame_result* result =
-      (const void*)((const char*)view.results + i * view.result_size);
+    const mln_render_frame_result* result = MLN_STRIDED_AT(
+      mln_render_frame_result, view.results, view.result_size, i
+    );
     if (result->disposition == MLN_RENDER_RESULT_FAILED)
       failed = true;
   }

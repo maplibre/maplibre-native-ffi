@@ -4,7 +4,6 @@
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
 #include <stddef.h>
-#include <stdint.h>
 
 static atomic_bool finished;
 
@@ -28,11 +27,10 @@ static void on_rendered(
   void* user_data, const mln_completion_result* result
 ) {
   if (result->status == MLN_STATUS_OK) {
-    const uint8_t* values = result->value;
     for (size_t i = 0; i < result->value_count; i++) {
-      // Step through the results by value_size, not by sizeof.
-      const mln_rendered_feature* hit =
-        (const void*)(values + i * result->value_size);
+      const mln_rendered_feature* hit = MLN_STRIDED_AT(
+        mln_rendered_feature, result->value, result->value_size, i
+      );
       // The views are valid only during this callback.
       copy_feature(hit->feature);
     }
@@ -46,10 +44,10 @@ static void on_source(
   void* user_data, const mln_completion_result* result
 ) {
   if (result->status == MLN_STATUS_OK) {
-    const uint8_t* values = result->value;
     for (size_t i = 0; i < result->value_count; i++) {
-      const mln_source_feature* hit =
-        (const void*)(values + i * result->value_size);
+      const mln_source_feature* hit = MLN_STRIDED_AT(
+        mln_source_feature, result->value, result->value_size, i
+      );
       copy_feature(hit->feature);
     }
   }

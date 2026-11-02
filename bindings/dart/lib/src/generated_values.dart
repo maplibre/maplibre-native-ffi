@@ -182,6 +182,12 @@ final class GesturePhase extends _Enum {
 
 /// How one side waits for the other's GPU work on a shared texture.
 ///
+/// A sync file descriptor or an OpenGL fence signals once, so when
+/// `AcquiredFrameHandle.release()` succeeds, the session takes the one you
+/// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
+/// up with each frame, so the one you pass stays yours. Keep it valid until a
+/// detach or disposal of the session completes.
+///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class GpuSyncKind extends _Enum {
@@ -1004,8 +1010,13 @@ final class RuntimeEventType extends _Enum {
   /// A resource that the region needs failed to download.
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(18);
 
-  /// The region stopped downloading Mapbox tiles because offline regions hold
-  /// as many as the limit allows.
+  /// The region's download became inactive because the cache file's offline
+  /// regions reached their limit of 6000 tiles from MapLibre's demo tile
+  /// server.
+  ///
+  /// Only tiles of sources on the demo server count toward the limit: sources
+  /// with a `maplibre://` URL, which resolves to
+  /// https://demotiles.maplibre.org. Tiles from other servers never count.
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(19);
   static const mapGlyphsRequested = RuntimeEventType.fromRawValue(20);
@@ -4407,6 +4418,9 @@ final class RenderSessionCapabilities extends _Value {
   final GpuSyncKind producerSyncKind;
 
   /// The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
+  ///
+  /// They depend on the target and on what the device supports, so read this
+  /// field instead of assuming a kind.
   final GpuSyncKindFlag consumerSyncKinds;
 
   @override
@@ -5399,7 +5413,8 @@ final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
   });
   final int regionId;
 
-  /// The number of Mapbox tiles that offline regions may hold.
+  /// The number of demo server tiles that the cache file's offline regions may
+  /// hold together.
   final int limit;
 
   @override

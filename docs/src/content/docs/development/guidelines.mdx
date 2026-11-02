@@ -144,8 +144,8 @@ typedef struct mln_lat_lng { // No size: this type never changes.
 
 An options struct holds a function's settings. Each optional setting has a bit
 in the struct's `fields` member. Native reads a setting only when its bit is
-set, and uses the setting's default otherwise, so a struct with only `size` set
-selects every default.
+set. For a struct that configures one call, native uses the setting's default
+otherwise, so a struct with only `size` set selects every default.
 
 ```c
 typedef enum mln_style_expression_option_field : uint32_t {
@@ -168,6 +168,10 @@ options.expected_type.kind = MLN_STYLE_EXPRESSION_TYPE_NUMBER;
   `mln_<x>_fields`.
 - A member with no sensible default, such as a width or a Vulkan device, is
   required instead. It has no bit and carries `MLN_BINDING("required=true")`.
+- A struct that updates state a handle keeps, such as the one
+  `mln_map_set_viewport_options` takes, changes only the settings whose bits are
+  set. The others keep their current values instead of returning to defaults,
+  and the function's comment says so.
 
 ### Data in and out
 
