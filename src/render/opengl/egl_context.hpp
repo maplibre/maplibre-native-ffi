@@ -14,10 +14,17 @@
 namespace mln::core::opengl {
 
 // The one context that the texture sessions of a single-context graphics
-// device take turns in. Each session is a user with its own number, so the next
-// one to take a turn knows whether the cached GL state it left behind survived.
+// device take turns in. Users are numbered rather than known by address,
+// because a new session can reuse a freed one's address.
 class EglSingleContext final {
  public:
+  struct Turn {
+    std::unique_lock<std::mutex> lock;
+    // Another user rendered since this user's last turn, so the cached GL
+    // state it left behind is gone.
+    bool state_lost = false;
+  };
+
   EglSingleContext(EGLDisplay display, EGLContext context);
   EglSingleContext(const EglSingleContext&) = delete;
   auto operator=(const EglSingleContext&) -> EglSingleContext& = delete;
@@ -27,10 +34,7 @@ class EglSingleContext final {
 
   [[nodiscard]] auto context() const -> EGLContext;
   [[nodiscard]] auto next_user() -> std::uint64_t;
-  // Waits for the turn of `user`, and reports whether another user rendered
-  // since its last turn.
-  [[nodiscard]] auto lock(std::uint64_t user) -> bool;
-  void unlock();
+  [[nodiscard]] auto take_turn(std::uint64_t user) -> Turn;
 
  private:
   EGLDisplay display_;
@@ -98,7 +102,7 @@ class EglSharedContext final {
   EGLenum active_api_ = EGL_NONE;
   std::shared_ptr<EglSingleContext> single_;
   std::uint64_t single_user_ = 0;
-  bool holds_turn_ = false;
+  std::unique_lock<std::mutex> turn_;
   bool state_lost_ = false;
 };
 
