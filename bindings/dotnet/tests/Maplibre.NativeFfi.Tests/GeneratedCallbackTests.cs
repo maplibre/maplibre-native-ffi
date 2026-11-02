@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
@@ -10,25 +9,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class GeneratedCallbackTests
 {
-    [Fact]
-    public void AReleasedRootDropsItsCallbackWhileTheWrapperRemainsAlive()
-    {
-        var (root, captured) = Gc.OnThread(CreateCapturingRoot);
-        root.Dispose();
-        Assert.False(Gc.IsAlive(captured));
-        GC.KeepAlive(root);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (NativeCallbackRoot Root, WeakReference Captured) CreateCapturingRoot()
-    {
-        var captured = new object();
-        return (
-            new NativeCallbackRoot(new Action(() => GC.KeepAlive(captured))),
-            new WeakReference(captured)
-        );
-    }
-
     [Fact]
     public void GeneratedCallbacksCopyArgumentsAndContainFailures()
     {
@@ -54,79 +34,48 @@ public sealed unsafe class GeneratedCallbackTests
         scope.Accept();
     }
 
+    // A registration that native accepted is reachable only through its user data, so it must
+    // survive a collection to run, including when the owning handle failed to construct.
     [Fact]
-    public void RegistrationsStayRootedUntilNativeRelease()
+    public void AcceptedRegistrationsSurviveACollection()
     {
-        var first = PrepareOwned();
-        var late = PrepareOwned();
+        var calls = 0;
+        var owned = Prepare(() => Interlocked.Increment(ref calls), adoptionFails: false);
+        var orphaned = Prepare(() => Interlocked.Increment(ref calls), adoptionFails: true);
         Gc.Collect();
-        Assert.True(first.Root.IsAlive);
-        Assert.True(late.Root.IsAlive);
-        first.Native.fetch_tile(first.Native.user_data, default);
-        first.Native.release_user_data(first.Native.user_data);
-        late.Native.release_user_data(late.Native.user_data);
-        Gc.Collect();
-        Assert.False(first.Root.IsAlive);
-        Assert.False(late.Root.IsAlive);
-    }
 
-    [Fact]
-    public void FailedOwnerConstructionKeepsAcceptedCallbacksUntilNativeRelease()
-    {
-        var (native, root) = PrepareFailedOwner();
-        Gc.Collect();
-        Assert.True(root.IsAlive);
-        native.fetch_tile(native.user_data, default);
-        native.release_user_data(native.user_data);
-        Gc.Collect();
-        Assert.False(root.IsAlive);
+        owned.fetch_tile(owned.user_data, default);
+        orphaned.fetch_tile(orphaned.user_data, default);
+        owned.release_user_data(owned.user_data);
+        orphaned.release_user_data(orphaned.user_data);
+        Assert.Equal(2, calls);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (
-        mln_custom_geometry_source_options Native,
-        WeakReference Root
-    ) PrepareFailedOwner()
+    private static mln_custom_geometry_source_options Prepare(Action onFetch, bool adoptionFails)
     {
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeCustomGeometrySourceOptions(
-            new CustomGeometrySourceOptions { FetchTile = _ => { } },
+            new CustomGeometrySourceOptions { FetchTile = _ => onFetch() },
             scope
         );
-        var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
         // A generated attachment accepts its registrations once native admits the call, before it
         // adopts the handle, so a failed adoption leaves them to native.
         scope.Accept();
-        var disposed = false;
-        var failure = new FormatException("Owner construction failed.");
-        Assert.Same(
-            failure,
-            Assert.Throws<FormatException>(() =>
-                NativeHandleState<MlnRuntime>.Adopt<RuntimeHandle>(
-                    SyntheticHandles.Runtime(1234),
-                    () => throw failure,
-                    (_, _) =>
-                    {
-                        disposed = true;
-                        return mln_status.MLN_STATUS_OK;
-                    }
+        if (adoptionFails)
+        {
+            var failure = new FormatException("Owner construction failed.");
+            Assert.Same(
+                failure,
+                Assert.Throws<FormatException>(() =>
+                    NativeHandleState<MlnRuntime>.Adopt<RuntimeHandle>(
+                        SyntheticHandles.Runtime(1234),
+                        () => throw failure,
+                        (_, _) => mln_status.MLN_STATUS_OK
+                    )
                 )
-            )
-        );
-        Assert.True(disposed);
-        return (native, weak);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (mln_custom_geometry_source_options Native, WeakReference Root) PrepareOwned()
-    {
-        using var scope = new NativeCallScope();
-        var native = GeneratedValues.NativeCustomGeometrySourceOptions(
-            new CustomGeometrySourceOptions { FetchTile = _ => { } },
-            scope
-        );
-        var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
-        scope.Accept();
-        return (native, weak);
+            );
+        }
+        return native;
     }
 }

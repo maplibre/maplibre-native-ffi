@@ -68,8 +68,8 @@ final class Pulse: @unchecked Sendable {
 }
 
 /// How often a waiter re-checks its condition without a signal, which covers
-/// state the library publishes without a wake, such as a finalizer that ran on
-/// another thread.
+/// state the library publishes without a wake, such as a disposed map's
+/// retirement.
 private let recheckInterval = DispatchTimeInterval.milliseconds(20)
 
 /// Waits until `condition` holds, re-checking it on every pulse. Records an
@@ -119,20 +119,6 @@ final class LockedBox<Value>: @unchecked Sendable {
   func update(_ body: (inout Value) -> Void) {
     lock.withLock { body(&stored) }
     Pulse.shared.signal()
-  }
-}
-
-/// Counts its own deallocation, so a test observes when the closure that
-/// captured it was released.
-final class ReleaseProbe: Sendable {
-  private let releases: LockedBox<Int>
-
-  init(_ releases: LockedBox<Int>) {
-    self.releases = releases
-  }
-
-  deinit {
-    releases.update { $0 += 1 }
   }
 }
 

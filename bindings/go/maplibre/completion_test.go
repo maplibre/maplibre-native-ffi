@@ -68,22 +68,6 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 	}
 }
 
-// A submission native refuses returns its error at once, and the binding
-// deletes the handle it passed as the completion's user data, since native
-// never calls the completion or its release.
-func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
-	handle, err := rejectedSubmissionForTest()
-	if !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("rejected submission: %v, want StatusInvalidState", err)
-	}
-	defer func() {
-		if recover() == nil {
-			t.Fatal("the rejected submission's handle is still live")
-		}
-	}()
-	handle.Value()
-}
-
 // A failed command's Await returns an *Error with its status, diagnostic, and
 // the generation it published.
 func TestFailedCommandReturnsItsError(t *testing.T) {

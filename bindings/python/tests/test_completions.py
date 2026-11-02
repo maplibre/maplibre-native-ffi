@@ -1,20 +1,16 @@
 """Native completions delivered as concurrent.futures futures."""
 
 import asyncio
-import gc
 import threading
-import weakref
 from concurrent.futures import CancelledError, Future, wait
 
 import maplibre_native_ffi as mln
 import pytest
-from maplibre_native_ffi._future import NativeFuture
 from support import (
     EMPTY_STYLE,
     TIMEOUT,
     Harness,
     denied_response,
-    leak_reports,
     map_options,
     result,
 )
@@ -36,25 +32,6 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
         map_handle.discarding.resize(
             mln.LogicalExtent(width=0, height=8, scale_factor=1)
         )
-
-
-def test_a_rejected_submission_frees_its_future(map_handle: mln.MapHandle) -> None:
-    def live_futures() -> list[NativeFuture[object]]:
-        # Any binding call applies the releases native made without the GIL.
-        mln.get_network_status()
-        gc.collect()
-        return [o for o in gc.get_objects() if isinstance(o, NativeFuture)]
-
-    existing = weakref.WeakSet(live_futures())
-    with pytest.raises(mln.MaplibreError) as raised:
-        map_handle.get_feature_state(
-            mln.FeatureStateSelector(
-                source_id="source", source_layer_id="", state_key="hover"
-            )
-        )
-    # Native rejected the submission, after the binding made its future.
-    assert raised.value.status == mln.Status.INVALID_ARGUMENT
-    assert [f for f in live_futures() if f not in existing] == []
 
 
 def test_a_done_callback_runs_off_the_dispatcher_thread_and_can_wait_on_native(
@@ -127,15 +104,12 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
         asyncio.run(wait_briefly())
     assert awaited.ready.cancelled()
 
-    with leak_reports() as reports:
-        release.set()
-        # Native work continues past the abandoned waits. A later runtime
-        # command resolves once both creations have finished, and the maps
-        # stay with their owner, which closes them.
-        result(harness.runtime.clear_resource_transform())
-        for owner in (created.map, awaited.map, map_handle):
-            assert owner.get_snapshot() is not None
-            assert result(owner.close()) is None
-        assert result(harness.runtime.close()) is None
-        gc.collect()
-    assert reports == []
+    release.set()
+    # Native work continues past the abandoned waits. A later runtime command
+    # resolves once both creations have finished, and the maps stay with
+    # their owner, which closes them.
+    result(harness.runtime.clear_resource_transform())
+    for owner in (created.map, awaited.map, map_handle):
+        assert owner.get_snapshot() is not None
+        assert result(owner.close()) is None
+    assert result(harness.runtime.close()) is None

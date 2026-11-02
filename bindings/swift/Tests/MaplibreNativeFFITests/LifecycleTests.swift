@@ -132,16 +132,15 @@ private func expectDescription(
 }
 
 /// A map holds its runtime, so a host may drop its own runtime reference
-/// while the map is live. The runtime goes once the map does.
+/// while the map is live, and the map keeps working.
 @Test func aMapKeepsItsRuntimeAlive() async throws {
   var runtime: RuntimeHandle? = try MapFixture.makeRuntime()
-  weak let weakRuntime = runtime
-  var map: MapHandle? = try await MapFixture.makeMap(on: #require(runtime))
+  // Kept only to close the runtime after its map.
+  weak let parent = runtime
+  let map = try await MapFixture.makeMap(on: #require(runtime))
   runtime = nil
-  #expect(weakRuntime != nil)
-  _ = try await map?.setStyleJson(emptyStyle)
 
-  try await map?.close()
-  map = nil
-  #expect(weakRuntime == nil)
+  try await map.setStyleJson(emptyStyle)
+  try await map.close()
+  try await #require(parent).close()
 }

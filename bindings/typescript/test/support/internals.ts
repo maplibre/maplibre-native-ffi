@@ -50,39 +50,6 @@ export function captureConsole(method: "warn" | "error"): string[] {
 }
 
 /**
- * Collects the leak reports that the binding makes during the running case
- * instead of printing them. Node, Bun, and Deno report a leak as a process
- * warning, and ArkTS and the browser through `console.warn`.
- */
-export function captureLeaks(): string[] {
-  if (
-    capabilities.host === "arkts" ||
-    capabilities.host === "browser" ||
-    capabilities.host === "hermes"
-  ) {
-    return captureConsole("warn");
-  }
-  const leaks: string[] = [];
-  const original = process.emitWarning.bind(process);
-  process.emitWarning = ((
-    warning: string,
-    options?: { type?: string; code?: string },
-  ) => {
-    if (
-      options?.type !== "ResourceWarning" ||
-      options.code !== "MAPLIBRE_NATIVE_FFI_LEAK"
-    ) {
-      throw new Error(`an unexpected process warning: ${warning}`);
-    }
-    leaks.push(warning);
-  }) as typeof process.emitWarning;
-  teardown(() => {
-    process.emitWarning = original;
-  });
-  return leaks;
-}
-
-/**
  * Collects the errors that the binding reports for a throwing host callback
  * during the running case. Bun and Deno define `reportError`, which their test
  * runners treat as an uncaught error. Node does not, so the binding rethrows

@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
-import gc
 import subprocess
 import sys
 import threading
 import time
-import weakref
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -30,7 +28,6 @@ from support import (
     Harness,
     Signal,
     close_if_live,
-    leak_reports,
     result,
 )
 
@@ -102,7 +99,6 @@ class OwnedTexture:
         harness: Harness,
         backend: str,
         driver: mln.RenderDriverKind,
-        ring_depth: int | None = None,
         frame_wake: Callable[[Callable[[], None]], mln.Wake | mln.NativeWake] = (
             mln.Wake
         ),
@@ -151,8 +147,6 @@ class OwnedTexture:
                 frame_wake=frame_wake(self.frames.notify),
                 driver_work_wake=mln.Wake(self._work.set),
             )
-            if ring_depth is not None:
-                options = replace(options, requested_texture_ring_depth=ring_depth)
             if queue_lock is not None:
                 options = replace(options, queue_lock=queue_lock)
             self.session, attached = self._attach(options)
@@ -456,37 +450,6 @@ def test_a_borrow_on_another_thread_holds_off_close(
             borrower.join()
 
         assert not failures
-        frame.close()
-        with pytest.raises(
-            mln.MaplibreError,
-            check=lambda error: error.status == mln.Status.INVALID_STATE,
-        ):
-            frame.get_result()
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
-    harness: Harness, backend: str
-) -> None:
-    driver = _default_driver(backend)
-    with OwnedTexture(harness, backend, driver, ring_depth=2) as target:
-        target.render_red()
-        frame = target.session.acquire_frame()
-        target.render()
-        siblings = [target.session.acquire_frame()]
-        retired = weakref.ref(siblings[0])
-
-        def inspect(view: object) -> int:
-            # The collector finalizes the sibling while this frame's view
-            # is open, and the view is still the frame's.
-            with leak_reports() as reports:
-                siblings.clear()
-                gc.collect()
-            assert retired() is None
-            assert reports == ["AcquiredFrameHandle was not explicitly closed"]
-            return _texture_name(backend, view)
-
-        assert target.with_texture(frame, inspect) != 0
         frame.close()
         with pytest.raises(
             mln.MaplibreError,

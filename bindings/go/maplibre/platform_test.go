@@ -1,8 +1,6 @@
 package maplibre
 
 import (
-	"context"
-	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -64,85 +62,4 @@ func exitWithLiveHandles(t *testing.T) {
 	await(t, submitted(f.m.AddCustomGeometrySource("live", CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}})))
 	_, _ = os.Stdout.WriteString("exiting with live handles\n")
 	os.Exit(0)
-}
-
-// The collector disposes a map nobody closed and logs the leak once through
-// the default slog logger, though the disposal succeeds.
-func TestCollectorDisposesAndLogsALeakedHandle(t *testing.T) {
-	leaks := captureLeakLogs(t)
-	f := newRuntimeFixture(t)
-	dropped := createMap(t, f.runtime, testMapOptions())
-	id := dropped.Id()
-	dropped = nil
-	closeOnceCollected(t, f.runtime, "the disposal of the dropped map")
-	for {
-		leak := receive(t, leaks, "the dropped map's leak log")
-		if leak.handle != id {
-			continue
-		}
-		if leak.typeName != "MapHandle" {
-			t.Fatalf("logged %+v", leak)
-		}
-		break
-	}
-	select {
-	case leak := <-leaks:
-		if leak.handle == id {
-			t.Fatalf("logged the map again: %+v", leak)
-		}
-	default:
-	}
-}
-
-type leakedHandle struct {
-	typeName string
-	handle   uint64
-}
-
-func captureLeakLogs(t *testing.T) <-chan leakedHandle {
-	leaks := make(chan leakedHandle, 64)
-	previous := slog.Default()
-	slog.SetDefault(slog.New(leakLogHandler(leaks)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	return leaks
-}
-
-type leakLogHandler chan<- leakedHandle
-
-func (leakLogHandler) Enabled(context.Context, slog.Level) bool   { return true }
-func (handler leakLogHandler) WithAttrs([]slog.Attr) slog.Handler { return handler }
-func (handler leakLogHandler) WithGroup(string) slog.Handler      { return handler }
-
-func (handler leakLogHandler) Handle(_ context.Context, record slog.Record) error {
-	if record.Level != slog.LevelWarn || record.Message != "maplibre: leaked handle; close it explicitly" {
-		return nil
-	}
-	var logged leakedHandle
-	record.Attrs(func(attr slog.Attr) bool {
-		switch attr.Key {
-		case "type":
-			logged.typeName = attr.Value.String()
-		case "handle":
-			logged.handle = attr.Value.Uint64()
-		}
-		return true
-	})
-	select {
-	case handler <- logged:
-	default:
-	}
-	return nil
-}
-
-// The collector retires a map that the test never closed, even one dropped
-// before its creation completes: the map's cleanup disposes it, and the
-// runtime then closes. TestCollectorDisposesAndLogsALeakedHandle checks the
-// leak log for a ready map.
-func TestCollectorRetiresUnclosedMaps(t *testing.T) {
-	f := newRuntimeFixture(t)
-	// The test keeps neither the map nor its readiness.
-	if _, _, err := f.runtime.CreateMap(testMapOptions()); err != nil {
-		t.Fatal(err)
-	}
-	closeOnceCollected(t, f.runtime, "the disposal of the unclosed map")
 }

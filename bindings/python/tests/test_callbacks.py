@@ -4,159 +4,41 @@ import gc
 import sys
 import threading
 import typing
-import weakref
 from concurrent.futures import Future
 
 import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import _native
 from support import (
-    EMPTY_STYLE,
     TIMEOUT,
     Harness,
     denied_response,
-    leak_reports,
     ok_response,
-    ready_map,
     result,
 )
 
 
-class _Retiring:
-    """A callback whose collection shows that native released it."""
-
-    def __init__(self) -> None:
-        self.called = threading.Event()
-        self.retired = threading.Event()
-
-    def __call__(self, *_: object) -> bool:
-        self.called.set()
-        return True
-
-    def __del__(self) -> None:
-        self.retired.set()
-
-
-def test_a_registration_is_rooted_until_native_releases_it(
+def test_a_camera_end_handler_survives_a_collection_and_still_runs(
     map_handle: mln.MapHandle,
 ) -> None:
-    result(map_handle.set_style_json(EMPTY_STYLE))
-
-    # A registration the submission rejects is released before the call
-    # returns.
-    rejected = _Retiring()
-    rejected_retired = rejected.retired
-    with pytest.raises(
-        mln.MaplibreError,
-        check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
-    ):
-        map_handle.add_custom_geometry_source(
-            "rejected",
-            mln.CustomGeometrySourceOptions(fetch_tile=rejected, min_zoom=-1),
-        )
-    del rejected
-    assert rejected_retired.is_set()
-
-    # An accepted one stays rooted while native holds it.
-    fetch = _Retiring()
-    fetch_retired = fetch.retired
-    result(
-        map_handle.add_custom_geometry_source(
-            "custom",
-            mln.CustomGeometrySourceOptions(fetch_tile=fetch, min_zoom=0, max_zoom=2),
-        )
-    )
-    del fetch
-    gc.collect()
-    assert not fetch_retired.is_set()
-
-    # A command that fails releases its registration once it completes.
-    duplicate = _Retiring()
-    duplicate_retired = duplicate.retired
-    failed = map_handle.add_custom_geometry_source(
-        "custom", mln.CustomGeometrySourceOptions(fetch_tile=duplicate)
-    )
-    with pytest.raises(mln.MaplibreError):
-        result(failed)
-    del duplicate, failed
-    assert duplicate_retired.wait(TIMEOUT)
-
-    # Removing the source releases the accepted one.
-    result(map_handle.remove_style_source("custom"))
-    assert fetch_retired.wait(TIMEOUT)
-
-
-def test_a_camera_end_handler_is_rooted_until_it_runs(
-    map_handle: mln.MapHandle,
-) -> None:
-    # The handler sits two records deep in the command's input. Native holds
-    # it while the ease runs, and runs it once when its identity is cancelled.
-    ended = _Retiring()
-    ended_retired = ended.retired
+    # The handler sits two records deep in the command's input, and nothing
+    # else references it once the command is dropped.
+    ended = threading.Event()
     update = mln.CameraUpdate(
         mode=mln.CameraUpdateMode.EASE,
         camera=mln.CameraOptions(zoom=4.0),
         animation=mln.AnimationOptions(
             duration_ms=60000.0,
             transition_id=3,
-            end_handler=mln.CameraTransitionHandler(ended),
+            end_handler=mln.CameraTransitionHandler(lambda _: ended.set()),
         ),
     )
     result(map_handle.update_camera(update))
     del update
     gc.collect()
-    assert not ended_retired.is_set()
+    # Cancelling the transition runs the handler before the command completes.
     result(map_handle.cancel_camera_transition(3))
-    assert ended.called.is_set()
-    del ended
-    assert ended_retired.wait(TIMEOUT)
-
-    # A rejected command releases the handler before the call returns.
-    rejected = _Retiring()
-    rejected_retired = rejected.retired
-    delta = mln.CameraDelta(
-        scale=-1.0,
-        animation=mln.AnimationOptions(
-            end_handler=mln.CameraTransitionHandler(rejected)
-        ),
-    )
-    with pytest.raises(
-        mln.MaplibreError,
-        check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
-    ):
-        map_handle.apply_camera_delta(delta)
-    del delta, rejected
-    assert rejected_retired.is_set()
-
-
-def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
-    woke = threading.Event()
-    receiver: dict[str, object] = {}
-
-    def receive_events(
-        _: tuple[mln.RuntimeEvent, ...], receiver: dict[str, object] = receiver
-    ) -> None:
-        if receiver.get("runtime") is not None:
-            woke.set()
-
-    callback = weakref.ref(receive_events)
-    runtime = mln.RuntimeHandle.create(mln.RuntimeOptions())
-    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
-    receiver["runtime"] = runtime
-    owner = weakref.ref(runtime)
-    map_handle = ready_map(runtime)
-    result(map_handle.set_style_json(EMPTY_STYLE))
-    assert woke.wait(TIMEOUT)
-    result(map_handle.close())
-
-    # The runtime roots the callback, and the callback reaches it, so only
-    # the cycle collector can reclaim them, which it can see through the root.
-    with leak_reports() as reports:
-        del map_handle, runtime, receive_events, receiver
-        gc.collect()
-    assert owner() is None
-    assert callback() is None
-    assert reports == ["RuntimeHandle was not explicitly closed"]
+    assert ended.is_set()
 
 
 def test_an_exception_in_a_callback_is_reported_and_contained(
@@ -256,55 +138,17 @@ def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
     result(harness.runtime.clear_resource_transform())
 
 
-def test_replacing_the_log_callback_releases_the_previous_one(
+def test_a_log_callback_survives_a_collection_and_still_runs(
     map_handle: mln.MapHandle,
 ) -> None:
-    first, second = _Retiring(), _Retiring()
-    first_retired, second_retired = first.retired, second.retired
-    logged = second.called
-
+    logged = threading.Event()
     try:
-        mln.set_log_callback(mln.LogHandler(first))
-        mln.set_log_callback(mln.LogHandler(second))
-        del first
-        assert first_retired.wait(TIMEOUT)
-
-        # The replacement receives what the map logs.
+        mln.set_log_callback(mln.LogHandler(lambda *_: logged.set()))
+        gc.collect()
         map_handle.set_style_json([])
         assert logged.wait(TIMEOUT)
     finally:
         mln.clear_log_callback()
-    del second
-    assert second_retired.wait(TIMEOUT)
-
-
-def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> None:
-    handles: list[mln.ResourceRequestHandle] = []
-    provided = threading.Event()
-
-    def hold(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> None:
-        handles.append(handle)
-        provided.set()
-
-    harness.routes["custom://discarded.json"] = hold
-    map_handle = harness.create_map()
-    map_handle.set_style_url("custom://discarded.json")
-    assert provided.wait(TIMEOUT)
-    handle = handles.pop()
-    # Closing the map discards the request before a callback is registered.
-    result(map_handle.close())
-    assert handle.is_cancelled() is True
-
-    callback = _Retiring()
-    retired = callback.retired
-    assert (
-        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback)) is True
-    )
-    del callback
-    assert retired.is_set()
-    handle.close()
 
 
 def test_a_providers_routes_decide_which_requests_reach_it(

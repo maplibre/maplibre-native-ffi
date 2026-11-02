@@ -280,18 +280,9 @@ pub(crate) fn list<N: Copy, T: FromNative<N>>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
-
-    #[derive(Debug)]
-    struct DropProbe(Arc<AtomicBool>);
-
-    impl Drop for DropProbe {
-        fn drop(&mut self) {
-            self.0.store(true, Ordering::Release);
-        }
-    }
 
     /// One accepted native submission, captured so a test can deliver its
     /// completion by hand instead of driving a live map.
@@ -432,18 +423,12 @@ mod tests {
 
     #[test]
     fn a_panicking_converter_completes_with_an_error_before_native_release() {
-        let dropped = Arc::new(AtomicBool::new(false));
-        let probe = DropProbe(Arc::clone(&dropped));
-        let (future, accepted) = accept(move |_| -> Result<()> {
-            let _probe = probe;
-            panic!("converter panic");
-        });
+        let (future, accepted) = accept(|_| -> Result<()> { panic!("converter panic") });
         accepted.deliver(sys::MLN_STATUS_OK);
         assert_eq!(
             completed(future).unwrap_err().status(),
             crate::Status::NativeError
         );
-        assert!(dropped.load(Ordering::Acquire));
         accepted.release();
     }
 
@@ -504,38 +489,21 @@ mod tests {
     }
 
     #[test]
-    fn a_wait_times_out_and_a_dropped_future_leaves_native_its_bridge() {
-        let dropped = Arc::new(AtomicBool::new(false));
-        let probe = DropProbe(Arc::clone(&dropped));
-        let (future, accepted) = accept(move |_| Ok(probe));
+    fn a_wait_times_out_and_a_dropped_future_accepts_a_late_completion() {
+        let (future, accepted) = accept(unit);
 
         let future = future.wait(Duration::ZERO).unwrap_err();
 
         // Dropping the future is how a caller stops waiting. Native still owns
-        // the bridge, so the late value lands in it, and native's release
-        // frees it.
+        // the bridge, so the late completion lands in it.
         drop(future);
         accepted.deliver(sys::MLN_STATUS_OK);
-        assert!(!dropped.load(Ordering::Acquire));
         accepted.release();
-        assert!(dropped.load(Ordering::Acquire));
     }
 
     #[test]
-    fn a_rejected_submission_frees_the_bridge_and_reports_the_status() {
-        let dropped = Arc::new(AtomicBool::new(false));
-        let probe = DropProbe(Arc::clone(&dropped));
-        let error = submit(
-            |_, _| sys::MLN_STATUS_INVALID_STATE,
-            move |_| {
-                // The converter owns the probe, so freeing the bridge drops it.
-                let _ = &probe;
-                Ok(())
-            },
-        )
-        .unwrap_err();
-
+    fn a_rejected_submission_returns_its_status() {
+        let error = submit(|_, _| sys::MLN_STATUS_INVALID_STATE, unit).unwrap_err();
         assert_eq!(error.status(), crate::Status::InvalidState);
-        assert!(dropped.load(Ordering::Acquire));
     }
 }

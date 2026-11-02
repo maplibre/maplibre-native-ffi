@@ -99,8 +99,8 @@ const liveWork: object[] = [];
 /**
  * Leaves native work live for the realm's end: a core-worker session in the
  * middle of frames, a provider request that was never answered, and callback
- * registrations of every delivery kind. PLAT-02 ends the process or the realm
- * right after it returns. Returns the session.
+ * registrations of every delivery kind. The process-exit test ends the process
+ * or the realm right after it returns. Returns the session.
  */
 export async function liveNativeWork(): Promise<RenderSessionHandle> {
   setLogCallback(() => {});

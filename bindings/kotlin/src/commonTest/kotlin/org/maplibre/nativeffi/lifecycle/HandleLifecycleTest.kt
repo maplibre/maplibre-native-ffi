@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.use as useAndClose
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
@@ -19,8 +20,8 @@ import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.use
@@ -163,16 +164,17 @@ class HandleLifecycleTest {
 
   @Test
   fun aMapKeepsItsRuntimeReachable() = runSuspendTest {
-    val (map, runtime) = mapWithUnreferencedRuntime()
+    val (map, weakRuntime) = mapWithUnreferencedRuntime()
+    var runtime: RuntimeHandle? = null
     try {
-      // Once the collector has reclaimed an unrelated object, it has run a full cycle, and the
-      // runtime is still reachable through its map.
-      assertTrue(awaitCollected(unreferencedObject()), "the collector never ran")
-      assertFalse(runtime.isCleared, "a live map let its runtime be collected")
-      map.setStyleJson(EMPTY_STYLE_JSON).await()
+      // Only the map references its runtime, so the runtime survives a collection and still works.
+      requestCollection()
+      runtime = assertNotNull(weakRuntime.value as RuntimeHandle?, "a live map let its runtime go")
+      runtime.clearResourceTransform().awaitWithin("a command on the runtime")
+      map.setStyleJson(EMPTY_STYLE_JSON).awaitWithin("a command on the map")
     } finally {
       map.release().awaitWithin("the map release")
-      (runtime.value as RuntimeHandle?)?.release()?.awaitWithin("the runtime release")
+      runtime?.release()?.awaitWithin("the runtime release")
     }
   }
 
@@ -181,8 +183,6 @@ class HandleLifecycleTest {
       return
     }
   }
-
-  private fun unreferencedObject(): TestWeakReference = TestWeakReference(Any())
 
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {

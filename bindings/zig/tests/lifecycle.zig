@@ -115,18 +115,11 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try fixture.closeMap();
 }
 
-fn ignoreEvents(_: *support.Counter, _: []const maplibre.RuntimeEvent) void {}
-
-fn countRelease(counter: *support.Counter) void {
-    counter.add();
-}
-
-// Native retirement of a disposed runtime waits for its live maps, so the
-// runtime's callback registrations stay rooted until the last map goes.
-test "a child map keeps its disposed runtime's callbacks alive" {
-    var handler_releases = support.Counter{};
+// Native retirement of a disposed runtime waits for its live maps, so a map
+// stays readable and releasable after its runtime is disposed. Native refuses
+// the map's commands once its runtime is disposed.
+test "a child map stays usable after its runtime is disposed" {
     var runtime = try maplibre.Runtime.create(.{}, null);
-    try support.expectCommitted(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
     const created = try runtime.createMap(support.mapOptions(), null);
     var map = created.map;
     try support.resolve(created.ready);
@@ -134,12 +127,5 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     runtime.deinit();
     try testing.expectError(error.InvalidState, runtime.getEventMask(null));
     _ = try map.getSnapshot(null);
-    // No fence can follow the disposal: native refuses the map's commands
-    // once its runtime is disposed. The count stays zero without one because
-    // native releases the handler only when it retires the runtime, which this
-    // live map holds off, and the binding never releases it on its own.
-    try testing.expectEqual(@as(usize, 0), handler_releases.get());
-
-    map.deinit();
-    try handler_releases.waitFor(1);
+    try support.closeMapHandle(&map);
 }

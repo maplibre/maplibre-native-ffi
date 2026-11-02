@@ -42,7 +42,7 @@ case "$preset" in
   *-webgpu) backend=webgpu ;;
   *) backend=opengl ;;
 esac
-# The collection cases force garbage collection, which V8 exposes behind a
+# A reachability case forces garbage collection, which V8 exposes behind a
 # flag.
 node "$MISE_MONOREPO_ROOT/scripts/run-browser-test.mjs" "$page/index.html" \
   --render-backend "$backend" --browser-arg --js-flags=--expose-gc \

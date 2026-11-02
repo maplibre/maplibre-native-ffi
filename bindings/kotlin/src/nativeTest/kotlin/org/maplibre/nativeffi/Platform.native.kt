@@ -8,8 +8,6 @@ package org.maplibre.nativeffi
 
 import kotlin.native.ref.WeakReference
 import kotlin.native.runtime.GC
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.alloc
@@ -64,19 +62,6 @@ internal actual class TestWeakReference actual constructor(value: Any) {
 
   actual val value: Any?
     get() = reference.value
-
-  actual val isCleared: Boolean
-    get() = reference.value == null
-}
-
-internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean {
-  // GC.collect() runs a full collection before it returns, so each round is a real result.
-  val deadline = TimeSource.Monotonic.markNow() + 10.seconds
-  while (deadline.hasNotPassedNow()) {
-    GC.collect()
-    if (reference.isCleared) return true
-  }
-  return reference.isCleared
 }
 
 internal actual suspend fun requestCollection() {

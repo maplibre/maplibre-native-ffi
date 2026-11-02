@@ -1,25 +1,14 @@
 package org.maplibre.nativeffi
 
-/** A weak reference that the garbage collector clears once nothing else reaches its value. */
+/** A weak reference, which lets a test reach an object without keeping it reachable. */
 internal expect class TestWeakReference(value: Any) {
   /** The value, or null once the collector has cleared it. */
   val value: Any?
-
-  val isCleared: Boolean
 }
 
 /**
- * Collects garbage until [reference] clears, and returns whether it did before the wait timeout.
- *
- * Each round blocks on the collector itself: a reference queue on the JVM and Android, or a
- * synchronous collection on Kotlin/Native. The browser clears a weak reference only after the task
- * that last read it, so on wasm each round yields to the page.
- */
-internal expect suspend fun awaitCollected(reference: TestWeakReference): Boolean
-
-/**
- * Asks the collector for a full collection, which queues the cleaners of unreachable handles. The
- * cleaners run on their own worker, so a caller still waits for what they do.
+ * Asks the collector for a full collection. The JVM may ignore the request, so a test asserts only
+ * what must hold whether or not anything was collected.
  */
 internal expect suspend fun requestCollection()
 

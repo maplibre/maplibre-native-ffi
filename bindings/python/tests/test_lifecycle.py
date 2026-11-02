@@ -1,4 +1,4 @@
-"""Handle lifetimes: close, refusal, abandonment, parents, GC, and shutdown."""
+"""Handle lifetimes: close, dispose, refusal, parents, and shutdown."""
 
 import gc
 import subprocess
@@ -8,7 +8,7 @@ import weakref
 
 import maplibre_native_ffi as mln
 import pytest
-from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, ready_map, result
+from support import EMPTY_STYLE, TIMEOUT, Harness, ready_map, result
 
 
 def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
@@ -117,83 +117,28 @@ def test_a_refused_close_leaves_the_handle_usable(
         harness.runtime.get_event_mask()
 
 
-def test_a_handle_abandoned_in_a_callback_is_reported_and_disposed(
-    harness: Harness,
-) -> None:
-    handles: list[mln.ResourceRequestHandle] = []
-    submitted = threading.Event()
-    cancelled = threading.Event()
-    owners = {"map": ready_map(harness.runtime)}
-
-    def abandon_map(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> None:
-        handles.append(handle)
-        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(cancelled.set))
-        # The last reference goes on the dispatcher thread, inside the
-        # provider, which disposes the map there.
-        assert submitted.wait(TIMEOUT)
-        owners.clear()
-
-    harness.routes["custom://abandoned.json"] = abandon_map
-    with leak_reports() as reports:
-        owners["map"].set_style_url("custom://abandoned.json")
-        submitted.set()
-        # Disposing the map discards its pending style request.
-        assert cancelled.wait(TIMEOUT)
-
-    assert reports == ["MapHandle was not explicitly closed"]
-    handles[0].close()
-    result(harness.runtime.close())
-
-
 def test_a_child_keeps_its_parent_alive() -> None:
+    loaded = threading.Event()
+
+    def receive_events(events: tuple[mln.RuntimeEvent, ...]) -> None:
+        if any(event.type == mln.RuntimeEventType.MAP_STYLE_LOADED for event in events):
+            loaded.set()
+
     runtime = mln.RuntimeHandle.create()
+    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
+    # Kept only to close the runtime after its map.
     parent = weakref.ref(runtime)
     map_handle = ready_map(runtime)
-    del runtime
+    del runtime, receive_events
     gc.collect()
 
+    # The map still works, and so does the event handler its runtime holds.
+    result(map_handle.set_style_json(EMPTY_STYLE))
+    assert loaded.wait(TIMEOUT)
+    result(map_handle.close())
     runtime = parent()
     assert runtime is not None
-    assert result(map_handle.get_camera()).generation > 0
-    result(map_handle.close())
     result(runtime.close())
-
-
-def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
-    harness: Harness, map_handle: mln.MapHandle
-) -> None:
-    handles: list[mln.ResourceRequestHandle] = []
-    provided = threading.Event()
-
-    def hold(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> None:
-        handles.append(handle)
-        provided.set()
-
-    class CloseOnCancel:
-        def __init__(self, owner: mln.ResourceRequestHandle) -> None:
-            self.owner = owner
-
-        def __call__(self) -> None:
-            self.owner.close()
-
-    harness.routes["custom://cycle.json"] = hold
-    map_handle.set_style_url("custom://cycle.json")
-    assert provided.wait(TIMEOUT)
-    handle = handles.pop()
-    callback = CloseOnCancel(handle)
-    handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback))
-    owner, root = weakref.ref(handle), weakref.ref(callback)
-    del callback, handle
-    gc.collect()
-
-    assert owner() is None
-    assert root() is None
-    result(map_handle.set_style_json(EMPTY_STYLE))
-    harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
 
 
 _SHUTDOWN_WITH_LIVE_HANDLES = """

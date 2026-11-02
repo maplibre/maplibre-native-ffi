@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
@@ -26,21 +27,12 @@ class CameraEndHandlerTest {
       val roots = map.bindingCallbacks
       val base = roots.rootCountForTesting()
       val ended = CompletableDeferred<CameraTransitionEnd>()
-      val update =
-        CameraUpdate(
-          mode = CameraUpdateMode.EASE,
-          camera = CameraOptions(zoom = 4.0),
-          animation =
-            AnimationOptions(
-              durationMs = 60000.0,
-              transitionId = ULong.MAX_VALUE,
-              endHandler = CameraTransitionHandler { ended.complete(it) },
-            ),
-        )
-      map.updateCamera(update).await()
+      map.updateCamera(endingEase(ended)).await()
       assertEquals(base + 1, roots.rootCountForTesting())
 
-      // Native runs the handler once, and releases it, when the identity is cancelled.
+      // Only the root holds the handler, so it survives a collection. Native runs it once, and
+      // releases it, when the identity is cancelled.
+      requestCollection()
       map.cancelCameraTransition(ULong.MAX_VALUE).await()
       val end = ended.awaitWithin("the end handler")
       assertEquals(CameraTransitionOutcome.CANCELLED, end.outcome)
@@ -59,4 +51,17 @@ class CameraEndHandlerTest {
       assertEquals(base, roots.rootCountForTesting())
     }
   }
+
+  /** A long ease whose end handler completes [ended], built here so the test keeps no reference. */
+  private fun endingEase(ended: CompletableDeferred<CameraTransitionEnd>) =
+    CameraUpdate(
+      mode = CameraUpdateMode.EASE,
+      camera = CameraOptions(zoom = 4.0),
+      animation =
+        AnimationOptions(
+          durationMs = 60000.0,
+          transitionId = ULong.MAX_VALUE,
+          endHandler = CameraTransitionHandler { ended.complete(it) },
+        ),
+    )
 }

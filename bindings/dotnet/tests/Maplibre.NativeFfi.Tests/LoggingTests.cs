@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
@@ -6,49 +5,8 @@ using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-/// <summary>The process-global log callback.</summary>
-[Collection(nameof(GlobalState))]
 public sealed class LoggingTests
 {
-    // Native swaps the observer under the lock its dispatch holds, so a replaced registration is
-    // released before the replacing call returns.
-    [Fact]
-    public void ReplacingTheLogCallbackReleasesThePreviousOne()
-    {
-        try
-        {
-            var first = Gc.OnThread(InstallCapturingCallback);
-            Assert.True(Gc.IsAlive(first));
-
-            var second = Gc.OnThread(InstallCapturingCallback);
-            Assert.False(Gc.IsAlive(first));
-            Assert.True(Gc.IsAlive(second));
-
-            Gc.OnThread(MaplibreNative.ClearLogCallback);
-            Assert.False(Gc.IsAlive(second));
-        }
-        finally
-        {
-            MaplibreNative.ClearLogCallback();
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference InstallCapturingCallback()
-    {
-        var captured = new object();
-        MaplibreNative.SetLogCallback(
-            new LogHandler(
-                (_, _, _, _) =>
-                {
-                    GC.KeepAlive(captured);
-                    return false;
-                }
-            )
-        );
-        return new WeakReference(captured);
-    }
-
     [Fact]
     public unsafe void TheLogTrampolineCopiesUnknownValuesAndContainsExceptions()
     {

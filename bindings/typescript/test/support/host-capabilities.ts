@@ -129,7 +129,6 @@ function runtimeCommand(script: string, args: readonly string[]) {
         "--allow-ffi",
         "--allow-read",
         "--allow-env",
-        "--v8-flags=--expose-gc",
         script,
         ...args,
       ],
@@ -137,7 +136,7 @@ function runtimeCommand(script: string, args: readonly string[]) {
   }
   // A Bun script outside any node_modules installs a package it cannot
   // resolve from the registry, which would find the published backends.
-  const flags = host === "node" ? ["--expose-gc"] : ["--no-install"];
+  const flags = host === "bun" ? ["--no-install"] : [];
   return {
     command: process.execPath,
     args: [...flags, script, ...args],

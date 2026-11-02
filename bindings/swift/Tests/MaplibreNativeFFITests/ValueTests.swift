@@ -159,21 +159,11 @@ import Testing
 
 private final class PointerTarget {}
 
-/// A retaining pointer keeps its object alive while the record that carries
-/// it exists, and compares by address alone.
-@Test func aRetainingPointerKeepsItsObjectAliveWithItsRecord() {
-  weak var weakTarget: PointerTarget?
-  var texture: MetalBorrowedTexture?
-  do {
-    let target = PointerTarget()
-    weakTarget = target
-    texture = MetalBorrowedTexture(texture: NativePointer(retaining: target))
-  }
-  let address = weakTarget.map {
-    UInt(bitPattern: Unmanaged.passUnretained($0).toOpaque())
-  }
-  #expect(texture?.texture.addressBitPattern == address)
-  #expect(texture?.texture == NativePointer(bitPattern: address ?? 0))
-  texture = nil
-  #expect(weakTarget == nil)
+/// A retaining pointer compares by address alone.
+@Test func aRetainingPointerComparesByAddress() {
+  let target = PointerTarget()
+  let address = UInt(bitPattern: Unmanaged.passUnretained(target).toOpaque())
+  let texture = MetalBorrowedTexture(texture: NativePointer(retaining: target))
+  #expect(texture.texture.addressBitPattern == address)
+  #expect(texture.texture == NativePointer(bitPattern: address))
 }

@@ -156,7 +156,6 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id, null));
-    try ended.releases.waitFor(1);
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
     try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
 }

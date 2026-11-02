@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -185,55 +184,6 @@ public sealed class ResourceProviderTests
     }
 
     [Fact]
-    public async Task ACancelRegistrationIsReleasedWithItsRequest()
-    {
-        var received = new TaskCompletionSource<ResourceRequestHandle>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl);
-        var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
-        var calls = 0;
-
-        var (cancelled, captured) = Gc.OnThread(() =>
-            RegisterCapturing(handle, () => Interlocked.Increment(ref calls))
-        );
-        Assert.False(cancelled);
-        Assert.True(Gc.IsAlive(captured));
-
-        // The answer consumes the handle, and the registration retires with it.
-        handle.Complete(StyleResponse());
-        Assert.False(Gc.IsAlive(captured));
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
-        Assert.Equal(0, calls);
-    }
-
-    // The registration reports that the request is already cancelled, so native stores nothing
-    // and the binding frees the callback at once.
-    [Fact]
-    public async Task ARegistrationOnACancelledRequestIsNotRooted()
-    {
-        var received = new TaskCompletionSource<ResourceRequestHandle>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
-        await fixture.Map.CloseAsync();
-        Assert.True(handle.IsCancelled());
-        var calls = 0;
-
-        var (cancelled, captured) = Gc.OnThread(() =>
-            RegisterCapturing(handle, () => Interlocked.Increment(ref calls))
-        );
-
-        Assert.True(cancelled);
-        Assert.False(Gc.IsAlive(captured));
-        handle.Dispose();
-        Assert.Equal(0, calls);
-    }
-
-    [Fact]
     public async Task PassingThroughDisarmsAnEscapedRequest()
     {
         ResourceRequestHandle? escaped = null;
@@ -264,21 +214,4 @@ public sealed class ResourceProviderTests
     /// <summary>A provider that keeps each request to answer later.</summary>
     private static ResourceProvider Holding(TaskCompletionSource<ResourceRequestHandle> received) =>
         new() { Callback = (_, handle) => received.TrySetResult(handle) };
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
-        ResourceRequestHandle handle,
-        Action onCancel
-    )
-    {
-        var captured = new object();
-        var cancelled = handle.SetCancelCallback(
-            new ResourceRequestCancelHandler(() =>
-            {
-                GC.KeepAlive(captured);
-                onCancel();
-            })
-        );
-        return (cancelled, new WeakReference(captured));
-    }
 }

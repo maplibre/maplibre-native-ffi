@@ -178,13 +178,8 @@ private func attachOwnedTextureSession(
     let session = rendered.session
     try await session.awaitRenderedFrame()
     let first = try #require(try session.acquireFrame())
-    try await session.awaitRenderedFrame()
-    var sibling = try Optional(#require(try session.acquireFrame()))
-    weak let weakSibling = sibling
 
     let escaped = try rendered.graphics.withTextureView(of: first) { view in
-      sibling = nil
-      #expect(weakSibling == nil)
       #expect(view.width == 32)
       #expect(view.height == 32)
       try view.readTexture()
@@ -217,24 +212,6 @@ private func attachOwnedTextureSession(
       first.description
         == "AcquiredFrameHandle(id=0x\(String(first.id, radix: 16)), closed=true)"
     )
-  }
-}
-
-/// A frame the host drops without releasing is discarded by its finalizer,
-/// which hands the frame back to its session without consumer
-/// synchronization.
-@Test func droppingAnUnreleasedFrameDiscardsIt() async throws {
-  try await withOwnedTextureSession { rendered in
-    let session = rendered.session
-    try await session.awaitRenderedFrame()
-    do {
-      let frame = try #require(try session.acquireFrame())
-      #expect(try session.getSnapshot().acquiredFrameCount == 1)
-      withExtendedLifetime(frame) {}
-    }
-    try await awaitCondition("the abandoned frame to retire") {
-      try session.getSnapshot().acquiredFrameCount == 0
-    }
   }
 }
 

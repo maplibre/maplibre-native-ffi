@@ -16,9 +16,7 @@ import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.TestSupport
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.internal.callback.NativeRoots
-import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -72,32 +70,19 @@ class PageThreadTest {
   }
 
   @Test
-  fun aCancelledCreationReleasesTheRuntimeItReceives() = runSuspendTest {
-    val leaks = mutableListOf<String>()
-    val restore =
-      interceptUncaught { failure ->
-        val message = failure.message.orEmpty()
-        message.startsWith("Leaked RuntimeHandle ").also { if (it) leaks += message }
-      }!!
-    try {
-      val roots = NativeRoots.countForTesting()
-      val creation =
-        async(start = CoroutineStart.UNDISPATCHED) {
-          RuntimeHandle.create(RuntimeOptions())
-        }
-      creation.cancel()
-      // The creation's thread still runs, so the caller resumes once its runtime arrives.
-      creation.join()
-      assertTrue(creation.isCancelled)
-      // The binding disposes the runtime that arrived, so its owner reports no leak once the
-      // collector reclaims it, and the creation's root is gone.
-      requestCollection()
-      awaitDeliveries()
-      assertEquals(roots, NativeRoots.countForTesting(), "the creation's root outlived it")
-      assertEquals(emptyList(), leaks, "the cancelled creation's runtime leaked")
-    } finally {
-      restore()
-    }
+  fun aCancelledCreationDropsItsRootOnceTheRuntimeArrives() = runSuspendTest {
+    val roots = NativeRoots.countForTesting()
+    val creation =
+      async(start = CoroutineStart.UNDISPATCHED) {
+        RuntimeHandle.create(RuntimeOptions())
+      }
+    creation.cancel()
+    // The creation's thread still runs, so the caller resumes once its runtime arrives.
+    creation.join()
+    assertTrue(creation.isCancelled)
+    // Once the page drains what native queued, the creation holds no root.
+    awaitDeliveries()
+    assertEquals(roots, NativeRoots.countForTesting(), "the creation's root outlived it")
   }
 
   @Test

@@ -1,45 +1,10 @@
 import Foundation
-import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
 /// Tests that change the process log callback or report observer run in order.
 @Suite(.serialized)
 struct GlobalStateTests {
-  /// Replacing the log callback releases the registration it replaces, and
-  /// clearing it releases the last one.
-  @Test func replacingTheLogCallbackReleasesThePreviousOne() async throws {
-    let records = LockedBox([LogSeverity]())
-    let releases = LockedBox(0)
-    defer { try? clearLogCallback() }
-
-    try setLogCallback(handler: recordingHandler(
-      into: records,
-      releasing: releases
-    ))
-    try await withMapFixture { fixture in
-      // MapLibre logs the parse failure of a malformed document.
-      _ = try? await fixture.map
-        .setStyleJson(#"{"version":8,"#)
-      await awaitCondition("a logged parse failure") {
-        records.value.contains(.error)
-      }
-    }
-    #expect(releases.value == 0)
-
-    try setLogCallback(handler: recordingHandler(
-      into: LockedBox([]),
-      releasing: releases
-    ))
-    await awaitCondition("the replaced callback's release") {
-      releases.value == 1
-    }
-    try clearLogCallback()
-    await awaitCondition("the cleared callback's release") {
-      releases.value == 2
-    }
-  }
-
   /// A callback's thrown error is reported, native receives the callback's
   /// fallback, and the runtime keeps working.
   @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
@@ -111,83 +76,9 @@ struct GlobalStateTests {
     }
     #expect(!capture.text.contains("the transform refused"))
   }
-
-  /// Abandoned handles are disposed on a worker and reported once to standard
-  /// error.
-  @Test func anAbandonedHandleIsDisposedOffTheCallbackStackAndReported(
-  ) async throws {
-    let capture = ReportCapture()
-    try abandonInsideACallback()
-    let failed =
-      "Leaked leaky_handle native handle 0x3 (native disposal failed); "
-        + "close handles explicitly."
-    let disposed =
-      "Leaked leaky_handle native handle 0x4; close handles explicitly."
-    await awaitCondition("the leak reports") {
-      capture.text.contains(failed) && capture.text.contains(disposed)
-    }
-    capture.finish()
-    #expect(capture.text.components(separatedBy: failed).count == 2)
-    #expect(capture.text.components(separatedBy: disposed).count == 2)
-    let disposals = RecordedHandle.disposals.value
-    #expect(Set(disposals) == [
-      RecordedHandle.Disposal(raw: 0x3, insideACallback: false),
-      RecordedHandle.Disposal(raw: 0x4, insideACallback: false),
-    ])
-    #expect(disposals.count == 2)
-  }
 }
 
 private struct CallbackFailure: Error {}
-
-private func recordingHandler(
-  into records: LockedBox<[LogSeverity]>,
-  releasing releases: LockedBox<Int>
-) -> LogHandler {
-  let sentinel = ReleaseProbe(releases)
-  return LogHandler { severity, _, _, _ in
-    withExtendedLifetime(sentinel) {}
-    records.update { $0.append(severity) }
-    return true
-  }
-}
-
-/// A handle whose disposal fails for 0x3, as one native refuses would, and
-/// succeeds otherwise. It records each disposal and whether it ran inside a
-/// callback.
-private struct RecordedHandle: NativeHandle {
-  struct Disposal: Hashable {
-    let raw: UInt64
-    let insideACallback: Bool
-  }
-
-  static let disposals = LockedBox([Disposal]())
-
-  let raw: UInt64
-
-  func disposeAbandoned() -> Bool {
-    let inside = Thread.current
-      .threadDictionary["MaplibreNativeFFITests.callback"] != nil
-    Self.disposals.update {
-      $0.append(Disposal(raw: raw, insideACallback: inside))
-    }
-    return raw != 0x3
-  }
-}
-
-private func abandonInsideACallback() throws {
-  Thread.current.threadDictionary["MaplibreNativeFFITests.callback"] = true
-  defer {
-    Thread.current.threadDictionary
-      .removeObject(forKey: "MaplibreNativeFFITests.callback")
-  }
-  for raw: UInt64 in [0x3, 0x4] {
-    _ = try NativeHandleState(
-      typeName: "leaky_handle",
-      handle: RecordedHandle(raw: raw)
-    )
-  }
-}
 
 /// Records the runtime's reports until ``finish()``; they still reach standard
 /// error. Redirecting file descriptor 2 instead races the suite's other

@@ -31,6 +31,7 @@ import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.interceptUncaught
+import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
 import org.maplibre.nativeffi.withMap
@@ -64,6 +65,26 @@ class ResourceCallbackTest {
       awaitDeliveries()
       assertEquals(0, request.bindingCallbacks.rootCountForTesting())
       assertEquals(0, cancels.load())
+    }
+  }
+
+  @Test
+  fun aCancelCallbackSurvivesACollectionAndRunsWhenNativeCancels() = runSuspendTest {
+    val claimed = CompletableDeferred<ResourceRequestHandle>()
+    withMap(provider = claimingProvider(STYLE_URL, claimed)) {
+      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      val request = claimed.awaitWithin("the provider to claim the request")
+      try {
+        val cancelled = CompletableDeferred<Unit>()
+        assertFalse(registerCancel(request, cancelled))
+        // Only the root holds the callback, so it survives a collection. Releasing the map cancels
+        // its pending request, and native runs the callback.
+        requestCollection()
+        map.release().awaitWithin("the map release")
+        cancelled.awaitWithin("the cancel callback")
+      } finally {
+        request.close()
+      }
     }
   }
 
@@ -217,6 +238,10 @@ class ResourceCallbackTest {
   }
 
   /** Claims the request for [url] without answering it, and hands it to [claimed]. */
+  // A function of its own, so the test keeps no reference to the callback.
+  private fun registerCancel(request: ResourceRequestHandle, cancelled: CompletableDeferred<Unit>) =
+    request.setCancelCallback(ResourceRequestCancelHandler { cancelled.complete(Unit) })
+
   private fun claimingProvider(url: String, claimed: CompletableDeferred<ResourceRequestHandle>) =
     denyingProvider { request, handle ->
       if (request.requestedUrl != url) return@denyingProvider false

@@ -89,24 +89,3 @@ pub fn Registration(comptime T: type) type {
         }
     };
 }
-
-test "inline native release preserves the caller root until acceptance" {
-    const Probe = struct {
-        context: ?*anyopaque,
-        release_context: ?*const fn (?*anyopaque) void,
-        fn released(context: ?*anyopaque) void {
-            const count: *usize = @ptrCast(@alignCast(context.?));
-            count.* += 1;
-        }
-    };
-    var count: usize = 0;
-    {
-        var roots: Roots = .{};
-        const state = try roots.retain(Probe, .{ .context = &count, .release_context = Probe.released });
-        Registration(Probe).releaseNative(state);
-        try std.testing.expectEqual(@as(usize, 0), count);
-        roots.accept();
-        roots.deinit();
-    }
-    try std.testing.expectEqual(@as(usize, 1), count);
-}

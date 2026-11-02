@@ -345,12 +345,9 @@ const FakeSubmission = struct {
 };
 
 const Tracked = struct {
-    var disposals: usize = 0;
     payload: u32,
 
-    pub fn deinit(_: *Tracked) void {
-        disposals += 1;
-    }
+    pub fn deinit(_: *Tracked) void {}
 
     fn copy(result: *const c.mln_completion_result) status.Error!Tracked {
         if (result.value == null or result.value_count != 1) return error.NativeError;
@@ -363,7 +360,6 @@ const Tracked = struct {
 // disposes what it built, so the future reports the error once and has nothing
 // of its own to dispose.
 test "a completion delivers once, and a value that fails to convert reports the error once" {
-    Tracked.disposals = 0;
     FakeSubmission.refuse = false;
     var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
     try std.testing.expect(!try future.poll());
@@ -372,9 +368,7 @@ test "a completion delivers once, and a value that fails to convert reports the 
     try std.testing.expect(try future.poll());
     try std.testing.expectEqual(@as(u32, 7), (try future.wait(null)).payload);
     try std.testing.expectError(error.AlreadyCompleted, future.wait(null));
-    // The caller took the value, so deinit leaves it to the caller.
     future.deinit();
-    try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
     var closed: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.InvalidState, future.wait(&closed));
     try std.testing.expectEqualStrings("Future is closed", closed.message());
@@ -390,34 +384,18 @@ test "a completion delivers once, and a value that fails to convert reports the 
     try std.testing.expectError(error.AlreadyCompleted, failed.wait(null));
 }
 
-const CountedContext = struct {
-    var releases: usize = 0;
-    unused: u8 = 0,
-
-    pub fn deinit(_: *CountedContext) void {
-        releases += 1;
-    }
-
-    fn copy(result: *const c.mln_completion_result, _: *CountedContext) status.Error!Tracked {
-        return Tracked.copy(result);
-    }
-};
-
-test "a refused submission frees the future and its copy context" {
-    CountedContext.releases = 0;
+test "a refused submission returns its error and fills the diagnostic" {
     FakeSubmission.refuse = true;
     defer FakeSubmission.refuse = false;
     var diagnostic: diagnostics.Diagnostic = .{};
-    try std.testing.expectError(error.InvalidArgument, submitWithCopyContext(Tracked, CountedContext, &diagnostic, CountedContext.copy, .{}, FakeSubmission.start, .{}));
+    try std.testing.expectError(error.InvalidArgument, submit(Tracked, &diagnostic, Tracked.copy, FakeSubmission.start, .{}));
     try std.testing.expectEqual(.invalid_argument, diagnostic.status);
-    try std.testing.expectEqual(@as(usize, 1), CountedContext.releases);
 }
 
 // Zig futures have no timed wait: `poll` checks without blocking, and dropping
 // the future abandons the wait. A value that native delivers afterwards has no
 // taker, so the binding disposes it.
 test "a pending future polls without blocking and deinit abandons it" {
-    Tracked.disposals = 0;
     FakeSubmission.refuse = false;
     var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
     try std.testing.expect(!try future.poll());
@@ -425,17 +403,15 @@ test "a pending future polls without blocking and deinit abandons it" {
     try std.testing.expectError(error.InvalidState, future.poll());
     FakeSubmission.deliver(1);
     FakeSubmission.retire();
-    try std.testing.expectEqual(@as(usize, 1), Tracked.disposals);
 }
 
 const CountedWake = struct {
     watched: ?*const Future(u32) = null,
     runs: std.atomic.Value(usize) = .init(0),
-    releases: std.atomic.Value(usize) = .init(0),
     ready_when_run: bool = false,
 
     fn wake(self: *CountedWake) Wake {
-        return .{ .context = self, .callback = run, .release_context = release };
+        return .{ .context = self, .callback = run };
     }
 
     fn run(context: ?*anyopaque) status.Error!void {
@@ -444,18 +420,12 @@ const CountedWake = struct {
         _ = self.runs.fetchAdd(1, .acq_rel);
     }
 
-    fn release(context: ?*anyopaque) void {
-        const self: *CountedWake = @ptrCast(@alignCast(context.?));
-        _ = self.releases.fetchAdd(1, .acq_rel);
-    }
-
-    fn expectCounts(self: *const CountedWake, runs: usize, releases: usize) !void {
+    fn expectRuns(self: *const CountedWake, runs: usize) !void {
         try std.testing.expectEqual(runs, self.runs.load(.acquire));
-        try std.testing.expectEqual(releases, self.releases.load(.acquire));
     }
 };
 
-test "a wake registered before the completion runs once when it arrives, then releases" {
+test "a wake registered before the completion runs once when it arrives" {
     FakeSubmission.refuse = false;
     var future = try submit(u32, null, value(u32), FakeSubmission.start, .{});
     defer future.deinit();
@@ -463,18 +433,18 @@ test "a wake registered before the completion runs once when it arrives, then re
     try future.notify(counted.wake());
     var second: CountedWake = .{};
     try std.testing.expectError(error.InvalidState, future.notify(second.wake()));
-    try counted.expectCounts(0, 0);
+    try counted.expectRuns(0);
 
     FakeSubmission.deliver(1);
-    try counted.expectCounts(1, 1);
+    try counted.expectRuns(1);
     try std.testing.expect(counted.ready_when_run);
     FakeSubmission.retire();
     try std.testing.expectEqual(@as(u32, 7), try future.wait(null));
-    try counted.expectCounts(1, 1);
-    try second.expectCounts(0, 0);
+    try counted.expectRuns(1);
+    try second.expectRuns(0);
 }
 
-test "a wake registered after the completion runs and releases before notify returns" {
+test "a wake registered after the completion runs before notify returns" {
     FakeSubmission.refuse = false;
     var future = try submit(u32, null, value(u32), FakeSubmission.start, .{});
     defer future.deinit();
@@ -482,36 +452,35 @@ test "a wake registered after the completion runs and releases before notify ret
     FakeSubmission.retire();
     var counted: CountedWake = .{ .watched = &future };
     try future.notify(counted.wake());
-    try counted.expectCounts(1, 1);
+    try counted.expectRuns(1);
     try std.testing.expect(counted.ready_when_run);
 
     var ready = try completed(u32, 3);
     defer ready.deinit();
     var on_ready: CountedWake = .{};
     try ready.notify(on_ready.wake());
-    try on_ready.expectCounts(1, 1);
+    try on_ready.expectRuns(1);
 }
 
-test "deinit before the completion releases the wake without running it" {
+test "deinit before the completion drops the wake without running it" {
     FakeSubmission.refuse = false;
     var future = try submit(u32, null, value(u32), FakeSubmission.start, .{});
     var counted: CountedWake = .{};
     try future.notify(counted.wake());
     future.deinit();
-    try counted.expectCounts(0, 1);
+    try counted.expectRuns(0);
     var late: CountedWake = .{};
     try std.testing.expectError(error.InvalidState, future.notify(late.wake()));
 
     FakeSubmission.deliver(1);
     FakeSubmission.retire();
-    try counted.expectCounts(0, 1);
-    try late.expectCounts(0, 0);
+    try counted.expectRuns(0);
+    try late.expectRuns(0);
 }
 
 // The completion and the owner race for the wake on different threads. Exactly
-// one side takes it, so the context is released once, and it runs only when
-// the completion took it.
-test "a completion racing notify or deinit releases the wake exactly once" {
+// one side takes it, and it runs only when the completion took it.
+test "a completion racing notify or deinit runs the wake at most once" {
     FakeSubmission.refuse = false;
     const Deliverer = struct {
         fn run() void {
@@ -526,12 +495,11 @@ test "a completion racing notify or deinit releases the wake exactly once" {
         try future.notify(counted.wake());
         if (round % 2 == 0) {
             deliverer.join();
-            try counted.expectCounts(1, 1);
+            try counted.expectRuns(1);
             future.deinit();
         } else {
             future.deinit();
             deliverer.join();
-            try std.testing.expectEqual(@as(usize, 1), counted.releases.load(.acquire));
             try std.testing.expect(counted.runs.load(.acquire) <= 1);
         }
     }

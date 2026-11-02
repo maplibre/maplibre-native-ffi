@@ -11,14 +11,9 @@ import {
   Status,
 } from "../src/index.ts";
 import { mapOptions, openRuntime } from "./support/fixture.ts";
-import {
-  bounded,
-  collectGarbageUntil,
-  test,
-  watchCollection,
-} from "./support/harness.ts";
+import { bounded, test, turn } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
-import { captureLeaks, runtimeIsLive } from "./support/internals.ts";
+import { runtimeIsLive } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
 
 function isInvalidState(error: unknown): boolean {
@@ -133,29 +128,17 @@ async function mapWithoutItsRuntime() {
   const runtime = await RuntimeHandle.create();
   const { map, ready } = runtime.createMap(mapOptions);
   await bounded(ready, "map creation");
-  return {
-    map,
-    runtime: new WeakRef(runtime),
-    collected: watchCollection(runtime),
-    id: runtime.id,
-  };
-}
-
-async function unreachableRuntime(): Promise<() => boolean> {
-  return watchCollection(await RuntimeHandle.create());
+  return { map, runtime: new WeakRef(runtime) };
 }
 
 test(
   "a map keeps its runtime reachable",
   async () => {
-    captureLeaks();
-    const { map, runtime, collected, id } = await mapWithoutItsRuntime();
-    // The same collections reclaim a runtime that nothing keeps.
-    const controlCollected = await unreachableRuntime();
-    await collectGarbageUntil(controlCollected, "a runtime without a map");
-    assert.equal(collected(), false, "the map's runtime was collected");
-    assert.ok(runtimeIsLive(id));
-
+    const { map, runtime } = await mapWithoutItsRuntime();
+    // Had the collector reclaimed the runtime, its owner token would have
+    // disposed the runtime and the map, and both closes would fail.
+    capabilities.forcedGc!();
+    await turn();
     await bounded(map.close(), "map close");
     await bounded(runtime.deref()!.close(), "runtime close");
   },

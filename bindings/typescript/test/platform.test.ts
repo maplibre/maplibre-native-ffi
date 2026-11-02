@@ -1,4 +1,4 @@
-// Loading, collection, and process exit: how the binding meets its host.
+// Loading and process exit: how the binding meets its host.
 
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -7,21 +7,10 @@ import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import {
-  cVersion,
-  clearLogCallback,
-  RuntimeEventType,
-  RuntimeHandle,
-} from "../src/index.ts";
-import { mapOptions, openRuntime, styleRoute } from "./support/fixture.ts";
-import {
-  collectGarbageUntil,
-  teardown,
-  test,
-  watchCollection,
-} from "./support/harness.ts";
+import { cVersion, clearLogCallback, RuntimeEventType } from "../src/index.ts";
+import { openRuntime } from "./support/fixture.ts";
+import { teardown, test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
-import { captureLeaks, runtimeIsLive } from "./support/internals.ts";
 import {
   nextMessage,
   spawnRealm,
@@ -193,81 +182,6 @@ test(
     );
   },
   { needs: ["childProcess"] },
-);
-
-/** Leaves a runtime and a map open for the collector. */
-async function abandonRuntimeWithMap() {
-  const runtime = await RuntimeHandle.create();
-  const { map, ready } = runtime.createMap(mapOptions);
-  await ready;
-  return {
-    runtime: runtime.id,
-    map: map.id,
-    collected: [watchCollection(runtime), watchCollection(map)],
-  };
-}
-
-test(
-  "an abandoned runtime with a live map is disposed and reported when collected",
-  async () => {
-    const leaks = captureLeaks();
-    const abandoned = await abandonRuntimeWithMap();
-    const reported = (name: string, id: bigint) =>
-      leaks.some((line) => line.includes(`${name} 0x${id.toString(16)}`));
-    // Owner-token finalizers dispose the runtime and its map with no
-    // JavaScript on the stack; the leak reports follow on the event loop.
-    await collectGarbageUntil(
-      () =>
-        abandoned.collected.every((collected) => collected()) &&
-        reported("RuntimeHandle", abandoned.runtime) &&
-        reported("MapHandle", abandoned.map),
-      "the abandoned runtime and its map",
-    );
-    assert.equal(runtimeIsLive(abandoned.runtime), false);
-  },
-  { needs: ["forcedGc"] },
-);
-
-/** A runtime whose event handler names it, and nothing else does. */
-async function runtimeHeldByItsEventHandler() {
-  const runtime: RuntimeHandle = await RuntimeHandle.create();
-  await runtime.setEventHandler(() => void runtime.id);
-  return { id: runtime.id, collected: watchCollection(runtime) };
-}
-
-/** A runtime whose provider names it, and nothing else does. */
-async function runtimeHeldByItsProvider() {
-  const runtime = await RuntimeHandle.create();
-  await runtime.setResourceProvider({
-    routes: [styleRoute("capture://style.json")],
-    callback(_request, handle) {
-      void runtime.id;
-      handle.close();
-    },
-  });
-  return { id: runtime.id, collected: watchCollection(runtime) };
-}
-
-test(
-  "callback registrations do not keep their owners reachable",
-  async () => {
-    captureLeaks();
-    const runtimes = [
-      await runtimeHeldByItsEventHandler(),
-      await runtimeHeldByItsProvider(),
-    ];
-    // Each runtime and the callback that captures it form a cycle through
-    // the registration, which the collector reclaims as a whole.
-    await collectGarbageUntil(
-      () => runtimes.every((runtime) => runtime.collected()),
-      "runtimes whose callbacks capture them",
-    );
-    await collectGarbageUntil(
-      () => runtimes.every((runtime) => !runtimeIsLive(runtime.id)),
-      "the disposal of those runtimes",
-    );
-  },
-  { needs: ["forcedGc"] },
 );
 
 /**

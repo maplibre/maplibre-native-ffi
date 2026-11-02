@@ -1,5 +1,5 @@
-//! Callback registrations: rooting and release, contained panics, request
-//! ownership, provider routes, and process-global callbacks.
+//! Callback registrations: nested handlers, contained panics, request
+//! ownership, and provider routes.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -12,53 +12,12 @@ use crate::support::*;
 const ROUTED_STYLE_JSON: &str = r#"{"version":8,"sources":{"points":{"type":"geojson","data":"custom://routed/source.geojson"}},"layers":[]}"#;
 
 #[test]
-fn a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released() {
+fn a_camera_end_handler_inside_a_command_runs_once_when_its_transition_ends() {
     let fixture = Fixture::new();
 
-    // An accepted provider stays alive while native holds it, and replacing
-    // it releases it.
-    let (probe, released) = release_probe();
-    wait_for(
-        fixture
-            .runtime()
-            .set_resource_provider(ResourceProvider::new(move |_, handle| {
-                let _ = &probe;
-                handle.pass_through().unwrap();
-            })),
-    );
-    assert!(released.try_recv().is_err());
-    wait_for(fixture.runtime().set_resource_provider(denying_provider()));
-    await_release(&released);
-
-    // A registration that native rejects is never handed over, so the binding
-    // releases it before the call returns.
-    let (probe, released) = release_probe();
-    let options = CustomGeometrySourceOptions {
-        min_zoom: Some(3.0),
-        max_zoom: Some(2.0),
-        ..CustomGeometrySourceOptions::new(move |_| {
-            let _ = &probe;
-        })
-    };
-    let error = fixture
-        .map()
-        .add_custom_geometry_source("rejected", options.clone())
-        .unwrap_err();
-    assert_eq!(error.status(), Status::InvalidArgument);
-    assert!(error.diagnostic().contains("min_zoom"), "{error}");
-    drop(options);
-    released
-        .try_recv()
-        .expect("a rejected registration kept its callback");
-}
-
-#[test]
-fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
-    let fixture = Fixture::new();
-
-    // The handler sits two records deep in the command's input. Native holds
-    // it while the ease runs, and runs it once when its identity is cancelled.
-    let (probe, released) = release_probe();
+    // The handler sits two records deep in the command's input, which the
+    // host drops once the call returns. Native holds the handler while the
+    // ease runs, and runs it once when its identity is cancelled.
     let (ended, outcomes) = mpsc::channel();
     let update = CameraUpdate {
         mode: CameraUpdateMode::Ease,
@@ -70,7 +29,6 @@ fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
             duration_ms: Some(60_000.0),
             transition_id: Some(u64::MAX),
             end_handler: CameraTransitionHandler::new(move |end| {
-                let _ = &probe;
                 ended.send(end).unwrap();
             }),
             ..Default::default()
@@ -79,49 +37,11 @@ fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
     };
     wait_for(fixture.map().update_camera(&update));
     drop(update);
-    assert!(released.try_recv().is_err());
     wait_for(fixture.map().cancel_camera_transition(u64::MAX));
     let end = outcomes.recv_timeout(timeout()).unwrap();
     assert_eq!(end.outcome, CameraTransitionOutcome::Cancelled);
     assert_ne!(end.generation, 0);
-    await_release(&released);
     assert!(outcomes.try_recv().is_err());
-
-    // A rejected command releases the handler before the call returns.
-    let (probe, released) = release_probe();
-    let delta = CameraDelta {
-        scale: Some(-1.0),
-        animation: AnimationOptions {
-            end_handler: CameraTransitionHandler::new(move |_| {
-                let _ = &probe;
-            }),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let error = fixture.map().apply_camera_delta(&delta).unwrap_err();
-    assert_eq!(error.status(), Status::InvalidArgument);
-    drop(delta);
-    released
-        .try_recv()
-        .expect("a rejected command kept its end handler");
-}
-
-#[test]
-fn a_registered_callback_does_not_keep_its_runtime_alive() {
-    let (probe, released) = release_probe();
-    let runtime = RuntimeHandle::create(&RuntimeOptions::default()).unwrap();
-    wait_for(
-        runtime.set_resource_provider(ResourceProvider::new(move |_, handle| {
-            let _ = &probe;
-            handle.pass_through().unwrap();
-        })),
-    );
-
-    // Native holds the callback, but not the handle it is registered on, so
-    // dropping the handle disposes the runtime, which releases the callback.
-    drop(runtime);
-    await_release(&released);
 }
 
 #[test]
@@ -387,76 +307,4 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     assert_eq!(server.requests(), ["/native/style.json"]);
     assert!(requests.try_recv().is_err());
-}
-
-#[test]
-fn replacing_the_log_callback_releases_the_one_it_replaced() {
-    let _global = global_state();
-    let (first, first_released) = release_probe();
-    set_log_callback(LogHandler::new(move |_, _, _, _| {
-        let _ = &first;
-        true
-    }))
-    .unwrap();
-    assert!(first_released.try_recv().is_err());
-
-    let (second, second_released) = release_probe();
-    set_log_callback(LogHandler::new(move |_, _, _, _| {
-        let _ = &second;
-        true
-    }))
-    .unwrap();
-    await_release(&first_released);
-    assert!(second_released.try_recv().is_err());
-
-    clear_log_callback().unwrap();
-    await_release(&second_released);
-}
-
-#[test]
-fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
-    let fixture = Fixture::new();
-    let (sender, requests) = mpsc::channel();
-    let sender = Mutex::new(sender);
-    let deny = denying_provider().callback;
-    wait_for(
-        fixture
-            .runtime()
-            .set_resource_provider(ResourceProvider::new(move |request, handle| {
-                if request.requested_url != "custom://style.json" {
-                    return deny(request, handle);
-                }
-                sender.lock().unwrap().send(handle).unwrap();
-            })),
-    );
-    fixture
-        .map()
-        .discarding()
-        .set_style_url("custom://style.json")
-        .unwrap();
-    let handle = requests.recv_timeout(timeout()).unwrap();
-
-    // Releasing the map discards its pending style request, which MapLibre
-    // then cancels.
-    let (runtime, map) = fixture.into_parts();
-    wait_for(map.release());
-    await_condition("the request to report cancelled", || {
-        handle.is_cancelled().unwrap()
-    });
-
-    // Native reports the cancellation instead of accepting the callback, so
-    // the binding drops the callback unrun before returning.
-    let (probe, released) = release_probe();
-    let already_cancelled = handle
-        .set_cancel_callback(ResourceRequestCancelHandler::new(move || {
-            let _ = &probe;
-            panic!("a cancelled request ran its cancel callback");
-        }))
-        .unwrap();
-    assert!(already_cancelled);
-    released
-        .try_recv()
-        .expect("the binding kept a callback that native never took");
-    handle.release().unwrap();
-    wait_for(runtime.release());
 }

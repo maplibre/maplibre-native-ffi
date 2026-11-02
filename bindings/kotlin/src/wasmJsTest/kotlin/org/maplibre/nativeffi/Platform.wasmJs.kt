@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
@@ -35,23 +34,11 @@ internal actual class TestWeakReference actual constructor(value: Any) {
 
   actual val value: Any?
     get() = deref(reference)?.get()
-
-  actual val isCleared: Boolean
-    get() = deref(reference) == null
 }
 
-// Karma starts Chromium with --expose-gc, so each round runs a full collection.
-internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean =
-  withTimeoutOrNull(WAIT_TIMEOUT) {
-    while (!reference.isCleared) {
-      // The page keeps a weak reference's value until the task that read it ends.
-      yield()
-      collectGarbage()
-    }
-    true
-  } ?: reference.isCleared
-
+// Karma starts Chromium with --expose-gc, which defines globalThis.gc.
 internal actual suspend fun requestCollection() {
+  // The page keeps a weak reference's value until the task that read it ends.
   yield()
   collectGarbage()
 }
