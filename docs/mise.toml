@@ -8,7 +8,12 @@ run = "pnpm exec astro sync"
 # Everything the site reads besides its own sources.
 [tasks.prepare]
 hide = true
-depends = ["api", "install", "generate-support-matrix", "generate-versions"]
+depends = [
+  "generate-api-index",
+  "install",
+  "generate-support-matrix",
+  "generate-versions",
+]
 
 [tasks.dev]
 depends = ["prepare"]
@@ -61,6 +66,12 @@ run = "python scripts/generate-support-matrix.py"
 description = "Print the support tracking issue body from the generated matrix"
 depends = ["generate-support-matrix"]
 run = "python scripts/render-support-issue.py"
+
+[tasks.generate-api-index]
+description = "Write each C declaration's name and reference link in every language"
+depends = ["api"]
+dir = ".."
+run = "uv run --no-sync python docs/scripts/generate-api-index.py"
 
 [tasks.generate-versions]
 description = "Write the release versions the pages quote into src/generated"

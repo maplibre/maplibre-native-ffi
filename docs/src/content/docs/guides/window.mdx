@@ -10,15 +10,14 @@ import { Aside } from "@astrojs/starlight/components";
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide presents a continuous map to a window or view that you create, and
-keeps it updated as the map changes. It starts from a runtime and a map in
-continuous mode. To create them, see
-[Create a map](/maplibre-native-ffi/guides/create-a-map/).
+This guide shows how to present a continuous map in a native window or surface,
+and keep it updated as the map changes. Start with a runtime and a continuous
+map from [Create a map](/maplibre-native-ffi/guides/create-a-map/).
 
 ## Attach a surface
 
-Create the window with your platform or windowing library, then get its surface
-handle for your backend:
+First, create the window with your platform or windowing library, and get the
+surface handle for your backend:
 
 - Metal: a
   [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer)
@@ -46,68 +45,86 @@ handle for your backend:
   surface with that backend's calls. The other steps are the same.
 </Aside>
 
-Attach the surface to the map at the window's size and scale factor, and wait
-for the attach to finish. Keep the surface until the session closes. Also pass
-the frame wake that [Render frames](#render-frames) uses.
+Attach the surface to the map at the window's size and scale factor. You also
+pass a frame wake callback here, covered in the next section.
 
-The driver runs the session's graphics work. Use the library thread unless the
-surface uses your OpenGL context or WebGPU in a browser, and use your graphics
-thread for those. See
-[Render on your graphics thread](#render-on-your-graphics-thread).
+The [](api:mln_render_session_attach_options.driver) picks which thread runs the
+session's graphics work. Usually that's the library's own thread. If the surface
+uses your OpenGL context, use your graphics thread instead, since an OpenGL
+context is current on only one thread at a time. See
+[Service driver work](#service-driver-work).
 
 <Snippet page="window" region="attach" />
 
 ## Render frames
 
-Ask for one frame at a time, starting after the attach finishes. Ask the frame
-to present and to wait for the map's next update, so that an idle map renders
-nothing. Stop asking before you close the session.
+The map updates on the runtime's thread whenever something changes, like the
+camera moving or a tile loading. Your app decides when to show those updates, at
+most once per display refresh.
 
-The frame wake can run on a library thread, so have it schedule a drain of the
-frame results on your event loop.
+When you're ready for a frame, call [](api:mln_render_session_request_frame)
+with [](api:MLN_FRAME_DEMAND_PRESENT) and
+[](api:MLN_FRAME_DEMAND_WAIT_FOR_UPDATE). The session waits until the map has
+something new to show, then draws and presents it. After the frame's result
+arrives, call it again at the next display refresh.
+
+```mermaid
+sequenceDiagram
+  accTitle: The frame loop
+  participant App as Your event loop
+  participant Session as Render session
+  loop Until you stop
+    App->>Session: Ready for a frame
+    Note over Session: Waits for a map update
+    Session->>Session: Draw and present the update
+    Session-->>App: Frame wake
+    App->>Session: Drain the frame results
+    Note over App: Wait for the next display refresh
+  end
+```
+
+The [](api:mln_render_session_attach_options.frame_wake) tells you that results
+are ready. It can run on a library thread, so have it schedule a drain of the
+results on your event loop with [](api:mln_render_session_drain_frame_results).
 
 <Snippet page="window" region="frame-wake" />
 
-When the result arrives, ask for the next frame at the next display refresh.
-This renders at most once per refresh, and shows every change made in between.
-
-When a frame fails, close the session and attach a new one.
+If a result is [](api:MLN_RENDER_RESULT_FAILED), close the session and attach a
+new one. To end the loop, such as before you close the session, stop requesting
+frames.
 
 <Snippet page="window" region="frame-loop" />
 
 ## Resize the window
 
-When the window's size changes, resize the session to the new width and height,
-and it resizes the map too. Keep asking for frames, and they render at the new
-size once the map has applied it.
-
-To change the scale factor, or if the platform gives you a new surface for the
-new size, set the surface as the session's target instead. See the next section.
+When the window's size changes, resize the session with
+[](api:mln_render_session_resize). The session resizes the map for you.
 
 <Snippet page="window" region="resize" />
 
 ## Handle a lost surface
 
-When the platform takes the surface away, such as when your application goes to
-the background, stop asking for frames. Release the session's target, and wait
-for the release before the surface is destroyed. The session keeps its tiles and
-other renderer state.
+Platforms can take the surface away, for example when your app goes to the
+background. Rather than closing the session, release its target, so the map
+keeps its tiles and renderer state for when the surface comes back.
 
-When the platform gives you a surface again, set it as the session's target.
-Wait for that to finish, then ask for a frame.
+Stop the frame loop and release the target with
+[](api:mln_render_session_release_target) before the platform destroys the
+surface. When the platform gives you a surface again, set it as the session's
+target and restart the frame loop.
 
 <Snippet page="window" region="lost-surface" />
 
-## Render on your graphics thread
+## Service driver work
 
-With the graphics-thread driver, the session's graphics work runs only when you
-service the session on your graphics thread. Make the target's context current
-there first.
+With the graphics-thread driver, the session does its graphics work only when
+you service it with [](api:mln_render_session_service_driver_work) on your
+graphics thread, with the target's context current.
 
-Pass a driver work wake when you attach. Each time it fires, schedule a service
-of the session on your graphics thread, even while you ask for no frames.
-Attaching, detaching, and releasing the target finish only through service. To
-close the session, detach it first, and keep servicing until the detach
-finishes.
+The [](api:mln_render_session_attach_options.driver_work_wake) tells you when
+there's work to do. Each time it fires, schedule a service on your graphics
+thread, even while the frame loop is stopped. To close the session, detach it
+first with [](api:mln_render_session_detach) and keep servicing until the detach
+finishes, so the session can free its graphics objects on your context.
 
 <Snippet page="window" region="service" />

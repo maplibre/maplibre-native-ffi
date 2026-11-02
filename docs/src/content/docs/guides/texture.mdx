@@ -10,8 +10,9 @@ import { Aside } from "@astrojs/starlight/components";
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide renders a continuous map into textures that your renderer draws, such
-as a UI framework, a game engine, or a compositor. It uses the frame loop from
+This guide shows how to render a continuous map into textures for another
+renderer to draw, such as a UI framework, a game engine, or a compositor. It
+builds on the frame loop from
 [Render to a window](/maplibre-native-ffi/guides/window/#render-frames).
 
 ## Attach a texture ring
@@ -19,8 +20,9 @@ as a UI framework, a game engine, or a compositor. It uses the frame loop from
 The session renders into a ring of textures, so your renderer can draw one frame
 while the session renders the next.
 
-Let the session create the ring on your GPU device. If your framework hands you
-the textures to render into, attach those as a borrowed ring instead.
+Usually, you let the session create the ring on your GPU device. If your
+framework hands you textures to render into, attach those as a borrowed ring
+instead.
 
 <Aside type="note">
   The snippets below use Vulkan. For another backend, use that backend's calls
@@ -29,49 +31,40 @@ the textures to render into, attach those as a borrowed ring instead.
 </Aside>
 
 Pass your graphics context, such as your device and queue. On Vulkan, if your
-renderer also submits to that queue, pass a lock, and take the same lock around
-your own calls on the queue.
+renderer submits to the same queue, also pass a lock, and hold it around your
+own submissions.
 
-Use the library thread as the driver unless the texture uses your OpenGL context
-or WebGPU in a browser, and use your graphics thread for those. See
-[Render on your graphics thread](/maplibre-native-ffi/guides/window/#render-on-your-graphics-thread).
+As with a window, use your graphics thread as the driver if the texture uses
+your OpenGL context, and the library thread otherwise. See
+[Service driver work](/maplibre-native-ffi/guides/window/#service-driver-work).
 
 <Snippet page="texture" region="attach-owned" />
 
-For a borrowed ring, pass your textures and their size in device pixels, and
-destroy them only after the session closes.
+For a borrowed ring, pass your textures and their size in device pixels.
 
 <Snippet page="texture" region="attach-borrowed" />
 
 ## Draw each frame
 
-Render frames with the same loop as for a window, without asking to present.
+Run the window's frame loop, but without [](api:MLN_FRAME_DEMAND_PRESENT), since
+your renderer shows the frames instead.
 
-When a frame renders, acquire it, and get its texture for your backend. The
-frame's rendering has already finished, so your renderer can read the texture
-right away.
+When a frame renders, acquire it with [](api:mln_render_session_acquire_frame)
+and get its texture for your backend.
 
-Release the frame after your reads finish. The session renders into that texture
-again only after the release. Release every acquired frame before you close the
-session. To sync on the GPU instead, see the GPU sync kinds in the
-[API reference](/maplibre-native-ffi/reference/c/render__target_8h.html).
-
-Keep at most one frame acquired while the next renders. If every texture in the
-ring is acquired, the next frame waits.
-
-If your renderer already runs a loop every frame, as a game engine does, you can
-drain the frame results there instead of using the frame wake.
+When your reads finish, release the frame with
+[](api:mln_acquired_frame_release), so the session can render into that texture
+again. To sync on the GPU, see [](api:mln_gpu_sync_kind). Keep at most one frame
+acquired, or the next frame waits for a free texture, and release every acquired
+frame before you close the session.
 
 <Snippet page="texture" region="acquire" />
 
 ## Resize the textures
 
-Release every acquired frame first.
-
-For an owned ring, resize the session, as for a
-[window](/maplibre-native-ffi/guides/window/#resize-the-window).
-
-For a borrowed ring, create textures at the new size and set them as the
-session's target, then destroy the old textures after that finishes.
+First, release every acquired frame. Then resize an owned ring with
+[](api:mln_render_session_resize), as for a window. For a borrowed ring, create
+textures at the new size and set them as the session's target, then destroy the
+old textures.
 
 <Snippet page="texture" region="resize-borrowed" />

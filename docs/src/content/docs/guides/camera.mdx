@@ -9,76 +9,73 @@ description:
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide changes a map's camera, from your code and from gestures. A camera
-has a center, a zoom, a bearing, and a pitch.
+This guide shows how to read and change a map's camera, from your code and from
+gestures. A [](api:mln_camera) has a center, a zoom, a bearing, and a pitch.
 
 ## Read the camera
 
-Read the camera from the map's snapshot. The read returns right away, but it can
-lag behind changes you just sent. To read the camera after your changes apply,
-query the camera instead, and wait for the result. See
-[Wait for results](/maplibre-native-ffi/guides/create-a-map/#wait-for-results).
+Read the camera from the map's snapshot with [](api:mln_map_get_snapshot). To
+read it after your pending changes apply, use [](api:mln_map_get_camera)
+instead.
 
 <Snippet page="camera" region="read" />
 
 ## Move the camera
 
-Send a camera update in jump mode, and set only the fields you want to change.
-The other fields keep their values.
+To move the camera, send a camera update with [](api:mln_map_update_camera) in
+jump mode. Set only the fields you want to change.
 
 <Snippet page="camera" region="jump" />
 
 ## Animate the camera
 
-Send a camera update in ease or fly mode, with a duration. Ease moves straight
-to the target, while fly zooms out, travels, and zooms back in.
+To animate, send the update in ease or fly mode with a duration. Ease moves
+straight to the target, while fly zooms out, travels, and zooms back in.
 
-The update's completion reports that the animation started. To act when it ends,
-set an end handler that reports whether the animation completed or was
-cancelled.
+To act when an animation ends, set a [](api:mln_camera_transition_handler).
 
-A later camera change replaces the animation of each field that it sets. To stop
-an animation where it is, cancel the map's camera transitions.
+To stop an animation where it is, cancel the map's camera transitions with
+[](api:mln_map_cancel_transitions).
 
 <Snippet page="camera" region="animate" />
 
-## Fit the camera to an area
+## Fit the camera
 
-Query the camera that fits a bounding box, then jump or animate to that camera.
-To fit a list of coordinates or a GeoJSON geometry instead, use the matching
-query.
+To show an area, query the camera that fits its bounding box with
+[](api:mln_map_camera_for_lat_lng_bounds), then jump or animate to that camera.
+For a list of coordinates or a GeoJSON geometry, use
+[](api:mln_map_camera_for_lat_lngs) or [](api:mln_map_camera_for_geometry)
+instead.
 
 <Snippet page="camera" region="fit" />
 
-## Limit where the camera can go
+## Limit the camera
 
-Set the map's bounds to keep the center inside an area, and the zoom and pitch
-inside ranges. Limits that you leave out keep their current values.
+To keep the camera within an area, set the map's bounds with
+[](api:mln_map_set_bounds). Bounds limit the center to an area, and the zoom and
+pitch to ranges.
 
 <Snippet page="camera" region="limit" />
 
 ## Apply gestures
 
-Your code recognizes each gesture from its input events. Screen points are in
+The library doesn't handle input, so your app recognizes gestures from its own
+input events and applies them to the camera as deltas. Screen points are in
 logical pixels from the map's top-left corner.
 
-When a gesture starts, cancel the camera transitions, then send a camera delta
-with the begin phase.
-
-For each movement, send a delta with the update phase, and pass the change since
-the last delta. For a drag, pass the movement as the offset, and for a pinch,
-pass the scale and the pinch's center as the anchor.
-
-When the gesture ends, send a delta with the end phase. If the platform cancels
-the gesture, send the cancel phase instead.
+When a gesture starts, cancel camera transitions, then send a delta with
+[](api:mln_map_apply_camera_delta) in the begin phase. For each movement, send a
+delta in the update phase with the change since the last one: the movement as
+the offset for a drag, or the scale and the pinch's center as the anchor for a
+pinch. When the gesture ends, send the end phase, or the cancel phase if the
+platform cancels it.
 
 <Snippet page="camera" region="gesture" />
 
-## Convert between pixels and coordinates
+## Convert coordinates
 
-Create a projection from the snapshot's view, and use it to convert screen
-points to coordinates and coordinates to screen points. A projection keeps the
-view it was created from, so create a new one after the camera moves. Close the
-projection when you're done.
+A [](api:mln_map_projection) converts between screen points and coordinates for
+one view of the map. Create it from the snapshot's view, and create a new one
+after the camera moves. Close it when you're done.
 
 <Snippet page="camera" region="convert" />

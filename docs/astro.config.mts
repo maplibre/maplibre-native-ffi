@@ -5,16 +5,32 @@ import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightCopyButton from "starlight-copy-button";
 import starlightLinksValidator from "starlight-links-validator";
-import starlightLlmsTxt from "starlight-llms-txt";
 
+import { apiLinksPlugin } from "./src/integrations/api-links";
 import { externalLinksPlugin } from "./src/integrations/external-links";
 import { mermaidPlugin } from "./src/integrations/mermaid";
 import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
 import { versionsPlugin } from "./src/integrations/versions";
-import { languageStorageKey } from "./src/languages";
+import {
+  defaultLanguage,
+  languageStorageKey,
+  languages,
+} from "./src/languages";
 
 const site = "https://maplibre.org";
 const base = "/maplibre-native-ffi";
+
+// Hides every element written for a language other than the reader's, or
+// other than the default before the reader picks one.
+const languageRules = [
+  ...languages.map(({ id }) => [`:root[data-language="${id}"]`, id]),
+  [":root:not([data-language])", defaultLanguage],
+]
+  .map(
+    ([root, shown]) =>
+      `${root} [data-for-language]:not([data-for-language="${shown}"]) { display: none; }`,
+  )
+  .join("\n");
 
 // https://astro.build/config
 export default defineConfig({
@@ -22,7 +38,7 @@ export default defineConfig({
   base,
   markdown: {
     processor: satteri({
-      mdastPlugins: [mermaidPlugin, versionsPlugin],
+      mdastPlugins: [mermaidPlugin, versionsPlugin, apiLinksPlugin(base)],
       hastPlugins: [externalLinksPlugin(site + base)],
     }),
   },
@@ -46,7 +62,8 @@ export default defineConfig({
       },
       customCss: ["./src/styles/custom.css"],
       head: [
-        // Restores the reader's snippet language before the page draws.
+        { tag: "style", content: languageRules },
+        // Restores the reader's language before the page draws.
         {
           tag: "script",
           content: `try {
@@ -57,7 +74,6 @@ export default defineConfig({
       ],
       plugins: [
         starlightCopyButton(),
-        starlightLlmsTxt({ exclude: ["reference/**"] }),
         starlightLinksValidator({
           exclude: [`${base}/reference/**`],
         }),

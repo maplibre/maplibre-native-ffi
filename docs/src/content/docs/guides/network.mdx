@@ -10,76 +10,77 @@ description:
 import Snippet from "../../../components/Snippet.astro";
 
 The library downloads styles, tiles, fonts, and icons from the URLs in the
-style. This guide changes those requests, serves resources from your code, and
-tells the library when the device is offline. Transforms and resource providers
-apply to every map on the runtime.
+style. This guide shows how to change those requests, serve resources from your
+own code, and tell the library when the device is offline. Transforms and
+resource providers apply to every map on the runtime.
 
 ## Add headers
 
-To add headers, such as an `Authorization` header, set a header transform.
+To add headers to requests, such as an `Authorization` header, set a header
+transform with [](api:mln_runtime_set_http_header_transform).
 
 For fixed values, give the transform rules. Each rule matches a URL pattern and
-lists its headers. Match only URLs on your server, so that your token doesn't go
+lists its headers. Match only URLs on your own server, so your token doesn't go
 to other servers in the style.
 
 For values that change, such as a token that expires, give the transform a
-callback instead. The callback sets the headers of each request, and must return
-right away.
-
-The browser and OpenHarmony can't add headers, so serve those requests with a
-resource provider there instead.
+callback instead. It sets the headers of each request.
 
 <Snippet page="network" region="headers" />
 
 ## Rewrite URLs
 
-To change a request's URL, set a resource transform. Use it to add an API key,
-or to send requests to another server.
+To change a request's URL, such as to add an API key or to use another server,
+set a resource transform with [](api:mln_runtime_set_resource_transform).
 
-The callback answers with the new URL, or releases the request to keep the old
-one. It can answer later, from any thread, such as after it signs the URL.
+The callback answers each request with its new URL through
+[](api:mln_resource_transform_request_complete).
 
 <Snippet page="network" region="rewrite" />
 
-## Serve resources from your code
+## Serve resources
 
-First check whether you need code. The library reads `file://` URLs, bundled
-files through `asset://` URLs and the runtime's asset path, and tile archives
-through `pmtiles://` and `mbtiles://` URLs. Point the style at those.
+You might not need code for this. The library already reads `file://` URLs,
+bundled files through `asset://` URLs and the runtime's asset path, and tile
+archives through `pmtiles://` and `mbtiles://` URLs, so you can point the style
+at those.
 
-For anything else, set a resource provider. Give your URLs a custom scheme in
-the style, such as `app://tiles/{z}/{x}/{y}.pbf`, and give the provider a route
-that matches that scheme. Requests that match no route skip the provider.
+For anything else, set a resource provider with
+[](api:mln_runtime_set_resource_provider). Give your URLs a custom scheme in the
+style, such as `app://tiles/{z}/{x}/{y}.pbf`, and give the provider a route that
+matches it.
 
-Answer each request with its bytes, or with no content for a tile that has no
-data. Answer later, from any thread, if loading takes time. To let the library
-download a request, pass it through.
+Answer each request with its bytes through
+[](api:mln_resource_request_complete), or pass it through with
+[](api:mln_resource_request_pass_through) to let the library download it.
 
 <Snippet page="network" region="provider" />
 
-## Supply tiles from your code
+## Add a custom source
 
-For tiles that have no URL, such as data that your code computes for an area,
-add a custom source. It asks your code for each tile it needs, by zoom, x, and
-y. A custom geometry source takes GeoJSON for each tile, and a custom vector
-source takes encoded vector tiles.
+For tiles that don't come from a URL, such as data your code computes, add a
+custom source. The map asks your code for each tile it needs, by zoom, x, and y.
+A source added with [](api:mln_map_add_custom_geometry_source) takes GeoJSON for
+each tile. For encoded vector tiles, add a custom vector source with
+[](api:mln_map_add_custom_vector_source) instead.
 
-Add the source to a map after its style loads, then add a layer that draws it.
-See [Style](/maplibre-native-ffi/guides/style/).
+Add the source after the map's style loads, then add a layer that draws it, as
+in [Style](/maplibre-native-ffi/guides/style/).
 
-Answer each request with the tile's data, or with an error. Answer later, from
-any thread, if it takes time. When your data for a tile changes, invalidate the
-tile, and the map asks for it again.
+Answer each request with the tile's data through
+[](api:mln_map_set_custom_geometry_source_tile_data). When your data for a tile
+changes, invalidate the tile with
+[](api:mln_map_invalidate_custom_geometry_source_tile), and the map asks for it
+again.
 
 <Snippet page="network" region="custom-source" />
 
 ## Set the network status
 
-When the device loses its connection, set the network status to offline. The
-library stops starting network requests and loads what it can from its cache.
-See [Offline](/maplibre-native-ffi/guides/offline/). Set the status to online
-when the connection returns.
-
-The status covers every runtime in the process.
+When the device loses its connection, set the network status to offline with
+[](api:mln_network_set_status). The library then stops starting network requests
+and loads what it can from its [cache](/maplibre-native-ffi/guides/offline/).
+Set it back to online when the connection returns. The status covers every
+runtime in the process.
 
 <Snippet page="network" region="status" />

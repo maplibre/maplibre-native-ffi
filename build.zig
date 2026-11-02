@@ -376,7 +376,7 @@ fn addMaplibreNativeDocs(
     addMaplibreNativeIncludes(b, docs_module, target, optimize, include_dirs, null, libc_file);
 
     const doc_compile = b.addObject(.{
-        .name = "maplibre_native_ffi_docs",
+        .name = "maplibre_native_ffi",
         .root_module = docs_module,
     });
     doc_compile.setLibCFile(libc_file);

@@ -22,7 +22,7 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   const extent = { width: 800, height: 600, scaleFactor: 2 };
   const { map, ready: mapReady } = runtime.createMap({
     initialExtent: extent,
-    mapMode: MapMode.staticValue,
+    mapMode: MapMode.static,
   });
   await mapReady;
   // #endregion map

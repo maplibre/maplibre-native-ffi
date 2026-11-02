@@ -9,10 +9,16 @@ import { Aside } from "@astrojs/starlight/components";
 
 import Snippet from "../../../components/Snippet.astro";
 
-You work with three objects. A runtime holds what its maps share, such as the
-network and the cache. A map belongs to a runtime, and holds a style, a camera,
-and data. A render session belongs to a map, and draws it into a target, such as
-a window.
+You primarily work with three stateful objects:
+
+- A [](api:mln_runtime) is the main configuration context for how the map
+  operates, including network and cache.
+- A [](api:mln_map) belongs to a runtime, and holds a single map's state, like
+  its style and camera.
+- A [](api:mln_render_session) belongs to a map, and holds the renderer that
+  draws it into a target, such as a texture or a window.
+
+To avoid a leak, close each of these when you're done with it.
 
 ```mermaid
 sequenceDiagram
@@ -39,54 +45,54 @@ the target.
 
 ## Create a runtime
 
-Create a runtime with the default options. One runtime can serve all your maps.
-To set a cache file, see [Offline](/maplibre-native-ffi/guides/offline/).
+Create a runtime with a [](api:mln_runtime_options). Usually, one runtime is all
+you need for all your maps.
 
 <Snippet page="create-a-map" region="runtime" />
 
 ## Create a map
 
-Create a map on the runtime, and give it a size in logical pixels, a scale
-factor, and a map mode. The scale factor and the mode can't change later. For
-the mode, see
+Create a map on the runtime with [](api:mln_map_options), and give it a size in
+logical pixels, a scale factor, and a map mode. The scale factor and the mode
+can't change later. For the mode, see
 [Choose a render target](/maplibre-native-ffi/guides/choose-a-target/).
 
-Wait for the map to be created before you attach a render target.
+Wait for the map to be ready before you attach a render target.
 
 <Snippet page="create-a-map" region="map" />
 
 ## Set a style
 
-Set the map's style by URL. You don't need to wait for it to load. To load style
-JSON or change the style, see [Style](/maplibre-native-ffi/guides/style/).
+Set the map's style by URL with [](api:mln_map_set_style_url) or by JSON with
+[](api:mln_map_set_style_json). To work with the map style in detail, see
+[Style](/maplibre-native-ffi/guides/style/).
 
 <Snippet page="create-a-map" region="style" />
 
 ## Wait for results
 
-Most calls return before their work is done. The library does the work later, in
-the order you sent it, and then reports the result. Wait for the result when
-your next step depends on it, or ignore it.
+Most work is coordinated by the map runtime on its own thread, so most calls are
+asynchronous. The library queues your work and then reports the result, either
+with a callback or with your language's idiom for asynchronous operations.
+
+Operations happen in the order you send them, so you generally only need to wait
+for the result you need, not every call on the way.
 
 <Snippet page="create-a-map" region="wait" />
 
-The library reports what you didn't ask for, such as a style that finished
-loading, as events. See
-[Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
+Some information is reported to your integration as events. See
+[Events and logs](/maplibre-native-ffi/guides/events-and-logs/) to listen for
+events.
 
-## Handle errors
-
-A call fails in one of two ways. Either it fails right away when an argument or
-the object's state is wrong, or it starts and its result reports a failure. Each
-binding reports both with its language's own errors, and every failure has a
-message that describes it.
+Some calls fail immediately, and others report a failure through their
+asynchronous result. See your language's API reference for how each call can
+fail. Every failure carries a [](api:mln_status) and a message.
 
 <Snippet page="create-a-map" region="errors" />
 
 ## Close
 
-Close the render session, the map, and the runtime, in that order. Wait only for
-the runtime: it finishes closing after its maps.
+Close the render session, the map, and the runtime, in that order.
 
 <Aside type="note">
   Even in a language with a garbage collector, close them yourself. The binding
