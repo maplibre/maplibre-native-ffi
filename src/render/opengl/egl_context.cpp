@@ -25,14 +25,12 @@ auto EglSingleContext::next_user() -> std::uint64_t {
   return users_.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
-auto EglSingleContext::lock(std::uint64_t user) -> bool {
-  mutex_.lock();
+auto EglSingleContext::take_turn(std::uint64_t user) -> Turn {
+  auto lock = std::unique_lock{mutex_};
   const auto lost = last_user_ != user;
   last_user_ = user;
-  return lost;
+  return Turn{.lock = std::move(lock), .state_lost = lost};
 }
-
-void EglSingleContext::unlock() { mutex_.unlock(); }
 
 EglSharedContext::EglSharedContext(
   mln_egl_context_descriptor descriptor,
@@ -91,10 +89,7 @@ auto EglSharedContext::take_state_lost() -> bool {
 }
 
 void EglSharedContext::release_turn() {
-  if (holds_turn_) {
-    holds_turn_ = false;
-    single_->unlock();
-  }
+  if (turn_.owns_lock()) turn_.unlock();
 }
 
 // Another session may hold the single context on its own core worker, so this
@@ -103,9 +98,10 @@ void EglSharedContext::release_turn() {
 void EglSharedContext::activate_single(
   EGLSurface draw_surface, EGLSurface read_surface
 ) {
-  if (!holds_turn_) {
-    state_lost_ = single_->lock(single_user_) || state_lost_;
-    holds_turn_ = true;
+  if (!turn_.owns_lock()) {
+    auto turn = single_->take_turn(single_user_);
+    state_lost_ = turn.state_lost || state_lost_;
+    turn_ = std::move(turn.lock);
   }
   try {
     const auto api = requested_api();
@@ -308,7 +304,7 @@ void EglSharedContext::restore_previous_context() {
 void EglSharedContext::destroy() {
   // A session of a single-context device creates no context, so teardown hands
   // back its turn and destroys only its pbuffer.
-  if (holds_turn_) {
+  if (turn_.owns_lock()) {
     release_current_context();
     release_turn();
   }

@@ -99,18 +99,14 @@ class RenderTargetNotReady : public std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
-class SurfaceSessionBackend {
+class RenderSessionBackend {
  public:
-  SurfaceSessionBackend() = default;
-  SurfaceSessionBackend(const SurfaceSessionBackend&) = delete;
-  auto operator=(const SurfaceSessionBackend&)
-    -> SurfaceSessionBackend& = delete;
-  SurfaceSessionBackend(SurfaceSessionBackend&&) = delete;
-  auto operator=(SurfaceSessionBackend&&) -> SurfaceSessionBackend& = delete;
-  virtual ~SurfaceSessionBackend() = default;
-
-  virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
-  virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
+  RenderSessionBackend() = default;
+  RenderSessionBackend(const RenderSessionBackend&) = delete;
+  auto operator=(const RenderSessionBackend&) -> RenderSessionBackend& = delete;
+  RenderSessionBackend(RenderSessionBackend&&) = delete;
+  auto operator=(RenderSessionBackend&&) -> RenderSessionBackend& = delete;
+  virtual ~RenderSessionBackend() = default;
 
   // Whether abandon may destroy this backend, and the renderer that draws
   // through it, on the abandoning thread instead of the driver thread. A
@@ -129,11 +125,17 @@ class SurfaceSessionBackend {
     return true;
   }
 
-  // Abandon calls this on a backend it keeps, once nothing can reach the
-  // backend again. A kept backend is never destroyed, so one that registered
-  // the host's graphics handles process-wide releases them here: the host may
-  // reuse those handles.
+  // Abandon calls this on a backend it keeps, and detach on a texture backend
+  // it keeps, once nothing can reach the backend again. A kept backend is never
+  // destroyed, so one that registered the host's graphics handles process-wide
+  // releases them here: the host may reuse those handles.
   virtual void quarantine() noexcept {}
+};
+
+class SurfaceSessionBackend : public RenderSessionBackend {
+ public:
+  virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
+  virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
   // Whether the surface can take a frame right now. Not ready skips the frame
   // and reports nothing rendered, so a minimized or occluded window is a retry
@@ -223,16 +225,8 @@ struct GpuWorkDone {
   void run() const noexcept;
 };
 
-class TextureSessionBackend {
+class TextureSessionBackend : public RenderSessionBackend {
  public:
-  TextureSessionBackend() = default;
-  TextureSessionBackend(const TextureSessionBackend&) = delete;
-  auto operator=(const TextureSessionBackend&)
-    -> TextureSessionBackend& = delete;
-  TextureSessionBackend(TextureSessionBackend&&) = delete;
-  auto operator=(TextureSessionBackend&&) -> TextureSessionBackend& = delete;
-  virtual ~TextureSessionBackend() = default;
-
   virtual auto headless_backend() -> mln::gfx::HeadlessBackend& = 0;
   virtual auto renderer_backend() -> mln::gfx::RendererBackend* {
     return headless_backend().getRendererBackend();
@@ -241,29 +235,6 @@ class TextureSessionBackend {
   // rebuilds it lazily; a backend whose renderer keys cached GPU state on that
   // resource overrides this to rebuild only what the size changed.
   virtual void resize(mln::Size size) { headless_backend().setSize(size); }
-
-  // Whether abandon may destroy this backend, and the renderer that draws
-  // through it, on the abandoning thread instead of the driver thread. A
-  // backend whose graphics objects only their graphics thread may destroy says
-  // no, and abandon keeps it until the process exits.
-  [[nodiscard]] virtual auto allows_off_thread_teardown() const noexcept
-    -> bool {
-    return false;
-  }
-
-  // Abandon calls this on the abandoning thread before it destroys the backend
-  // there. A backend whose GPU work can outlive the driver call that submitted
-  // it waits for that work here. False keeps the backend, because work that
-  // may still use its objects did not finish.
-  [[nodiscard]] virtual auto prepare_off_thread_teardown() noexcept -> bool {
-    return true;
-  }
-
-  // Detach and abandon call this on a backend they keep, once nothing can
-  // reach the backend again. A kept backend is never destroyed, so one that
-  // registered the host's graphics handles process-wide releases them here:
-  // the host may reuse those handles.
-  virtual void quarantine() noexcept {}
 
   // Renders into a new ring of caller-owned textures, keeping the graphics
   // context and every resource the renderer holds against it. The target names
