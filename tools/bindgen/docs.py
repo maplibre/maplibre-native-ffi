@@ -21,6 +21,7 @@ applies that language's escaping to the prose and leaves code spans intact.
 
 from __future__ import annotations
 
+import dataclasses
 import html
 import re
 import textwrap
@@ -389,8 +390,10 @@ class Content:
 
 def _content(doc: Doc, symbol: Symbol) -> Content:
     spell = getattr(symbol, "parameter", None) or (lambda name: name)
+    record = doc.symbol.split(".")[0]
     parameters: Parameters = {
         **dict.fromkeys(doc.hidden),
+        **dict.fromkeys(getattr(symbol, "fields", {}).get(record, ())),
         **{name: spell(name) for name in doc.parameters},
     }
 
@@ -402,10 +405,15 @@ def _content(doc: Doc, symbol: Symbol) -> Content:
             return prose(block)
         return tuple(text for item in block if (text := prose(item)))
 
-    threads = getattr(symbol, "threads", None)
+    # A binding's own paragraph replaces the C ones.
+    own = getattr(symbol, "threads", {}).get(doc.symbol)
+    if own is None:
+        threads = [prose(paragraph) for paragraph in doc.threads]
+    else:
+        threads = [own] if doc.threads else []
     blocks = [
         *map(body, doc.paragraphs),
-        *([threads] if doc.threads and threads else map(prose, doc.threads)),
+        *threads,
         *(translate(note, symbol, doc.symbol, parameters) for note in doc.notes),
     ]
     errors = []
@@ -429,7 +437,8 @@ def resolver(
     field: Callable[[ValuePlan, FieldPlan], str | None],
     flag: Callable[[ValuePlan, MaskFlag], str | None] | None = None,
     extra: dict[str, str] | None = None,
-    threads: str | None = None,
+    threads: dict[str, str] | None = None,
+    fields: dict[str, frozenset[str]] | None = None,
     parameter: Callable[[str], str] | None = None,
 ) -> Symbol:
     """A binding's symbol resolver over the declarations that a host can name.
@@ -439,8 +448,9 @@ def resolver(
     public record, and the flags of a record's mask. Each function spells a
     declaration as the binding generates it, or returns None for one that it
     does not generate. `extra` names declarations that a binding's handwritten
-    runtime presents. `parameter` spells a C parameter name as the binding's
-    parameters do; without it, a parameter keeps its C name.
+    runtime presents. `threads` and `fields` are as `Resolver` describes.
+    `parameter` spells a C parameter name as the binding's parameters do;
+    without it, a parameter keeps its C name.
     """
     names: dict[str, str | None] = {}
     for native, value in bound.public_values.items():
@@ -459,7 +469,7 @@ def resolver(
             names[plan.name] = operation(plan)
     found = {name: spelled for name, spelled in names.items() if spelled}
     found.update(extra or {})
-    return Resolver(found, threads, parameter)
+    return Resolver(found, threads or {}, fields or {}, parameter)
 
 
 @dataclass(frozen=True)
@@ -467,13 +477,17 @@ class Resolver:
     """A binding's symbol resolver, how its own callbacks run, and how it
     spells parameters.
 
-    `threads` replaces a callback's C `Threads:` paragraph in a binding that
-    delivers callbacks through a queue it drains itself, where the native
-    threads never run host code.
+    `threads` replaces the C `Threads:` paragraphs of a declaration, by its C
+    name, in a binding that delivers callbacks through a queue it drains
+    itself, where the native threads never run host code. An empty paragraph
+    drops them. `fields` names the fields of a record, by the record's C name,
+    that the binding leaves out, so a sentence that names one leaves the
+    record's documentation and its fields'.
     """
 
     names: dict[str, str]
-    threads: str | None = None
+    threads: dict[str, str] = dataclasses.field(default_factory=dict)
+    fields: dict[str, frozenset[str]] = dataclasses.field(default_factory=dict)
     parameter: Callable[[str], str] | None = None
 
     def __call__(self, name: str) -> str | None:

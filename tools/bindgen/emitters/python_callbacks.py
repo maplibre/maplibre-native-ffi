@@ -242,10 +242,6 @@ def sources(values, plan):
         native_method, native_class = native_sources(values, plan)
         methods.append(native_method)
     doc = values.api.doc(plan.native)
-    if doc and not fields:
-        # Native rules or a native registration answer this registration, so
-        # no Python code runs for it, on the dispatcher thread or elsewhere.
-        doc = replace(doc, threads=())
     record_rust, record_python = values.record_sources(
         plain_fields(plan),
         doc=doc,

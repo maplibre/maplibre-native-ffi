@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 
 from support import parse
 
-from tools.bindgen import docs
+from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.docs import Doc
 from tools.bindgen.names import camel
@@ -37,6 +37,52 @@ typedef struct mln_tick_handler {
 /** Installs a tick callback. */
 mln_status mln_tick_set_callback(
   const mln_tick_handler* handler, mln_diagnostic* out_diagnostic
+);
+"""
+
+# After TICK, a registration whose synchronous callback only native code can
+# supply, and one whose callback an async-only host leaves to native rules.
+HOST_FORMS = """
+/**
+ * Locks a queue.
+ *
+ * Threads:
+ * It runs on a library thread.
+ */
+BIND("synchronous=true")
+typedef void (*mln_lock_callback)(void* context);
+/** A queue lock. */
+typedef struct mln_lock {
+  mln_lock_callback lock BIND("nullable=true");
+  void* context BIND("kind=context");
+  mln_tick_release release;
+} mln_lock BIND("kind=callback_registration;release=release");
+/** Takes a queue lock. */
+mln_status mln_set_lock(const mln_lock* lock, mln_diagnostic* out_diagnostic);
+/**
+ * Picks a header.
+ *
+ * Threads:
+ * Runs on a library thread.
+ */
+typedef bool (*mln_header_callback)(void* context) BIND("failure=false");
+/**
+ * Headers to add.
+ *
+ * Set either `callback` or `rules`, not both.
+ */
+typedef struct mln_header_transform {
+  unsigned int size;
+  mln_header_callback callback BIND("nullable=true");
+  void* context BIND("kind=context");
+  mln_tick_release release;
+  /** The rules that add headers. */
+  const mln_buffer_view* rules BIND("length=rule_count");
+  unsigned long rule_count;
+} mln_header_transform BIND("kind=callback_registration;release=release");
+/** Adds headers. */
+mln_status mln_set_header_transform(
+  const mln_header_transform* transform, mln_diagnostic* out_diagnostic
 );
 """
 
@@ -201,12 +247,40 @@ class ThreadsTests(unittest.TestCase):
         doc = Doc(
             "mln_tick_handler", "Tick callback state.", threads=("Runs on a worker.",)
         )
-        queued = docs.Resolver({}, threads="Runs on the registering thread.")
+        queued = docs.Resolver(
+            {}, threads={"mln_tick_handler": "Runs on the registering thread."}
+        )
         self.assertIn(
             "/// Tick callback state.\n///\n/// Runs on the registering thread.\n",
             docs.line_comment(doc, queued),
         )
         self.assertNotIn("worker", docs.line_comment(doc, queued))
+
+    def test_an_async_host_states_its_threads_only_where_it_runs_a_callback(self):
+        # The host runs the wake callback. Native code runs the lock's
+        # synchronous callback, so the lock keeps the C threads. Native rules
+        # answer for the header callback that the host leaves out, so the
+        # header transform names neither that callback nor a thread.
+        api = parse(TICK + HOST_FORMS)
+        validate(api)
+        bound = compile_api(api)
+        symbols = docs.Resolver(
+            {},
+            threads=async_hosts.threads(bound, "Runs on the host's thread."),
+            fields=async_hosts.omitted_fields(bound),
+        )
+
+        def text(name):
+            return docs.line_comment(bound.doc(name), symbols)
+
+        self.assertIn("Runs on the host's thread.", text("mln_tick_handler"))
+        self.assertIn("Runs on the host's thread.", text("mln_tick_set_callback"))
+        self.assertIn("It runs on a library thread.", text("mln_lock"))
+        self.assertNotIn("host", text("mln_lock"))
+        for name in ("mln_header_transform", "mln_set_header_transform"):
+            self.assertNotIn("thread", text(name), name)
+            self.assertNotIn("callback", text(name), name)
+        self.assertIn("rules", text("mln_header_transform.rules"))
 
 
 class BodyTests(unittest.TestCase):

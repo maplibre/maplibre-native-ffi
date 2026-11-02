@@ -182,10 +182,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         parameter=camel,
         # Native queues each call, and the isolate that registered the callback
         # dispatches the queue from a receive port.
-        threads=(
+        threads=async_hosts.threads(
+            bound,
             "The callback runs asynchronously in the isolate and zone that "
-            "registered it, after native queues the call."
+            "registered it, after native queues the call.",
         ),
+        fields=async_hosts.omitted_fields(bound),
     )
 
 

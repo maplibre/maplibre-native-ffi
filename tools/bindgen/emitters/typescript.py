@@ -201,10 +201,12 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
         parameter=parameter_name,
         # Native queues each call, and the realm dispatches the queue on its
         # event loop after the native callback has returned.
-        threads=(
+        threads=async_hosts.threads(
+            bound,
             "The callback runs asynchronously on the JavaScript thread that "
-            "registered it, after native queues the call."
+            "registered it, after native queues the call.",
         ),
+        fields=async_hosts.omitted_fields(bound),
     )
 
 

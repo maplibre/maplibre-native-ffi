@@ -128,6 +128,52 @@ def accepts_native(bound: BoundApi, value: ValuePlan) -> bool:
     )
 
 
+def threads(bound: BoundApi, sentence: str) -> dict[str, str]:
+    """The `Threads:` paragraph that the host shows in place of the C one, by
+    the C name of each declaration whose callbacks it runs.
+
+    The host runs the callbacks of a registration in the `queue` or `wake`
+    form, so `sentence` says where, for each such callback, registration, and
+    operation that takes one. A registration in the `rules` form, and an
+    operation that takes only such registrations, carry no callback, so their
+    paragraph is empty. A declaration absent here keeps the C paragraph,
+    because native code runs its callbacks, as for a registration in the
+    `native` form.
+    """
+    found: dict[str, str] = {}
+    for value in bound.values.values():
+        match form(bound, value):
+            case "queue" | "wake":
+                found[value.native] = sentence
+                for field in callback_fields(value):
+                    found[field.value.native] = sentence
+            case "rules":
+                found[value.native] = ""
+    for plan in bound.operations:
+        texts = {
+            found.get(registration.descriptor)
+            for registration in plan.registrations
+            if not registration.path
+        }
+        if sentence in texts:
+            found[plan.name] = sentence
+        elif texts == {""}:
+            found[plan.name] = ""
+    return found
+
+
+def omitted_fields(bound: BoundApi) -> dict[str, frozenset[str]]:
+    """The callback fields that the host leaves unset, by the C name of their
+    registration. A sentence of the registration's documentation that names
+    one leaves the host's text."""
+    found = {}
+    for value in bound.values.values():
+        names = frozenset(f.name for f in callback_fields(value) if omitted(bound, f))
+        if names:
+            found[value.native] = names
+    return found
+
+
 def rule_answered_operations(
     bound: BoundApi, registrations: Iterable[ValuePlan]
 ) -> set[str]:
