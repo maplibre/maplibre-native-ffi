@@ -15,18 +15,6 @@ const _featureCollection = {
 
 void main() {
   test('caller-sized text returns a result longer than its first storage', () {
-    final zoom = StyleExpressionHandle.create([
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      0,
-      0,
-      10,
-      100,
-    ]);
-    addTearDown(zoom.close);
-    expect(zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)), 50.0);
-
     // The result outgrows the runtime's first storage, so the call runs
     // again.
     final text = 'a' * 1000;

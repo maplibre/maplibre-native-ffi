@@ -39,21 +39,8 @@ func exitWithLiveHandles(t *testing.T) {
 	if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
-	runtime, err := NewRuntime(RuntimeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.runtime = runtime
-	// A handler accepted before CreateMap receives the map's first events.
-	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(events []RuntimeEvent) {
-		for _, event := range events {
-			f.pendingEvents <- event
-		}
-	}}); err != nil {
-		t.Fatal(err)
-	}
-	f.m = createMap(t, runtime, testMapOptions())
+	// The process exits before the fixture's cleanups can close anything.
+	f := newFixture(t)
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {
 		t.Fatal(err)

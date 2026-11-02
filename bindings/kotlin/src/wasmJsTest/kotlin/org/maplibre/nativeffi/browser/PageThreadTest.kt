@@ -14,9 +14,7 @@ import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.TestSupport
-import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -27,7 +25,6 @@ class PageThreadTest {
   fun aRuntimeCreatedOnThePageCreatesAMap() = runSuspendTest {
     assertTrue(crossOriginIsolated(), "the test page is not cross-origin isolated")
     assertTrue(onThePage(), "the test runs off the page thread")
-    val roots = NativeRoots.countForTesting()
 
     // The page refuses mln_runtime_create, so a runtime that arrives came from a thread that the
     // binding started, and the page yields while that thread starts.
@@ -46,8 +43,6 @@ class PageThreadTest {
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the runtime release")
     assertTrue(map.isClosed)
-    awaitDeliveries()
-    assertEquals(roots, NativeRoots.countForTesting(), "a completion root outlived its release")
   }
 
   @Test
@@ -70,8 +65,7 @@ class PageThreadTest {
   }
 
   @Test
-  fun aCancelledCreationDropsItsRootOnceTheRuntimeArrives() = runSuspendTest {
-    val roots = NativeRoots.countForTesting()
+  fun aCancelledCreationResumesOnceTheRuntimeArrives() = runSuspendTest {
     val creation =
       async(start = CoroutineStart.UNDISPATCHED) {
         RuntimeHandle.create(RuntimeOptions())
@@ -80,9 +74,6 @@ class PageThreadTest {
     // The creation's thread still runs, so the caller resumes once its runtime arrives.
     creation.join()
     assertTrue(creation.isCancelled)
-    // Once the page drains what native queued, the creation holds no root.
-    awaitDeliveries()
-    assertEquals(roots, NativeRoots.countForTesting(), "the creation's root outlived it")
   }
 
   @Test

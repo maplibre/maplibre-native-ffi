@@ -8,7 +8,6 @@ import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /** The pool size the suite loads the module with, unlike the module's default of 20. */
 internal const val TEST_POOL_SIZE: Int = 24
@@ -53,10 +52,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
 // Native consumes each record and queues it, and the page runs the callback as it dispatches.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
-}
-
-internal actual suspend fun awaitDeliveries() {
-  HostDelivery.dispatch()
 }
 
 private fun replaceReportError(sink: (JsReference<Throwable>) -> Boolean): JsAny =

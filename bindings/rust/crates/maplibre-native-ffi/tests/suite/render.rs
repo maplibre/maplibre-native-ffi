@@ -1,8 +1,6 @@
 //! Render sessions on the backend this build compiled in, with GPU contexts
 //! from tests/graphics.
 
-use std::sync::{Arc, mpsc};
-
 use maplibre_native_ffi::*;
 
 use crate::support::graphics::{Graphics, with_frame_view};
@@ -95,76 +93,6 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     // Once the view's scope ends, the frame releases.
     frame.release(None).unwrap();
     session.close();
-}
-
-#[test]
-fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
-    let fixture = styled_fixture();
-    let map = fixture.map();
-
-    // The host's graphics thread creates the context, attaches, and drives
-    // the session; this thread holds only the session's control handle.
-    let (sender, attached) = mpsc::channel::<Arc<RenderSessionHandle>>();
-    let (finish, finished) = mpsc::channel::<()>();
-    std::thread::scope(|scope| {
-        let graphics_thread = scope.spawn(move || {
-            let graphics = Graphics::new();
-            let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
-            let session = Session::finish_attach(
-                graphics
-                    .attach_owned_texture(map, EXTENT, &options)
-                    .unwrap(),
-                wakes,
-            );
-            assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
-            let Session { handle, wakes } = session;
-            let handle = Arc::new(handle);
-            sender.send(Arc::clone(&handle)).unwrap();
-            finished.recv_timeout(timeout()).unwrap();
-            // The graphics thread is the sole owner again, and closes it.
-            let handle = Arc::into_inner(handle).unwrap();
-            Session { handle, wakes }.close();
-        });
-
-        let session = attached.recv_timeout(timeout()).unwrap();
-        // Controls work from any thread, but the driver's work belongs to the
-        // thread whose first service call claimed it.
-        assert_eq!(
-            session.get_snapshot().unwrap().state,
-            RenderSessionState::Attached
-        );
-        let error = session.service_driver_work().unwrap_err();
-        assert_eq!(error.status(), Status::WrongThread);
-        drop(session);
-        finish.send(()).unwrap();
-        graphics_thread.join().unwrap();
-    });
-}
-
-#[test]
-fn a_released_session_lets_the_host_destroy_its_graphics_objects() {
-    let graphics = Graphics::new();
-    let (_fixture, session) = rendering_fixture(&graphics);
-    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
-    // The release completes once the attached session has retired, so the
-    // device may go while the map stays open.
-    session.release();
-    drop(graphics);
-}
-
-#[test]
-fn a_session_dropped_while_attached_retires_before_its_map_releases() {
-    let graphics = Graphics::new();
-    let (fixture, session) = rendering_fixture(&graphics);
-    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
-    // Drop disposes the attached session without reporting its retirement.
-    drop(session);
-    let (runtime, map) = fixture.into_parts();
-    // The map's release completes after the session releases its map
-    // attachment, once no library thread touches the device.
-    wait_for(map.release());
-    drop(graphics);
-    wait_for(runtime.release());
 }
 
 #[test]

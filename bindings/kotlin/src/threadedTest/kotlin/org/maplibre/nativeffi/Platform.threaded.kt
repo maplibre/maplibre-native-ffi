@@ -20,9 +20,6 @@ internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): Te
     withTimeout(TEST_TIMEOUT) { block() }
   }
 
-// Native runs each release and callback inside its own call.
-internal actual suspend fun awaitDeliveries() {}
-
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   setLogCallback(
     LogHandler { _, event, _, _ ->

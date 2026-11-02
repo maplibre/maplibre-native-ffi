@@ -54,7 +54,6 @@ public sealed class CallbackLifetimeTests
 
         Assert.True(map.IsAlive);
         await ((MapHandle)map.Target!).CloseAsync();
-        // The finalizer disposed the map, so the runtime has no live child to refuse its close.
         await runtime.CloseAsync();
     }
 

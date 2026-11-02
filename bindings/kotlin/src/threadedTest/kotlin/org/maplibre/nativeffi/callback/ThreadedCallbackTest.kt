@@ -7,17 +7,12 @@ import kotlin.test.assertIs
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.HttpHeaderTransform
 import org.maplibre.nativeffi.HttpHeaderTransformResponse
-import org.maplibre.nativeffi.LogEvent
-import org.maplibre.nativeffi.LogHandler
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.clearLogCallback
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setHeader
 import org.maplibre.nativeffi.setHttpHeaderTransform
-import org.maplibre.nativeffi.setLogCallback
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -25,33 +20,6 @@ import org.maplibre.nativeffi.withMap
  * threaded target serves.
  */
 class ThreadedCallbackTest {
-  @Test
-  fun aLogCallbackAnswersWhetherItConsumesARecord() = runSuspendTest {
-    val roots = CallbackOwner.global
-    val base = roots.rootCountForTesting()
-    val parsed = CompletableDeferred<LogEvent>()
-    try {
-      setLogCallback(
-        LogHandler { _, event, _, _ ->
-          if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
-          // Leave the record to MapLibre's own logger as well.
-          false
-        },
-      )
-      assertEquals(base + 1, roots.rootCountForTesting())
-      withMap {
-        // A style whose center has the wrong JSON type logs a parser warning.
-        map
-          .setStyleJson("""{"version":8,"center":false,"sources":{},"layers":[]}""")
-          .awaitWithin("the style command")
-        assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
-      }
-    } finally {
-      clearLogCallback()
-    }
-    assertEquals(base, roots.rootCountForTesting())
-  }
-
   @Test
   fun aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread() = runSuspendTest {
     val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()

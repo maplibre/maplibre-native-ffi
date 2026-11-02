@@ -129,12 +129,17 @@ void discarded_commands_keep_the_graph_alive_until_the_worker_drains() {
   );
   const auto map_disposed = mln_map_dispose(map, nullptr);
   const auto runtime_disposed = mln_runtime_dispose(runtime, nullptr);
+  // With the case's lease gone, only the parked worker's queue holds the graph.
+  live.reset();
+  const auto alive_while_parked = !weak.expired();
   worker.release = true;
   mln_test_pulse();
-  live.reset();
   MLN_TEST_OK(submitted);
   MLN_TEST_OK(map_disposed);
   MLN_TEST_OK(runtime_disposed);
+  TEST_ASSERT_TRUE_MESSAGE(
+    alive_while_parked, "the graph retired before its worker drained"
+  );
   TEST_ASSERT_TRUE(expired(weak));
 }
 

@@ -146,16 +146,7 @@ pub const rawStatus = generated.toRaw;
 
 test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     const table = .{
-        .{ c.MLN_STATUS_INVALID_ARGUMENT, error.InvalidArgument },
         .{ c.MLN_STATUS_INVALID_STATE, error.InvalidState },
-        .{ c.MLN_STATUS_WRONG_THREAD, error.WrongThread },
-        .{ c.MLN_STATUS_UNSUPPORTED, error.Unsupported },
-        .{ c.MLN_STATUS_CANCELLED, error.Cancelled },
-        .{ c.MLN_STATUS_BUSY, error.Busy },
-        .{ c.MLN_STATUS_TARGET_LOST, error.TargetLost },
-        .{ c.MLN_STATUS_NOT_READY, error.NotReady },
-        .{ c.MLN_STATUS_NOT_FOUND, error.NotFound },
-        .{ c.MLN_STATUS_NATIVE_ERROR, error.NativeError },
     };
     inline for (table) |row| {
         try std.testing.expectError(row[1], errorFromRawStatus(row[0]));

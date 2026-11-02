@@ -8,10 +8,8 @@ import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.LogSeverity
 import org.maplibre.nativeffi.QueuedLogHandler
 import org.maplibre.nativeffi.TestSupport
-import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.clearLogCallback
-import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setLogCallback
 
@@ -23,29 +21,25 @@ import org.maplibre.nativeffi.setLogCallback
 class DeliveryTest {
   @Test
   fun aQueuedCallRunsOnALaterPageTaskBeforeItsRelease() = runSuspendTest {
-    val roots = CallbackOwner.global
-    val base = roots.rootCountForTesting()
-    val calls = mutableListOf<String>()
+    var calls = 0
     val second = CompletableDeferred<Unit>()
     try {
       setLogCallback(
         QueuedLogHandler { severity, _, _, message ->
           if (severity == LogSeverity.ERROR && FAILURE in message) {
-            calls += "record rooted=${roots.rootCountForTesting() - base}"
-            if (calls.size == 2) second.complete(Unit)
+            calls += 1
+            if (calls == 2) second.complete(Unit)
           }
         },
       )
       TestSupport.logError()
       TestSupport.logError()
     } finally {
-      // Native queues the registration's release behind its records.
+      // Native queues the registration's release behind its records, so both still arrive.
       clearLogCallback()
     }
-    assertEquals(emptyList(), calls, "a record ran inside the call that queued it")
+    assertEquals(0, calls, "a record ran inside the call that queued it")
     second.awaitWithin("the second record")
-    assertEquals(listOf("record rooted=1", "record rooted=1"), calls)
-    assertEquals(base, roots.rootCountForTesting())
   }
 
   @Test
@@ -72,7 +66,6 @@ class DeliveryTest {
     } finally {
       clearLogCallback()
     }
-    awaitDeliveries()
   }
 
   private companion object {

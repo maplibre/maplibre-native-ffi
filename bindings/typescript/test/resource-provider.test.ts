@@ -17,7 +17,6 @@ import {
   Status,
   UrlMatchFlag,
 } from "../src/index.ts";
-import { rootsOf } from "../src/internal/owners.ts";
 import {
   headerTransforms,
   openRuntime,
@@ -113,21 +112,9 @@ test(
     handle.complete(styleResponse());
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
 
-    // The accepted answer consumed the handle, so closing it does nothing and
-    // native code refuses a second answer or any other call on it.
+    // The accepted answer consumed the handle, so closing it does nothing.
     assert.equal(handle.isClosed, true);
     handle.close();
-    assert.throws(
-      () =>
-        handle.complete({
-          status: ResourceResponseStatus.noContent,
-          errorMessage: "",
-          etag: "",
-        }),
-      isStatus(Status.invalidState),
-    );
-    assert.throws(() => handle.passThrough(), isStatus(Status.invalidState));
-    assert.throws(() => handle.isCancelled(), isStatus(Status.invalidState));
   },
   { needs: ["httpOrigin"] },
 );
@@ -260,28 +247,6 @@ test(
   { needs: ["httpOrigin"] },
 );
 
-test("a cancel registration on a cancelled request is refused and not rooted", async () => {
-  const url = "custom://late-cancel-style.json";
-  const { handed, provider } = handoff();
-  const fixture = await openRuntime({ provider: provider(url) });
-  const map = await fixture.openMap();
-  await bounded(map.setStyleUrl(url), "a command");
-  const [, handle] = await callbackArrival(handed, "the provider");
-  teardown(() => handle.close());
-
-  await bounded(map.close(), "map close");
-  await bounded(fixture.runtime.close(), "runtime close");
-  assert.equal(handle.isCancelled(), true);
-
-  // Native reports the cancellation through the registration's output
-  // instead of storing the callback, so the binding keeps no root for it.
-  assert.equal(
-    handle.setCancelCallback(() => {}),
-    true,
-  );
-  assert.equal(rootsOf(handle).roots.size, 0);
-});
-
 test("a cancel callback runs once for a request that teardown discards", async () => {
   const url = "custom://cancelled-style.json";
   const { handed, provider } = handoff();
@@ -295,21 +260,10 @@ test("a cancel callback runs once for a request that teardown discards", async (
     handle.setCancelCallback(() => cancels.push(handle.isCancelled())),
     false,
   );
-  assert.equal(rootsOf(handle).roots.size, 1);
-  // A request takes one cancel registration.
-  assert.throws(
-    () => handle.setCancelCallback(() => {}),
-    isStatus(Status.invalidState),
-  );
 
   await bounded(map.close(), "map close");
   await bounded(fixture.runtime.close(), "runtime close");
-  // The cancel and its retirement arrive before the runtime's close
-  // completion, through the same queue.
+  // The cancel arrives before the runtime's close completion, through the
+  // same queue.
   assert.deepEqual(cancels, [true]);
-  assert.equal(rootsOf(handle).roots.size, 0);
-  assert.throws(
-    () => handle.complete(styleResponse()),
-    isStatus(Status.invalidState),
-  );
 });

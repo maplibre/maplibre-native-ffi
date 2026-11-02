@@ -1,4 +1,6 @@
-// Rejected registrations retain host ownership even when acceptance throws.
+// Resource registrations and requests when allocations fail: a rejected
+// registration leaves ownership with the host, and a request still reaches a
+// terminal response, its cancel, and its release in order.
 #include <optional>
 
 #include <mln/storage/response.hpp>
@@ -16,6 +18,7 @@ struct DispatchedCalls {
   std::size_t requests = 0;
   std::size_t cancels = 0;
   std::size_t releases = 0;
+  std::size_t cancels_at_release = 0;
   mln_resource_request cancelled = MLN_HANDLE_NULL;
 };
 
@@ -33,7 +36,10 @@ void record_queued_cancel(void*, mln_resource_request handle) {
   dispatched.cancelled = handle;
 }
 
-void record_queued_release(void*) { ++dispatched.releases; }
+void record_queued_release(void*) {
+  ++dispatched.releases;
+  dispatched.cancels_at_release = dispatched.cancels;
+}
 
 void rejected_provider_registration_queues_no_release() {
   auto unexpected_retirements = std::size_t{};
@@ -267,6 +273,7 @@ void a_queued_cancel_precedes_its_release_when_allocations_fail() {
   TEST_ASSERT_EQUAL_size_t(1, dispatched.cancels);
   TEST_ASSERT_EQUAL_UINT64(handle, dispatched.cancelled);
   TEST_ASSERT_EQUAL_size_t(1, dispatched.releases);
+  TEST_ASSERT_EQUAL_size_t(1, dispatched.cancels_at_release);
   mln_resource_request_release(handle);
   mln_delivery_queue_release(queue);
 }

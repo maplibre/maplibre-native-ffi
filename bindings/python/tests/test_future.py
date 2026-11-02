@@ -50,8 +50,6 @@ def test_cancelling_a_derived_future_cancels_a_pending_source() -> None:
     # claimed the source.
     assert wait([source, result], timeout=0).done == {source, result}
     assert set(as_completed([source, result], timeout=0)) == {source, result}
-    # A late completion finds the source cancelled and takes no result.
-    assert source._claim() is False
 
 
 def test_a_value_that_arrives_after_cancellation_is_dropped() -> None:

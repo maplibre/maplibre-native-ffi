@@ -1,6 +1,5 @@
-// The status and diagnostic contract every call shares, how a handle parameter
-// rejects a value that names no live object, and what the library reports
-// about its own build.
+// The status and diagnostic contract every call shares, and what the library
+// reports about its own build.
 
 #include "support/test_support.h"
 
@@ -82,11 +81,8 @@ static void android_initialization_requires_its_environment_and_context(void) {
 #endif
 }
 
-// A binding compares the ABI version against the one it was generated for,
-// and the backend mask decides which render targets it offers.
-static void the_library_reports_its_abi_version_and_built_backend(void) {
-  TEST_ASSERT_EQUAL_UINT32(0, mln_c_version());
-
+// The backend mask decides which render targets a binding offers.
+static void the_library_reports_its_built_backend(void) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const uint32_t expected = MLN_RENDER_BACKEND_FLAG_METAL;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -106,5 +102,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
   RUN_TEST(a_native_exception_becomes_native_error_with_its_text);
   RUN_TEST(android_initialization_requires_its_environment_and_context);
-  RUN_TEST(the_library_reports_its_abi_version_and_built_backend);
+  RUN_TEST(the_library_reports_its_built_backend);
 }

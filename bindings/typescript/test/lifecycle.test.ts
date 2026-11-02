@@ -13,7 +13,6 @@ import {
 import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, test, turn } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
-import { runtimeIsLive } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
 
 function isInvalidState(error: unknown): boolean {
@@ -21,12 +20,11 @@ function isInvalidState(error: unknown): boolean {
 }
 
 test(
-  "a call before the browser module loads throws and leaves nothing pending",
+  "a call before the browser module loads throws",
   () => {
-    const { error, pending } = capabilities.beforeLoad!();
+    const error = capabilities.beforeLoad!();
     assert.ok(error instanceof Error, "the call did not throw");
     assert.match(error.message, /call loadModule\(\) first/);
-    assert.equal(pending, 0);
   },
   { needs: ["beforeLoad"] },
 );
@@ -109,7 +107,6 @@ test("a refused close leaves the handle usable for a later close", async () => {
 
   await bounded(map.close(), "map close");
   await bounded(runtime.close(), "runtime close");
-  assert.equal(runtimeIsLive(runtime.id), false);
 });
 
 test("a handle id names its events and outlives close", async () => {

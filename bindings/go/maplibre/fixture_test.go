@@ -238,20 +238,3 @@ func notify(wake chan<- struct{}) {
 	default:
 	}
 }
-
-// awaitCondition re-checks ready until it holds. Only a state that raises no
-// wake of its own uses it, such as a request's cancelled flag.
-func awaitCondition(t *testing.T, what string, ready func() bool) {
-	t.Helper()
-	recheck := time.NewTicker(time.Millisecond)
-	defer recheck.Stop()
-	deadline := time.NewTimer(testTimeout())
-	defer deadline.Stop()
-	for !ready() {
-		select {
-		case <-recheck.C:
-		case <-deadline.C:
-			t.Fatalf("timed out waiting for %s", what)
-		}
-	}
-}

@@ -3,21 +3,14 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Host strings cross as counted views, and native validates URLs before a
-/// C-string consumer reads them. Native-lent strings decode as C strings.
-@Test func hostStringsUseViewsAndNativeLentStringsDecode() async throws {
+/// Host strings cross as counted views, so an embedded NUL survives, and
+/// native-lent strings decode as C strings. Invalid UTF-8 from native throws.
+@Test func hostStringsUseViewsAndNativeLentStringsDecode() throws {
   let arena = NativeInputArena()
   let view = arena.view("é\0")
   #expect(try NativeString.copyUTF8(data: view.data, size: view.size) == "é\0")
   #expect(try NativeString
     .copyCString(arena.cString("native-lent")) == "native-lent")
-
-  try await withMapFixture { fixture in
-    let error = await expectMaplibreError(.invalidArgument) {
-      try await fixture.map.setStyleUrl("custom://a\0b.json")
-    }
-    #expect(error?.status == .invalidArgument)
-  }
 
   var invalid: [UInt8] = [0xFF]
   #expect(throws: MaplibreError.self) {

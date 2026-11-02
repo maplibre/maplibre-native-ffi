@@ -89,15 +89,6 @@ static void expect_image(
   TEST_ASSERT_EQUAL_size_t(strlen(name) + strlen(availability) + 3, length);
 }
 
-static void constants_evaluate_without_inputs(void) {
-  expect_evaluates("[\"+\", 1, 2]", NULL, "3.0");
-  expect_evaluates("\"text\"", NULL, "\"text\"");
-  expect_evaluates(
-    "[\"literal\", {\"a\": [1, true]}]", NULL, "{\"a\":[1.0,true]}"
-  );
-  expect_evaluates("null", NULL, "null");
-}
-
 static void each_input_reaches_the_expression_that_reads_it(void) {
   mln_style_expression_inputs inputs = {
     .size = sizeof(mln_style_expression_inputs)
@@ -188,6 +179,10 @@ static void values_serialize_as_style_json(void) {
   // writes them.
   expect_evaluates("[\"/\", 0, 0]", NULL, "null");
   expect_evaluates("[\"literal\", [1, 2]]", NULL, "[1.0,2.0]");
+  expect_evaluates(
+    "[\"literal\", {\"a\": [1, true]}]", NULL, "{\"a\":[1.0,true]}"
+  );
+  expect_evaluates("\"text\"", NULL, "\"text\"");
   expect_evaluates("[\"-\", [\"ln\", 0]]", NULL, "null");
 }
 
@@ -506,7 +501,6 @@ static void an_expression_evaluates_and_releases_on_another_thread(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(constants_evaluate_without_inputs);
   RUN_TEST(each_input_reaches_the_expression_that_reads_it);
   RUN_TEST(within_reads_the_canonical_tile);
   RUN_TEST(values_serialize_as_style_json);

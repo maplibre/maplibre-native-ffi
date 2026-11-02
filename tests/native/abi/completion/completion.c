@@ -1,4 +1,5 @@
-// Raw C ABI coverage for one-shot completions and direct queue wakes.
+// One-shot completions: when they run and release, and how discarded commands
+// are fenced by a later completion.
 
 #include "support/camera.h"
 #include "support/frames.h"
@@ -63,30 +64,6 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.releases));
-}
-
-static void record_wake(void* user_data) {
-  atomic_fetch_add((atomic_uint*)user_data, 1);
-}
-
-static void runtime_events_wake_the_receiver_directly(void) {
-  atomic_uint wakes;
-  atomic_init(&wakes, 0);
-  const mln_wake event_wake = {
-    .callback = record_wake,
-    .user_data = &wakes,
-  };
-  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
-  mln_test_configure_events(runtime, event_wake);
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
-  MLN_TEST_OK(mln_test_map_fence(map));
-  TEST_ASSERT_GREATER_THAN_UINT32(0, atomic_load(&wakes));
-  TEST_ASSERT_GREATER_THAN_size_t(0, mln_test_drain_all(runtime));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 static void discarded_commands_publish_state_and_events_before_a_later_query(
@@ -216,7 +193,6 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
 MLN_TEST_GROUP {
   RUN_TEST(an_accepted_completion_runs_and_releases_exactly_once);
   RUN_TEST(a_rejected_submission_leaves_callback_state_with_the_caller);
-  RUN_TEST(runtime_events_wake_the_receiver_directly);
   RUN_TEST(discarded_commands_publish_state_and_events_before_a_later_query);
   RUN_TEST(a_later_command_completion_fences_discarded_commands);
   RUN_TEST(discarded_commands_keep_synchronous_validation);

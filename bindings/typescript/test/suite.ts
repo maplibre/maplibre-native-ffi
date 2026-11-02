@@ -1,6 +1,5 @@
 // Register the shared binding cases once for every host runner.
 
-import "./callbacks.test.ts";
 import "./completions.test.ts";
 import "./errors.test.ts";
 import "./event-loop.test.ts";

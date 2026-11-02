@@ -11,7 +11,7 @@ import pytest
 from support import EMPTY_STYLE, TIMEOUT, Harness, ready_map, result
 
 
-def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
+def test_a_closed_handle_refuses_use_and_a_synchronous_close_repeats_safely() -> None:
     with pytest.raises(TypeError):
         mln.MapHandle()
 
@@ -86,7 +86,6 @@ def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> 
         map_handle = ready_map(runtime)
     _check_handle(runtime, closed=True)
     _check_handle(map_handle, closed=False)
-    assert type(map_handle).__module__ == "maplibre_native_ffi"
     result(map_handle.close())
 
 

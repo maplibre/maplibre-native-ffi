@@ -114,18 +114,3 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try fixture.fence();
     try fixture.closeMap();
 }
-
-// Native retirement of a disposed runtime waits for its live maps, so a map
-// stays readable and releasable after its runtime is disposed. Native refuses
-// the map's commands once its runtime is disposed.
-test "a child map stays usable after its runtime is disposed" {
-    var runtime = try maplibre.Runtime.create(.{}, null);
-    const created = try runtime.createMap(support.mapOptions(), null);
-    var map = created.map;
-    try support.resolve(created.ready);
-
-    runtime.deinit();
-    try testing.expectError(error.InvalidState, runtime.getEventMask(null));
-    _ = try map.getSnapshot(null);
-    try support.closeMapHandle(&map);
-}

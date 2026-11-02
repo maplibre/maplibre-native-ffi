@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class HandleLifecycleTests
 {
     [Fact]
-    public async Task SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative()
+    public async Task ASecondCloseFailsAndADisposeAfterCloseDoesNothing()
     {
         var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = runtime.CreateMap(NativeFixture.SmallMap);
@@ -42,10 +42,6 @@ public sealed class HandleLifecycleTests
         );
         runtime.Dispose();
         runtime.Dispose();
-
-        var disposed = RuntimeHandle.Create(new RuntimeOptions());
-        disposed.Dispose();
-        await disposed.DisposeAsync();
     }
 
     [Fact]

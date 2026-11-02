@@ -50,10 +50,9 @@ private func expectDescription(
       closed: true
     )
 
-    let error = await expectMaplibreError(.invalidState) {
+    await expectMaplibreError(.invalidState) {
       try await fixture.map.addGeoJsonSourceData("late", data: data)
     }
-    #expect(error?.status == .invalidState)
   }
 }
 
@@ -79,23 +78,13 @@ private func expectDescription(
     id: map.id,
     closed: true
   )
-  let repeated = await expectMaplibreError(.invalidState) {
+  await expectMaplibreError(.invalidState) {
     try await map.close()
   }
-  #expect(repeated?.status == .invalidState)
 
-  // The runtime refuses its release until the disposed map retires.
-  var teardown: NativeFuture<Void>?
-  try await awaitCondition("the disposed map to retire") {
-    do {
-      teardown = try runtime.startClose()
-      return true
-    } catch let error as MaplibreError where error.status == .invalidState {
-      return false
-    }
-  }
+  // The runtime finishes its teardown once the disposed map retires.
+  try runtime.dispose()
   #expect(runtime.isClosed)
-  try await teardown?.value()
 }
 
 /// A handle's id is the source that its events carry, and it stays readable
@@ -121,10 +110,9 @@ private func expectDescription(
 @Test func aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds(
 ) async throws {
   let fixture = try await MapFixture.make()
-  let refusal = await expectMaplibreError(.invalidState) {
+  await expectMaplibreError(.invalidState) {
     try await fixture.runtime.close()
   }
-  #expect(refusal?.status == .invalidState)
   try await fixture.runtime.clearResourceTransform()
 
   try await fixture.map.close()

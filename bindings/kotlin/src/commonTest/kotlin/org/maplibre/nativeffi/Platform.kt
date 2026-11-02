@@ -19,10 +19,3 @@ internal expect suspend fun requestCollection()
  * where the binding's reports go to the log.
  */
 internal expect fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)?
-
-/**
- * Waits until native's releases and deliveries so far have reached Kotlin. A threaded target runs
- * each one inside native's call, so this returns at once. On wasm, native queues each one, and the
- * page dispatches them in order on later tasks.
- */
-internal expect suspend fun awaitDeliveries()

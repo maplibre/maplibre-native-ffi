@@ -800,6 +800,9 @@ static void failed_loads_report_their_text(void) {
       &fixture, map, still_diagnostic, sizeof(still_diagnostic)
     )
   );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(still_diagnostic, denied_message), still_diagnostic
+  );
   // The failed style command queued its loading-failed event before completing.
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE_FAILURE, log, &context);

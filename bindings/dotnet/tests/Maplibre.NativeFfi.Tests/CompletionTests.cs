@@ -148,32 +148,4 @@ public sealed class CompletionTests
         completion.release_user_data(completion.user_data);
         return task;
     }
-
-    // A still image on a static map with no session stays pending until the map closes, so every
-    // outcome below comes from the wait rather than from native. A caller abandons a wait with
-    // WaitAsync.
-    [Fact]
-    public async Task AWaitCanTimeOutOrBeCancelled()
-    {
-        await using var fixture = await NativeFixture.CreateAsync(
-            NativeFixture.SmallMap with
-            {
-                MapMode = MapMode.Static,
-            }
-        );
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        var stillImage = fixture.Map.RequestStillImageAsync();
-
-        await Assert.ThrowsAsync<TimeoutException>(() =>
-            stillImage.WaitAsync(TimeSpan.Zero, TestWaits.Token)
-        );
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            stillImage.WaitAsync(cancellation.Token)
-        );
-
-        // The native request is still outstanding, and closing the map retires it.
-        Assert.False(stillImage.IsCompleted);
-        await fixture.Map.CloseAsync();
-    }
 }

@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-func TestClosingTwiceIsSafe(t *testing.T) {
+// Once a close is accepted, a second close and any other call fail with
+// StatusInvalidState and a diagnostic, and Dispose does nothing.
+func TestCallsAfterCloseFailWithInvalidState(t *testing.T) {
 	f := newFixture(t)
 	await(t, submitted(f.m.Close()))
 	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {

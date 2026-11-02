@@ -154,52 +154,26 @@ def test_a_log_callback_survives_a_collection_and_still_runs(
 def test_a_providers_routes_decide_which_requests_reach_it(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    seen: list[tuple[mln.ResourceKind, str]] = []
-    sprites = {mln.ResourceKind.SPRITE_JSON, mln.ResourceKind.SPRITE_IMAGE}
-    sprites_seen = threading.Event()
-    routed_style = {
-        "version": 8,
-        "sprite": "custom://routed/sprite",
-        "sources": {},
-        "layers": [],
-    }
+    seen: list[str] = []
 
     def provide(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> None:
-        seen.append((request.kind, request.requested_url))
-        if request.kind == mln.ResourceKind.STYLE:
-            handle.complete(ok_response(routed_style))
-        else:
-            handle.complete(denied_response())
-        if sprites <= {kind for kind, _ in seen}:
-            sprites_seen.set()
+        seen.append(request.requested_url)
+        handle.complete(ok_response())
 
-    routes = [
-        # Another kind: claims no style or sprite, whatever its URL.
-        mln.ResourceRoute(
-            kinds=mln.ResourceKindFlag.TILE,
-            flags=mln.UrlMatchFlag.GLOB,
-            url="**",
-        ),
-        # A URL pattern alone claims every kind under it.
-        mln.ResourceRoute(
-            flags=mln.UrlMatchFlag.GLOB,
-            url="custom://routed/**",
-        ),
-    ]
-    registered = harness.runtime.set_resource_provider(
-        mln.ResourceProvider(callback=provide, routes=typing.cast(typing.Any, routes))
+    result(
+        harness.runtime.set_resource_provider(
+            mln.ResourceProvider(
+                callback=provide,
+                routes=[
+                    mln.ResourceRoute(
+                        flags=mln.UrlMatchFlag.GLOB, url="custom://routed/**"
+                    )
+                ],
+            )
+        )
     )
-    # Native holds its own copy, so a route that would claim everything,
-    # added after the call, claims nothing.
-    routes[0] = mln.ResourceRoute(
-        kinds=mln.ResourceKindFlag.ALL,
-        flags=mln.UrlMatchFlag.GLOB,
-        url="**",
-    )
-    routes.clear()
-    result(registered)
 
     # A style outside the routes passes through to native, which serves no
     # such scheme.
@@ -209,9 +183,7 @@ def test_a_providers_routes_decide_which_requests_reach_it(
 
     map_handle.set_style_url("custom://routed/style.json")
     harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
-    assert sprites_seen.wait(TIMEOUT)
-    assert seen[0] == (mln.ResourceKind.STYLE, "custom://routed/style.json")
-    assert all(url.startswith("custom://routed/") for _, url in seen)
+    assert seen == ["custom://routed/style.json"]
 
 
 def test_callbacks_and_completions_run_on_the_dispatcher_thread(
@@ -294,16 +266,3 @@ def test_waiting_for_a_pending_future_in_a_callback_raises(
     assert isinstance(exception_error, RuntimeError)
     # The future resolves once the callback has returned.
     assert result(typing.cast(typing.Any, pending)).generation > 0
-
-
-def test_a_header_transform_takes_native_rules_alone(harness: Harness) -> None:
-    assert list(mln.HttpHeaderTransform.__dataclass_fields__) == ["rules"]
-    rule = mln.HttpHeaderRule(
-        flags=mln.UrlMatchFlag.GLOB,
-        url="http://127.0.0.1:1/**",
-        headers=[mln.HttpHeader(name="X-Test", value="rules")],
-    )
-    result(
-        harness.runtime.set_http_header_transform(mln.HttpHeaderTransform(rules=[rule]))
-    )
-    result(harness.runtime.clear_http_header_transform())

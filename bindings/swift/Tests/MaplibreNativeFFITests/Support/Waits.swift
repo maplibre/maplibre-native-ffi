@@ -13,8 +13,8 @@ enum TestTimeout {
     return value
   }()
 
-  static func deadline(seconds: Double = 10) -> DispatchTime {
-    .now() + seconds * scale
+  static func deadline() -> DispatchTime {
+    .now() + 10 * scale
   }
 }
 
@@ -67,38 +67,29 @@ final class Pulse: @unchecked Sendable {
   }
 }
 
-/// How often a waiter re-checks its condition without a signal, which covers
-/// state the library publishes without a wake, such as a disposed map's
-/// retirement.
-private let recheckInterval = DispatchTimeInterval.milliseconds(20)
-
-/// Waits until `condition` holds, re-checking it on every pulse. Records an
-/// issue naming `subject` and returns false at the deadline.
+/// Waits until `condition` holds, re-checking it on every pulse, so the
+/// condition may read only state whose writer pulses after it writes. Records
+/// an issue naming `subject` and returns false at the deadline.
 @discardableResult
 func awaitCondition(
   _ subject: String,
-  seconds: Double = 10,
   sourceLocation: SourceLocation = #_sourceLocation,
   _ condition: () throws -> Bool
 ) async rethrows -> Bool {
-  let deadline = TestTimeout.deadline(seconds: seconds)
+  let deadline = TestTimeout.deadline()
   while true {
     let seen = Pulse.shared.generation
     if try condition() {
       return true
     }
-    let now = DispatchTime.now()
-    guard now < deadline else {
+    guard DispatchTime.now() < deadline else {
       Issue.record(
         "timed out waiting for \(subject)",
         sourceLocation: sourceLocation
       )
       return false
     }
-    await Pulse.shared.wait(
-      past: seen,
-      until: min(deadline, now + recheckInterval)
-    )
+    await Pulse.shared.wait(past: seen, until: deadline)
   }
 }
 

@@ -665,8 +665,8 @@ static void frame_results_report_whether_the_map_was_fully_loaded(void) {
   mln_test_provider_destroy(provider);
 }
 
-// The backends whose renderer counts frames and draws per render pass, which
-// the 0032-webgpu-frame-stats patch carries for WebGPU, Metal, and Vulkan.
+// The backends whose renderer counts frames and draws per render pass:
+// WebGPU, Metal, and Vulkan.
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU) || \
   defined(MLN_FFI_TEST_BACKEND_METAL) || defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #define COUNTS_DRAWS_PER_FRAME 1

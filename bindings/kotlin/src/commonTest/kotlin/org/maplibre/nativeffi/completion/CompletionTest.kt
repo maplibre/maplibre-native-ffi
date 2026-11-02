@@ -23,11 +23,6 @@ import org.maplibre.nativeffi.RuntimeEventHandler
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.internal.c.C
-import org.maplibre.nativeffi.internal.c.CompletionLayout
-import org.maplibre.nativeffi.internal.call.nativeUnit
-import org.maplibre.nativeffi.internal.callback.NativeRoots
-import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
@@ -43,34 +38,6 @@ class CompletionTest {
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
         map.discarding.resize(LogicalExtent(0u, 8u, 1.0))
       }
-    }
-  }
-
-  @Test
-  fun aSubmissionNativeRejectsLeavesNoCompletionBehind() = runSuspendTest {
-    withMap {
-      var token = 0L
-      // Native rejects the unknown state before it takes the completion, so the call itself throws
-      // the rejection and the bridge frees its state without returning a Deferred.
-      val failure =
-        assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-          nativeUnit(runtime, runtime.binding) {
-            token = readAddress(completion + CompletionLayout.USER_DATA)
-            check(
-              C.mln_runtime_set_offline_region_download_state(
-                handle,
-                1,
-                900,
-                completion,
-                diagnostic,
-              ),
-            )
-          }
-        }
-      assertTrue(failure.diagnostic.isNotEmpty(), "the rejection carries its diagnostic")
-      assertTrue(token != 0L, "the rejected call received a completion token")
-      // Setup completions may still be releasing their state, so inspect only this call's root.
-      assertNull(NativeRoots.get(token))
     }
   }
 

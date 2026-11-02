@@ -53,23 +53,21 @@ private struct ConversionFailure: Error {}
   }
 }
 
-/// A completion delivers its value to the one waiter exactly once, and when
-/// the conversion of a delivered value fails, the waiter gets the conversion's
+/// A completion delivers its converted value to its waiter, and when the
+/// conversion of a delivered value fails, the waiter gets the conversion's
 /// error.
-@Test func aCompletionDeliversOnceAndAFailedConversionThrows() async throws {
+@Test func aCompletionDeliversItsValueAndAFailedConversionThrows(
+) async throws {
   let held = HeldCompletion()
-  let converted = LockedBox(0)
   let delivered = try NativeCompletion.start({ completion, _ in
     held.keep(completion)
     return MLN_STATUS_OK
   }) { result in
-    converted.update { $0 += 1 }
-    return try NativeCompletion.value(result, as: Int32.self)
+    try NativeCompletion.value(result, as: Int32.self)
   }
   held.deliver(value: 42)
   held.release()
   #expect(try await delivered.value() == 42)
-  #expect(converted.value == 1)
 
   let failingHeld = HeldCompletion()
   let failing = try NativeCompletion.start({ completion, _ in

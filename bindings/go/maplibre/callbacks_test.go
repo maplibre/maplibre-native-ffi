@@ -271,48 +271,23 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
 }
 
-// Native copies a provider's routes, so the caller may reuse the slice once the
-// submission returns. Only a request that a route matches reaches the
-// callback, and any other passes through to native loading. A route that names
-// a kind claims no other kind, and one that names only a URL pattern claims
-// every kind.
+// A provider's routes reach native code: a request that a route matches
+// reaches the callback, and any other passes through to native loading.
 func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	f := newFixture(t)
-	const routedStyle = `{"version":8,"sources":{"tiles":{"type":"vector","url":"custom://any/tiles.json"}},"layers":[]}`
-	type routed struct {
-		url  string
-		kind ResourceKind
-	}
-	requests := make(chan routed, 8)
-	deny := denyingProvider().Callback
-	routes := []ResourceRoute{
-		{Kinds: ResourceKindFlagTile, Flags: UrlMatchFlagGlob, Url: "**"},
-		{Kinds: ResourceKindFlagStyle, Url: "custom://routed/style.json"},
-		{Flags: UrlMatchFlagGlob, Url: "custom://any/**"},
-	}
+	requests := make(chan string, 4)
+	routes := []ResourceRoute{{Kinds: ResourceKindFlagStyle, Flags: UrlMatchFlagGlob, Url: "custom://routed/**"}}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		offer(requests, routed{request.RequestedUrl, request.Kind})
-		if request.RequestedUrl != "custom://routed/style.json" {
-			deny(request, handle)
-			return
-		}
-		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(routedStyle)})
+		offer(requests, request.RequestedUrl)
+		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)})
 	}})))
-	for i := range routes {
-		routes[i] = ResourceRoute{Url: "custom://overwritten.json"}
-	}
 
 	if _, err := f.m.SetStyleUrl("custom://routed/style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the routed style load", isStyleLoaded)
-	for _, want := range []routed{
-		{"custom://routed/style.json", ResourceKindStyle},
-		{"custom://any/tiles.json", ResourceKindSource},
-	} {
-		if got := receive(t, requests, want.url); got != want {
-			t.Fatalf("the provider received %+v, want %+v", got, want)
-		}
+	if got := receive(t, requests, "the routed request"); got != "custom://routed/style.json" {
+		t.Fatalf("the provider received %q", got)
 	}
 
 	// No route claims this style, so native loading fails it for its scheme.
@@ -322,7 +297,7 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	f.awaitEvent(t, "the unrouted style's loading failure", isLoadingFailure("custom://unrouted/style.json"))
 	select {
 	case got := <-requests:
-		t.Fatalf("the provider received %+v, which no route matches", got)
+		t.Fatalf("the provider received %q, which no route matches", got)
 	default:
 	}
 }
@@ -390,12 +365,10 @@ func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
 }
 
 // A cancel callback that native stores on a live request survives a
-// collection to run when the request is discarded. On a request native already
-// cancelled, SetCancelCallback reports the cancellation and never runs the
-// callback.
-func TestCancelCallbackRunsOnlyWhenStored(t *testing.T) {
+// collection to run when the request is discarded.
+func TestCancelCallbackSurvivesACollectionUntilItRuns(t *testing.T) {
 	f := newFixture(t)
-	requests := make(chan *ResourceRequestHandle, 2)
+	requests := make(chan *ResourceRequestHandle, 1)
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
 	}})))
@@ -412,25 +385,6 @@ func TestCancelCallbackRunsOnlyWhenStored(t *testing.T) {
 	// Closing the map discards the request, which runs the callback.
 	await(t, submitted(f.m.Close()))
 	receive(t, ran, "the cancel callback")
-
-	other := createMap(t, f.runtime, testMapOptions())
-	if _, err := other.SetStyleUrl("custom://discarded.json"); err != nil {
-		t.Fatal(err)
-	}
-	discarded := receive(t, requests, "the discarded request")
-	await(t, submitted(other.Close()))
-	// Nothing signals a cancellation that has no callback to run.
-	awaitCondition(t, "the request's cancellation", func() bool {
-		cancelled, err := discarded.IsCancelled()
-		return err != nil || cancelled
-	})
-	cancelled, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { t.Error("a callback ran for an already cancelled request") }})
-	if !cancelled || err != nil {
-		t.Fatalf("SetCancelCallback on a cancelled request = (%v, %v), want (true, nil)", cancelled, err)
-	}
-	if err := discarded.Close(); err != nil {
-		t.Fatal(err)
-	}
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}

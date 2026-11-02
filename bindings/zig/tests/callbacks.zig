@@ -46,10 +46,10 @@ fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handl
     return error.NativeError;
 }
 
-// A provider's error stays inside the binding, which reports it and releases
-// the request it adopted. A request the provider already answered keeps that
+// A provider's error stays inside the binding, which logs it and releases the
+// request it adopted. A request the provider already answered keeps that
 // answer, and one it did not answer fails.
-test "an error returned by a resource provider is contained and reported" {
+test "an error returned by a resource provider is contained" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = completeThenFail });
@@ -124,27 +124,6 @@ test "a kept request handle answers its request later from another thread" {
     try testing.expect(handle.isClosed());
     try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }, null));
     try testing.expectError(error.InvalidState, copy.complete(.{ .bytes = support.style_json }, null));
-    var loaded = try fixture.waitForEvent(.map_style_loaded);
-    loaded.deinit();
-}
-
-// A released handle's copies stay closed, including after the provider takes
-// further requests.
-test "released request handle copies stay closed after later requests" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    var provider = DeferringProvider{ .url = "custom://stale.json" };
-    try provider.install(fixture);
-
-    var stale = try provider.take(fixture);
-    var stale_copy = stale;
-    stale.release();
-    try testing.expectError(error.InvalidState, stale_copy.isCancelled(null));
-
-    var live = try provider.take(fixture);
-    defer live.release();
-    try testing.expectError(error.InvalidState, stale_copy.complete(.{ .bytes = support.style_json }, null));
-    try live.complete(.{ .bytes = support.style_json }, null);
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }

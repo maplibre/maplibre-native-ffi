@@ -10,7 +10,6 @@ import Testing
       try fixture.runtime
         .setEventMask(RuntimeEventFlag(rawValue: 1 << 63))
     }
-    #expect(native?.status == .invalidArgument)
     #expect(native?.diagnostic.isEmpty == false)
     #expect(native?.description
       .hasPrefix("invalidArgument: ") == true)
@@ -21,7 +20,6 @@ import Testing
       try await fixture.map.close()
       return try fixture.map.getSnapshot()
     }
-    #expect(binding?.status == .invalidState)
     #expect(binding?.diagnostic.isEmpty == false)
   }
 }

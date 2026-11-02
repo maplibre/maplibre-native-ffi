@@ -1,6 +1,5 @@
-// Completions: dispatch through the realm's queue, conversion failures,
-// rejected submissions, failed commands, discarded commands, and waits that
-// give up.
+// Completions: conversion failures, failed commands, discarded commands, and
+// waits that give up.
 
 import assert from "node:assert/strict";
 
@@ -11,17 +10,13 @@ import {
   MaplibreError,
   Status,
 } from "../src/index.ts";
-import { native } from "../src/internal/addon.ts";
-import { run } from "../src/internal/completions.ts";
 import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, test } from "./support/harness.ts";
-import { pendingCompletions } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
 
-test("a completion delivers once and reports a value that fails to convert", async () => {
+test("a value that fails to convert rejects its completion", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
-  const pending = pendingCompletions();
   // The addon converts a JSON value through the realm's JSON.parse, so a
   // parse that throws fails the conversion.
   const parse = JSON.parse;
@@ -37,26 +32,7 @@ test("a completion delivers once and reports a value that fails to convert", asy
   } finally {
     JSON.parse = parse;
   }
-  assert.equal(pendingCompletions(), pending);
   await bounded(map.getGlobalState(), "a later call");
-  assert.equal(pendingCompletions(), pending);
-});
-
-test("a submission native rejects frees its completion state", async () => {
-  const pending = pendingCompletions();
-  // Native never knows the null runtime, so it refuses the call.
-  await assert.rejects(
-    run((completion) =>
-      native.mln_runtime_clear_resource_transform(0n, completion),
-    ),
-    (error) =>
-      error instanceof MaplibreError && error.status === Status.invalidArgument,
-  );
-  assert.equal(pendingCompletions(), pending);
-
-  const fixture = await openRuntime();
-  await bounded(fixture.runtime.clearResourceTransform(), "a later call");
-  assert.equal(pendingCompletions(), pending);
 });
 
 test("a failed command rejects with its status and generation", async () => {

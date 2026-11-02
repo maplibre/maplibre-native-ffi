@@ -91,14 +91,10 @@ export interface Capabilities {
   /** The host defines `Symbol.dispose` and `Symbol.asyncDispose`. */
   readonly disposers?: true;
   /**
-   * What a call made before the browser module loaded threw, and how many
-   * entries it left pending. Other hosts load the addon as they import the
-   * binding, so no call precedes the load.
+   * What a call made before the browser module loaded threw. Other hosts load
+   * the addon as they import the binding, so no call precedes the load.
    */
-  readonly beforeLoad?: () => {
-    readonly error: unknown;
-    readonly pending: number;
-  };
+  readonly beforeLoad?: () => unknown;
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
   readonly unrefTimer: (timer: ReturnType<typeof setTimeout>) => void;

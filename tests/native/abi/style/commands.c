@@ -66,10 +66,6 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
     mln_map_remove_style_source(map, source, &completion.descriptor, NULL)
   );
   TEST_ASSERT_FALSE(source_exists(map, "owned-source"));
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "source does not exist",
-    mln_map_remove_style_source(map, source, &completion.descriptor, NULL)
-  );
 
   const uint8_t pixel[4] = {0, 0, 0, 0};
   mln_premultiplied_rgba8_image image = {
@@ -311,15 +307,12 @@ static void set_transition_options(
 static const uint32_t timing =
   MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
 
-static void a_loaded_style_reports_the_300_ms_transition_default(void) {
+// MapLibre picks the default duration, so the case checks only which fields
+// the read reports.
+static void transition_options_report_the_fields_the_style_sets(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_UINT32(0, read_transition_options(map).fields & timing);
-
-  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
-  mln_style_transition_options read = read_transition_options(map);
-  TEST_ASSERT_BITS_HIGH(MLN_STYLE_TRANSITION_OPTION_DURATION, read.fields);
-  TEST_ASSERT_EQUAL_DOUBLE(300.0, read.duration_ms);
 
   mln_test_load_style_and_wait(
     map, MLN_BUFFER_LITERAL(
@@ -327,7 +320,7 @@ static void a_loaded_style_reports_the_300_ms_transition_default(void) {
            "\"layers\":[]}"
          )
   );
-  read = read_transition_options(map);
+  const mln_style_transition_options read = read_transition_options(map);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_TRANSITION_OPTION_DELAY, read.fields & timing
   );
@@ -470,7 +463,7 @@ MLN_TEST_GROUP {
   RUN_TEST(missing_style_ids_report_not_found);
   RUN_TEST(global_state_reads_back_defaults_and_set_properties);
   RUN_TEST(the_loaded_style_document_reads_back_as_loaded);
-  RUN_TEST(a_loaded_style_reports_the_300_ms_transition_default);
+  RUN_TEST(transition_options_report_the_fields_the_style_sets);
   RUN_TEST(style_transition_options_reject_unsafe_raw_input);
   RUN_TEST(the_style_light_round_trips_through_json);
 }

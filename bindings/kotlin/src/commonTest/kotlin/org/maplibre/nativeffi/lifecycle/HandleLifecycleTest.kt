@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.lifecycle
 
-// AutoCloseable's `use`, which the suspending `use` imported below would shadow.
+// `useAndClose` is AutoCloseable's `use`, which the suspending `use` imported below would shadow.
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -56,12 +56,9 @@ class HandleLifecycleTest {
   @Test
   fun aDisposeEndsTheHandleAndRepeatedCleanupDoesNothing() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    val id = "0x" + runtime.id.toString(16)
     assertFalse(runtime.isClosed)
-    assertEquals("RuntimeHandle(id=$id, closed=false)", runtime.toString())
     runtime.dispose()
     assertTrue(runtime.isClosed)
-    assertEquals("RuntimeHandle(id=$id, closed=true)", runtime.toString())
     // A second dispose, a close, and either `use` leave the disposed handle as it is.
     runtime.dispose()
     runtime.close()

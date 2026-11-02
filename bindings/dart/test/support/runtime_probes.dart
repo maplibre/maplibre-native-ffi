@@ -1,70 +1,20 @@
-import 'dart:async';
 import 'dart:ffi';
 import 'dart:mirrors';
 
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/callback/delivery_queue.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart' as runtime;
 import 'package:maplibre_native_ffi/src/values.dart';
 
 // Tests inspect library-private state through VM mirrors, keeping probes out of
 // the shipped runtime and leaving the production converters under test.
 final _runtime = reflectClass(runtime.CommandCompletion).owner as LibraryMirror;
-final _queue = reflectClass(DeliveryQueue).owner as LibraryMirror;
 
 Symbol _symbol(String name, LibraryMirror library) =>
     MirrorSystem.getSymbol(name, library);
 
-Object? _field(Object target, String name, [LibraryMirror? library]) =>
-    reflect(target).getField(_symbol(name, library ?? _runtime)).reflectee
-        as Object?;
-
-/// Observes the runtime's retirement hook without adding state to registrations.
-final class RegistrationProbe {
-  RegistrationProbe(DeliveryRegistration registration) {
-    final previous = registration.onRetired;
-    registration.onRetired = () {
-      previous?.call();
-      _retired.complete();
-    };
-  }
-
-  final _retired = Completer<void>();
-  bool get closed => _retired.isCompleted;
-  Future<void> get released => _retired.future;
-}
-
-/// The one callback registration that owner still roots, or null.
-RegistrationProbe? singleRegistrationProbeForTesting(Object owner) {
-  final roots = _field(owner, '_callbackRoots')!;
-  final queued = _field(roots, 'queued') as Set<DeliveryRegistration>;
-  return queued.isEmpty ? null : RegistrationProbe(queued.single);
-}
-
-RegistrationProbe? logRegistrationProbeForTesting() {
-  final registrations =
-      _field(isolateDeliveryQueue, '_registrations', _queue)
-          as Map<int, WeakReference<DeliveryRegistration>>;
-  final pending = registrations.values
-      .map((reference) => reference.target)
-      .whereType<DeliveryRegistration>()
-      .where(
-        (registration) => registration.callbacks.containsKey(#mln_log_callback),
-      );
-  return pending.isEmpty ? null : RegistrationProbe(pending.last);
-}
-
-/// The function pointer that runs a dispatched resource provider call.
-raw.mln_resource_provider_callback resourceProviderCallbackForTesting() =>
-    _runtime
-            .getField(_symbol('_deliverResourceProviderCallback', _runtime))
-            .reflectee
-        as raw.mln_resource_provider_callback;
-
-/// The completions this isolate's delivery queue still waits for.
-int pendingCompletionCountForTesting() =>
-    (_field(isolateDeliveryQueue, '_pendingCompletions', _queue) as Map).length;
+Object? _field(Object target, String name) =>
+    reflect(target).getField(_symbol(name, _runtime)).reflectee as Object?;
 
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_event_batch_view batch,
@@ -83,18 +33,6 @@ List<LatLng> decodeLatLngListForTesting(raw.mln_completion_result result) {
       ).invoke(_symbol('readList', _runtime), [result]).reflectee
       as List<LatLng>;
 }
-
-T adoptOwnedForTesting<T>(
-  int handle,
-  T Function() adopt,
-  void Function(int) dispose,
-) =>
-    _runtime.invoke(_symbol('_adoptOwned', _runtime), [
-          handle,
-          adopt,
-          dispose,
-        ]).reflectee
-        as T;
 
 /// Prepares wakes as an owner's call would, without a render backend.
 final class WakeRootsProbe {

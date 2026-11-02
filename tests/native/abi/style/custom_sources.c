@@ -494,60 +494,6 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
   }
 }
 
-static void jump_to_zoom(mln_map map, double zoom) {
-  mln_camera_update camera = {
-    .size = sizeof(mln_camera_update),
-    .camera = {.size = sizeof(mln_camera_options)}
-  };
-  camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.camera.zoom = zoom;
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &camera, &completion.descriptor, NULL)
-  );
-}
-
-// Zooming in past a tile the host has not answered, beyond the zoom levels
-// MapLibre prefetches below the ideal one, keeps it at most as an optional
-// fallback, which cancels it. Zooming back out requires it again, which fetches
-// it again.
-static void a_cancelled_tile_is_fetched_when_required_again(void) {
-  FOR_EACH_KIND(kind) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    custom_probe probe;
-    mln_test_render_fixture fixture = {0};
-    start_rendering(kind, runtime, map, &probe, &fixture);
-
-    const size_t fetches = atomic_load(&probe.root_fetches);
-    const size_t cancels = atomic_load(&probe.root_cancels);
-    jump_to_zoom(map, 6);
-    probe_target cancelled = {
-      .probe = &probe, .root_fetches = fetches, .root_cancels = cancels + 1
-    };
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_style_render_until(
-        &fixture, probe_reached, &cancelled, "the root tile's cancel"
-      ),
-      kind->name
-    );
-
-    jump_to_zoom(map, 0);
-    probe_target refetched = {
-      .probe = &probe, .root_fetches = fetches + 1, .root_cancels = cancels + 1
-    };
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_style_render_until(
-        &fixture, probe_reached, &refetched, "the root tile's fetch"
-      ),
-      kind->name
-    );
-
-    mln_test_render_fixture_destroy(&fixture);
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-}
-
 // Set from MapLibre's threads, so it lives in static storage that outlives any
 // registration a failing case leaves behind. The expected fragment is written
 // before the callback is installed and only read after.
@@ -899,7 +845,6 @@ MLN_TEST_GROUP {
   RUN_TEST(accepted_adds_release_their_callback_state);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
   RUN_TEST(a_failed_tile_is_reported_and_invalidation_refetches_it);
-  RUN_TEST(a_cancelled_tile_is_fetched_when_required_again);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);
 }

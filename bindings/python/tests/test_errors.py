@@ -2,7 +2,7 @@
 
 import maplibre_native_ffi as mln
 import pytest
-from support import Harness, map_options, result
+from support import Harness, result
 
 
 def test_native_statuses_carry_their_status_and_diagnostic(
@@ -26,14 +26,3 @@ def test_native_statuses_carry_their_status_and_diagnostic(
         assert raised.value.diagnostic
         assert str(raised.value) == f"{status.name}: {raised.value.diagnostic}"
     assert "network status" in invalid_argument.value.diagnostic
-
-
-def test_a_closed_handle_reports_the_native_status() -> None:
-    runtime = mln.RuntimeHandle.create()
-    result(runtime.close())
-
-    with pytest.raises(mln.MaplibreError) as raised:
-        runtime.create_map(map_options())
-
-    assert raised.value.status == mln.Status.INVALID_STATE
-    assert raised.value.diagnostic

@@ -30,6 +30,5 @@ public sealed class LoggingTests
             )
         );
         Assert.Equal((999u, 998u, 42L, "é"), copied);
-        _ = MaplibreNative.CVersion();
     }
 }

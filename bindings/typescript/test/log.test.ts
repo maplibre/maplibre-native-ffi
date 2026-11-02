@@ -16,7 +16,6 @@ import {
 } from "../src/index.ts";
 import { openRuntime } from "./support/fixture.ts";
 import { bounded, teardown, test } from "./support/harness.ts";
-import { liveRoots, released } from "./support/internals.ts";
 
 /** Whether a message is one of the two rules around a debug-log dump. */
 function isDumpRule(message: string): boolean {
@@ -39,26 +38,20 @@ function collectDumpRules(): [LogSeverity, LogEvent][] {
  * records reach the realm's queue before the dump's completion does.
  */
 async function openLoggingMap(): Promise<MapHandle> {
-  const roots = liveRoots();
   setLogAsyncSeverityMask(0);
-  teardown(async () => {
+  teardown(() => {
     clearLogCallback();
     setLogAsyncSeverityMask(LogSeverityFlag.default);
-    // The release arrives through the realm's queue; a later case that counts roots
-    // must not see it.
-    await released(() => liveRoots() === roots, "the log registration release");
   });
   const fixture = await openRuntime();
   return fixture.openMap();
 }
 
-test("replacing the log callback releases the previous registration", async () => {
+test("a replaced or cleared log callback receives no more records", async () => {
   const map = await openLoggingMap();
-  const baseline = liveRoots();
   const dump = () => bounded(map.dumpDebugLogs(), "a command");
 
   const first = collectDumpRules();
-  assert.equal(liveRoots(), baseline + 1);
   await dump();
   const rules = first.length;
   assert.ok(rules > 0);
@@ -71,19 +64,11 @@ test("replacing the log callback releases the previous registration", async () =
   );
 
   const replacement = collectDumpRules();
-  await released(
-    () => liveRoots() === baseline + 1,
-    "the replaced registration release",
-  );
   await dump();
   assert.equal(replacement.length, rules);
   assert.equal(first.length, rules);
 
   clearLogCallback();
-  await released(
-    () => liveRoots() === baseline,
-    "the cleared registration release",
-  );
   await dump();
   assert.equal(replacement.length, rules);
 });

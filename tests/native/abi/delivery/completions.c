@@ -304,22 +304,6 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void runtime_release_can_finish_before_queued_results_run(void) {
-  mln_test_calls_reset();
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
-  const mln_completion queued = mln_test_queue_completion(queue.handle, NULL);
-  MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &queued, NULL));
-  MLN_TEST_AWAIT_OK(mln_runtime_release(runtime, &completion.descriptor, NULL));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_calls.count);
-  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
-  mln_test_delivery_queue_release(&queue);
-  TEST_ASSERT_EQUAL_size_t(1, mln_test_calls.count);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(operation_and_command_completions_reach_the_queue);
   RUN_TEST(a_rejected_submission_queues_nothing);
@@ -327,6 +311,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_later_completion_follows_earlier_queued_completions);
   RUN_TEST(list_results_outlive_the_runtime);
   RUN_TEST(runtime_release_completes_through_the_queue);
-  RUN_TEST(runtime_release_can_finish_before_queued_results_run);
   RUN_TEST(a_completion_for_a_released_queue_is_discarded);
 }

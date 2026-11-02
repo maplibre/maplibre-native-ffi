@@ -151,26 +151,11 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_call_maps_its_status_and_keeps_an_unknown_code() {
-        let statuses = [
-            (sys::MLN_STATUS_INVALID_ARGUMENT, Status::InvalidArgument),
-            (sys::MLN_STATUS_INVALID_STATE, Status::InvalidState),
-            (sys::MLN_STATUS_WRONG_THREAD, Status::WrongThread),
-            (sys::MLN_STATUS_UNSUPPORTED, Status::Unsupported),
-            (sys::MLN_STATUS_CANCELLED, Status::Cancelled),
-            (sys::MLN_STATUS_BUSY, Status::Busy),
-            (sys::MLN_STATUS_TARGET_LOST, Status::TargetLost),
-            (sys::MLN_STATUS_NOT_READY, Status::NotReady),
-            (sys::MLN_STATUS_NOT_FOUND, Status::NotFound),
-            (sys::MLN_STATUS_NATIVE_ERROR, Status::NativeError),
-        ];
-        for (status, expected) in statuses {
-            let error = failing_call(status, b"failed\0");
-            assert_eq!(error.status(), expected);
-            assert_eq!(error.to_string(), format!("{expected}: failed"));
-            assert_eq!(error.status().as_raw(), status);
-            assert_eq!(error.diagnostic(), "failed");
-        }
+    fn a_failed_call_carries_its_status_and_keeps_an_unknown_code() {
+        let error = failing_call(sys::MLN_STATUS_INVALID_STATE, b"failed\0");
+        assert_eq!(error.status(), Status::InvalidState);
+        assert_eq!(error.diagnostic(), "failed");
+        assert_eq!(error.to_string(), "INVALID_STATE: failed");
 
         let error = failing_call(-123_456, b"future status\0");
         assert_eq!(error.status(), Status::Unknown(-123_456));

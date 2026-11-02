@@ -1,37 +1,10 @@
-// What a case observes below the public API: the realm's callback roots and
-// pending completions, and whether native code still knows a handle.
+// What the binding reports outside the public API: its console output and the
+// errors that host callbacks throw.
 
 import process from "node:process";
 
-import { MaplibreError, Status } from "../../src/index.ts";
-import { native } from "../../src/internal/addon.ts";
-import { rootReleaseListeners } from "../../src/internal/realm.ts";
-import { callbackArrival, teardown } from "./harness.ts";
+import { teardown } from "./harness.ts";
 import { capabilities } from "./host-capabilities.ts";
-
-export { liveRoots, pendingCompletions } from "../../src/internal/realm.ts";
-
-/**
- * Whether native code still knows a runtime, asked through the raw export,
- * which is the only way to name a runtime that no owner holds.
- */
-export function runtimeIsLive(runtime: bigint): boolean {
-  try {
-    native.mln_runtime_get_event_mask(runtime);
-    return true;
-  } catch (error) {
-    // Native rejects a handle it never issued, and reports a released one as
-    // stale.
-    if (
-      error instanceof MaplibreError &&
-      (error.status === Status.invalidArgument ||
-        error.status === Status.invalidState)
-    ) {
-      return false;
-    }
-    throw error;
-  }
-}
 
 /**
  * Collects what the binding writes through `console[method]` during the
@@ -75,21 +48,4 @@ export function captureReportedErrors(): string[] {
     scope.reportError = original;
   });
   return errors;
-}
-
-/**
- * Resolves once `done` holds, checking now and after each callback root
- * release. A release arrives through the realm's queue with no Promise of its
- * own, so the wait holds the event loop as a callback arrival does.
- */
-export function released(done: () => boolean, what: string): Promise<void> {
-  let check!: () => void;
-  const settled = new Promise<void>((resolve) => {
-    check = () => done() && resolve();
-  });
-  rootReleaseListeners.add(check);
-  check();
-  return callbackArrival(settled, what).finally(() =>
-    rootReleaseListeners.delete(check),
-  );
 }

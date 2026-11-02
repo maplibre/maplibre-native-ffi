@@ -6,7 +6,6 @@
 // console, and reports the run to scripts/run-browser-test.mjs.
 
 import { loadModule, RuntimeHandle } from "../../src/browser.ts";
-import { pendingCompletions } from "../../src/internal/realm.ts";
 
 // The suite checks against the Node types, which declare no page globals.
 declare const location: { readonly href: string };
@@ -23,10 +22,7 @@ try {
   // A call before the load throws, which a case checks once the module loads.
   let error: unknown;
   await RuntimeHandle.create().catch((thrown: unknown) => (error = thrown));
-  (globalThis as { mlnTsBeforeLoad?: unknown }).mlnTsBeforeLoad = {
-    error,
-    pending: pendingCompletions(),
-  };
+  (globalThis as { mlnTsBeforeLoad?: unknown }).mlnTsBeforeLoad = error;
   await loadModule(new URL("maplibre_native_ffi_test.mjs", location.href));
   await import("../suite.ts");
   const { execute, scheduled } = await import("../support/harness.ts");

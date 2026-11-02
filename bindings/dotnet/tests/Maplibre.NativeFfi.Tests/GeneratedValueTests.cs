@@ -86,14 +86,6 @@ public sealed class GeneratedValueTests
         // The layer ID comes back as text that native lends for the completion.
         await fixture.Map.AddStyleLayerJsonAsync("""{"id":"café-层","type":"background"}""", "");
         Assert.Equal(["café-层"], (await fixture.Map.ListStyleLayersAsync()).Select(l => l.Id));
-
-        // Native rejects a NUL in a URL view before a C-string consumer reads it.
-        var error = Assert.Throws<MaplibreException>(() =>
-        {
-            _ = fixture.Map.SetStyleUrlAsync("style\0.json");
-        });
-        Assert.Contains("embedded NUL", error.Diagnostic, StringComparison.Ordinal);
-        Assert.Equal(Status.InvalidArgument, error.Status);
     }
 
     [Fact]

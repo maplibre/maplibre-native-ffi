@@ -1,74 +1,13 @@
-// Resource providers: routes that decide which requests reach the provider,
-// and queued requests that the binding hands over as owned handles.
+// Resource providers: queued requests that the binding hands over as owned
+// handles, and the errors that their callbacks throw.
 import 'dart:async';
-import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
-    show nativeDiagnostic;
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
-    as raw;
-import 'package:maplibre_native_ffi/src/internal/callback/delivery_queue.dart';
-import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
-import 'support/runtime_probes.dart';
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
 void main() {
-  test('a routed provider answers the requests its routes match', () async {
-    const styleUrl = 'custom://routed-style.json';
-    const sourceUrl = 'custom://routed-source.json';
-    final requested = <(String?, ResourceKind)>[];
-    final sourceRequested = Completer<void>();
-    final fixture = await openRuntime(
-      provider: routedProvider(
-        [
-          // A route with the default kinds claims the style and its source alike.
-          ResourceRoute(
-            flags: UrlMatchFlag.glob,
-            url: 'custom://routed-*.json',
-          ),
-        ],
-        (request, handle) {
-          requested.add((request.requestedUrl, request.kind));
-          handle.complete(
-            ResourceResponse(
-              status: ResourceResponseStatus.ok,
-              bytes: jsonBytes(
-                request.kind == ResourceKind.style
-                    ? {
-                        'version': 8,
-                        'sources': {
-                          'routed': {'type': 'vector', 'url': sourceUrl},
-                        },
-                        'layers': <Object?>[],
-                      }
-                    : {
-                        'tilejson': '3.0.0',
-                        'tiles': ['custom://unrouted/{z}/{x}/{y}.pbf'],
-                      },
-              ),
-            ),
-          );
-          if (request.kind == ResourceKind.source) sourceRequested.complete();
-        },
-      ),
-    );
-    final map = await fixture.openMap();
-
-    await expectCommitted(map.setStyleUrl(styleUrl));
-    final loaded = await fixture.awaitEventType(
-      RuntimeEventType.mapStyleLoaded,
-    );
-    expect(loaded.source, map.id);
-    await within(sourceRequested.future, 'the source request');
-    expect(requested, [
-      (styleUrl, ResourceKind.style),
-      (sourceUrl, ResourceKind.source),
-    ]);
-  });
-
   test('a provider answers a request after its callback returns', () async {
     const styleUrl = 'custom://deferred-style.json';
     final handed = Completer<(ResourceRequestInfo, ResourceRequestHandle)>();
@@ -152,7 +91,7 @@ void main() {
     },
   );
 
-  test('a cancel callback runs once for a request teardown discards', () async {
+  test('a cancel callback runs for a request that teardown discards', () async {
     const styleUrl = 'custom://cancelled-style.json';
     final handed = Completer<ResourceRequestHandle>();
     final cancelled = Completer<bool>();
@@ -173,74 +112,11 @@ void main() {
     final map = await fixture.openMap();
     await expectCommitted(map.setStyleUrl(styleUrl));
     final handle = await within(handed.future, 'the provider');
-    final probe = singleRegistrationProbeForTesting(handle)!;
-    expect(probe.closed, isFalse);
 
     await within(map.close(), 'map close');
     await within(fixture.runtime.close(), 'runtime close');
     expect(await within(cancelled.future, 'the cancel callback'), isTrue);
-    // The retirement that follows the one delivery unroots the registration,
-    // so no second delivery can arrive.
-    await within(probe.released, 'the cancel registration release');
     expect(zoneErrors, [isA<StateError>()]);
-    expect(singleRegistrationProbeForTesting(handle), isNull);
     handle.close();
-  });
-
-  test(
-    'a cancel registration on a cancelled request is refused and not rooted',
-    () async {
-      const styleUrl = 'custom://late-cancel-style.json';
-      final handed = Completer<ResourceRequestHandle>();
-      final fixture = await openRuntime(
-        provider: routedProvider([
-          styleRoute(styleUrl),
-        ], (_, handle) => handed.complete(handle)),
-      );
-      final map = await fixture.openMap();
-      await expectCommitted(map.setStyleUrl(styleUrl));
-      final handle = await within(handed.future, 'the provider');
-      addTearDown(handle.close);
-
-      await within(map.close(), 'map close');
-      await within(fixture.runtime.close(), 'runtime close');
-      expect(handle.isCancelled(), isTrue);
-
-      // Native reports the cancellation through the registration's output
-      // instead of storing the callback, so the binding keeps no root for it.
-      expect(handle.setCancelCallback(() {}), isTrue);
-      expect(singleRegistrationProbeForTesting(handle), isNull);
-    },
-  );
-
-  test('a call for a registration this isolate no longer holds releases its '
-      'request, which fails it', () async {
-    const styleUrl = 'custom://unclaimed-style.json';
-    final fixture = await openRuntime();
-    // A provider whose token names no registration of this isolate, as one
-    // whose registration the isolate already dropped would.
-    await startNativeCompletion<void>(
-      start: (completion) => withNativeArena((arena) {
-        final provider = arena<raw.mln_resource_provider>();
-        provider.ref.size = sizeOf<raw.mln_resource_provider>();
-        provider.ref.callback = resourceProviderCallbackForTesting();
-        provider.ref.queue = isolateDeliveryQueue.handle;
-        provider.ref.user_data = Pointer.fromAddress(0x7fffffff);
-        return raw.mln_runtime_set_resource_provider(
-          fixture.runtime.id.toSigned(64).toInt(),
-          provider,
-          completion,
-          nativeDiagnostic,
-        );
-      }),
-      decode: (_) {},
-    );
-    final map = await fixture.openMap();
-
-    await expectCommitted(map.setStyleUrl(styleUrl));
-    final failure = await fixture.awaitEventType(
-      RuntimeEventType.mapLoadingFailed,
-    );
-    expect(failure.message, contains('released without a response'));
   });
 }

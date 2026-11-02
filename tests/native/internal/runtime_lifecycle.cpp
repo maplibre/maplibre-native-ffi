@@ -1,5 +1,7 @@
-// Runtime release against a map's physical cleanup, which runs on a teardown
-// lane after the map's own release has completed.
+// What a runtime or map release waits for: a map's physical cleanup, which
+// runs on a teardown lane after the map's own release has completed, queued
+// leases, accepted completions, and worker thread destruction. Also the stack
+// size of the threads a runtime starts.
 
 #include <cstddef>
 #include <thread>

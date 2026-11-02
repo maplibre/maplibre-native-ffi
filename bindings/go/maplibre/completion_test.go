@@ -28,9 +28,9 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	}
 }
 
-// A value that fails to convert, whether by error or by panic, fails the
-// future instead of unwinding into native.
-func TestCompletionDeliversExactlyOnce(t *testing.T) {
+// A delivered result stays readable by every Await. A result with no value, or
+// a conversion that panics, fails the future instead of unwinding into native.
+func TestCompletionSettlesItsFutureFromTheResult(t *testing.T) {
 	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	first := int32(7)
 	deliver(0, &first)

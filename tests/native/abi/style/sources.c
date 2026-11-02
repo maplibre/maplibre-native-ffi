@@ -323,7 +323,7 @@ static void read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
 
 static const mln_lat_lng corners[4] = {{1, 2}, {1, 3}, {0, 3}, {0, 2}};
 
-static void image_sources_hold_corners_and_pixels(void) {
+static void image_sources_take_corners_images_and_urls(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
@@ -426,5 +426,5 @@ MLN_TEST_GROUP {
   RUN_TEST(sources_list_in_style_order_with_their_info);
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
-  RUN_TEST(image_sources_hold_corners_and_pixels);
+  RUN_TEST(image_sources_take_corners_images_and_urls);
 }

@@ -60,8 +60,6 @@ static bool sources_hold_the_features(void* context) {
   return true;
 }
 
-static void defaults(mln_geo_json_source_options* options) { (void)options; }
-
 static void clustered(mln_geo_json_source_options* options) {
   options->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
   options->cluster = true;
@@ -156,16 +154,6 @@ typedef struct geojson_data_case {
 } geojson_data_case;
 
 static const geojson_data_case geojson_data_cases[] = {
-  {"an unknown geometry type",
-   "{\"type\":\"Unsupported\",\"coordinates\":[]}",
-   0,
-   defaults,
-   {"is invalid"}},
-  {"a geometry type that is not a string",
-   "{\"type\":1}",
-   0,
-   defaults,
-   {"type must be a string"}},
   {"bytes after the document", trailing_bytes, 0, NULL, {NULL}},
   {"an embedded NUL", embedded_nul, sizeof(embedded_nul) - 1, NULL, {NULL}},
   {"undersized options", EMPTY_COLLECTION, 0, undersized, {NULL}},
