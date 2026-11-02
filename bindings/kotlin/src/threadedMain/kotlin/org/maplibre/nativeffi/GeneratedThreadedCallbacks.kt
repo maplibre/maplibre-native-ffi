@@ -25,8 +25,6 @@ public data class LogHandler(
 /**
  * Receives a log message. Kotlin/Wasm takes `QueuedLogCallback` in its place.
  *
- * Return true if you handled the message, or false to also send it to the platform's log.
- *
  * Native code calls it on one of its own threads and waits for it to return.
  *
  * If it throws, native receives `false`, and the binding reports it as a `CallbackException`.

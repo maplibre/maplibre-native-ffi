@@ -2013,10 +2013,10 @@ class MetalBorrowedTextureDescriptor:
     `MapHandle.attach_metal_borrowed_texture()` and
     `RenderSessionHandle.set_metal_borrowed_texture_target()`.
 
-    `extent` sets the map's size and scale factor, and `physical_width` and
-    `physical_height` give the textures' size in pixels. The textures must
-    all have that size, one device, one pixel format, one sample, and
-    MTLTextureUsageRenderTarget.
+    `extent` sets the map's size and the session's scale factor, so give it
+    the map's scale factor. `physical_width` and `physical_height` give the
+    textures' size in pixels. The textures must all have that size, one
+    device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
 
     The session uses the textures until a replacement or release of the
     target completes, a detach or disposal of the session completes, or an
@@ -2373,8 +2373,9 @@ class OpenGlBorrowedTextureDescriptor:
     `MapHandle.attach_open_gl_borrowed_texture()` and
     `RenderSessionHandle.set_open_gl_borrowed_texture_target()`.
 
-    `extent` sets the map's size and scale factor, and `physical_width` and
-    `physical_height` give the textures' size in pixels. The context must use
+    `extent` sets the map's size and the session's scale factor, so give it
+    the map's scale factor. `physical_width` and `physical_height` give the
+    textures' size in pixels. The context must use
     `OpenGlContextOwnership.SHARED`. Each texture must be in your context's
     share group, with storage of that size.
 
@@ -4106,10 +4107,10 @@ class VulkanBorrowedTextureDescriptor:
     `MapHandle.attach_vulkan_borrowed_texture()` and
     `RenderSessionHandle.set_vulkan_borrowed_texture_target()`.
 
-    `extent` sets the map's size and scale factor, and `physical_width` and
-    `physical_height` give the images' size in pixels. Each image must have
-    that size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong
-    to the context's device.
+    `extent` sets the map's size and the session's scale factor, so give it
+    the map's scale factor. `physical_width` and `physical_height` give the
+    images' size in pixels. Each image must have that size, `format`, and
+    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 
     The session uses the images until a replacement or release of the target
     completes, a detach or disposal of the session completes, or an abandon
@@ -4459,9 +4460,6 @@ class CustomSourceFetchTileCallback(Protocol):
 
 class LogCallback(Protocol):
     """Receives a log message.
-
-    Return true if you handled the message, or false to also send it to the
-    platform's log.
 
     The callback runs on the binding's dispatcher thread, after native queues
     the call.

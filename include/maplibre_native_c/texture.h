@@ -48,8 +48,9 @@ typedef struct mln_metal_borrowed_texture {
  * A ring of your Metal textures, for mln_map_attach_metal_borrowed_texture()
  * and mln_render_session_set_metal_borrowed_texture_target().
  *
- * `extent` sets the map's size and scale factor, and `physical_width` and
- * `physical_height` give the textures' size in pixels. The textures must all
+ * `extent` sets the map's size and the session's scale factor, so give it the
+ * map's scale factor. `physical_width` and `physical_height` give the
+ * textures' size in pixels. The textures must all
  * have that size, one device, one pixel format, one sample, and
  * MTLTextureUsageRenderTarget. The ring holds up to MLN_TEXTURE_RING_MAX_DEPTH
  * distinct textures.
@@ -136,11 +137,11 @@ typedef enum mln_vulkan_image_owner : uint32_t {
  * A ring of your Vulkan images, for mln_map_attach_vulkan_borrowed_texture()
  * and mln_render_session_set_vulkan_borrowed_texture_target().
  *
- * `extent` sets the map's size and scale factor, and `physical_width` and
- * `physical_height` give the images' size in pixels. Each image must have that
- * size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the
- * context's device. The ring holds up to MLN_TEXTURE_RING_MAX_DEPTH distinct
- * images.
+ * `extent` sets the map's size and the session's scale factor, so give it the
+ * map's scale factor. `physical_width` and `physical_height` give the images'
+ * size in pixels. Each image must have that size, `format`, and
+ * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
+ * ring holds up to MLN_TEXTURE_RING_MAX_DEPTH distinct images.
  *
  * The session uses the images until a replacement or release of the target
  * completes, a detach or disposal of the session completes, or an abandon of it
@@ -207,8 +208,9 @@ typedef struct mln_open_gl_borrowed_texture {
  * A ring of your OpenGL textures, for mln_map_attach_open_gl_borrowed_texture()
  * and mln_render_session_set_open_gl_borrowed_texture_target().
  *
- * `extent` sets the map's size and scale factor, and `physical_width` and
- * `physical_height` give the textures' size in pixels. The context must use
+ * `extent` sets the map's size and the session's scale factor, so give it the
+ * map's scale factor. `physical_width` and `physical_height` give the
+ * textures' size in pixels. The context must use
  * MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED. Each texture must be in your context's
  * share group, with storage of that size. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
@@ -252,8 +254,9 @@ typedef struct mln_web_gpu_borrowed_texture {
  * A ring of your WebGPU textures, for mln_map_attach_web_gpu_borrowed_texture()
  * and mln_render_session_set_web_gpu_borrowed_texture_target().
  *
- * `extent` sets the map's size and scale factor, and `physical_width` and
- * `physical_height` give the textures' size in pixels. Each texture must be 2D
+ * `extent` sets the map's size and the session's scale factor, so give it the
+ * map's scale factor. `physical_width` and `physical_height` give the
+ * textures' size in pixels. Each texture must be 2D
  * with that size, `format`, one layer, one mip level, one sample, and
  * WGPUTextureUsage_RenderAttachment. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.

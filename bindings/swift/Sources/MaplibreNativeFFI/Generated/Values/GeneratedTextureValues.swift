@@ -31,10 +31,10 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
 /// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
 /// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the textures' size in pixels. The textures must all
-/// have that size, one device, one pixel format, one sample, and
-/// MTLTextureUsageRenderTarget.
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The textures must all have that size, one device,
+/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -227,8 +227,9 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
 /// `MapHandle.attachOpenGlBorrowedTexture()` and
 /// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the textures' size in pixels. The context must use
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The context must use
 /// `OpenGlContextOwnership.shared`. Each texture must be in your context's
 /// share group, with storage of that size.
 ///
@@ -471,10 +472,10 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
 /// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`
 /// and `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the images' size in pixels. Each image must have that
-/// size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the
-/// context's device.
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the images'
+/// size in pixels. Each image must have that size, `format`, and
+/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of

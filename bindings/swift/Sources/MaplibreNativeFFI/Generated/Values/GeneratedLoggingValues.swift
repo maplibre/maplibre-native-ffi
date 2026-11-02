@@ -5,9 +5,6 @@ import Foundation
 
 /// Receives a log message.
 ///
-/// Return true if you handled the message, or false to also send it to the
-/// platform's log.
-///
 /// Runs on the thread that logged the message, or on a background thread for
 /// the severities that `setLogAsyncSeverityMask()` selects. The callback can't
 /// call the library.

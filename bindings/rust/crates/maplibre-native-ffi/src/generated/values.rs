@@ -2093,10 +2093,10 @@ impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
 /// `MapHandle::attach_metal_borrowed_texture()` and
 /// `RenderSessionHandle::set_metal_borrowed_texture_target()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the textures' size in pixels. The textures must all
-/// have that size, one device, one pixel format, one sample, and
-/// MTLTextureUsageRenderTarget.
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The textures must all have that size, one device,
+/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2567,8 +2567,9 @@ impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
 /// `MapHandle::attach_open_gl_borrowed_texture()` and
 /// `RenderSessionHandle::set_open_gl_borrowed_texture_target()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the textures' size in pixels. The context must use
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The context must use
 /// `OpenGlContextOwnership::Shared`. Each texture must be in your context's
 /// share group, with storage of that size.
 ///
@@ -5246,10 +5247,10 @@ impl ToNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
 /// `MapHandle::attach_vulkan_borrowed_texture()` and
 /// `RenderSessionHandle::set_vulkan_borrowed_texture_target()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the images' size in pixels. Each image must have that
-/// size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the
-/// context's device.
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the images'
+/// size in pixels. Each image must have that size, `format`, and
+/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -5635,10 +5636,10 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture> for WebGpuBorrowedTexture {
 /// `MapHandle::attach_web_gpu_borrowed_texture()` and
 /// `RenderSessionHandle::set_web_gpu_borrowed_texture_target()`.
 ///
-/// `extent` sets the map's size and scale factor, and `physical_width` and
-/// `physical_height` give the textures' size in pixels. Each texture must be 2D
-/// with that size, `format`, one layer, one mip level, one sample, and
-/// WGPUTextureUsage_RenderAttachment.
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. Each texture must be 2D with that size, `format`,
+/// one layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of

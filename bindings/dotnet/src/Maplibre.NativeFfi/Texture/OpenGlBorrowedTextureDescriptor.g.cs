@@ -8,11 +8,11 @@ namespace Maplibre.NativeFfi;
 /// <c>RenderSessionHandle.SetOpenGlBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// <para><c>extent</c> sets the map's size and scale factor, and
-/// <c>physical_width</c> and <c>physical_height</c> give the textures' size in
-/// pixels. The context must use <c>OpenGlContextOwnership.Shared</c>. Each
-/// texture must be in your context's share group, with storage of that
-/// size.</para>
+/// <para><c>extent</c> sets the map's size and the session's scale factor, so
+/// give it the map's scale factor. <c>physical_width</c> and
+/// <c>physical_height</c> give the textures' size in pixels. The context must
+/// use <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your
+/// context's share group, with storage of that size.</para>
 /// <para>The session uses the textures until a replacement or release of the
 /// target completes, a detach or disposal of the session completes, or an
 /// abandon of it returns.</para>

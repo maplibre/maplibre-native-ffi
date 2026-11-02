@@ -29,8 +29,6 @@ public data class QueuedLogHandler(
  * Receives a log message. The page receives the call after native has answered it, so the callback
  * returns nothing, and native answers `true` as it does for a queue.
  *
- * Return true if you handled the message, or false to also send it to the platform's log.
- *
  * The page calls it when it dispatches the binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.

@@ -6,8 +6,6 @@ namespace Maplibre.NativeFfi;
 /// Receives a log message.
 /// </summary>
 /// <remarks>
-/// <para>Return true if you handled the message, or false to also send it to
-/// the platform's log.</para>
 /// <para>Runs on the thread that logged the message, or on a background thread
 /// for the severities that <c>MaplibreNative.SetLogAsyncSeverityMask()</c>
 /// selects. The callback can't call the library.</para>

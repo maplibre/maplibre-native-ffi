@@ -8,11 +8,11 @@ namespace Maplibre.NativeFfi;
 /// <c>RenderSessionHandle.SetVulkanBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// <para><c>extent</c> sets the map's size and scale factor, and
-/// <c>physical_width</c> and <c>physical_height</c> give the images' size in
-/// pixels. Each image must have that size, <c>format</c>, and
-/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's
-/// device.</para>
+/// <para><c>extent</c> sets the map's size and the session's scale factor, so
+/// give it the map's scale factor. <c>physical_width</c> and
+/// <c>physical_height</c> give the images' size in pixels. Each image must have
+/// that size, <c>format</c>, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and
+/// belong to the context's device.</para>
 /// <para>The session uses the images until a replacement or release of the
 /// target completes, a detach or disposal of the session completes, or an
 /// abandon of it returns.</para>

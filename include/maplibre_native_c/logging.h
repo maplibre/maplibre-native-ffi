@@ -63,8 +63,9 @@ typedef enum mln_log_event : uint32_t {
 /**
  * Receives a log message.
  *
- * Return true if you handled the message, or false to also send it to the
- * platform's log.
+ * Without an mln_delivery_queue, return true if you handled the message, or
+ * false to also send it to the platform's log. With an mln_delivery_queue,
+ * the platform's log never gets the message.
  *
  * Threads:
  * Runs on the thread that logged the message, or on a background thread for the
