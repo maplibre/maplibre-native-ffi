@@ -14,7 +14,7 @@ from dataclasses import replace
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, Function, Lowered
-from tools.bindgen.names import pascal, type_name
+from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
@@ -190,6 +190,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{pascal(name)}"
             for name in ("generation", "render_update_generation")
         },
+        parameter=camel,
     )
 
 

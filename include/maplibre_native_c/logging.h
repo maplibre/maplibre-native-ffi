@@ -1,6 +1,6 @@
 /**
  * @file maplibre_native_c/logging.h
- * Public C API declarations for logging.
+ * Log messages from the library.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_LOGGING_H
@@ -14,18 +14,22 @@
 extern "C" {
 #endif
 
-/** Log severity values emitted by MapLibre Native. */
+/** The severity of a log message. */
 typedef enum mln_log_severity : uint32_t {
   MLN_LOG_SEVERITY_INFO = 1,
   MLN_LOG_SEVERITY_WARNING = 2,
   MLN_LOG_SEVERITY_ERROR = 3,
 } mln_log_severity;
 
-/** Bitmask values for log severities dispatched asynchronously. */
+/** A log severity, as a bit in a set. */
 typedef enum MLN_BINDING("kind=bitmask") mln_log_severity_flag : uint32_t {
   MLN_LOG_SEVERITY_FLAG_INFO = 1U << MLN_LOG_SEVERITY_INFO,
   MLN_LOG_SEVERITY_FLAG_WARNING = 1U << MLN_LOG_SEVERITY_WARNING,
   MLN_LOG_SEVERITY_FLAG_ERROR = 1U << MLN_LOG_SEVERITY_ERROR,
+  /**
+   * The severities logged on a background thread until
+   * mln_log_set_async_severity_mask() changes them.
+   */
   MLN_LOG_SEVERITY_FLAG_DEFAULT = MLN_LOG_SEVERITY_FLAG_INFO |
     MLN_LOG_SEVERITY_FLAG_WARNING,
   MLN_LOG_SEVERITY_FLAG_ALL = MLN_LOG_SEVERITY_FLAG_INFO |
@@ -35,7 +39,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_log_severity_flag : uint32_t {
 /** A set of mln_log_severity_flag bits. */
 typedef uint32_t mln_log_severity_flags;
 
-/** Log event categories emitted by MapLibre Native. */
+/** The part of the library that logged a message. */
 typedef enum mln_log_event : uint32_t {
   MLN_LOG_EVENT_GENERAL = 0,
   MLN_LOG_EVENT_SETUP = 1,
@@ -57,19 +61,18 @@ typedef enum mln_log_event : uint32_t {
 } mln_log_event;
 
 /**
- * Receives a MapLibre Native log record.
+ * Receives a log message.
  *
- * message is borrowed for the callback duration and is NUL-terminated after
- * its bytes. Returning true consumes the record. Returning false lets MapLibre
- * Native's platform logger handle it.
- *
- * A handler that names a queue consumes each record and queues a copy, so the
- * callback's result is ignored.
+ * Return true if you handled the message, or false to also send it to the
+ * platform's log.
  *
  * Threads:
- * The callback runs synchronously on the thread that emits the record, or on a
- * MapLibre background thread for a severity that
- * mln_log_set_async_severity_mask() dispatches asynchronously.
+ * Runs on the thread that logged the message, or on a background thread for the
+ * severities that mln_log_set_async_severity_mask() selects. The callback can't
+ * call the library.
+ *
+ * Lifetimes:
+ * `message` stays valid until the callback returns.
  */
 MLN_BINDING("failure=false;queue_result=true")
 typedef bool (*mln_log_callback)(
@@ -77,93 +80,35 @@ typedef bool (*mln_log_callback)(
   mln_buffer_view message
 );
 
-/**
- * Process-global log callback.
- *
- * The struct itself is borrowed for mln_log_set_callback().
- */
+/** A log callback, for mln_log_set_callback(). */
 typedef struct mln_log_handler {
   uint32_t size;
-  /** Receives each record. */
   mln_log_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data after the final callback returns, when the
-   * handler is replaced or cleared.
-   *
-   * It runs on the thread that replaces or clears the handler, under the
-   * same restrictions as the callback.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. Native code consumes each record and queues a copy, and the
-   * callback and release_user_data run in mln_delivery_queue_dispatch(),
-   * where they may call the C API. A record the queue refuses, because the
-   * queue was released or the copy could not be allocated, goes to the platform
-   * logger instead. The queue's wake and wake release run inline on the logging
-   * thread, under the same restrictions as the log callback.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
 /**
- * Installs a process-global MapLibre Native log callback.
+ * Sends the log messages of every runtime in the process to a callback.
  *
- * MLN_STATUS_OK replaces the current handler and transfers the handler's
- * callback, user_data, and release_user_data to the C API. The handler struct
- * itself is borrowed for the call. With a null release_user_data, the caller
- * keeps responsibility for user_data and must keep it valid until the handler
- * is replaced or cleared, or, with a queue, until the queue is released. A
- * rejected call leaves the current handler in place and invokes no release.
- * mln_log_clear_callback() clears the handler.
- *
- * The callback may run on any thread, according to the async severity mask. It
- * must be thread-safe, return promptly, and not call this C API: each
- * status-returning function returns MLN_STATUS_INVALID_STATE when the callback
- * calls it.
- *
- * A handler that names a queue lifts these restrictions from its callback
- * and release, which run in dispatch, but not from the queue's wake.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handler is null, handler->size is too
- *   small, callback is null, or queue is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when queue has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The callback replaces the one set before.
  */
 MLN_API mln_status mln_log_set_callback(
   const mln_log_handler* handler, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Clears the process-global log callback.
- *
- * The C API invokes or queues the cleared handler's release_user_data, if any,
- * before returning.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Sends log messages to the platform's log again, instead of a callback. */
 MLN_API mln_status
 mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
 /**
- * Controls which log severities MapLibre Native may dispatch asynchronously.
+ * Selects the severities that the library logs on a background thread.
  *
- * MLN_LOG_SEVERITY_FLAG_DEFAULT lets info and warning records dispatch
- * asynchronously and keeps error records synchronous.
- *
- * A severity outside the mask invokes the log callback synchronously on the
- * thread that emits the record, before the logging call returns.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The library logs other severities on the thread that logged them. `mask`
+ * applies to every runtime in the process.
  */
 MLN_API mln_status mln_log_set_async_severity_mask(
   mln_log_severity_flags mask, mln_diagnostic* out_diagnostic

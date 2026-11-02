@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Quaternion stored as x, y, z, w components.
+/// A rotation, as a quaternion.
 /// </summary>
 /// <remarks>
 /// See <c>mln_quaternion</c> in the <see

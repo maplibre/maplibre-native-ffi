@@ -1,39 +1,6 @@
 /**
  * @file maplibre_native_c/delivery.h
- * Public C API declarations for delivery queues, which run host callbacks on
- * a thread that the host chooses.
- *
- * A host that cannot run code on a native thread, such as a Dart isolate or a
- * JavaScript engine, names a delivery queue on a registration alongside its
- * callback. Native code then never calls the callback itself. It answers any
- * synchronous decision itself, copies the arguments, and queues the call,
- * waking the queue when it goes from empty to nonempty. The host calls
- * mln_delivery_queue_dispatch() on its own thread, which runs the queued
- * calls there.
- *
- * Every registration whose callbacks a host need not answer on a native thread
- * accepts a queue: mln_completion, mln_wake, mln_runtime_event_handler,
- * mln_log_handler, mln_resource_provider, mln_resource_request_cancel_handler,
- * mln_resource_transform, mln_camera_transition_handler, and the custom
- * geometry and custom vector source options. A queued call keeps the
- * callback's contract except for its thread: its arguments are borrowed for
- * the call, owned handles pass to the callback, and release_user_data runs in
- * dispatch after the registration's last call. Calls queued before the
- * registration is replaced, cleared, or released still run, so its callback
- * and user_data stay in use until release_user_data runs or, without one,
- * until the queue is released.
- *
- * A queue is FIFO in push order. A map command queues the runtime events it
- * raises before pushing its completion. Events and completions that select
- * the same queue arrive in that order. Adjacent events share one call.
- *
- * A queue has no bound. A host that stops dispatching keeps every queued call
- * in memory until it dispatches or releases the queue.
- *
- * Once process exit begins, pushes drop their items without disposing owned
- * values, wakes stop, and dispatch runs nothing.
- *
- * This header targets C23.
+ * Run callbacks on a thread that the caller chooses.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_DELIVERY_H
@@ -50,41 +17,24 @@ extern "C" {
 
 // NOLINTBEGIN(modernize-use-using,modernize-use-trailing-return-type)
 
-/** Options for mln_delivery_queue_create(). All-zero members are defaults. */
+/** Options for mln_delivery_queue_create(). */
 typedef struct mln_delivery_queue_options {
   uint32_t size;
   /**
-   * Wakes the receiver when the queue goes from empty to nonempty. A disabled
-   * wake leaves service to the host's schedule. The wake must not name a
-   * queue.
+   * Tells the caller when the empty queue gains calls. Dispatch the queue after
+   * each wake.
    */
   mln_wake wake;
   /**
-   * Optional. Receives the user_data of each registration whose
-   * release_user_data, or whose completion callback,
-   * mln_delivery_queue_release() abandons. The release calls it once for each
-   * such registration, on the releasing thread, before it returns. It must not
-   * call into the host's runtime or into this queue. A host that sets it
-   * releases the queue only while no call that names the queue in a
-   * registration, completion, or wake is running, on any thread.
+   * Runs in place of a registration's release function when the queue is
+   * released before that function can run.
    */
   mln_user_data_release release_abandoned_user_data;
 } mln_delivery_queue_options;
 
 /**
- * Creates a delivery queue.
- *
- * MLN_STATUS_OK transfers the wake's callback, user_data, and
- * release_user_data to the queue. A rejected call leaves the wake's user_data
- * with the caller. The output must point to the null handle and receives
- * ownership of the queue on success.
- *
- * Returns:
- * - MLN_STATUS_OK when out_queue receives an owned queue.
- * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
- *   small, the wake descriptor is invalid or names a queue, or out_queue is
- *   null or does not point to the null handle.
- * - MLN_STATUS_NATIVE_ERROR when the queue could not be allocated.
+ * Creates a queue that holds callback calls until mln_delivery_queue_dispatch()
+ * runs them.
  */
 MLN_API mln_status mln_delivery_queue_create(
   const mln_delivery_queue_options* options,
@@ -93,43 +43,20 @@ MLN_API mln_status mln_delivery_queue_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases a delivery queue. A null handle is a no-op.
+ * Releases a queue.
  *
- * The call consumes the handle, closes the queue, and returns without blocking.
- * It abandons what is pending without running it: no queued call runs, and
- * the release_user_data of a registration that still names the queue never
- * runs. The queue's release_abandoned_user_data receives its user_data
- * instead. A queued provider request is released, which fails it, and a
- * queued transform request is released, which keeps its URL.
- *
- * Registrations that still name the queue keep working, but the queue refuses
- * their later pushes: a completion is discarded, a log record goes to the
- * platform logger, a provider request fails, a transform request keeps its
- * URL, and other queued callbacks are dropped.
- *
- * No wake call starts after release. The wake's release_user_data runs once
- * in-flight wake calls return, on whichever thread finishes last. The host may
- * release the queue from inside its own wake, from a call that the queue
- * dispatches, and from a finalizer.
+ * The calls in the queue, and any that registrations would add later, never
+ * run.
  */
 MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
 
 /**
- * Runs every call queued so far, in push order, on the calling thread.
- *
- * Calls queued while it runs wait for the next dispatch, and the wake fires
- * again when the first of them arrives. A running call may call any C
- * function, including one that releases the queue, which abandons the calls
- * after it, or disposes the owner of its registration.
+ * Runs the calls in the queue on the calling thread.
  *
  * Returns:
- * - MLN_STATUS_OK when at least one call ran.
- * - MLN_STATUS_NOT_READY when no call was queued. This is not an error.
- * - MLN_STATUS_BUSY when another dispatch of the queue is running, on another
- *   thread or further up this one. That dispatch also runs the calls queued
- *   by the time this one returns.
- * - MLN_STATUS_INVALID_ARGUMENT when queue is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when queue has been released.
+ * - MLN_STATUS_NOT_READY when the queue had no calls to run.
+ * - MLN_STATUS_BUSY when another dispatch of the queue is running. That
+ *   dispatch runs the calls instead.
  */
 MLN_API mln_status mln_delivery_queue_dispatch(
   mln_delivery_queue queue, mln_diagnostic* out_diagnostic

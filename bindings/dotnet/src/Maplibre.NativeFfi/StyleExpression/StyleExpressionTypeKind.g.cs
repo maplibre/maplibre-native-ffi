@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Style expression types that a parsed expression may be required to have.
+/// The type of a style expression's result, or of the items of an array result.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_expression_type_kind</c> in the <see
@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 public enum StyleExpressionTypeKind : uint
 {
     /// <summary>
-    /// Any value.
+    /// Any type.
     /// </summary>
     Value = 0,
     Number = 1,
@@ -20,16 +20,8 @@ public enum StyleExpressionTypeKind : uint
     Color = 4,
     Object = 5,
     Formatted = 6,
-
-    /// <summary>
-    /// A resolved image, as the image expression returns.
-    /// </summary>
     Image = 7,
     Padding = 8,
     VariableAnchorOffsetCollection = 9,
-
-    /// <summary>
-    /// An array whose items have item_kind, which is not itself an array.
-    /// </summary>
     Array = 10,
 }

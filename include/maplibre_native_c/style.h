@@ -1,26 +1,6 @@
 /**
  * @file maplibre_native_c/style.h
- * Public C API declarations for style sources, layers, and images.
- *
- * Every map mutation is a command. It copies input bytes, arrays, option
- * structs, and image pixels before returning and applies them in runtime
- * submission order. Each function lists submission and completion failures
- * separately. Its completion reports committed, superseded, failed, or
- * cancelled disposition. A command that ran, whether it committed or failed,
- * completes with the map snapshot generation that it published, so a caller
- * can fence a later mln_map_get_snapshot() on it.
- *
- * Every query is ordered. It copies its inputs before returning and observes
- * all commands accepted earlier by the runtime. Its completion borrows the
- * typed result for the duration of the callback.
- *
- * A query that reads a whole source, layer, or image by ID completes
- * successfully with no value when no object has that ID. A query that reads one
- * member of an object completes with MLN_STATUS_NOT_FOUND when the object is
- * missing, as a command on it does, and completes with no value only when the
- * object exists and lacks that member, such as a layer without a filter.
- *
- * All declarations in this header are callable from any thread.
+ * Read and change the sources, layers, and images of a map's style.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_STYLE_H
@@ -42,18 +22,12 @@ extern "C" {
 #endif
 
 /**
- * Submits a global-state JSON value. JSON null restores the style default.
- *
- * Returns:
- * - MLN_STATUS_OK when accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
- *   invalid, value is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Sets a value that the style's `global-state`
+ * [expressions](https://maplibre.org/maplibre-style-spec/expressions/) read.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when value is not valid JSON.
- * - MLN_STATUS_INVALID_STATE when the style has not loaded.
+ * - MLN_STATUS_INVALID_STATE when the style or one of its sources or sprites is
+ *   still loading.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_global_state_property(
@@ -61,23 +35,13 @@ MLN_API mln_status mln_map_set_global_state_property(
   mln_buffer_view value MLN_BINDING("encoding=json"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
-/**
- * Queries the global-state JSON object, including style defaults.
- *
- * Completion borrows one mln_buffer_view for the duration of the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when accepted.
- * - MLN_STATUS_INVALID_ARGUMENT for an invalid map handle or completion.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Reads the global state of the map's style as a JSON object. */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_global_state(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Style source type values returned by source metadata queries. */
+/** The type of a style source. */
 typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0,
   MLN_STYLE_SOURCE_TYPE_VECTOR = 1,
@@ -91,62 +55,47 @@ typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 9,
 } mln_style_source_type;
 
-/** Fields available in mln_style_source_info. */
+/** The fields that mln_style_source_info sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_style_source_info_field : uint32_t {
-  /** The tile source was defined with an inline TileJSON description. */
   MLN_STYLE_SOURCE_INFO_TILE_JSON = 1U << 0U,
-  /** The inline TileJSON description contains geographic bounds. */
   MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 1U,
-  /** The source exposes a tile size. */
   MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 2U,
-  /** The source exposes a vector tile encoding. */
   MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 3U,
-  /** The source exposes a DEM raster encoding. */
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 4U,
 } mln_style_source_info_field;
 
 /** A set of mln_style_source_info_field bits. */
 typedef uint32_t mln_style_source_info_fields;
 
-/** Tile URL coordinate scheme values. */
+/**
+ * Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
+ */
 typedef enum mln_style_tile_scheme : uint32_t {
   MLN_STYLE_TILE_SCHEME_XYZ = 0,
   MLN_STYLE_TILE_SCHEME_TMS = 1,
 } mln_style_tile_scheme;
 
-/** Vector tile encoding values. */
+/** The format of vector tiles. */
 typedef enum mln_style_vector_tile_encoding : uint32_t {
   MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0,
   MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1,
 } mln_style_vector_tile_encoding;
 
-/** DEM raster encoding values. */
+/** How a raster DEM tile encodes elevation in its colors. */
 typedef enum mln_style_raster_dem_encoding : uint32_t {
   MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0,
   MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
 } mln_style_raster_dem_encoding;
 
-/**
- * One stretchable interval along an image axis, in image pixels.
- *
- * MapLibre scales only the stretchable intervals when it resizes the image, so
- * the pixels outside them keep their size. An interval runs from a lower `from`
- * to a higher `to`, and the intervals along one axis run in increasing order
- * without overlapping. mln_map_set_style_image() rejects intervals that break
- * that shape.
- */
+/** A range of image pixels, from `from` to `to`, that stretches to fit text. */
 typedef struct mln_image_stretch {
   float from;
   float to;
 } mln_image_stretch;
 
-/**
- * Content-box insets in image pixels, measured from the image's top-left.
- *
- * MapLibre places a symbol's text inside this box when `icon-text-fit` applies.
- */
+/** The area of an image, in image pixels, that text fits inside. */
 typedef struct mln_image_content {
   float left;
   float top;
@@ -154,20 +103,20 @@ typedef struct mln_image_content {
   float bottom;
 } mln_image_content;
 
-/** How a stretchable image fits text along one axis. */
+/** How an image stretches to fit text along one axis. */
 typedef enum mln_style_image_text_fit : uint32_t {
   MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0,
   MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1,
   MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2,
 } mln_style_image_text_fit;
 
-/** Layer visibility values used by the visibility setter and layer info. */
+/** Whether a layer shows. */
 typedef enum mln_style_layer_visibility : uint32_t {
   MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0,
   MLN_STYLE_LAYER_VISIBILITY_NONE = 1,
 } mln_style_layer_visibility;
 
-/** Field mask values for mln_geo_json_source_options. */
+/** The fields that mln_geo_json_source_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_geo_json_source_option_field : uint32_t {
@@ -186,7 +135,7 @@ typedef enum MLN_BINDING(
 /** A set of mln_geo_json_source_option_field bits. */
 typedef uint32_t mln_geo_json_source_option_fields;
 
-/** Field mask values for mln_custom_geometry_source_options. */
+/** The fields that mln_custom_geometry_source_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_custom_geometry_source_option_field : uint32_t {
@@ -202,7 +151,7 @@ typedef enum MLN_BINDING(
 /** A set of mln_custom_geometry_source_option_field bits. */
 typedef uint32_t mln_custom_geometry_source_option_fields;
 
-/** Field mask values for mln_custom_vector_source_options. */
+/** The fields that mln_custom_vector_source_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_custom_vector_source_option_field : uint32_t {
@@ -213,7 +162,7 @@ typedef enum MLN_BINDING(
 /** A set of mln_custom_vector_source_option_field bits. */
 typedef uint32_t mln_custom_vector_source_option_fields;
 
-/** Field mask values for mln_style_image_options. */
+/** The fields that mln_style_image_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_style_image_option_field : uint32_t {
@@ -230,20 +179,17 @@ typedef enum MLN_BINDING(
 /** A set of mln_style_image_option_field bits. */
 typedef uint32_t mln_style_image_option_fields;
 
-/** Field mask values for mln_style_image_info. */
+/** The fields that mln_style_image_info sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
-  /** The image declares a content box. */
   MLN_STYLE_IMAGE_INFO_CONTENT = 1U << 0U,
-  /** The image declares a horizontal text-fit mode. */
   MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 1U << 1U,
-  /** The image declares a vertical text-fit mode. */
   MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 1U << 2U,
 } mln_style_image_info_field;
 
 /** A set of mln_style_image_info_field bits. */
 typedef uint32_t mln_style_image_info_fields;
 
-/** Field mask values for mln_style_transition_options. */
+/** The fields that mln_style_transition_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_style_transition_option_field : uint32_t {
@@ -255,147 +201,103 @@ typedef enum MLN_BINDING(
 /** A set of mln_style_transition_option_field bits. */
 typedef uint32_t mln_style_transition_option_fields;
 
-/**
- * Inline TileJSON metadata of a tile source.
- *
- * mln_style_source_info carries it when fields contains TILE_JSON.
- */
+/** The tiles of a source, as the style lists them. */
 typedef struct mln_style_source_tile_info {
-  /** Tile URL templates in TileJSON order. */
   const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
   size_t tile_url_count;
-  /** Lowest zoom level the TileJSON provides tiles for. */
   double min_zoom;
-  /** Highest zoom level the TileJSON provides tiles for. */
   double max_zoom;
   mln_style_tile_scheme scheme;
 } mln_style_source_tile_info;
 
-/**
- * Complete metadata of one style source.
- *
- * A completion callback borrows it. Views and arrays remain valid until the
- * completion callback returns. A masked member whose bit is absent from fields
- * is zero.
- */
+/** A source in the map's style. */
 typedef struct mln_style_source_info {
-  /** Source ID. */
   mln_buffer_view id;
   mln_style_source_type type;
-  /** Bitwise combination of mln_style_source_info_field values. */
   mln_style_source_info_fields fields;
-  /** Whether the source is marked volatile. */
   bool is_volatile;
-  /** Attribution string, or empty when the source sets none. */
   mln_buffer_view attribution;
-  /** URL that the source loads from, or empty when it has none. */
   mln_buffer_view url;
-  /** Inline TileJSON metadata, when the source was defined with it. */
+  /**
+   * The tiles that the style lists in the source itself, instead of at a URL.
+   */
   mln_style_source_tile_info tile_json
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_JSON");
-  /** Geographic bounds, when inline TileJSON sets them. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_BOUNDS");
-  /** Tile size in pixels, for a tile source. */
   uint32_t tile_size
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_SIZE");
-  /** Vector tile encoding, for a vector source. */
   mln_style_vector_tile_encoding vector_encoding
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING");
-  /** DEM raster encoding, when inline TileJSON sets one. */
   mln_style_raster_dem_encoding raster_encoding
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING");
 } mln_style_source_info;
 
-/**
- * One style layer.
- *
- * A completion callback borrows it. Every view stays valid until the callback
- * returns.
- */
+/** A layer in the map's style. */
 typedef struct mln_style_layer_info {
-  /** Layer ID. */
   mln_buffer_view id;
-  /** The style-spec layer type string. */
+  /**
+   * The layer's [type](https://maplibre.org/maplibre-style-spec/layers/#type),
+   * such as `fill`.
+   */
   mln_buffer_view type;
-  /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id;
-  /** Source-layer ID. Empty when the layer sets none. */
   mln_buffer_view source_layer;
-  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
+  /**
+   * The zoom level where the layer starts to show, or negative infinity when
+   * the layer doesn't set one.
+   */
   double min_zoom;
-  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
+  /**
+   * The zoom level where the layer stops showing, or infinity when the layer
+   * doesn't set one.
+   */
   double max_zoom;
   mln_style_layer_visibility visibility;
 } mln_style_layer_info;
 
 /**
- * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
- * size.
+ * Options for a GeoJSON
+ * [source](https://maplibre.org/maplibre-style-spec/sources/#geojson).
  *
- * These options are fixed for the source's lifetime. URL updates preserve
- * them, and prepared data updates require matching options.
+ * Zoom levels are whole numbers.
  */
 typedef struct mln_geo_json_source_options {
   uint32_t size;
   mln_geo_json_source_option_fields fields;
-  /** Minimum tiling zoom. Absent selects 0. */
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM");
-  /** Maximum tiling zoom, an integer within [0, 24]. Absent selects 18. */
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM");
-  /** Douglas-Peucker simplification tolerance. Absent selects 0.375. */
   double tolerance
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE");
-  /** Highest zoom that clusters points. Absent selects 17. */
   double cluster_max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
-  /**
-   * Cluster aggregation expressions keyed by property name, as a JSON object
-   * whose members follow the MapLibre Style Spec clusterProperties form, or
-   * empty for none.
-   *
-   * The UTF-8 bytes are borrowed for the call.
-   */
+  /** The `clusterProperties` object, or empty for none. */
   mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
-  /** Tile buffer in pixels within [0, 512]. Absent selects 128. */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_BUFFER");
-  /** Cluster radius in pixels within [0, 4095]. Absent selects 50. */
   uint32_t cluster_radius
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS");
-  /** Points required to form a cluster. Absent selects 2. */
   uint32_t cluster_min_points MLN_BINDING(
     "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS"
   );
-  /** Adds line distance metrics to line features. Absent selects false. */
   bool line_metrics
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS");
-  /**
-   * Clusters point features. Absent selects false.
-   *
-   * Clustering applies to feature collections whose every feature carries point
-   * geometry. mln_geo_json_source_data_create() rejects a bare geometry, a
-   * single feature, or a feature collection that mixes in other geometry. An
-   * empty feature collection stays accepted and carries nothing to cluster.
-   */
   bool cluster
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER");
   /**
-   * Tiles the data for the next render update instead of in the background.
-   * Absent selects false.
-   *
-   * A rendered frame may still wait for tile layout.
-   * mln_map_set_geo_json_source_synchronous_tiling() overrides this at runtime.
+   * Builds tiles while the map renders instead of in the background, so that
+   * new data shows in the next frame.
    */
   bool synchronous_tiling MLN_BINDING(
     "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING"
   );
 } mln_geo_json_source_options;
 
-/** Canonical tile identity used by custom geometry and custom vector source
- * callbacks. */
+/**
+ * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
+ */
 typedef struct mln_canonical_tile_id {
   uint32_t z;
   uint32_t x;
@@ -403,311 +305,193 @@ typedef struct mln_canonical_tile_id {
 } mln_canonical_tile_id;
 
 /**
- * Requests one tile of a custom geometry or custom vector source.
+ * Asks for the data of a tile in a custom source.
  *
- * A source that names a queue queues a copy of the call instead.
- *
- * Threads:
- * The callback may run on any native worker thread, concurrently with runtime
- * and map calls.
+ * Return quickly. Once the data is ready, pass it to
+ * mln_map_set_custom_geometry_source_tile_data() or
+ * mln_map_set_custom_vector_source_tile_data(). If it fails to load, report
+ * that with mln_map_set_custom_geometry_source_tile_error() or
+ * mln_map_set_custom_vector_source_tile_error().
  */
 typedef void (*mln_custom_source_fetch_tile_callback)(
   void* user_data, mln_canonical_tile_id tile_id
 );
 
-/**
- * Cancels a request for one tile of a custom geometry or custom vector
- * source, best effort.
- *
- * A source that names a queue queues a copy of the call instead.
- *
- * Threads:
- * The callback may run on any native worker thread, concurrently with runtime
- * and map calls.
- */
+/** Reports that a custom source no longer needs a tile. */
 typedef void (*mln_custom_source_cancel_tile_callback)(
   void* user_data, mln_canonical_tile_id tile_id
 );
 
-/** Options for custom geometry sources. */
+/**
+ * The callbacks and options of a custom geometry source.
+ *
+ * Zoom levels are whole numbers from 0 to 32.
+ */
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
   mln_custom_geometry_source_option_fields fields;
-  /** Tile fetch callback. */
   mln_custom_source_fetch_tile_callback fetch_tile;
-  /** Optional best-effort tile cancel callback. */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
-  /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM");
+  /** How far, in pixels, simplified geometry can stray from the original. */
   double tolerance
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE");
+  /** The width of a tile in pixels, a power of two no larger than 8192. */
   uint32_t tile_size
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE");
+  /**
+   * The width in pixels of the margin around a tile that holds geometry from
+   * beyond its edges.
+   */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER");
+  /** Whether to cut geometry at the outer edge of a tile's margin. */
   bool clip
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP");
+  /** Whether to wrap geometry that crosses the antimeridian. */
   bool wrap
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP");
-  /**
-   * Optional. Invoked once after an accepted command stops referencing
-   * user_data.
-   *
-   * The call runs on the runtime execution thread when the source is removed
-   * explicitly, when a style command replaces the style that held the source,
-   * when the map is destroyed, or when asynchronous application rejects the
-   * source. It runs at most once for each accepted command. A synchronous
-   * rejection before command acceptance invokes no release. A host transfers
-   * its callback state to each accepted command and frees that state here. Null
-   * means the host needs no release.
-   *
-   * Free callback state and return promptly. The callback may call the C API,
-   * but must not wait for runtime work that only its own thread can advance.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. The callbacks and release_user_data run in
-   * mln_delivery_queue_dispatch(). A command rejects an invalid
-   * queue handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
-   * MLN_STATUS_INVALID_STATE.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_custom_geometry_source_options MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Options for custom vector sources. */
+/**
+ * The callbacks and options of a custom vector source.
+ *
+ * Zoom levels are whole numbers from 0 to 32.
+ */
 typedef struct mln_custom_vector_source_options {
   uint32_t size;
   mln_custom_vector_source_option_fields fields;
-  /** Tile fetch callback. */
   mln_custom_source_fetch_tile_callback fetch_tile;
-  /** Optional best-effort tile cancel callback. */
   mln_custom_source_cancel_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
-  /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM");
-  /**
-   * Optional. Invoked once after an accepted command stops referencing
-   * user_data.
-   *
-   * The call runs on the runtime execution thread when the source is removed
-   * explicitly, when a style command replaces the style that held the source,
-   * when the map is destroyed, or when asynchronous application rejects the
-   * source. It runs at most once for each accepted command. A synchronous
-   * rejection before command acceptance invokes no release. A host transfers
-   * its callback state to each accepted command and frees that state here.
-   * Null means the host needs no release.
-   *
-   * Free callback state and return promptly. The callback may call the C API,
-   * but must not wait for runtime work that only its own thread can advance.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. The callbacks and release_user_data run in
-   * mln_delivery_queue_dispatch(). A command rejects an invalid
-   * queue handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
-   * MLN_STATUS_INVALID_STATE.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_custom_vector_source_options MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Caller-owned premultiplied RGBA8 image pixels. */
+/** An image of 8-bit RGBA pixels whose colors are multiplied by their alpha. */
 typedef struct mln_premultiplied_rgba8_image {
   uint32_t size;
-  /** Image width in pixels. Required. */
   uint32_t width MLN_BINDING("required=true");
-  /** Image height in pixels. Required. */
   uint32_t height MLN_BINDING("required=true");
-  /** Bytes per image row. Required, and at least width * 4. */
+  /**
+   * The number of bytes from the start of one row to the start of the next, at
+   * least `width` * 4.
+   */
   uint32_t stride MLN_BINDING("required=true");
-  /** Premultiplied RGBA8 pixels. Required. */
+  /** The rows of pixels, `stride` bytes apart, from the top row down. */
   const uint8_t* pixels
     MLN_BINDING("length=byte_length;encoding=bytes;required=true");
-  /** Available bytes at pixels. */
   size_t byte_length;
 } mln_premultiplied_rgba8_image;
 
-/** Options for runtime style images. */
+/**
+ * Options for a style image, as the
+ * [sprite](https://maplibre.org/maplibre-style-spec/sprite/) spec describes
+ * them.
+ */
 typedef struct mln_style_image_options {
   uint32_t size;
   mln_style_image_option_fields fields;
   /**
-   * Horizontally stretchable intervals.
-   *
-   * Borrowed for the call and copied before return. May be null only when
-   * stretch_x_count is 0.
+   * The ranges of columns that stretch, in increasing order without overlap.
    */
   const mln_image_stretch* stretch_x MLN_BINDING(
     "length=stretch_x_count;mask=fields;"
     "bit=MLN_STYLE_IMAGE_OPTION_STRETCH_X"
   );
   size_t stretch_x_count;
-  /**
-   * Vertically stretchable intervals.
-   *
-   * Borrowed for the call and copied before return. May be null only when
-   * stretch_y_count is 0.
-   */
+  /** The ranges of rows that stretch, in increasing order without overlap. */
   const mln_image_stretch* stretch_y MLN_BINDING(
     "length=stretch_y_count;mask=fields;"
     "bit=MLN_STYLE_IMAGE_OPTION_STRETCH_Y"
   );
   size_t stretch_y_count;
-  /** Content box used when icon-text-fit applies. */
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_CONTENT");
-  /** Absent selects STRETCH_OR_SHRINK. */
   mln_style_image_text_fit text_fit_width
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH");
-  /** Absent selects STRETCH_OR_SHRINK. */
   mln_style_image_text_fit text_fit_height
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT");
-  /** Sprite pixel ratio. Absent selects 1. */
   float pixel_ratio
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO");
-  /** Whether the image is a signed distance field icon. Absent selects false.
-   */
   bool sdf MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_SDF");
   /**
-   * Keeps the image once no loaded tile uses it. Absent selects false.
-   *
-   * mln_map_set_style_image() describes the images that MapLibre drops.
+   * Keeps the image after no layer uses it. Without this, the map can remove
+   * an image that it asked for through
+   * MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING.
    */
   bool keep_unused
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED");
 } mln_style_image_options;
 
-/**
- * One complete runtime style image.
- *
- * A completion callback borrows it. pixels and the stretch arrays remain valid
- * until the completion callback returns. A masked member whose bit is absent
- * from fields is zero.
- */
+/** An image in the map's style. */
 typedef struct mln_style_image_info {
-  /** Image width in pixels. */
   uint32_t width;
-  /** Image height in pixels. */
   uint32_t height;
-  /** Bitwise combination of mln_style_image_info_field values. */
   mln_style_image_info_fields fields;
   /**
-   * Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top
-   * row first.
+   * The premultiplied RGBA pixels, in rows of `width` * 4 bytes, from the top
+   * row down.
    */
   mln_buffer_view pixels MLN_BINDING("encoding=bytes");
-  /** Horizontally stretchable intervals. */
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
   size_t stretch_x_count;
-  /** Vertically stretchable intervals. */
   const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
   size_t stretch_y_count;
-  /** Content box, when the image sets one. */
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
-  /** How the image fits text horizontally, when it sets this. */
   mln_style_image_text_fit text_fit_width
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH");
-  /** How the image fits text vertically, when it sets this. */
   mln_style_image_text_fit text_fit_height
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT");
-  /** Sprite pixel ratio. */
   float pixel_ratio;
-  /** Whether the image is a signed distance field icon. */
   bool sdf;
-  /** Whether the map keeps the image once no loaded tile uses it. */
   bool keep_unused;
 } mln_style_image_info;
 
 /**
- * Global style transition options.
- *
- * These control how the style animates paint property changes and whether
- * symbol placement changes cross-fade. They are distinct from camera animation
- * options, which time camera moves.
- *
- * A paint property's own style-spec transition, such as
- * "fill-color-transition", overrides these for that property. These apply to
- * every property that declares none.
+ * The default
+ * [transition](https://maplibre.org/maplibre-style-spec/transition/) for
+ * changes to a style's paint properties.
  */
 typedef struct mln_style_transition_options {
   uint32_t size;
   mln_style_transition_option_fields fields;
-  /**
-   * Transition duration in milliseconds. Must be finite, non-negative, and
-   * short enough to represent as a duration.
-   *
-   * When this field is omitted, paint property changes apply instantly, and
-   * a 300 millisecond default governs the symbol placement
-   * cross-fade that enable_placement_transitions gates. A continuous-mode map
-   * applies that same default to the pattern cross-fade across integer zoom
-   * levels, while a still-mode map fades those patterns instantly instead.
-   *
-   * A still-mode map ignores this field and delay_ms for paint property
-   * transitions. A property using these global options reaches its final value
-   * in the next still image.
-   */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TRANSITION_OPTION_DURATION");
-  /**
-   * Transition delay in milliseconds. Must be finite, non-negative, and short
-   * enough to represent as a duration.
-   *
-   * When this field is omitted, transitions start without delay.
-   */
   double delay_ms
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TRANSITION_OPTION_DELAY");
-  /**
-   * Whether symbol placement changes cross-fade.
-   *
-   * Clearing this makes symbol placement changes apply to the next rendered
-   * frame, in every map mode. Hosts that move symbol-backed features at pointer
-   * frequency clear it for the duration of the interaction.
-   *
-   * When this field is omitted, the cross-fade stays on. A style carries no
-   * equivalent, so loading a style leaves the cross-fade on.
-   */
+  /** Whether symbols fade in and out as the map places them. */
   bool enable_placement_transitions MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS"
   );
 } mln_style_transition_options;
 
 /**
- * Adds one style source from a style-spec source JSON object.
+ * Adds a source to the map's style.
  *
- * Vector sources with a TileJSON URL accept minzoom, maxzoom, and encoding
- * ("mvt" or "mlt") in the source JSON. These fields override the loaded
- * TileJSON. For example:
- * {"type":"vector","url":"https://tiles.example/source.json",
- *  "minzoom":2,"maxzoom":14,"encoding":"mlt"}.
- *
- * source_id and source_json are borrowed for the call and copied before
- * return. source_json is the object that appears under sources[source_id] in a
- * style document.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, source_json is empty or invalid, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `source_json` is a
+ * [source](https://maplibre.org/maplibre-style-spec/sources/) object.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
- *   source JSON cannot be converted.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_source_json(
@@ -717,21 +501,11 @@ MLN_API mln_status mln_map_add_style_source_json(
 ) MLN_NOEXCEPT;
 
 /**
- * Removes one style source by ID.
- *
- * source_id is borrowed for the call. The command commits when a source with
- * that ID existed and was removed.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Removes a source from the map's style.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_STATE when a layer still uses the source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_source(
@@ -740,19 +514,9 @@ MLN_API mln_status mln_map_remove_style_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the complete metadata of one style source.
+ * Reads a source of the map's style.
  *
- * A found source completes with one borrowed mln_style_source_info that
- * includes its attribution, URL, and inline TileJSON tile URLs. A missing
- * source completes successfully with no value. Copy retained views before the
- * callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the style has no source named `source_id`.
  */
 MLN_BINDING("execution=query;result=mln_style_source_info;nullable=true")
 MLN_API mln_status mln_map_get_style_source(
@@ -761,23 +525,12 @@ MLN_API mln_status mln_map_get_style_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets whether one style source stores fetched tiles in the persistent cache.
+ * Sets whether a source is volatile.
  *
- * source_id is copied before acceptance. When is_volatile is true, sources
- * that fetch tiles stop storing them in persistent storage.
- * Other source types retain the value for inspection without changing how they
- * load. The change applies when the command commits and is visible through
- * mln_map_get_style_source as is_volatile.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The map doesn't store the tiles of a volatile source in the persistent cache.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_source_volatile(
@@ -785,43 +538,18 @@ MLN_API mln_status mln_map_set_style_source_volatile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Lists every style source in style order.
- *
- * The completion borrows value_count mln_style_source_info values, value_size
- * bytes apart, one per source: the sources the style document declares, in its
- * order, then added sources in the order they were added. Copy retained
- * entries, their views, and their tile URLs before the callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Lists the sources of the map's style. */
 MLN_BINDING("execution=query;result=mln_style_source_info;shape=array")
 MLN_API mln_status mln_map_list_style_sources(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a GeoJSON source with URL data.
- *
- * source_id, url, and options are borrowed for the call. The source loads
- * GeoJSON from url through MapLibre Native's resource system. options may be
- * null for defaults, and the options are fixed for the lifetime of the source.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Adds a GeoJSON source that loads its data from `url`.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
- *   options cannot be converted.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geo_json_source_url(
@@ -831,31 +559,16 @@ MLN_API mln_status mln_map_add_geo_json_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Prepares GeoJSON source data for installation on a map.
+ * Prepares GeoJSON data for GeoJSON sources.
  *
- * data contains UTF-8 GeoJSON. data and options are borrowed for the call.
- * Preparation finishes before return. options may be null for defaults and
- * must match the options of every source the data is installed on.
- *
- * When options enable clustering, the data must be a feature collection whose
- * every feature carries point geometry. Data that does not is rejected, and
- * the diagnostic names the constraint.
- *
- * The prepared data is immutable and independent of any map or runtime.
- * Preparation, installation, and release may happen on different threads.
- *
- * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
- * handle the host releases with mln_geo_json_source_data_release(). Installing
- * the data borrows the handle, so one prepared handle may be installed on any
- * number of sources and released at any time afterward.
+ * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
+ * can be slow, but adding the result to a source is quick, and several sources
+ * can share it.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when data is empty or invalid, options is
- *   invalid, out_data is null or *out_data is not MLN_HANDLE_NULL, or
- *   clustering is enabled and the data is a bare geometry or a single feature,
- *   or a feature carries geometry other than a point.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * - MLN_STATUS_INVALID_ARGUMENT when `data` isn't valid GeoJSON, or when
+ *   `options` turns on clustering and `data` isn't a feature collection of
+ *   points.
  */
 MLN_API mln_status mln_geo_json_source_data_create(
   mln_buffer_view data MLN_BINDING("encoding=json"),
@@ -865,34 +578,23 @@ MLN_API mln_status mln_geo_json_source_data_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases prepared GeoJSON source data.
+ * Releases prepared GeoJSON data.
  *
- * Callable from any thread. A null or already-released handle is a no-op.
- * Sources the data was installed on keep their own reference, so releasing
- * the handle preserves each source.
+ * Sources that use the data keep it.
  */
 MLN_API void mln_geo_json_source_data_release(
   mln_geo_json_source_data data
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a GeoJSON source with prepared inline data.
+ * Adds a GeoJSON source with prepared data.
  *
- * source_id is borrowed for the call. data names a live handle from
- * mln_geo_json_source_data_create(); the call borrows the handle, and the
- * source adopts the options the data was prepared with, fixed for the lifetime
- * of the source.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or data is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when map or data has been released, or the map is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The source uses the options that `data` was prepared with. `data` can be
+ * released once this function returns.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geo_json_source_data(
@@ -901,21 +603,12 @@ MLN_API mln_status mln_map_add_geo_json_source_data(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates one GeoJSON source to load data from a URL.
- *
- * source_id and url are borrowed for the call. The source keeps the
- * mln_geo_json_source_options it was added with.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Makes a GeoJSON source load its data from `url`.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   GeoJSON source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_url(
@@ -924,29 +617,15 @@ MLN_API mln_status mln_map_set_geo_json_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates one GeoJSON source with prepared inline data.
+ * Replaces the data of a GeoJSON source.
  *
- * source_id is borrowed for the call. data names a live handle from
- * mln_geo_json_source_data_create(); the call borrows the handle and retains
- * prepared data before returning.
- *
- * The data must have been prepared with options equal to the options the
- * source was added with. Cluster aggregation expressions compare by parsed
- * equality, so equivalent cluster_properties JSON matches regardless of
- * formatting. A mismatch is rejected.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, data is an invalid handle, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map or data has been released, or the map is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `data` must have been prepared with the same options as the source. It can be
+ * released once this function returns.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source, or
- *   the data was prepared with options that do not match the source's options.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   GeoJSON source, or `data` was prepared with other options.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_data(
@@ -955,23 +634,16 @@ MLN_API mln_status mln_map_set_geo_json_source_data(
 ) MLN_NOEXCEPT;
 
 /**
- * Overrides one GeoJSON source's synchronous tiling at runtime.
+ * Sets whether a GeoJSON source builds its tiles synchronously.
  *
- * source_id is borrowed for the call. While enabled is true, the source
- * behaves as if its options had set synchronous_tiling; false restores the
- * option the source was added with. The override applies to render updates
- * after the command commits.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * This works like the synchronous tiling option of mln_geo_json_source_options,
+ * but `enabled` can't turn off synchronous tiling that the source's options
+ * turned on.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   GeoJSON source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
@@ -980,43 +652,15 @@ MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a custom geometry source.
- *
- * source_id is borrowed for the call. options is borrowed for the call, but the
- * callback function pointers and user_data pointer are retained by value. The
- * callback functions and user_data must remain valid until the source is
- * removed, the style is replaced, or the map is destroyed, and until any
- * in-flight callback invocation has returned. For URL loads, style replacement
- * occurs when the new style loads, not when the load request is accepted. For
- * inline JSON loads, style replacement completes when
- * mln_map_set_style_json() commits.
- *
- * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
- * concurrent with runtime and map calls. The style command functions in this
- * header may be called directly from these callbacks. Callbacks must not block
- * waiting for command execution. Every callback returns normally; see
- * mln_user_data_release. cancel_tile is best-effort and may be repeated or
- * race with fetch_tile.
- *
- * Custom geometry sources belong to the current style. Replacing the style
- * drops sources that were added to the previous style.
- *
- * A host that owns callback state frees it in options.release_user_data, which
- * this API invokes once after it stops referencing user_data. See
- * mln_custom_geometry_source_options.release_user_data.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, options is null or invalid, or options->fetch_tile is
- *   null.
- * - MLN_STATUS_INVALID_STATE when map or options->queue has been released, or
- *   the map is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Adds a source whose GeoJSON tiles come from callbacks.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
- *   runs release_user_data once.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
+ *
+ * Lifetimes:
+ * When this function returns an error, the caller keeps `user_data` and the
+ * library doesn't call `release_user_data`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_geometry_source(
@@ -1026,27 +670,15 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets custom geometry source data for one canonical tile.
+ * Sets the data of a tile in a custom geometry source.
  *
- * source_id and the UTF-8 GeoJSON data are borrowed for the call and copied
- * before return.
- *
- * MapLibre ignores the data unless fetch_tile requested that tile and
- * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
- * after validation.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, data is invalid or empty, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `data` is a GeoJSON feature collection. The source ignores data for a tile
+ * that it hasn't asked for, or has since cancelled.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the data is not valid GeoJSON, or the
- *   source is not a custom geometry source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom geometry source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
@@ -1056,28 +688,12 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
 ) MLN_NOEXCEPT;
 
 /**
- * Reports a custom geometry source error for one canonical tile.
- *
- * source_id and the UTF-8 diagnostic message are borrowed for the call. The
- * function copies accepted bytes before return. An empty message is accepted.
- *
- * MapLibre ignores the error unless fetch_tile requested that tile and
- * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
- * after validation. The tile stays failed until the host delivers its data or
- * invalidates it, which fetches it again.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, message is a null pointer with a
- *   nonzero size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Reports that a tile of a custom geometry source failed to load.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom geometry source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_error(
@@ -1087,19 +703,12 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_error(
 ) MLN_NOEXCEPT;
 
 /**
- * Invalidates custom geometry source data for one canonical tile.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Makes a custom geometry source ask for a tile again when the map needs it.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom geometry source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
@@ -1108,19 +717,13 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
 ) MLN_NOEXCEPT;
 
 /**
- * Invalidates custom geometry source data inside one geographic region.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, bounds is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Makes a custom geometry source ask again for the tiles in `bounds` that the
+ * map still needs.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom geometry source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
@@ -1129,45 +732,15 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a custom vector source.
- *
- * source_id is borrowed for the call. options is borrowed for the call, but the
- * callback function pointers and user_data pointer are retained by value. The
- * callback functions and user_data must remain valid until the source is
- * removed, the style is replaced, or the map is destroyed, and until any
- * in-flight callback invocation has returned. For URL loads, style replacement
- * occurs when the new style loads, not when the load request is accepted. For
- * inline JSON loads, style replacement completes when
- * mln_map_set_style_json() commits.
- *
- * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
- * concurrent with runtime and map calls. The style command functions in this
- * header, including the tile-delivery commands below, may be called directly
- * from these callbacks. Callbacks must not block waiting for command
- * execution. Every callback returns normally; see mln_user_data_release.
- * cancel_tile is best-effort and may be repeated or race with fetch_tile.
- *
- * Custom vector sources belong to the current style. Replacing the style
- * drops sources that were added to the previous style. A layer that draws this
- * source names a source-layer that exists inside the tile bytes the host
- * delivers.
- *
- * A host that owns callback state frees it in options.release_user_data, which
- * this API invokes once after it stops referencing user_data. See
- * mln_custom_vector_source_options.release_user_data.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, options is null or invalid, or options->fetch_tile is
- *   null.
- * - MLN_STATUS_INVALID_STATE when map or options->queue has been released, or
- *   the map is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Adds a source whose vector tiles come from callbacks.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
- *   runs release_user_data once.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
+ *
+ * Lifetimes:
+ * When this function returns an error, the caller keeps `user_data` and the
+ * library doesn't call `release_user_data`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_vector_source(
@@ -1177,32 +750,15 @@ MLN_API mln_status mln_map_add_custom_vector_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets custom vector source data for one canonical tile.
+ * Sets the data of a tile in a custom vector source.
  *
- * source_id and the tile bytes are borrowed for the call. The function copies
- * accepted bytes before return. encoding names the format of data: MVT
- * protobuf bytes, or MapLibre Tile bytes that decode as
- * mln_map_options.fast_pfor_enabled allows. One source may mix encodings
- * across tiles. A zero-length view, including a null pointer with size 0, is
- * an empty tile.
- *
- * MapLibre ignores the bytes unless fetch_tile requested that tile and
- * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
- * after validation.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, encoding is not an
- *   mln_style_vector_tile_encoding value, data is a null pointer with a
- *   nonzero size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `data` is the tile, encoded as `encoding`. The source ignores data for a tile
+ * that it hasn't asked for, or has since cancelled.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom vector source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_vector_source_tile_data(
@@ -1213,28 +769,12 @@ MLN_API mln_status mln_map_set_custom_vector_source_tile_data(
 ) MLN_NOEXCEPT;
 
 /**
- * Reports a custom vector source error for one canonical tile.
- *
- * source_id and the UTF-8 diagnostic message are borrowed for the call. The
- * function copies accepted bytes before return. An empty message is accepted.
- *
- * MapLibre ignores the error unless fetch_tile requested that tile and
- * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
- * after validation. The tile stays failed until the host delivers its data or
- * invalidates it, which fetches it again.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, message is a null pointer with a
- *   nonzero size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Reports that a tile of a custom vector source failed to load.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom vector source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_vector_source_tile_error(
@@ -1244,19 +784,12 @@ MLN_API mln_status mln_map_set_custom_vector_source_tile_error(
 ) MLN_NOEXCEPT;
 
 /**
- * Invalidates custom vector source data for one canonical tile.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Makes a custom vector source ask for a tile again when the map needs it.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom vector
- *   source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom vector source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
@@ -1264,31 +797,7 @@ MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Sets one runtime style image.
- *
- * image_id, image, and image pixels are borrowed for the call and copied
- * before return. If image_id already exists, the image is replaced when
- * the command commits.
- *
- * Runtime style images belong to the current style. Loading another style URL
- * or JSON document drops images that were added to the previous style.
- *
- * MapLibre also drops an image that it reported through
- * MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING before this call set it, once no
- * loaded tile uses the image. A tile that needs the image again reports it
- * missing again. Set keep_unused in options to keep such an image until it is
- * removed or replaced. Replacing an image replaces its options, keep_unused
- * included.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
- *   invalid or empty, image or options is invalid, image pixels are null, image
- *   dimensions or stride are invalid, or image byte_length is too small.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Adds an image to the map's style, or replaces the image named `image_id`. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
@@ -1298,20 +807,10 @@ MLN_API mln_status mln_map_set_style_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Removes one runtime style image by ID.
- *
- * image_id is borrowed for the call. The command commits when an image with
- * that ID existed and was removed.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Removes an image from the map's style.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
+ * - MLN_STATUS_NOT_FOUND when the style has no image named `image_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_image(
@@ -1320,18 +819,9 @@ MLN_API mln_status mln_map_remove_style_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one complete runtime style image.
+ * Reads an image of the map's style.
  *
- * A found image completes with one borrowed mln_style_image_info that includes
- * its pixels and stretch intervals. A missing image completes successfully with
- * no value. Copy retained pixels and intervals before the callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the style has no image named `image_id`.
  */
 MLN_BINDING("execution=query;result=mln_style_image_info;nullable=true")
 MLN_API mln_status mln_map_get_style_image(
@@ -1340,26 +830,13 @@ MLN_API mln_status mln_map_get_style_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds an image source that loads its image from a URL.
+ * Adds an image source that loads its image from `url`.
  *
- * source_id, coordinates, and url are borrowed for the call. coordinates must
- * contain exactly four coordinates in top-left, top-right, bottom-right,
- * bottom-left order. The strings and coordinates are copied before return.
- * Later URL load or decode failures are reported through runtime events.
- *
- * Image sources belong to the current style. Loading another style URL or JSON
- * document drops sources that were added to the previous style.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, coordinates is null or invalid, or coordinate_count is
- *   not 4.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `coordinates` are the image's four corners, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_image_source_url(
@@ -1370,27 +847,13 @@ MLN_API mln_status mln_map_add_image_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds an image source with inline image pixels.
+ * Adds an image source that shows `image`.
  *
- * source_id, coordinates, image, and image pixels are borrowed for the call.
- * coordinates must contain exactly four coordinates in top-left, top-right,
- * bottom-right, bottom-left order. The coordinates and pixels are copied
- * before return.
- *
- * Image sources belong to the current style. Loading another style URL or JSON
- * document drops sources that were added to the previous style.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, coordinates is null or invalid, coordinate_count is not
- *   4, image is invalid, image pixels are null, image dimensions or stride are
- *   invalid, or image byte_length is too small.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `coordinates` are the image's four corners, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ *   `source_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_image_source_image(
@@ -1401,21 +864,12 @@ MLN_API mln_status mln_map_add_image_source_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates an image source to load its image from a URL.
- *
- * source_id and url are borrowed for the call. Later URL load or decode
- * failures are reported through runtime events.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Makes an image source load its image from `url`.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
+ *   image source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_url(
@@ -1424,23 +878,12 @@ MLN_API mln_status mln_map_set_image_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates an image source with inline image pixels.
- *
- * source_id, image, and image pixels are borrowed for the call and copied
- * before return.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, image is invalid, image pixels are null, image dimensions
- *   or stride are invalid, image byte_length is too small, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Replaces the image of an image source.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
+ *   image source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_image(
@@ -1450,23 +893,14 @@ MLN_API mln_status mln_map_set_image_source_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates image source coordinates.
+ * Moves the image of an image source.
  *
- * coordinates is borrowed for the call and copied before return, and must
- * contain exactly four coordinates in top-left, top-right, bottom-right,
- * bottom-left order.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, coordinates is null or invalid, coordinate_count is not
- *   4, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `coordinates` are the image's four corners, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
+ *   image source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_coordinates(
@@ -1477,21 +911,12 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies image source coordinates.
- *
- * The completion borrows four mln_lat_lng values in top-left, top-right,
- * bottom-right, bottom-left order.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Reads the corners of an image source's image, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
+ *   image source.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_get_image_source_coordinates(
@@ -1500,25 +925,17 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds one style layer from a full style-spec layer JSON object.
+ * Adds a layer to the map's style.
  *
- * layer_json and before_layer_id are borrowed for the call. layer_json must
- * contain id and type members. Passing an empty before_layer_id appends the
- * layer; otherwise the layer is inserted before that existing layer.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_json is
- *   empty or invalid, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `layer_json` is a [layer](https://maplibre.org/maplibre-style-spec/layers/)
+ * object. The layer goes below the layer named `before_layer_id`, or above
+ * every layer when `before_layer_id` is empty.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when before_layer_id is non-empty and no style layer
- *   has it, or the layer requires a source no style source has.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer JSON cannot be converted, or a
- *   layer already has the JSON's id, or the source does not support the layer
- *   type.
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `before_layer_id`,
+ *   or no source with the ID that the layer uses.
+ * - MLN_STATUS_INVALID_ARGUMENT when the style already has a layer with the new
+ *   layer's ID.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
@@ -1528,20 +945,10 @@ MLN_API mln_status mln_map_add_style_layer_json(
 ) MLN_NOEXCEPT;
 
 /**
- * Removes one style layer by ID.
- *
- * layer_id is borrowed for the call. The command commits when a layer with
- * that ID existed and was removed.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Removes a layer from the map's style.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_layer(
@@ -1550,18 +957,9 @@ MLN_API mln_status mln_map_remove_style_layer(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the complete metadata of one style layer.
+ * Reads a layer of the map's style.
  *
- * A found layer completes with one borrowed mln_style_layer_info whose id is
- * the requested ID. A missing layer completes successfully with no value. Copy
- * retained views before the callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the style has no layer named `layer_id`.
  */
 MLN_BINDING("execution=query;result=mln_style_layer_info;nullable=true")
 MLN_API mln_status mln_map_get_style_layer(
@@ -1569,41 +967,19 @@ MLN_API mln_status mln_map_get_style_layer(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Starts an ordered query of every style layer in style order.
- *
- * The completion borrows value_count mln_style_layer_info values, value_size
- * bytes apart, in style order. Copy retained entries and their views before the
- * callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Lists the layers of the map's style, from bottom to top. */
 MLN_BINDING("execution=query;result=mln_style_layer_info;shape=array")
 MLN_API mln_status mln_map_list_style_layers(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Moves one style layer before another layer or to the top.
- *
- * layer_id and before_layer_id are borrowed for the call. Passing an empty
- * before_layer_id moves the layer to the top of the style order.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Moves a layer of the map's style below the layer named `before_layer_id`, or
+ * above every layer when `before_layer_id` is empty.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has layer_id, or before_layer_id
- *   is non-empty and no style layer has it.
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id` or
+ *   `before_layer_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_move_style_layer(
@@ -1612,17 +988,10 @@ MLN_API mln_status mln_map_move_style_layer(
 ) MLN_NOEXCEPT;
 
 /**
- * Serializes one style layer as a full style-spec layer JSON object.
+ * Reads a layer of the map's style as a
+ * [layer](https://maplibre.org/maplibre-style-spec/layers/) object.
  *
- * A found layer completes with one borrowed mln_buffer_view. A missing layer
- * completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the style has no layer named `layer_id`.
  */
 MLN_BINDING(
   "execution=query;result=mln_buffer_view;nullable=true;"
@@ -1634,19 +1003,8 @@ MLN_API mln_status mln_map_get_style_layer_json(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets the style light from a style-spec light JSON object.
- *
- * light_json is borrowed for the call.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, light_json is
- *   empty or invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the light JSON cannot be converted.
+ * Replaces the [light](https://maplibre.org/maplibre-style-spec/light/) of the
+ * map's style.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_json(
@@ -1654,23 +1012,7 @@ MLN_API mln_status mln_map_set_style_light_json(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Sets one style light property using its MapLibre style-spec property name.
- *
- * property_name and value are borrowed for the call. value is a style-spec JSON
- * value.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
- *   invalid or empty, value is empty or invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown, or the
- *   value cannot be converted for that property.
- */
+/** Sets a property of the light of the map's style. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name,
@@ -1679,17 +1021,9 @@ MLN_API mln_status mln_map_set_style_light_property(
 ) MLN_NOEXCEPT;
 
 /**
- * Serializes one style light property as a style-spec JSON value.
+ * Reads a property of the light of the map's style.
  *
- * A defined property completes with one borrowed mln_buffer_view. An undefined
- * property completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the light doesn't set the property.
  */
 MLN_BINDING(
   "execution=query;result=mln_buffer_view;nullable=true;"
@@ -1700,89 +1034,29 @@ MLN_API mln_status mln_map_get_style_light_property(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Sets the style's global transition options.
- *
- * options is borrowed for the call and copied before return. When the command
- * commits, omitted duration and delay fields clear the style-wide override.
- * The command replaces the whole transition configuration.
- *
- * Loading a style replaces these options with the ones that style declares, so
- * a host that overrides them applies the override after the style loads.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null
- *   or undersized, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when options->fields contains unknown bits, or
- *   an enabled duration or delay is negative, non-finite, or too long to
- *   represent. A rejected command changes nothing.
- * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
- */
+/** Sets the default transition of the map's style. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Reads the style's global transition options.
- *
- * The completion borrows the last-known transition configuration. Duration
- * and delay report through their field-mask bits and may be unset.
- *
- * A map that has loaded no style yet reports duration and delay unset. A style
- * carrying no "transition" member reports a 300 millisecond duration, while a
- * style carrying one reports only the members that object names, so a style
- * whose transition declares a delay alone reports no duration. Read the
- * field-mask bits rather than assuming a loaded style sets either.
- *
- * MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS is always set on
- * return and reports nothing about the field.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Reads the default transition of the map's style. */
 MLN_BINDING("execution=query;result=mln_style_transition_options")
 MLN_API mln_status mln_map_get_style_transition_options(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Sets one layer property using its MapLibre style-spec property name.
+ * Sets a property of a layer in the map's style.
  *
- * layer_id, property_name, and value are borrowed for the call. value is a
- * style-spec JSON value; expressions use style-spec expression JSON arrays.
- * Paint and layout property names are unprefixed. The root keys filter,
- * source, source-layer, minzoom, and maxzoom are also supported.
- *
- * JSON null clears a filter and resets minzoom or maxzoom to an unbounded
- * range (-INFINITY or INFINITY). For paint and layout properties, JSON null
- * restores the property's default. source and source-layer take JSON strings;
- * an empty source-layer string clears it. A source ID may name a source that
- * has not been added yet. Zoom values are rounded to single precision.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
- *   property_name is invalid or empty, value is empty or invalid, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `property_name` is one of the layer's layout or paint
+ * [properties](https://maplibre.org/maplibre-style-spec/layers/), or `filter`,
+ * `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value` resets any
+ * of these but `source` and `source-layer` to its default.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown for that
- *   layer, the value cannot be converted for that property, or source or
- *   source-layer is set on a layer type that takes no source.
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_layer_property(
@@ -1792,25 +1066,12 @@ MLN_API mln_status mln_map_set_style_layer_property(
 ) MLN_NOEXCEPT;
 
 /**
- * Serializes one layer property as a style-spec JSON value.
+ * Reads a property of a layer in the map's style.
  *
- * A defined property completes with one borrowed mln_buffer_view. An undefined
- * property completes successfully with no value.
- *
- * Paint and layout property names are unprefixed. The root keys filter,
- * source, source-layer, minzoom, and maxzoom use the layer's serialized values.
- * An unset filter, an empty source or source-layer, and an unbounded minzoom
- * or maxzoom complete successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
- *   property_name is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Completes with no value when the layer doesn't set the property.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.
  */
 MLN_BINDING(
   "execution=query;result=mln_buffer_view;nullable=true;"

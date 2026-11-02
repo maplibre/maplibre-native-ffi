@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for creating a graphics device.
+/// Options for <c>GraphicsDeviceHandle.Create()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_graphics_device_options</c> in the <see
@@ -12,15 +12,13 @@ namespace Maplibre.NativeFfi;
 public sealed record GraphicsDeviceOptions
 {
     /// <summary>
-    /// The adapter to create the device on, as a position in the graphics API's
-    /// own list of adapters, from zero. Without it, the backend picks its
-    /// default adapter.
+    /// The GPU to use, as an index into the platform's list of GPUs.
     /// </summary>
     public uint? AdapterIndex { get; init; }
 
     /// <summary>
-    /// Whether the device's texture sessions take turns rendering in one EGL
-    /// context instead of each creating its own. Absent selects false.
+    /// Whether the device's texture sessions take turns in one OpenGL context
+    /// instead of having one each. Only an EGL device reads it.
     /// </summary>
     public bool? SingleContext { get; init; }
 }

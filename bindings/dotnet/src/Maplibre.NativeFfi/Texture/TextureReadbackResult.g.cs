@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Texture readback.
+/// The pixels that <c>RenderSessionHandle.ReadTextureAsync()</c> reads.
 /// </summary>
 /// <remarks>
 /// See <c>mln_texture_readback_result</c> in the <see
@@ -18,7 +18,8 @@ public readonly partial record struct TextureReadbackResult
     }
 
     /// <summary>
-    /// Pixel bytes.
+    /// Premultiplied RGBA pixels with 8 bits per channel, in rows from top to
+    /// bottom.
     /// </summary>
     public ImmutableArray<byte> Data
     {

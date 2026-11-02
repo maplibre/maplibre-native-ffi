@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * Prepared GeoJSON data that sources retain independently of its handle.
+ * GeoJSON data, parsed and ready to add to a GeoJSON source.
  *
  * See `mln_geo_json_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -28,7 +28,9 @@ internal constructor(
     get() = binding.isReleased
 
   /**
-   * Releases prepared GeoJSON source data.
+   * Releases prepared GeoJSON data.
+   *
+   * Sources that use the data keep it.
    *
    * See `mln_geo_json_source_data_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -41,10 +43,18 @@ internal constructor(
 
   public companion object {
     /**
-     * Prepares GeoJSON source data for installation on a map.
+     * Prepares GeoJSON data for GeoJSON sources.
+     *
+     * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it can be slow, but
+     * adding the result to a source is quick, and several sources can share it.
      *
      * See `mln_geo_json_source_data_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+     *
+     * Errors:
+     *
+     * - `Status.INVALID_ARGUMENT` when `data` isn't valid GeoJSON, or when `options` turns on
+     *   clustering and `data` isn't a feature collection of points.
      */
     public fun create(
       data: String,

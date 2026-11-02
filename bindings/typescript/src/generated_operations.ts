@@ -116,8 +116,9 @@ import {
 } from "./internal/realm.ts";
 
 /**
- * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
- * and will increment on each SemVer major release.
+ * Returns the API epoch of the library.
+ *
+ * Headers and a library with different epochs aren't compatible.
  *
  * See `mln_c_version` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -127,7 +128,7 @@ export function cVersion(): number {
 }
 
 /**
- * Clears the process-global log callback.
+ * Sends log messages to the platform's log again, instead of a callback.
  *
  * See `mln_log_clear_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -137,7 +138,7 @@ export function clearLogCallback(): void {
 }
 
 /**
- * Reads MapLibre Native's process-global network status.
+ * Reads whether the library may use the network.
  *
  * See `mln_network_get_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -147,7 +148,12 @@ export function getNetworkStatus(): NetworkStatus {
 }
 
 /**
- * Returns the process-wide plugin registration entry point; never null.
+ * Returns the function that registers a plugin's style layer types.
+ *
+ * Pass the function to the plugin's registration entry point before loading a
+ * style that uses the plugin's layer types. Plugin callbacks run on library
+ * threads and can keep running while the process exits, so they must not use
+ * state that the process destroys at exit.
  *
  * See `mln_plugin_get_register_function_v1` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
@@ -157,7 +163,7 @@ export function getPluginRegisterFunctionV1(): bigint {
 }
 
 /**
- * Converts spherical Mercator projected meters to a geographic coordinate.
+ * Converts meters in the Web Mercator projection to a coordinate.
  *
  * See `mln_lat_lng_for_projected_meters` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -167,7 +173,7 @@ export function latLngForProjectedMeters(meters: ProjectedMeters = {}): LatLng {
 }
 
 /**
- * Computes the physical device-pixel size of a logical extent.
+ * Computes the size in pixels of a target with a logical size and scale factor.
  *
  * See `mln_logical_extent_physical_size` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -180,7 +186,7 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent = {}): {
 }
 
 /**
- * Returns OpenGL context providers supported by this build.
+ * Reports the OpenGL context platforms that this build of the library has.
  *
  * See `mln_open_gl_supported_context_provider_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -190,7 +196,7 @@ export function openGlSupportedContextProviderMask(): OpenGlContextProviderFlag 
 }
 
 /**
- * Converts a geographic coordinate to spherical Mercator projected meters.
+ * Converts a coordinate to meters in the Web Mercator projection.
  *
  * See `mln_projected_meters_for_lat_lng` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -202,7 +208,10 @@ export function projectedMetersForLatLng(
 }
 
 /**
- * Controls which log severities MapLibre Native may dispatch asynchronously.
+ * Selects the severities that the library logs on a background thread.
+ *
+ * The library logs other severities on the thread that logged them. `mask`
+ * applies to every runtime in the process.
  *
  * See `mln_log_set_async_severity_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -212,9 +221,12 @@ export function setLogAsyncSeverityMask(mask: LogSeverityFlag): void {
 }
 
 /**
- * Installs a process-global MapLibre Native log callback. The callback runs
- * asynchronously on the JavaScript thread that registered it, after native
- * queues the call.
+ * Sends the log messages of every runtime in the process to a callback.
+ *
+ * The callback replaces the one set before.
+ *
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -227,7 +239,12 @@ export function setLogCallback(handler: LogHandler): void {
 }
 
 /**
- * Sets MapLibre Native's process-global network status.
+ * Tells the library whether it may use the network.
+ *
+ * While the status is `NetworkStatus.offline`, the library starts no network
+ * requests. The requests that wait start when the status returns to
+ * `NetworkStatus.online`. The status starts as online and applies to every
+ * runtime in the process.
  *
  * See `mln_network_set_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -237,7 +254,7 @@ export function setNetworkStatus(status: NetworkStatus): void {
 }
 
 /**
- * Reports the render backends available in this native library build.
+ * Returns the render backends that this build of the library draws with.
  *
  * See `mln_supported_render_backend_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -247,7 +264,7 @@ export function supportedRenderBackendMask(): RenderBackendFlag {
 }
 
 /**
- * A rendered frame that a render session lends until its release.
+ * A rendered frame that the caller holds to read or show.
  *
  * See `mln_acquired_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -268,8 +285,10 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Consumes an acquired frame without consumer GPU synchronization, so it
-   * quarantines the frame's slot of the texture ring.
+   * Gives up an acquired frame without saying when your GPU stops reading it.
+   *
+   * Because your GPU may still read the frame's texture, the session never
+   * renders into that texture again.
    *
    * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -281,20 +300,33 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies common metadata for an acquired frame.
+   * Reads the frame result of an acquired frame.
    *
    * See `mln_acquired_frame_get_result` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   getResult(): RenderFrameResult {
     return native.mln_acquired_frame_get_result(this.id);
   }
 
   /**
-   * Releases an acquired frame after the host's GPU work that reads it.
+   * Gives an acquired frame back to the session once you're done reading it.
+   *
+   * `consumerCompletion` says when your GPU work that reads the texture
+   * finishes. Null means that the work has already finished. The session waits
+   * for that point before it renders into the texture again.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `RenderSessionCapabilities.consumerSyncKinds`
+   *   lacks the kind of `consumerCompletion`.
    */
   release(consumerCompletion?: GpuSync): void {
     closeSync(this, (handle, token) =>
@@ -303,10 +335,14 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies Metal-native metadata from an acquired frame.
+   * Gets the Metal texture of an acquired frame.
    *
    * See `mln_acquired_frame_get_metal_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   withMetalTexture<T>(use: (view: ScopedMetalTextureFrame) => T): T {
     return new ViewScope(
@@ -326,10 +362,14 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies OpenGL-native metadata from an acquired frame.
+   * Gets the OpenGL texture of an acquired frame.
    *
    * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   withOpenGlTexture<T>(use: (view: ScopedOpenGlTextureFrame) => T): T {
     return new ViewScope(
@@ -349,10 +389,14 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies the producer synchronization for an acquired texture frame.
+   * Reads what to wait for before you read an acquired frame's texture.
    *
    * See `mln_acquired_frame_get_producer_sync` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   withProducerSync<T>(use: (view: ScopedGpuSync) => T): T {
     return new ViewScope(
@@ -372,10 +416,14 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies Vulkan-native metadata from an acquired frame.
+   * Gets the Vulkan image of an acquired frame.
    *
    * See `mln_acquired_frame_get_vulkan_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   withVulkanTexture<T>(use: (view: ScopedVulkanTextureFrame) => T): T {
     return new ViewScope(
@@ -395,10 +443,14 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Copies WebGPU-native metadata from an acquired frame.
+   * Gets the WebGPU texture of an acquired frame.
    *
    * See `mln_acquired_frame_get_web_gpu_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session lost its target.
    */
   withWebGpuTexture<T>(use: (view: ScopedWebGpuTextureFrame) => T): T {
     return new ViewScope(
@@ -420,7 +472,7 @@ export class AcquiredFrameHandle extends Owner {
 defineDisposers(AcquiredFrameHandle, undefined, undefined);
 
 /**
- * Prepared GeoJSON data that sources retain independently of its handle.
+ * GeoJSON data, parsed and ready to add to a GeoJSON source.
  *
  * See `mln_geo_json_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -446,7 +498,9 @@ export class GeoJsonSourceDataHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases prepared GeoJSON source data.
+   * Releases prepared GeoJSON data.
+   *
+   * Sources that use the data keep it.
    *
    * See `mln_geo_json_source_data_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -458,10 +512,20 @@ export class GeoJsonSourceDataHandle extends Owner {
   }
 
   /**
-   * Prepares GeoJSON source data for installation on a map.
+   * Prepares GeoJSON data for GeoJSON sources.
+   *
+   * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
+   * can be slow, but adding the result to a source is quick, and several
+   * sources can share it.
    *
    * See `mln_geo_json_source_data_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `data` isn't valid GeoJSON, or when
+   *   `options` turns on clustering and `data` isn't a feature collection of
+   *   points.
    */
   static create(
     data: unknown,
@@ -479,7 +543,7 @@ export class GeoJsonSourceDataHandle extends Owner {
 defineDisposers(GeoJsonSourceDataHandle, undefined, "close");
 
 /**
- * A GPU device that native code creates for texture render targets.
+ * A GPU device that the library creates to render maps into textures.
  *
  * See `mln_graphics_device` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -507,6 +571,8 @@ export class GraphicsDeviceHandle extends Owner {
   /**
    * Releases a graphics device.
    *
+   * Render sessions on the device keep working until they detach.
+   *
    * See `mln_graphics_device_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
    */
@@ -517,10 +583,19 @@ export class GraphicsDeviceHandle extends Owner {
   }
 
   /**
-   * Creates a graphics device for this build's render backend.
+   * Creates a GPU device for rendering maps into textures.
+   *
+   * Render sessions on several maps can share one device.
    *
    * See `mln_graphics_device_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when this build's render backend can't create a
+   *   device.
+   * - `Status.nativeError` when `adapter_index` names no GPU, or the platform
+   *   can't create the device.
    */
   static create(options?: GraphicsDeviceOptions): GraphicsDeviceHandle {
     const handle = native.mln_graphics_device_create(options);
@@ -534,7 +609,7 @@ export class GraphicsDeviceHandle extends Owner {
 defineDisposers(GraphicsDeviceHandle, undefined, "close");
 
 /**
- * A map, which holds map state independent of any render target.
+ * A map, with its style and camera.
  *
  * See `mln_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -577,11 +652,15 @@ export class MapHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Adds a custom geometry source. The callback runs asynchronously on the
-   * JavaScript thread that registered it, after native queues the call.
+   * Adds a source whose GeoJSON tiles come from callbacks.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addCustomGeometrySource(
     sourceId: string,
@@ -601,11 +680,15 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a custom vector source. The callback runs asynchronously on the
-   * JavaScript thread that registered it, after native queues the call.
+   * Adds a source whose vector tiles come from callbacks.
    *
    * See `mln_map_add_custom_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addCustomVectorSource(
     sourceId: string,
@@ -625,10 +708,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a GeoJSON source with prepared inline data.
+   * Adds a GeoJSON source with prepared data.
+   *
+   * The source uses the options that `data` was prepared with. `data` can be
+   * released once this function returns.
    *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addGeoJsonSourceData(
     sourceId: string,
@@ -645,10 +736,15 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a GeoJSON source with URL data.
+   * Adds a GeoJSON source that loads its data from `url`.
    *
    * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addGeoJsonSourceUrl(
     sourceId: string,
@@ -667,10 +763,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds an image source with inline image pixels.
+   * Adds an image source that shows `image`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addImageSourceImage(
     sourceId: string,
@@ -689,10 +792,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds an image source that loads its image from a URL.
+   * Adds an image source that loads its image from `url`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addImageSourceUrl(
     sourceId: string,
@@ -711,10 +821,22 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds one style layer from a full style-spec layer JSON object.
+   * Adds a layer to the map's style.
+   *
+   * `layerJson` is a
+   * &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object.
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty.
    *
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `beforeLayerId`, or
+   *   no source with the ID that the layer uses.
+   * - `Status.invalidArgument` when the style already has a layer with the new
+   *   layer's ID.
    */
   addStyleLayerJson(
     layerJson: unknown,
@@ -731,10 +853,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds one style source from a style-spec source JSON object.
+   * Adds a source to the map's style.
+   *
+   * `sourceJson` is a
+   * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/) object.
    *
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the style already has a source named
+   *   `sourceId`.
    */
   addStyleSourceJson(
     sourceId: string,
@@ -751,7 +881,14 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits one atomic relative camera update.
+   * Moves the camera relative to where it is, as a gesture does.
+   *
+   * `delta` can pan the map's content by an offset on the screen, scale the
+   * zoom, and add to the bearing and pitch. An anchor keeps one screen point in
+   * place while the scale, bearing, or pitch changes. An anchor needs one of
+   * those changes, and combines with an offset only when the delta has no
+   * animation. The function finishes when the map applies the delta, before an
+   * animation ends.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -766,10 +903,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a texture target that renders on a graphics device.
+   * Attaches a render session that draws the map into a texture on `device`.
+   *
+   * `options` must select `RenderDriverKind.coreWorker`. Read the frames back
+   * with `RenderSessionHandle.readTexture()`.
    *
    * See `mln_map_attach_graphics_device_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the map already has a render session.
    */
   attachGraphicsDeviceTexture(
     device: GraphicsDeviceHandle,
@@ -799,10 +943,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a ring of caller-owned Metal textures.
+   * Creates a session that renders the map into a ring of your Metal textures.
    *
    * See `mln_map_attach_metal_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.metal`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor,
@@ -830,10 +980,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a session-owned Metal texture ring.
+   * Creates a session that renders the map into a ring of new Metal textures.
    *
    * See `mln_map_attach_metal_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.metal`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
@@ -861,10 +1017,15 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a Metal surface target.
+   * Creates a session that renders the map to a Metal layer.
    *
    * See `mln_map_attach_metal_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.metal`.
    */
   attachMetalSurface(
     descriptor: MetalSurfaceDescriptor,
@@ -892,10 +1053,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a ring of caller-owned OpenGL textures.
+   * Creates a session that renders the map into a ring of your OpenGL textures.
+   *
+   * The session needs `RenderDriverKind.callerGraphicsThread`.
    *
    * See `mln_map_attach_open_gl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
+   *   the context's platform, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachOpenGlBorrowedTexture(
     descriptor: OpenGlBorrowedTextureDescriptor,
@@ -923,10 +1092,23 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a session-owned OpenGL texture ring.
+   * Creates a session that renders the map into a ring of new OpenGL textures.
+   *
+   * With `OpenGlContextOwnership.shared`, the session needs
+   * `RenderDriverKind.callerGraphicsThread`, and the textures are in your
+   * context's share group. With `OpenGlContextOwnership.dedicated`, the session
+   * needs `RenderDriverKind.coreWorker` and renders in a context of its own.
+   * You can't acquire its frames, but `RenderSessionHandle.readTexture()` reads
+   * them.
    *
    * See `mln_map_attach_open_gl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
+   *   the context's platform, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachOpenGlOwnedTexture(
     descriptor: OpenGlOwnedTextureDescriptor,
@@ -954,10 +1136,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of an OpenGL surface target.
+   * Creates a session that renders the map to an OpenGL surface.
+   *
+   * The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
+   * canvas, and `RenderDriverKind.callerGraphicsThread` for any other context.
    *
    * See `mln_map_attach_open_gl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
+   *   the context's platform.
    */
   attachOpenGlSurface(
     descriptor: OpenGlSurfaceDescriptor,
@@ -985,10 +1175,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a ring of caller-owned Vulkan images.
+   * Creates a session that renders the map into a ring of your Vulkan images.
    *
    * See `mln_map_attach_vulkan_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.vulkan`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor,
@@ -1016,10 +1212,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a session-owned Vulkan texture ring.
+   * Creates a session that renders the map into a ring of new Vulkan images.
    *
    * See `mln_map_attach_vulkan_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.vulkan`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachVulkanOwnedTexture(
     descriptor: VulkanOwnedTextureDescriptor,
@@ -1047,10 +1249,15 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a Vulkan surface target.
+   * Creates a session that renders the map to a Vulkan surface.
    *
    * See `mln_map_attach_vulkan_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.vulkan`.
    */
   attachVulkanSurface(
     descriptor: VulkanSurfaceDescriptor,
@@ -1078,10 +1285,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a ring of caller-owned WebGPU textures.
+   * Creates a session that renders the map into a ring of your WebGPU textures.
+   *
+   * The session needs `RenderDriverKind.callerGraphicsThread`.
    *
    * See `mln_map_attach_web_gpu_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.webGpu`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachWebGpuBorrowedTexture(
     descriptor: WebGpuBorrowedTextureDescriptor,
@@ -1109,10 +1324,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a session-owned WebGPU texture ring.
+   * Creates a session that renders the map into a ring of new WebGPU textures.
+   *
+   * The session needs `RenderDriverKind.callerGraphicsThread`.
    *
    * See `mln_map_attach_web_gpu_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.webGpu`, or when the target supports none of the
+   *   `producer_sync_kinds` in `options`.
    */
   attachWebGpuOwnedTexture(
     descriptor: WebGpuOwnedTextureDescriptor,
@@ -1140,10 +1363,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts attachment of a WebGPU surface target.
+   * Creates a session that renders the map to a WebGPU surface.
+   *
+   * The session needs `RenderDriverKind.callerGraphicsThread`.
    *
    * See `mln_map_attach_web_gpu_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.webGpu`.
    */
   attachWebGpuSurface(
     descriptor: WebGpuSurfaceDescriptor,
@@ -1171,8 +1401,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Begins a command group, which holds this map's render updates until the
-   * group ends.
+   * Holds back the map's changes from rendering until
+   * `MapHandle.endCommandGroup()`, so they show in the same frame.
+   *
+   * Groups nest, and the changes render when the outermost group ends.
    *
    * See `mln_map_begin_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1184,7 +1416,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered query for a camera that fits a GeoJSON geometry.
+   * Computes a camera that fits a GeoJSON geometry in the map's view.
+   *
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+   * feature. The camera keeps the map's bearing and pitch unless `fitOptions`
+   * sets them, and its zoom stays within the map's zoom limits.
    *
    * See `mln_map_camera_for_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1204,7 +1440,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered query for a camera that fits geographic bounds.
+   * Computes a camera that fits `bounds` in the map's view.
+   *
+   * The camera keeps the map's bearing and pitch unless `fitOptions` sets them,
+   * and its zoom stays within the map's zoom limits.
    *
    * See `mln_map_camera_for_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1224,7 +1463,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered query for a camera that fits geographic coordinates.
+   * Computes a camera that fits `coordinates` in the map's view.
+   *
+   * `coordinates` must not be empty. The camera keeps the map's bearing and
+   * pitch unless `fitOptions` sets them, and its zoom stays within the map's
+   * zoom limits.
    *
    * See `mln_map_camera_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1244,8 +1487,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Cancels the camera transitions of the commands whose animation carried
-   * transition_id, and leaves every other transition running.
+   * Stops the running camera animations whose animation options set
+   * `transitionId`.
+   *
+   * Other animations keep running. The end handler of each stopped animation
+   * reports `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_cancel_camera_transition` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1261,7 +1507,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Cancels the camera transitions running when this command commits.
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_cancel_transitions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1273,7 +1522,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Releases a map asynchronously.
+   * Releases the map.
+   *
+   * Detach the map's render session first.
    *
    * See `mln_map_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1287,7 +1538,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Consumes a map handle without observing its asynchronous retirement.
+   * Releases the map in any state, and finishes in the background.
+   *
+   * Use it from destructors and finalizers. Otherwise, use `MapHandle.close()`.
    *
    * See `mln_map_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1297,7 +1550,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits an ordered debug-log command.
+   * Logs debugging information about the map's style and sources.
    *
    * See `mln_map_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1309,8 +1562,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Ends the innermost command group that `MapHandle.beginCommandGroup()`
-   * began.
+   * Ends the group that `MapHandle.beginCommandGroup()` began.
    *
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1322,7 +1574,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered camera read.
+   * Reads the map's camera.
+   *
+   * The query reads the camera after the map applies the commands sent before
+   * it.
    *
    * See `mln_map_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1334,7 +1589,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered read of per-feature state from this map.
+   * Reads the state of a feature, as a JSON object.
+   *
+   * The object is empty when the feature has no state.
    *
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1346,7 +1603,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Queries the global-state JSON object, including style defaults.
+   * Reads the global state of the map's style as a JSON object.
    *
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1358,10 +1615,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Copies image source coordinates.
+   * Reads the corners of an image source's image, clockwise from the top left.
    *
    * See `mln_map_get_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't an image
+   *   source.
    */
   getImageSourceCoordinates(sourceId: string): Promise<readonly LatLng[]> {
     return query<readonly LatLng[]>((completion) =>
@@ -1374,7 +1637,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered copy of the last successfully parsed style document.
+   * Reads the JSON of the style that the map loaded.
+   *
+   * The JSON doesn't include the changes made to the style since it loaded.
    *
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1386,7 +1651,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Copies the map's latest published snapshot.
+   * Copies the map's state.
+   *
+   * The copy doesn't wait for pending commands. To read the camera after they
+   * apply, use `MapHandle.getCamera()`.
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1396,7 +1664,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Copies one complete runtime style image.
+   * Reads an image of the map's style.
+   *
+   * Completes with no value when the style has no image named `imageId`.
    *
    * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1408,7 +1678,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Copies the complete metadata of one style layer.
+   * Reads a layer of the map's style.
+   *
+   * Completes with no value when the style has no layer named `layerId`.
    *
    * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1420,7 +1692,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Serializes one style layer as a full style-spec layer JSON object.
+   * Reads a layer of the map's style as a
+   * &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object.
+   *
+   * Completes with no value when the style has no layer named `layerId`.
    *
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1432,10 +1707,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Serializes one layer property as a style-spec JSON value.
+   * Reads a property of a layer in the map's style.
+   *
+   * Completes with no value when the layer doesn't set the property.
    *
    * See `mln_map_get_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `layerId`.
    */
   getStyleLayerProperty(
     layerId: string,
@@ -1452,7 +1733,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Serializes one style light property as a style-spec JSON value.
+   * Reads a property of the light of the map's style.
+   *
+   * Completes with no value when the light doesn't set the property.
    *
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1468,7 +1751,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Copies the complete metadata of one style source.
+   * Reads a source of the map's style.
+   *
+   * Completes with no value when the style has no source named `sourceId`.
    *
    * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1480,7 +1765,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Reads the style's global transition options.
+   * Reads the default transition of the map's style.
    *
    * See `mln_map_get_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1492,7 +1777,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered copy of the last requested style URL.
+   * Reads the URL of the map's style.
+   *
+   * The URL is empty when the style came from `MapHandle.setStyleJson()`.
    *
    * See `mln_map_get_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1504,10 +1791,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Invalidates custom geometry source data inside one geographic region.
+   * Makes a custom geometry source ask again for the tiles in `bounds` that the
+   * map still needs.
    *
    * See `mln_map_invalidate_custom_geometry_source_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
   invalidateCustomGeometrySourceRegion(
     sourceId: string,
@@ -1524,10 +1818,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Invalidates custom geometry source data for one canonical tile.
+   * Makes a custom geometry source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_geometry_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
   invalidateCustomGeometrySourceTile(
     sourceId: string,
@@ -1544,10 +1844,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Invalidates custom vector source data for one canonical tile.
+   * Makes a custom vector source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_vector_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
   invalidateCustomVectorSourceTile(
     sourceId: string,
@@ -1564,7 +1870,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered wrapped-bounds query for a copied camera.
+   * Computes the area that the map would show with `camera`.
+   *
+   * Camera fields that `camera` doesn't set come from the map's camera. The
+   * longitudes stay between -180 and 180.
    *
    * See `mln_map_lat_lng_bounds_for_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1576,7 +1885,12 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered unwrapped-bounds query for a copied camera.
+   * Computes the area that the map would show with `camera`, without wrapping
+   * longitudes.
+   *
+   * Camera fields that `camera` doesn't set come from the map's camera. The
+   * longitudes can fall outside -180 to 180, so a view across the antimeridian
+   * gives one continuous range.
    *
    * See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1594,7 +1908,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Starts an ordered query of every style layer in style order.
+   * Lists the layers of the map's style, from bottom to top.
    *
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1606,7 +1920,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Lists every style source in style order.
+   * Lists the sources of the map's style.
    *
    * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1618,10 +1932,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Moves one style layer before another layer or to the top.
+   * Moves a layer of the map's style below the layer named `beforeLayerId`, or
+   * above every layer when `beforeLayerId` is empty.
    *
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `layerId` or
+   *   `beforeLayerId`.
    */
   moveStyleLayer(
     layerId: string,
@@ -1638,7 +1958,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Removes per-feature state from this map.
+   * Removes the feature state that `selector` selects.
    *
    * See `mln_map_remove_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1652,10 +1972,14 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Removes one runtime style image by ID.
+   * Removes an image from the map's style.
    *
    * See `mln_map_remove_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no image named `imageId`.
    */
   removeStyleImage(imageId: string): Promise<CommandCompletion> {
     return command((completion) =>
@@ -1664,10 +1988,14 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Removes one style layer by ID.
+   * Removes a layer from the map's style.
    *
    * See `mln_map_remove_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `layerId`.
    */
   removeStyleLayer(layerId: string): Promise<CommandCompletion> {
     return command((completion) =>
@@ -1676,10 +2004,15 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Removes one style source by ID.
+   * Removes a source from the map's style.
    *
    * See `mln_map_remove_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidState` when a layer still uses the source.
    */
   removeStyleSource(sourceId: string): Promise<CommandCompletion> {
     return command((completion) =>
@@ -1688,7 +2021,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Requests a repaint for a continuous map.
+   * Renders a new frame of a continuous map, even when nothing changed.
    *
    * See `mln_map_request_repaint` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1700,10 +2033,19 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Requests one still image for a static or tile map, which renders itself.
+   * Renders a still image of a static or tile map.
+   *
+   * The map's render session draws the image once every resource that the image
+   * needs has loaded.
    *
    * See `mln_map_request_still_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.cancelled` when the map is released before the image is done.
+   * - `Status.nativeError` when the style or a resource that the image needs
+   *   fails to load.
    */
   requestStillImage(): Promise<void> {
     return run((completion) =>
@@ -1712,7 +2054,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits the sole post-creation logical extent update.
+   * Sets the map's size.
+   *
+   * `extent` must keep the scale factor that the map was created with. A map
+   * with a render session takes its size from the session, so resize the
+   * session with `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1724,7 +2070,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a copied camera-constraint command.
+   * Limits the camera's center to an area, and its zoom and pitch to ranges.
+   *
+   * Limits that `options` doesn't set keep their current values. When the
+   * camera is outside the new limits, it moves inside them.
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1736,10 +2085,19 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets custom geometry source data for one canonical tile.
+   * Sets the data of a tile in a custom geometry source.
+   *
+   * `data` is a GeoJSON feature collection. The source ignores data for a tile
+   * that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_geometry_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
   setCustomGeometrySourceTileData(
     sourceId: string,
@@ -1758,10 +2116,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Reports a custom geometry source error for one canonical tile.
+   * Reports that a tile of a custom geometry source failed to load.
    *
    * See `mln_map_set_custom_geometry_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
   setCustomGeometrySourceTileError(
     sourceId: string,
@@ -1780,10 +2144,19 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets custom vector source data for one canonical tile.
+   * Sets the data of a tile in a custom vector source.
+   *
+   * `data` is the tile, encoded as `encoding`. The source ignores data for a
+   * tile that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_vector_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
   setCustomVectorSourceTileData(
     sourceId: string,
@@ -1804,10 +2177,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Reports a custom vector source error for one canonical tile.
+   * Reports that a tile of a custom vector source failed to load.
    *
    * See `mln_map_set_custom_vector_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
   setCustomVectorSourceTileError(
     sourceId: string,
@@ -1826,7 +2205,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a debug-overlay command.
+   * Draws debugging overlays, such as tile borders, on the map.
+   *
+   * `options` replaces the overlays set before.
    *
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1838,7 +2219,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Selects which map-originated event types this map queues.
+   * Selects the events that the map reports.
    *
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1850,7 +2231,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a copied per-feature-state command.
+   * Merges `state` into the state of a feature.
+   *
+   * `state` is a JSON object. Its keys replace the same keys in the feature's
+   * state, and the other keys stay.
    *
    * See `mln_map_set_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1865,7 +2249,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a copied free-camera command.
+   * Places the camera at a position and orientation in space.
+   *
+   * The map adjusts them to a camera that it can show, and stops running camera
+   * animations.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1879,10 +2266,19 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Updates one GeoJSON source with prepared inline data.
+   * Replaces the data of a GeoJSON source.
+   *
+   * `data` must have been prepared with the same options as the source. It can
+   * be released once this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a GeoJSON
+   *   source, or `data` was prepared with other options.
    */
   setGeoJsonSourceData(
     sourceId: string,
@@ -1899,10 +2295,20 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Overrides one GeoJSON source's synchronous tiling at runtime.
+   * Sets whether a GeoJSON source builds its tiles synchronously.
+   *
+   * This works like the synchronous tiling option of `GeoJsonSourceOptions`,
+   * but `enabled` can't turn off synchronous tiling that the source's options
+   * turned on.
    *
    * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a GeoJSON
+   *   source.
    */
   setGeoJsonSourceSynchronousTiling(
     sourceId: string,
@@ -1919,10 +2325,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Updates one GeoJSON source to load data from a URL.
+   * Makes a GeoJSON source load its data from `url`.
    *
    * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a GeoJSON
+   *   source.
    */
   setGeoJsonSourceUrl(
     sourceId: string,
@@ -1939,10 +2351,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a global-state JSON value. JSON null restores the style default.
+   * Sets a value that the style's `global-state`
+   * &#91;expressions&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * read.
    *
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the style or one of its sources or sprites is
+   *   still loading.
    */
   setGlobalStateProperty(
     propertyName: string,
@@ -1959,10 +2378,18 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Updates image source coordinates.
+   * Moves the image of an image source.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_set_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't an image
+   *   source.
    */
   setImageSourceCoordinates(
     sourceId: string,
@@ -1979,10 +2406,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Updates an image source with inline image pixels.
+   * Replaces the image of an image source.
    *
    * See `mln_map_set_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't an image
+   *   source.
    */
   setImageSourceImage(
     sourceId: string,
@@ -1999,10 +2432,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Updates an image source to load its image from a URL.
+   * Makes an image source load its image from `url`.
    *
    * See `mln_map_set_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't an image
+   *   source.
    */
   setImageSourceUrl(sourceId: string, url: string): Promise<CommandCompletion> {
     return command((completion) =>
@@ -2011,7 +2450,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits axonometric rendering options.
+   * Sets whether the map draws in perspective or axonometric projection, and
+   * how much it skews the view.
+   *
+   * Settings that `mode` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2023,7 +2465,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a rendering-stats visibility command.
+   * Shows or hides an overlay of rendering statistics on the map.
    *
    * See `mln_map_set_rendering_stats_view_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2039,7 +2481,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets one runtime style image.
+   * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2061,12 +2503,16 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Queues an inline style JSON command. A committed command means the map
-   * applied the JSON, not that the style loaded: style loading events report
-   * the resource and parse results that follow.
+   * Loads the map's style from `json`.
+   *
+   * The style's sources, sprites, and glyphs load in the background.
    *
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.nativeError` when `json` isn't a valid style.
    */
   setStyleJson(json: unknown): Promise<CommandCompletion> {
     return command((completion) =>
@@ -2075,10 +2521,19 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets one layer property using its MapLibre style-spec property name.
+   * Sets a property of a layer in the map's style.
+   *
+   * `propertyName` is one of the layer's layout or paint
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or
+   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
+   * resets any of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `layerId`.
    */
   setStyleLayerProperty(
     layerId: string,
@@ -2097,7 +2552,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets the style light from a style-spec light JSON object.
+   * Replaces the
+   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
+   * map's style.
    *
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2109,7 +2566,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets one style light property using its MapLibre style-spec property name.
+   * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2129,10 +2586,17 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets whether one style source stores fetched tiles in the persistent cache.
+   * Sets whether a source is volatile.
+   *
+   * The map doesn't store the tiles of a volatile source in the persistent
+   * cache.
    *
    * See `mln_map_set_style_source_volatile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
    */
   setStyleSourceVolatile(
     sourceId: string,
@@ -2149,7 +2613,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets the style's global transition options.
+   * Sets the default transition of the map's style.
    *
    * See `mln_map_set_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2163,9 +2627,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Queues a style URL command. A committed command means the map accepted the
-   * URL, not that the style loaded: style loading events report the network,
-   * decode, and parse results that follow.
+   * Loads the map's style from `url`.
+   *
+   * The style loads in the background, and `RuntimeEventType.mapStyleLoaded` or
+   * `RuntimeEventType.mapLoadingFailed` reports how the load ends. Sources,
+   * layers, and images added before the style loads are lost when it loads.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2177,7 +2643,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a copied tile-options command.
+   * Sets how the map chooses which tiles to load, and at what detail.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2189,7 +2657,9 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits a copied viewport-options command.
+   * Sets how the map orients and constrains its view.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2203,7 +2673,12 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Submits one atomic camera update.
+   * Moves the camera, at once or with an animation.
+   *
+   * Camera fields that `update` doesn't set keep their values, and the update
+   * stops any running animation of the fields it sets. The function finishes
+   * when the map applies the update, before an animation ends. To learn when an
+   * animation ends, set an `CameraTransitionHandler` in its animation options.
    *
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2238,8 +2713,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a custom geometry source. The callback runs asynchronously on the
-   * JavaScript thread that registered it, after native queues the call.
+   * Adds a source whose GeoJSON tiles come from callbacks.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2260,8 +2734,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a custom vector source. The callback runs asynchronously on the
-   * JavaScript thread that registered it, after native queues the call.
+   * Adds a source whose vector tiles come from callbacks.
    *
    * See `mln_map_add_custom_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2282,7 +2755,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a GeoJSON source with prepared inline data.
+   * Adds a GeoJSON source with prepared data.
+   *
+   * The source uses the options that `data` was prepared with. `data` can be
+   * released once this function returns.
    *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2297,7 +2773,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a GeoJSON source with URL data.
+   * Adds a GeoJSON source that loads its data from `url`.
    *
    * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2317,7 +2793,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds an image source with inline image pixels.
+   * Adds an image source that shows `image`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2337,7 +2815,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds an image source that loads its image from a URL.
+   * Adds an image source that loads its image from `url`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2357,7 +2837,12 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds one style layer from a full style-spec layer JSON object.
+   * Adds a layer to the map's style.
+   *
+   * `layerJson` is a
+   * &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object.
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty.
    *
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2372,7 +2857,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds one style source from a style-spec source JSON object.
+   * Adds a source to the map's style.
+   *
+   * `sourceJson` is a
+   * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/) object.
    *
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2387,7 +2875,14 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits one atomic relative camera update.
+   * Moves the camera relative to where it is, as a gesture does.
+   *
+   * `delta` can pan the map's content by an offset on the screen, scale the
+   * zoom, and add to the bearing and pitch. An anchor keeps one screen point in
+   * place while the scale, bearing, or pitch changes. An anchor needs one of
+   * those changes, and combines with an offset only when the delta has no
+   * animation. The function finishes when the map applies the delta, before an
+   * animation ends.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2400,8 +2895,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Begins a command group, which holds this map's render updates until the
-   * group ends.
+   * Holds back the map's changes from rendering until
+   * `MapHandle.endCommandGroup()`, so they show in the same frame.
+   *
+   * Groups nest, and the changes render when the outermost group ends.
    *
    * See `mln_map_begin_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2411,8 +2908,11 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Cancels the camera transitions of the commands whose animation carried
-   * transition_id, and leaves every other transition running.
+   * Stops the running camera animations whose animation options set
+   * `transitionId`.
+   *
+   * Other animations keep running. The end handler of each stopped animation
+   * reports `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_cancel_camera_transition` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2426,7 +2926,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Cancels the camera transitions running when this command commits.
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_cancel_transitions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2436,7 +2939,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits an ordered debug-log command.
+   * Logs debugging information about the map's style and sources.
    *
    * See `mln_map_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2446,8 +2949,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Ends the innermost command group that `MapHandle.beginCommandGroup()`
-   * began.
+   * Ends the group that `MapHandle.beginCommandGroup()` began.
    *
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2457,7 +2959,8 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Invalidates custom geometry source data inside one geographic region.
+   * Makes a custom geometry source ask again for the tiles in `bounds` that the
+   * map still needs.
    *
    * See `mln_map_invalidate_custom_geometry_source_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2475,7 +2978,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Invalidates custom geometry source data for one canonical tile.
+   * Makes a custom geometry source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_geometry_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2493,7 +2996,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Invalidates custom vector source data for one canonical tile.
+   * Makes a custom vector source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_vector_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2511,7 +3014,8 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Moves one style layer before another layer or to the top.
+   * Moves a layer of the map's style below the layer named `beforeLayerId`, or
+   * above every layer when `beforeLayerId` is empty.
    *
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2526,7 +3030,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Removes per-feature state from this map.
+   * Removes the feature state that `selector` selects.
    *
    * See `mln_map_remove_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2536,7 +3040,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Removes one runtime style image by ID.
+   * Removes an image from the map's style.
    *
    * See `mln_map_remove_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2546,7 +3050,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Removes one style layer by ID.
+   * Removes a layer from the map's style.
    *
    * See `mln_map_remove_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2556,7 +3060,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Removes one style source by ID.
+   * Removes a source from the map's style.
    *
    * See `mln_map_remove_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2566,7 +3070,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Requests a repaint for a continuous map.
+   * Renders a new frame of a continuous map, even when nothing changed.
    *
    * See `mln_map_request_repaint` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2576,7 +3080,11 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits the sole post-creation logical extent update.
+   * Sets the map's size.
+   *
+   * `extent` must keep the scale factor that the map was created with. A map
+   * with a render session takes its size from the session, so resize the
+   * session with `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2586,7 +3094,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a copied camera-constraint command.
+   * Limits the camera's center to an area, and its zoom and pitch to ranges.
+   *
+   * Limits that `options` doesn't set keep their current values. When the
+   * camera is outside the new limits, it moves inside them.
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2596,7 +3107,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets custom geometry source data for one canonical tile.
+   * Sets the data of a tile in a custom geometry source.
+   *
+   * `data` is a GeoJSON feature collection. The source ignores data for a tile
+   * that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_geometry_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2616,7 +3130,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Reports a custom geometry source error for one canonical tile.
+   * Reports that a tile of a custom geometry source failed to load.
    *
    * See `mln_map_set_custom_geometry_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2636,7 +3150,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets custom vector source data for one canonical tile.
+   * Sets the data of a tile in a custom vector source.
+   *
+   * `data` is the tile, encoded as `encoding`. The source ignores data for a
+   * tile that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_vector_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2658,7 +3175,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Reports a custom vector source error for one canonical tile.
+   * Reports that a tile of a custom vector source failed to load.
    *
    * See `mln_map_set_custom_vector_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2678,7 +3195,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a debug-overlay command.
+   * Draws debugging overlays, such as tile borders, on the map.
+   *
+   * `options` replaces the overlays set before.
    *
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2688,7 +3207,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Selects which map-originated event types this map queues.
+   * Selects the events that the map reports.
    *
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2698,7 +3217,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a copied per-feature-state command.
+   * Merges `state` into the state of a feature.
+   *
+   * `state` is a JSON object. Its keys replace the same keys in the feature's
+   * state, and the other keys stay.
    *
    * See `mln_map_set_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2713,7 +3235,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a copied free-camera command.
+   * Places the camera at a position and orientation in space.
+   *
+   * The map adjusts them to a camera that it can show, and stops running camera
+   * animations.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2723,7 +3248,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Updates one GeoJSON source with prepared inline data.
+   * Replaces the data of a GeoJSON source.
+   *
+   * `data` must have been prepared with the same options as the source. It can
+   * be released once this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2738,7 +3266,11 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Overrides one GeoJSON source's synchronous tiling at runtime.
+   * Sets whether a GeoJSON source builds its tiles synchronously.
+   *
+   * This works like the synchronous tiling option of `GeoJsonSourceOptions`,
+   * but `enabled` can't turn off synchronous tiling that the source's options
+   * turned on.
    *
    * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2753,7 +3285,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Updates one GeoJSON source to load data from a URL.
+   * Makes a GeoJSON source load its data from `url`.
    *
    * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2768,7 +3300,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a global-state JSON value. JSON null restores the style default.
+   * Sets a value that the style's `global-state`
+   * &#91;expressions&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * read.
    *
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2783,7 +3317,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Updates image source coordinates.
+   * Moves the image of an image source.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_set_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2801,7 +3337,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Updates an image source with inline image pixels.
+   * Replaces the image of an image source.
    *
    * See `mln_map_set_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2816,7 +3352,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Updates an image source to load its image from a URL.
+   * Makes an image source load its image from `url`.
    *
    * See `mln_map_set_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2831,7 +3367,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits axonometric rendering options.
+   * Sets whether the map draws in perspective or axonometric projection, and
+   * how much it skews the view.
+   *
+   * Settings that `mode` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2841,7 +3380,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a rendering-stats visibility command.
+   * Shows or hides an overlay of rendering statistics on the map.
    *
    * See `mln_map_set_rendering_stats_view_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2855,7 +3394,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets one runtime style image.
+   * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2875,9 +3414,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Queues an inline style JSON command. A committed command means the map
-   * applied the JSON, not that the style loaded: style loading events report
-   * the resource and parse results that follow.
+   * Loads the map's style from `json`.
+   *
+   * The style's sources, sprites, and glyphs load in the background.
    *
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2887,7 +3426,12 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets one layer property using its MapLibre style-spec property name.
+   * Sets a property of a layer in the map's style.
+   *
+   * `propertyName` is one of the layer's layout or paint
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or
+   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
+   * resets any of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2907,7 +3451,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets the style light from a style-spec light JSON object.
+   * Replaces the
+   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
+   * map's style.
    *
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2917,7 +3463,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets one style light property using its MapLibre style-spec property name.
+   * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2932,7 +3478,10 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets whether one style source stores fetched tiles in the persistent cache.
+   * Sets whether a source is volatile.
+   *
+   * The map doesn't store the tiles of a volatile source in the persistent
+   * cache.
    *
    * See `mln_map_set_style_source_volatile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2947,7 +3496,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets the style's global transition options.
+   * Sets the default transition of the map's style.
    *
    * See `mln_map_set_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2961,9 +3510,11 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Queues a style URL command. A committed command means the map accepted the
-   * URL, not that the style loaded: style loading events report the network,
-   * decode, and parse results that follow.
+   * Loads the map's style from `url`.
+   *
+   * The style loads in the background, and `RuntimeEventType.mapStyleLoaded` or
+   * `RuntimeEventType.mapLoadingFailed` reports how the load ends. Sources,
+   * layers, and images added before the style loads are lost when it loads.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2973,7 +3524,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a copied tile-options command.
+   * Sets how the map chooses which tiles to load, and at what detail.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2983,7 +3536,9 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits a copied viewport-options command.
+   * Sets how the map orients and constrains its view.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2993,7 +3548,12 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Submits one atomic camera update.
+   * Moves the camera, at once or with an animation.
+   *
+   * Camera fields that `update` doesn't set keep their values, and the update
+   * stops any running animation of the fields it sets. The function finishes
+   * when the map applies the update, before an animation ends. To learn when an
+   * animation ends, set an `CameraTransitionHandler` in its animation options.
    *
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3007,7 +3567,7 @@ export class MapHandleDiscarding {
 }
 
 /**
- * A standalone projection of one map view.
+ * A camera view for converting between screen points and coordinates.
  *
  * See `mln_map_projection` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -3033,7 +3593,7 @@ export class MapProjectionHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a standalone projection.
+   * Releases a projection.
    *
    * See `mln_map_projection_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3045,8 +3605,11 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Creates a standalone projection of a view, such as the view of a rendered
-   * frame or of a map snapshot.
+   * Creates a projection that converts coordinates for one view of a map.
+   *
+   * Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
+   * The projection doesn't follow the map, so create a new one after the map's
+   * camera or size changes.
    *
    * See `mln_map_projection_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3061,7 +3624,7 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Copies the projection camera.
+   * Reads the projection's camera.
    *
    * See `mln_map_projection_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3071,7 +3634,9 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts a screen point to a geographic coordinate.
+   * Finds the coordinate at a screen point.
+   *
+   * The longitude stays between -180 and 180.
    *
    * See `mln_map_projection_lat_lng_for_pixel` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3081,7 +3646,10 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts a screen point to an unwrapped geographic coordinate.
+   * Finds the coordinate at a screen point, without wrapping its longitude.
+   *
+   * The longitude can fall outside -180 to 180, to show which copy of the world
+   * the point is in.
    *
    * See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3094,7 +3662,8 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts screen points to geographic coordinates.
+   * Finds the coordinates at several screen points, as
+   * `MapProjectionHandle.latLngForPixel()` does.
    *
    * See `mln_map_projection_lat_lngs_for_pixels` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3104,7 +3673,8 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts screen points to unwrapped geographic coordinates.
+   * Finds the coordinates at several screen points, as
+   * `MapProjectionHandle.latLngForPixelUnwrapped()` does.
    *
    * See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3117,8 +3687,10 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Reads the ground distance covered by one logical map pixel at a latitude
-   * for the helper camera zoom.
+   * Computes how many meters one screen pixel covers at `latitude`, at the
+   * projection's zoom.
+   *
+   * The result ignores the camera's pitch.
    *
    * See `mln_map_projection_meters_per_pixel_at_latitude` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3131,7 +3703,9 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts a geographic coordinate to a screen point.
+   * Finds the screen point of a coordinate.
+   *
+   * The point is in the copy of the world nearest the camera's center.
    *
    * See `mln_map_projection_pixel_for_lat_lng` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3141,7 +3715,8 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Converts geographic coordinates to screen points.
+   * Finds the screen points of several coordinates, as
+   * `MapProjectionHandle.pixelForLatLng()` does.
    *
    * See `mln_map_projection_pixels_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3151,7 +3726,9 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
-   * Applies a camera update to a standalone projection.
+   * Moves the projection's camera, without changing the map.
+   *
+   * Camera fields that `camera` doesn't set keep their values.
    *
    * See `mln_map_projection_set_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3163,7 +3740,7 @@ export class MapProjectionHandle extends Owner {
 defineDisposers(MapProjectionHandle, undefined, "close");
 
 /**
- * A render session, which renders one map to one render target.
+ * A render session draws a map into a surface or a texture.
  *
  * See `mln_render_session` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -3203,8 +3780,13 @@ export class RenderSessionHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Irreversibly ends session work and destroys the session's graphics objects
-   * where that is safe.
+   * Stops the session right away, without running its pending graphics work.
+   *
+   * Use it when the target's graphics objects are going away and a detach can't
+   * finish first. Pending work completes with `Status.targetLost`, and pending
+   * frame requests finish with `RenderResult.targetNotReady`. Once the call
+   * returns, the library no longer uses your graphics objects, and you can
+   * attach another session to the map. Dispose the session afterward.
    *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3214,11 +3796,20 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Acquires the oldest rendered frame that is not already acquired. The frame
-   * owns its slot until release. The call is nonblocking.
+   * Takes a rendered frame from the session's texture ring, if one is ready.
+   *
+   * It takes the oldest frame that you haven't acquired. The session can render
+   * over a frame before you acquire it. While you hold a frame in every texture
+   * of the ring, new frames wait until you release one.
    *
    * See `mln_render_session_acquire_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session lacks
+   *   `RenderSessionCapabilityFlag.frameAcquisition`.
+   * - `Status.invalidState` when the session has failed.
    */
   acquireFrame(): AcquiredFrameHandle | undefined {
     const handle = native.mln_render_session_acquire_frame(this.id);
@@ -3232,15 +3823,18 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Ends every frame demand that has not started with `RenderResult.noUpdate`
-   * and completes after earlier driver work has finished. A running demand
-   * finishes its attempt and ends any wait for a map update or a free slot.
-   * After completion, a new frame demand is required to render again, except
-   * that a pending still image submits its next demand itself; see
-   * `MapHandle.requestStillImage()`.
+   * Ends the session's pending frame requests and waits for its earlier work.
+   *
+   * Frame requests that haven't started, including those that wait for a map
+   * update, finish with `RenderResult.noUpdate`.
    *
    * See `mln_render_session_barrier` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session loses its target before the barrier
+   *   runs.
    */
   barrier(): Promise<void> {
     return run((completion) =>
@@ -3249,10 +3843,16 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts asynchronous renderer-data clearing.
+   * Clears the data that the session's renderer holds, such as loaded tiles,
+   * and draws the map again.
    *
    * See `mln_render_session_clear_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session loses its target before the work
+   *   runs.
    */
   clearData(): Promise<void> {
     return run((completion) =>
@@ -3261,8 +3861,14 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Consumes a session in any state and retires it, then runs completion, if
-   * given, once the host may destroy the target's graphics objects.
+   * Releases the session in any state.
+   *
+   * An attached session driven by `RenderDriverKind.coreWorker` detaches first
+   * unless you hold one of its frames. Any other session is abandoned as
+   * `RenderSessionHandle.abandon()` does. To free the graphics objects of a
+   * session driven by `RenderDriverKind.callerGraphicsThread`, detach it before
+   * you dispose it. Once the disposal completes, the library no longer uses
+   * your graphics objects.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3276,10 +3882,20 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts normal graphics-owner teardown and map detachment.
+   * Detaches the session from its map and frees its graphics objects.
+   *
+   * Release every acquired frame first. Pending frame requests finish with
+   * `RenderResult.targetNotReady`. Once the detach completes, the library no
+   * longer uses your graphics objects, and you can attach another session to
+   * the map. Dispose the session afterward.
    *
    * See `mln_render_session_detach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session loses its target before the detach
+   *   runs.
    */
   detach(): Promise<void> {
     return run((completion) =>
@@ -3288,8 +3904,14 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Consumes a session in any state and retires it, then runs completion, if
-   * given, once the host may destroy the target's graphics objects.
+   * Releases the session in any state.
+   *
+   * An attached session driven by `RenderDriverKind.coreWorker` detaches first
+   * unless you hold one of its frames. Any other session is abandoned as
+   * `RenderSessionHandle.abandon()` does. To free the graphics objects of a
+   * session driven by `RenderDriverKind.callerGraphicsThread`, detach it before
+   * you dispose it. Once the disposal completes, the library no longer uses
+   * your graphics objects.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3301,7 +3923,7 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Drains every currently queued terminal frame result.
+   * Takes the frame results that the session has queued.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3311,10 +3933,15 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts asynchronous renderer diagnostic-log emission.
+   * Logs debugging information about the session's renderer.
    *
    * See `mln_render_session_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session loses its target before the work
+   *   runs.
    */
   dumpDebugLogs(): Promise<void> {
     return run((completion) =>
@@ -3323,7 +3950,7 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Returns the immutable capabilities fixed during attachment.
+   * Reads what the session supports.
    *
    * See `mln_render_session_get_capabilities` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3333,17 +3960,25 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Reports the session's first terminal failure from any native thread.
+   * Reports the error that made the session fail.
+   *
+   * The call fails with that error, and succeeds while the session hasn't
+   * failed.
    *
    * See `mln_render_session_get_failure` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session failed because it lost its target.
+   * - `Status.nativeError` when the session failed for another reason.
    */
   getFailure(): void {
     native.mln_render_session_get_failure(this.id);
   }
 
   /**
-   * Copies the latest render-session snapshot from any native thread.
+   * Reads the session's current state.
    *
    * See `mln_render_session_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3353,7 +3988,15 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts a feature-extension query against the latest driver state.
+   * Reads a value that a source computes for one of its features.
+   *
+   * A clustered GeoJSON source answers the `supercluster` extension for a
+   * cluster feature. Its `extensionField` is `children` for the cluster's child
+   * features, `leaves` for the points in the cluster, or `expansion-zoom` for
+   * the zoom level where the cluster splits. For `leaves`, `argumentsValue` can
+   * set `limit` and `offset`. Without `limit`, the result has up to 10 points
+   * and ignores `offset`. The result is JSON: a GeoJSON feature collection, a
+   * number, or null when the source has no answer.
    *
    * See `mln_render_session_query_feature_extensions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -3379,9 +4022,10 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts a rendered-feature query against the last frame that the session
-   * rendered, so render after a camera or style change for a result that
-   * matches it.
+   * Finds the features that the session drew in an area of the screen.
+   *
+   * The query reads the last frame that the session rendered. A feature that
+   * several layers draw appears once for each layer.
    *
    * See `mln_render_session_query_rendered_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -3401,8 +4045,10 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts a source-feature query against the tiles that the source loaded for
-   * rendering, which it loads only while a visible layer uses it.
+   * Finds the features of the source named `sourceId`.
+   *
+   * The query covers only the tiles that the source has loaded for the current
+   * view. A source loads tiles only while a visible layer uses it.
    *
    * See `mln_render_session_query_source_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -3422,11 +4068,17 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Reads back the latest frame of the session's owned texture as premultiplied
-   * RGBA8.
+   * Reads the pixels of the last frame that the session rendered.
    *
    * See `mln_render_session_read_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session's capabilities lack
+   *   `RenderSessionCapabilityFlag.readback`.
+   * - `Status.invalidState` when the session hasn't rendered a frame since it
+   *   attached, resized, or changed its target.
    */
   readTexture(): Promise<TextureReadbackResult> {
     return query<TextureReadbackResult>((completion) =>
@@ -3435,10 +4087,15 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts best-effort release of renderer caches.
+   * Frees memory that the session's renderer can rebuild, such as caches.
    *
    * See `mln_render_session_reduce_memory_use` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session loses its target before the work
+   *   runs.
    */
   reduceMemoryUse(): Promise<void> {
     return run((completion) =>
@@ -3447,11 +4104,25 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts releasing the session's surface or borrowed texture ring while
-   * keeping its renderer.
+   * Lets go of the session's surface or textures, and keeps the rest of the
+   * session.
+   *
+   * Use it when the platform takes a surface away, such as when your app goes
+   * to the background. Release every acquired frame first. Until you give the
+   * session a new target, frame requests finish with
+   * `RenderResult.targetNotReady`. Once the release completes, you can destroy
+   * the old target.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session renders into a ring that it
+   *   created.
+   * - `Status.unsupported` when the target is a WebGL canvas.
+   * - `Status.targetLost` when the session loses its target before the release
+   *   runs.
    */
   releaseTarget(): Promise<void> {
     return run((completion) =>
@@ -3460,27 +4131,40 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Requests a frame without waiting. Every accepted demand produces one
-   * terminal result record. Caller-driver sessions require service on the
-   * graphics thread. Core-worker sessions need no host service.
+   * Asks the session to render a frame.
+   *
+   * Call it once the attach completes. Every request finishes with one frame
+   * result that carries its token, and
+   * `RenderSessionHandle.drainFrameResults()` takes it. A request without
+   * `FrameDemandFlag.force` replaces each pending request with the same flags.
    *
    * See `mln_render_session_request_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the session has failed.
    */
   requestFrame(demand: FrameDemand = {}): void {
     native.mln_render_session_request_frame(this.id, demand);
   }
 
   /**
-   * Starts an ordered logical resize of the driver and the map. The driver
-   * applies the extent in order with its other work, and later driver work does
-   * not wait for the map. The completion runs after both have applied it and
-   * the map has published its snapshot. Frames render once a map update matches
-   * the applied extent; static and tile maps publish that update for their next
-   * still image.
+   * Resizes the session's target and its map.
+   *
+   * `extent` must keep the session's scale factor. To change the scale factor,
+   * give the session a new target or attach a new session. Release every
+   * acquired frame first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session renders into a borrowed ring. Give
+   *   it new textures of the new size instead.
+   * - `Status.targetLost` when the session loses its target before the resize
+   *   applies.
    */
   resize(extent: LogicalExtent = {}): Promise<CommandCompletion> {
     return command((completion) =>
@@ -3489,10 +4173,13 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Services every queued item for a caller-graphics-thread driver. The first
-   * successful service call fixes the session's graphics-thread identity; later
-   * calls from another native thread return `Status.wrongThread`. The target
-   * context must be current. Core-worker sessions return `Status.invalidState`.
+   * Runs the session's ready graphics work on your graphics thread.
+   *
+   * Use it with `RenderDriverKind.callerGraphicsThread`, and call it from the
+   * same thread every time. Call it each time
+   * `RenderSessionAttachOptions.driverWorkWake` is called, even while you
+   * request no frames, and until a detach completes. It returns once no work is
+   * ready.
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3502,11 +4189,21 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered replacement of every texture of a caller-owned Metal
-   * ring.
+   * Replaces the Metal textures that a borrowed ring renders into.
+   *
+   * Use it to resize the ring, or to give the session textures again after
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
+   * The new ring must have as many textures as the old one, and the same device
+   * and command queue. Once the replacement completes, the session no longer
+   * uses the old textures.
    *
    * See `mln_render_session_set_metal_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the new textures have a different pixel format
+   *   than the old ones. Attach a new session to change it.
    */
   setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor,
@@ -3521,7 +4218,12 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered Metal surface replacement.
+   * Replaces the Metal layer that the session renders to.
+   *
+   * Use it to give the session a layer again after
+   * `RenderSessionHandle.releaseTarget()`, or to move it to another layer. The
+   * new layer must use the same device. Once the replacement completes, the
+   * session no longer uses the old layer.
    *
    * See `mln_render_session_set_metal_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -3537,8 +4239,13 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered replacement of every texture of a caller-owned OpenGL
-   * ring.
+   * Replaces the OpenGL textures that a borrowed ring renders into.
+   *
+   * Use it to resize the ring, or to give the session textures again after
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
+   * The new ring must have as many textures as the old one, and the same
+   * context. Once the replacement completes, the session no longer uses the old
+   * textures.
    *
    * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3556,7 +4263,12 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered OpenGL surface replacement.
+   * Replaces the OpenGL surface that the session presents to.
+   *
+   * Use it to give the session a surface again after
+   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
+   * The new surface must use the same context. Once the replacement completes,
+   * the session no longer uses the old surface.
    *
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -3572,10 +4284,21 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered replacement of every image of a caller-owned Vulkan ring.
+   * Replaces the Vulkan images that a borrowed ring renders into.
+   *
+   * Use it to resize the ring, or to give the session images again after
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
+   * The new ring must have as many images as the old one, and the same context.
+   * Once the replacement completes, the session no longer uses the old images.
    *
    * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the new ring has a different `format`,
+   *   `final_layout`, or `owner` than the old one. Attach a new session to
+   *   change them.
    */
   setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor,
@@ -3590,10 +4313,20 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered Vulkan surface replacement.
+   * Replaces the Vulkan surface that the session presents to.
+   *
+   * Use it to give the session a surface again after
+   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
+   * The new surface must use the same context. Once the replacement completes,
+   * the session no longer uses the old surface.
    *
    * See `mln_render_session_set_vulkan_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the new surface needs a different color format
+   *   or pre-rotation support than the old one. Attach a new session instead.
    */
   setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Promise<void> {
     return run((completion) =>
@@ -3606,11 +4339,21 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered replacement of every texture of a caller-owned WebGPU
-   * ring.
+   * Replaces the WebGPU textures that a borrowed ring renders into.
+   *
+   * Use it to resize the ring, or to give the session textures again after
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
+   * The new ring must have as many textures as the old one, and the same
+   * context. Once the replacement completes, the session no longer uses the old
+   * textures.
    *
    * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the new ring has a different `format` than the
+   *   old one. Attach a new session to change it.
    */
   setWebGpuBorrowedTextureTarget(
     descriptor: WebGpuBorrowedTextureDescriptor,
@@ -3625,10 +4368,20 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Starts an ordered WebGPU surface replacement.
+   * Replaces the WebGPU surface that the session presents to.
+   *
+   * Use it to give the session a surface again after
+   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
+   * The new surface must use the same context. Once the replacement completes,
+   * the session no longer uses the old surface.
    *
    * See `mln_render_session_set_web_gpu_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the new `format` differs from the old one.
+   *   Attach a new session to change it.
    */
   setWebGpuSurfaceTarget(descriptor: WebGpuSurfaceDescriptor): Promise<void> {
     return run((completion) =>
@@ -3661,15 +4414,19 @@ export class RenderSessionHandleDiscarding {
   }
 
   /**
-   * Starts an ordered logical resize of the driver and the map. The driver
-   * applies the extent in order with its other work, and later driver work does
-   * not wait for the map. The completion runs after both have applied it and
-   * the map has published its snapshot. Frames render once a map update matches
-   * the applied extent; static and tile maps publish that update for their next
-   * still image.
+   * Resizes the session's target and its map.
+   *
+   * `extent` must keep the session's scale factor. To change the scale factor,
+   * give the session a new target or attach a new session. Release every
+   * acquired frame first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session renders into a borrowed ring. Give
+   *   it new textures of the new size instead.
    */
   resize(extent: LogicalExtent = {}): void {
     native.mln_render_session_resize(this.#owner.id, extent, undefined);
@@ -3677,7 +4434,7 @@ export class RenderSessionHandleDiscarding {
 }
 
 /**
- * A resource request that a resource provider handles.
+ * A resource load that a resource provider answers.
  *
  * See `mln_resource_request` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -3703,7 +4460,7 @@ export class ResourceRequestHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases the provider's resource request handle without answering it.
+   * Releases a resource request.
    *
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3715,10 +4472,14 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Completes a C API resource provider request and consumes its handle.
+   * Answers a resource request.
    *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the library cancelled the request.
    */
   complete(response: ResourceResponse = {}): void {
     answerSync(this, (handle, token) =>
@@ -3727,7 +4488,7 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Reports whether MapLibre has cancelled a C API resource provider request.
+   * Reads whether the library cancelled a resource request.
    *
    * See `mln_resource_request_is_cancelled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3737,11 +4498,14 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Hands an outstanding provider request to the built-in network loader and
-   * consumes its handle.
+   * Hands a resource request back to the library to load as usual.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the library cancelled the request.
    */
   passThrough(): void {
     answerSync(this, (handle, token) =>
@@ -3750,9 +4514,11 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Registers a callback that runs when MapLibre cancels a C API resource
-   * provider request. The callback runs asynchronously on the JavaScript thread
-   * that registered it, after native queues the call.
+   * Calls a callback when the library cancels a resource request.
+   *
+   * The callback never runs after the request is answered. A request takes one
+   * cancel callback. When the library has already cancelled the request, the
+   * call reports that instead and the callback never runs.
    *
    * See `mln_resource_request_set_cancel_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3771,7 +4537,7 @@ export class ResourceRequestHandle extends Owner {
 defineDisposers(ResourceRequestHandle, undefined, "close");
 
 /**
- * A resource URL transform that waits for its host's answer.
+ * A URL rewrite that a resource transform answers with the URL to load.
  *
  * See `mln_resource_transform_request` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -3797,7 +4563,7 @@ export class ResourceTransformRequestHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a resource transform request without answering it.
+   * Releases a resource transform request.
    *
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3809,8 +4575,9 @@ export class ResourceTransformRequestHandle extends Owner {
   }
 
   /**
-   * Answers a resource transform request with a replacement URL and consumes
-   * its handle.
+   * Answers a resource transform request with the URL to load instead.
+   *
+   * `url` must not be empty.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3824,7 +4591,7 @@ export class ResourceTransformRequestHandle extends Owner {
 defineDisposers(ResourceTransformRequestHandle, undefined, "close");
 
 /**
- * A runtime: the native scheduler thread and event store for its maps.
+ * A runtime owns maps and the network and cache settings that they share.
  *
  * See `mln_runtime` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -3862,7 +4629,7 @@ export class RuntimeHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Stops event delivery and retires the previous handler.
+   * Stops sending the events of the runtime and its maps to a callback.
    *
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3874,7 +4641,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Clears the runtime-scoped outgoing HTTP header transform.
+   * Stops adding headers to the runtime's HTTP requests.
    *
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3886,7 +4653,8 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Clears the runtime-scoped network resource provider.
+   * Removes the runtime's resource provider, so the library loads every request
+   * itself.
    *
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3898,7 +4666,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Clears the runtime-scoped URL transform for network resources.
+   * Stops rewriting the URLs of the runtime's network requests.
    *
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3910,7 +4678,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts release of a runtime after checking its children.
+   * Releases a runtime.
+   *
+   * Release the runtime's maps first.
    *
    * See `mln_runtime_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3925,6 +4695,10 @@ export class RuntimeHandle extends Owner {
 
   /**
    * Creates a runtime.
+   *
+   * A runtime holds maps and the resource loading, cache, and offline regions
+   * that they share. In a browser, create runtimes on a Web Worker, not on the
+   * main thread.
    *
    * Resolves once the call completes, so a browser page, which cannot block,
    * can call it.
@@ -3945,7 +4719,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts creation of a map on the runtime.
+   * Creates a map on `runtime`.
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3965,7 +4739,11 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts creating an offline region.
+   * Creates an offline region in the runtime's cache file.
+   *
+   * `metadata` holds any bytes to store with the region, such as its name. The
+   * region doesn't download until
+   * `RuntimeHandle.setOfflineRegionDownloadState()` makes its download active.
    *
    * See `mln_runtime_create_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3985,10 +4763,14 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Deletes an offline region.
+   * Deletes the offline region `regionId` from the runtime's cache file.
    *
    * See `mln_runtime_delete_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   deleteOfflineRegion(regionId: bigint): Promise<void> {
     return run((completion) =>
@@ -3997,7 +4779,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Consumes a runtime handle without observing its asynchronous retirement.
+   * Releases a runtime in any state, without waiting.
+   *
+   * The runtime finishes its teardown after its maps are released.
    *
    * See `mln_runtime_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4009,7 +4793,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Reports which runtime-scoped event types this runtime queues.
+   * Reads the runtime's event mask.
    *
    * See `mln_runtime_get_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4019,7 +4803,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts getting one offline region by ID.
+   * Reads the offline region `regionId`.
+   *
+   * The result is null when the cache file has no region with that ID.
    *
    * See `mln_runtime_get_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4031,10 +4817,14 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts getting the current download status for an offline region.
+   * Reads the download progress of the offline region `regionId`.
    *
    * See `mln_runtime_get_offline_region_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   getOfflineRegionStatus(regionId: bigint): Promise<OfflineRegionStatus> {
     return query<OfflineRegionStatus>((completion) =>
@@ -4047,10 +4837,17 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Invalidates cached resources for an offline region.
+   * Makes maps check each resource of the offline region `regionId` with the
+   * server before they use it.
+   *
+   * The region keeps its resources.
    *
    * See `mln_runtime_invalidate_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   invalidateOfflineRegion(regionId: bigint): Promise<void> {
     return run((completion) =>
@@ -4063,7 +4860,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts listing the offline regions in the runtime database.
+   * Lists the offline regions in the runtime's cache file.
    *
    * See `mln_runtime_list_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4075,10 +4872,20 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts merging offline regions from another MapLibre offline database.
+   * Copies the offline regions of another cache file into the runtime's cache
+   * file.
+   *
+   * A region whose definition and metadata match one that the runtime's file
+   * already has isn't copied again. The result lists the runtime's copy of each
+   * region in the other file.
    *
    * See `mln_runtime_merge_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
+   *   database file.
    */
   mergeOfflineRegions(
     sideDatabasePath: string,
@@ -4093,7 +4900,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts a MapLibre ambient cache maintenance operation for this runtime.
+   * Runs an action on the runtime's ambient cache.
    *
    * See `mln_runtime_run_ambient_cache_operation` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4109,9 +4916,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Selects how runtime and map events reach the host. The callback runs
-   * asynchronously on the JavaScript thread that registered it, after native
-   * queues the call.
+   * Sends the events of the runtime and its maps to a callback.
+   *
+   * The callback replaces the one set before.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4126,7 +4933,10 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Selects which runtime-scoped event types this runtime queues.
+   * Selects the runtime's own events that reach the event callback.
+   *
+   * Each map selects its events with `MapHandle.setEventMask()` instead. A
+   * runtime starts with every event selected.
    *
    * See `mln_runtime_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4136,12 +4946,21 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+   * Adds headers to the runtime's HTTP requests.
+   *
+   * The transform replaces the one set before. In a browser or on OpenHarmony,
+   * serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+   *
    * The callback runs asynchronously on the JavaScript thread that registered
    * it, after native queues the call.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the library runs in a browser or on
+   *   OpenHarmony.
    */
   setHttpHeaderTransform(
     transform: HttpHeaderTransform,
@@ -4159,7 +4978,10 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts a change to this runtime's maximum ambient cache size.
+   * Limits the size of the runtime's ambient cache.
+   *
+   * `size` is in bytes. Offline regions count toward it, but the library evicts
+   * only ambient cache resources to stay within it.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4175,10 +4997,16 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Sets an offline region's native download state.
+   * Starts or pauses the download of the offline region `regionId`.
+   *
+   * A download stops when the runtime closes.
    *
    * See `mln_runtime_set_offline_region_download_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   setOfflineRegionDownloadState(
     regionId: bigint,
@@ -4195,10 +5023,15 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Enables or disables runtime events for an offline region.
+   * Sets whether the runtime reports the download progress of the offline
+   * region `regionId` as events.
    *
    * See `mln_runtime_set_offline_region_observed` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   setOfflineRegionObserved(regionId: bigint, observed: boolean): Promise<void> {
     return run((completion) =>
@@ -4212,9 +5045,11 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Registers or replaces a runtime-scoped network resource provider. The
-   * callback runs asynchronously on the JavaScript thread that registered it,
-   * after native queues the call.
+   * Serves the runtime's network requests through a callback.
+   *
+   * The provider receives the network requests that its routes match, and the
+   * library loads the rest as usual. A provider can serve URL schemes that the
+   * library can't load itself. The provider replaces the one set before.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4229,9 +5064,9 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Registers or updates a runtime-scoped URL transform for network resources.
-   * The callback runs asynchronously on the JavaScript thread that registered
-   * it, after native queues the call.
+   * Rewrites the URLs of the runtime's network requests through a callback.
+   *
+   * The transform replaces the one set before.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4252,10 +5087,14 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Starts updating opaque binary metadata for an offline region.
+   * Replaces the metadata of the offline region `regionId`.
    *
    * See `mln_runtime_update_offline_region_metadata` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
    */
   updateOfflineRegionMetadata(
     regionId: bigint,
@@ -4292,7 +5131,7 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Stops event delivery and retires the previous handler.
+   * Stops sending the events of the runtime and its maps to a callback.
    *
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4302,7 +5141,7 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Clears the runtime-scoped outgoing HTTP header transform.
+   * Stops adding headers to the runtime's HTTP requests.
    *
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4312,7 +5151,8 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Clears the runtime-scoped network resource provider.
+   * Removes the runtime's resource provider, so the library loads every request
+   * itself.
    *
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4322,7 +5162,7 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Clears the runtime-scoped URL transform for network resources.
+   * Stops rewriting the URLs of the runtime's network requests.
    *
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4332,9 +5172,9 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Selects how runtime and map events reach the host. The callback runs
-   * asynchronously on the JavaScript thread that registered it, after native
-   * queues the call.
+   * Sends the events of the runtime and its maps to a callback.
+   *
+   * The callback replaces the one set before.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4347,12 +5187,21 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+   * Adds headers to the runtime's HTTP requests.
+   *
+   * The transform replaces the one set before. In a browser or on OpenHarmony,
+   * serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+   *
    * The callback runs asynchronously on the JavaScript thread that registered
    * it, after native queues the call.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the library runs in a browser or on
+   *   OpenHarmony.
    */
   setHttpHeaderTransform(transform: HttpHeaderTransform): void {
     withRegistrations((registrations) => {
@@ -4366,9 +5215,11 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Registers or replaces a runtime-scoped network resource provider. The
-   * callback runs asynchronously on the JavaScript thread that registered it,
-   * after native queues the call.
+   * Serves the runtime's network requests through a callback.
+   *
+   * The provider receives the network requests that its routes match, and the
+   * library loads the rest as usual. A provider can serve URL schemes that the
+   * library can't load itself. The provider replaces the one set before.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4385,9 +5236,9 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Registers or updates a runtime-scoped URL transform for network resources.
-   * The callback runs asynchronously on the JavaScript thread that registered
-   * it, after native queues the call.
+   * Rewrites the URLs of the runtime's network requests through a callback.
+   *
+   * The transform replaces the one set before.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4405,7 +5256,7 @@ export class RuntimeHandleDiscarding {
 }
 
 /**
- * A parsed style expression, immutable and independent of any map.
+ * A parsed style expression.
  *
  * See `mln_style_expression` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -4431,7 +5282,7 @@ export class StyleExpressionHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a style expression.
+   * Releases a parsed style expression.
    *
    * See `mln_style_expression_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -4443,10 +5294,17 @@ export class StyleExpressionHandle extends Owner {
   }
 
   /**
-   * Parses a style expression.
+   * Parses a style
+   * &#91;expression&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * to evaluate without a map.
    *
    * See `mln_style_expression_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `expression` isn't a valid expression, or
+   *   its result can't have the expected type.
    */
   static create(
     expression: unknown,
@@ -4461,17 +5319,24 @@ export class StyleExpressionHandle extends Owner {
   }
 
   /**
-   * Evaluates a parsed expression and writes its result as UTF-8 JSON.
+   * Evaluates a style expression and writes its result as JSON.
+   *
+   * A number in the result that isn't finite becomes null.
    *
    * See `mln_style_expression_evaluate` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the expression fails to evaluate, such as
+   *   when it reads an input that `inputs` doesn't set.
    */
   evaluate(inputs?: StyleExpressionInputs): unknown {
     return native.mln_style_expression_evaluate(this.id, inputs);
   }
 
   /**
-   * Copies what a parsed expression depends on.
+   * Reads what a style expression's result depends on.
    *
    * See `mln_style_expression_get_info` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

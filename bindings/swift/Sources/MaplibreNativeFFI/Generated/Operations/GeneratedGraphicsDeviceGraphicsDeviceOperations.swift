@@ -4,10 +4,19 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension GraphicsDeviceHandle {
-  /// Creates a graphics device for this build's render backend.
+  /// Creates a GPU device for rendering maps into textures.
+  ///
+  /// Render sessions on several maps can share one device.
   ///
   /// See `mln_graphics_device_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when this build's render backend can't create a
+  ///   device.
+  /// - `Status.nativeError` when `adapter_index` names no GPU, or the platform
+  ///   can't create the device.
   static func create(options bindingArg0: GraphicsDeviceOptions? = nil) throws
     -> GraphicsDeviceHandle
   {
@@ -21,6 +30,8 @@ public extension GraphicsDeviceHandle {
   }
 
   /// Releases a graphics device.
+  ///
+  /// Render sessions on the device keep working until they detach.
   ///
   /// See `mln_graphics_device_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).

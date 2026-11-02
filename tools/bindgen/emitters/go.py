@@ -70,10 +70,22 @@ def name(value: str) -> str:
     return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
 
 
-def doc(bound, native: str, declared: str | None, *, operation: bool = False) -> str:
-    """The Go doc comment of a declaration, or empty when it has none."""
+def doc(
+    bound,
+    native: str,
+    declared: str | None,
+    *,
+    operation: bool = False,
+    discard: bool = False,
+) -> str:
+    """The Go doc comment of a declaration, or empty when it has none. With
+    `discard`, it documents a form that passes no completion."""
+    found = bound.doc(native)
     return docs.go_comment(
-        bound.doc(native), symbols(bound), declared, operation=operation
+        docs.discarding(found) if discard else found,
+        symbols(bound),
+        declared,
+        operation=operation,
     )
 
 
@@ -83,6 +95,7 @@ def symbols(bound) -> docs.Symbol:
 
 
 def _symbols(bound) -> docs.Symbol:
+    from .go_callbacks import parameter_name
     from .go_operations import declared_name, receiver_type_name
     from .go_values import Values, enum_member, public, union_name, variant_name
 
@@ -138,15 +151,18 @@ def _symbols(bound) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{name(member)}"
             for member in ("generation", "render_update_generation")
         },
+        parameter=parameter_name,
     )
 
 
-def documented_operation(bound, native: str, source: str) -> str:
+def documented_operation(
+    bound, native: str, source: str, *, discard: bool = False
+) -> str:
     """An operation's source with its comment before its function."""
     match = re.search(r"^func (?:\([^)]*\) )?(\w+)", source, re.MULTILINE)
     if not match:
         return source
-    comment = doc(bound, native, match[1], operation=True)
+    comment = doc(bound, native, match[1], operation=True, discard=discard)
     return source[: match.start()] + comment + source[match.start() :]
 
 
@@ -242,7 +258,10 @@ def _lower(api):
             plan = bound.operations_by_name[handle.dispose]
             operations.append(
                 documented_operation(
-                    bound, plan.name, operation(plan, values, dispose=True)
+                    bound,
+                    plan.name,
+                    operation(plan, values, dispose=True),
+                    discard=True,
                 )
             )
     go, header, c = [], [], []
@@ -312,12 +331,13 @@ import "C"
 
 def go_source(chunks: str, build: str | None = None) -> str:
     """A file of the package that holds `chunks`, built only under `build`."""
+    code = re.sub(r"(?m)^\s*//.*$", "", chunks)
     return (
         PREAMBLE.format(build=f"//go:build {build}\n\n" if build else "")
         + "\n".join(
             f'import "{module}"'
             for module in ("unsafe", "runtime", "runtime/cgo", "weak", "fmt")
-            if module.rsplit("/", 1)[-1] + "." in chunks
+            if module.rsplit("/", 1)[-1] + "." in code
         )
         + "\n"
         + chunks

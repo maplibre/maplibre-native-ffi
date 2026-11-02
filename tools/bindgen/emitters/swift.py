@@ -199,6 +199,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{camel(member)}"
             for member in ("generation", "render_update_generation")
         },
+        parameter=camel,
     )
 
 

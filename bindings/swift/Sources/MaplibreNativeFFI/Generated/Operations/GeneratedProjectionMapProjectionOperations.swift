@@ -4,8 +4,11 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapProjectionHandle {
-  /// Creates a standalone projection of a view, such as the view of a rendered
-  /// frame or of a map snapshot.
+  /// Creates a projection that converts coordinates for one view of a map.
+  ///
+  /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
+  /// The projection doesn't follow the map, so create a new one after the map's
+  /// camera or size changes.
   ///
   /// See `mln_map_projection_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -19,7 +22,7 @@ public extension MapProjectionHandle {
       ) } result: { try MapProjectionHandle(adopting: value0) }
   }
 
-  /// Copies the projection camera.
+  /// Reads the projection's camera.
   ///
   /// See `mln_map_projection_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -35,7 +38,9 @@ public extension MapProjectionHandle {
     } result: { CameraOptions(raw: value0) }
   }
 
-  /// Converts a screen point to a geographic coordinate.
+  /// Finds the coordinate at a screen point.
+  ///
+  /// The longitude stays between -180 and 180.
   ///
   /// See `mln_map_projection_lat_lng_for_pixel` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -51,7 +56,10 @@ public extension MapProjectionHandle {
     } result: { LatLng(raw: value0) }
   }
 
-  /// Converts a screen point to an unwrapped geographic coordinate.
+  /// Finds the coordinate at a screen point, without wrapping its longitude.
+  ///
+  /// The longitude can fall outside -180 to 180, to show which copy of the
+  /// world the point is in.
   ///
   /// See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -69,7 +77,8 @@ public extension MapProjectionHandle {
     } result: { LatLng(raw: value0) }
   }
 
-  /// Converts screen points to geographic coordinates.
+  /// Finds the coordinates at several screen points, as
+  /// `MapProjectionHandle.latLngForPixel()` does.
   ///
   /// See `mln_map_projection_lat_lngs_for_pixels` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -89,7 +98,8 @@ public extension MapProjectionHandle {
     } result: { value0.map { item in LatLng(raw: item) } }
   }
 
-  /// Converts screen points to unwrapped geographic coordinates.
+  /// Finds the coordinates at several screen points, as
+  /// `MapProjectionHandle.latLngForPixelUnwrapped()` does.
   ///
   /// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -111,8 +121,10 @@ public extension MapProjectionHandle {
     } result: { value0.map { item in LatLng(raw: item) } }
   }
 
-  /// Reads the ground distance covered by one logical map pixel at a latitude
-  /// for the helper camera zoom.
+  /// Computes how many meters one screen pixel covers at `latitude`, at the
+  /// projection's zoom.
+  ///
+  /// The result ignores the camera's pitch.
   ///
   /// See `mln_map_projection_meters_per_pixel_at_latitude` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -128,7 +140,9 @@ public extension MapProjectionHandle {
     } result: { value0 }
   }
 
-  /// Converts a geographic coordinate to a screen point.
+  /// Finds the screen point of a coordinate.
+  ///
+  /// The point is in the copy of the world nearest the camera's center.
   ///
   /// See `mln_map_projection_pixel_for_lat_lng` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -144,7 +158,8 @@ public extension MapProjectionHandle {
     } result: { ScreenPoint(raw: value0) }
   }
 
-  /// Converts geographic coordinates to screen points.
+  /// Finds the screen points of several coordinates, as
+  /// `MapProjectionHandle.pixelForLatLng()` does.
   ///
   /// See `mln_map_projection_pixels_for_lat_lngs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -166,7 +181,7 @@ public extension MapProjectionHandle {
     } result: { value0.map { item in ScreenPoint(raw: item) } }
   }
 
-  /// Releases a standalone projection.
+  /// Releases a projection.
   ///
   /// See `mln_map_projection_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -174,7 +189,9 @@ public extension MapProjectionHandle {
     nativeClose { raw in mln_map_projection_release(raw) }
   }
 
-  /// Applies a camera update to a standalone projection.
+  /// Moves the projection's camera, without changing the map.
+  ///
+  /// Camera fields that `camera` doesn't set keep their values.
   ///
   /// See `mln_map_projection_set_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

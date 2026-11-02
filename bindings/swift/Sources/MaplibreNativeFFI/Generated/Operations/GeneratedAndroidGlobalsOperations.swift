@@ -4,7 +4,11 @@ internal import MaplibreNativeC
 import Foundation
 
 #if os(Android)
-  /// Initializes Android platform services.
+  /// Gives the library the Java VM and the app context that it needs on
+  /// Android.
+  ///
+  /// Call it before creating a runtime. `jniEnv` is the calling thread's
+  /// `JNIEnv*`, and `context` is an Android `Context`, such as the application.
   ///
   /// See `mln_android_init` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

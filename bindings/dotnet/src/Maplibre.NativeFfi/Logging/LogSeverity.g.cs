@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Log severity values emitted by MapLibre Native.
+/// The severity of a log message.
 /// </summary>
 /// <remarks>
 /// See <c>mln_log_severity</c> in the <see

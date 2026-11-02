@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a resource provider answered a request.
+/// The outcome of a resource request.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_response_status</c> in the <see
@@ -12,6 +12,15 @@ public enum ResourceResponseStatus : uint
 {
     Ok = 0,
     Error = 1,
+
+    /// <summary>
+    /// The resource exists and is empty.
+    /// </summary>
     NoContent = 2,
+
+    /// <summary>
+    /// The earlier copy that the request's <c>prior_</c> fields describe is
+    /// current.
+    /// </summary>
     NotModified = 3,
 }

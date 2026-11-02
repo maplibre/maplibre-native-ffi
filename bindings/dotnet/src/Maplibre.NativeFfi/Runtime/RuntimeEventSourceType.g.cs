@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Source kinds used by <c>RuntimeEvent.SourceType</c>.
+/// The kind of handle that raised an event.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_source_type</c> in the <see

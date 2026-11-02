@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Prepared GeoJSON data that sources retain independently of its handle.
+/// GeoJSON data, parsed and ready to add to a GeoJSON source.
 /// </summary>
 /// <remarks>
 /// See <c>mln_geo_json_source_data</c> in the <see
@@ -60,11 +60,20 @@ public sealed unsafe partial class GeoJsonSourceDataHandle
     }
 
     /// <summary>
-    /// Prepares GeoJSON source data for installation on a map.
+    /// Prepares GeoJSON data for GeoJSON sources.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_geo_json_source_data_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// <para><c>data</c> is a GeoJSON feature collection, feature, or geometry.
+    /// Preparing it can be slow, but adding the result to a source is quick,
+    /// and several sources can share it.</para>
+    /// <para>See <c>mln_geo_json_source_data_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>data</c> isn't
+    /// valid GeoJSON, or when <c>options</c> turns on clustering and
+    /// <c>data</c> isn't a feature collection of points.</description></item>
+    /// </list>
     /// </remarks>
     public static GeoJsonSourceDataHandle Create(string data, GeoJsonSourceOptions? options = null)
     {

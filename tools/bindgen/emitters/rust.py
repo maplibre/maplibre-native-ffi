@@ -73,9 +73,16 @@ def gated(plan: OperationPlan, code: str) -> str:
     return "".join(lines)
 
 
-def doc(bound: BoundApi, native: str, indent: str = "") -> str:
-    """The rustdoc comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), symbols(bound), indent)
+def doc(bound: BoundApi, native: str, indent: str = "", *, discard=False) -> str:
+    """The rustdoc comment of a declaration, or empty when it has none. With
+    `discard`, it documents a form that passes no completion."""
+    found = bound.doc(native)
+    return docs.line_comment(
+        docs.discarding(found) if discard else found,
+        symbols(bound),
+        indent,
+        errors="# Errors",
+    )
 
 
 def receiver_native(plan: OperationPlan) -> str | None:

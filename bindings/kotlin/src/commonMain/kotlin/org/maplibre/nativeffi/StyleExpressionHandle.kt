@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A parsed style expression, immutable and independent of any map.
+ * A parsed style expression.
  *
  * See `mln_style_expression` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -28,10 +28,17 @@ internal constructor(
     get() = binding.isReleased
 
   /**
-   * Evaluates a parsed expression and writes its result as UTF-8 JSON.
+   * Evaluates a style expression and writes its result as JSON.
+   *
+   * A number in the result that isn't finite becomes null.
    *
    * See `mln_style_expression_evaluate` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the expression fails to evaluate, such as when it reads an
+   *   input that `inputs` doesn't set.
    */
   public fun evaluate(inputs: StyleExpressionInputs? = null): String =
     nativeCall(this, binding) {
@@ -59,7 +66,7 @@ internal constructor(
     }
 
   /**
-   * Copies what a parsed expression depends on.
+   * Reads what a style expression's result depends on.
    *
    * See `mln_style_expression_get_info` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -72,7 +79,7 @@ internal constructor(
     }
 
   /**
-   * Releases a style expression.
+   * Releases a parsed style expression.
    *
    * See `mln_style_expression_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -85,10 +92,16 @@ internal constructor(
 
   public companion object {
     /**
-     * Parses a style expression.
+     * Parses a style &#91;expression&#93;(https://maplibre.org/maplibre-style-spec/expressions/) to
+     * evaluate without a map.
      *
      * See `mln_style_expression_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+     *
+     * Errors:
+     *
+     * - `Status.INVALID_ARGUMENT` when `expression` isn't a valid expression, or its result can't
+     *   have the expected type.
      */
     public fun create(
       expression: String,

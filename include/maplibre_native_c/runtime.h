@@ -1,6 +1,7 @@
 /**
  * @file maplibre_native_c/runtime.h
- * Public C API declarations for runtime, resources, and events.
+ * Create runtimes, control how they load and cache resources, and receive
+ * their events.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_RUNTIME_H
@@ -20,115 +21,95 @@
 extern "C" {
 #endif
 
+/** Whether the library may use the network. */
 typedef enum mln_network_status : uint32_t {
   MLN_NETWORK_STATUS_ONLINE = 1,
   MLN_NETWORK_STATUS_OFFLINE = 2,
 } mln_network_status;
 
+/**
+ * An action on a runtime's ambient cache.
+ *
+ * The ambient cache holds the resources that maps load, apart from the ones
+ * that offline regions hold.
+ */
 typedef enum mln_ambient_cache_operation : uint32_t {
+  /**
+   * Deletes the whole database, offline regions included, and starts an empty
+   * one.
+   */
   MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
+  /** Shrinks the database file to free the disk space it no longer uses. */
   MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2,
+  /**
+   * Makes the library check each cached resource for changes before it uses
+   * the resource again.
+   */
   MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3,
   MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4,
 } mln_ambient_cache_operation;
 
+/** The ID of an offline region in a runtime's database. */
 typedef int64_t mln_offline_region_id;
 
+/** The shape of an offline region. */
 typedef enum mln_offline_region_definition_type : uint32_t {
   MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID = 1,
   MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2,
 } mln_offline_region_definition_type;
 
+/** Whether an offline region is downloading. */
 typedef enum mln_offline_region_download_state : uint32_t {
   MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0,
   MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 } mln_offline_region_download_state;
 
-/** Offline region status snapshot. */
+/** The download progress of an offline region. */
 typedef struct mln_offline_region_status {
   mln_offline_region_download_state download_state;
+  /** The resources downloaded so far, tiles included. */
   uint64_t completed_resource_count;
+  /** The size of the downloaded resources in bytes, tiles included. */
   uint64_t completed_resource_size;
   uint64_t completed_tile_count;
   uint64_t required_tile_count;
+  /** The size of the downloaded tiles in bytes. */
   uint64_t completed_tile_size;
+  /**
+   * The resources that the region needs, tiles included. Until
+   * `required_resource_count_is_precise` is true, this is only a lower bound.
+   */
   uint64_t required_resource_count;
   bool required_resource_count_is_precise;
+  /** Whether the region has downloaded every resource it needs. */
   bool complete;
 } mln_offline_region_status;
 
 /**
- * Runtime event types carried by mln_runtime_event.type.
+ * The kind of an event.
  *
- * The event type selects the meaning of mln_runtime_event.code and the
- * mln_runtime_event_payload member behind mln_runtime_event.payload_type. Event
- * type names below omit their MLN_RUNTIME_EVENT_ prefix and payload type names
- * omit their MLN_RUNTIME_EVENT_PAYLOAD_ prefix.
- *
- * Each value is also a bit index in the subscription masks: the bit for an
- * event type is 1ULL shifted left by the type value. See
- * mln_runtime_event_flag.
- *
- * - MAP_CAMERA_WILL_CHANGE: code is an mln_camera_change_mode; payload NONE.
- * - MAP_CAMERA_IS_CHANGING: code is 0; payload NONE.
- * - MAP_CAMERA_DID_CHANGE: code is an mln_camera_change_mode; payload NONE.
- *   Each MapLibre transition reports its own as it ends, so a camera delta
- *   that pans and also zooms, rotates, or pitches ends with two, and other
- *   transitions may still be animating; see
- *   mln_map_snapshot.transition_in_progress.
- * - MAP_STYLE_LOADED: code is 0; payload NONE.
- * - MAP_LOADING_STARTED: code is 0; payload NONE.
- * - MAP_LOADING_FINISHED: code is 0; payload NONE.
- * - MAP_LOADING_FAILED: code identifies the kind of failure, or is 0, and has
- * no named values; message carries the failure text; payload NONE.
- * - MAP_IDLE: code is 0; payload NONE.
- * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
- *   MapLibre reports a failure that it renders past, and a render session
- *   reports a terminal failure of its native work; see
- *   MLN_RENDER_SESSION_STATE_FAILED.
- * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
- * - MAP_RENDER_FRAME_FINISHED: code is 0; payload RENDER_FRAME.
- * - MAP_RENDER_MAP_STARTED: code is 0; payload NONE.
- * - MAP_RENDER_MAP_FINISHED: code is 0; payload RENDER_MAP.
- * - MAP_STYLE_IMAGE_MISSING: code is 0; message carries the image ID; payload
- *   NONE.
- * - MAP_TILE_ACTION: code is 0; message carries the source ID; payload
- *   TILE_ACTION.
- * - MAP_SOURCE_CHANGED: a style source changed its description, such as when
- *   its TileJSON arrives with new attribution or tile URLs, or its GeoJSON data
- *   is replaced; code is 0; message carries the source ID; payload NONE. A
- *   style query submitted after the event observes the change.
- * - OFFLINE_REGION_STATUS_CHANGED: code is 0; payload OFFLINE_REGION_STATUS.
- * - OFFLINE_REGION_RESPONSE_ERROR: code is 0; message carries the resource
- *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
- * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
- *   OFFLINE_REGION_TILE_COUNT_LIMIT.
- * - MAP_GLYPHS_REQUESTED: MapLibre requested a glyph range of a font stack;
- *   code is 0; payload GLYPHS.
- * - MAP_GLYPHS_LOADED: a requested glyph range arrived and parsed; code is 0;
- *   payload GLYPHS.
- * - MAP_GLYPHS_ERROR: a glyph range failed to load or parse; code is 0;
- *   message carries the error text; payload GLYPHS.
- * - MAP_SPRITE_REQUESTED: MapLibre requested a sprite of the style; code is 0;
- *   payload SPRITE.
- * - MAP_SPRITE_LOADED: a sprite's image and JSON arrived and parsed; code is
- *   0; payload SPRITE. A style without a sprite reports one with an empty ID
- *   and URL.
- * - MAP_SPRITE_ERROR: a sprite's image or JSON failed to load, or the sprite
- *   failed to parse; code is 0; message carries the error text; payload
- *   SPRITE. A sprite whose image and JSON both fail reports each.
- *
- * A glyph or sprite error fails a pending mln_map_request_still_image() with
- * the same error text.
+ * Only maps in MLN_MAP_MODE_CONTINUOUS raise
+ * MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, MLN_RUNTIME_EVENT_MAP_IDLE, and the
+ * render frame and render map events. Offline region events come only for the
+ * regions that mln_runtime_set_offline_region_observed() observes.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2,
   MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3,
   MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4,
+  /** The map started to load a style. */
   MLN_RUNTIME_EVENT_MAP_LOADING_STARTED = 5,
+  /**
+   * The map loaded its style and everything that the current view needs, and
+   * rendered the result.
+   */
   MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
+  /**
+   * The map rendered a complete frame and has nothing left to load, animate,
+   * or redraw.
+   */
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
   MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 9,
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 10,
@@ -136,10 +117,16 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 12,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 13,
   MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
+  /** A tile moved to another step of loading. */
   MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
   MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
+  /** A resource that the region needs failed to download. */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
+  /**
+   * The region stopped downloading Mapbox tiles because offline regions hold
+   * as many as the limit allows.
+   */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
   MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
   MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
@@ -149,21 +136,8 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
 } mln_runtime_event_type;
 
-/**
- * Bit values for the map and runtime event subscription masks.
- *
- * Each bit is 1ULL shifted left by the mln_runtime_event_type value it selects,
- * so a host can compute a bit from a type value it decoded from an event.
- *
- * mln_map_set_event_mask() reads the bits in
- * MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS and ignores the rest.
- * mln_runtime_set_event_mask() reads the bits in
- * MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS and ignores the rest. Both entry
- * points accept MLN_RUNTIME_EVENT_FLAG_ALL and reject bits outside it. A host
- * that reads a mask, sets one bit, and writes it back keeps every other bit.
- */
+/** An event type, as a bit in a set. */
 typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
-  /** Selects no event type. */
   MLN_RUNTIME_EVENT_FLAG_NONE = 0,
   MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE = 1ULL
     << MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
@@ -214,7 +188,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     << MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED,
   MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR,
-  /** Selects every map-originated event type this version defines. */
   MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE |
     MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING |
@@ -237,12 +210,10 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED |
     MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED |
     MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR,
-  /** Selects every runtime-originated event type this version defines. */
   MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR |
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-  /** Selects every event type this version defines. */
   MLN_RUNTIME_EVENT_FLAG_ALL = MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS |
     MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
 } mln_runtime_event_flag;
@@ -250,13 +221,13 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
 /** A set of mln_runtime_event_flag bits. */
 typedef uint64_t mln_runtime_event_flags;
 
-/** Source kinds used by mln_runtime_event.source_type. */
+/** The kind of handle that raised an event. */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
   MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
 } mln_runtime_event_source_type;
 
-/** Payload kinds used by mln_runtime_event.payload_type. */
+/** The member of mln_runtime_event_payload that an event carries. */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1,
@@ -269,21 +240,22 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8,
 } mln_runtime_event_payload_type;
 
-/** Camera change kinds reported by camera will-change and did-change events. */
+/** Whether a camera change jumps or animates. */
 typedef enum mln_camera_change_mode : uint32_t {
-  /** The camera reached its new value without an animated transition. */
   MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
-  /** The camera moved as part of an animated transition. */
   MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 } mln_camera_change_mode;
 
-/** Render modes reported by render observer events and frame results. */
+/**
+ * Whether a frame drew the map complete, or lacked resources that are still
+ * loading.
+ */
 typedef enum mln_render_mode : uint32_t {
   MLN_RENDER_MODE_PARTIAL = 0,
   MLN_RENDER_MODE_FULL = 1,
 } mln_render_mode;
 
-/** Tile operations reported by tile observer events. */
+/** A step in loading a tile. */
 typedef enum mln_tile_operation : uint32_t {
   MLN_TILE_OPERATION_REQUESTED_FROM_CACHE = 0,
   MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK = 1,
@@ -296,6 +268,7 @@ typedef enum mln_tile_operation : uint32_t {
   MLN_TILE_OPERATION_NULL = 8,
 } mln_tile_operation;
 
+/** The kind of a resource that the library loads. */
 typedef enum mln_resource_kind : uint32_t {
   MLN_RESOURCE_KIND_UNKNOWN = 0,
   MLN_RESOURCE_KIND_STYLE = 1,
@@ -307,144 +280,125 @@ typedef enum mln_resource_kind : uint32_t {
   MLN_RESOURCE_KIND_IMAGE = 7,
 } mln_resource_kind;
 
+/** Where a request may load its resource from. */
 typedef enum mln_resource_loading_method : uint32_t {
+  /** The cache or the network. */
   MLN_RESOURCE_LOADING_METHOD_ALL = 0,
   MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY = 1,
   MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2,
 } mln_resource_loading_method;
 
+/** The priority of a resource request. */
 typedef enum mln_resource_priority : uint32_t {
   MLN_RESOURCE_PRIORITY_REGULAR = 0,
   MLN_RESOURCE_PRIORITY_LOW = 1,
 } mln_resource_priority;
 
+/** Whether a request loads a resource for a map or an offline region. */
 typedef enum mln_resource_usage : uint32_t {
   MLN_RESOURCE_USAGE_ONLINE = 0,
   MLN_RESOURCE_USAGE_OFFLINE = 1,
 } mln_resource_usage;
 
+/** Whether the library keeps a loaded resource in its cache. */
 typedef enum mln_resource_storage_policy : uint32_t {
   MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0,
   MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1,
 } mln_resource_storage_policy;
 
-/**
- * How a resource provider answered a request.
- *
- * - OK carries the resource's bytes.
- * - ERROR fails the request with mln_resource_response.error_reason. A tile
- *   whose reason is NOT_FOUND renders as an empty tile; any other failed tile,
- *   and any failed style, reaches the map as a loading error.
- * - NO_CONTENT reports a resource that exists but is empty. A tile renders as
- *   an empty tile.
- * - NOT_MODIFIED answers a revalidation, a request that carries prior_etag or
- *   prior_modified, and keeps the cached copy. When the request also carries
- *   prior_data, the map has not received that copy yet, and this answer
- *   delivers those bytes.
- */
+/** The outcome of a resource request. */
 typedef enum mln_resource_response_status : uint32_t {
   MLN_RESOURCE_RESPONSE_STATUS_OK = 0,
   MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1,
+  /** The resource exists and is empty. */
   MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2,
+  /**
+   * The earlier copy that the request's `prior_` fields describe is current.
+   */
   MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3,
 } mln_resource_response_status;
 
+/** Why a resource request failed. */
 typedef enum mln_resource_error_reason : uint32_t {
   MLN_RESOURCE_ERROR_REASON_NONE = 0,
   MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1,
+  /** The server reported an error. */
   MLN_RESOURCE_ERROR_REASON_SERVER = 2,
+  /** The server couldn't be reached. */
   MLN_RESOURCE_ERROR_REASON_CONNECTION = 3,
   MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4,
   MLN_RESOURCE_ERROR_REASON_OTHER = 5,
 } mln_resource_error_reason;
 
-/**
- * Reads MapLibre Native's process-global network status.
- *
- * On success, out_status receives a mln_network_status value.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when out_status is null.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Reads whether the library may use the network. */
 MLN_API mln_status mln_network_get_status(
   mln_network_status* out_status MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Sets MapLibre Native's process-global network status.
+ * Tells the library whether it may use the network.
  *
- * MLN_NETWORK_STATUS_ONLINE allows network requests.
- * MLN_NETWORK_STATUS_OFFLINE stops new network requests until the status
- * returns to online. Runtime-scoped resource configuration is unchanged.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when status is not a mln_network_status value.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * While the status is MLN_NETWORK_STATUS_OFFLINE, the library starts no
+ * network requests. The requests that wait start when the status returns to
+ * MLN_NETWORK_STATUS_ONLINE. The status starts as online and applies to every
+ * runtime in the process.
  */
 MLN_API mln_status mln_network_set_status(
   mln_network_status status, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Options used when creating a runtime. */
+/** Options for mln_runtime_create(). */
 typedef struct mln_runtime_options {
   uint32_t size;
   /**
-   * Directory root for asset:// URLs. Copied during runtime creation.
-   * Empty selects `/android_asset` on Android and `.` elsewhere.
-   *
-   * On Android, paths under `/android_asset/` read the APK `assets/`
-   * directory after mln_android_init. Other paths read the filesystem.
-   * Explicit file:// URLs use their own paths, independently of this root.
+   * The directory that `asset://` URLs load from. Empty uses the working
+   * directory, or the app's assets on Android.
    */
   mln_buffer_view asset_path;
   /**
-   * Cache database path. Copied during runtime creation. Empty selects an
-   * in-memory cache.
+   * The database file that holds the ambient cache and offline regions. Empty
+   * keeps them in memory.
    */
   mln_buffer_view cache_path;
 } mln_runtime_options;
 
-/**
- * Rendering statistics of one finished frame.
- *
- * mln_runtime_event_render_frame carries them in the
- * MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME payload.
- * mln_event_batch_view.event_size covers the whole event, including these
- * statistics.
- */
+/** Statistics about the frames that a map renders. */
 typedef struct mln_rendering_stats {
-  /** Frame CPU encoding time in seconds. */
+  /** The time that the frame took to encode, in seconds. */
   double encoding_time;
-  /** Frame CPU rendering time in seconds. */
+  /** The time that the frame took to render, in seconds. */
   double rendering_time;
-  /** Number of frames rendered by the native renderer. */
+  /** The frames rendered so far. */
   int64_t frame_count;
-  /** Draw calls executed during the most recent frame. */
+  /** The draw calls in the frame. */
   int64_t draw_call_count;
-  /** Total draw calls executed by the native renderer. */
+  /** The draw calls in every frame so far. */
   int64_t total_draw_call_count;
 } mln_rendering_stats;
 
-/** Payload for MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. */
+/** The details of MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. */
 typedef struct mln_runtime_event_render_frame {
   mln_render_mode mode;
-  /** Whether MapLibre needs another frame after this one. */
   bool needs_repaint;
-  /** Whether symbol placement changed during this frame. */
   bool placement_changed;
   mln_rendering_stats stats;
 } mln_runtime_event_render_frame;
 
-/** Payload for MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED. */
+/** The details of MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED. */
 typedef struct mln_runtime_event_render_map {
   mln_render_mode mode;
 } mln_runtime_event_render_map;
 
-/** Overscaled tile identity reported in tile observer events. */
+/**
+ * The ID of a tile.
+ *
+ * `canonical_x` and `canonical_y` place the tile in the source's grid at zoom
+ * `canonical_z`. `overscaled_z` is the zoom that the map draws the tile at,
+ * and is greater when the source has no tiles that deep. `wrap` says which
+ * copy of the world holds the tile: zero for the main one, negative to the
+ * west, and positive to the east.
+ */
 typedef struct mln_tile_id {
   uint32_t overscaled_z;
   int32_t wrap;
@@ -453,93 +407,58 @@ typedef struct mln_tile_id {
   uint32_t canonical_y;
 } mln_tile_id;
 
-/**
- * Payload for MLN_RUNTIME_EVENT_MAP_TILE_ACTION.
- *
- * The event message carries the source ID.
- */
+/** The details of MLN_RUNTIME_EVENT_MAP_TILE_ACTION. */
 typedef struct mln_runtime_event_tile_action {
   mln_tile_operation operation;
   mln_tile_id tile_id;
 } mln_runtime_event_tile_action;
 
 /**
- * Payload for MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
- * MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED, and MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR.
+ * The details of a glyph event.
  *
- * The font stack array and its names are borrowed with the event.
+ * The event covers the glyphs from `first` to `last`, both included.
  */
 typedef struct mln_runtime_event_glyphs {
-  /** Font names of the font stack, in the style's order. */
+  /** The fonts that the glyphs come from, in order of preference. */
   const mln_buffer_view* font_stack MLN_BINDING("length=font_count");
   size_t font_count;
-  /** First glyph of the range. */
   uint32_t first;
-  /** Last glyph of the range, inclusive. */
   uint32_t last;
-  /**
-   * Whether the range stands for a whole font file that the style's
-   * font-faces names. MapLibre then loads the whole file, and first and last
-   * do not describe the glyphs it holds.
-   */
   bool font_face;
 } mln_runtime_event_glyphs;
 
 /**
- * Payload for MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED,
- * MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED, and MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR.
+ * The details of a sprite event.
  *
- * The ID and URL are borrowed with the event.
+ * `id` and `url` are both empty when the style has no sprite.
  */
 typedef struct mln_runtime_event_sprite {
-  /**
-   * Sprite ID: the id of an entry in the style's sprite array, or "default"
-   * when the style names one sprite URL.
-   */
   mln_buffer_view id;
-  /**
-   * Sprite URL as the style names it, without the pixel-ratio suffix and file
-   * extension that MapLibre appends to request the image and JSON.
-   */
   mln_buffer_view url;
 } mln_runtime_event_sprite;
 
-/** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
+/** The details of MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
   mln_offline_region_status status;
 } mln_runtime_event_offline_region_status;
 
-/**
- * Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR.
- *
- * A download skips a resource that fails with
- * MLN_RESOURCE_ERROR_REASON_NOT_FOUND and continues with the rest of the
- * region. A resource that fails for another reason stays outstanding.
- */
+/** The details of MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR. */
 typedef struct mln_runtime_event_offline_region_response_error {
   mln_offline_region_id region_id;
   mln_resource_error_reason reason;
 } mln_runtime_event_offline_region_response_error;
 
-/** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED. */
+/**
+ * The details of MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.
+ */
 typedef struct mln_runtime_event_offline_region_tile_count_limit {
   mln_offline_region_id region_id;
+  /** The number of Mapbox tiles that offline regions may hold. */
   uint64_t limit;
 } mln_runtime_event_offline_region_tile_count_limit;
 
-/**
- * Typed event payload carried inline by every event.
- *
- * mln_runtime_event.payload_type selects the member. An event whose payload
- * type is MLN_RUNTIME_EVENT_PAYLOAD_NONE carries zeroed payload bytes.
- *
- * A host that decodes a payload type this version does not define treats the
- * payload as opaque bytes and forwards them unchanged. Those bytes run from the
- * payload's offset within mln_runtime_event to
- * mln_event_batch_view.event_size, and any pointers among them are borrowed
- * with the event.
- */
+/** The details of an event, in the member that its `payload_type` names. */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME");
@@ -563,112 +482,63 @@ typedef union mln_runtime_event_payload {
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_SPRITE");
 } mln_runtime_event_payload;
 
-/**
- * One delivered runtime event.
- *
- * Message bytes, and the views and arrays that the payload holds, are borrowed
- * for the callback.
- *
- * Step through an array of these by mln_event_batch_view.event_size rather
- * than by the size of this struct: a later version may add a member to
- * mln_runtime_event_payload and widen the stride. Every field below, payload
- * included, keeps its offset across versions.
- */
+/** An event that a runtime or one of its maps raised. */
 typedef struct mln_runtime_event {
   mln_runtime_event_type type;
   mln_runtime_event_source_type source_type;
-  /**
-   * Source handle: the mln_runtime or mln_map that source_type selects.
-   *
-   * The value names one object for the life of the process, so a host may
-   * compare it against a handle it holds even after that handle is released.
-   */
+  /** The runtime or map that raised the event, as `source_type` says. */
   uint64_t source;
   /**
-   * Map snapshot generation that the event reports, or zero when source_type
-   * is MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
-   *
-   * A camera, style, loading-finished, loading-failed, or idle event follows
-   * the publication of a snapshot that includes the change it reports and
-   * carries that snapshot's generation, so a snapshot read after receiving it
-   * shows state at least as new as the event. Every other map event carries the
-   * generation the map had published last.
-   *
-   * An event that a map command raises carries the generation that the
-   * command's completion reports. An event at or past a command's completion
-   * generation was raised by that command or after it; one below it was raised
-   * before the command ran. Events from one map are queued in non-decreasing
-   * generation order.
+   * For a map event, a map snapshot with this generation or a later one
+   * includes what the event reports. Zero for a runtime event.
    */
   uint64_t generation;
   /**
-   * Secondary event detail whose meaning type selects; see
-   * mln_runtime_event_type.
+   * The mln_camera_change_mode for MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE
+   * and MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE.
    */
   uint32_t code;
   mln_runtime_event_payload_type payload_type;
   /**
-   * UTF-8 message, empty when this event carries no message.
-   *
-   * The bytes are borrowed with the event.
+   * The error for an event that reports a failure, the image ID for
+   * MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, or the source ID for
+   * MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED and MLN_RUNTIME_EVENT_MAP_TILE_ACTION.
    */
   mln_buffer_view message;
-  /** Typed payload selected by payload_type. */
   mln_runtime_event_payload payload MLN_BINDING(
     "tag=payload_type;empty_variant=MLN_RUNTIME_EVENT_PAYLOAD_NONE"
   );
 } mln_runtime_event;
 
 /**
- * A borrowed span of runtime events in one delivery.
+ * A batch of events.
  *
- * Step through events by event_size. The event and message pointers remain
- * valid during the callback.
+ * Lifetimes:
+ * Step through `events` by `event_size` bytes. A newer library's events can be
+ * larger than the mln_runtime_event in these headers.
  */
 typedef struct mln_event_batch_view {
   uint32_t size;
-  /**
-   * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
-   * header a caller compiled against. Index events with this value.
-   */
   uint32_t event_size;
-  /**
-   * Events in queue order.
-   *
-   * Borrowed array of event_count events.
-   */
   const mln_runtime_event* events
     MLN_BINDING("length=event_count;stride=event_size");
-  /** Number of events in events. */
   size_t event_count;
 } mln_event_batch_view MLN_BINDING("kind=slice");
 
 /**
- * Receives selected events after their snapshots have been published.
+ * Receives a batch of events.
  *
- * The callback must be thread-safe and return promptly. It may call any-thread
- * C APIs, but must not wait for runtime or graphics-driver work that can only
- * progress on its current thread.
- *
- * Threads:
- * Map events arrive on the runtime's native scheduler thread, and offline
- * events may arrive on a MapLibre worker thread.
+ * Lifetimes:
+ * `events` and the data it points to stay valid until the callback returns.
  */
 MLN_BINDING("capture=manual")
 typedef void (*mln_runtime_event_callback)(
   void* user_data, const mln_event_batch_view* events
 );
 
-/**
- * Runtime and map event callback.
- *
- * The callback borrows the events for the call, and user_data is released
- * after replacement, clear, or runtime teardown. With a queue, the callback
- * and release run in mln_delivery_queue_dispatch().
- */
+/** An event callback, for mln_runtime_set_event_handler(). */
 typedef struct mln_runtime_event_handler {
   uint32_t size;
-  /** Receives each event batch. */
   mln_runtime_event_callback callback;
   void* user_data MLN_BINDING("kind=context");
   mln_user_data_release release_user_data;
@@ -677,12 +547,7 @@ typedef struct mln_runtime_event_handler {
   "kind=callback_registration;release=release_user_data"
 );
 
-/**
- * The resource kinds that a route or rule matches, one bit per
- * mln_resource_kind value.
- * Registration rejects unknown bits. MLN_RESOURCE_KIND_FLAG_ALL, like zero,
- * selects every resource kind.
- */
+/** A resource kind, as a bit in a set. */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_flag : uint32_t {
   MLN_RESOURCE_KIND_FLAG_UNKNOWN = 1U << MLN_RESOURCE_KIND_UNKNOWN,
   MLN_RESOURCE_KIND_FLAG_STYLE = 1U << MLN_RESOURCE_KIND_STYLE,
@@ -705,166 +570,91 @@ typedef uint32_t mln_resource_kind_flags;
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
 
-/// How a rule or route compares its url against a request URL.
+/// How a URL pattern matches a request's URL.
 ///
-/// With no flags, a rule compares the complete URL byte for byte.
-/// MLN_URL_MATCH_GLOB reads the url as a glob pattern instead:
-///
-/// - `*` matches a run of any length that contains no `/`, including an empty
-///   run.
-/// - `**` matches a run of any length, including one that contains `/`.
-/// - `?` matches one character other than `/`.
-/// - `\` matches the next character literally, and a trailing `\` matches
-///   itself.
-///
-/// Every other byte compares literally. A pattern matches the complete URL, so
-/// a pattern that describes a suffix opens with a wildcard. Comparison is
-/// case-sensitive either way, and applies no URL parsing or normalization.
-///
-/// A glob accepts at most 4096 tokens. Each literal byte, escaped byte, `?`,
-/// or consecutive run of `*` bytes counts as one token. Registering a longer
-/// glob returns MLN_STATUS_INVALID_ARGUMENT. Exact URL matches have no token
-/// limit.
-///
-/// Confining `*` to one path segment is what makes a host pattern hold:
-/// `https://*.example.com/**` matches every subdomain of example.com and never
-/// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern
-/// spans path segments, as in `https://tiles.example.com/**` for one host.
+/// A pattern matches the whole URL, query included.
 typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flag : uint32_t {
   MLN_URL_MATCH_EXACT = 0U,
-  /** Reads url as a glob pattern. */
+  /// The URL matches the pattern as a glob. `*` matches any characters except
+  /// `/`, `**` matches any characters, and `?` matches one character except
+  /// `/`. `\` makes the next character match only itself. For example,
+  /// `https://*.example.com/tiles/**` matches every URL under `/tiles/` on
+  /// each subdomain of `example.com`.
   MLN_URL_MATCH_GLOB = 1U << 0U,
 } mln_url_match_flag;
 
 /** A set of mln_url_match_flag bits. */
 typedef uint32_t mln_url_match_flags;
 
-/**
- * One request pattern that a resource provider claims.
- *
- * Routes compare the normalized resolved URL that native loading fetches. In
- * an array of routes, each route's size steps to the next, so a caller built
- * against a later version of this header passes its larger routes unchanged.
- */
+/** The requests that a resource provider serves. */
 typedef struct mln_resource_route {
   uint32_t size;
-  /** The resource kinds to match. Zero selects every kind. */
+  /** The kinds of resource that the route covers. Zero covers every kind. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
-  /** The URL or glob pattern to compare. */
   mln_buffer_view url;
 } mln_resource_route;
 
-/** One HTTP header that a header rule supplies. */
+/**
+ * An HTTP header.
+ *
+ * `name` follows the rules of
+ * mln_http_header_transform_response_set_header().
+ */
 typedef struct mln_http_header {
-  /** Header field name. Required. */
   mln_buffer_view name MLN_BINDING("required=true");
   mln_buffer_view value;
 } mln_http_header;
 
-/**
- * One rule of a native HTTP header transform.
- *
- * The first rule whose kind and URL match supplies all its headers, including
- * an empty header list that stops the search.
- *
- * In an array of rules, each rule's size steps to the next, so a caller built
- * against a later version of this header passes its larger rules unchanged.
- */
+/** Headers to add to the HTTP requests whose URL matches a pattern. */
 typedef struct mln_http_header_rule {
   uint32_t size;
-  /** The resource kinds to match. Zero selects every kind. */
+  /** The kinds of resource that the rule covers. Zero covers every kind. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
-  /** The URL or glob pattern to compare. */
   mln_buffer_view url;
-  /**
-   * The headers to set. Registration validates each one as
-   * mln_http_header_transform_response_set_header() does.
-   */
   const mln_http_header* headers MLN_BINDING("length=header_count");
   size_t header_count;
 } mln_http_header_rule;
 
 /**
- * Asks the host for the URL of one network resource request.
+ * Rewrites the URL of a network request before the library sends it.
  *
- * MapLibre waits for the answer before it schedules the request. The host
- * answers through request, inline or later from any thread:
- * mln_resource_transform_request_complete() replaces the URL and consumes
- * request, and releasing request without completing it keeps the URL. The
- * callback owns request until one of the two consumes it.
+ * The request waits until you answer with
+ * mln_resource_transform_request_complete() or release `request` to keep
+ * `url`. You can answer now or later, from any thread.
  *
- * The callback must be thread-safe and return promptly, and must not wait for
- * runtime work. url is borrowed for the callback and is NUL-terminated after
- * its bytes. The C API invokes release_user_data after the final callback
- * returns.
- *
- * A transform that names a queue queues a copy of each call instead.
- *
- * Threads:
- * The callback runs on a MapLibre network thread.
+ * Lifetimes:
+ * `url` stays valid until the callback returns. The callback owns `request`.
  */
 typedef void (*mln_resource_transform_callback)(
   void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request MLN_BINDING("ownership=owned")
 );
 
-/**
- * Resource transform state.
- *
- * The struct itself is borrowed for the registering call.
- */
+/** A resource transform callback, for mln_runtime_set_resource_transform(). */
 typedef struct mln_resource_transform {
   uint32_t size;
-  /** Asks for the URL of each network resource request. */
   mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data exactly once for each accepted registration,
-   * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned. Requests the callback already
-   * received keep their handles.
-   *
-   * Its threads and its handoff follow
-   * mln_resource_provider.release_user_data.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. Each request is copied with its handle into the queue, and the
-   * callback and release_user_data run in mln_delivery_queue_dispatch(). A
-   * request the queue refuses keeps its URL.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
+/** The headers that an HTTP header transform callback sets. */
 typedef struct mln_http_header_transform_response {
   uint32_t size;
-  /** C API-managed callback context, which callbacks leave unchanged. */
   void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_http_header_transform_response MLN_BINDING("kind=callback_response");
 
 /**
- * Sets one outgoing HTTP request header for the current transform invocation.
+ * Sets a header on the request that an HTTP header transform callback handles.
  *
- * The function copies name and value before returning. A later call using the
- * same case-insensitive name replaces the earlier value.
- *
- * A diagnostic for a rejected header names the header but never includes its
- * value.
- *
- * Returns:
- * - MLN_STATUS_OK when the header was recorded.
- * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
- *   small, a view has null data with a nonzero size, name is not a valid HTTP
- *   field name, value is not valid UTF-8, value contains a disallowed control
- *   byte, or name identifies a header managed by MapLibre or the platform
- *   transport.
- * - MLN_STATUS_INVALID_STATE when called outside an active HTTP header
- *   transform callback.
- * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
+ * Setting a header again, in any letter case, replaces its value. `name` can't
+ * be a header that the library or the platform manages, such as `Host`,
+ * `Range`, `Accept-Encoding`, or `User-Agent`.
  */
 MLN_API mln_status mln_http_header_transform_response_set_header(
   mln_http_header_transform_response* response, mln_buffer_view name,
@@ -872,22 +662,16 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds end-to-end headers to one outgoing HTTP request attempt.
+ * Sets the headers of an HTTP request before the library sends it.
  *
- * MapLibre invokes the callback after resource URL transformation and
- * immediately before the platform HTTP transport starts the attempt. kind is
- * one mln_resource_kind value and url is the transformed URL that the
- * transport will request.
- *
- * The callback and user_data must be thread-safe. The C API invokes
- * release_user_data after the final callback returns. url and out_response are
- * borrowed for the callback duration, and url is NUL-terminated after its
- * bytes. Callbacks return promptly and must not wait for work that only their
- * own thread can advance. A non-OK result discards every header collected
- * during the invocation and lets the request proceed unchanged.
+ * `url` is the request's URL after any resource transform. The request waits
+ * for the callback, so return quickly.
  *
  * Threads:
- * The callback runs synchronously on a MapLibre worker or network thread.
+ * Runs on a library thread.
+ *
+ * Lifetimes:
+ * `url` and `out_response` stay valid until the callback returns.
  */
 MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
 typedef mln_status (*mln_http_header_transform_callback)(
@@ -896,80 +680,52 @@ typedef mln_status (*mln_http_header_transform_callback)(
 );
 
 /**
- * HTTP header transform state: a callback, or native header rules.
+ * Headers to add to HTTP requests, for mln_runtime_set_http_header_transform().
  *
- * The struct itself is borrowed for the registering call, which copies every
- * rule, header, and string before it returns. With a null callback, the first
- * rule that matches a request supplies all its headers. A transform requires a
- * callback or at least one rule; clear it through
- * mln_runtime_clear_http_header_transform(). A rules transform carries no
- * user_data or release_user_data.
+ * Set either `callback` or `rules`, not both.
  */
 typedef struct mln_http_header_transform {
   uint32_t size;
-  /** The callback, or null to apply rules. */
   mln_http_header_transform_callback callback MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data exactly once for each accepted registration,
-   * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned.
-   *
-   * Its threads and its handoff follow
-   * mln_resource_provider.release_user_data.
-   */
   mln_user_data_release release_user_data;
-  /** Header rules for a transform without a callback; empty with one. */
+  /** The first rule that matches a request adds its headers, and no other. */
   const mln_http_header_rule* rules MLN_BINDING("length=rule_count");
   size_t rule_count;
 } mln_http_header_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Inclusive byte range of a resource request. */
+/** The bytes from `start` to `end` of a resource, both included. */
 typedef struct mln_resource_range {
-  /** First byte offset of the requested range. */
   uint64_t start;
-  /** Last byte offset of the requested range, inclusive. */
   uint64_t end;
 } mln_resource_range;
 
-/** Field mask values for mln_resource_request_info. */
+/** The fields that mln_resource_request_info sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
-  /** The request asks only for the bytes in range. */
   MLN_RESOURCE_REQUEST_RANGE = 1U << 0U,
-  /** The cached copy being revalidated carries a modification time. */
   MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 1U << 1U,
-  /** The cached copy being revalidated carries an expiration time. */
   MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 1U << 2U,
 } mln_resource_request_field;
 
 /** A set of mln_resource_request_field bits. */
 typedef uint32_t mln_resource_request_fields;
 
+/**
+ * A request that a resource provider serves.
+ *
+ * When the cache holds an earlier copy of the resource, the `prior_` fields
+ * describe it.
+ */
 typedef struct mln_resource_request_info {
   uint32_t size;
   mln_resource_request_fields fields;
-  /**
-   * URL entering the network layer, before tile server normalization.
-   *
-   * It preserves configured URI scheme aliases such as maplibre: and custom
-   * schemes, and it is the logical, cache-facing identity of the request.
-   * Tile coordinates, glyph ranges, and sprite suffixes are already
-   * substituted.
-   */
+  /** The URL as the style names it. */
   mln_buffer_view requested_url;
   /**
-   * URL to fetch, after resource-kind normalization against the runtime's
-   * tile server options and API key.
-   *
-   * It matches requested_url when no configured alias applies. Providers that
-   * replace the built-in network stack fetch this URL.
-   *
-   * It also matches requested_url when normalization rejects the URL, as a tile
-   * server requiring an API key does when no key is configured. Native loading
-   * fails such a request, so a provider that only fetches over HTTP checks the
-   * scheme before serving it.
+   * The URL to load, after the library expands any shorthand in
+   * `requested_url` and before any resource transform. Routes match this URL.
    */
   mln_buffer_view resolved_url;
   mln_resource_kind kind;
@@ -977,176 +733,111 @@ typedef struct mln_resource_request_info {
   mln_resource_priority priority;
   mln_resource_usage usage;
   mln_resource_storage_policy storage_policy;
+  /** The only bytes of the resource that the request wants. */
   mln_resource_range range
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
   int64_t prior_modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_MODIFIED");
   int64_t prior_expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_EXPIRES");
-  /** Entity tag of the cached copy, or empty when there is none. */
+  /** Empty when the earlier copy has no ETag. */
   mln_buffer_view prior_etag;
   const uint8_t* prior_data
     MLN_BINDING("length=prior_data_size;encoding=bytes");
   size_t prior_data_size;
 } mln_resource_request_info;
 
-/** Field mask values for mln_resource_response. */
+/** The fields that mln_resource_response sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_resource_response_field : uint32_t {
-  /** The response carries a modification time. */
   MLN_RESOURCE_RESPONSE_MODIFIED = 1U << 0U,
-  /** The response carries an expiration time. */
   MLN_RESOURCE_RESPONSE_EXPIRES = 1U << 1U,
-  /** An ERROR response carries the earliest time to retry the request. */
   MLN_RESOURCE_RESPONSE_RETRY_AFTER = 1U << 2U,
 } mln_resource_response_field;
 
 /** A set of mln_resource_response_field bits. */
 typedef uint32_t mln_resource_response_fields;
 
-/**
- * A resource provider's answer to one request.
- *
- * A fields value with bits outside mln_resource_response_field is malformed,
- * and mln_resource_request_complete() converts it to a provider error response.
- */
+/** The answer to a resource request. */
 typedef struct mln_resource_response {
   uint32_t size;
   mln_resource_response_fields fields;
   mln_resource_response_status status;
+  /** Why the request failed, for MLN_RESOURCE_RESPONSE_STATUS_ERROR. */
   mln_resource_error_reason error_reason;
-  /**
-   * Response bytes.
-   *
-   * May be null only when byte_count is 0.
-   */
+  /** The resource, for MLN_RESOURCE_RESPONSE_STATUS_OK. */
   const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
   size_t byte_count;
+  /** A description of the error, for MLN_RESOURCE_RESPONSE_STATUS_ERROR. */
   mln_buffer_view error_message;
+  /**
+   * Whether the library must request the resource again before it reuses this
+   * copy.
+   */
   bool must_revalidate;
   int64_t modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
   int64_t expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
+  /** Empty when the resource has no ETag. */
   mln_buffer_view etag;
+  /** When to retry, for MLN_RESOURCE_RESPONSE_STATUS_ERROR. */
   int64_t retry_after_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
 } mln_resource_response;
 
 /**
- * Intercepts a network resource request.
+ * Serves a network request in place of the library.
  *
- * request and its pointed-to fields are borrowed for the callback. The callback
- * owns handle and answers through it, inline or later from any thread: complete
- * the request with mln_resource_request_complete(), hand it to the built-in
- * network loader with mln_resource_request_pass_through(), or release it, which
- * fails the request. Either answer consumes the handle when it returns
- * MLN_STATUS_OK. A handle released during the callback fails the request once
- * the callback returns.
+ * Answer with mln_resource_request_complete(), or hand the request back to the
+ * library with mln_resource_request_pass_through(). Either can come now or
+ * later, from any thread. A request released without an answer fails.
  *
- * The callback must be thread-safe and return quickly. It may call the C API,
- * but must not wait for runtime work that only its own thread can advance. The
- * C API invokes release_user_data after the final callback returns.
- *
- * A provider that names a queue queues a copy of the request with its handle,
- * for the host to answer later.
- *
- * Threads:
- * The callback runs synchronously on a MapLibre thread.
+ * Lifetimes:
+ * `request` and the data it points to stay valid until the callback returns.
+ * The callback owns `handle`.
  */
 typedef void (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle MLN_BINDING("ownership=owned")
 );
 /**
- * Reports that MapLibre cancelled a C API resource provider request.
+ * Reports that the library no longer needs a resource request.
  *
- * The callback runs at most once per request, and only for a request the
- * provider has not completed. The callback must be thread-safe and return
- * quickly. It may call the C API, including
- * mln_resource_request_release(), but must not wait for runtime work that only
- * its own thread can advance.
+ * The request no longer accepts an answer, so stop working on it and release
+ * it.
  *
- * handle is the cancelled request, borrowed for the callback; the provider's
- * own reference to it is unchanged.
- *
- * A handler that names a queue queues a copy of the call instead.
- *
- * Threads:
- * The callback runs on the thread that discards the request, never a host
- * thread: the runtime's native scheduler thread when a committed map or runtime
- * command discards it, such as a style change or map destruction, and a
- * MapLibre worker thread otherwise.
+ * Lifetimes:
+ * The callback borrows `handle` from its owner.
  */
 MLN_BINDING("borrowed_owner=handle")
 typedef void (*mln_resource_request_cancel_callback)(
   void* user_data, mln_resource_request handle
 );
 
-/**
- * Cancel callback for one handled resource request.
- *
- * The struct itself is borrowed for the registering call.
- */
+/** A cancel callback, for mln_resource_request_set_cancel_callback(). */
 typedef struct mln_resource_request_cancel_handler {
   uint32_t size;
-  /** Reports the request's cancellation. */
   mln_resource_request_cancel_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data exactly once for an accepted registration,
-   * after the callback can no longer run: when the callback returns, on the
-   * thread that ran it, or when the request is released without the callback
-   * having run, on the releasing thread. It never runs for a rejected
-   * registration or for a request that was already cancelled.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. The callback and release_user_data run in
-   * mln_delivery_queue_dispatch(). The registration rejects
-   * an invalid queue handle with MLN_STATUS_INVALID_ARGUMENT and a released
-   * queue with MLN_STATUS_INVALID_STATE.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_request_cancel_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/**
- * Resource provider state.
- *
- * The struct itself is borrowed for the registering call, which copies every
- * route and string before it returns. With routes, a request that matches none
- * passes through to native loading without reaching the provider. Without
- * routes, every network request reaches the provider.
- */
+/** A resource provider, for mln_runtime_set_resource_provider(). */
 typedef struct mln_resource_provider {
   uint32_t size;
-  /** Answers each request that the routes leave to the provider. */
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data exactly once for each accepted registration,
-   * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned.
-   *
-   * It may run on a runtime, worker, network, or closing thread, and never runs
-   * for a rejected registration. Another thread may retire an accepted
-   * registration before its registration function returns, so the caller
-   * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. Native code queues a copy of each request with its handle, and
-   * the callback and release_user_data run in mln_delivery_queue_dispatch().
-   * A request the queue refuses, because the queue was released or
-   * the copy could not be allocated, fails without native loading, except
-   * during process exit, which passes it through.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
-  /** The requests that reach the provider; empty to claim every request. */
+  /**
+   * The requests that the provider serves. Without routes, it serves every
+   * network request.
+   */
   const mln_resource_route* routes MLN_BINDING("length=route_count");
   size_t route_count;
 } mln_resource_provider MLN_BINDING(
@@ -1156,17 +847,9 @@ typedef struct mln_resource_provider {
 /**
  * Creates a runtime.
  *
- * The call blocks until initialization completes. In the browser, call from a
- * Web Worker; the main thread cannot block. The output must point to the null
- * handle and receives ownership of the runtime on success.
- *
- * Returns:
- * - MLN_STATUS_OK when out_runtime receives an owned runtime.
- * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
- *   small, a path view has null data with a nonzero size or embedded NUL,
- *   or out_runtime is null or does not point to the null handle.
- * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
- * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
+ * A runtime holds maps and the resource loading, cache, and offline regions
+ * that they share. In a browser, create runtimes on a Web Worker, not on the
+ * main thread.
  */
 MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(
@@ -1176,46 +859,11 @@ MLN_API mln_status mln_runtime_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Registers or replaces a runtime-scoped network resource provider.
+ * Serves the runtime's network requests through a callback.
  *
- * The provider handles network requests. Built-in non-network schemes such as
- * file, asset, mbtiles, and pmtiles bypass it.
- *
- * The provider sees every network request, including one the ambient cache
- * holds a fresh copy of. MapLibre delivers the cached copy first, then asks the
- * provider to revalidate it, with prior_etag, prior_modified, and
- * prior_expires describing that copy, even before the copy expires. The
- * provider answers NOT_MODIFIED to keep it.
- *
- * The function copies the provider shape and accepts the change from any
- * thread. Execution is ordered with every other command for this runtime.
- * The completion reports the terminal command disposition.
- *
- * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
- * releasing user_data to the C API. With a null release_user_data, the caller
- * keeps user_data valid until a committed replacement or clear command, or
- * until native runtime teardown finishes, or, with a queue, until the queue is
- * released. Requests that the previous provider already handled retain their
- * request handles.
- *
- * A URL with an unrecognized scheme, such as jar:file:, reaches this callback
- * and completes as an HTTP error when the provider passes it through.
- *
- * With a queue, no host code runs on the requesting thread: each request
- * reaches the provider's queue, and the host completes it or passes it through
- * from the dispatched callback or later.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, provider is
- *   null, provider->size is too small, callback is null, queue is an invalid
- *   handle, a route is invalid, or completion is invalid. A route is invalid
- *   when routes is null with a nonzero route_count, its size is too small, its
- *   url is null, its kinds hold an unknown bit, or its flags hold an unknown
- *   bit; the diagnostic names the route's index.
- * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
- *   runtime is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * The provider receives the network requests that its routes match, and the
+ * library loads the rest as usual. A provider can serve URL schemes that the
+ * library can't load itself. The provider replaces the one set before.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_resource_provider(
@@ -1224,21 +872,8 @@ MLN_API mln_status mln_runtime_set_resource_provider(
 ) MLN_NOEXCEPT;
 
 /**
- * Clears the runtime-scoped network resource provider.
- *
- * The function accepts the change from any thread and orders it with every
- * other command for this runtime. The completion reports the terminal command
- * disposition. The C API invokes the previous provider's release_user_data
- * after every in-flight callback returns. Later requests use the built-in
- * network loader. Requests that the previous provider already handled retain
- * their handles.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * Removes the runtime's resource provider, so the library loads every request
+ * itself.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_resource_provider(
@@ -1247,27 +882,14 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
 ) MLN_NOEXCEPT;
 
 /**
- * Completes a C API resource provider request and consumes its handle.
- *
- * This function may be called inline from the provider callback or later from
- * any thread. The C API copies all response bytes and strings before returning.
- *
- * MLN_STATUS_OK consumes the handle, as mln_resource_request_release() would,
- * so the caller does not release it; a request's cancel registration retires
- * with it. Any other status leaves the handle with the caller, who releases it
- * or answers again. Completion after cancellation or with null arguments does
- * not invoke MapLibre's resource callback. Malformed response contents are
- * converted to provider error responses and still complete the request.
- * Invalid string views are rejected before the request is completed.
+ * Answers a resource request.
  *
  * Returns:
- * - MLN_STATUS_OK when the response was accepted for asynchronous delivery.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, response is
- *   null, or a response string has null data with a nonzero size or embedded
- *   NUL.
- * - MLN_STATUS_INVALID_STATE when handle has been released or consumed, or the
- *   request was cancelled or can no longer accept a response.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * - MLN_STATUS_INVALID_STATE when the library cancelled the request.
+ *
+ * Lifetimes:
+ * A successful call ends `handle`. After a failed one, the caller still owns
+ * it.
  */
 MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_request_complete(
@@ -1276,85 +898,36 @@ MLN_API mln_status mln_resource_request_complete(
 ) MLN_NOEXCEPT;
 
 /**
- * Hands an outstanding provider request to the built-in network loader and
- * consumes its handle.
- *
- * This is how a provider declines a request. Call from any thread, inline in
- * the provider callback or after it returns, or after taking a queued request.
- * Native loading starts on the requesting MapLibre thread and applies the
- * current native transforms. The request bypasses the provider when it
- * resumes.
- *
- * MLN_STATUS_OK consumes the handle, as mln_resource_request_release() would,
- * without cancelling native loading; the request's cancel registration retires
- * with it, and its cancel callback never runs. Any other status leaves the
- * handle with the caller. Completion, cancellation, release, and pass-through
- * are serialized: only an outstanding request can pass through. Cancellation
- * that wins first returns MLN_STATUS_INVALID_STATE; cancellation after
- * acceptance cancels native loading as usual.
+ * Hands a resource request back to the library to load as usual.
  *
  * Returns:
- * - MLN_STATUS_OK when native loading was scheduled.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is invalid.
- * - MLN_STATUS_INVALID_STATE when handle has been released or consumed, or the
- *   request was cancelled.
- * - MLN_STATUS_NATIVE_ERROR when scheduling fails; the request stays
- *   outstanding.
+ * - MLN_STATUS_INVALID_STATE when the library cancelled the request.
+ *
+ * Lifetimes:
+ * A successful call ends `handle`. After a failed one, the caller still owns
+ * it.
  */
 MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_request_pass_through(
   mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Reports whether MapLibre has cancelled a C API resource provider request.
- *
- * This function may be called from any thread while the provider still owns the
- * handle. A cancelled request no longer wants a response; later completion is
- * ignored with MLN_STATUS_INVALID_STATE, and the provider releases the handle.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or
- *   out_cancelled is null.
- * - MLN_STATUS_INVALID_STATE when handle has been released.
- */
+/** Reads whether the library cancelled a resource request. */
 MLN_API mln_status mln_resource_request_is_cancelled(
   mln_resource_request handle, bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Registers a callback that runs when MapLibre cancels a C API resource
- * provider request.
+ * Calls a callback when the library cancels a resource request.
  *
- * A request that is already cancelled registers nothing and reports true
- * through out_cancelled, and the caller handles that cancellation itself.
+ * The callback never runs after the request is answered. A request takes one
+ * cancel callback. When the library has already cancelled the request, the
+ * call reports that instead and the callback never runs.
  *
- * This function may be called from any thread while the provider still owns the
- * handle. A request accepts one registration: a later call fails and leaves the
- * first registration in place.
- *
- * MLN_STATUS_OK with out_cancelled false transfers the handler's callback,
- * user_data, and release_user_data to the C API. The callback runs at most
- * once. The handler struct itself is borrowed for the call.
- *
- * Only a request that is cancelled and not yet completed reports true. The
- * caller then keeps user_data, and neither callback runs. Any other request
- * reports false. This function never invokes either callback.
- *
- * Without a queue, mln_resource_request_release() waits for a cancel callback
- * running on another thread to return, so the callback and user_data are
- * unused once release returns. Called from inside the callback, release
- * returns without waiting.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, when handler
- *   or out_cancelled is null, when handler->size is too small, when
- *   handler->callback is null, or when handler->queue is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when handle or handler->queue has been released,
- *   or the request already has a cancel callback.
+ * Lifetimes:
+ * When `out_cancelled` is true, the library never calls the handler's
+ * `release_user_data`, and the caller still owns its `user_data`.
  */
 MLN_BINDING("accepted_unless=out_cancelled")
 MLN_API mln_status mln_resource_request_set_cancel_callback(
@@ -1364,53 +937,15 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Releases the provider's resource request handle without answering it.
- *
- * Release a handle that mln_resource_request_complete() and
- * mln_resource_request_pass_through() did not consume, such as one whose
- * request was cancelled. Releasing a request that is not cancelled fails it
- * with an MLN_RESOURCE_ERROR_REASON_OTHER error, which reaches the map
- * asynchronously; the provider callback may release its handle inline.
- * A request handle is not a child of its runtime, whether the provider still
- * holds it or its failure is still queued, so it never makes
- * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
- * Passing MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
- * released. A released handle reports MLN_STATUS_INVALID_STATE from every
- * other request entry point, including from a copy another thread holds.
- */
+/** Releases a resource request. */
 MLN_API void mln_resource_request_release(
   mln_resource_request handle
 ) MLN_NOEXCEPT;
 
 /**
- * Registers or updates a runtime-scoped URL transform for network resources.
+ * Rewrites the URLs of the runtime's network requests through a callback.
  *
- * The transform applies to built-in network loading, including nested PMTiles
- * network range requests. It does not apply to file, asset, database, MBTiles,
- * or requests handled by a registered C API provider.
- *
- * The function copies the transform shape and accepts the change from any
- * thread. Execution is ordered with every other command for this runtime.
- * The completion reports the terminal command disposition.
- * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
- * releasing user_data to the C API. With a null release_user_data, the caller
- * keeps user_data valid until a committed replacement or clear command, or
- * until native runtime teardown finishes, or, with a queue, until the queue is
- * released.
- *
- * With a queue, no host code runs on a MapLibre thread: each request reaches
- * the transform's queue, and the host answers its handle from the dispatched
- * callback or later.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, callback is null, queue is an invalid
- *   handle, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
- *   runtime is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * The transform replaces the one set before.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_resource_transform(
@@ -1418,23 +953,7 @@ MLN_API mln_status mln_runtime_set_resource_transform(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Clears the runtime-scoped URL transform for network resources.
- *
- * The function accepts the change from any thread and orders it with every
- * other command for this runtime. The completion reports the terminal command
- * disposition. The C API invokes the previous transform's release_user_data
- * after every in-flight callback returns. Later network resource URLs pass
- * through unchanged; requests the previous transform already received wait
- * for their answers.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Stops rewriting the URLs of the runtime's network requests. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion,
@@ -1442,21 +961,9 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
 ) MLN_NOEXCEPT;
 
 /**
- * Answers a resource transform request with a replacement URL and consumes its
- * handle.
+ * Answers a resource transform request with the URL to load instead.
  *
- * Call from any thread, inline in the transform callback or later. The C API
- * copies url before returning. MLN_STATUS_OK consumes the handle, as
- * mln_resource_transform_request_release() would, so the caller does not
- * release it; any other status leaves the handle with the caller. A request
- * that MapLibre cancelled while it waited accepts the answer and discards it.
- *
- * Returns:
- * - MLN_STATUS_OK when the answer was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when request is an invalid handle, url is
- *   empty, or url has null data with a nonzero size or contains embedded NUL.
- * - MLN_STATUS_INVALID_STATE when request has been released or consumed.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * `url` must not be empty.
  */
 MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_transform_request_complete(
@@ -1464,54 +971,20 @@ MLN_API mln_status mln_resource_transform_request_complete(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Releases a resource transform request without answering it.
- *
- * A request released without an answer keeps its URL. Release a request that
- * mln_resource_transform_request_complete() did not consume. Passing
- * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
- * released.
- */
+/** Releases a resource transform request. */
 MLN_API void mln_resource_transform_request_release(
   mln_resource_transform_request request
 ) MLN_NOEXCEPT;
 
 /**
- * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+ * Adds headers to the runtime's HTTP requests.
  *
- * The transform applies only to requests that reach the built-in HTTP client,
- * including online and offline requests and nested network-backed PMTiles
- * range requests. Cache hits, non-HTTP schemes, and provider-handled requests
- * do not invoke it.
- *
- * The function copies the transform shape and accepts the change from any
- * thread. Execution is ordered with every other command for this runtime.
- * The completion reports the terminal command disposition.
- * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
- * releasing user_data to the C API. With a null release_user_data, the caller
- * keeps user_data valid until a committed replacement or clear command, or
- * until native runtime teardown finishes.
- *
- * A transform without a callback adds headers through its rules, so a host
- * that cannot run code on a MapLibre thread can use it.
+ * The transform replaces the one set before. In a browser or on OpenHarmony,
+ * serve the requests with mln_runtime_set_resource_provider() instead.
  *
  * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, neither a callback nor rules are set,
- *   a callback comes with rules, a rules
- *   transform carries user_data or release_user_data, a rule is invalid, or
- *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, its size is too small, its url is null, its kinds hold an
- *   unknown bit, its flags hold an unknown bit, its headers are null with a
- *   nonzero header_count, or a header breaks a rule of
- *   mln_http_header_transform_response_set_header(). The diagnostic names the
- *   rule's index and never includes a header value.
- * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP
- *   clients cannot prevent transformed headers from following a cross-origin
- *   redirect. A resource provider serves those requests instead.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * - MLN_STATUS_UNSUPPORTED when the library runs in a browser or on
+ *   OpenHarmony.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_http_header_transform(
@@ -1519,45 +992,14 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Clears the runtime-scoped outgoing HTTP header transform.
- *
- * The function accepts the change from any thread and orders it with every
- * other command for this runtime. The completion reports the terminal command
- * disposition. The C API invokes the previous transform's release_user_data
- * after every in-flight callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Stops adding headers to the runtime's HTTP requests. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_http_header_transform(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Starts a MapLibre ambient cache maintenance operation for this runtime.
- *
- * When runtime options omit cache_path, this operates on MapLibre's default
- * in-memory database and its effects are not durable beyond the native database
- * lifetime. The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, operation is
- *   not an mln_ambient_cache_operation value, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK when the maintenance operation finished.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
- */
+/** Runs an action on the runtime's ambient cache. */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_run_ambient_cache_operation(
   mln_runtime runtime, mln_ambient_cache_operation operation,
@@ -1565,26 +1007,10 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a change to this runtime's maximum ambient cache size.
+ * Limits the size of the runtime's ambient cache.
  *
- * size is the ambient cache budget in bytes. MapLibre evicts ambient resources
- * to fit the new budget, so lowering it discards cached resources. Offline
- * regions are not ambient and are unaffected.
- *
- * When runtime options omit cache_path, this operates on MapLibre's default
- * in-memory database and its effects are not durable beyond the native database
- * lifetime. The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK when the budget was applied.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * `size` is in bytes. Offline regions count toward it, but the library evicts
+ * only ambient cache resources to stay within it.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
@@ -1593,80 +1019,9 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts release of a runtime after checking its children.
+ * Releases a runtime.
  *
- * The call rejects a runtime that has live children and leaves it open. A
- * runtime's children are its maps, including one that is still creating.
- * Resource request handles are not children: one that a provider still holds,
- * or has released with its failure still queued, leaves this call free to
- * succeed. A successful call consumes the public handle before returning.
- * Previously accepted work and native teardown continue in submission order;
- * callback user data remains native-owned until its release callback runs.
- * This function may be called from any thread.
- *
- * The completion runs after every earlier accepted submission, including
- * released maps' teardown and each submission's completion and release
- * callback, has finished. The runtime's worker has exited, including its
- * thread-local cleanup, and runtime-owned callback and resource state has
- * retired. The completion must not block. Shared native services remain
- * outside this guarantee; release completion does not permit unloading the
- * library. A host that outlives its runtimes may pass
- * a discarding completion.
- *
- * Items that the runtime's registrations already pushed to a delivery queue
- * stay in that queue, so the completion can run before the host dispatches
- * them.
- *
- * Teardown may allocate. Allocation failure after acceptance terminates the
- * process. A runtime whose teardown is slow delays other runtimes' release
- * completions.
- *
- * A process may exit at any point, including while runtimes and maps are live
- * and their work is in flight. Render sessions may stay live too, once their
- * graphics calls have ended as described below. Native work may continue until
- * the operating system ends the process. Once exit begins, native code
- * dispatches no further callback that the host registered through this API,
- * release callbacks included. A callback that native code dispatched before
- * exit began may still start or be running after it. A completion or release
- * callback that is still pending when exit begins never runs, so code that
- * runs after exit begins must not wait for one. Plugin code is native code,
- * not a host callback in this sense; see plugin.h.
- *
- * When exit begins depends on the platform. On Windows, it begins when the
- * operating system ends the process's other threads, after every exit handler
- * and static destructor that the host registered has run. Elsewhere, it begins
- * when the C runtime runs the exit handler that the library registers when it
- * first creates a runtime or installs the log callback; exit handlers and
- * static destructors that the host registered before that run after it. A
- * process that ends without running exit handlers, such as through _exit(),
- * ends native threads with it.
- *
- * A host that tears down state its callbacks use before exit begins must stop
- * native callbacks into that state first. That covers a language runtime that
- * shuts down before the C runtime's exit handlers run, such as an interpreter
- * that finalizes first; on Windows, every exit handler and static destructor
- * that the host registered; and elsewhere, those that the host registered
- * after the library's exit handler. Releasing each runtime and waiting for its
- * release completion stops its callbacks.
- *
- * Before the process calls exit() or returns from main, the host must end the
- * graphics calls of every render session it attached. To end them, abandon
- * the session, or detach it and wait for the detach completion.
- * A host that drives a session on its own graphics thread stops driver service
- * first. Abandon returns once the session's in-flight driver call has ended,
- * so an exit path can end a session that is mid-frame. A disposed session's
- * graphics calls have ended once its wake release callbacks have run. A browser
- * WebGPU readback whose copy is still mapping is the one exception to both
- * paths: the library releases its own staging buffer when the graphics
- * thread's event loop delivers the map; see mln_render_session_abandon().
- *
- * Returns:
- * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released, or the runtime has
- *   a live child or is already closing.
- * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
+ * Release the runtime's maps first.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_release(
@@ -1675,41 +1030,18 @@ MLN_API mln_status mln_runtime_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Consumes a runtime handle without observing its asynchronous retirement.
+ * Releases a runtime in any state, without waiting.
  *
- * A successful call consumes the handle before returning. A failed call
- * retains caller ownership. Retirement waits for live children and accepted
- * work. Existing children retain their own cleanup obligations; dispose or
- * release them to let the runtime finish retiring. Teardown may
- * allocate; allocation failure after acceptance terminates the process.
- *
- * Returns:
- * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is already
- *   closing.
+ * The runtime finishes its teardown after its maps are released.
  */
 MLN_API mln_status mln_runtime_dispose(
   mln_runtime runtime, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Selects how runtime and map events reach the host.
+ * Sends the events of the runtime and its maps to a callback.
  *
- * MLN_STATUS_OK transfers the handler's user_data to the runtime. A rejected
- * call leaves it with the caller. Events queued before replacement stay on
- * their original queue. Before a handler is set, events are dropped. The
- * command runs in order with map creation and offline region observation, so
- * a handler whose command is accepted before mln_runtime_create_map() or
- * mln_runtime_set_offline_region_observed() receives that map's or region's
- * first events; the host need not wait for the completion.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime or handler is invalid, or the
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime or the handler's queue is released.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * The callback replaces the one set before.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_event_handler(
@@ -1717,15 +1049,7 @@ MLN_API mln_status mln_runtime_set_event_handler(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Stops event delivery and retires the previous handler.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime is released.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Stops sending the events of the runtime and its maps to a callback. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_event_handler(
   mln_runtime runtime, const mln_completion* completion,
@@ -1733,56 +1057,17 @@ MLN_API mln_status mln_runtime_clear_event_handler(
 ) MLN_NOEXCEPT;
 
 /**
- * Selects which runtime-scoped event types this runtime queues.
+ * Selects the runtime's own events that reach the event callback.
  *
- * The mask applies at once, where mln_map_set_event_mask() is an ordered
- * command: a map snapshot reports the map's mask, so the map orders its change
- * with the commands that snapshot observes, and a runtime has no snapshot.
- *
- * A runtime queues an offline event when this mask selects its type. Region
- * status, response error, and tile count limit events also require the region
- * to be observed with mln_runtime_set_offline_region_observed(), so this
- * mask narrows that subscription rather than replacing it.
- *
- * A runtime that has not been narrowed selects every runtime-scoped event type
- * this library reports, which covers types a caller's header may not
- * declare. A new mask applies to later events and keeps the events already
- * queued.
- *
- * This call accepts only bits in MLN_RUNTIME_EVENT_FLAG_ALL. It reads the bits
- * in MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS and ignores map-originated bits.
- * mln_runtime_get_event_mask() reports the value last set, so a host reads it,
- * changes one bit, and writes it back.
- *
- * Changing this mask does not affect one-shot completion or result ownership.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or mask
- *   holds a bit outside MLN_RUNTIME_EVENT_FLAG_ALL.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Each map selects its events with mln_map_set_event_mask() instead. A runtime
+ * starts with every event selected.
  */
 MLN_API mln_status mln_runtime_set_event_mask(
   mln_runtime runtime, mln_runtime_event_flags mask,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Reports which runtime-scoped event types this runtime queues.
- *
- * The value is the mask last set, including bits outside
- * MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS that this runtime ignores. A
- * runtime that has not been narrowed reports MLN_RUNTIME_EVENT_FLAG_ALL as this
- * library defines it.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_mask
- *   is null.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Reads the runtime's event mask. */
 MLN_API mln_status mln_runtime_get_event_mask(
   mln_runtime runtime,
   mln_runtime_event_flags* out_mask MLN_BINDING("direction=out"),

@@ -219,12 +219,20 @@ def parameter_name(name: str) -> str:
 
 
 def doc(
-    bound: BoundApi, native: str, indent: str = "", notes: tuple[str, ...] = ()
+    bound: BoundApi,
+    native: str,
+    indent: str = "",
+    notes: tuple[str, ...] = (),
+    *,
+    discard=False,
 ) -> str:
-    """The doc comment of a declaration, with `notes` in place of the C notes."""
+    """The doc comment of a declaration, with `notes` in place of the C notes.
+    With `discard`, it documents a form that passes no completion."""
     from .typescript import symbols
 
     comment = bound.doc(native)
+    if discard:
+        comment = docs.discarding(comment)
     if comment is not None and notes:
         comment = dataclasses.replace(comment, notes=notes)
     return docs.block_comment(comment, symbols(bound), indent)

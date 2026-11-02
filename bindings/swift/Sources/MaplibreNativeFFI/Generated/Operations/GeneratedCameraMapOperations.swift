@@ -4,7 +4,14 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Submits one atomic relative camera update.
+  /// Moves the camera relative to where it is, as a gesture does.
+  ///
+  /// `delta` can pan the map's content by an offset on the screen, scale the
+  /// zoom, and add to the bearing and pitch. An anchor keeps one screen point
+  /// in place while the scale, bearing, or pitch changes. An anchor needs one
+  /// of those changes, and combines with an offset only when the delta has no
+  /// animation. The function finishes when the map applies the delta, before an
+  /// animation ends.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -22,7 +29,11 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered query for a camera that fits a GeoJSON geometry.
+  /// Computes a camera that fits a GeoJSON geometry in the map's view.
+  ///
+  /// `geometry` is a GeoJSON geometry object with at least one coordinate, not
+  /// a feature. The camera keeps the map's bearing and pitch unless
+  /// `fitOptions` sets them, and its zoom stays within the map's zoom limits.
   ///
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -43,7 +54,10 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered query for a camera that fits geographic bounds.
+  /// Computes a camera that fits `bounds` in the map's view.
+  ///
+  /// The camera keeps the map's bearing and pitch unless `fitOptions` sets
+  /// them, and its zoom stays within the map's zoom limits.
   ///
   /// See `mln_map_camera_for_lat_lng_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -64,7 +78,11 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered query for a camera that fits geographic coordinates.
+  /// Computes a camera that fits `coordinates` in the map's view.
+  ///
+  /// `coordinates` must not be empty. The camera keeps the map's bearing and
+  /// pitch unless `fitOptions` sets them, and its zoom stays within the map's
+  /// zoom limits.
   ///
   /// See `mln_map_camera_for_lat_lngs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -86,8 +104,11 @@ public extension MapHandle {
     }
   }
 
-  /// Cancels the camera transitions of the commands whose animation carried
-  /// transition_id, and leaves every other transition running.
+  /// Stops the running camera animations whose animation options set
+  /// `transitionId`.
+  ///
+  /// Other animations keep running. The end handler of each stopped animation
+  /// reports `CameraTransitionOutcome.cancelled`.
   ///
   /// See `mln_map_cancel_camera_transition` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -105,7 +126,10 @@ public extension MapHandle {
     }
   }
 
-  /// Cancels the camera transitions running when this command commits.
+  /// Stops every running camera animation where it is.
+  ///
+  /// The end handler of each stopped animation reports
+  /// `CameraTransitionOutcome.cancelled`.
   ///
   /// See `mln_map_cancel_transitions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -120,7 +144,7 @@ public extension MapHandle {
     }
   }
 
-  /// Submits an ordered debug-log command.
+  /// Logs debugging information about the map's style and sources.
   ///
   /// See `mln_map_dump_debug_logs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -135,7 +159,10 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered camera read.
+  /// Reads the map's camera.
+  ///
+  /// The query reads the camera after the map applies the commands sent before
+  /// it.
   ///
   /// See `mln_map_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -149,7 +176,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Starts an ordered wrapped-bounds query for a copied camera.
+  /// Computes the area that the map would show with `camera`.
+  ///
+  /// Camera fields that `camera` doesn't set come from the map's camera. The
+  /// longitudes stay between -180 and 180.
   ///
   /// See `mln_map_lat_lng_bounds_for_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -168,7 +198,12 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered unwrapped-bounds query for a copied camera.
+  /// Computes the area that the map would show with `camera`, without wrapping
+  /// longitudes.
+  ///
+  /// Camera fields that `camera` doesn't set come from the map's camera. The
+  /// longitudes can fall outside -180 to 180, so a view across the antimeridian
+  /// gives one continuous range.
   ///
   /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -187,7 +222,10 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a copied camera-constraint command.
+  /// Limits the camera's center to an area, and its zoom and pitch to ranges.
+  ///
+  /// Limits that `options` doesn't set keep their current values. When the
+  /// camera is outside the new limits, it moves inside them.
   ///
   /// See `mln_map_set_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -205,7 +243,9 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a debug-overlay command.
+  /// Draws debugging overlays, such as tile borders, on the map.
+  ///
+  /// `options` replaces the overlays set before.
   ///
   /// See `mln_map_set_debug_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -223,7 +263,10 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a copied free-camera command.
+  /// Places the camera at a position and orientation in space.
+  ///
+  /// The map adjusts them to a camera that it can show, and stops running
+  /// camera animations.
   ///
   /// See `mln_map_set_free_camera_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -241,7 +284,10 @@ public extension MapHandle {
     }
   }
 
-  /// Submits axonometric rendering options.
+  /// Sets whether the map draws in perspective or axonometric projection, and
+  /// how much it skews the view.
+  ///
+  /// Settings that `mode` doesn't set keep their current values.
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -259,7 +305,7 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a rendering-stats visibility command.
+  /// Shows or hides an overlay of rendering statistics on the map.
   ///
   /// See `mln_map_set_rendering_stats_view_enabled` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -277,7 +323,9 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a copied tile-options command.
+  /// Sets how the map chooses which tiles to load, and at what detail.
+  ///
+  /// Settings that `options` doesn't set keep their current values.
   ///
   /// See `mln_map_set_tile_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -295,7 +343,9 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a copied viewport-options command.
+  /// Sets how the map orients and constrains its view.
+  ///
+  /// Settings that `options` doesn't set keep their current values.
   ///
   /// See `mln_map_set_viewport_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -313,7 +363,13 @@ public extension MapHandle {
     }
   }
 
-  /// Submits one atomic camera update.
+  /// Moves the camera, at once or with an animation.
+  ///
+  /// Camera fields that `update` doesn't set keep their values, and the update
+  /// stops any running animation of the fields it sets. The function finishes
+  /// when the map applies the update, before an animation ends. To learn when
+  /// an animation ends, set an `CameraTransitionHandler` in its animation
+  /// options.
   ///
   /// See `mln_map_update_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

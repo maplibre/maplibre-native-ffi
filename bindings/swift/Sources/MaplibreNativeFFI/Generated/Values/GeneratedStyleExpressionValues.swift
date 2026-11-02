@@ -3,14 +3,14 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// What a parsed expression depends on.
+/// What a style expression's result depends on.
 ///
 /// See `mln_style_expression_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionInfo: Equatable, Hashable, Sendable {
-  /// Whether the result is the same for every feature and feature state.
+  /// True when the result doesn't depend on the feature or its state.
   public var isFeatureConstant: Bool
-  /// Whether the result is the same at every zoom.
+  /// True when the result doesn't depend on the zoom level.
   public var isZoomConstant: Bool
   public init(isFeatureConstant: Bool = false, isZoomConstant: Bool = false) {
     self.isFeatureConstant = isFeatureConstant
@@ -23,29 +23,26 @@ public struct StyleExpressionInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// What one evaluation reads.
+/// The inputs that a style expression reads while it evaluates.
 ///
 /// See `mln_style_expression_inputs` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
-  /// The value of the zoom expression.
   public var zoom: Double?
-  /// The value of the heatmap-density and line-progress expressions, and of the
-  /// elevation expression in a color-relief layer.
+  /// The value that `heatmap-density` and `line-progress` read.
   public var colorRampParameter: Double?
-  /// The value of the elevation expression outside a color-relief layer.
+  /// The value that `elevation` reads when `color_ramp_parameter` isn't set.
   public var elevation: Double?
-  /// One UTF-8 GeoJSON Feature that feature data expressions read.
+  /// The feature to evaluate against, as a GeoJSON feature, or empty for none.
   public var feature: String
-  /// A UTF-8 JSON object that the feature-state expression reads.
+  /// The feature's state, as a JSON object, or empty for none.
   public var featureState: String
-  /// A UTF-8 JSON object that the global-state expression reads.
+  /// The values that `global-state` reads, as a JSON object, or empty for none.
   public var globalState: String
-  /// The tile that holds the feature, which the within and distance expressions
-  /// need to place its geometry.
+  /// The tile that holds the feature. `within` and `distance` need it to read
+  /// the feature's geometry.
   public var canonicalTileId: CanonicalTileId?
-  /// The image IDs that the image expression reports as available. The
-  /// expression reports any other ID as unavailable.
+  /// The IDs of the images that `image` treats as available.
   public var availableImages: [String]
   public init(
     zoom: Double? = nil,
@@ -134,9 +131,7 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
 /// See `mln_style_expression_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
-  /// The type that the expression must produce. A string type coerces the
-  /// result to a string, as a string layer property does; every other type
-  /// asserts it. Without it, the expression keeps the type it infers.
+  /// The type that the result must have.
   public var expectedType: StyleExpressionType?
   public init(expectedType: StyleExpressionType? = nil) {
     self.expectedType = expectedType
@@ -159,15 +154,16 @@ public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// A style expression type.
+/// The type of a style expression's result.
 ///
 /// See `mln_style_expression_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionType: Equatable, Hashable, Sendable {
   public var kind: StyleExpressionTypeKind
-  /// For an array, its items' kind; ignored for any other kind.
+  /// The type of each item when `kind` is `StyleExpressionTypeKind.array`. It
+  /// can't be an array itself.
   public var itemKind: StyleExpressionTypeKind
-  /// For an array, its fixed length, or zero for any length.
+  /// The length of an array, or 0 for any length.
   public var itemCount: UInt32
   public init(
     kind: StyleExpressionTypeKind = .init(rawValue: 0),
@@ -194,7 +190,7 @@ public struct StyleExpressionType: Equatable, Hashable, Sendable {
   }
 }
 
-/// Style expression types that a parsed expression may be required to have.
+/// The type of a style expression's result, or of the items of an array result.
 ///
 /// See `mln_style_expression_type_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -207,7 +203,7 @@ public struct StyleExpressionTypeKind: RawRepresentable,
     self.rawValue = rawValue
   }
 
-  /// Any value.
+  /// Any type.
   public static let value: StyleExpressionTypeKind = .init(rawValue: 0)
   public static let number: StyleExpressionTypeKind = .init(rawValue: 1)
   public static let string: StyleExpressionTypeKind = .init(rawValue: 2)
@@ -215,12 +211,10 @@ public struct StyleExpressionTypeKind: RawRepresentable,
   public static let color: StyleExpressionTypeKind = .init(rawValue: 4)
   public static let object: StyleExpressionTypeKind = .init(rawValue: 5)
   public static let formatted: StyleExpressionTypeKind = .init(rawValue: 6)
-  /// A resolved image, as the image expression returns.
   public static let image: StyleExpressionTypeKind = .init(rawValue: 7)
   public static let padding: StyleExpressionTypeKind = .init(rawValue: 8)
   public static let variableAnchorOffsetCollection: StyleExpressionTypeKind =
     .init(rawValue: 9)
-  /// An array whose items have item_kind, which is not itself an array.
   public static let array: StyleExpressionTypeKind = .init(rawValue: 10)
   public var description: String {
     switch rawValue {

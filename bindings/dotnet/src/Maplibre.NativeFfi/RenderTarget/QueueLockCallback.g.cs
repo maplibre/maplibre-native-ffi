@@ -3,13 +3,11 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Takes or returns the host's lock on the queue that a session shares with it.
-/// Native code relies on the lock being held or released when the call returns.
-/// The callback runs on the session's graphics thread or on the thread that
-/// abandons the session.
+/// Locks or unlocks the Vulkan queue that you share with a render session.
 /// </summary>
 /// <remarks>
-/// See <c>mln_queue_lock_callback</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// <para>It can run on a library thread, and it can't call the library.</para>
+/// <para>See <c>mln_queue_lock_callback</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>
 public delegate void QueueLockCallback();

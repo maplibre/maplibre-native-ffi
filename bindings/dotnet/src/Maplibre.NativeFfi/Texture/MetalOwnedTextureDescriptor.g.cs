@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Metal attachment options for an owned texture target.
+/// A ring of Metal textures that the session creates, for
+/// <c>MapHandle.AttachMetalOwnedTexture()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_metal_owned_texture_descriptor</c> in the <see
@@ -25,29 +26,23 @@ public readonly partial record struct MetalOwnedTextureDescriptor
         this.CommandQueue = CommandQueue;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
 
     /// <summary>
-    /// Metal backend context. device is required.
+    /// Names the MTLDevice that creates the textures.
     /// </summary>
     public MetalContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// Backend-native MTLPixelFormat value of the ring's textures: either
-    /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
-    /// returns RGBA8 for either format.
+    /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
+    /// MTLPixelFormatBGRA8Unorm.
     /// </summary>
     public required ulong PixelFormat { get; init; }
 
     /// <summary>
-    /// <c>id&lt;MTLCommandQueue&gt;</c> / <c>MTL::CommandQueue*</c> on
-    /// context.device that the session submits its work to, retained by the
-    /// session. Optional; null makes the session create its own queue.
-    /// <c>GpuSyncKind.QueueOrder</c> orders frames on this queue.
+    /// Your MTLCommandQueue on the same device, or null for a queue of the
+    /// session's own. With your queue, frames can use
+    /// <c>GpuSyncKind.QueueOrder</c>.
     /// </summary>
     public NativePointer CommandQueue { get; init; }
 }

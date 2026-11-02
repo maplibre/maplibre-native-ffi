@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  /// Stops event delivery and retires the previous handler.
+  /// Stops sending the events of the runtime and its maps to a callback.
   ///
   /// See `mln_runtime_clear_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -19,7 +19,7 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Clears the runtime-scoped outgoing HTTP header transform.
+  /// Stops adding headers to the runtime's HTTP requests.
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -34,7 +34,8 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Clears the runtime-scoped network resource provider.
+  /// Removes the runtime's resource provider, so the library loads every
+  /// request itself.
   ///
   /// See `mln_runtime_clear_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -49,7 +50,7 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Clears the runtime-scoped URL transform for network resources.
+  /// Stops rewriting the URLs of the runtime's network requests.
   ///
   /// See `mln_runtime_clear_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -66,6 +67,10 @@ public extension RuntimeHandle {
 
   /// Creates a runtime.
   ///
+  /// A runtime holds maps and the resource loading, cache, and offline regions
+  /// that they share. In a browser, create runtimes on a Web Worker, not on the
+  /// main thread.
+  ///
   /// See `mln_runtime_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func create(options bindingArg0: RuntimeOptions) throws
@@ -80,7 +85,9 @@ public extension RuntimeHandle {
       ) } result: { try RuntimeHandle(adopting: value0) }
   }
 
-  /// Consumes a runtime handle without observing its asynchronous retirement.
+  /// Releases a runtime in any state, without waiting.
+  ///
+  /// The runtime finishes its teardown after its maps are released.
   ///
   /// See `mln_runtime_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -88,7 +95,7 @@ public extension RuntimeHandle {
     try nativeClose { raw, diagnostic in mln_runtime_dispose(raw, diagnostic) }
   }
 
-  /// Reports which runtime-scoped event types this runtime queues.
+  /// Reads the runtime's event mask.
   ///
   /// See `mln_runtime_get_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -101,7 +108,9 @@ public extension RuntimeHandle {
     ) } result: { RuntimeEventFlag(rawValue: value0) }
   }
 
-  /// Starts release of a runtime after checking its children.
+  /// Releases a runtime.
+  ///
+  /// Release the runtime's maps first.
   ///
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -118,7 +127,7 @@ public extension RuntimeHandle {
     ) }
   }
 
-  /// Starts a MapLibre ambient cache maintenance operation for this runtime.
+  /// Runs an action on the runtime's ambient cache.
   ///
   /// See `mln_runtime_run_ambient_cache_operation` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -135,9 +144,9 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Selects how runtime and map events reach the host. Map events arrive on
-  /// the runtime's native scheduler thread, and offline events may arrive on a
-  /// MapLibre worker thread.
+  /// Sends the events of the runtime and its maps to a callback.
+  ///
+  /// The callback replaces the one set before.
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -155,7 +164,10 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Selects which runtime-scoped event types this runtime queues.
+  /// Selects the runtime's own events that reach the event callback.
+  ///
+  /// Each map selects its events with `MapHandle.setEventMask()` instead. A
+  /// runtime starts with every event selected.
   ///
   /// See `mln_runtime_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -167,11 +179,20 @@ public extension RuntimeHandle {
     ) }
   }
 
-  /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
-  /// The callback runs synchronously on a MapLibre worker or network thread.
+  /// Adds headers to the runtime's HTTP requests.
+  ///
+  /// The transform replaces the one set before. In a browser or on OpenHarmony,
+  /// serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+  ///
+  /// Runs on a library thread.
   ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the library runs in a browser or on
+  ///   OpenHarmony.
   @discardableResult
   func setHttpHeaderTransform(_ bindingArg0: HttpHeaderTransform) async throws
     -> CommandCompletion
@@ -186,7 +207,10 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Starts a change to this runtime's maximum ambient cache size.
+  /// Limits the size of the runtime's ambient cache.
+  ///
+  /// `size` is in bytes. Offline regions count toward it, but the library
+  /// evicts only ambient cache resources to stay within it.
   ///
   /// See `mln_runtime_set_maximum_ambient_cache_size` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -201,8 +225,11 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Registers or replaces a runtime-scoped network resource provider. The
-  /// callback runs synchronously on a MapLibre thread.
+  /// Serves the runtime's network requests through a callback.
+  ///
+  /// The provider receives the network requests that its routes match, and the
+  /// library loads the rest as usual. A provider can serve URL schemes that the
+  /// library can't load itself. The provider replaces the one set before.
   ///
   /// See `mln_runtime_set_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -220,8 +247,9 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Registers or updates a runtime-scoped URL transform for network resources.
-  /// The callback runs on a MapLibre network thread.
+  /// Rewrites the URLs of the runtime's network requests through a callback.
+  ///
+  /// The transform replaces the one set before.
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

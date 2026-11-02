@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Style source type values returned by source metadata queries.
+/// The type of a style source.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_type</c> in the <see

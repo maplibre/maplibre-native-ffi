@@ -3,11 +3,15 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vulkan attachment options for an owned texture target.
+/// A ring of Vulkan images that the session creates, for
+/// <c>MapHandle.AttachVulkanOwnedTexture()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_owned_texture_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para>Each frame leaves its image in the layout that
+/// <c>VulkanTextureFrame.Layout</c> reports, owned by the queue family of
+/// <c>graphics_queue_family_index</c>.</para>
+/// <para>See <c>mln_vulkan_owned_texture_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct VulkanOwnedTextureDescriptor
 {
@@ -18,14 +22,6 @@ public readonly partial record struct VulkanOwnedTextureDescriptor
         this.Context = Context;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Borrowed Vulkan context. All handles are required.
-    /// </summary>
     public required VulkanContextDescriptor Context { get; init; }
 }

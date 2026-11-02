@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A resource provider's answer to one request.
+/// The answer to a resource request.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_response</c> in the <see
@@ -12,10 +12,14 @@ namespace Maplibre.NativeFfi;
 public sealed record ResourceResponse
 {
     public ResourceResponseStatus Status { get; init; }
+
+    /// <summary>
+    /// Why the request failed, for <c>ResourceResponseStatus.Error</c>.
+    /// </summary>
     public ResourceErrorReason ErrorReason { get; init; }
 
     /// <summary>
-    /// Response bytes.
+    /// The resource, for <c>ResourceResponseStatus.Ok</c>.
     /// </summary>
     public ImmutableArray<byte> Bytes
     {
@@ -23,10 +27,27 @@ public sealed record ResourceResponse
         init => BytesStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> BytesStorage { get; init; }
+
+    /// <summary>
+    /// A description of the error, for <c>ResourceResponseStatus.Error</c>.
+    /// </summary>
     public string ErrorMessage { get; init; } = "";
+
+    /// <summary>
+    /// Whether the library must request the resource again before it reuses
+    /// this copy.
+    /// </summary>
     public bool MustRevalidate { get; init; }
     public long? ModifiedUnixMs { get; init; }
     public long? ExpiresUnixMs { get; init; }
+
+    /// <summary>
+    /// Empty when the resource has no ETag.
+    /// </summary>
     public string Etag { get; init; } = "";
+
+    /// <summary>
+    /// When to retry, for <c>ResourceResponseStatus.Error</c>.
+    /// </summary>
     public long? RetryAfterUnixMs { get; init; }
 }

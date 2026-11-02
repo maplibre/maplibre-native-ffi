@@ -4,8 +4,12 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension HttpHeaderTransformResponse {
-  /// Sets one outgoing HTTP request header for the current transform
-  /// invocation.
+  /// Sets a header on the request that an HTTP header transform callback
+  /// handles.
+  ///
+  /// Setting a header again, in any letter case, replaces its value. `name`
+  /// can't be a header that the library or the platform manages, such as
+  /// `Host`, `Range`, `Accept-Encoding`, or `User-Agent`.
   ///
   /// See `mln_http_header_transform_response_set_header` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -21,7 +25,7 @@ public extension HttpHeaderTransformResponse {
   }
 }
 
-/// Reads MapLibre Native's process-global network status.
+/// Reads whether the library may use the network.
 ///
 /// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -33,7 +37,12 @@ public func getNetworkStatus() throws -> NetworkStatus {
   ) } result: { NetworkStatus(rawValue: value0.rawValue) }
 }
 
-/// Sets MapLibre Native's process-global network status.
+/// Tells the library whether it may use the network.
+///
+/// While the status is `NetworkStatus.offline`, the library starts no network
+/// requests. The requests that wait start when the status returns to
+/// `NetworkStatus.online`. The status starts as online and applies to every
+/// runtime in the process.
 ///
 /// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

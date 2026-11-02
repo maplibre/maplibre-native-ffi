@@ -4,10 +4,17 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Starts attachment of a texture target that renders on a graphics device.
+  /// Attaches a render session that draws the map into a texture on `device`.
+  ///
+  /// `options` must select `RenderDriverKind.coreWorker`. Read the frames back
+  /// with `RenderSessionHandle.readTexture()`.
   ///
   /// See `mln_map_attach_graphics_device_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the map already has a render session.
   func attachGraphicsDeviceTexture(
     _ bindingArg0: GraphicsDeviceHandle,
     descriptor bindingArg1: GraphicsDeviceTextureDescriptor,

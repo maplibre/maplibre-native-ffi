@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// WGL context fields shared by OpenGL render targets on Windows.
+/// The WGL objects that a render session makes its OpenGL context from.
 /// </summary>
 /// <remarks>
 /// See <c>mln_wgl_context_descriptor</c> in the <see
@@ -24,21 +24,17 @@ public readonly partial record struct WglContextDescriptor
     }
 
     /// <summary>
-    /// Borrowed HDC used to create the session context. Required. A dedicated
-    /// owned texture makes its context current on this HDC from its core
-    /// worker.
+    /// An <c>HDC</c>.
     /// </summary>
     public required NativePointer DeviceContext { get; init; }
 
     /// <summary>
-    /// Borrowed HGLRC whose share group the session context joins. Required
-    /// under shared ownership. A dedicated session joins no share group, so it
-    /// must be null there.
+    /// Your <c>HGLRC</c>, for a shared context.
     /// </summary>
     public NativePointer ShareContext { get; init; }
 
     /// <summary>
-    /// Optional wglGetProcAddress-compatible function for the host loader.
+    /// Your <c>wglGetProcAddress</c>, or null to use the system's.
     /// </summary>
     public NativePointer GetProcAddress { get; init; }
 }

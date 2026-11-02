@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Frame-demand policy bits.
+/// How a frame request behaves.
 /// </summary>
 /// <remarks>
 /// See <c>mln_frame_demand_flag</c> in the <see
@@ -12,30 +12,19 @@ namespace Maplibre.NativeFfi;
 public enum FrameDemandFlag : uint
 {
     /// <summary>
-    /// Render even when no map update is newer than the last rendered one.
+    /// Draws a frame even when nothing changed since the last one. It can't be
+    /// combined with <c>FrameDemandFlag.WaitForUpdate</c>.
     /// </summary>
     Force = 1,
 
     /// <summary>
-    /// Present the rendered frame on a target that supports presentation. A
-    /// presenting target whose demand clears this bit still renders and keeps
-    /// whatever it presented last. Ignored by targets without presentation.
+    /// Shows the frame on a surface target.
     /// </summary>
     Present = 2,
 
     /// <summary>
-    /// Without <c>FrameDemandFlag.Force</c>, a demand that would finish with
-    /// <c>RenderResult.NoUpdate</c> waits instead, and runs again after the
-    /// map's next update, a target replacement, or an applied resize. A waiting
-    /// demand holds no ring slot. A later demand with the same flags supersedes
-    /// it, a barrier ends its wait with <c>RenderResult.NoUpdate</c>, and
-    /// detach, abandon, or the quarantine of the ring's last usable slot end it
-    /// with <c>RenderResult.TargetNotReady</c>. A waiting demand's result can
-    /// follow the results of demands accepted after it. The flag does not pace:
-    /// a host that re-arms a waiting demand as each result arrives renders
-    /// every update the map publishes, and a command that arrives while a frame
-    /// renders appears in a later frame. To show several commands in one frame,
-    /// submit them in a command group, or arm demands once per display frame.
+    /// When the map has nothing new to draw, waits for its next update instead
+    /// of finishing with <c>RenderResult.NoUpdate</c>.
     /// </summary>
     WaitForUpdate = 4,
 }

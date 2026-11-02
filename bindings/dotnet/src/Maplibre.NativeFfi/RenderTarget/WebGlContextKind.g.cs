@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// WebGL context placement.
+/// How a render session gets its WebGL context.
 /// </summary>
 /// <remarks>
 /// See <c>mln_web_gl_context_kind</c> in the <see
@@ -11,13 +11,14 @@ namespace Maplibre.NativeFfi;
 public enum WebGlContextKind : uint
 {
     /// <summary>
-    /// Use a host-created context on its current browser agent.
+    /// The session uses a context that you created with
+    /// <c>emscripten_webgl_create_context()</c>.
     /// </summary>
     Existing = 0,
 
     /// <summary>
-    /// Transfer the canvas named by canvas_selector to a native worker and
-    /// create a WebGL 2 context there.
+    /// The library transfers the canvas that <c>canvas_selector</c> names to a
+    /// worker and creates the context there.
     /// </summary>
     TransferredCanvas = 1,
 }

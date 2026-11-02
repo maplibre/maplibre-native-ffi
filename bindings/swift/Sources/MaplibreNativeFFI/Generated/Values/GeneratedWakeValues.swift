@@ -3,14 +3,15 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Receiver wake callback copied by a successful owning call. The callback
-/// schedules service by the receiver and returns without waiting for another
-/// thread. Native code may invoke the callback from any thread, and calls may
-/// coalesce or overlap.
+/// A callback that tells the caller when work is ready.
+///
+/// Can run on any thread, including the caller's own thread during a library
+/// call. Return quickly and don't block.
 ///
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 public struct Wake: Sendable {
+  /// Null to turn the wake off.
   public var callback: WakeCallback?
   public init(callback: WakeCallback? = nil) {
     self.callback = callback
@@ -34,8 +35,13 @@ private func invokeWakeCallback(user_data: UnsafeMutableRawPointer?) {
   box.value.callback?()
 }
 
-/// Schedules service by the receiver that owns a queue or driver. Native code
-/// may invoke the callback from any thread, and calls may coalesce or overlap.
+/// Tells the caller that work is ready for it.
+///
+/// One call can stand for several pieces of ready work, so take all of it each
+/// time.
+///
+/// Can run on any thread, including the caller's own thread during a library
+/// call. Return quickly and don't block.
 ///
 /// See `mln_wake_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).

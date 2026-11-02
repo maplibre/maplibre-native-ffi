@@ -1,6 +1,7 @@
 /**
  * @file maplibre_native_c/render_target.h
- * Shared public C API declarations for render target descriptors.
+ * Options, capabilities, graphics contexts, and GPU synchronization that every
+ * render target shares.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_RENDER_TARGET_H
@@ -16,40 +17,32 @@
 extern "C" {
 #endif
 
-/**
- * Bit pattern of a Vulkan non-dispatchable handle.
- *
- * It carries either native representation of the handle, a pointer or a
- * uint64_t. Zero represents VK_NULL_HANDLE.
- */
+/** A Vulkan non-dispatchable handle, such as a `VkImage`, as an integer. */
 typedef uint64_t mln_vulkan_non_dispatchable_handle;
 
-/** Null Vulkan non-dispatchable handle. */
+/** The null Vulkan non-dispatchable handle. */
 #define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
 
-/** The most slots a texture ring holds, owned or borrowed. */
+/** The most textures that a render session's texture ring can have. */
 #define MLN_TEXTURE_RING_MAX_DEPTH 8
 
-/** Execution placement for one render session. */
+/** The thread that runs a render session's graphics work. */
 typedef enum mln_render_driver_kind : uint32_t {
-  /**
-   * Native code initializes, services, and tears down transferable graphics
-   * state on a library-owned thread.
-   */
+  /** A library thread. */
   MLN_RENDER_DRIVER_CORE_WORKER = 1U,
-  /**
-   * The host services driver work on the thread or realm where its graphics
-   * context is current.
-   */
+  /** Your thread, when it calls mln_render_session_service_driver_work(). */
   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2U,
 } mln_render_driver_kind;
 
-/** Optional render-session capabilities. */
+/** Something that a render session can do. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_render_session_capability_flag : uint32_t {
+  /** mln_render_session_acquire_frame() can take the frames it renders. */
   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1U << 0U,
+  /** mln_render_session_read_texture() can copy its texture to memory. */
   MLN_RENDER_SESSION_CAPABILITY_READBACK = 1U << 1U,
+  /** It shows frames on a surface. */
   MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 2U,
 } mln_render_session_capability_flag;
 
@@ -57,187 +50,55 @@ typedef enum MLN_BINDING(
 typedef uint32_t mln_render_session_capability_flags;
 
 /**
- * Takes or returns the host's lock on the queue that a session shares with it.
- * Native code relies on the lock being held or released when the call returns.
+ * Locks or unlocks the Vulkan queue that you share with a render session.
  *
  * Threads:
- * The callback runs on the session's graphics thread or on the thread that
- * abandons the session.
+ * It can run on a library thread, and it can't call the library.
  */
 MLN_BINDING("synchronous=true")
 typedef void (*mln_queue_lock_callback)(void* user_data);
 
 /**
- * Host lock on the graphics queue that a session shares with its host, copied
- * by a successful attach.
+ * Your lock on a Vulkan queue that you and a render session both submit to.
  *
- * Vulkan requires the host to synchronize every call that uses a queue. A
- * Vulkan session submits to the context's graphics_queue. A host that also
- * uses that queue must pass a lock here and take the same lock around its own
- * queue calls. The callbacks may run on the graphics thread or the thread that
- * abandons the session. Each queue submission or presentation holds the lock
- * only for that call, never across a wait.
- *
- * Both callbacks are null to disable the lock, or both are set. A disabled
- * lock must not carry release_user_data. A session without a lock assumes that
- * the host leaves the queue alone while the session is attached.
- *
- * The callbacks must not call the C API; each status-returning function
- * returns MLN_STATUS_INVALID_STATE when a callback calls it. The host
- * must not hold the lock while calling the C API or waiting on a thread that
- * does. Sessions sharing a queue must use the same host mutex.
- *
- * Native code calls release_user_data once, after the session can no longer
- * invoke the callbacks.
+ * The session holds the lock only while it submits or presents to the queue.
+ * Set both `lock` and `unlock`, or neither when you don't submit to the queue
+ * yourself.
  */
 typedef struct mln_queue_lock {
   mln_queue_lock_callback lock MLN_BINDING("nullable=true");
   mln_queue_lock_callback unlock MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data once, after all callback invocations have
-   * returned and the session can no longer invoke the callbacks. A disabled
-   * lock leaves it null.
-   */
   mln_user_data_release release_user_data;
 } mln_queue_lock MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Synchronization payload kind for acquired texture frames. */
+/** How one side waits for the other's GPU work on a shared texture. */
 typedef enum mln_gpu_sync_kind : uint32_t {
-  /**
-   * The host needs no synchronization object. The work completed before the
-   * frame became acquirable or before the release call.
-   *
-   * As producer synchronization of an acquired frame, the producer's GPU writes
-   * to the frame's texture completed. On OpenGL, a host that samples the
-   * texture from another context of the share group binds it again after
-   * acquisition.
-   *
-   * As consumer synchronization, the host's GPU reads completed.
-   */
+  /** The work has already finished, so there is nothing to wait for. */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
-  /**
-   * GLsync in the shared EGL or WGL context's share group, used only by a
-   * caller-graphics-thread driver. handle is nonzero.
-   *
-   * A producer fence is a flushed GL_SYNC_GPU_COMMANDS_COMPLETE fence. Before
-   * reading the texture,
-   * the host queues glWaitSync(handle, 0, GL_TIMEOUT_IGNORED) in a context in
-   * that share group and binds the texture again. A CPU read instead waits
-   * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
-   *
-   * The session owns producer fences. The host borrows one until it releases
-   * or discards the acquired frame and must never delete it. A view scope
-   * extends that borrowing.
-   *
-   * The host inserts a consumer fence after its reads and calls glFlush in
-   * that context before releasing the frame. A successful release transfers
-   * the fence to the session, which waits on it before it renders into the
-   * slot again.
-   *
-   * Target loss invalidates frame access and may retain consumer fences until
-   * process exit. Abandon performs no graphics cleanup and may retain producer
-   * and consumer fences until process exit.
-   * The host finishes its GPU reads before destroying borrowed textures.
-   */
+  /** `handle` is a `GLsync` in the session's share group. */
   MLN_GPU_SYNC_OPEN_GL_FENCE = 1U,
   /**
-   * The host needs no synchronization object. The work was submitted, before
-   * the frame became acquirable or before the release call, to the queue that
-   * the session and the host share, which orders it before any work submitted
-   * there afterwards.
-   *
-   * As producer synchronization, the host submits its reads of the frame's
-   * texture to that queue. As consumer synchronization, the host submitted its
-   * reads there before the release call.
-   *
-   * WebGPU orders on the device's queue. Vulkan orders on the context's
-   * graphics_queue, which the host shares through the attach options'
-   * queue_lock: the session's writes and its transition to the frame's layout
-   * are visible to every later command on that queue, and its next render
-   * into the slot waits for every earlier one. Metal orders on the texture
-   * descriptor's command_queue, through Metal's hazard tracking, so a target
-   * without one does not support this kind, and a borrowed texture must leave
-   * hazard tracking on.
+   * The work was submitted to the queue that both sides share, so work
+   * submitted to that queue later runs after it.
    */
   MLN_GPU_SYNC_QUEUE_ORDER = 2U,
-  /**
-   * VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
-   * device, and the counter value that the work signals. handle is nonzero.
-   * The device must enable the timelineSemaphore feature, through Vulkan 1.2
-   * or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
-   *
-   * A producer semaphore belongs to the session, which signals it after each
-   * frame's work on the context's graphics_queue, with a value larger than the
-   * last frame's. The host waits for value, on a queue of the device or on the
-   * CPU, before it reads the texture. The host never signals the semaphore,
-   * which stays valid until detach completes, and finishes the work that
-   * waits on it before then.
-   *
-   * A consumer semaphore belongs to the host, which signals value once its
-   * reads complete. The session's later work on its queue waits for it. The
-   * host keeps the semaphore valid until detach completes.
-   */
+  /** `handle` is a `VkSemaphore`. Wait until it reaches `value`. */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3U,
-  /**
-   * A Linux sync file descriptor, which handle holds as an int64_t bit
-   * pattern. -1 is a fence that has already signaled. Vulkan supports it once
-   * the device enables VK_KHR_external_semaphore_fd, and EGL where the display
-   * has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
-   *
-   * A producer fd belongs to the session, which closes it. The host borrows it
-   * until it releases or discards the frame, so a host that passes it to an
-   * API that takes ownership, such as ASurfaceTransaction_setBuffer(),
-   * duplicates it first.
-   *
-   * A consumer fd signals once the host's reads complete. A successful release
-   * takes ownership of it, and the session's later GPU work waits for it; a
-   * failed release leaves it with the host.
-   */
+  /** `handle` is a sync file descriptor. */
   MLN_GPU_SYNC_SYNC_FD = 4U,
-  /**
-   * `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
-   * signals. handle is nonzero. Metal supports it, as does EGL on ANGLE where
-   * the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK
-   * once the device enables VK_EXT_metal_objects and the timelineSemaphore
-   * feature.
-   *
-   * A producer event belongs to the session, which signals it after each
-   * frame's work with a value larger than the last frame's. The host waits for
-   * value, on the GPU or the CPU, before it reads the texture. The host never
-   * signals the event, which stays valid until detach completes.
-   *
-   * A consumer event belongs to the host, which signals value once its reads
-   * complete. The session's later work waits for it. The host keeps the event
-   * valid until detach completes.
-   */
+  /** `handle` is an `MTLSharedEvent`. Wait until it reaches `value`. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 5U,
   /**
-   * An NT HANDLE to a shared ID3D12Fence, and the value that the work
-   * signals. handle is nonzero. Vulkan supports it once the device enables
-   * VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
-   * the driver shares timeline semaphores as D3D12 fences. WGL supports it for
-   * borrowed textures, where the context imports D3D12 fences through
-   * GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
-   * device of the context's adapter.
-   *
-   * A producer handle belongs to the session, which signals the fence after
-   * each frame's work with a value larger than the last frame's. The host
-   * opens the handle, for example with ID3D12Device::OpenSharedHandle(), and
-   * waits for value before it reads the texture. The host never signals the
-   * fence, and never closes the handle, which stays open until detach
-   * completes.
-   *
-   * A consumer handle belongs to the host, which signals value once its reads
-   * complete. The session's later work waits for it. The host keeps the handle
-   * open until detach completes.
+   * `handle` is a shared Windows handle to an `ID3D12Fence`. Wait until it
+   * reaches `value`.
    */
   MLN_GPU_SYNC_D3D12_FENCE = 6U,
 } mln_gpu_sync_kind;
 
-/** A bit for each mln_gpu_sync_kind. */
+/** A GPU sync kind, as a bit in a set. */
 typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
   MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1U << 0U,
   MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE = 1U << 1U,
@@ -251,281 +112,186 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
 /** A set of mln_gpu_sync_kind_flag bits. */
 typedef uint32_t mln_gpu_sync_kind_flags;
 
-/**
- * Common attachment policy copied before an attach call returns.
- *
- * Every backend attachment call requires *out_session to be MLN_HANDLE_NULL
- * on entry. MLN_STATUS_OK transfers an ATTACHING session to the caller and
- * accepts its completion. A non-OK return leaves *out_session unchanged and
- * invokes no completion. Hosts may service caller-driver work before
- * attachment completes. After a failed completion, the host still disposes
- * the session with mln_render_session_dispose().
- */
+/** Options for attaching a render session to a map. */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
-  /** Where the session's driver runs. Required. */
   mln_render_driver_kind driver MLN_BINDING("required=true");
   /**
-   * Requested slot count of a session-owned texture ring, up to 8. Zero selects
-   * 2, so the host can retain one frame while the session renders its
-   * replacement. Private targets grant one slot regardless of this value. A
-   * borrowed texture ring's depth is its texture count, so borrowed and other
-   * targets ignore this value.
-   *
-   * MLN_TEXTURE_RING_MAX_DEPTH names the maximum.
+   * How many textures a ring that the session creates has, up to 8. Zero picks
+   * a default.
    */
   uint32_t requested_texture_ring_depth;
   /**
-   * Producer synchronization kinds that the host accepts for acquired texture
-   * frames. The session picks the first one its target supports in this order:
-   * MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_OPEN_GL_FENCE,
-   * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, MLN_GPU_SYNC_METAL_SHARED_EVENT,
-   * MLN_GPU_SYNC_D3D12_FENCE, MLN_GPU_SYNC_SYNC_FD, then
-   * MLN_GPU_SYNC_CPU_COMPLETE.
-   * Its capabilities report the pick. Zero accepts
-   * MLN_GPU_SYNC_CPU_COMPLETE, or MLN_GPU_SYNC_QUEUE_ORDER on WebGPU, whose
-   * device has a single queue. A set that the target cannot satisfy fails the
-   * attach with MLN_STATUS_UNSUPPORTED.
-   *
-   * MLN_GPU_SYNC_OPEN_GL_FENCE requires a shared EGL or WGL texture target and
-   * a caller-graphics-thread driver.
+   * The kinds of mln_gpu_sync that you can wait on before you read an acquired
+   * frame. The session uses one of them that its target supports. Zero lets the
+   * session pick a kind that names no object to wait on.
    */
   mln_gpu_sync_kind_flags producer_sync_kinds;
-  /** Wakes the receiver when the frame-result queue becomes nonempty. */
+  /**
+   * Called when frame results are waiting for
+   * mln_render_session_drain_frame_results(). It isn't called again until a
+   * drain takes them.
+   */
   mln_wake frame_wake;
   /**
-   * Wakes the graphics receiver when caller-driver work is available,
-   * including work that a finished driver result releases.
-   *
-   * The host services that work whenever the wake fires, even while it renders
-   * no frames, because attach, detach, and queries complete only through
-   * service.
+   * Called when a session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+   * has work for mln_render_session_service_driver_work(). It isn't called
+   * again until a service runs.
    */
   mln_wake driver_work_wake;
-  /**
-   * Host lock on the graphics queue, disabled by default. Only Vulkan targets
-   * accept an enabled lock; other backends fail the attach with
-   * MLN_STATUS_UNSUPPORTED.
-   */
+  /** Your lock on the Vulkan queue, when you submit to it yourself. */
   mln_queue_lock queue_lock;
 } mln_render_session_attach_options;
 
-/** Driver and target capabilities fixed for one attached render session. */
+/** What an attached render session supports. */
 typedef struct mln_render_session_capabilities {
   uint32_t size;
   mln_render_driver_kind driver;
-  /**
-   * Granted texture ring depth: the slot count of a session-owned ring, or the
-   * texture count of a borrowed one. Zero for a surface.
-   */
+  /** How many textures the session's texture ring has. */
   uint32_t texture_ring_depth;
   mln_render_session_capability_flags flags;
   /**
-   * Producer synchronization of acquired frames, picked from the attach
-   * options' producer_sync_kinds. MLN_GPU_SYNC_CPU_COMPLETE for a target
-   * without frame acquisition.
+   * The kind of mln_gpu_sync that mln_acquired_frame_get_producer_sync()
+   * reports.
    */
   mln_gpu_sync_kind producer_sync_kind;
-  /**
-   * Consumer synchronization kinds that mln_acquired_frame_release() accepts.
-   * Empty for a target without frame acquisition.
-   */
+  /** The kinds of mln_gpu_sync that mln_acquired_frame_release() accepts. */
   mln_gpu_sync_kind_flags consumer_sync_kinds;
 } mln_render_session_capabilities;
 
-/**
- * Backend synchronization copied by frame access and release calls.
- *
- * OpenGL ownership and lifetimes follow MLN_GPU_SYNC_OPEN_GL_FENCE.
- */
+/** A point in GPU work that the other side waits for before using a texture. */
 typedef struct mln_gpu_sync {
   uint32_t size;
   mln_gpu_sync_kind kind;
-  /**
-   * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-   * descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
-   *
-   * Zero when kind names no object. A producer fence that frame access copies
-   * is valid only until the frame's release or discard.
-   */
+  /** The object to wait on, for the kinds that name one. */
   uint64_t handle MLN_BINDING("lifetime=owner");
-  /** Counter value of a timeline kind. Zero for other kinds. */
   uint64_t value;
 } mln_gpu_sync;
 
-/** Metal backend context fields shared by Metal render targets. */
+/** The Metal device that a render session uses. */
 typedef struct mln_metal_context_descriptor {
-  /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
+  /** An `MTLDevice`. */
   void* device;
 } mln_metal_context_descriptor;
 
-/** Vulkan backend context fields shared by Vulkan render targets. */
+/**
+ * The Vulkan device and queue that a render session uses.
+ *
+ * Keep these objects alive until a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ */
 typedef struct mln_vulkan_context_descriptor {
-  /** Borrowed VkInstance. Required. */
+  /** A `VkInstance`. */
   void* instance MLN_BINDING("required=true");
-  /** Borrowed VkPhysicalDevice. Required. */
+  /** A `VkPhysicalDevice`. */
   void* physical_device MLN_BINDING("required=true");
-  /** Borrowed VkDevice. Required. */
+  /** A `VkDevice`. */
   void* device MLN_BINDING("required=true");
   /**
-   * Borrowed graphics VkQueue. Required. The session's driver submits to it
-   * from its own thread, so a host that uses the same queue passes
-   * mln_render_session_attach_options.queue_lock at attach.
+   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
+   * you submit to it too, set mln_render_session_attach_options.queue_lock.
    */
   void* graphics_queue MLN_BINDING("required=true");
-  /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;
-  /** PFN_vkGetInstanceProcAddr for the loader that created the instance. */
+  /** Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's. */
   void* get_instance_proc_addr;
-  /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
+  /** Your `vkGetDeviceProcAddr`, or null to look it up from the instance. */
   void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
-/** WebGPU backend context fields shared by WebGPU render targets. */
+/** The WebGPU device that a render session uses. */
 typedef struct mln_web_gpu_context_descriptor {
-  /** Borrowed WGPUInstance. Optional for texture targets. */
+  /** A `WGPUInstance`, or null. */
   void* instance;
-  /** Borrowed WGPUDevice. Required. */
+  /** A `WGPUDevice`. */
   void* device MLN_BINDING("required=true");
-  /**
-   * Borrowed WGPUQueue. Optional; null uses the device default queue. A
-   * non-null queue must belong to device.
-   */
+  /** A `WGPUQueue`, or null to use the device's queue. */
   void* queue;
 } mln_web_gpu_context_descriptor;
 
-/** OpenGL context providers supported by this build. */
+/** An OpenGL context platform, as a bit in a set. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_open_gl_context_provider_flag : uint32_t {
   MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,
   MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 1u << 1u,
-  /** Browser WebGL context imported into an Emscripten module. */
   MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 1u << 2u,
 } mln_open_gl_context_provider_flag;
 
 /** A set of mln_open_gl_context_provider_flag bits. */
 typedef uint32_t mln_open_gl_context_provider_flags;
 
-/** OpenGL platform context provider used by a context descriptor. */
+/** The platform API that provides an OpenGL context. */
 typedef enum mln_open_gl_context_platform : uint32_t {
-  /** No OpenGL context provider is selected. */
   MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED = 0u,
   MLN_OPEN_GL_CONTEXT_PLATFORM_WGL = 1u,
   MLN_OPEN_GL_CONTEXT_PLATFORM_EGL = 2u,
-  /** Emscripten WebGL context handle. */
   MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3u,
 } mln_open_gl_context_platform;
 
-/**
- * How a session's OpenGL context relates to its driver thread and host graphics
- * state.
- *
- * A shared session leaves the thread as it found it: every render makes the
- * session context current and restores whatever was current before. The session
- * context joins the host share group named by the descriptor, so a host may
- * hand the session a texture and sample it from its own context.
- *
- * A dedicated session joins no share group and leaves its context current
- * after a render instead of restoring what was current before. A render that
- * finds another context current makes its own current again, so several
- * dedicated sessions can share one thread, and the host can use its own
- * context between renders. Teardown releases the session context from the
- * thread and restores nothing.
- */
+/** Whether a render session's OpenGL context shares objects with yours. */
 typedef enum mln_open_gl_context_ownership : uint32_t {
-  /** The session shares its thread with host graphics work. */
+  /** The session's context shares objects with your `share_context`. */
   MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0u,
-  /** The session keeps its own OpenGL context current on its thread. */
+  /** The session's context shares objects with no other context. */
   MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
 } mln_open_gl_context_ownership;
 
-/** OpenGL client API a dedicated EGL session creates its context for. */
+/** The OpenGL API that a dedicated EGL context uses. */
 typedef enum mln_open_gl_client_api : uint32_t {
-  /** No client API is named. */
   MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0u,
-  /** Desktop OpenGL, as EGL_OPENGL_API names it. */
   MLN_OPEN_GL_CLIENT_API_GL = 1u,
-  /** OpenGL ES, as EGL_OPENGL_ES_API names it. */
   MLN_OPEN_GL_CLIENT_API_GLES = 2u,
 } mln_open_gl_client_api;
 
-/** WGL context fields shared by OpenGL render targets on Windows. */
+/** The WGL objects that a render session makes its OpenGL context from. */
 typedef struct mln_wgl_context_descriptor {
-  /**
-   * Borrowed HDC used to create the session context. Required. A dedicated
-   * owned texture makes its context current on this HDC from its core worker.
-   */
+  /** An `HDC`. */
   void* device_context MLN_BINDING("required=true");
-  /**
-   * Borrowed HGLRC whose share group the session context joins. Required under
-   * shared ownership. A dedicated session joins no share group, so it must be
-   * null there.
-   */
+  /** Your `HGLRC`, for a shared context. */
   void* share_context;
-  /** Optional wglGetProcAddress-compatible function for the host loader. */
+  /** Your `wglGetProcAddress`, or null to use the system's. */
   void* get_proc_address;
 } mln_wgl_context_descriptor;
 
-/** EGL context fields shared by OpenGL render targets. */
+/** The EGL objects that a render session makes its OpenGL context from. */
 typedef struct mln_egl_context_descriptor {
-  /**
-   * Borrowed EGLDisplay. Required and kept initialized through teardown.
-   * eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
-   * process, so a shared display must stay initialized until every session
-   * using it has detached or been destroyed. The host must not call
-   * eglTerminate per session.
-   */
+  /** An `EGLDisplay`. */
   void* display MLN_BINDING("required=true");
-  /**
-   * Borrowed EGLConfig used to create the session context. Required.
-   * OpenGL texture targets require EGL_SURFACE_TYPE to include
-   * EGL_PBUFFER_BIT.
-   */
+  /** An `EGLConfig`. */
   void* config MLN_BINDING("required=true");
-  /**
-   * Borrowed EGLContext whose share group the session context joins. Required
-   * under shared ownership, where the session also takes its client API from
-   * this context. A dedicated session joins no share group, so it must be null
-   * there and names client_api instead.
-   */
+  /** Your `EGLContext`, for a shared context. */
   void* share_context;
-  /**
-   * Client API the session creates its context for. Required under dedicated
-   * ownership. A shared session queries share_context for it, so this is
-   * ignored there.
-   */
+  /** The API of a dedicated context. A shared context uses the API of yours. */
   mln_open_gl_client_api client_api;
-  /** Optional eglGetProcAddress-compatible function for the host loader. */
+  /** Your `eglGetProcAddress`, or null to use the system's. */
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
-/** WebGL context placement. */
+/** How a render session gets its WebGL context. */
 typedef enum mln_web_gl_context_kind : uint32_t {
-  /** Use a host-created context on its current browser agent. */
+  /**
+   * The session uses a context that you created with
+   * `emscripten_webgl_create_context()`.
+   */
   MLN_WEB_GL_CONTEXT_EXISTING = 0U,
   /**
-   * Transfer the canvas named by canvas_selector to a native worker and create
-   * a WebGL 2 context there.
+   * The library transfers the canvas that `canvas_selector` names to a worker
+   * and creates the context there.
    */
   MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1U,
 } mln_web_gl_context_kind;
 
-/** WebGL context fields shared by OpenGL render targets in the browser. */
+/** The WebGL context or canvas that a render session uses. */
 typedef struct mln_web_gl_context_descriptor {
   mln_web_gl_context_kind kind;
-  /**
-   * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
-   */
+  /** Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context. */
   int32_t context;
-  /**
-   * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-   * canvas must still be transferable when attachment starts.
-   */
+  /** The canvas's CSS selector, for a transferred canvas. */
   mln_buffer_view canvas_selector;
 } mln_web_gl_context_descriptor;
 
-/** Backend-specific OpenGL context data. */
+/** The WGL, EGL, or WebGL part of an OpenGL context descriptor. */
 typedef union mln_open_gl_context_descriptor_data {
   mln_wgl_context_descriptor wgl
     MLN_BINDING("variant=MLN_OPEN_GL_CONTEXT_PLATFORM_WGL");
@@ -535,31 +301,20 @@ typedef union mln_open_gl_context_descriptor_data {
     MLN_BINDING("variant=MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL");
 } mln_open_gl_context_descriptor_data;
 
-/** OpenGL backend context fields shared by OpenGL render targets. */
+/**
+ * How a render session gets the OpenGL context that it renders with.
+ *
+ * Keep the objects that it names alive until a detach or disposal of the
+ * session completes, or an abandon of it returns.
+ */
 typedef struct mln_open_gl_context_descriptor {
-  /** WGL, EGL, or WebGL context provider. Required. */
   mln_open_gl_context_platform platform;
-  /**
-   * Whether the session shares its driver thread and graphics objects with the
-   * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-   * dedicated to their core worker.
-   */
   mln_open_gl_context_ownership ownership;
   mln_open_gl_context_descriptor_data data MLN_BINDING("tag=platform");
 } mln_open_gl_context_descriptor;
 
 /**
- * Computes the physical device-pixel size of a logical extent.
- *
- * Each dimension is ceil(logical * scale_factor). Session-owned texture targets
- * and surface targets are sized this way. Caller-owned borrowed texture targets
- * state their physical size directly; see texture.h.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when extent has a zero width or height, or a
- *   scale_factor that is not finite and positive; out_width or out_height is
- *   null; or a scaled dimension exceeds UINT32_MAX.
+ * Computes the size in pixels of a target with a logical size and scale factor.
  */
 MLN_API mln_status mln_logical_extent_physical_size(
   mln_logical_extent extent, uint32_t* out_width MLN_BINDING("direction=out"),
@@ -567,9 +322,7 @@ MLN_API mln_status mln_logical_extent_physical_size(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Returns OpenGL context providers supported by this build.
- */
+/** Reports the OpenGL context platforms that this build of the library has. */
 MLN_API mln_open_gl_context_provider_flags
 mln_open_gl_supported_context_provider_mask(void) MLN_NOEXCEPT;
 

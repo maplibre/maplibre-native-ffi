@@ -35,9 +35,9 @@ def validate(values, plan):
             values.require(callback.result)
 
 
-def parameter_name(parameter):
+def parameter_name(native):
     """A callback argument's name in a func type: its C name in camel case."""
-    first, *rest = parameter.name.split("_")
+    first, *rest = native.split("_")
     label = first + "".join(name(part) for part in rest)
     while label in GO_KEYWORDS:
         label += "_"
@@ -45,7 +45,9 @@ def parameter_name(parameter):
 
 
 def signature(values, callback):
-    args = [parameter_name(p) + " " + values.type(p.value) for p in callback.arguments]
+    args = [
+        parameter_name(p.name) + " " + values.type(p.value) for p in callback.arguments
+    ]
     result = (
         ""
         if callback.result.native == "void"

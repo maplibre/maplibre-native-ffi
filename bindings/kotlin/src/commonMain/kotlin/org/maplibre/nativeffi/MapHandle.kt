@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A map, which holds map state independent of any render target.
+ * A map, with its style and camera.
  *
  * See `mln_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -41,11 +41,14 @@ internal constructor(
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Adds a custom geometry source. The callback may run on any native worker thread, concurrently
-   * with runtime and map calls.
+   * Adds a source whose GeoJSON tiles come from callbacks.
    *
    * See `mln_map_add_custom_geometry_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addCustomGeometrySource(
     sourceId: String,
@@ -64,11 +67,14 @@ internal constructor(
     }
 
   /**
-   * Adds a custom vector source. The callback may run on any native worker thread, concurrently
-   * with runtime and map calls.
+   * Adds a source whose vector tiles come from callbacks.
    *
    * See `mln_map_add_custom_vector_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addCustomVectorSource(
     sourceId: String,
@@ -87,10 +93,17 @@ internal constructor(
     }
 
   /**
-   * Adds a GeoJSON source with prepared inline data.
+   * Adds a GeoJSON source with prepared data.
+   *
+   * The source uses the options that `data` was prepared with. `data` can be released once this
+   * function returns.
    *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addGeoJsonSourceData(
     sourceId: String,
@@ -109,10 +122,14 @@ internal constructor(
     }
 
   /**
-   * Adds a GeoJSON source with URL data.
+   * Adds a GeoJSON source that loads its data from `url`.
    *
    * See `mln_map_add_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addGeoJsonSourceUrl(
     sourceId: String,
@@ -133,10 +150,16 @@ internal constructor(
     }
 
   /**
-   * Adds an image source with inline image pixels.
+   * Adds an image source that shows `image`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addImageSourceImage(
     sourceId: String,
@@ -158,10 +181,16 @@ internal constructor(
     }
 
   /**
-   * Adds an image source that loads its image from a URL.
+   * Adds an image source that loads its image from `url`.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_add_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addImageSourceUrl(
     sourceId: String,
@@ -183,10 +212,20 @@ internal constructor(
     }
 
   /**
-   * Adds one style layer from a full style-spec layer JSON object.
+   * Adds a layer to the map's style.
+   *
+   * `layerJson` is a &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object. The
+   * layer goes below the layer named `beforeLayerId`, or above every layer when `beforeLayerId` is
+   * empty.
    *
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`, or no source with the
+   *   ID that the layer uses.
+   * - `Status.INVALID_ARGUMENT` when the style already has a layer with the new layer's ID.
    */
   public fun addStyleLayerJson(
     layerJson: String,
@@ -205,10 +244,16 @@ internal constructor(
     }
 
   /**
-   * Adds one style source from a style-spec source JSON object.
+   * Adds a source to the map's style.
+   *
+   * `sourceJson` is a &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/) object.
    *
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
    */
   public fun addStyleSourceJson(sourceId: String, sourceJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -224,7 +269,13 @@ internal constructor(
     }
 
   /**
-   * Submits one atomic relative camera update.
+   * Moves the camera relative to where it is, as a gesture does.
+   *
+   * `delta` can pan the map's content by an offset on the screen, scale the zoom, and add to the
+   * bearing and pitch. An anchor keeps one screen point in place while the scale, bearing, or pitch
+   * changes. An anchor needs one of those changes, and combines with an offset only when the delta
+   * has no animation. The function finishes when the map applies the delta, before an animation
+   * ends.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -235,10 +286,17 @@ internal constructor(
     }
 
   /**
-   * Starts attachment of a texture target that renders on a graphics device.
+   * Attaches a render session that draws the map into a texture on `device`.
+   *
+   * `options` must select `RenderDriverKind.CORE_WORKER`. Read the frames back with
+   * `RenderSessionHandle.readTexture()`.
    *
    * See `mln_map_attach_graphics_device_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` when the map already has a render session.
    */
   public fun attachGraphicsDeviceTexture(
     device: GraphicsDeviceHandle,
@@ -267,10 +325,17 @@ internal constructor(
     }
 
   /**
-   * Starts attachment of a ring of caller-owned OpenGL textures.
+   * Creates a session that renders the map into a ring of your OpenGL textures.
+   *
+   * The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
    *
    * See `mln_map_attach_open_gl_borrowed_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
+   *   platform, or when the target supports none of the `producer_sync_kinds` in `options`.
    */
   public fun attachOpenGlBorrowedTexture(
     descriptor: OpenGlBorrowedTextureDescriptor,
@@ -297,10 +362,21 @@ internal constructor(
     }
 
   /**
-   * Starts attachment of a session-owned OpenGL texture ring.
+   * Creates a session that renders the map into a ring of new OpenGL textures.
+   *
+   * With `OpenGlContextOwnership.SHARED`, the session needs
+   * `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and the textures are in your context's share group.
+   * With `OpenGlContextOwnership.DEDICATED`, the session needs `RenderDriverKind.CORE_WORKER` and
+   * renders in a context of its own. You can't acquire its frames, but
+   * `RenderSessionHandle.readTexture()` reads them.
    *
    * See `mln_map_attach_open_gl_owned_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
+   *   platform, or when the target supports none of the `producer_sync_kinds` in `options`.
    */
   public fun attachOpenGlOwnedTexture(
     descriptor: OpenGlOwnedTextureDescriptor,
@@ -327,10 +403,18 @@ internal constructor(
     }
 
   /**
-   * Starts attachment of an OpenGL surface target.
+   * Creates a session that renders the map to an OpenGL surface.
+   *
+   * The session needs `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, and
+   * `RenderDriverKind.CALLER_GRAPHICS_THREAD` for any other context.
    *
    * See `mln_map_attach_open_gl_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
+   *   platform.
    */
   public fun attachOpenGlSurface(
     descriptor: OpenGlSurfaceDescriptor,
@@ -357,7 +441,10 @@ internal constructor(
     }
 
   /**
-   * Begins a command group, which holds this map's render updates until the group ends.
+   * Holds back the map's changes from rendering until `MapHandle.endCommandGroup()`, so they show
+   * in the same frame.
+   *
+   * Groups nest, and the changes render when the outermost group ends.
    *
    * See `mln_map_begin_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -368,7 +455,11 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered query for a camera that fits a GeoJSON geometry.
+   * Computes a camera that fits a GeoJSON geometry in the map's view.
+   *
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The camera
+   * keeps the map's bearing and pitch unless `fitOptions` sets them, and its zoom stays within the
+   * map's zoom limits.
    *
    * See `mln_map_camera_for_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -390,7 +481,10 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered query for a camera that fits geographic bounds.
+   * Computes a camera that fits `bounds` in the map's view.
+   *
+   * The camera keeps the map's bearing and pitch unless `fitOptions` sets them, and its zoom stays
+   * within the map's zoom limits.
    *
    * See `mln_map_camera_for_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -412,7 +506,10 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered query for a camera that fits geographic coordinates.
+   * Computes a camera that fits `coordinates` in the map's view.
+   *
+   * `coordinates` must not be empty. The camera keeps the map's bearing and pitch unless
+   * `fitOptions` sets them, and its zoom stays within the map's zoom limits.
    *
    * See `mln_map_camera_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -435,8 +532,10 @@ internal constructor(
     }
 
   /**
-   * Cancels the camera transitions of the commands whose animation carried transition_id, and
-   * leaves every other transition running.
+   * Stops the running camera animations whose animation options set `transitionId`.
+   *
+   * Other animations keep running. The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_cancel_camera_transition` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -449,7 +548,9 @@ internal constructor(
     }
 
   /**
-   * Cancels the camera transitions running when this command commits.
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_cancel_transitions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -460,7 +561,9 @@ internal constructor(
     }
 
   /**
-   * Consumes a map handle without observing its asynchronous retirement.
+   * Releases the map in any state, and finishes in the background.
+   *
+   * Use it from destructors and finalizers. Otherwise, use `MapHandle.release()`.
    *
    * See `mln_map_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -469,7 +572,7 @@ internal constructor(
     nativeClose(this, binding) { check(C.mln_map_dispose(handle, diagnostic)) }
 
   /**
-   * Submits an ordered debug-log command.
+   * Logs debugging information about the map's style and sources.
    *
    * See `mln_map_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -480,7 +583,7 @@ internal constructor(
     }
 
   /**
-   * Ends the innermost command group that `MapHandle.beginCommandGroup()` began.
+   * Ends the group that `MapHandle.beginCommandGroup()` began.
    *
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -491,7 +594,9 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered camera read.
+   * Reads the map's camera.
+   *
+   * The query reads the camera after the map applies the commands sent before it.
    *
    * See `mln_map_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -506,7 +611,9 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered read of per-feature state from this map.
+   * Reads the state of a feature, as a JSON object.
+   *
+   * The object is empty when the feature has no state.
    *
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -524,7 +631,7 @@ internal constructor(
     }
 
   /**
-   * Queries the global-state JSON object, including style defaults.
+   * Reads the global state of the map's style as a JSON object.
    *
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -535,10 +642,15 @@ internal constructor(
     }
 
   /**
-   * Copies image source coordinates.
+   * Reads the corners of an image source's image, clockwise from the top left.
    *
    * See `mln_map_get_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    */
   public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>> =
     nativeSubmit(
@@ -559,7 +671,9 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered copy of the last successfully parsed style document.
+   * Reads the JSON of the style that the map loaded.
+   *
+   * The JSON doesn't include the changes made to the style since it loaded.
    *
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -570,7 +684,10 @@ internal constructor(
     }
 
   /**
-   * Copies the map's latest published snapshot.
+   * Copies the map's state.
+   *
+   * The copy doesn't wait for pending commands. To read the camera after they apply, use
+   * `MapHandle.getCamera()`.
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -583,7 +700,9 @@ internal constructor(
     }
 
   /**
-   * Copies one complete runtime style image.
+   * Reads an image of the map's style.
+   *
+   * Completes with no value when the style has no image named `imageId`.
    *
    * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -601,7 +720,9 @@ internal constructor(
     }
 
   /**
-   * Copies the complete metadata of one style layer.
+   * Reads a layer of the map's style.
+   *
+   * Completes with no value when the style has no layer named `layerId`.
    *
    * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -619,7 +740,10 @@ internal constructor(
     }
 
   /**
-   * Serializes one style layer as a full style-spec layer JSON object.
+   * Reads a layer of the map's style as a
+   * &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object.
+   *
+   * Completes with no value when the style has no layer named `layerId`.
    *
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -637,10 +761,16 @@ internal constructor(
     }
 
   /**
-   * Serializes one layer property as a style-spec JSON value.
+   * Reads a property of a layer in the map's style.
+   *
+   * Completes with no value when the layer doesn't set the property.
    *
    * See `mln_map_get_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    */
   public fun getStyleLayerProperty(layerId: String, propertyName: String): Deferred<String?> =
     nativeSubmit(
@@ -663,7 +793,9 @@ internal constructor(
     }
 
   /**
-   * Serializes one style light property as a style-spec JSON value.
+   * Reads a property of the light of the map's style.
+   *
+   * Completes with no value when the light doesn't set the property.
    *
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -681,7 +813,9 @@ internal constructor(
     }
 
   /**
-   * Copies the complete metadata of one style source.
+   * Reads a source of the map's style.
+   *
+   * Completes with no value when the style has no source named `sourceId`.
    *
    * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -699,7 +833,7 @@ internal constructor(
     }
 
   /**
-   * Reads the style's global transition options.
+   * Reads the default transition of the map's style.
    *
    * See `mln_map_get_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -714,7 +848,9 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered copy of the last requested style URL.
+   * Reads the URL of the map's style.
+   *
+   * The URL is empty when the style came from `MapHandle.setStyleJson()`.
    *
    * See `mln_map_get_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -725,10 +861,15 @@ internal constructor(
     }
 
   /**
-   * Invalidates custom geometry source data inside one geographic region.
+   * Makes a custom geometry source ask again for the tiles in `bounds` that the map still needs.
    *
    * See `mln_map_invalidate_custom_geometry_source_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
    */
   public fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
@@ -747,10 +888,15 @@ internal constructor(
     }
 
   /**
-   * Invalidates custom geometry source data for one canonical tile.
+   * Makes a custom geometry source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_geometry_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
    */
   public fun invalidateCustomGeometrySourceTile(
     sourceId: String,
@@ -769,10 +915,15 @@ internal constructor(
     }
 
   /**
-   * Invalidates custom vector source data for one canonical tile.
+   * Makes a custom vector source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_vector_source_tile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
    */
   public fun invalidateCustomVectorSourceTile(
     sourceId: String,
@@ -791,7 +942,10 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered wrapped-bounds query for a copied camera.
+   * Computes the area that the map would show with `camera`.
+   *
+   * Camera fields that `camera` doesn't set come from the map's camera. The longitudes stay between
+   * -180 and 180.
    *
    * See `mln_map_lat_lng_bounds_for_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -809,7 +963,10 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered unwrapped-bounds query for a copied camera.
+   * Computes the area that the map would show with `camera`, without wrapping longitudes.
+   *
+   * Camera fields that `camera` doesn't set come from the map's camera. The longitudes can fall
+   * outside -180 to 180, so a view across the antimeridian gives one continuous range.
    *
    * See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -827,7 +984,7 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered query of every style layer in style order.
+   * Lists the layers of the map's style, from bottom to top.
    *
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -851,7 +1008,7 @@ internal constructor(
     }
 
   /**
-   * Lists every style source in style order.
+   * Lists the sources of the map's style.
    *
    * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -875,10 +1032,15 @@ internal constructor(
     }
 
   /**
-   * Moves one style layer before another layer or to the top.
+   * Moves a layer of the map's style below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty.
    *
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `layerId` or `beforeLayerId`.
    */
   public fun moveStyleLayer(layerId: String, beforeLayerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -894,7 +1056,9 @@ internal constructor(
     }
 
   /**
-   * Releases a map asynchronously.
+   * Releases the map.
+   *
+   * Detach the map's render session first.
    *
    * See `mln_map_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -903,7 +1067,7 @@ internal constructor(
     nativeRetire(this, binding) { check(C.mln_map_release(handle, completion, diagnostic)) }
 
   /**
-   * Removes per-feature state from this map.
+   * Removes the feature state that `selector` selects.
    *
    * See `mln_map_remove_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -921,10 +1085,14 @@ internal constructor(
     }
 
   /**
-   * Removes one runtime style image by ID.
+   * Removes an image from the map's style.
    *
    * See `mln_map_remove_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no image named `imageId`.
    */
   public fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -932,10 +1100,14 @@ internal constructor(
     }
 
   /**
-   * Removes one style layer by ID.
+   * Removes a layer from the map's style.
    *
    * See `mln_map_remove_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    */
   public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -943,10 +1115,15 @@ internal constructor(
     }
 
   /**
-   * Removes one style source by ID.
+   * Removes a source from the map's style.
    *
    * See `mln_map_remove_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_STATE` when a layer still uses the source.
    */
   public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -954,7 +1131,7 @@ internal constructor(
     }
 
   /**
-   * Requests a repaint for a continuous map.
+   * Renders a new frame of a continuous map, even when nothing changed.
    *
    * See `mln_map_request_repaint` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -965,10 +1142,17 @@ internal constructor(
     }
 
   /**
-   * Requests one still image for a static or tile map, which renders itself.
+   * Renders a still image of a static or tile map.
+   *
+   * The map's render session draws the image once every resource that the image needs has loaded.
    *
    * See `mln_map_request_still_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.CANCELLED` when the map is released before the image is done.
+   * - `Status.NATIVE_ERROR` when the style or a resource that the image needs fails to load.
    */
   public fun requestStillImage(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -976,7 +1160,11 @@ internal constructor(
     }
 
   /**
-   * Submits the sole post-creation logical extent update.
+   * Sets the map's size.
+   *
+   * `extent` must keep the scale factor that the map was created with. A map with a render session
+   * takes its size from the session, so resize the session with `RenderSessionHandle.resize()`
+   * instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -987,7 +1175,10 @@ internal constructor(
     }
 
   /**
-   * Submits a copied camera-constraint command.
+   * Limits the camera's center to an area, and its zoom and pitch to ranges.
+   *
+   * Limits that `options` doesn't set keep their current values. When the camera is outside the new
+   * limits, it moves inside them.
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -998,10 +1189,18 @@ internal constructor(
     }
 
   /**
-   * Sets custom geometry source data for one canonical tile.
+   * Sets the data of a tile in a custom geometry source.
+   *
+   * `data` is a GeoJSON feature collection. The source ignores data for a tile that it hasn't asked
+   * for, or has since cancelled.
    *
    * See `mln_map_set_custom_geometry_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
    */
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
@@ -1022,10 +1221,15 @@ internal constructor(
     }
 
   /**
-   * Reports a custom geometry source error for one canonical tile.
+   * Reports that a tile of a custom geometry source failed to load.
    *
    * See `mln_map_set_custom_geometry_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
    */
   public fun setCustomGeometrySourceTileError(
     sourceId: String,
@@ -1046,10 +1250,18 @@ internal constructor(
     }
 
   /**
-   * Sets custom vector source data for one canonical tile.
+   * Sets the data of a tile in a custom vector source.
+   *
+   * `data` is the tile, encoded as `encoding`. The source ignores data for a tile that it hasn't
+   * asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_vector_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
    */
   public fun setCustomVectorSourceTileData(
     sourceId: String,
@@ -1072,10 +1284,15 @@ internal constructor(
     }
 
   /**
-   * Reports a custom vector source error for one canonical tile.
+   * Reports that a tile of a custom vector source failed to load.
    *
    * See `mln_map_set_custom_vector_source_tile_error` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
    */
   public fun setCustomVectorSourceTileError(
     sourceId: String,
@@ -1096,7 +1313,9 @@ internal constructor(
     }
 
   /**
-   * Submits a debug-overlay command.
+   * Draws debugging overlays, such as tile borders, on the map.
+   *
+   * `options` replaces the overlays set before.
    *
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1107,7 +1326,7 @@ internal constructor(
     }
 
   /**
-   * Selects which map-originated event types this map queues.
+   * Selects the events that the map reports.
    *
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1118,7 +1337,10 @@ internal constructor(
     }
 
   /**
-   * Submits a copied per-feature-state command.
+   * Merges `state` into the state of a feature.
+   *
+   * `state` is a JSON object. Its keys replace the same keys in the feature's state, and the other
+   * keys stay.
    *
    * See `mln_map_set_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1140,7 +1362,9 @@ internal constructor(
     }
 
   /**
-   * Submits a copied free-camera command.
+   * Places the camera at a position and orientation in space.
+   *
+   * The map adjusts them to a camera that it can show, and stops running camera animations.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1158,10 +1382,19 @@ internal constructor(
     }
 
   /**
-   * Updates one GeoJSON source with prepared inline data.
+   * Replaces the data of a GeoJSON source.
+   *
+   * `data` must have been prepared with the same options as the source. It can be released once
+   * this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source, or `data`
+   *   was prepared with other options.
    */
   public fun setGeoJsonSourceData(
     sourceId: String,
@@ -1180,10 +1413,18 @@ internal constructor(
     }
 
   /**
-   * Overrides one GeoJSON source's synchronous tiling at runtime.
+   * Sets whether a GeoJSON source builds its tiles synchronously.
+   *
+   * This works like the synchronous tiling option of `GeoJsonSourceOptions`, but `enabled` can't
+   * turn off synchronous tiling that the source's options turned on.
    *
    * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
    */
   public fun setGeoJsonSourceSynchronousTiling(
     sourceId: String,
@@ -1202,10 +1443,15 @@ internal constructor(
     }
 
   /**
-   * Updates one GeoJSON source to load data from a URL.
+   * Makes a GeoJSON source load its data from `url`.
    *
    * See `mln_map_set_geo_json_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
    */
   public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1221,10 +1467,15 @@ internal constructor(
     }
 
   /**
-   * Submits a global-state JSON value. JSON null restores the style default.
+   * Sets a value that the style's `global-state`
+   * &#91;expressions&#93;(https://maplibre.org/maplibre-style-spec/expressions/) read.
    *
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` when the style or one of its sources or sprites is still loading.
    */
   public fun setGlobalStateProperty(
     propertyName: String,
@@ -1243,10 +1494,17 @@ internal constructor(
     }
 
   /**
-   * Updates image source coordinates.
+   * Moves the image of an image source.
+   *
+   * `coordinates` are the image's four corners, clockwise from the top left.
    *
    * See `mln_map_set_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    */
   public fun setImageSourceCoordinates(
     sourceId: String,
@@ -1266,10 +1524,15 @@ internal constructor(
     }
 
   /**
-   * Updates an image source with inline image pixels.
+   * Replaces the image of an image source.
    *
    * See `mln_map_set_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    */
   public fun setImageSourceImage(
     sourceId: String,
@@ -1288,10 +1551,15 @@ internal constructor(
     }
 
   /**
-   * Updates an image source to load its image from a URL.
+   * Makes an image source load its image from `url`.
    *
    * See `mln_map_set_image_source_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    */
   public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1301,7 +1569,10 @@ internal constructor(
     }
 
   /**
-   * Submits axonometric rendering options.
+   * Sets whether the map draws in perspective or axonometric projection, and how much it skews the
+   * view.
+   *
+   * Settings that `mode` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1314,7 +1585,7 @@ internal constructor(
     }
 
   /**
-   * Submits a rendering-stats visibility command.
+   * Shows or hides an overlay of rendering statistics on the map.
    *
    * See `mln_map_set_rendering_stats_view_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1325,7 +1596,7 @@ internal constructor(
     }
 
   /**
-   * Sets one runtime style image.
+   * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1349,11 +1620,16 @@ internal constructor(
     }
 
   /**
-   * Queues an inline style JSON command. A committed command means the map applied the JSON, not
-   * that the style loaded: style loading events report the resource and parse results that follow.
+   * Loads the map's style from `json`.
+   *
+   * The style's sources, sprites, and glyphs load in the background.
    *
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NATIVE_ERROR` when `json` isn't a valid style.
    */
   public fun setStyleJson(json: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1361,10 +1637,19 @@ internal constructor(
     }
 
   /**
-   * Sets one layer property using its MapLibre style-spec property name.
+   * Sets a property of a layer in the map's style.
+   *
+   * `propertyName` is one of the layer's layout or paint
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or `filter`, `minzoom`,
+   * `maxzoom`, `source`, or `source-layer`. A null `value` resets any of these but `source` and
+   * `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    */
   public fun setStyleLayerProperty(
     layerId: String,
@@ -1385,7 +1670,8 @@ internal constructor(
     }
 
   /**
-   * Sets the style light from a style-spec light JSON object.
+   * Replaces the &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the map's
+   * style.
    *
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1396,7 +1682,7 @@ internal constructor(
     }
 
   /**
-   * Sets one style light property using its MapLibre style-spec property name.
+   * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1418,10 +1704,16 @@ internal constructor(
     }
 
   /**
-   * Sets whether one style source stores fetched tiles in the persistent cache.
+   * Sets whether a source is volatile.
+   *
+   * The map doesn't store the tiles of a volatile source in the persistent cache.
    *
    * See `mln_map_set_style_source_volatile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    */
   public fun setStyleSourceVolatile(
     sourceId: String,
@@ -1440,7 +1732,7 @@ internal constructor(
     }
 
   /**
-   * Sets the style's global transition options.
+   * Sets the default transition of the map's style.
    *
    * See `mln_map_set_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1460,8 +1752,11 @@ internal constructor(
     }
 
   /**
-   * Queues a style URL command. A committed command means the map accepted the URL, not that the
-   * style loaded: style loading events report the network, decode, and parse results that follow.
+   * Loads the map's style from `url`.
+   *
+   * The style loads in the background, and `RuntimeEventType.MAP_STYLE_LOADED` or
+   * `RuntimeEventType.MAP_LOADING_FAILED` reports how the load ends. Sources, layers, and images
+   * added before the style loads are lost when it loads.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1472,7 +1767,9 @@ internal constructor(
     }
 
   /**
-   * Submits a copied tile-options command.
+   * Sets how the map chooses which tiles to load, and at what detail.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1485,7 +1782,9 @@ internal constructor(
     }
 
   /**
-   * Submits a copied viewport-options command.
+   * Sets how the map orients and constrains its view.
+   *
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1503,7 +1802,12 @@ internal constructor(
     }
 
   /**
-   * Submits one atomic camera update.
+   * Moves the camera, at once or with an animation.
+   *
+   * Camera fields that `update` doesn't set keep their values, and the update stops any running
+   * animation of the fields it sets. The function finishes when the map applies the update, before
+   * an animation ends. To learn when an animation ends, set an `CameraTransitionHandler` in its
+   * animation options.
    *
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

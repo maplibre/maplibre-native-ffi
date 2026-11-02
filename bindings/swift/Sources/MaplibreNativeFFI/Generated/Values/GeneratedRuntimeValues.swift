@@ -3,6 +3,13 @@
 internal import MaplibreNativeC
 import Foundation
 
+/// An action on a runtime's ambient cache.
+///
+/// The ambient cache holds the resources that maps load, apart from the ones
+/// that offline regions hold.
+///
+/// See `mln_ambient_cache_operation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -11,8 +18,13 @@ public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
+  /// Deletes the whole database, offline regions included, and starts an empty
+  /// one.
   public static let resetDatabase: AmbientCacheOperation = .init(rawValue: 1)
+  /// Shrinks the database file to free the disk space it no longer uses.
   public static let packDatabase: AmbientCacheOperation = .init(rawValue: 2)
+  /// Makes the library check each cached resource for changes before it uses
+  /// the resource again.
   public static let invalidate: AmbientCacheOperation = .init(rawValue: 3)
   public static let clear: AmbientCacheOperation = .init(rawValue: 4)
   public var description: String {
@@ -26,7 +38,7 @@ public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Camera change kinds reported by camera will-change and did-change events.
+/// Whether a camera change jumps or animates.
 ///
 /// See `mln_camera_change_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -38,9 +50,7 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The camera reached its new value without an animated transition.
   public static let immediate: CameraChangeMode = .init(rawValue: 0)
-  /// The camera moved as part of an animated transition.
   public static let animated: CameraChangeMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
@@ -51,12 +61,13 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// One HTTP header that a header rule supplies.
+/// An HTTP header.
+///
+/// `name` follows the rules of `HttpHeaderTransformResponse.setHeader()`.
 ///
 /// See `mln_http_header` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeader: Equatable, Hashable, Sendable {
-  /// Header field name. Required.
   public var name: String
   public var value: String
   public init(name: String, value: String = "") {
@@ -83,18 +94,15 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
   }
 }
 
-/// One rule of a native HTTP header transform.
+/// Headers to add to the HTTP requests whose URL matches a pattern.
 ///
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderRule: Equatable, Hashable, Sendable {
-  /// The resource kinds to match. Zero selects every kind.
+  /// The kinds of resource that the rule covers. Zero covers every kind.
   public var kinds: ResourceKindFlag
   public var flags: UrlMatchFlag
-  /// The URL or glob pattern to compare.
   public var url: String
-  /// The headers to set. Registration validates each one as
-  /// `HttpHeaderTransformResponse.setHeader()` does.
   public var headers: [HttpHeader]
   public init(
     kinds: ResourceKindFlag = .init(rawValue: 0),
@@ -134,15 +142,18 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 }
 
-/// HTTP header transform state: a callback, or native header rules. The
-/// callback runs synchronously on a MapLibre worker or network thread.
+/// Headers to add to HTTP requests, for
+/// `RuntimeHandle.setHttpHeaderTransform()`.
+///
+/// Set either `callback` or `rules`, not both.
+///
+/// Runs on a library thread.
 ///
 /// See `mln_http_header_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderTransform: Sendable {
-  /// The callback, or null to apply rules.
   public var callback: HttpHeaderTransformCallback?
-  /// Header rules for a transform without a callback; empty with one.
+  /// The first rule that matches a request adds its headers, and no other.
   public var rules: [HttpHeaderRule]
   public init(
     callback: HttpHeaderTransformCallback? = nil,
@@ -195,8 +206,12 @@ private func invokeHttpHeaderTransformCallback(
   }
 }
 
-/// Adds end-to-end headers to one outgoing HTTP request attempt. The callback
-/// runs synchronously on a MapLibre worker or network thread.
+/// Sets the headers of an HTTP request before the library sends it.
+///
+/// `url` is the request's URL after any resource transform. The request waits
+/// for the callback, so return quickly.
+///
+/// Runs on a library thread.
 ///
 /// Returning succeeds. Throwing a `MaplibreError` whose status is not
 /// `Status.ok` fails the call with that status. Any other thrown error fails it
@@ -226,6 +241,10 @@ public final class HttpHeaderTransformResponse: @unchecked Sendable {
   }
 }
 
+/// Whether the library may use the network.
+///
+/// See `mln_network_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct NetworkStatus: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -245,6 +264,10 @@ public struct NetworkStatus: RawRepresentable, CustomStringConvertible,
   }
 }
 
+/// Whether an offline region is downloading.
+///
+/// See `mln_offline_region_download_state` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct OfflineRegionDownloadState: RawRepresentable,
   CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -264,19 +287,25 @@ public struct OfflineRegionDownloadState: RawRepresentable,
   }
 }
 
-/// Offline region status snapshot.
+/// The download progress of an offline region.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   public var downloadState: OfflineRegionDownloadState
+  /// The resources downloaded so far, tiles included.
   public var completedResourceCount: UInt64
+  /// The size of the downloaded resources in bytes, tiles included.
   public var completedResourceSize: UInt64
   public var completedTileCount: UInt64
   public var requiredTileCount: UInt64
+  /// The size of the downloaded tiles in bytes.
   public var completedTileSize: UInt64
+  /// The resources that the region needs, tiles included. Until
+  /// `required_resource_count_is_precise` is true, this is only a lower bound.
   public var requiredResourceCount: UInt64
   public var requiredResourceCountIsPrecise: Bool
+  /// Whether the region has downloaded every resource it needs.
   public var complete: Bool
   public init(
     downloadState: OfflineRegionDownloadState = .init(rawValue: 0),
@@ -314,7 +343,8 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
-/// Render modes reported by render observer events and frame results.
+/// Whether a frame drew the map complete, or lacked resources that are still
+/// loading.
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -337,20 +367,20 @@ public struct RenderMode: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Rendering statistics of one finished frame.
+/// Statistics about the frames that a map renders.
 ///
 /// See `mln_rendering_stats` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RenderingStats: Equatable, Hashable, Sendable {
-  /// Frame CPU encoding time in seconds.
+  /// The time that the frame took to encode, in seconds.
   public var encodingTime: Double
-  /// Frame CPU rendering time in seconds.
+  /// The time that the frame took to render, in seconds.
   public var renderingTime: Double
-  /// Number of frames rendered by the native renderer.
+  /// The frames rendered so far.
   public var frameCount: Int64
-  /// Draw calls executed during the most recent frame.
+  /// The draw calls in the frame.
   public var drawCallCount: Int64
-  /// Total draw calls executed by the native renderer.
+  /// The draw calls in every frame so far.
   public var totalDrawCallCount: Int64
   public init(
     encodingTime: Double = 0,
@@ -375,6 +405,10 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
   }
 }
 
+/// Why a resource request failed.
+///
+/// See `mln_resource_error_reason` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -385,7 +419,9 @@ public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
 
   public static let none: ResourceErrorReason = .init(rawValue: 0)
   public static let notFound: ResourceErrorReason = .init(rawValue: 1)
+  /// The server reported an error.
   public static let server: ResourceErrorReason = .init(rawValue: 2)
+  /// The server couldn't be reached.
   public static let connection: ResourceErrorReason = .init(rawValue: 3)
   public static let rateLimit: ResourceErrorReason = .init(rawValue: 4)
   public static let other: ResourceErrorReason = .init(rawValue: 5)
@@ -402,6 +438,10 @@ public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
   }
 }
 
+/// The kind of a resource that the library loads.
+///
+/// See `mln_resource_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceKind: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -433,9 +473,7 @@ public struct ResourceKind: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// The resource kinds that a route or rule matches, one bit per `ResourceKind`
-/// value. Registration rejects unknown bits. `ResourceKindFlag.all`, like zero,
-/// selects every resource kind.
+/// A resource kind, as a bit in a set.
 ///
 /// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -458,6 +496,10 @@ public struct ResourceKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let all: ResourceKindFlag = .init(rawValue: 255)
 }
 
+/// Where a request may load its resource from.
+///
+/// See `mln_resource_loading_method` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -466,6 +508,7 @@ public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
+  /// The cache or the network.
   public static let all: ResourceLoadingMethod = .init(rawValue: 0)
   public static let cacheOnly: ResourceLoadingMethod = .init(rawValue: 1)
   public static let networkOnly: ResourceLoadingMethod = .init(rawValue: 2)
@@ -479,6 +522,10 @@ public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
   }
 }
 
+/// The priority of a resource request.
+///
+/// See `mln_resource_priority` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -498,15 +545,14 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Resource provider state. The callback runs synchronously on a MapLibre
-/// thread.
+/// A resource provider, for `RuntimeHandle.setResourceProvider()`.
 ///
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
-  /// Answers each request that the routes leave to the provider.
   public var callback: ResourceProviderCallback
-  /// The requests that reach the provider; empty to claim every request.
+  /// The requests that the provider serves. Without routes, it serves every
+  /// network request.
   public var routes: [ResourceRoute]
   public init(
     callback: @escaping ResourceProviderCallback,
@@ -551,8 +597,11 @@ private func invokeResourceProviderCallback(
   }
 }
 
-/// Intercepts a network resource request. The callback runs synchronously on a
-/// MapLibre thread.
+/// Serves a network request in place of the library.
+///
+/// Answer with `ResourceRequestHandle.complete()`, or hand the request back to
+/// the library with `ResourceRequestHandle.passThrough()`. Either can come now
+/// or later, from any thread. A request released without an answer fails.
 ///
 /// See `mln_resource_provider_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -561,14 +610,12 @@ public typealias ResourceProviderCallback = @Sendable (
   _ handle: ResourceRequestHandle
 ) -> Void
 
-/// Inclusive byte range of a resource request.
+/// The bytes from `start` to `end` of a resource, both included.
 ///
 /// See `mln_resource_range` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRange: Equatable, Hashable, Sendable {
-  /// First byte offset of the requested range.
   public var start: UInt64
-  /// Last byte offset of the requested range, inclusive.
   public var end: UInt64
   public init(start: UInt64 = 0, end: UInt64 = 0) {
     self.start = start
@@ -581,26 +628,20 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
   }
 }
 
-/// Reports that MapLibre cancelled a C API resource provider request. The
-/// callback runs on the thread that discards the request, never a host thread:
-/// the runtime's native scheduler thread when a committed map or runtime
-/// command discards it, such as a style change or map destruction, and a
-/// MapLibre worker thread otherwise.
+/// Reports that the library no longer needs a resource request.
+///
+/// The request no longer accepts an answer, so stop working on it and release
+/// it.
 ///
 /// See `mln_resource_request_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public typealias ResourceRequestCancelCallback = @Sendable () -> Void
 
-/// Cancel callback for one handled resource request. The callback runs on the
-/// thread that discards the request, never a host thread: the runtime's native
-/// scheduler thread when a committed map or runtime command discards it, such
-/// as a style change or map destruction, and a MapLibre worker thread
-/// otherwise.
+/// A cancel callback, for `ResourceRequestHandle.setCancelCallback()`.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestCancelHandler: Sendable {
-  /// Reports the request's cancellation.
   public var callback: ResourceRequestCancelCallback
   public init(callback: @escaping ResourceRequestCancelCallback) {
     self.callback = callback
@@ -628,21 +669,29 @@ private func invokeResourceRequestCancelHandlerCallback(
   box.value.callback()
 }
 
+/// A request that a resource provider serves.
+///
+/// When the cache holds an earlier copy of the resource, the `prior_` fields
+/// describe it.
+///
+/// See `mln_resource_request_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
-  /// URL entering the network layer, before tile server normalization.
+  /// The URL as the style names it.
   public var requestedUrl: String
-  /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key.
+  /// The URL to load, after the library expands any shorthand in
+  /// `requested_url` and before any resource transform. Routes match this URL.
   public var resolvedUrl: String
   public var kind: ResourceKind
   public var loadingMethod: ResourceLoadingMethod
   public var priority: ResourcePriority
   public var usage: ResourceUsage
   public var storagePolicy: ResourceStoragePolicy
+  /// The only bytes of the resource that the request wants.
   public var range: ResourceRange?
   public var priorModifiedUnixMs: Int64?
   public var priorExpiresUnixMs: Int64?
-  /// Entity tag of the cached copy, or empty when there is none.
+  /// Empty when the earlier copy has no ETag.
   public var priorEtag: String
   public var priorData: Data
   public init(
@@ -707,20 +756,26 @@ public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// A resource provider's answer to one request.
+/// The answer to a resource request.
 ///
 /// See `mln_resource_response` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var status: ResourceResponseStatus
+  /// Why the request failed, for `ResourceResponseStatus.error`.
   public var errorReason: ResourceErrorReason
-  /// Response bytes.
+  /// The resource, for `ResourceResponseStatus.ok`.
   public var bytes: Data
+  /// A description of the error, for `ResourceResponseStatus.error`.
   public var errorMessage: String
+  /// Whether the library must request the resource again before it reuses this
+  /// copy.
   public var mustRevalidate: Bool
   public var modifiedUnixMs: Int64?
   public var expiresUnixMs: Int64?
+  /// Empty when the resource has no ETag.
   public var etag: String
+  /// When to retry, for `ResourceResponseStatus.error`.
   public var retryAfterUnixMs: Int64?
   public init(
     status: ResourceResponseStatus = .init(rawValue: 0),
@@ -795,7 +850,7 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a resource provider answered a request.
+/// The outcome of a resource request.
 ///
 /// See `mln_resource_response_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -809,7 +864,9 @@ public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
 
   public static let ok: ResourceResponseStatus = .init(rawValue: 0)
   public static let error: ResourceResponseStatus = .init(rawValue: 1)
+  /// The resource exists and is empty.
   public static let noContent: ResourceResponseStatus = .init(rawValue: 2)
+  /// The earlier copy that the request's `prior_` fields describe is current.
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
@@ -822,15 +879,14 @@ public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// One request pattern that a resource provider claims.
+/// The requests that a resource provider serves.
 ///
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRoute: Equatable, Hashable, Sendable {
-  /// The resource kinds to match. Zero selects every kind.
+  /// The kinds of resource that the route covers. Zero covers every kind.
   public var kinds: ResourceKindFlag
   public var flags: UrlMatchFlag
-  /// The URL or glob pattern to compare.
   public var url: String
   public init(
     kinds: ResourceKindFlag = .init(rawValue: 0),
@@ -861,6 +917,10 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 }
 
+/// Whether the library keeps a loaded resource in its cache.
+///
+/// See `mln_resource_storage_policy` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -880,12 +940,11 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Resource transform state. The callback runs on a MapLibre network thread.
+/// A resource transform callback, for `RuntimeHandle.setResourceTransform()`.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
-  /// Asks for the URL of each network resource request.
   public var callback: ResourceTransformCallback
   public init(callback: @escaping ResourceTransformCallback) {
     self.callback = callback
@@ -925,8 +984,11 @@ private func invokeResourceTransformCallback(
   }
 }
 
-/// Asks the host for the URL of one network resource request. The callback runs
-/// on a MapLibre network thread.
+/// Rewrites the URL of a network request before the library sends it.
+///
+/// The request waits until you answer with
+/// `ResourceTransformRequestHandle.complete()` or release `request` to keep
+/// `url`. You can answer now or later, from any thread.
 ///
 /// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -936,6 +998,10 @@ public typealias ResourceTransformCallback = @Sendable (
   _ request: ResourceTransformRequestHandle
 ) -> Void
 
+/// Whether a request loads a resource for a map or an offline region.
+///
+/// See `mln_resource_usage` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -955,24 +1021,25 @@ public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// One delivered runtime event.
+/// An event that a runtime or one of its maps raised.
 ///
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
   public var type: RuntimeEventType
   public var sourceType: RuntimeEventSourceType
-  /// Source handle: the `RuntimeHandle` or `MapHandle` that source_type
-  /// selects.
+  /// The runtime or map that raised the event, as `source_type` says.
   public var source: UInt64
-  /// Map snapshot generation that the event reports, or zero when source_type
-  /// is `RuntimeEventSourceType.runtime`.
+  /// For a map event, a map snapshot with this generation or a later one
+  /// includes what the event reports. Zero for a runtime event.
   public var generation: UInt64
-  /// Secondary event detail whose meaning type selects; see `RuntimeEventType`.
+  /// The `CameraChangeMode` for `RuntimeEventType.mapCameraWillChange` and
+  /// `RuntimeEventType.mapCameraDidChange`.
   public var code: UInt32
-  /// UTF-8 message, empty when this event carries no message.
+  /// The error for an event that reports a failure, the image ID for
+  /// `RuntimeEventType.mapStyleImageMissing`, or the source ID for
+  /// `RuntimeEventType.mapSourceChanged` and `RuntimeEventType.mapTileAction`.
   public var message: String
-  /// Typed payload selected by payload_type.
   public var payload: RuntimeEventPayload
   public init(
     type: RuntimeEventType = .init(rawValue: 0),
@@ -1053,16 +1120,14 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 }
 
-/// Receives selected events after their snapshots have been published. Map
-/// events arrive on the runtime's native scheduler thread, and offline events
-/// may arrive on a MapLibre worker thread.
+/// Receives a batch of events.
 ///
 /// See `mln_runtime_event_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public typealias RuntimeEventCallback = @Sendable (_ events: [RuntimeEvent])
   -> Void
 
-/// Bit values for the map and runtime event subscription masks.
+/// An event type, as a bit in a set.
 ///
 /// See `mln_runtime_event_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1074,7 +1139,6 @@ public struct RuntimeEventFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  /// Selects no event type.
   public static let none: RuntimeEventFlag = []
   public static let mapCameraWillChange: RuntimeEventFlag = .init(rawValue: 2)
   public static let mapCameraIsChanging: RuntimeEventFlag = .init(rawValue: 4)
@@ -1115,30 +1179,23 @@ public struct RuntimeEventFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     .init(rawValue: 16_777_216)
   public static let mapSpriteError: RuntimeEventFlag =
     .init(rawValue: 33_554_432)
-  /// Selects every map-originated event type this version defines.
   public static let allMapEvents: RuntimeEventFlag = .init(rawValue: 66_191_358)
-  /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventFlag =
     .init(rawValue: 917_504)
-  /// Selects every event type this version defines.
   public static let all: RuntimeEventFlag = .init(rawValue: 67_108_862)
 }
 
-/// Payload for `RuntimeEventType.mapGlyphsRequested`,
-/// `RuntimeEventType.mapGlyphsLoaded`, and `RuntimeEventType.mapGlyphsError`.
+/// The details of a glyph event.
+///
+/// The event covers the glyphs from `first` to `last`, both included.
 ///
 /// See `mln_runtime_event_glyphs` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventGlyphs: Equatable, Hashable, Sendable {
-  /// Font names of the font stack, in the style's order.
+  /// The fonts that the glyphs come from, in order of preference.
   public var fontStack: [String]
-  /// First glyph of the range.
   public var first: UInt32
-  /// Last glyph of the range, inclusive.
   public var last: UInt32
-  /// Whether the range stands for a whole font file that the style's font-faces
-  /// names. MapLibre then loads the whole file, and first and last do not
-  /// describe the glyphs it holds.
   public var fontFace: Bool
   public init(
     fontStack: [String] = [],
@@ -1166,13 +1223,11 @@ public struct RuntimeEventGlyphs: Equatable, Hashable, Sendable {
   }
 }
 
-/// Runtime and map event callback. Map events arrive on the runtime's native
-/// scheduler thread, and offline events may arrive on a MapLibre worker thread.
+/// An event callback, for `RuntimeHandle.setEventHandler()`.
 ///
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventHandler: Sendable {
-  /// Receives each event batch.
   public var callback: RuntimeEventCallback
   public init(callback: @escaping RuntimeEventCallback) {
     self.callback = callback
@@ -1211,7 +1266,7 @@ private func invokeRuntimeEventHandlerCallback(
   }
 }
 
-/// Payload for `RuntimeEventType.offlineRegionResponseError`.
+/// The details of `RuntimeEventType.offlineRegionResponseError`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1234,7 +1289,7 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
   }
 }
 
-/// Payload for `RuntimeEventType.offlineRegionStatusChanged`.
+/// The details of `RuntimeEventType.offlineRegionStatusChanged`.
 ///
 /// See `mln_runtime_event_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1252,7 +1307,7 @@ public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
-/// Payload for `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
+/// The details of `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
 ///
 /// See `mln_runtime_event_offline_region_tile_count_limit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1260,6 +1315,7 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   Sendable
 {
   public var regionId: Int64
+  /// The number of Mapbox tiles that offline regions may hold.
   public var limit: UInt64
   public init(regionId: Int64 = 0, limit: UInt64 = 0) {
     self.regionId = regionId
@@ -1272,7 +1328,7 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   }
 }
 
-/// Typed event payload carried inline by every event.
+/// The details of an event, in the member that its `payload_type` names.
 ///
 /// See `mln_runtime_event_payload` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1289,15 +1345,13 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case unknown(UInt32, Data)
 }
 
-/// Payload for `RuntimeEventType.mapRenderFrameFinished`.
+/// The details of `RuntimeEventType.mapRenderFrameFinished`.
 ///
 /// See `mln_runtime_event_render_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   public var mode: RenderMode
-  /// Whether MapLibre needs another frame after this one.
   public var needsRepaint: Bool
-  /// Whether symbol placement changed during this frame.
   public var placementChanged: Bool
   public var stats: RenderingStats
   public init(
@@ -1320,7 +1374,7 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   }
 }
 
-/// Payload for `RuntimeEventType.mapRenderMapFinished`.
+/// The details of `RuntimeEventType.mapRenderMapFinished`.
 ///
 /// See `mln_runtime_event_render_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1335,7 +1389,7 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
   }
 }
 
-/// Source kinds used by `RuntimeEvent.sourceType`.
+/// The kind of handle that raised an event.
 ///
 /// See `mln_runtime_event_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1358,17 +1412,14 @@ public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Payload for `RuntimeEventType.mapSpriteRequested`,
-/// `RuntimeEventType.mapSpriteLoaded`, and `RuntimeEventType.mapSpriteError`.
+/// The details of a sprite event.
+///
+/// `id` and `url` are both empty when the style has no sprite.
 ///
 /// See `mln_runtime_event_sprite` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventSprite: Equatable, Hashable, Sendable {
-  /// Sprite ID: the id of an entry in the style's sprite array, or "default"
-  /// when the style names one sprite URL.
   public var id: String
-  /// Sprite URL as the style names it, without the pixel-ratio suffix and file
-  /// extension that MapLibre appends to request the image and JSON.
   public var url: String
   public init(id: String = "", url: String = "") {
     self.id = id
@@ -1384,7 +1435,7 @@ public struct RuntimeEventSprite: Equatable, Hashable, Sendable {
   }
 }
 
-/// Payload for `RuntimeEventType.mapTileAction`.
+/// The details of `RuntimeEventType.mapTileAction`.
 ///
 /// See `mln_runtime_event_tile_action` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1405,7 +1456,12 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   }
 }
 
-/// Runtime event types carried by `RuntimeEvent.type`.
+/// The kind of an event.
+///
+/// Only maps in `MapMode.continuous` raise
+/// `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
+/// render frame and render map events. Offline region events come only for the
+/// regions that `RuntimeHandle.setOfflineRegionObserved()` observes.
 ///
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1421,9 +1477,14 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   public static let mapCameraIsChanging: RuntimeEventType = .init(rawValue: 2)
   public static let mapCameraDidChange: RuntimeEventType = .init(rawValue: 3)
   public static let mapStyleLoaded: RuntimeEventType = .init(rawValue: 4)
+  /// The map started to load a style.
   public static let mapLoadingStarted: RuntimeEventType = .init(rawValue: 5)
+  /// The map loaded its style and everything that the current view needs, and
+  /// rendered the result.
   public static let mapLoadingFinished: RuntimeEventType = .init(rawValue: 6)
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
+  /// The map rendered a complete frame and has nothing left to load, animate,
+  /// or redraw.
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 9)
   public static let mapRenderFrameStarted: RuntimeEventType =
@@ -1433,12 +1494,16 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   public static let mapRenderMapStarted: RuntimeEventType = .init(rawValue: 12)
   public static let mapRenderMapFinished: RuntimeEventType = .init(rawValue: 13)
   public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 14)
+  /// A tile moved to another step of loading.
   public static let mapTileAction: RuntimeEventType = .init(rawValue: 15)
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 16)
   public static let offlineRegionStatusChanged: RuntimeEventType =
     .init(rawValue: 17)
+  /// A resource that the region needs failed to download.
   public static let offlineRegionResponseError: RuntimeEventType =
     .init(rawValue: 18)
+  /// The region stopped downloading Mapbox tiles because offline regions hold
+  /// as many as the limit allows.
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 19)
   public static let mapGlyphsRequested: RuntimeEventType = .init(rawValue: 20)
@@ -1479,16 +1544,16 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Options used when creating a runtime.
+/// Options for `RuntimeHandle.create()`.
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Equatable, Hashable, Sendable {
-  /// Directory root for asset:// URLs. Copied during runtime creation. Empty
-  /// selects `/android_asset` on Android and `.` elsewhere.
+  /// The directory that `asset://` URLs load from. Empty uses the working
+  /// directory, or the app's assets on Android.
   public var assetPath: String
-  /// Cache database path. Copied during runtime creation. Empty selects an
-  /// in-memory cache.
+  /// The database file that holds the ambient cache and offline regions. Empty
+  /// keeps them in memory.
   public var cachePath: String
   public init(assetPath: String = "", cachePath: String = "") {
     self.assetPath = assetPath
@@ -1518,7 +1583,13 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Overscaled tile identity reported in tile observer events.
+/// The ID of a tile.
+///
+/// `canonical_x` and `canonical_y` place the tile in the source's grid at zoom
+/// `canonical_z`. `overscaled_z` is the zoom that the map draws the tile at,
+/// and is greater when the source has no tiles that deep. `wrap` says which
+/// copy of the world holds the tile: zero for the main one, negative to the
+/// west, and positive to the east.
 ///
 /// See `mln_tile_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1551,7 +1622,7 @@ public struct TileId: Equatable, Hashable, Sendable {
   }
 }
 
-/// Tile operations reported by tile observer events.
+/// A step in loading a tile.
 ///
 /// See `mln_tile_operation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1588,7 +1659,9 @@ public struct TileOperation: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// How a rule or route compares its url against a request URL.
+/// How a URL pattern matches a request's URL.
+///
+/// A pattern matches the whole URL, query included.
 ///
 /// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1601,6 +1674,10 @@ public struct UrlMatchFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   }
 
   public static let exact: UrlMatchFlag = []
-  /// Reads url as a glob pattern.
+  /// The URL matches the pattern as a glob. `*` matches any characters except
+  /// `/`, `**` matches any characters, and `?` matches one character except
+  /// `/`. `\` makes the next character match only itself. For example,
+  /// `https://*.example.com/tiles/**` matches every URL under `/tiles/` on each
+  /// subdomain of `example.com`.
   public static let glob: UrlMatchFlag = .init(rawValue: 1)
 }

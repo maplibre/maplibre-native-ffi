@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL attachment options for an owned texture target.
+/// A ring of OpenGL textures that the session creates, for
+/// <c>MapHandle.AttachOpenGlOwnedTexture()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_owned_texture_descriptor</c> in the <see
@@ -18,17 +19,6 @@ public readonly partial record struct OpenGlOwnedTextureDescriptor
         this.Context = Context;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Borrowed OpenGL context provider data. Shared ownership creates a
-    /// context whose texture frames the host can acquire. Dedicated EGL, WGL,
-    /// or transferred WebGL ownership creates a private core-worker context for
-    /// CPU readback.
-    /// </summary>
     public required OpenGlContextDescriptor Context { get; init; }
 }

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Screen-space inset in logical map pixels.
+/// Distances in logical pixels from each edge of the map.
 /// </summary>
 /// <remarks>
 /// See <c>mln_edge_insets</c> in the <see

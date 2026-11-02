@@ -243,7 +243,7 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         values = emitted(python, real_api())[
             "python/maplibre_native_ffi/_generated_values.py"
         ]
-        self.assertIn("    `MapHandle.cancel_camera_transition()` matches.\n", values)
+        self.assertIn("`MapHandle.cancel_camera_transition()`", values)
         self.assertNotIn("`mln_map_cancel_camera_transition()`", values)
 
     def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):

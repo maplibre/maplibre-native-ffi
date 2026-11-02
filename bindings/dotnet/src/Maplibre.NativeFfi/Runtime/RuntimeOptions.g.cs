@@ -3,19 +3,19 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options used when creating a runtime.
+/// Options for <c>RuntimeHandle.Create()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="AssetPath">
-/// Directory root for asset:// URLs. Copied during runtime creation. Empty
-/// selects <c>/android_asset</c> on Android and <c>.</c> elsewhere.
+/// The directory that <c>asset://</c> URLs load from. Empty uses the working
+/// directory, or the app's assets on Android.
 /// </param>
 /// <param name="CachePath">
-/// Cache database path. Copied during runtime creation. Empty selects an
-/// in-memory cache.
+/// The database file that holds the ambient cache and offline regions. Empty
+/// keeps them in memory.
 /// </param>
 public readonly partial record struct RuntimeOptions(string AssetPath, string CachePath)
 {

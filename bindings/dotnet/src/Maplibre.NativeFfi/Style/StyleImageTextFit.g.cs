@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a stretchable image fits text along one axis.
+/// How an image stretches to fit text along one axis.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_text_fit</c> in the <see

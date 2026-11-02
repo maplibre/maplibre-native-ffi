@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A GPU device that native code creates for texture render targets.
+/// A GPU device that the library creates to render maps into textures.
 /// </summary>
 /// <remarks>
 /// See <c>mln_graphics_device</c> in the <see
@@ -60,11 +60,20 @@ public sealed unsafe partial class GraphicsDeviceHandle
     }
 
     /// <summary>
-    /// Creates a graphics device for this build's render backend.
+    /// Creates a GPU device for rendering maps into textures.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_graphics_device_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html">C API reference</see>.
+    /// <para>Render sessions on several maps can share one device.</para>
+    /// <para>See <c>mln_graphics_device_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when this build's render
+    /// backend can't create a device.</description></item>
+    /// <item><description><c>Status.NativeError</c> when <c>adapter_index</c>
+    /// names no GPU, or the platform can't create the
+    /// device.</description></item>
+    /// </list>
     /// </remarks>
     public static GraphicsDeviceHandle Create(GraphicsDeviceOptions? options = null)
     {

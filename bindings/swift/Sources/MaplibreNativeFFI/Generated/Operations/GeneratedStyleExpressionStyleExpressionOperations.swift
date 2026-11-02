@@ -4,10 +4,17 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension StyleExpressionHandle {
-  /// Parses a style expression.
+  /// Parses a style
+  /// \[expression\](https://maplibre.org/maplibre-style-spec/expressions/) to
+  /// evaluate without a map.
   ///
   /// See `mln_style_expression_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `expression` isn't a valid expression, or
+  ///   its result can't have the expected type.
   static func create(
     expression bindingArg0: String,
     options bindingArg1: StyleExpressionOptions? = nil
@@ -22,10 +29,17 @@ public extension StyleExpressionHandle {
       ) } result: { try StyleExpressionHandle(adopting: value0) }
   }
 
-  /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
+  /// Evaluates a style expression and writes its result as JSON.
+  ///
+  /// A number in the result that isn't finite becomes null.
   ///
   /// See `mln_style_expression_evaluate` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the expression fails to evaluate, such as
+  ///   when it reads an input that `inputs` doesn't set.
   func evaluate(inputs bindingArg0: StyleExpressionInputs? = nil) throws
     -> String
   {
@@ -47,7 +61,7 @@ public extension StyleExpressionHandle {
     } result: { bindingText }
   }
 
-  /// Copies what a parsed expression depends on.
+  /// Reads what a style expression's result depends on.
   ///
   /// See `mln_style_expression_get_info` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -63,7 +77,7 @@ public extension StyleExpressionHandle {
     } result: { StyleExpressionInfo(raw: value0) }
   }
 
-  /// Releases a style expression.
+  /// Releases a parsed style expression.
   ///
   /// See `mln_style_expression_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

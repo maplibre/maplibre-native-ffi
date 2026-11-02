@@ -9,9 +9,29 @@ import {
   nativeRegistration,
 } from "./internal/native_registrations.ts";
 
+/**
+ * An action on a runtime's ambient cache.
+ *
+ * The ambient cache holds the resources that maps load, apart from the ones
+ * that offline regions hold.
+ *
+ * See `mln_ambient_cache_operation` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const AmbientCacheOperation = {
+  /**
+   * Deletes the whole database, offline regions included, and starts an empty
+   * one.
+   */
   resetDatabase: 1,
+  /**
+   * Shrinks the database file to free the disk space it no longer uses.
+   */
   packDatabase: 2,
+  /**
+   * Makes the library check each cached resource for changes before it uses the
+   * resource again.
+   */
   invalidate: 3,
   clear: 4,
 } as const;
@@ -21,49 +41,40 @@ export type AmbientCacheOperation =
   | (number & {});
 
 /**
- * Optional animation controls for camera transitions.
+ * How a camera change animates.
  *
  * See `mln_animation_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface AnimationOptions {
-  /**
-   * Duration in milliseconds. Must be finite, non-negative, and short enough to
-   * represent as a duration.
-   */
   durationMs?: number;
   /**
-   * Average fly velocity in screenfuls per second. Must be positive and finite;
-   * absent selects 1.2. A flight whose derived duration is too long to
-   * represent fails its completion with `Status.nativeError`. An explicit
-   * duration overrides velocity.
+   * The average speed of a fly animation, in screens per second. `duration_ms`
+   * overrides it.
    */
   velocity?: number;
   /**
-   * Peak zoom for flyTo transitions.
+   * The zoom level at the peak of a fly animation.
    */
   minZoom?: number;
   easing?: UnitBezier;
   /**
-   * Caller-chosen identity of the command that these options animate, which
-   * `MapHandle.cancelCameraTransition()` matches.
+   * An ID that `MapHandle.cancelCameraTransition()` cancels the change by.
+   * Several changes can share one.
    */
   transitionId?: bigint;
-  /**
-   * Reports the end of the command's transitions. Disabled by default.
-   */
   endHandler?: CameraTransitionHandler;
 }
 
 /**
- * Optional map camera constraint fields.
+ * Limits on the camera, for `MapHandle.setBounds()`.
  *
  * See `mln_bound_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface BoundOptions {
   /**
-   * Geographic bounds that the camera center stays inside.
+   * The area that the camera's center stays within.
    */
   bounds?: LatLngBounds;
   minZoom?: number;
@@ -71,17 +82,15 @@ export interface BoundOptions {
   minPitch?: number;
   maxPitch?: number;
   /**
-   * Selects the unbounded geographic constraint, which leaves every camera
-   * center unconstrained and lets the map pan freely across the antimeridian.
-   * This differs from world bounds of -90/-180 to 90/180, which clamp longitude
-   * to that range. Mutually exclusive with `BoundOptions.bounds`, which it
-   * leaves unread.
+   * Removes the area that limits the camera's center.
    */
   unbounded?: boolean;
 }
 
 /**
- * A complete camera, as native reports it.
+ * A map's whole camera.
+ *
+ * Its members mean the same as those of `CameraOptions`.
  *
  * See `mln_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -98,19 +107,13 @@ export interface Camera {
 }
 
 /**
- * Camera change kinds reported by camera will-change and did-change events.
+ * Whether a camera change jumps or animates.
  *
  * See `mln_camera_change_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export const CameraChangeMode = {
-  /**
-   * The camera reached its new value without an animated transition.
-   */
   immediate: 0,
-  /**
-   * The camera moved as part of an animated transition.
-   */
   animated: 1,
 } as const;
 /** One of the CameraChangeMode values, or a value this binding does not know. */
@@ -119,31 +122,32 @@ export type CameraChangeMode =
   | (number & {});
 
 /**
- * One atomic relative camera update.
+ * A change to the camera from where it is now, for gestures.
  *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface CameraDelta {
   /**
-   * Pan in logical map pixels; the content moves by this offset.
+   * Moves the map's content this far on the screen, as a drag does.
    */
   offset?: ScreenPoint;
   /**
-   * Positive zoom factor; 2 zooms in one level.
+   * Multiplies the map's scale. 2 zooms in by one level.
    */
   scale?: number;
   /**
-   * Degrees added to the bearing.
+   * Degrees to add to the bearing.
    */
   bearing?: number;
   /**
-   * Degrees added to the pitch; positive tilts further from straight down.
+   * Degrees to add to the pitch.
    */
   pitch?: number;
   /**
-   * Screen point in logical map pixels that scale, bearing, and pitch keep
-   * fixed.
+   * The screen point that `scale`, `bearing`, and `pitch` keep in place. It
+   * needs one of them, and it combines with `offset` only in a delta without a
+   * duration.
    */
   anchor?: ScreenPoint;
   animation?: AnimationOptions;
@@ -151,40 +155,62 @@ export interface CameraDelta {
 }
 
 /**
- * Optional fitting controls for camera-for-viewport queries.
+ * Options for finding the camera that fits an area.
  *
  * See `mln_camera_fit_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface CameraFitOptions {
+  /**
+   * Space to leave between the area and each edge of the map.
+   */
   padding?: EdgeInsets;
   bearing?: number;
   pitch?: number;
 }
 
 /**
- * Camera fields used by snapshots and camera updates.
+ * A camera, with only the members that `fields` selects.
  *
  * See `mln_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface CameraOptions {
   center?: LatLng;
+  /**
+   * The altitude of the center, in meters above sea level.
+   */
   centerAltitude?: number;
+  /**
+   * Insets from the map's edges. The camera centers within the rest.
+   */
   padding?: EdgeInsets;
   /**
-   * Optional screen-space focal point in logical map pixels.
+   * The screen point that a change to the zoom, bearing, or pitch keeps in
+   * place. A `center` overrides it.
    */
   anchor?: ScreenPoint;
   zoom?: number;
+  /**
+   * The rotation from north, in degrees.
+   */
   bearing?: number;
+  /**
+   * The tilt toward the horizon, in degrees. 0 looks straight down.
+   */
   pitch?: number;
+  /**
+   * The roll, in degrees.
+   */
   roll?: number;
+  /**
+   * The vertical field of view, in degrees.
+   */
   fieldOfView?: number;
 }
 
 /**
- * Camera result of an ordered camera query.
+ * A map's camera, with the snapshot generation that it matches.
  *
  * See `mln_camera_query_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -195,7 +221,7 @@ export interface CameraQueryResult {
 }
 
 /**
- * The end of one camera command's transitions.
+ * The end of a camera change.
  *
  * See `mln_camera_transition_end` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -203,18 +229,17 @@ export interface CameraQueryResult {
 export interface CameraTransitionEnd {
   readonly outcome: CameraTransitionOutcome;
   /**
-   * Generation of the published snapshot that shows the camera where the
-   * transitions left it. The map events of the change that ended them carry
-   * this generation and are queued before the callback runs. Zero for
-   * `CameraTransitionOutcome.closed`.
+   * The generation of the first map snapshot that shows where the change left
+   * the camera, or 0 when the map closed first.
    */
   readonly generation: bigint;
 }
 
 /**
- * Callback that one camera command copies to report the end of its transitions.
- * The callback runs asynchronously on the JavaScript thread that registered it,
- * after native queues the call.
+ * A callback for the end of a camera change, for `AnimationOptions`.
+ *
+ * The callback runs once for each camera command, after every part of the
+ * change that the command started has ended.
  *
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -222,25 +247,23 @@ export interface CameraTransitionEnd {
 export type CameraTransitionHandler = (end: CameraTransitionEnd) => void;
 
 /**
- * How the transitions of one camera command ended.
+ * How a camera change ended.
  *
  * See `mln_camera_transition_outcome` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const CameraTransitionOutcome = {
   /**
-   * Every property of the command reached its target, or a later camera write
-   * replaced it.
+   * The camera finished the change, or a later camera change replaced it.
    */
   completed: 0,
   /**
-   * `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or
-   * `GesturePhase.cancel` ended the transitions, or the command failed before
-   * it started them.
+   * `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or a
+   * gesture's `GesturePhase.cancel` stopped the change.
    */
   cancelled: 1,
   /**
-   * The map closed before the transitions ended.
+   * The map closed before the change ended.
    */
   closed: 2,
 } as const;
@@ -250,7 +273,10 @@ export type CameraTransitionOutcome =
   | (number & {});
 
 /**
- * One atomic absolute camera update.
+ * A camera change for `MapHandle.updateCamera()`.
+ *
+ * A jump uses only the end handler of `animation`, and the handler runs as soon
+ * as the camera moves.
  *
  * See `mln_camera_update` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -263,14 +289,23 @@ export interface CameraUpdate {
 }
 
 /**
- * Camera transition behavior for `CameraUpdate`.
+ * How `MapHandle.updateCamera()` moves the camera.
  *
  * See `mln_camera_update_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const CameraUpdateMode = {
+  /**
+   * Moves the camera at once.
+   */
   jump: 0,
+  /**
+   * Animates the camera straight to the target.
+   */
   ease: 1,
+  /**
+   * Zooms out, travels to the target, and zooms back in.
+   */
   fly: 2,
 } as const;
 /** One of the CameraUpdateMode values, or a value this binding does not know. */
@@ -279,8 +314,7 @@ export type CameraUpdateMode =
   | (number & {});
 
 /**
- * Canonical tile identity used by custom geometry and custom vector source
- * callbacks.
+ * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
  *
  * See `mln_canonical_tile_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -292,15 +326,24 @@ export interface CanonicalTileId {
 }
 
 /**
- * Map constraint modes used by `MapViewportOptions`.
+ * How the map keeps the camera within the world or within its bounds.
  *
  * See `mln_constrain_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const ConstrainMode = {
   none: 0,
+  /**
+   * Keeps the world filling the view from top to bottom.
+   */
   heightOnly: 1,
+  /**
+   * Keeps the world filling the view in both directions.
+   */
   widthAndHeight: 2,
+  /**
+   * Keeps the whole view inside the bounds from `MapHandle.setBounds()`.
+   */
   screen: 3,
 } as const;
 /** One of the ConstrainMode values, or a value this binding does not know. */
@@ -309,52 +352,58 @@ export type ConstrainMode =
   | (number & {});
 
 /**
- * Options for custom geometry sources. The callback runs asynchronously on the
- * JavaScript thread that registered it, after native queues the call.
+ * The callbacks and options of a custom geometry source.
+ *
+ * Zoom levels are whole numbers from 0 to 32.
  *
  * See `mln_custom_geometry_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomGeometrySourceOptions {
-  /**
-   * Tile fetch callback.
-   */
   fetchTile: (tileId: CanonicalTileId) => void;
-  /**
-   * Optional best-effort tile cancel callback.
-   */
   cancelTile?: (tileId: CanonicalTileId) => void;
   minZoom?: number;
   maxZoom?: number;
+  /**
+   * How far, in pixels, simplified geometry can stray from the original.
+   */
   tolerance?: number;
+  /**
+   * The width of a tile in pixels, a power of two no larger than 8192.
+   */
   tileSize?: number;
+  /**
+   * The width in pixels of the margin around a tile that holds geometry from
+   * beyond its edges.
+   */
   buffer?: number;
+  /**
+   * Whether to cut geometry at the outer edge of a tile's margin.
+   */
   clip?: boolean;
+  /**
+   * Whether to wrap geometry that crosses the antimeridian.
+   */
   wrap?: boolean;
 }
 
 /**
- * Options for custom vector sources. The callback runs asynchronously on the
- * JavaScript thread that registered it, after native queues the call.
+ * The callbacks and options of a custom vector source.
+ *
+ * Zoom levels are whole numbers from 0 to 32.
  *
  * See `mln_custom_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomVectorSourceOptions {
-  /**
-   * Tile fetch callback.
-   */
   fetchTile: (tileId: CanonicalTileId) => void;
-  /**
-   * Optional best-effort tile cancel callback.
-   */
   cancelTile?: (tileId: CanonicalTileId) => void;
   minZoom?: number;
   maxZoom?: number;
 }
 
 /**
- * Screen-space inset in logical map pixels.
+ * Distances in logical pixels from each edge of the map.
  *
  * See `mln_edge_insets` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -367,122 +416,92 @@ export interface EdgeInsets {
 }
 
 /**
- * EGL context fields shared by OpenGL render targets.
+ * The EGL objects that a render session makes its OpenGL context from.
  *
  * See `mln_egl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface EglContextDescriptor {
   /**
-   * Borrowed EGLDisplay. Required and kept initialized through teardown.
-   * eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
-   * process, so a shared display must stay initialized until every session
-   * using it has detached or been destroyed. The host must not call
-   * eglTerminate per session.
+   * An `EGLDisplay`.
    */
   display: bigint;
   /**
-   * Borrowed EGLConfig used to create the session context. Required. OpenGL
-   * texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
+   * An `EGLConfig`.
    */
   config: bigint;
   /**
-   * Borrowed EGLContext whose share group the session context joins. Required
-   * under shared ownership, where the session also takes its client API from
-   * this context. A dedicated session joins no share group, so it must be null
-   * there and names client_api instead.
+   * Your `EGLContext`, for a shared context.
    */
   shareContext?: bigint;
   /**
-   * Client API the session creates its context for. Required under dedicated
-   * ownership. A shared session queries share_context for it, so this is
-   * ignored there.
+   * The API of a dedicated context. A shared context uses the API of yours.
    */
   clientApi?: OpenGlClientApi;
   /**
-   * Optional eglGetProcAddress-compatible function for the host loader.
+   * Your `eglGetProcAddress`, or null to use the system's.
    */
   getProcAddress?: bigint;
 }
 
 /**
- * Feature-state source, feature, and key selector.
+ * The features whose state to set, read, or remove.
  *
  * See `mln_feature_state_selector` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface FeatureStateSelector {
-  /**
-   * Source ID. Required.
-   */
   sourceId: string;
   /**
-   * Source layer ID, or empty for none. Required for vector-source
-   * disambiguation.
+   * The source layer, for a vector source. Empty for other sources.
    */
   sourceLayerId?: string;
   /**
-   * Optional feature ID. Required by set and get, optional for remove. A
-   * numeric feature ID matches its decimal text, such as "7" for the GeoJSON id
-   * 7. Its field bit tells an absent ID from the empty ID "".
+   * The feature's ID. Setting or reading state needs it. Without it,
+   * `MapHandle.removeFeatureState()` removes the state of every feature in the
+   * source layer.
    */
   featureId?: string;
   /**
-   * State key, or empty to select every key. Used only by remove, and requires
-   * feature_id.
+   * The one key that `MapHandle.removeFeatureState()` removes. It needs
+   * `feature_id`. Empty removes every key.
    */
   stateKey?: string;
 }
 
 /**
- * One nonblocking request for a frame.
+ * A request for one frame.
  *
  * See `mln_frame_demand` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export interface FrameDemand {
-  /**
-   * Frame-demand policy. Zero renders only when a newer map update exists,
-   * without presenting.
-   */
   flags?: FrameDemandFlag;
   /**
-   * Host identity returned with the terminal frame result. Any value except the
-   * maximum uint64_t value.
+   * A value of your choice that the request's frame result carries.
    */
   token?: bigint;
 }
 
 /**
- * Frame-demand policy bits.
+ * How a frame request behaves.
  *
  * See `mln_frame_demand_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export const FrameDemandFlag = {
   /**
-   * Render even when no map update is newer than the last rendered one.
+   * Draws a frame even when nothing changed since the last one. It can't be
+   * combined with `FrameDemandFlag.waitForUpdate`.
    */
   force: 1,
   /**
-   * Present the rendered frame on a target that supports presentation. A
-   * presenting target whose demand clears this bit still renders and keeps
-   * whatever it presented last. Ignored by targets without presentation.
+   * Shows the frame on a surface target.
    */
   present: 2,
   /**
-   * Without `FrameDemandFlag.force`, a demand that would finish with
-   * `RenderResult.noUpdate` waits instead, and runs again after the map's next
-   * update, a target replacement, or an applied resize. A waiting demand holds
-   * no ring slot. A later demand with the same flags supersedes it, a barrier
-   * ends its wait with `RenderResult.noUpdate`, and detach, abandon, or the
-   * quarantine of the ring's last usable slot end it with
-   * `RenderResult.targetNotReady`. A waiting demand's result can follow the
-   * results of demands accepted after it. The flag does not pace: a host that
-   * re-arms a waiting demand as each result arrives renders every update the
-   * map publishes, and a command that arrives while a frame renders appears in
-   * a later frame. To show several commands in one frame, submit them in a
-   * command group, or arm demands once per display frame.
+   * When the map has nothing new to draw, waits for its next update instead of
+   * finishing with `RenderResult.noUpdate`.
    */
   waitForUpdate: 4,
 } as const;
@@ -490,100 +509,71 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
- * Free camera position and orientation in MapLibre Native camera space.
+ * The camera's position and orientation in three dimensions.
  *
  * See `mln_free_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface FreeCameraOptions {
+  /**
+   * The camera's position in Web Mercator units, where the world is 1 wide, (0,
+   * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the
+   * altitude in the same units.
+   */
   position?: Vec3;
+  /**
+   * The camera's rotation from looking straight down with north at the top of
+   * the screen.
+   */
   orientation?: Quaternion;
 }
 
 /**
- * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
- * size.
+ * Options for a GeoJSON
+ * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/#geojson).
+ *
+ * Zoom levels are whole numbers.
  *
  * See `mln_geo_json_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface GeoJsonSourceOptions {
-  /**
-   * Minimum tiling zoom. Absent selects 0.
-   */
   minZoom?: number;
-  /**
-   * Maximum tiling zoom, an integer within &#91;0, 24&#93;. Absent selects 18.
-   */
   maxZoom?: number;
-  /**
-   * Douglas-Peucker simplification tolerance. Absent selects 0.375.
-   */
   tolerance?: number;
-  /**
-   * Highest zoom that clusters points. Absent selects 17.
-   */
   clusterMaxZoom?: number;
   /**
-   * Cluster aggregation expressions keyed by property name, as a JSON object
-   * whose members follow the MapLibre Style Spec clusterProperties form, or
-   * empty for none.
+   * The `clusterProperties` object, or empty for none.
    */
   clusterProperties?: unknown;
-  /**
-   * Tile buffer in pixels within &#91;0, 512&#93;. Absent selects 128.
-   */
   buffer?: number;
-  /**
-   * Cluster radius in pixels within &#91;0, 4095&#93;. Absent selects 50.
-   */
   clusterRadius?: number;
-  /**
-   * Points required to form a cluster. Absent selects 2.
-   */
   clusterMinPoints?: number;
-  /**
-   * Adds line distance metrics to line features. Absent selects false.
-   */
   lineMetrics?: boolean;
-  /**
-   * Clusters point features. Absent selects false.
-   */
   cluster?: boolean;
   /**
-   * Tiles the data for the next render update instead of in the background.
-   * Absent selects false.
+   * Builds tiles while the map renders instead of in the background, so that
+   * new data shows in the next frame.
    */
   synchronousTiling?: boolean;
 }
 
 /**
- * Gesture boundary carried atomically with a camera update or delta.
+ * Where a camera change falls in a gesture that the user makes.
  *
  * See `mln_gesture_phase` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const GesturePhase = {
   /**
-   * The update carries no gesture boundary and leaves the flag as it is.
+   * The change isn't part of a gesture.
    */
   none: 0,
-  /**
-   * Marks a gesture as in progress before the camera write. It does not cancel
-   * running transitions; use `MapHandle.cancelTransitions()` for that.
-   */
   begin: 1,
-  /**
-   * Keeps the gesture marked as in progress before the camera write.
-   */
   update: 2,
-  /**
-   * Clears the gesture flag after the camera write.
-   */
   end: 3,
   /**
-   * Cancels transitions running after the camera write, then clears the gesture
-   * flag.
+   * The platform cancelled the gesture. This also cancels camera changes.
    */
   cancel: 4,
 } as const;
@@ -593,7 +583,7 @@ export type GesturePhase =
   | (number & {});
 
 /**
- * Backend synchronization copied by frame access and release calls.
+ * A point in GPU work that the other side waits for before using a texture.
  *
  * See `mln_gpu_sync` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -601,70 +591,47 @@ export type GesturePhase =
 export interface GpuSync {
   kind?: GpuSyncKind;
   /**
-   * Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-   * descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
+   * The object to wait on, for the kinds that name one.
    */
   handle?: bigint;
-  /**
-   * Counter value of a timeline kind. Zero for other kinds.
-   */
   value?: bigint;
 }
 
 /**
- * Synchronization payload kind for acquired texture frames.
+ * How one side waits for the other's GPU work on a shared texture.
  *
  * See `mln_gpu_sync_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const GpuSyncKind = {
   /**
-   * The host needs no synchronization object. The work completed before the
-   * frame became acquirable or before the release call.
+   * The work has already finished, so there is nothing to wait for.
    */
   cpuComplete: 0,
   /**
-   * GLsync in the shared EGL or WGL context's share group, used only by a
-   * caller-graphics-thread driver. handle is nonzero.
+   * `handle` is a `GLsync` in the session's share group.
    */
   openGlFence: 1,
   /**
-   * The host needs no synchronization object. The work was submitted, before
-   * the frame became acquirable or before the release call, to the queue that
-   * the session and the host share, which orders it before any work submitted
-   * there afterwards.
+   * The work was submitted to the queue that both sides share, so work
+   * submitted to that queue later runs after it.
    */
   queueOrder: 2,
   /**
-   * VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
-   * device, and the counter value that the work signals. handle is nonzero. The
-   * device must enable the timelineSemaphore feature, through Vulkan 1.2 or
-   * VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+   * `handle` is a `VkSemaphore`. Wait until it reaches `value`.
    */
   vulkanTimelineSemaphore: 3,
   /**
-   * A Linux sync file descriptor, which handle holds as an int64_t bit pattern.
-   * -1 is a fence that has already signaled. Vulkan supports it once the device
-   * enables VK_KHR_external_semaphore_fd, and EGL where the display has
-   * EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+   * `handle` is a sync file descriptor.
    */
   syncFd: 4,
   /**
-   * `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
-   * signals. handle is nonzero. Metal supports it, as does EGL on ANGLE where
-   * the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK
-   * once the device enables VK_EXT_metal_objects and the timelineSemaphore
-   * feature.
+   * `handle` is an `MTLSharedEvent`. Wait until it reaches `value`.
    */
   metalSharedEvent: 5,
   /**
-   * An NT HANDLE to a shared ID3D12Fence, and the value that the work signals.
-   * handle is nonzero. Vulkan supports it once the device enables
-   * VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
-   * the driver shares timeline semaphores as D3D12 fences. WGL supports it for
-   * borrowed textures, where the context imports D3D12 fences through
-   * GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
-   * device of the context's adapter.
+   * `handle` is a shared Windows handle to an `ID3D12Fence`. Wait until it
+   * reaches `value`.
    */
   d3d12Fence: 6,
 } as const;
@@ -674,7 +641,7 @@ export type GpuSyncKind =
   | (number & {});
 
 /**
- * A bit for each `GpuSyncKind`.
+ * A GPU sync kind, as a bit in a set.
  *
  * See `mln_gpu_sync_kind_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -692,92 +659,81 @@ export const GpuSyncKindFlag = {
 export type GpuSyncKindFlag = number;
 
 /**
- * Options for creating a graphics device.
+ * Options for `GraphicsDeviceHandle.create()`.
  *
  * See `mln_graphics_device_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
  */
 export interface GraphicsDeviceOptions {
   /**
-   * The adapter to create the device on, as a position in the graphics API's
-   * own list of adapters, from zero. Without it, the backend picks its default
-   * adapter.
+   * The GPU to use, as an index into the platform's list of GPUs.
    */
   adapterIndex?: number;
   /**
-   * Whether the device's texture sessions take turns rendering in one EGL
-   * context instead of each creating its own. Absent selects false.
+   * Whether the device's texture sessions take turns in one OpenGL context
+   * instead of having one each. Only an EGL device reads it.
    */
   singleContext?: boolean;
 }
 
 /**
- * Attachment options for a graphics device texture target.
+ * The texture that `MapHandle.attachGraphicsDeviceTexture()` draws into.
  *
  * See `mln_graphics_device_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
  */
 export interface GraphicsDeviceTextureDescriptor {
-  /**
-   * Logical texture extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
 }
 
 /**
- * One HTTP header that a header rule supplies.
+ * An HTTP header.
  *
  * See `mln_http_header` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface HttpHeader {
-  /**
-   * Header field name. Required.
-   */
   name: string;
   value?: string;
 }
 
 /**
- * One rule of a native HTTP header transform.
+ * Headers to add to the HTTP requests whose URL matches a pattern.
  *
  * See `mln_http_header_rule` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface HttpHeaderRule {
   /**
-   * The resource kinds to match. Zero selects every kind.
+   * The kinds of resource that the rule covers. Zero covers every kind.
    */
   kinds?: ResourceKindFlag;
   flags?: UrlMatchFlag;
-  /**
-   * The URL or glob pattern to compare.
-   */
   url?: string;
-  /**
-   * The headers to set.
-   */
   headers?: readonly HttpHeader[];
 }
 
 /**
- * HTTP header transform state: a callback, or native header rules. The callback
- * runs asynchronously on the JavaScript thread that registered it, after native
- * queues the call.
+ * Headers to add to HTTP requests, for
+ * `RuntimeHandle.setHttpHeaderTransform()`.
+ *
+ * Set either `callback` or `rules`, not both.
+ *
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface HttpHeaderTransform {
   /**
-   * Header rules for a transform without a callback; empty with one.
+   * The first rule that matches a request adds its headers, and no other.
    */
   rules?: readonly HttpHeaderRule[];
 }
 
 /**
- * Content-box insets in image pixels, measured from the image's top-left.
+ * The area of an image, in image pixels, that text fits inside.
  *
  * See `mln_image_content` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -790,7 +746,7 @@ export interface ImageContent {
 }
 
 /**
- * One stretchable interval along an image axis, in image pixels.
+ * A range of image pixels, from `from` to `to`, that stretches to fit text.
  *
  * See `mln_image_stretch` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -801,24 +757,18 @@ export interface ImageStretch {
 }
 
 /**
- * Geographic coordinate in degrees used by map and projection APIs.
+ * A geographic coordinate, in degrees.
  *
  * See `mln_lat_lng` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface LatLng {
-  /**
-   * Latitude in degrees, finite and within &#91;-90, 90&#93; on input.
-   */
   latitude?: number;
-  /**
-   * Longitude in degrees. Input longitude must be finite.
-   */
   longitude?: number;
 }
 
 /**
- * Geographic bounds in degrees.
+ * A rectangle of coordinates, from its southwest to its northeast corner.
  *
  * See `mln_lat_lng_bounds` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -829,7 +779,7 @@ export interface LatLngBounds {
 }
 
 /**
- * Log event categories emitted by MapLibre Native.
+ * The part of the library that logged a message.
  *
  * See `mln_log_event` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -857,8 +807,10 @@ export const LogEvent = {
 export type LogEvent = (typeof LogEvent)[keyof typeof LogEvent] | (number & {});
 
 /**
- * Process-global log callback. The callback runs asynchronously on the
- * JavaScript thread that registered it, after native queues the call.
+ * A log callback, for `setLogCallback()`.
+ *
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -871,7 +823,7 @@ export type LogHandler = (
 ) => void;
 
 /**
- * Log severity values emitted by MapLibre Native.
+ * The severity of a log message.
  *
  * See `mln_log_severity` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -887,7 +839,7 @@ export type LogSeverity =
   | (number & {});
 
 /**
- * Bitmask values for log severities dispatched asynchronously.
+ * A log severity, as a bit in a set.
  *
  * See `mln_log_severity_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -896,6 +848,10 @@ export const LogSeverityFlag = {
   info: 2,
   warning: 4,
   error: 8,
+  /**
+   * The severities logged on a background thread until
+   * `setLogAsyncSeverityMask()` changes them.
+   */
   default: 6,
   all: 14,
 } as const;
@@ -903,28 +859,19 @@ export const LogSeverityFlag = {
 export type LogSeverityFlag = number;
 
 /**
- * Logical extent in UI pixels and the device-pixel scale.
+ * A size in logical pixels, and the physical pixels in each logical pixel.
  *
  * See `mln_logical_extent` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface LogicalExtent {
-  /**
-   * Width in UI pixels.
-   */
   width?: number;
-  /**
-   * Height in UI pixels.
-   */
   height?: number;
-  /**
-   * Device pixels per UI pixel.
-   */
   scaleFactor?: number;
 }
 
 /**
- * Debug overlay mask values for `MapHandle.setDebugOptions()`.
+ * A debug overlay that the map draws.
  *
  * See `mln_map_debug_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -942,22 +889,22 @@ export const MapDebugFlag = {
 export type MapDebugFlag = number;
 
 /**
- * Map rendering modes used when creating a map.
+ * When a map renders.
  *
  * See `mln_map_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const MapMode = {
   /**
-   * Continuously updates as data arrives and map state changes.
+   * Renders whenever the map changes.
    */
   continuous: 0,
   /**
-   * Produces one-off still images of an arbitrary viewport.
+   * Renders only when `MapHandle.requestStillImage()` asks for an image.
    */
   static: 1,
   /**
-   * Produces one-off still images for a single tile.
+   * Renders still images of single tiles, as `MapMode.static` does.
    */
   tile: 2,
 } as const;
@@ -965,126 +912,115 @@ export const MapMode = {
 export type MapMode = (typeof MapMode)[keyof typeof MapMode] | (number & {});
 
 /**
- * Options used when creating a map.
+ * Options for `RuntimeHandle.createMap()`.
  *
  * See `mln_map_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapOptions {
   /**
-   * Initial logical extent. Required. Width and height must be nonzero, and
-   * scale_factor must be finite and positive. scale_factor is fixed for the
-   * map's lifetime.
+   * The map's first size. Its scale factor stays fixed for the map's life.
    */
   initialExtent: LogicalExtent;
   mapMode?: MapMode;
   /**
-   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-   * encodings.
+   * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
+   * encoding. Without it, such tiles fail to load.
    */
   fastPforEnabled?: boolean;
   /**
-   * Map-originated event types this map queues.
+   * The events that the map reports. Without it, the map reports them all.
    */
   eventMask?: RuntimeEventFlag;
   /**
-   * Whether each source keeps tiles that leave the view, so the map can show
-   * them again without loading them. Absent selects true.
+   * Whether the map keeps tiles in memory after they leave the view, so they
+   * show again without loading. Without it, the map keeps them.
    */
   tileCacheEnabled?: boolean;
 }
 
 /**
- * Immutable map state copied from the latest published generation.
+ * A map's state, as `MapHandle.getSnapshot()` reads it.
  *
  * See `mln_map_snapshot` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapSnapshot {
-  /**
-   * Debug overlays that the map draws.
-   */
   readonly debugOptions: MapDebugFlag;
+  /**
+   * Grows with each change to the map's state.
+   */
   readonly generation: bigint;
   /**
-   * True once every requested style and tile resource finished loading.
+   * Whether the style and every resource that the view needs have loaded.
    */
   readonly fullyLoaded: boolean;
   readonly renderingStatsViewEnabled: boolean;
-  /**
-   * True while the map is inside a gesture.
-   */
   readonly gestureInProgress: boolean;
-  /**
-   * True while a camera command with a duration is still animating.
-   */
   readonly transitionInProgress: boolean;
   readonly eventMask: RuntimeEventFlag;
   /**
-   * Generation of the latest render update the map published. A rendered frame
-   * at or past it draws map state that includes every command this snapshot
-   * observes, though animations and resource loads finish in later frames.
+   * Counts the render updates that the map has made for its render session.
    */
   readonly latestRenderUpdateGeneration: bigint;
   readonly tile: MapTileOptions;
   readonly bounds: BoundOptions;
   readonly freeCamera: FreeCameraOptions;
-  /**
-   * The map's camera, extent, projection mode, and viewport options.
-   * `MapProjectionHandle.create()` converts coordinates for this view.
-   */
   readonly view: MapView;
 }
 
 /**
- * Tile prefetch and LOD tuning controls.
+ * How the map picks the tiles to load.
+ *
+ * The `lod_` members lower the level of detail away from the camera, so the map
+ * loads fewer tiles when the pitch is high.
  *
  * See `mln_map_tile_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapTileOptions {
   /**
-   * Prefetch zoom delta, at most 255.
+   * How many zoom levels lower the map also loads tiles for, so it can show a
+   * coarse map while the current tiles load. 0 loads only the current tiles.
    */
   prefetchZoomDelta?: number;
+  /**
+   * The radius around the view point, in tiles, that keeps full detail.
+   */
   lodMinRadius?: number;
+  /**
+   * Scales the distance to the view point. Above 1 lowers the detail.
+   */
   lodScale?: number;
+  /**
+   * The pitch, in radians, above which the map lowers the detail.
+   */
   lodPitchThreshold?: number;
+  /**
+   * Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
+   */
   lodZoomShift?: number;
+  /**
+   * `TileLodMode.distance` ignores `lod_min_radius`.
+   */
   lodMode?: TileLodMode;
 }
 
 /**
- * Everything that a projection depends on: the transform that a published
- * snapshot or a rendered frame describes.
+ * One view of a map: its camera, size, and projection.
  *
  * See `mln_map_view` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapView {
-  /**
-   * The camera. Its center is unwrapped: the longitude keeps the visible world
-   * copy and may fall outside -180 to 180.
-   */
   camera?: Camera;
-  /**
-   * Logical size and device-pixel scale. A snapshot carries the map's scale
-   * factor, and a frame carries the scale factor of the target that drew it.
-   */
   extent?: LogicalExtent;
-  /**
-   * Axonometric mode and skew, with every field set.
-   */
   projectionMode?: ProjectionMode;
-  /**
-   * North orientation, constrain mode, viewport mode, and frustum offset, with
-   * every field set.
-   */
   viewport?: MapViewportOptions;
 }
 
 /**
- * Live map viewport and render-transform controls.
+ * How the map orients and constrains its view.
  *
  * See `mln_map_viewport_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1097,165 +1033,144 @@ export interface MapViewportOptions {
 }
 
 /**
- * One caller-owned Metal texture of a borrowed texture ring.
+ * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface MetalBorrowedTexture {
   /**
-   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+   * Your MTLTexture.
    */
   texture: bigint;
 }
 
 /**
- * Metal attachment options for a borrowed texture target.
+ * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
+ * and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+ *
+ * `extent` sets the map's size and scale factor, and `physical_width` and
+ * `physical_height` give the textures' size in pixels. The textures must all
+ * have that size, one device, one pixel format, one sample, and
+ * MTLTextureUsageRenderTarget.
+ *
+ * The session uses the textures until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
  *
  * See `mln_metal_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface MetalBorrowedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. physical_width and physical_height give
-   * the texture's size. A scale_factor that differs from the map's is accepted
-   * and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Physical texture width in device pixels. Required.
-   */
   physicalWidth: number;
-  /**
-   * Physical texture height in device pixels. Required.
-   */
   physicalHeight: number;
-  /**
-   * The ring's textures, one per slot, in slot order. Required.
-   */
   textures: readonly MetalBorrowedTexture[];
   /**
-   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
-   * the session submits its work to, retained by the session. Optional; null
-   * makes the session create its own queue. `GpuSyncKind.queueOrder` orders
-   * frames on this queue. A replacement names the queue the session attached
-   * with.
+   * Your MTLCommandQueue on the textures' device, or null for a queue of the
+   * session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
    */
   commandQueue?: bigint;
 }
 
 /**
- * Metal backend context fields shared by Metal render targets.
+ * The Metal device that a render session uses.
  *
  * See `mln_metal_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface MetalContextDescriptor {
   /**
-   * `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
+   * An `MTLDevice`.
    */
   device?: bigint;
 }
 
 /**
- * Metal attachment options for an owned texture target.
+ * A ring of Metal textures that the session creates, for
+ * `MapHandle.attachMetalOwnedTexture()`.
  *
  * See `mln_metal_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface MetalOwnedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
   /**
-   * Metal backend context. device is required.
+   * Names the MTLDevice that creates the textures.
    */
   context?: MetalContextDescriptor;
   /**
-   * Backend-native MTLPixelFormat value of the ring's textures: either
-   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
-   * returns RGBA8 for either format.
+   * The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
+   * MTLPixelFormatBGRA8Unorm.
    */
   pixelFormat: bigint;
   /**
-   * `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
-   * session submits its work to, retained by the session. Optional; null makes
-   * the session create its own queue. `GpuSyncKind.queueOrder` orders frames on
-   * this queue.
+   * Your MTLCommandQueue on the same device, or null for a queue of the
+   * session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
    */
   commandQueue?: bigint;
 }
 
 /**
- * Metal attachment options for a native surface.
+ * A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
+ * `RenderSessionHandle.setMetalSurfaceTarget()`.
+ *
+ * The session sets the layer's device, pixel format, and drawable size. It uses
+ * the layer until a replacement or release of the target completes, a detach or
+ * disposal of the session completes, or an abandon of it returns.
  *
  * See `mln_metal_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 export interface MetalSurfaceDescriptor {
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
   /**
-   * Metal backend context. device is optional for Metal surfaces.
+   * The MTLDevice to render with. A null device picks the system's default.
    */
   context?: MetalContextDescriptor;
   /**
-   * `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
+   * Your CAMetalLayer.
    */
   layer: bigint;
 }
 
 /**
- * Metal frame acquired from a texture ring.
+ * The Metal texture of an acquired frame.
  *
  * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface MetalTextureFrame {
-  /**
-   * Session generation that produced this frame.
-   */
   readonly generation: bigint;
-  /**
-   * Physical Metal texture width in device pixels.
-   */
   readonly width: number;
-  /**
-   * Physical Metal texture height in device pixels.
-   */
   readonly height: number;
-  /**
-   * UI-to-device pixel scale used for this frame.
-   */
   readonly scaleFactor: number;
-  /**
-   * Opaque identity of this frame.
-   */
   readonly frameId: bigint;
   /**
-   * Ring slot that holds this frame. For a borrowed target, the index of its
-   * texture in the descriptor's textures array.
+   * The texture's index in the ring. For a borrowed ring, it indexes the
+   * descriptor's `textures`.
    */
   readonly slot: number;
   /**
-   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
+   * The MTLTexture.
    */
   readonly texture: bigint;
   /**
-   * Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
+   * The texture's MTLDevice.
    */
   readonly device: bigint;
   /**
-   * Backend-native pixel format value. Metal uses MTLPixelFormat.
+   * The texture's MTLPixelFormat.
    */
   readonly pixelFormat: bigint;
 }
 
+/**
+ * Whether the library may use the network.
+ *
+ * See `mln_network_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const NetworkStatus = {
   online: 1,
   offline: 2,
@@ -1266,7 +1181,7 @@ export type NetworkStatus =
   | (number & {});
 
 /**
- * Map north orientation values used by `MapViewportOptions`.
+ * The screen direction that north points to when the bearing is 0.
  *
  * See `mln_north_orientation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1283,32 +1198,25 @@ export type NorthOrientation =
   | (number & {});
 
 /**
- * Geometry offline region definition.
+ * An offline region that covers a GeoJSON geometry.
+ *
+ * The members other than `geometry` mean the same as those of
+ * `OfflineTilePyramidRegionDefinition`.
  *
  * See `mln_offline_geometry_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface OfflineGeometryRegionDefinition {
-  /**
-   * Style URL. Copied during region creation.
-   */
   styleUrl?: string;
-  /**
-   * UTF-8 GeoJSON Geometry. Required.
-   */
   geometry: unknown;
   minZoom?: number;
-  /**
-   * Maximum zoom. Positive infinity lets each tile source use its own maximum
-   * zoom.
-   */
   maxZoom?: number;
   pixelRatio?: number;
   includeIdeographs?: boolean;
 }
 
 /**
- * Tagged offline region definition.
+ * The area, zoom range, and style that an offline region covers.
  *
  * See `mln_offline_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1328,6 +1236,12 @@ export type OfflineRegionDefinition =
       readonly bytes: Uint8Array;
     };
 
+/**
+ * Whether an offline region is downloading.
+ *
+ * See `mln_offline_region_download_state` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const OfflineRegionDownloadState = {
   inactive: 0,
   active: 1,
@@ -1338,7 +1252,7 @@ export type OfflineRegionDownloadState =
   | (number & {});
 
 /**
- * Region data delivered by an offline completion.
+ * An offline region in the runtime's cache file.
  *
  * See `mln_offline_region_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1346,119 +1260,121 @@ export type OfflineRegionDownloadState =
 export interface OfflineRegionInfo {
   readonly id: bigint;
   readonly definition: OfflineRegionDefinition;
-  /**
-   * Metadata bytes.
-   */
   readonly metadata: Uint8Array;
 }
 
 /**
- * Offline region status snapshot.
+ * The download progress of an offline region.
  *
  * See `mln_offline_region_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface OfflineRegionStatus {
   readonly downloadState: OfflineRegionDownloadState;
+  /**
+   * The resources downloaded so far, tiles included.
+   */
   readonly completedResourceCount: bigint;
+  /**
+   * The size of the downloaded resources in bytes, tiles included.
+   */
   readonly completedResourceSize: bigint;
   readonly completedTileCount: bigint;
   readonly requiredTileCount: bigint;
+  /**
+   * The size of the downloaded tiles in bytes.
+   */
   readonly completedTileSize: bigint;
+  /**
+   * The resources that the region needs, tiles included. Until
+   * `required_resource_count_is_precise` is true, this is only a lower bound.
+   */
   readonly requiredResourceCount: bigint;
   readonly requiredResourceCountIsPrecise: boolean;
+  /**
+   * Whether the region has downloaded every resource it needs.
+   */
   readonly complete: boolean;
 }
 
 /**
- * Tile-pyramid offline region definition.
+ * An offline region that covers a rectangle of the map.
  *
  * See `mln_offline_tile_pyramid_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface OfflineTilePyramidRegionDefinition {
   /**
-   * Style URL. Copied during region creation.
+   * The style whose resources the region holds. Maps use the region when they
+   * load the same style URL.
    */
   styleUrl?: string;
   bounds?: LatLngBounds;
   minZoom?: number;
   /**
-   * Maximum zoom. Positive infinity lets each tile source use its own maximum
-   * zoom.
+   * INFINITY covers every zoom level that the style's sources have.
    */
   maxZoom?: number;
+  /**
+   * The pixel ratio of the images to download, such as 2 for dense screens.
+   */
   pixelRatio?: number;
+  /**
+   * Whether the region holds the glyphs of CJK ideographs.
+   */
   includeIdeographs?: boolean;
 }
 
 /**
- * One caller-owned OpenGL texture of a borrowed texture ring.
+ * An OpenGL texture of a borrowed ring.
  *
  * See `mln_open_gl_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlBorrowedTexture {
   /**
-   * Borrowed OpenGL texture object name. Required.
+   * Your texture name.
    */
   texture: number;
 }
 
 /**
- * OpenGL attachment options for a borrowed texture target.
+ * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()`
+ * and `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+ *
+ * `extent` sets the map's size and scale factor, and `physical_width` and
+ * `physical_height` give the textures' size in pixels. The context must use
+ * `OpenGlContextOwnership.shared`. Each texture must be in your context's share
+ * group, with storage of that size.
+ *
+ * The session uses the textures until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
  *
  * See `mln_open_gl_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlBorrowedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. physical_width and physical_height give
-   * the texture's size. A scale_factor that differs from the map's is accepted
-   * and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Physical texture width in device pixels. Required.
-   */
   physicalWidth: number;
-  /**
-   * Physical texture height in device pixels. Required.
-   */
   physicalHeight: number;
-  /**
-   * Borrowed OpenGL context provider data. The textures must belong to this
-   * context or a context in the same share group.
-   */
   context: OpenGlContextDescriptor;
-  /**
-   * The ring's textures, one per slot, in slot order. Required.
-   */
   textures: readonly OpenGlBorrowedTexture[];
   /**
-   * OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
+   * The textures' target. It must be GL_TEXTURE_2D.
    */
   target: number;
 }
 
 /**
- * OpenGL client API a dedicated EGL session creates its context for.
+ * The OpenGL API that a dedicated EGL context uses.
  *
  * See `mln_open_gl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const OpenGlClientApi = {
-  /**
-   * No client API is named.
-   */
   unspecified: 0,
-  /**
-   * Desktop OpenGL, as EGL_OPENGL_API names it.
-   */
   gl: 1,
-  /**
-   * OpenGL ES, as EGL_OPENGL_ES_API names it.
-   */
   gles: 2,
 } as const;
 /** One of the OpenGlClientApi values, or a value this binding does not know. */
@@ -1467,23 +1383,21 @@ export type OpenGlClientApi =
   | (number & {});
 
 /**
- * OpenGL backend context fields shared by OpenGL render targets.
+ * How a render session gets the OpenGL context that it renders with.
+ *
+ * Keep the objects that it names alive until a detach or disposal of the
+ * session completes, or an abandon of it returns.
  *
  * See `mln_open_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface OpenGlContextDescriptor {
-  /**
-   * Whether the session shares its driver thread and graphics objects with the
-   * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-   * dedicated to their core worker.
-   */
   ownership?: OpenGlContextOwnership;
   data: OpenGlContextDescriptorData;
 }
 
 /**
- * Backend-specific OpenGL context data.
+ * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
  *
  * See `mln_open_gl_context_descriptor_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1494,19 +1408,18 @@ export type OpenGlContextDescriptorData =
   | { readonly kind: "webGl"; readonly value: WebGlContextDescriptor };
 
 /**
- * How a session's OpenGL context relates to its driver thread and host graphics
- * state.
+ * Whether a render session's OpenGL context shares objects with yours.
  *
  * See `mln_open_gl_context_ownership` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const OpenGlContextOwnership = {
   /**
-   * The session shares its thread with host graphics work.
+   * The session's context shares objects with your `share_context`.
    */
   shared: 0,
   /**
-   * The session keeps its own OpenGL context current on its thread.
+   * The session's context shares objects with no other context.
    */
   dedicated: 1,
 } as const;
@@ -1516,7 +1429,7 @@ export type OpenGlContextOwnership =
   | (number & {});
 
 /**
- * OpenGL context providers supported by this build.
+ * An OpenGL context platform, as a bit in a set.
  *
  * See `mln_open_gl_context_provider_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1524,178 +1437,124 @@ export type OpenGlContextOwnership =
 export const OpenGlContextProviderFlag = {
   wgl: 1,
   egl: 2,
-  /**
-   * Browser WebGL context imported into an Emscripten module.
-   */
   webGl: 4,
 } as const;
 /** A bitwise OR of OpenGlContextProviderFlag flags. */
 export type OpenGlContextProviderFlag = number;
 
 /**
- * OpenGL attachment options for an owned texture target.
+ * A ring of OpenGL textures that the session creates, for
+ * `MapHandle.attachOpenGlOwnedTexture()`.
  *
  * See `mln_open_gl_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlOwnedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed OpenGL context provider data. Shared ownership creates a context
-   * whose texture frames the host can acquire. Dedicated EGL, WGL, or
-   * transferred WebGL ownership creates a private core-worker context for CPU
-   * readback.
-   */
   context: OpenGlContextDescriptor;
 }
 
 /**
- * OpenGL attachment options for a native surface.
+ * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
+ * `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+ *
+ * The session uses the surface until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
  *
  * See `mln_open_gl_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 export interface OpenGlSurfaceDescriptor {
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed OpenGL context provider data.
-   */
   context: OpenGlContextDescriptor;
   /**
-   * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
-   * both required. Null for WebGL, whose context carries its canvas binding.
+   * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
    */
   surface?: bigint;
 }
 
 /**
- * OpenGL frame acquired from a texture ring.
+ * The OpenGL texture of an acquired frame.
  *
  * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlTextureFrame {
-  /**
-   * Session generation that produced this frame.
-   */
   readonly generation: bigint;
-  /**
-   * Physical OpenGL texture width in device pixels.
-   */
   readonly width: number;
-  /**
-   * Physical OpenGL texture height in device pixels.
-   */
   readonly height: number;
-  /**
-   * UI-to-device pixel scale used for this frame.
-   */
   readonly scaleFactor: number;
-  /**
-   * Opaque identity of this frame.
-   */
   readonly frameId: bigint;
   /**
-   * Ring slot that holds this frame. For a borrowed target, the index of its
-   * texture in the descriptor's textures array.
+   * The texture's index in the ring. For a borrowed ring, it indexes the
+   * descriptor's `textures`.
    */
   readonly slot: number;
-  /**
-   * Borrowed OpenGL texture object name. Valid until frame release.
-   */
   readonly texture: number;
-  /**
-   * OpenGL texture target. GL_TEXTURE_2D is the expected target.
-   */
   readonly target: number;
   /**
-   * OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
-   * whose format the host chose.
+   * The texture's internal format, or 0 for a borrowed ring.
    */
   readonly internalFormat: number;
   /**
-   * OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
+   * The texture's pixel format, or 0 for a borrowed ring.
    */
   readonly format: number;
   /**
-   * OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
+   * The texture's pixel type, or 0 for a borrowed ring.
    */
   readonly type: number;
 }
 
 /**
- * Caller-owned premultiplied RGBA8 image pixels.
+ * An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
  *
  * See `mln_premultiplied_rgba8_image` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface PremultipliedRgba8Image {
-  /**
-   * Image width in pixels. Required.
-   */
   width: number;
-  /**
-   * Image height in pixels. Required.
-   */
   height: number;
   /**
-   * Bytes per image row. Required, and at least width &#42; 4.
+   * The number of bytes from the start of one row to the start of the next, at
+   * least `width` &#42; 4.
    */
   stride: number;
   /**
-   * Premultiplied RGBA8 pixels. Required.
+   * The rows of pixels, `stride` bytes apart, from the top row down.
    */
   pixels: Uint8Array;
 }
 
 /**
- * Lower-level Spherical Mercator projected-meter coordinate.
+ * A point in the Web Mercator projection, in meters.
  *
  * See `mln_projected_meters` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ProjectedMeters {
-  /**
-   * Distance measured northward from the equator, in meters.
-   */
   northing?: number;
-  /**
-   * Distance measured eastward from the prime meridian, in meters.
-   */
   easting?: number;
 }
 
 /**
- * MapLibre axonometric rendering options used for snapshots and commands.
+ * Settings that skew the map or draw it without perspective.
  *
  * See `mln_projection_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ProjectionMode {
   /**
-   * Enables a non-perspective axonometric render transform.
+   * Whether the map draws without perspective.
    */
   axonometric?: boolean;
-  /**
-   * X-skew factor of the axonometric transform.
-   */
   xSkew?: number;
-  /**
-   * Y-skew factor of the axonometric transform.
-   */
   ySkew?: number;
 }
 
 /**
- * Quaternion stored as x, y, z, w components.
+ * A rotation, as a quaternion.
  *
  * See `mln_quaternion` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1708,9 +1567,14 @@ export interface Quaternion {
 }
 
 /**
- * Host lock on the graphics queue that a session shares with its host, copied
- * by a successful attach. The callback runs asynchronously on the JavaScript
- * thread that registered it, after native queues the call.
+ * Your lock on a Vulkan queue that you and a render session both submit to.
+ *
+ * The session holds the lock only while it submits or presents to the queue.
+ * Set both `lock` and `unlock`, or neither when you don't submit to the queue
+ * yourself.
+ *
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_queue_lock` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1741,27 +1605,20 @@ export interface NativeQueueLockFields {
   readonly lock: bigint;
   readonly unlock: bigint;
   readonly userData?: bigint;
-  /**
-   * Optional. Releases user_data once, after all callback invocations have
-   * returned and the session can no longer invoke the callbacks. A disabled
-   * lock leaves it null.
-   */
   readonly releaseUserData?: bigint;
 }
 
 /**
- * What abandon did with a session's graphics resources.
+ * What `RenderSessionHandle.abandon()` did with a session's graphics objects.
  *
  * See `mln_render_abandon_disposition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export const RenderAbandonDisposition = {
-  /**
-   * Abandon destroyed every graphics resource, or none remained.
-   */
   clean: 0,
   /**
-   * Abandon kept graphics resources that it could not safely destroy.
+   * It kept some objects that it couldn't destroy safely. They stay allocated
+   * until the process exits.
    */
   quarantined: 1,
 } as const;
@@ -1770,16 +1627,19 @@ export type RenderAbandonDisposition =
   | (typeof RenderAbandonDisposition)[keyof typeof RenderAbandonDisposition]
   | (number & {});
 
+/**
+ * The outcome of `RenderSessionHandle.abandon()`.
+ *
+ * See `mln_render_abandon_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 export interface RenderAbandonResult {
   readonly disposition: RenderAbandonDisposition;
-  /**
-   * Backend resource groups intentionally retained until process exit.
-   */
   readonly quarantinedResourceCount: number;
 }
 
 /**
- * Render backend support flags reported by this native library build.
+ * A render backend, as a bit in a set.
  *
  * See `mln_render_backend_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -1794,20 +1654,18 @@ export const RenderBackendFlag = {
 export type RenderBackendFlag = number;
 
 /**
- * Execution placement for one render session.
+ * The thread that runs a render session's graphics work.
  *
  * See `mln_render_driver_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const RenderDriverKind = {
   /**
-   * Native code initializes, services, and tears down transferable graphics
-   * state on a library-owned thread.
+   * A library thread.
    */
   coreWorker: 1,
   /**
-   * The host services driver work on the thread or realm where its graphics
-   * context is current.
+   * Your thread, when it calls `RenderSessionHandle.serviceDriverWork()`.
    */
   callerGraphicsThread: 2,
 } as const;
@@ -1817,8 +1675,7 @@ export type RenderDriverKind =
   | (number & {});
 
 /**
- * Terminal result of one frame demand, held by an owned frame-result batch and
- * copied by `AcquiredFrameHandle.getResult()`.
+ * How one frame request finished.
  *
  * See `mln_render_frame_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1827,50 +1684,24 @@ export interface RenderFrameResult {
   readonly disposition: RenderResult;
   readonly token: bigint;
   /**
-   * Generation of the map render update the demand evaluated. When disposition
-   * is `RenderResult.rendered`, the frame drew that update; compare it with
-   * `CommandCompletion.renderUpdateGeneration` to find the first frame that
-   * includes a command.
+   * The map update that a rendered frame shows. The frame includes a command's
+   * change when this is at least the command's
+   * `CommandCompletion.renderUpdateGeneration`.
    */
   readonly mapUpdateGeneration: bigint;
-  /**
-   * The session's target generation when the demand reached its result. See
-   * `RenderSessionSnapshot.generation`.
-   */
   readonly generation: bigint;
-  /**
-   * Position of the frame among the frames that the session rendered, counting
-   * from one. Zero unless disposition is `RenderResult.rendered`.
-   */
   readonly frameGeneration: bigint;
-  /**
-   * Whether the map asked for another frame while it rendered this one, as
-   * during an ongoing paint transition. Set only when disposition is
-   * `RenderResult.rendered`, and false for every other outcome. It matches the
-   * needs_repaint field of `RuntimeEventType.mapRenderFrameFinished`. A camera
-   * transition does not set it: the map publishes an update for each of the
-   * transition's frames instead, which a render-if-needed demand renders.
-   */
   readonly needsRepaint: boolean;
   /**
-   * The view that this frame drew, from the transform of the map update that it
-   * rendered. A host that displays the frame builds its projection with
-   * `MapProjectionHandle.create()` to place overlays where the frame drew their
-   * coordinates. Zero, with a size of zero, unless disposition is
-   * `RenderResult.rendered`.
+   * The camera and extent that a rendered frame shows.
    */
   readonly view: MapView;
-  /**
-   * `RenderMode.full` when the frame drew its update with the style and every
-   * tile and image that the update needs loaded. Partial unless disposition is
-   * `RenderResult.rendered`. It matches the mode field of
-   * `RuntimeEventType.mapRenderFrameFinished`.
-   */
   readonly mode: RenderMode;
 }
 
 /**
- * Render modes reported by render observer events and frame results.
+ * Whether a frame drew the map complete, or lacked resources that are still
+ * loading.
  *
  * See `mln_render_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1885,40 +1716,29 @@ export type RenderMode =
   | (number & {});
 
 /**
- * Terminal disposition of one accepted frame demand.
+ * How a frame request finished.
  *
  * See `mln_render_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export const RenderResult = {
-  /**
-   * A frame was rendered for acquisition, presentation, or ordered readback.
-   */
   rendered: 0,
   /**
-   * No newer map update was available, the map had no complete frame to draw,
-   * or the update extent differed from the target. The map publishes another
-   * update when it has one. A demand with `FrameDemandFlag.waitForUpdate` waits
-   * for that update instead, and finishes with this result only when a barrier
-   * ends its wait.
+   * The map had nothing new to draw.
    */
   noUpdate: 1,
   /**
-   * The target could not produce a frame. The attempt consumes nothing, so a
-   * later demand with the same flags renders what this one would have. This
-   * result does not cause a map update, so the host demands again when the
-   * target can be ready, such as after a paced delay.
+   * The target couldn't take a frame, such as while a window is hidden or after
+   * `RenderSessionHandle.releaseTarget()`. Request a frame again later.
    */
   targetNotReady: 2,
   /**
-   * A newer demand with the same flags, neither of them forced, replaced this
-   * demand. A still image's demand is never replaced, and never replaces one.
+   * A later request with the same flags replaced this one.
    */
   superseded: 3,
   /**
-   * The session failed before this demand could produce a usable frame. Read
-   * its saved failure with `RenderSessionHandle.getFailure()`. Further demands
-   * require disposing of this session and attaching a new one.
+   * The session failed, and `RenderSessionHandle.getFailure()` reports why.
+   * Once `RenderSessionHandle.close()` completes, you can attach a new session.
    */
   failed: 4,
 } as const;
@@ -1928,55 +1748,44 @@ export type RenderResult =
   | (number & {});
 
 /**
- * Common attachment policy copied before an attach call returns.
+ * Options for attaching a render session to a map.
  *
  * See `mln_render_session_attach_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface RenderSessionAttachOptions {
-  /**
-   * Where the session's driver runs. Required.
-   */
   driver: RenderDriverKind;
   /**
-   * Requested slot count of a session-owned texture ring, up to 8. Zero selects
-   * 2, so the host can retain one frame while the session renders its
-   * replacement. Private targets grant one slot regardless of this value. A
-   * borrowed texture ring's depth is its texture count, so borrowed and other
-   * targets ignore this value.
+   * How many textures a ring that the session creates has, up to 8. Zero picks
+   * a default.
    */
   requestedTextureRingDepth?: number;
   /**
-   * Producer synchronization kinds that the host accepts for acquired texture
-   * frames. The session picks the first one its target supports in this order:
-   * `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-   * `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
-   * `GpuSyncKind.d3d12Fence`, `GpuSyncKind.syncFd`, then
-   * `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-   * `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-   * device has a single queue. A set that the target cannot satisfy fails the
-   * attach with `Status.unsupported`.
+   * The kinds of `GpuSync` that you can wait on before you read an acquired
+   * frame. The session uses one of them that its target supports. Zero lets the
+   * session pick a kind that names no object to wait on.
    */
   producerSyncKinds?: GpuSyncKindFlag;
   /**
-   * Wakes the receiver when the frame-result queue becomes nonempty.
+   * Called when frame results are waiting for
+   * `RenderSessionHandle.drainFrameResults()`. It isn't called again until a
+   * drain takes them.
    */
   frameWake?: Wake;
   /**
-   * Wakes the graphics receiver when caller-driver work is available, including
-   * work that a finished driver result releases.
+   * Called when a session driven by `RenderDriverKind.callerGraphicsThread` has
+   * work for `RenderSessionHandle.serviceDriverWork()`. It isn't called again
+   * until a service runs.
    */
   driverWorkWake?: Wake;
   /**
-   * Host lock on the graphics queue, disabled by default. Only Vulkan targets
-   * accept an enabled lock; other backends fail the attach with
-   * `Status.unsupported`.
+   * Your lock on the Vulkan queue, when you submit to it yourself.
    */
   queueLock?: QueueLock;
 }
 
 /**
- * Driver and target capabilities fixed for one attached render session.
+ * What an attached render session supports.
  *
  * See `mln_render_session_capabilities` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1984,76 +1793,62 @@ export interface RenderSessionAttachOptions {
 export interface RenderSessionCapabilities {
   readonly driver: RenderDriverKind;
   /**
-   * Granted texture ring depth: the slot count of a session-owned ring, or the
-   * texture count of a borrowed one. Zero for a surface.
+   * How many textures the session's texture ring has.
    */
   readonly textureRingDepth: number;
   readonly flags: RenderSessionCapabilityFlag;
   /**
-   * Producer synchronization of acquired frames, picked from the attach
-   * options' producer_sync_kinds. `GpuSyncKind.cpuComplete` for a target
-   * without frame acquisition.
+   * The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()`
+   * reports.
    */
   readonly producerSyncKind: GpuSyncKind;
   /**
-   * Consumer synchronization kinds that `AcquiredFrameHandle.release()`
-   * accepts. Empty for a target without frame acquisition.
+   * The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
    */
   readonly consumerSyncKinds: GpuSyncKindFlag;
 }
 
 /**
- * Optional render-session capabilities.
+ * Something that a render session can do.
  *
  * See `mln_render_session_capability_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const RenderSessionCapabilityFlag = {
+  /**
+   * `RenderSessionHandle.acquireFrame()` can take the frames it renders.
+   */
   frameAcquisition: 1,
+  /**
+   * `RenderSessionHandle.readTexture()` can copy its texture to memory.
+   */
   readback: 2,
+  /**
+   * It shows frames on a surface.
+   */
   presentation: 4,
 } as const;
 /** A bitwise OR of RenderSessionCapabilityFlag flags. */
 export type RenderSessionCapabilityFlag = number;
 
 /**
- * Any-thread render-session snapshot.
+ * The state of a render session at one moment.
  *
  * See `mln_render_session_snapshot` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export interface RenderSessionSnapshot {
   readonly state: RenderSessionState;
-  /**
-   * Logical extent applied by the driver.
-   */
   readonly extent: LogicalExtent;
-  /**
-   * Increases when the session's lifecycle state, target, or applied extent
-   * changes. An acquired texture frame reports the value it rendered under.
-   */
   readonly generation: bigint;
-  /**
-   * Generation of the latest map render update that the session has seen.
-   */
   readonly mapUpdateGeneration: bigint;
-  /**
-   * Map render update generation that the latest rendered frame drew. Zero
-   * before the first frame after attachment or a target replacement.
-   */
   readonly renderedUpdateGeneration: bigint;
-  /**
-   * Frame generation of the latest rendered frame, zero before the first.
-   */
   readonly frameGeneration: bigint;
-  /**
-   * Acquired frames that the host has not released or discarded.
-   */
   readonly acquiredFrameCount: number;
 }
 
 /**
- * Render-session lifecycle visible in snapshots.
+ * Where a render session is in its life.
  *
  * See `mln_render_session_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2063,15 +1858,6 @@ export const RenderSessionState = {
   attached: 2,
   detaching: 3,
   detached: 4,
-  /**
-   * Native rendering or driver work failed and the session can no longer
-   * render. This does not imply target or device loss. Read the first failure
-   * with `RenderSessionHandle.getFailure()`. The map also reports it as
-   * `RuntimeEventType.mapRenderError`; a failed attach reports it through its
-   * completion instead. Snapshots, frame-result drains, acquired-frame release,
-   * abandon, and dispose remain available. Dispose this session before
-   * attaching a replacement.
-   */
   failed: 5,
   abandoned: 6,
 } as const;
@@ -2081,38 +1867,51 @@ export type RenderSessionState =
   | (number & {});
 
 /**
- * One rendered-feature query hit.
+ * A feature that a rendered feature query found.
  *
  * See `mln_rendered_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface RenderedFeature {
+  /**
+   * The feature, as a GeoJSON feature.
+   */
   readonly feature: unknown;
+  /**
+   * The layer that drew the feature.
+   */
   readonly layerId: string;
   readonly sourceId: string;
+  /**
+   * The feature's source layer, or empty when its source has none.
+   */
   readonly sourceLayerId: string;
+  /**
+   * The feature's state, as a JSON object.
+   */
   readonly state: unknown;
 }
 
 /**
- * Options for rendered feature queries.
+ * Options for a rendered feature query.
  *
  * See `mln_rendered_feature_query_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface RenderedFeatureQueryOptions {
   /**
-   * Optional style layer IDs. When absent, all rendered layers are queried.
+   * The layers to query. Without them, the query covers every layer.
    */
   layerIds?: readonly string[];
   /**
-   * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * that each feature must match. Empty matches every feature.
    */
   filter?: unknown;
 }
 
 /**
- * Rendered feature query geometry descriptor.
+ * The screen area that a rendered feature query covers.
  *
  * See `mln_rendered_query_geometry` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -2123,38 +1922,50 @@ export type RenderedQueryGeometry =
   | { readonly kind: "lineString"; readonly value: ScreenLineString };
 
 /**
- * Rendering statistics of one finished frame.
+ * Statistics about the frames that a map renders.
  *
  * See `mln_rendering_stats` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RenderingStats {
   /**
-   * Frame CPU encoding time in seconds.
+   * The time that the frame took to encode, in seconds.
    */
   readonly encodingTime: number;
   /**
-   * Frame CPU rendering time in seconds.
+   * The time that the frame took to render, in seconds.
    */
   readonly renderingTime: number;
   /**
-   * Number of frames rendered by the native renderer.
+   * The frames rendered so far.
    */
   readonly frameCount: bigint;
   /**
-   * Draw calls executed during the most recent frame.
+   * The draw calls in the frame.
    */
   readonly drawCallCount: bigint;
   /**
-   * Total draw calls executed by the native renderer.
+   * The draw calls in every frame so far.
    */
   readonly totalDrawCallCount: bigint;
 }
 
+/**
+ * Why a resource request failed.
+ *
+ * See `mln_resource_error_reason` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourceErrorReason = {
   none: 0,
   notFound: 1,
+  /**
+   * The server reported an error.
+   */
   server: 2,
+  /**
+   * The server couldn't be reached.
+   */
   connection: 3,
   rateLimit: 4,
   other: 5,
@@ -2164,6 +1975,12 @@ export type ResourceErrorReason =
   | (typeof ResourceErrorReason)[keyof typeof ResourceErrorReason]
   | (number & {});
 
+/**
+ * The kind of a resource that the library loads.
+ *
+ * See `mln_resource_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourceKind = {
   unknown: 0,
   style: 1,
@@ -2180,9 +1997,7 @@ export type ResourceKind =
   | (number & {});
 
 /**
- * The resource kinds that a route or rule matches, one bit per `ResourceKind`
- * value. Registration rejects unknown bits. `ResourceKindFlag.all`, like zero,
- * selects every resource kind.
+ * A resource kind, as a bit in a set.
  *
  * See `mln_resource_kind_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2201,7 +2016,16 @@ export const ResourceKindFlag = {
 /** A bitwise OR of ResourceKindFlag flags. */
 export type ResourceKindFlag = number;
 
+/**
+ * Where a request may load its resource from.
+ *
+ * See `mln_resource_loading_method` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourceLoadingMethod = {
+  /**
+   * The cache or the network.
+   */
   all: 0,
   cacheOnly: 1,
   networkOnly: 2,
@@ -2211,6 +2035,12 @@ export type ResourceLoadingMethod =
   | (typeof ResourceLoadingMethod)[keyof typeof ResourceLoadingMethod]
   | (number & {});
 
+/**
+ * The priority of a resource request.
+ *
+ * See `mln_resource_priority` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourcePriority = {
   regular: 0,
   low: 1,
@@ -2221,61 +2051,59 @@ export type ResourcePriority =
   | (number & {});
 
 /**
- * Resource provider state. The callback runs asynchronously on the JavaScript
- * thread that registered it, after native queues the call.
+ * A resource provider, for `RuntimeHandle.setResourceProvider()`.
  *
  * See `mln_resource_provider` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface ResourceProvider {
-  /**
-   * Answers each request that the routes leave to the provider.
-   */
   callback: (
     request: ResourceRequestInfo,
     handle: ResourceRequestHandle,
   ) => void;
   /**
-   * The requests that reach the provider; empty to claim every request.
+   * The requests that the provider serves. Without routes, it serves every
+   * network request.
    */
   routes?: readonly ResourceRoute[];
 }
 
 /**
- * Inclusive byte range of a resource request.
+ * The bytes from `start` to `end` of a resource, both included.
  *
  * See `mln_resource_range` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface ResourceRange {
-  /**
-   * First byte offset of the requested range.
-   */
   readonly start: bigint;
-  /**
-   * Last byte offset of the requested range, inclusive.
-   */
   readonly end: bigint;
 }
 
 /**
- * Cancel callback for one handled resource request. The callback runs
- * asynchronously on the JavaScript thread that registered it, after native
- * queues the call.
+ * A cancel callback, for `ResourceRequestHandle.setCancelCallback()`.
  *
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export type ResourceRequestCancelHandler = () => void;
 
+/**
+ * A request that a resource provider serves.
+ *
+ * When the cache holds an earlier copy of the resource, the `prior_` fields
+ * describe it.
+ *
+ * See `mln_resource_request_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export interface ResourceRequestInfo {
   /**
-   * URL entering the network layer, before tile server normalization.
+   * The URL as the style names it.
    */
   readonly requestedUrl: string;
   /**
-   * URL to fetch, after resource-kind normalization against the runtime's tile
-   * server options and API key.
+   * The URL to load, after the library expands any shorthand in `requested_url`
+   * and before any resource transform. Routes match this URL.
    */
   readonly resolvedUrl: string;
   readonly kind: ResourceKind;
@@ -2283,39 +2111,58 @@ export interface ResourceRequestInfo {
   readonly priority: ResourcePriority;
   readonly usage: ResourceUsage;
   readonly storagePolicy: ResourceStoragePolicy;
+  /**
+   * The only bytes of the resource that the request wants.
+   */
   readonly range?: ResourceRange;
   readonly priorModifiedUnixMs?: bigint;
   readonly priorExpiresUnixMs?: bigint;
   /**
-   * Entity tag of the cached copy, or empty when there is none.
+   * Empty when the earlier copy has no ETag.
    */
   readonly priorEtag: string;
   readonly priorData: Uint8Array;
 }
 
 /**
- * A resource provider's answer to one request.
+ * The answer to a resource request.
  *
  * See `mln_resource_response` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface ResourceResponse {
   status?: ResourceResponseStatus;
+  /**
+   * Why the request failed, for `ResourceResponseStatus.error`.
+   */
   errorReason?: ResourceErrorReason;
   /**
-   * Response bytes.
+   * The resource, for `ResourceResponseStatus.ok`.
    */
   bytes?: Uint8Array;
+  /**
+   * A description of the error, for `ResourceResponseStatus.error`.
+   */
   errorMessage?: string;
+  /**
+   * Whether the library must request the resource again before it reuses this
+   * copy.
+   */
   mustRevalidate?: boolean;
   modifiedUnixMs?: bigint;
   expiresUnixMs?: bigint;
+  /**
+   * Empty when the resource has no ETag.
+   */
   etag?: string;
+  /**
+   * When to retry, for `ResourceResponseStatus.error`.
+   */
   retryAfterUnixMs?: bigint;
 }
 
 /**
- * How a resource provider answered a request.
+ * The outcome of a resource request.
  *
  * See `mln_resource_response_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2323,7 +2170,13 @@ export interface ResourceResponse {
 export const ResourceResponseStatus = {
   ok: 0,
   error: 1,
+  /**
+   * The resource exists and is empty.
+   */
   noContent: 2,
+  /**
+   * The earlier copy that the request's `prior_` fields describe is current.
+   */
   notModified: 3,
 } as const;
 /** One of the ResourceResponseStatus values, or a value this binding does not know. */
@@ -2332,23 +2185,26 @@ export type ResourceResponseStatus =
   | (number & {});
 
 /**
- * One request pattern that a resource provider claims.
+ * The requests that a resource provider serves.
  *
  * See `mln_resource_route` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface ResourceRoute {
   /**
-   * The resource kinds to match. Zero selects every kind.
+   * The kinds of resource that the route covers. Zero covers every kind.
    */
   kinds?: ResourceKindFlag;
   flags?: UrlMatchFlag;
-  /**
-   * The URL or glob pattern to compare.
-   */
   url?: string;
 }
 
+/**
+ * Whether the library keeps a loaded resource in its cache.
+ *
+ * See `mln_resource_storage_policy` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourceStoragePolicy = {
   permanent: 0,
   volatile: 1,
@@ -2359,8 +2215,7 @@ export type ResourceStoragePolicy =
   | (number & {});
 
 /**
- * Resource transform state. The callback runs asynchronously on the JavaScript
- * thread that registered it, after native queues the call.
+ * A resource transform callback, for `RuntimeHandle.setResourceTransform()`.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2371,6 +2226,12 @@ export type ResourceTransform = (
   request: ResourceTransformRequestHandle,
 ) => void;
 
+/**
+ * Whether a request loads a resource for a map or an offline region.
+ *
+ * See `mln_resource_usage` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 export const ResourceUsage = {
   online: 0,
   offline: 1,
@@ -2381,7 +2242,7 @@ export type ResourceUsage =
   | (number & {});
 
 /**
- * One delivered runtime event.
+ * An event that a runtime or one of its maps raised.
  *
  * See `mln_runtime_event` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2390,38 +2251,35 @@ export interface RuntimeEvent {
   readonly type: RuntimeEventType;
   readonly sourceType: RuntimeEventSourceType;
   /**
-   * Source handle: the `RuntimeHandle` or `MapHandle` that source_type selects.
+   * The runtime or map that raised the event, as `source_type` says.
    */
   readonly source: bigint;
   /**
-   * Map snapshot generation that the event reports, or zero when source_type is
-   * `RuntimeEventSourceType.runtime`.
+   * For a map event, a map snapshot with this generation or a later one
+   * includes what the event reports. Zero for a runtime event.
    */
   readonly generation: bigint;
   /**
-   * Secondary event detail whose meaning type selects; see `RuntimeEventType`.
+   * The `CameraChangeMode` for `RuntimeEventType.mapCameraWillChange` and
+   * `RuntimeEventType.mapCameraDidChange`.
    */
   readonly code: number;
   /**
-   * UTF-8 message, empty when this event carries no message.
+   * The error for an event that reports a failure, the image ID for
+   * `RuntimeEventType.mapStyleImageMissing`, or the source ID for
+   * `RuntimeEventType.mapSourceChanged` and `RuntimeEventType.mapTileAction`.
    */
   readonly message: string;
-  /**
-   * Typed payload selected by payload_type.
-   */
   readonly payload: RuntimeEventPayload;
 }
 
 /**
- * Bit values for the map and runtime event subscription masks.
+ * An event type, as a bit in a set.
  *
  * See `mln_runtime_event_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export const RuntimeEventFlag = {
-  /**
-   * Selects no event type.
-   */
   none: 0n,
   mapCameraWillChange: 2n,
   mapCameraIsChanging: 4n,
@@ -2448,53 +2306,33 @@ export const RuntimeEventFlag = {
   mapSpriteRequested: 8388608n,
   mapSpriteLoaded: 16777216n,
   mapSpriteError: 33554432n,
-  /**
-   * Selects every map-originated event type this version defines.
-   */
   allMapEvents: 66191358n,
-  /**
-   * Selects every runtime-originated event type this version defines.
-   */
   allRuntimeEvents: 917504n,
-  /**
-   * Selects every event type this version defines.
-   */
   all: 67108862n,
 } as const;
 /** A bitwise OR of RuntimeEventFlag flags. */
 export type RuntimeEventFlag = bigint;
 
 /**
- * Payload for `RuntimeEventType.mapGlyphsRequested`,
- * `RuntimeEventType.mapGlyphsLoaded`, and `RuntimeEventType.mapGlyphsError`.
+ * The details of a glyph event.
+ *
+ * The event covers the glyphs from `first` to `last`, both included.
  *
  * See `mln_runtime_event_glyphs` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventGlyphs {
   /**
-   * Font names of the font stack, in the style's order.
+   * The fonts that the glyphs come from, in order of preference.
    */
   readonly fontStack: readonly string[];
-  /**
-   * First glyph of the range.
-   */
   readonly first: number;
-  /**
-   * Last glyph of the range, inclusive.
-   */
   readonly last: number;
-  /**
-   * Whether the range stands for a whole font file that the style's font-faces
-   * names. MapLibre then loads the whole file, and first and last do not
-   * describe the glyphs it holds.
-   */
   readonly fontFace: boolean;
 }
 
 /**
- * Runtime and map event callback. The callback runs asynchronously on the
- * JavaScript thread that registered it, after native queues the call.
+ * An event callback, for `RuntimeHandle.setEventHandler()`.
  *
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2502,7 +2340,7 @@ export interface RuntimeEventGlyphs {
 export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
 
 /**
- * Payload for `RuntimeEventType.offlineRegionResponseError`.
+ * The details of `RuntimeEventType.offlineRegionResponseError`.
  *
  * See `mln_runtime_event_offline_region_response_error` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2513,7 +2351,7 @@ export interface RuntimeEventOfflineRegionResponseError {
 }
 
 /**
- * Payload for `RuntimeEventType.offlineRegionStatusChanged`.
+ * The details of `RuntimeEventType.offlineRegionStatusChanged`.
  *
  * See `mln_runtime_event_offline_region_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2524,18 +2362,21 @@ export interface RuntimeEventOfflineRegionStatus {
 }
 
 /**
- * Payload for `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
+ * The details of `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
  *
  * See `mln_runtime_event_offline_region_tile_count_limit` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventOfflineRegionTileCountLimit {
   readonly regionId: bigint;
+  /**
+   * The number of Mapbox tiles that offline regions may hold.
+   */
   readonly limit: bigint;
 }
 
 /**
- * Typed event payload carried inline by every event.
+ * The details of an event, in the member that its `payload_type` names.
  *
  * See `mln_runtime_event_payload` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2566,26 +2407,20 @@ export type RuntimeEventPayload =
     };
 
 /**
- * Payload for `RuntimeEventType.mapRenderFrameFinished`.
+ * The details of `RuntimeEventType.mapRenderFrameFinished`.
  *
  * See `mln_runtime_event_render_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventRenderFrame {
   readonly mode: RenderMode;
-  /**
-   * Whether MapLibre needs another frame after this one.
-   */
   readonly needsRepaint: boolean;
-  /**
-   * Whether symbol placement changed during this frame.
-   */
   readonly placementChanged: boolean;
   readonly stats: RenderingStats;
 }
 
 /**
- * Payload for `RuntimeEventType.mapRenderMapFinished`.
+ * The details of `RuntimeEventType.mapRenderMapFinished`.
  *
  * See `mln_runtime_event_render_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2595,7 +2430,7 @@ export interface RuntimeEventRenderMap {
 }
 
 /**
- * Source kinds used by `RuntimeEvent.sourceType`.
+ * The kind of handle that raised an event.
  *
  * See `mln_runtime_event_source_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2610,27 +2445,20 @@ export type RuntimeEventSourceType =
   | (number & {});
 
 /**
- * Payload for `RuntimeEventType.mapSpriteRequested`,
- * `RuntimeEventType.mapSpriteLoaded`, and `RuntimeEventType.mapSpriteError`.
+ * The details of a sprite event.
+ *
+ * `id` and `url` are both empty when the style has no sprite.
  *
  * See `mln_runtime_event_sprite` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventSprite {
-  /**
-   * Sprite ID: the id of an entry in the style's sprite array, or "default"
-   * when the style names one sprite URL.
-   */
   readonly id: string;
-  /**
-   * Sprite URL as the style names it, without the pixel-ratio suffix and file
-   * extension that MapLibre appends to request the image and JSON.
-   */
   readonly url: string;
 }
 
 /**
- * Payload for `RuntimeEventType.mapTileAction`.
+ * The details of `RuntimeEventType.mapTileAction`.
  *
  * See `mln_runtime_event_tile_action` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2641,7 +2469,12 @@ export interface RuntimeEventTileAction {
 }
 
 /**
- * Runtime event types carried by `RuntimeEvent.type`.
+ * The kind of an event.
+ *
+ * Only maps in `MapMode.continuous` raise
+ * `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
+ * render frame and render map events. Offline region events come only for the
+ * regions that `RuntimeHandle.setOfflineRegionObserved()` observes.
  *
  * See `mln_runtime_event_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2651,9 +2484,20 @@ export const RuntimeEventType = {
   mapCameraIsChanging: 2,
   mapCameraDidChange: 3,
   mapStyleLoaded: 4,
+  /**
+   * The map started to load a style.
+   */
   mapLoadingStarted: 5,
+  /**
+   * The map loaded its style and everything that the current view needs, and
+   * rendered the result.
+   */
   mapLoadingFinished: 6,
   mapLoadingFailed: 7,
+  /**
+   * The map rendered a complete frame and has nothing left to load, animate, or
+   * redraw.
+   */
   mapIdle: 8,
   mapRenderError: 9,
   mapRenderFrameStarted: 10,
@@ -2661,10 +2505,20 @@ export const RuntimeEventType = {
   mapRenderMapStarted: 12,
   mapRenderMapFinished: 13,
   mapStyleImageMissing: 14,
+  /**
+   * A tile moved to another step of loading.
+   */
   mapTileAction: 15,
   mapSourceChanged: 16,
   offlineRegionStatusChanged: 17,
+  /**
+   * A resource that the region needs failed to download.
+   */
   offlineRegionResponseError: 18,
+  /**
+   * The region stopped downloading Mapbox tiles because offline regions hold as
+   * many as the limit allows.
+   */
   offlineRegionTileCountLimitExceeded: 19,
   mapGlyphsRequested: 20,
   mapGlyphsLoaded: 21,
@@ -2679,26 +2533,26 @@ export type RuntimeEventType =
   | (number & {});
 
 /**
- * Options used when creating a runtime.
+ * Options for `RuntimeHandle.create()`.
  *
  * See `mln_runtime_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeOptions {
   /**
-   * Directory root for asset:// URLs. Copied during runtime creation. Empty
-   * selects `/android_asset` on Android and `.` elsewhere.
+   * The directory that `asset://` URLs load from. Empty uses the working
+   * directory, or the app's assets on Android.
    */
   assetPath?: string;
   /**
-   * Cache database path. Copied during runtime creation. Empty selects an
-   * in-memory cache.
+   * The database file that holds the ambient cache and offline regions. Empty
+   * keeps them in memory.
    */
   cachePath?: string;
 }
 
 /**
- * Screen-space box in logical map pixels.
+ * A rectangle of the screen, from its `min` corner to its `max` corner.
  *
  * See `mln_screen_box` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -2709,21 +2563,17 @@ export interface ScreenBox {
 }
 
 /**
- * Screen-space line string in logical map pixels.
+ * A line through points on the screen.
  *
  * See `mln_screen_line_string` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface ScreenLineString {
-  /**
-   * Points.
-   */
   points?: readonly ScreenPoint[];
 }
 
 /**
- * Screen-space point in logical map pixels, from the top-left of the viewport
- * with y growing downward.
+ * A point on the screen, in logical pixels from the map's top-left corner.
  *
  * See `mln_screen_point` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2734,35 +2584,43 @@ export interface ScreenPoint {
 }
 
 /**
- * One source-feature query hit.
+ * A feature that a source feature query found.
  *
  * See `mln_source_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface SourceFeature {
+  /**
+   * The feature, as a GeoJSON feature.
+   */
   readonly feature: unknown;
+  /**
+   * The feature's source layer, or empty when its source has none.
+   */
   readonly sourceLayerId: string;
 }
 
 /**
- * Options for source feature queries.
+ * Options for a source feature query.
  *
  * See `mln_source_feature_query_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface SourceFeatureQueryOptions {
   /**
-   * Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+   * The source layers to query. A vector source finds features only in the
+   * source layers named here.
    */
   sourceLayerIds?: readonly string[];
   /**
-   * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * that each feature must match. Empty matches every feature.
    */
   filter?: unknown;
 }
 
 /**
- * Status values returned by status-returning functions.
+ * The result of a call or of asynchronous work.
  *
  * See `mln_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -2770,43 +2628,45 @@ export interface SourceFeatureQueryOptions {
 export const Status = {
   ok: 0,
   /**
-   * A pointer, size field, mask, or handle argument was invalid.
+   * An argument is invalid, such as malformed JSON or a value out of range.
    */
   invalidArgument: -1,
   /**
-   * The object is valid but not currently in a state that permits the call.
+   * The call doesn't fit the current state, such as removing a source that a
+   * layer still uses.
    */
   invalidState: -2,
   /**
-   * The handle is thread-affine and the call came from the wrong thread.
+   * The call came from a thread that can't make it.
    */
   wrongThread: -3,
   /**
-   * The entry point or requested behavior is unavailable in this build.
+   * The platform, the build, or the render target lacks the feature.
    */
   unsupported: -4,
   /**
-   * Native code failed; the diagnostic describes the error.
+   * The library or the platform hit an error, such as a failed graphics driver
+   * call.
    */
   nativeError: -5,
   /**
-   * The operation reached its terminal cancelled disposition.
+   * The work stopped before it finished, such as when its handle was released.
    */
   cancelled: -6,
   /**
-   * A conflicting driver call or lifecycle transition is in flight.
+   * Another call is still using the same object.
    */
   busy: -7,
   /**
-   * The render target or graphics receiver was irreversibly lost.
+   * The render target can't be drawn to anymore.
    */
   targetLost: -8,
   /**
-   * A nonblocking drain or acquisition has nothing to return yet.
+   * There is nothing to return yet, such as when no new frame is ready.
    */
   notReady: -9,
   /**
-   * A call named an ID with no live object behind it.
+   * Nothing has the given ID.
    */
   notFound: -10,
 } as const;
@@ -2814,62 +2674,57 @@ export const Status = {
 export type Status = (typeof Status)[keyof typeof Status] | (number & {});
 
 /**
- * What a parsed expression depends on.
+ * What a style expression's result depends on.
  *
  * See `mln_style_expression_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 export interface StyleExpressionInfo {
   /**
-   * Whether the result is the same for every feature and feature state.
+   * True when the result doesn't depend on the feature or its state.
    */
   readonly isFeatureConstant: boolean;
   /**
-   * Whether the result is the same at every zoom.
+   * True when the result doesn't depend on the zoom level.
    */
   readonly isZoomConstant: boolean;
 }
 
 /**
- * What one evaluation reads.
+ * The inputs that a style expression reads while it evaluates.
  *
  * See `mln_style_expression_inputs` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 export interface StyleExpressionInputs {
-  /**
-   * The value of the zoom expression.
-   */
   zoom?: number;
   /**
-   * The value of the heatmap-density and line-progress expressions, and of the
-   * elevation expression in a color-relief layer.
+   * The value that `heatmap-density` and `line-progress` read.
    */
   colorRampParameter?: number;
   /**
-   * The value of the elevation expression outside a color-relief layer.
+   * The value that `elevation` reads when `color_ramp_parameter` isn't set.
    */
   elevation?: number;
   /**
-   * One UTF-8 GeoJSON Feature that feature data expressions read.
+   * The feature to evaluate against, as a GeoJSON feature, or empty for none.
    */
   feature?: unknown;
   /**
-   * A UTF-8 JSON object that the feature-state expression reads.
+   * The feature's state, as a JSON object, or empty for none.
    */
   featureState?: unknown;
   /**
-   * A UTF-8 JSON object that the global-state expression reads.
+   * The values that `global-state` reads, as a JSON object, or empty for none.
    */
   globalState?: unknown;
   /**
-   * The tile that holds the feature, which the within and distance expressions
-   * need to place its geometry.
+   * The tile that holds the feature. `within` and `distance` need it to read
+   * the feature's geometry.
    */
   canonicalTileId?: CanonicalTileId;
   /**
-   * The image IDs that the image expression reports as available. The
-   * expression reports any other ID as unavailable.
+   * The IDs of the images that `image` treats as available.
    */
   availableImages?: readonly string[];
 }
@@ -2882,15 +2737,13 @@ export interface StyleExpressionInputs {
  */
 export interface StyleExpressionOptions {
   /**
-   * The type that the expression must produce. A string type coerces the result
-   * to a string, as a string layer property does; every other type asserts it.
-   * Without it, the expression keeps the type it infers.
+   * The type that the result must have.
    */
   expectedType?: StyleExpressionType;
 }
 
 /**
- * A style expression type.
+ * The type of a style expression's result.
  *
  * See `mln_style_expression_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -2898,24 +2751,25 @@ export interface StyleExpressionOptions {
 export interface StyleExpressionType {
   kind?: StyleExpressionTypeKind;
   /**
-   * For an array, its items' kind; ignored for any other kind.
+   * The type of each item when `kind` is `StyleExpressionTypeKind.array`. It
+   * can't be an array itself.
    */
   itemKind?: StyleExpressionTypeKind;
   /**
-   * For an array, its fixed length, or zero for any length.
+   * The length of an array, or 0 for any length.
    */
   itemCount?: number;
 }
 
 /**
- * Style expression types that a parsed expression may be required to have.
+ * The type of a style expression's result, or of the items of an array result.
  *
  * See `mln_style_expression_type_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 export const StyleExpressionTypeKind = {
   /**
-   * Any value.
+   * Any type.
    */
   value: 0,
   number: 1,
@@ -2924,15 +2778,9 @@ export const StyleExpressionTypeKind = {
   color: 4,
   object: 5,
   formatted: 6,
-  /**
-   * A resolved image, as the image expression returns.
-   */
   image: 7,
   padding: 8,
   variableAnchorOffsetCollection: 9,
-  /**
-   * An array whose items have item_kind, which is not itself an array.
-   */
   array: 10,
 } as const;
 /** One of the StyleExpressionTypeKind values, or a value this binding does not know. */
@@ -2941,102 +2789,60 @@ export type StyleExpressionTypeKind =
   | (number & {});
 
 /**
- * One complete runtime style image.
+ * An image in the map's style.
  *
  * See `mln_style_image_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleImageInfo {
-  /**
-   * Image width in pixels.
-   */
   readonly width: number;
-  /**
-   * Image height in pixels.
-   */
   readonly height: number;
   /**
-   * Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes,
-   * top row first.
+   * The premultiplied RGBA pixels, in rows of `width` &#42; 4 bytes, from the
+   * top row down.
    */
   readonly pixels: Uint8Array;
-  /**
-   * Horizontally stretchable intervals.
-   */
   readonly stretchX: readonly ImageStretch[];
-  /**
-   * Vertically stretchable intervals.
-   */
   readonly stretchY: readonly ImageStretch[];
-  /**
-   * Content box, when the image sets one.
-   */
   readonly content?: ImageContent;
-  /**
-   * How the image fits text horizontally, when it sets this.
-   */
   readonly textFitWidth?: StyleImageTextFit;
-  /**
-   * How the image fits text vertically, when it sets this.
-   */
   readonly textFitHeight?: StyleImageTextFit;
-  /**
-   * Sprite pixel ratio.
-   */
   readonly pixelRatio: number;
-  /**
-   * Whether the image is a signed distance field icon.
-   */
   readonly sdf: boolean;
-  /**
-   * Whether the map keeps the image once no loaded tile uses it.
-   */
   readonly keepUnused: boolean;
 }
 
 /**
- * Options for runtime style images.
+ * Options for a style image, as the
+ * &#91;sprite&#93;(https://maplibre.org/maplibre-style-spec/sprite/) spec
+ * describes them.
  *
  * See `mln_style_image_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleImageOptions {
   /**
-   * Horizontally stretchable intervals.
+   * The ranges of columns that stretch, in increasing order without overlap.
    */
   stretchX?: readonly ImageStretch[];
   /**
-   * Vertically stretchable intervals.
+   * The ranges of rows that stretch, in increasing order without overlap.
    */
   stretchY?: readonly ImageStretch[];
-  /**
-   * Content box used when icon-text-fit applies.
-   */
   content?: ImageContent;
-  /**
-   * Absent selects STRETCH_OR_SHRINK.
-   */
   textFitWidth?: StyleImageTextFit;
-  /**
-   * Absent selects STRETCH_OR_SHRINK.
-   */
   textFitHeight?: StyleImageTextFit;
-  /**
-   * Sprite pixel ratio. Absent selects 1.
-   */
   pixelRatio?: number;
-  /**
-   * Whether the image is a signed distance field icon. Absent selects false.
-   */
   sdf?: boolean;
   /**
-   * Keeps the image once no loaded tile uses it. Absent selects false.
+   * Keeps the image after no layer uses it. Without this, the map can remove an
+   * image that it asked for through `RuntimeEventType.mapStyleImageMissing`.
    */
   keepUnused?: boolean;
 }
 
 /**
- * How a stretchable image fits text along one axis.
+ * How an image stretches to fit text along one axis.
  *
  * See `mln_style_image_text_fit` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3052,41 +2858,36 @@ export type StyleImageTextFit =
   | (number & {});
 
 /**
- * One style layer.
+ * A layer in the map's style.
  *
  * See `mln_style_layer_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleLayerInfo {
-  /**
-   * Layer ID.
-   */
   readonly id: string;
   /**
-   * The style-spec layer type string.
+   * The layer's
+   * &#91;type&#93;(https://maplibre.org/maplibre-style-spec/layers/#type), such
+   * as `fill`.
    */
   readonly type: string;
-  /**
-   * Source ID. Empty for a layer type that takes no source.
-   */
   readonly sourceId: string;
-  /**
-   * Source-layer ID. Empty when the layer sets none.
-   */
   readonly sourceLayer: string;
   /**
-   * Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+   * The zoom level where the layer starts to show, or negative infinity when
+   * the layer doesn't set one.
    */
   readonly minZoom: number;
   /**
-   * Highest zoom at which the layer draws; INFINITY with no upper bound.
+   * The zoom level where the layer stops showing, or infinity when the layer
+   * doesn't set one.
    */
   readonly maxZoom: number;
   readonly visibility: StyleLayerVisibility;
 }
 
 /**
- * Layer visibility values used by the visibility setter and layer info.
+ * Whether a layer shows.
  *
  * See `mln_style_layer_visibility` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3101,7 +2902,7 @@ export type StyleLayerVisibility =
   | (number & {});
 
 /**
- * DEM raster encoding values.
+ * How a raster DEM tile encodes elevation in its colors.
  *
  * See `mln_style_raster_dem_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3116,75 +2917,42 @@ export type StyleRasterDemEncoding =
   | (number & {});
 
 /**
- * Complete metadata of one style source.
+ * A source in the map's style.
  *
  * See `mln_style_source_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleSourceInfo {
-  /**
-   * Source ID.
-   */
   readonly id: string;
   readonly type: StyleSourceType;
-  /**
-   * Whether the source is marked volatile.
-   */
   readonly isVolatile: boolean;
-  /**
-   * Attribution string, or empty when the source sets none.
-   */
   readonly attribution: string;
-  /**
-   * URL that the source loads from, or empty when it has none.
-   */
   readonly url: string;
   /**
-   * Inline TileJSON metadata, when the source was defined with it.
+   * The tiles that the style lists in the source itself, instead of at a URL.
    */
   readonly tileJson?: StyleSourceTileInfo;
-  /**
-   * Geographic bounds, when inline TileJSON sets them.
-   */
   readonly bounds?: LatLngBounds;
-  /**
-   * Tile size in pixels, for a tile source.
-   */
   readonly tileSize?: number;
-  /**
-   * Vector tile encoding, for a vector source.
-   */
   readonly vectorEncoding?: StyleVectorTileEncoding;
-  /**
-   * DEM raster encoding, when inline TileJSON sets one.
-   */
   readonly rasterEncoding?: StyleRasterDemEncoding;
 }
 
 /**
- * Inline TileJSON metadata of a tile source.
+ * The tiles of a source, as the style lists them.
  *
  * See `mln_style_source_tile_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleSourceTileInfo {
-  /**
-   * Tile URL templates in TileJSON order.
-   */
   readonly tileUrls: readonly string[];
-  /**
-   * Lowest zoom level the TileJSON provides tiles for.
-   */
   readonly minZoom: number;
-  /**
-   * Highest zoom level the TileJSON provides tiles for.
-   */
   readonly maxZoom: number;
   readonly scheme: StyleTileScheme;
 }
 
 /**
- * Style source type values returned by source metadata queries.
+ * The type of a style source.
  *
  * See `mln_style_source_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3207,7 +2975,7 @@ export type StyleSourceType =
   | (number & {});
 
 /**
- * Tile URL coordinate scheme values.
+ * Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
  *
  * See `mln_style_tile_scheme` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3222,30 +2990,24 @@ export type StyleTileScheme =
   | (number & {});
 
 /**
- * Global style transition options.
+ * The default
+ * &#91;transition&#93;(https://maplibre.org/maplibre-style-spec/transition/)
+ * for changes to a style's paint properties.
  *
  * See `mln_style_transition_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface StyleTransitionOptions {
-  /**
-   * Transition duration in milliseconds. Must be finite, non-negative, and
-   * short enough to represent as a duration.
-   */
   durationMs?: number;
-  /**
-   * Transition delay in milliseconds. Must be finite, non-negative, and short
-   * enough to represent as a duration.
-   */
   delayMs?: number;
   /**
-   * Whether symbol placement changes cross-fade.
+   * Whether symbols fade in and out as the map places them.
    */
   enablePlacementTransitions?: boolean;
 }
 
 /**
- * Vector tile encoding values.
+ * The format of vector tiles.
  *
  * See `mln_style_vector_tile_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3260,46 +3022,44 @@ export type StyleVectorTileEncoding =
   | (number & {});
 
 /**
- * CPU image readback metadata for a texture target frame.
+ * The layout of the pixels that `RenderSessionHandle.readTexture()` reads.
  *
  * See `mln_texture_image_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface TextureImageInfo {
-  /**
-   * Physical image width in device pixels.
-   */
   readonly width: number;
-  /**
-   * Physical image height in device pixels.
-   */
   readonly height: number;
   /**
-   * Bytes per image row.
+   * The bytes from the start of one row to the start of the next.
    */
   readonly stride: number;
-  /**
-   * Required output buffer byte length.
-   */
   readonly byteLength: bigint;
 }
 
 /**
- * Texture readback.
+ * The pixels that `RenderSessionHandle.readTexture()` reads.
  *
  * See `mln_texture_readback_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface TextureReadbackResult {
   /**
-   * Pixel bytes.
+   * Premultiplied RGBA pixels with 8 bits per channel, in rows from top to
+   * bottom.
    */
   readonly data: Uint8Array;
   readonly info: TextureImageInfo;
 }
 
 /**
- * Overscaled tile identity reported in tile observer events.
+ * The ID of a tile.
+ *
+ * `canonical_x` and `canonical_y` place the tile in the source's grid at zoom
+ * `canonical_z`. `overscaled_z` is the zoom that the map draws the tile at, and
+ * is greater when the source has no tiles that deep. `wrap` says which copy of
+ * the world holds the tile: zero for the main one, negative to the west, and
+ * positive to the east.
  *
  * See `mln_tile_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3313,13 +3073,19 @@ export interface TileId {
 }
 
 /**
- * Tile LOD algorithms used by `MapTileOptions`.
+ * How the map picks the level of detail of its tiles.
  *
  * See `mln_tile_lod_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const TileLodMode = {
+  /**
+   * Uses the most detail at the center of the screen.
+   */
   default: 0,
+  /**
+   * Uses the most detail closest to the camera.
+   */
   distance: 1,
 } as const;
 /** One of the TileLodMode values, or a value this binding does not know. */
@@ -3328,7 +3094,7 @@ export type TileLodMode =
   | (number & {});
 
 /**
- * Tile operations reported by tile observer events.
+ * A step in loading a tile.
  *
  * See `mln_tile_operation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3350,7 +3116,10 @@ export type TileOperation =
   | (number & {});
 
 /**
- * Cubic easing curve for animated camera transitions.
+ * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
+ * and (`x2`, `y2`).
+ *
+ * `x1` and `x2` are between 0 and 1.
  *
  * See `mln_unit_bezier` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3363,7 +3132,9 @@ export interface UnitBezier {
 }
 
 /**
- * How a rule or route compares its url against a request URL.
+ * How a URL pattern matches a request's URL.
+ *
+ * A pattern matches the whole URL, query included.
  *
  * See `mln_url_match_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3371,7 +3142,11 @@ export interface UnitBezier {
 export const UrlMatchFlag = {
   exact: 0,
   /**
-   * Reads url as a glob pattern.
+   * The URL matches the pattern as a glob. `*` matches any characters except
+   * `/`, `**` matches any characters, and `?` matches one character except `/`.
+   * `\` makes the next character match only itself. For example,
+   * `https:// *.example.com/tiles/ **` matches every URL under `/tiles/` on each
+   * subdomain of `example.com`.
    */
   glob: 1,
 } as const;
@@ -3379,7 +3154,7 @@ export const UrlMatchFlag = {
 export type UrlMatchFlag = number;
 
 /**
- * Three-component vector used by free camera options.
+ * A vector in three dimensions.
  *
  * See `mln_vec3` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3391,13 +3166,16 @@ export interface Vec3 {
 }
 
 /**
- * Viewport orientation modes used by `MapViewportOptions`.
+ * The vertical direction of the image that the map renders.
  *
  * See `mln_viewport_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const ViewportMode = {
   default: 0,
+  /**
+   * Renders the image upside down.
+   */
   flippedY: 1,
 } as const;
 /** One of the ViewportMode values, or a value this binding does not know. */
@@ -3406,132 +3184,113 @@ export type ViewportMode =
   | (number & {});
 
 /**
- * One caller-owned Vulkan image of a borrowed texture ring.
+ * A Vulkan image of a borrowed ring.
  *
  * See `mln_vulkan_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface VulkanBorrowedTexture {
   /**
-   * Borrowed VkImage. Required.
+   * Your VkImage.
    */
   image: bigint;
   /**
-   * Borrowed VkImageView for image. Required. The view must be a 2D color view
-   * that matches image and the descriptor's format.
+   * A 2D VkImageView of `image` with one mip level and one layer.
    */
   imageView: bigint;
 }
 
 /**
- * Vulkan attachment options for a borrowed texture target.
+ * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`
+ * and `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+ *
+ * `extent` sets the map's size and scale factor, and `physical_width` and
+ * `physical_height` give the images' size in pixels. Each image must have that
+ * size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the
+ * context's device.
+ *
+ * The session uses the images until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
  *
  * See `mln_vulkan_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface VulkanBorrowedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. physical_width and physical_height give
-   * the texture's size. A scale_factor that differs from the map's is accepted
-   * and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Physical image width in device pixels. Required.
-   */
   physicalWidth: number;
-  /**
-   * Physical image height in device pixels. Required.
-   */
   physicalHeight: number;
-  /**
-   * Borrowed Vulkan context. All handles are required.
-   */
   context: VulkanContextDescriptor;
-  /**
-   * The ring's images, one per slot, in slot order. Required.
-   */
   textures: readonly VulkanBorrowedTexture[];
   /**
-   * Backend-native VkFormat value of every image. Required, so
-   * VK_FORMAT_UNDEFINED is invalid.
+   * The images' VkFormat.
    */
   format: number;
   /**
-   * Backend-native VkImageLayout value left after rendering succeeds, such as
-   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-   * VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
-   * takes the image in any layout and the host returns no layout.
+   * The VkImageLayout that each frame leaves its image in.
    */
   finalLayout: number;
-  /**
-   * The queue family that owns each image while the host holds its frame.
-   * Unless it is the graphics queue's family, the session releases a frame's
-   * image to it in final_layout, before the frame's producer synchronization,
-   * and, since a render clears the image, takes it back without a transfer. A
-   * replacement keeps the owner the session attached with.
-   */
   owner?: VulkanImageOwner;
 }
 
 /**
- * Vulkan backend context fields shared by Vulkan render targets.
+ * The Vulkan device and queue that a render session uses.
+ *
+ * Keep these objects alive until a detach or disposal of the session completes,
+ * or an abandon of it returns.
  *
  * See `mln_vulkan_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface VulkanContextDescriptor {
   /**
-   * Borrowed VkInstance. Required.
+   * A `VkInstance`.
    */
   instance: bigint;
   /**
-   * Borrowed VkPhysicalDevice. Required.
+   * A `VkPhysicalDevice`.
    */
   physicalDevice: bigint;
   /**
-   * Borrowed VkDevice. Required.
+   * A `VkDevice`.
    */
   device: bigint;
   /**
-   * Borrowed graphics VkQueue. Required. The session's driver submits to it
-   * from its own thread, so a host that uses the same queue passes
-   * `RenderSessionAttachOptions.queueLock` at attach.
+   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
+   * you submit to it too, set `RenderSessionAttachOptions.queueLock`.
    */
   graphicsQueue: bigint;
-  /**
-   * Queue family index for graphics_queue. Must support graphics commands.
-   */
   graphicsQueueFamilyIndex?: number;
   /**
-   * PFN_vkGetInstanceProcAddr for the loader that created the instance.
+   * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
    */
   getInstanceProcAddr?: bigint;
   /**
-   * PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
+   * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
    */
   getDeviceProcAddr?: bigint;
 }
 
 /**
- * The queue family that holds a borrowed Vulkan image between frames.
+ * The queue family that a borrowed image goes to after each frame.
+ *
+ * With `VulkanImageOwner.external` or `VulkanImageOwner.foreign`, acquire the
+ * image on your side before you read it. You don't need to release it back.
  *
  * See `mln_vulkan_image_owner` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export const VulkanImageOwner = {
   /**
-   * The context's graphics queue family keeps the image.
+   * The image stays with the queue family of `graphics_queue_family_index`.
    */
   graphicsQueue: 0,
   /**
-   * VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
-   * image's memory.
+   * Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
    */
   external: 1,
   /**
-   * VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
-   * VK_EXT_queue_family_foreign.
+   * Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT.
    */
   foreign: 2,
 } as const;
@@ -3541,108 +3300,86 @@ export type VulkanImageOwner =
   | (number & {});
 
 /**
- * Vulkan attachment options for an owned texture target.
+ * A ring of Vulkan images that the session creates, for
+ * `MapHandle.attachVulkanOwnedTexture()`.
+ *
+ * Each frame leaves its image in the layout that `VulkanTextureFrame.layout`
+ * reports, owned by the queue family of `graphics_queue_family_index`.
  *
  * See `mln_vulkan_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface VulkanOwnedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed Vulkan context. All handles are required.
-   */
   context: VulkanContextDescriptor;
 }
 
 /**
- * Vulkan attachment options for a native surface.
+ * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and
+ * `RenderSessionHandle.setVulkanSurfaceTarget()`.
+ *
+ * The device must have VK_KHR_swapchain enabled, and the queue family of
+ * `graphics_queue_family_index` must support presenting to the surface. The
+ * session creates the swapchain. It uses the surface until a replacement or
+ * release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
  *
  * See `mln_vulkan_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 export interface VulkanSurfaceDescriptor {
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed Vulkan context. All handles are required. The device must support
-   * VK_KHR_swapchain, and the queue family must support graphics and
-   * presentation to this descriptor's surface.
-   */
   context: VulkanContextDescriptor;
   /**
-   * Borrowed VkSurfaceKHR bit pattern. Required.
+   * Your VkSurfaceKHR.
    */
   surface: bigint;
 }
 
 /**
- * Vulkan frame acquired from a texture ring.
+ * The Vulkan image of an acquired frame.
  *
  * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface VulkanTextureFrame {
-  /**
-   * Session generation that produced this frame.
-   */
   readonly generation: bigint;
-  /**
-   * Physical Vulkan image width in device pixels.
-   */
   readonly width: number;
-  /**
-   * Physical Vulkan image height in device pixels.
-   */
   readonly height: number;
-  /**
-   * UI-to-device pixel scale used for this frame.
-   */
   readonly scaleFactor: number;
-  /**
-   * Opaque identity of this frame.
-   */
   readonly frameId: bigint;
   /**
-   * Ring slot that holds this frame. For a borrowed target, the index of its
-   * image in the descriptor's textures array.
+   * The image's index in the ring. For a borrowed ring, it indexes the
+   * descriptor's `textures`.
    */
   readonly slot: number;
   /**
-   * Borrowed VkImage bit pattern. Valid until frame release.
+   * The VkImage.
    */
   readonly image: bigint;
   /**
-   * Borrowed VkImageView bit pattern. Valid until frame release.
+   * The VkImageView.
    */
   readonly imageView: bigint;
   /**
-   * Borrowed VkDevice. Valid until frame release.
+   * The image's VkDevice.
    */
   readonly device: bigint;
   /**
-   * Backend-native VkFormat value.
+   * The image's VkFormat.
    */
   readonly format: number;
   /**
-   * Backend-native VkImageLayout value that the image is in:
-   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
-   * descriptor's final_layout for a borrowed one.
+   * The VkImageLayout that the frame left the image in.
    */
   readonly layout: number;
 }
 
 /**
- * Receiver wake callback copied by a successful owning call. The callback
- * schedules service by the receiver and returns without waiting for another
- * thread. The callback runs asynchronously on the JavaScript thread that
- * registered it, after native queues the call.
+ * A callback that tells the caller when work is ready.
+ *
+ * The callback runs asynchronously on the JavaScript thread that registered it,
+ * after native queues the call.
  *
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
@@ -3669,17 +3406,16 @@ export const Wake = {
 
 /** The fields of a native {@link Wake}, as native addresses. */
 export interface NativeWakeFields {
+  /**
+   * Null to turn the wake off.
+   */
   readonly callback: bigint;
   readonly userData?: bigint;
-  /**
-   * Optional. Releases user_data after all callback invocations have returned.
-   * A disabled wake leaves it null.
-   */
   readonly releaseUserData?: bigint;
 }
 
 /**
- * WebGL context fields shared by OpenGL render targets in the browser.
+ * The WebGL context or canvas that a render session uses.
  *
  * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -3687,30 +3423,30 @@ export interface NativeWakeFields {
 export interface WebGlContextDescriptor {
   kind?: WebGlContextKind;
   /**
-   * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
+   * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
    */
   context?: number;
   /**
-   * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-   * canvas must still be transferable when attachment starts.
+   * The canvas's CSS selector, for a transferred canvas.
    */
   canvasSelector?: string;
 }
 
 /**
- * WebGL context placement.
+ * How a render session gets its WebGL context.
  *
  * See `mln_web_gl_context_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const WebGlContextKind = {
   /**
-   * Use a host-created context on its current browser agent.
+   * The session uses a context that you created with
+   * `emscripten_webgl_create_context()`.
    */
   existing: 0,
   /**
-   * Transfer the canvas named by canvas_selector to a native worker and create
-   * a WebGL 2 context there.
+   * The library transfers the canvas that `canvas_selector` names to a worker
+   * and creates the context there.
    */
   transferredCanvas: 1,
 } as const;
@@ -3720,199 +3456,159 @@ export type WebGlContextKind =
   | (number & {});
 
 /**
- * One caller-owned WebGPU texture of a borrowed texture ring.
+ * A WebGPU texture of a borrowed ring.
  *
  * See `mln_web_gpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface WebGpuBorrowedTexture {
   /**
-   * Borrowed WGPUTexture. Required.
+   * Your WGPUTexture.
    */
   texture: bigint;
   /**
-   * Borrowed WGPUTextureView for texture. Required. The view must be a 2D color
-   * view compatible with texture and the descriptor's format.
+   * A WGPUTextureView of `texture`.
    */
   textureView: bigint;
 }
 
 /**
- * WebGPU attachment options for a borrowed texture target.
+ * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()`
+ * and `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
+ *
+ * `extent` sets the map's size and scale factor, and `physical_width` and
+ * `physical_height` give the textures' size in pixels. Each texture must be 2D
+ * with that size, `format`, one layer, one mip level, one sample, and
+ * WGPUTextureUsage_RenderAttachment.
+ *
+ * The session uses the textures until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
  *
  * See `mln_web_gpu_borrowed_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface WebGpuBorrowedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. physical_width and physical_height give
-   * the texture's size. A scale_factor that differs from the map's is accepted
-   * and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Physical texture width in device pixels. Required.
-   */
   physicalWidth: number;
-  /**
-   * Physical texture height in device pixels. Required.
-   */
   physicalHeight: number;
-  /**
-   * Borrowed WebGPU context. device is required. Rendering is submitted through
-   * context.queue or that device's default queue.
-   */
   context: WebGpuContextDescriptor;
-  /**
-   * The ring's textures, one per slot, in slot order. Required.
-   */
   textures: readonly WebGpuBorrowedTexture[];
   /**
-   * Backend-native WGPUTextureFormat value of every texture. Required, so
-   * Undefined is invalid.
+   * The textures' WGPUTextureFormat.
    */
   format: number;
 }
 
 /**
- * WebGPU backend context fields shared by WebGPU render targets.
+ * The WebGPU device that a render session uses.
  *
  * See `mln_web_gpu_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebGpuContextDescriptor {
   /**
-   * Borrowed WGPUInstance. Optional for texture targets.
+   * A `WGPUInstance`, or null.
    */
   instance?: bigint;
   /**
-   * Borrowed WGPUDevice. Required.
+   * A `WGPUDevice`.
    */
   device: bigint;
   /**
-   * Borrowed WGPUQueue. Optional; null uses the device default queue. A
-   * non-null queue must belong to device.
+   * A `WGPUQueue`, or null to use the device's queue.
    */
   queue?: bigint;
 }
 
 /**
- * WebGPU attachment options for an owned texture target.
+ * A ring of WebGPU textures that the session creates, for
+ * `MapHandle.attachWebGpuOwnedTexture()`.
  *
  * See `mln_web_gpu_owned_texture_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface WebGpuOwnedTextureDescriptor {
-  /**
-   * Logical texture extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed WebGPU context. device is required.
-   */
   context: WebGpuContextDescriptor;
 }
 
 /**
- * WebGPU attachment options for a native surface.
+ * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()` and
+ * `RenderSessionHandle.setWebGpuSurfaceTarget()`.
+ *
+ * The session configures the surface. It uses the surface until a replacement
+ * or release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
  *
  * See `mln_web_gpu_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 export interface WebGpuSurfaceDescriptor {
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   extent: LogicalExtent;
-  /**
-   * Borrowed WebGPU context. device is required.
-   */
   context: WebGpuContextDescriptor;
   /**
-   * Borrowed WGPUSurface. Required, and must stay alive until the session ends,
-   * replaces it, or releases it. The session configures it for this device and
-   * extent, and unconfigures it then.
+   * Your WGPUSurface.
    */
   surface: bigint;
   /**
-   * WGPUTextureFormat to configure the surface with. Required. A browser host
-   * takes it from navigator.gpu.getPreferredCanvasFormat().
+   * The WGPUTextureFormat to configure the surface with.
    */
   format: number;
 }
 
 /**
- * WebGPU frame acquired from a texture ring.
+ * The WebGPU texture of an acquired frame.
  *
  * See `mln_web_gpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface WebGpuTextureFrame {
-  /**
-   * Session generation that produced this frame.
-   */
   readonly generation: bigint;
-  /**
-   * Physical WebGPU texture width in device pixels.
-   */
   readonly width: number;
-  /**
-   * Physical WebGPU texture height in device pixels.
-   */
   readonly height: number;
-  /**
-   * UI-to-device pixel scale used for this frame.
-   */
   readonly scaleFactor: number;
-  /**
-   * Opaque identity of this frame.
-   */
   readonly frameId: bigint;
   /**
-   * Ring slot that holds this frame. For a borrowed target, the index of its
-   * texture in the descriptor's textures array.
+   * The texture's index in the ring. For a borrowed ring, it indexes the
+   * descriptor's `textures`.
    */
   readonly slot: number;
   /**
-   * Borrowed WGPUTexture. Valid until frame release.
+   * The WGPUTexture.
    */
   readonly texture: bigint;
   /**
-   * Borrowed WGPUTextureView. Valid until frame release.
+   * The WGPUTextureView.
    */
   readonly textureView: bigint;
   /**
-   * Borrowed WGPUDevice. Valid until frame release.
+   * The texture's WGPUDevice.
    */
   readonly device: bigint;
   /**
-   * Backend-native WGPUTextureFormat value.
+   * The texture's WGPUTextureFormat.
    */
   readonly format: number;
 }
 
 /**
- * WGL context fields shared by OpenGL render targets on Windows.
+ * The WGL objects that a render session makes its OpenGL context from.
  *
  * See `mln_wgl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WglContextDescriptor {
   /**
-   * Borrowed HDC used to create the session context. Required. A dedicated
-   * owned texture makes its context current on this HDC from its core worker.
+   * An `HDC`.
    */
   deviceContext: bigint;
   /**
-   * Borrowed HGLRC whose share group the session context joins. Required under
-   * shared ownership. A dedicated session joins no share group, so it must be
-   * null there.
+   * Your `HGLRC`, for a shared context.
    */
   shareContext?: bigint;
   /**
-   * Optional wglGetProcAddress-compatible function for the host loader.
+   * Your `wglGetProcAddress`, or null to use the system's.
    */
   getProcAddress?: bigint;
 }

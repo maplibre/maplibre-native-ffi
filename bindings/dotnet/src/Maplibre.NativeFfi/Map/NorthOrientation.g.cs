@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Map north orientation values used by <c>MapViewportOptions</c>.
+/// The screen direction that north points to when the bearing is 0.
 /// </summary>
 /// <remarks>
 /// See <c>mln_north_orientation</c> in the <see

@@ -1,10 +1,6 @@
 /**
  * @file maplibre_native_c/query.h
- * Public C API declarations for feature queries.
- *
- * Query inputs are copied before return. Caller-driver queries complete only
- * after the host services driver work on the graphics thread. Core-worker
- * queries need no host service.
+ * Find the features on the map or in a source.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_QUERY_H
@@ -21,36 +17,26 @@
 extern "C" {
 #endif
 
-/** Rendered feature query geometry variants. */
+/** The shape of the screen area that a rendered feature query covers. */
 typedef enum mln_rendered_query_geometry_type : uint32_t {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1,
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX = 2,
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3,
 } mln_rendered_query_geometry_type;
 
-/**
- * Screen-space box in logical map pixels.
- *
- * Corners may be given in any order and may extend past the viewport. Rendered
- * queries normalize the corners and clip the box to the viewport.
- */
+/** A rectangle of the screen, from its `min` corner to its `max` corner. */
 typedef struct mln_screen_box {
   mln_screen_point min;
   mln_screen_point max;
 } mln_screen_box;
 
-/** Screen-space line string in logical map pixels. */
+/** A line through points on the screen. */
 typedef struct mln_screen_line_string {
-  /**
-   * Points.
-   *
-   * Null only when point_count is 0.
-   */
   const mln_screen_point* points MLN_BINDING("length=point_count");
   size_t point_count;
 } mln_screen_line_string;
 
-/** Screen-space query geometry data. */
+/** The point, box, or line of a rendered feature query. */
 typedef union mln_rendered_query_geometry_data {
   mln_screen_point point
     MLN_BINDING("variant=MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT");
@@ -60,14 +46,14 @@ typedef union mln_rendered_query_geometry_data {
     MLN_BINDING("variant=MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING");
 } mln_rendered_query_geometry_data;
 
-/** Rendered feature query geometry descriptor. */
+/** The screen area that a rendered feature query covers. */
 typedef struct mln_rendered_query_geometry {
   uint32_t size;
   mln_rendered_query_geometry_type type;
   mln_rendered_query_geometry_data data MLN_BINDING("tag=type");
 } mln_rendered_query_geometry;
 
-/** Optional fields for mln_rendered_feature_query_options. */
+/** The fields that mln_rendered_feature_query_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_rendered_feature_query_option_field : uint32_t {
@@ -77,21 +63,24 @@ typedef enum MLN_BINDING(
 /** A set of mln_rendered_feature_query_option_field bits. */
 typedef uint32_t mln_rendered_feature_query_option_fields;
 
-/** Options for rendered feature queries. */
+/** Options for a rendered feature query. */
 typedef struct mln_rendered_feature_query_options {
   uint32_t size;
   mln_rendered_feature_query_option_fields fields;
-  /** Optional style layer IDs. When absent, all rendered layers are queried. */
+  /** The layers to query. Without them, the query covers every layer. */
   const mln_buffer_view* layer_ids MLN_BINDING(
     "length=layer_id_count;mask=fields;"
     "bit=MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS"
   );
   size_t layer_id_count;
-  /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
+  /**
+   * A [filter](https://maplibre.org/maplibre-style-spec/expressions/) that
+   * each feature must match. Empty matches every feature.
+   */
   mln_buffer_view filter MLN_BINDING("encoding=json");
 } mln_rendered_feature_query_options;
 
-/** Optional fields for mln_source_feature_query_options. */
+/** The fields that mln_source_feature_query_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_source_feature_query_option_field : uint32_t {
@@ -101,80 +90,52 @@ typedef enum MLN_BINDING(
 /** A set of mln_source_feature_query_option_field bits. */
 typedef uint32_t mln_source_feature_query_option_fields;
 
-/** Options for source feature queries. */
+/** Options for a source feature query. */
 typedef struct mln_source_feature_query_options {
   uint32_t size;
   mln_source_feature_query_option_fields fields;
   /**
-   * Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+   * The source layers to query. A vector source finds features only in the
+   * source layers named here.
    */
   const mln_buffer_view* source_layer_ids MLN_BINDING(
     "length=source_layer_id_count;mask=fields;"
     "bit=MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS"
   );
   size_t source_layer_id_count;
-  /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
+  /**
+   * A [filter](https://maplibre.org/maplibre-style-spec/expressions/) that
+   * each feature must match. Empty matches every feature.
+   */
   mln_buffer_view filter MLN_BINDING("encoding=json");
 } mln_source_feature_query_options;
 
-/**
- * One rendered-feature query hit.
- *
- * A completion callback borrows it, and every view is valid only for that
- * callback; copy what the host keeps.
- * feature is one UTF-8 GeoJSON Feature, and layer_id is the style layer that
- * rendered it. A feature that several style layers render yields one hit per
- * layer. source_id, source_layer_id, and state are empty when absent; a layer
- * without a source, such as a location indicator, has no source_id. state is a
- * UTF-8 JSON object.
- */
+/** A feature that a rendered feature query found. */
 typedef struct mln_rendered_feature {
+  /** The feature, as a GeoJSON feature. */
   mln_buffer_view feature MLN_BINDING("encoding=json");
+  /** The layer that drew the feature. */
   mln_buffer_view layer_id;
   mln_buffer_view source_id;
+  /** The feature's source layer, or empty when its source has none. */
   mln_buffer_view source_layer_id;
+  /** The feature's state, as a JSON object. */
   mln_buffer_view state MLN_BINDING("encoding=json");
 } mln_rendered_feature;
 
-/**
- * One source-feature query hit.
- *
- * A completion callback borrows it, and every view is valid only for that
- * callback; copy what the host keeps.
- * feature is one UTF-8 GeoJSON Feature. source_layer_id names the vector source
- * layer the feature came from, and is empty for a source without source
- * layers, such as GeoJSON.
- */
+/** A feature that a source feature query found. */
 typedef struct mln_source_feature {
+  /** The feature, as a GeoJSON feature. */
   mln_buffer_view feature MLN_BINDING("encoding=json");
+  /** The feature's source layer, or empty when its source has none. */
   mln_buffer_view source_layer_id;
 } mln_source_feature;
 
 /**
- * Starts a rendered-feature query against the last frame that the session
- * rendered, so render after a camera or style change for a result that matches
- * it.
+ * Finds the features that the session drew in an area of the screen.
  *
- * The completion borrows value_count mln_rendered_feature values, value_size
- * bytes apart.
- *
- * Box geometry is normalized and clipped to the viewport, so a box that
- * over-covers the viewport queries everything visible. A box that lies entirely
- * outside the viewport yields an empty result. Point and line-string geometry
- * are queried as given.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, geometry is
- *   null, undersized, or names an unknown kind, options is undersized or
- *   carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
- *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query fails.
+ * The query reads the last frame that the session rendered. A feature that
+ * several layers draw appears once for each layer.
  */
 MLN_BINDING("execution=query;result=mln_rendered_feature;shape=array")
 MLN_API mln_status mln_render_session_query_rendered_features(
@@ -185,24 +146,10 @@ MLN_API mln_status mln_render_session_query_rendered_features(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a source-feature query against the tiles that the source loaded for
- * rendering, which it loads only while a visible layer uses it.
+ * Finds the features of the source named `source_id`.
  *
- * The completion borrows value_count mln_source_feature values, value_size
- * bytes apart.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, source_id is
- *   invalid or empty, options is undersized or carries an invalid field, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
- *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query fails.
+ * The query covers only the tiles that the source has loaded for the current
+ * view. A source loads tiles only while a visible layer uses it.
  */
 MLN_BINDING("execution=query;result=mln_source_feature;shape=array")
 MLN_API mln_status mln_render_session_query_source_features(
@@ -212,29 +159,15 @@ MLN_API mln_status mln_render_session_query_source_features(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a feature-extension query against the latest driver state.
+ * Reads a value that a source computes for one of its features.
  *
- * The completion borrows one mln_buffer_view holding UTF-8 JSON (value_count
- * 1), valid only for the callback.
- *
- * For the supercluster extension, the feature's cluster_id property and the
- * limit and offset arguments are nonnegative JSON integers, such as 5 rather
- * than 5.0. A feature without such a cluster_id yields an empty result. Leaves
- * use a limit of 10 unless the arguments supply one, and apply an offset only
- * with a limit. arguments is a UTF-8 JSON object, or empty for none.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, any of
- *   source_id, feature, extension, or extension_field is invalid or empty,
- *   arguments is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
- *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query fails.
+ * A clustered GeoJSON source answers the `supercluster` extension for a cluster
+ * feature. Its `extension_field` is `children` for the cluster's child
+ * features, `leaves` for the points in the cluster, or `expansion-zoom` for the
+ * zoom level where the cluster splits. For `leaves`, `arguments` can set
+ * `limit` and `offset`. Without `limit`, the result has up to 10 points and
+ * ignores `offset`. The result is JSON: a GeoJSON feature collection, a number,
+ * or null when the source has no answer.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_render_session_query_feature_extensions(

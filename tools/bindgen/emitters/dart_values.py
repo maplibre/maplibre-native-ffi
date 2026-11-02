@@ -67,9 +67,10 @@ NOTES = {
 }
 
 
-def doc(bound: BoundApi, native: str, indent: str = "") -> str:
-    """The dartdoc comment of a declaration, or empty when it has none."""
-    found = bound.doc(native)
+def doc(bound: BoundApi, native: str, indent: str = "", *, discard=False) -> str:
+    """The dartdoc comment of a declaration, or empty when it has none. With
+    `discard`, it documents a form that passes no completion."""
+    found = docs.discarding(bound.doc(native)) if discard else bound.doc(native)
     if found is not None and native in NOTES:
         found = replace(found, notes=(*found.notes, *NOTES[native]))
     from .dart import symbols

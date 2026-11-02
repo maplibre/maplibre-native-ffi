@@ -16,7 +16,7 @@ from ._lifecycle import NativeHandleMixin, ScopedHandleMixin
 
 
 class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
-    """A rendered frame that a render session lends until its release.
+    """A rendered frame that the caller holds to read or show.
 
     See `mln_acquired_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -42,7 +42,7 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
 
 
 class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMixin):
-    """Prepared GeoJSON data that sources retain independently of its handle.
+    """GeoJSON data, parsed and ready to add to a GeoJSON source.
 
     See `mln_geo_json_source_data` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -68,7 +68,7 @@ class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMi
 
 
 class GraphicsDeviceHandle(_GraphicsDeviceHandleOperations, ScopedHandleMixin):
-    """A GPU device that native code creates for texture render targets.
+    """A GPU device that the library creates to render maps into textures.
 
     See `mln_graphics_device` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -94,7 +94,7 @@ class GraphicsDeviceHandle(_GraphicsDeviceHandleOperations, ScopedHandleMixin):
 
 
 class MapHandle(_MapHandleOperations, ScopedHandleMixin):
-    """A map, which holds map state independent of any render target.
+    """A map, with its style and camera.
 
     See `mln_map` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -123,7 +123,10 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
         return int(self._native.id)
 
     def dispose(self) -> None:
-        """Consumes a map handle without observing its asynchronous retirement.
+        """Releases the map in any state, and finishes in the background.
+
+        Use it from destructors and finalizers. Otherwise, use
+        `MapHandle.close()`.
 
         See `mln_map_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -132,7 +135,7 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
 
 
 class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
-    """A standalone projection of one map view.
+    """A camera view for converting between screen points and coordinates.
 
     See `mln_map_projection` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -158,7 +161,7 @@ class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
 
 
 class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
-    """A render session, which renders one map to one render target.
+    """A render session draws a map into a surface or a texture.
 
     See `mln_render_session` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -183,8 +186,15 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
         return int(self._native.id)
 
     def dispose(self) -> None:
-        """Consumes a session in any state and retires it, then runs completion,
-        if given, once the host may destroy the target's graphics objects.
+        """Releases the session in any state.
+
+        An attached session driven by `RenderDriverKind.CORE_WORKER` detaches
+        first unless you hold one of its frames. Any other session is
+        abandoned as `RenderSessionHandle.abandon()` does. To free the
+        graphics objects of a session driven by
+        `RenderDriverKind.CALLER_GRAPHICS_THREAD`, detach it before you
+        dispose it. Once the disposal completes, the library no longer uses
+        your graphics objects.
 
         See `mln_render_session_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -193,7 +203,7 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
 
 
 class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin):
-    """A resource request that a resource provider handles.
+    """A resource load that a resource provider answers.
 
     See `mln_resource_request` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -221,7 +231,7 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin)
 class ResourceTransformRequestHandle(
     _ResourceTransformRequestHandleOperations, ScopedHandleMixin
 ):
-    """A resource URL transform that waits for its host's answer.
+    """A URL rewrite that a resource transform answers with the URL to load.
 
     See `mln_resource_transform_request` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -247,7 +257,7 @@ class ResourceTransformRequestHandle(
 
 
 class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
-    """A runtime: the native scheduler thread and event store for its maps.
+    """A runtime owns maps and the network and cache settings that they share.
 
     See `mln_runtime` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -276,8 +286,9 @@ class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
         return int(self._native.id)
 
     def dispose(self) -> None:
-        """Consumes a runtime handle without observing its asynchronous
-        retirement.
+        """Releases a runtime in any state, without waiting.
+
+        The runtime finishes its teardown after its maps are released.
 
         See `mln_runtime_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -286,7 +297,7 @@ class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
 
 
 class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin):
-    """A parsed style expression, immutable and independent of any map.
+    """A parsed style expression.
 
     See `mln_style_expression` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

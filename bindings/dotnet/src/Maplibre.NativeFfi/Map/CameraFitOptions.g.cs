@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Optional fitting controls for camera-for-viewport queries.
+/// Options for finding the camera that fits an area.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_fit_options</c> in the <see
@@ -11,6 +11,9 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record CameraFitOptions
 {
+    /// <summary>
+    /// Space to leave between the area and each edge of the map.
+    /// </summary>
     public EdgeInsets? Padding { get; init; }
     public double? Bearing { get; init; }
     public double? Pitch { get; init; }

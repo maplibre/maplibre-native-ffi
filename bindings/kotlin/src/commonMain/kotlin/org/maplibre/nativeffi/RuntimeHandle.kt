@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A runtime: the native scheduler thread and event store for its maps.
+ * A runtime owns maps and the network and cache settings that they share.
  *
  * See `mln_runtime` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -40,7 +40,7 @@ internal constructor(
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Stops event delivery and retires the previous handler.
+   * Stops sending the events of the runtime and its maps to a callback.
    *
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -51,7 +51,7 @@ internal constructor(
     }
 
   /**
-   * Clears the runtime-scoped outgoing HTTP header transform.
+   * Stops adding headers to the runtime's HTTP requests.
    *
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -62,7 +62,7 @@ internal constructor(
     }
 
   /**
-   * Clears the runtime-scoped network resource provider.
+   * Removes the runtime's resource provider, so the library loads every request itself.
    *
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -73,7 +73,7 @@ internal constructor(
     }
 
   /**
-   * Clears the runtime-scoped URL transform for network resources.
+   * Stops rewriting the URLs of the runtime's network requests.
    *
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -84,7 +84,7 @@ internal constructor(
     }
 
   /**
-   * Starts creation of a map on the runtime.
+   * Creates a map on `runtime`.
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -104,7 +104,10 @@ internal constructor(
     }
 
   /**
-   * Starts creating an offline region.
+   * Creates an offline region in the runtime's cache file.
+   *
+   * `metadata` holds any bytes to store with the region, such as its name. The region doesn't
+   * download until `RuntimeHandle.setOfflineRegionDownloadState()` makes its download active.
    *
    * See `mln_runtime_create_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -131,10 +134,14 @@ internal constructor(
     }
 
   /**
-   * Deletes an offline region.
+   * Deletes the offline region `regionId` from the runtime's cache file.
    *
    * See `mln_runtime_delete_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun deleteOfflineRegion(regionId: Long): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -142,7 +149,9 @@ internal constructor(
     }
 
   /**
-   * Consumes a runtime handle without observing its asynchronous retirement.
+   * Releases a runtime in any state, without waiting.
+   *
+   * The runtime finishes its teardown after its maps are released.
    *
    * See `mln_runtime_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -151,7 +160,7 @@ internal constructor(
     nativeClose(this, binding) { check(C.mln_runtime_dispose(handle, diagnostic)) }
 
   /**
-   * Reports which runtime-scoped event types this runtime queues.
+   * Reads the runtime's event mask.
    *
    * See `mln_runtime_get_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -164,7 +173,9 @@ internal constructor(
     }
 
   /**
-   * Starts getting one offline region by ID.
+   * Reads the offline region `regionId`.
+   *
+   * The result is null when the cache file has no region with that ID.
    *
    * See `mln_runtime_get_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -182,10 +193,14 @@ internal constructor(
     }
 
   /**
-   * Starts getting the current download status for an offline region.
+   * Reads the download progress of the offline region `regionId`.
    *
    * See `mln_runtime_get_offline_region_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun getOfflineRegionStatus(regionId: Long): Deferred<OfflineRegionStatus> =
     nativeSubmit(
@@ -197,10 +212,17 @@ internal constructor(
     }
 
   /**
-   * Invalidates cached resources for an offline region.
+   * Makes maps check each resource of the offline region `regionId` with the server before they use
+   * it.
+   *
+   * The region keeps its resources.
    *
    * See `mln_runtime_invalidate_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun invalidateOfflineRegion(regionId: Long): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -208,7 +230,7 @@ internal constructor(
     }
 
   /**
-   * Starts listing the offline regions in the runtime database.
+   * Lists the offline regions in the runtime's cache file.
    *
    * See `mln_runtime_list_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -232,10 +254,17 @@ internal constructor(
     }
 
   /**
-   * Starts merging offline regions from another MapLibre offline database.
+   * Copies the offline regions of another cache file into the runtime's cache file.
+   *
+   * A region whose definition and metadata match one that the runtime's file already has isn't
+   * copied again. The result lists the runtime's copy of each region in the other file.
    *
    * See `mln_runtime_merge_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when `sideDatabasePath` isn't a readable database file.
    */
   public fun mergeOfflineRegions(sideDatabasePath: String): Deferred<List<OfflineRegionInfo>> =
     nativeSubmit(
@@ -258,7 +287,9 @@ internal constructor(
     }
 
   /**
-   * Starts release of a runtime after checking its children.
+   * Releases a runtime.
+   *
+   * Release the runtime's maps first.
    *
    * See `mln_runtime_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -267,7 +298,7 @@ internal constructor(
     nativeRetire(this, binding) { check(C.mln_runtime_release(handle, completion, diagnostic)) }
 
   /**
-   * Starts a MapLibre ambient cache maintenance operation for this runtime.
+   * Runs an action on the runtime's ambient cache.
    *
    * See `mln_runtime_run_ambient_cache_operation` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -285,8 +316,9 @@ internal constructor(
     }
 
   /**
-   * Selects how runtime and map events reach the host. Map events arrive on the runtime's native
-   * scheduler thread, and offline events may arrive on a MapLibre worker thread.
+   * Sends the events of the runtime and its maps to a callback.
+   *
+   * The callback replaces the one set before.
    *
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -304,7 +336,10 @@ internal constructor(
     }
 
   /**
-   * Selects which runtime-scoped event types this runtime queues.
+   * Selects the runtime's own events that reach the event callback.
+   *
+   * Each map selects its events with `MapHandle.setEventMask()` instead. A runtime starts with
+   * every event selected.
    *
    * See `mln_runtime_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -315,7 +350,10 @@ internal constructor(
     }
 
   /**
-   * Starts a change to this runtime's maximum ambient cache size.
+   * Limits the size of the runtime's ambient cache.
+   *
+   * `size` is in bytes. Offline regions count toward it, but the library evicts only ambient cache
+   * resources to stay within it.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -328,10 +366,16 @@ internal constructor(
     }
 
   /**
-   * Sets an offline region's native download state.
+   * Starts or pauses the download of the offline region `regionId`.
+   *
+   * A download stops when the runtime closes.
    *
    * See `mln_runtime_set_offline_region_download_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun setOfflineRegionDownloadState(
     regionId: Long,
@@ -350,10 +394,15 @@ internal constructor(
     }
 
   /**
-   * Enables or disables runtime events for an offline region.
+   * Sets whether the runtime reports the download progress of the offline region `regionId` as
+   * events.
    *
    * See `mln_runtime_set_offline_region_observed` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun setOfflineRegionObserved(regionId: Long, observed: Boolean): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -369,8 +418,11 @@ internal constructor(
     }
 
   /**
-   * Registers or replaces a runtime-scoped network resource provider. The callback runs
-   * synchronously on a MapLibre thread.
+   * Serves the runtime's network requests through a callback.
+   *
+   * The provider receives the network requests that its routes match, and the library loads the
+   * rest as usual. A provider can serve URL schemes that the library can't load itself. The
+   * provider replaces the one set before.
    *
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -388,8 +440,9 @@ internal constructor(
     }
 
   /**
-   * Registers or updates a runtime-scoped URL transform for network resources. The callback runs on
-   * a MapLibre network thread.
+   * Rewrites the URLs of the runtime's network requests through a callback.
+   *
+   * The transform replaces the one set before.
    *
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -407,10 +460,14 @@ internal constructor(
     }
 
   /**
-   * Starts updating opaque binary metadata for an offline region.
+   * Replaces the metadata of the offline region `regionId`.
    *
    * See `mln_runtime_update_offline_region_metadata` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
   public fun updateOfflineRegionMetadata(
     regionId: Long,
@@ -446,6 +503,9 @@ internal constructor(
   public companion object {
     /**
      * Creates a runtime.
+     *
+     * A runtime holds maps and the resource loading, cache, and offline regions that they share. In
+     * a browser, create runtimes on a Web Worker, not on the main thread.
      *
      * Suspends until the call's thread starts. On the JVM, Android, and Kotlin/Native the call
      * waits on the calling thread, which it blocks until then. On Kotlin/Wasm it runs on a thread

@@ -8,12 +8,13 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Reports the C ABI contract version. The value is 0 while the ABI is
-    /// unstable, and will increment on each SemVer major release.
+    /// Returns the API epoch of the library.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_c_version</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+    /// <para>Headers and a library with different epochs aren't
+    /// compatible.</para>
+    /// <para>See <c>mln_c_version</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.</para>
     /// </remarks>
     public static uint CVersion()
     {
@@ -23,7 +24,7 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Reports the render backends available in this native library build.
+    /// Returns the render backends that this build of the library draws with.
     /// </summary>
     /// <remarks>
     /// See <c>mln_supported_render_backend_mask</c> in the <see

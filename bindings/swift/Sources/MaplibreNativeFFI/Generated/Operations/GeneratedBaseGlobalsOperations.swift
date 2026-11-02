@@ -3,8 +3,9 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Reports the C ABI contract version. The value is 0 while the ABI is
-/// unstable, and will increment on each SemVer major release.
+/// Returns the API epoch of the library.
+///
+/// Headers and a library with different epochs aren't compatible.
 ///
 /// See `mln_c_version` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -12,7 +13,7 @@ public func cVersion() -> UInt32 {
   mln_c_version()
 }
 
-/// Reports the render backends available in this native library build.
+/// Returns the render backends that this build of the library draws with.
 ///
 /// See `mln_supported_render_backend_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

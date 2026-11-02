@@ -3,7 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Global style transition options.
+/// The default
+/// [transition](https://maplibre.org/maplibre-style-spec/transition/) for
+/// changes to a style's paint properties.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_transition_options</c> in the <see
@@ -11,20 +13,11 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record StyleTransitionOptions
 {
-    /// <summary>
-    /// Transition duration in milliseconds. Must be finite, non-negative, and
-    /// short enough to represent as a duration.
-    /// </summary>
     public double? DurationMs { get; init; }
-
-    /// <summary>
-    /// Transition delay in milliseconds. Must be finite, non-negative, and
-    /// short enough to represent as a duration.
-    /// </summary>
     public double? DelayMs { get; init; }
 
     /// <summary>
-    /// Whether symbol placement changes cross-fade.
+    /// Whether symbols fade in and out as the map places them.
     /// </summary>
     public bool? EnablePlacementTransitions { get; init; }
 }

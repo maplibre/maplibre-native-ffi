@@ -912,7 +912,7 @@ def disposer(handle) -> str:
 def render_dispose(bound, handle, indent: str) -> str:
     """The synchronous dispose of a handle whose dispose is also its release:
     the release passes a completion, and this passes none."""
-    text = doc(bound, handle.dispose, indent)
+    text = doc(bound, handle.dispose, indent, discard=True)
     text += f"{indent}dispose(): void {{\n"
     text += f"{indent}  closeSync(this, (handle, token) =>\n"
     text += f"{indent}    native.{handle.dispose}(handle, token, undefined),\n"
@@ -1052,7 +1052,7 @@ def render_discarding(bound, values, public, entries) -> str:
             )
             for line in body
         ]
-        text += "\n" + doc(bound, entry.plan.name, "  ")
+        text += "\n" + doc(bound, entry.plan.name, "  ", discard=True)
         text += f"  {entry.method}({signature(entry)}): void {{\n"
         text += "".join(f"    {line}\n" for line in body)
         text += "  }\n"

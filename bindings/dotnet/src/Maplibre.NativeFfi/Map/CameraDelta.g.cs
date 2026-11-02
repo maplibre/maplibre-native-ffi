@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One atomic relative camera update.
+/// A change to the camera from where it is now, for gestures.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_delta</c> in the <see
@@ -12,28 +12,29 @@ namespace Maplibre.NativeFfi;
 public sealed record CameraDelta
 {
     /// <summary>
-    /// Pan in logical map pixels; the content moves by this offset.
+    /// Moves the map's content this far on the screen, as a drag does.
     /// </summary>
     public ScreenPoint? Offset { get; init; }
 
     /// <summary>
-    /// Positive zoom factor; 2 zooms in one level.
+    /// Multiplies the map's scale. 2 zooms in by one level.
     /// </summary>
     public double? Scale { get; init; }
 
     /// <summary>
-    /// Degrees added to the bearing.
+    /// Degrees to add to the bearing.
     /// </summary>
     public double? Bearing { get; init; }
 
     /// <summary>
-    /// Degrees added to the pitch; positive tilts further from straight down.
+    /// Degrees to add to the pitch.
     /// </summary>
     public double? Pitch { get; init; }
 
     /// <summary>
-    /// Screen point in logical map pixels that scale, bearing, and pitch keep
-    /// fixed.
+    /// The screen point that <c>scale</c>, <c>bearing</c>, and <c>pitch</c>
+    /// keep in place. It needs one of them, and it combines with <c>offset</c>
+    /// only in a delta without a duration.
     /// </summary>
     public ScreenPoint? Anchor { get; init; }
     public AnimationOptions Animation { get; init; } = new();

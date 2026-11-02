@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Resource provider state. The callback runs synchronously on a MapLibre
-/// thread.
+/// A resource provider, for <c>RuntimeHandle.SetResourceProviderAsync()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_provider</c> in the <see
@@ -19,13 +18,11 @@ public readonly partial record struct ResourceProvider
         this.Routes = Routes;
     }
 
-    /// <summary>
-    /// Answers each request that the routes leave to the provider.
-    /// </summary>
     public required ResourceProviderCallback Callback { get; init; }
 
     /// <summary>
-    /// The requests that reach the provider; empty to claim every request.
+    /// The requests that the provider serves. Without routes, it serves every
+    /// network request.
     /// </summary>
     public ImmutableArray<ResourceRoute> Routes
     {

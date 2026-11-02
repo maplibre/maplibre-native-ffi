@@ -267,35 +267,38 @@ instead.
 
 ### API reference comments
 
+The C header comments are the API reference for every binding. Write them for
+someone integrating the library: what a declaration does, and what a caller must
+know to use it correctly. Promise only that. Behavior that holds today but that
+an integration doesn't need stays out of the comment, so we can change it.
+
 A comment has a one-sentence summary, then paragraphs about behavior, then these
 sections in order. Leave out a section that would be empty:
 
-- `Threads:` lists the threads a callback runs on.
-- `Returns:` lists every status the function returns, each with a condition the
-  caller can check or act on.
+- `Threads:` says where a callback runs, when its caller needs to know.
+- `Returns:` lists the statuses a correct caller handles, each with its
+  condition.
 - `Completes with:` does the same for the completion.
-- `Lifetimes:` says how long each pointer stays valid and who ends it. Bindings
-  manage lifetimes themselves, so only C callers need it.
+- `Lifetimes:` says how long each pointer stays valid and who ends it.
 
-The generator copies every part except `Lifetimes:` into each binding, and
-replaces each C name with that binding's symbol and each status with its error.
-The summary says what the function does for the caller, using names that every
-binding has. The execution annotation already says that a function is
-asynchronous, so a summary doesn't start with "Submits a command".
+Give every function and type a summary. Comment a field or an enum constant only
+when its name and type don't say what a caller needs.
+
+Name parameters in backticks. Leave out what bindings take over: completions,
+`out_diagnostic`, output pointers, `size` fields, and a callback's `user_data`,
+release function, and queue. The rules above cover them, and anything more that
+a C caller needs about them goes under `Lifetimes:`.
+
+The generator copies each comment into every binding, with C names and
+parameters spelled as that binding's symbols. It turns `Returns:` and
+`Completes with:` into the binding's errors, and leaves `Lifetimes:` in C.
 
 ```c
 /**
  * Removes a source from the map's style.
  *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map isn't a valid handle, source_id is
- *   empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released.
- *
  * Completes with:
- * - MLN_STATUS_OK when the source is removed.
- * - MLN_STATUS_NOT_FOUND when the style has no source with that ID.
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_STATE when a layer still uses the source.
  */
 MLN_BINDING("execution=command")
@@ -305,16 +308,20 @@ MLN_API mln_status mln_map_remove_style_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Receives the result of an asynchronous function.
+ * Sets the headers of an HTTP request before the library sends it.
+ *
+ * `url` is the request's URL after any resource transform. The request waits
+ * for the callback, so return quickly.
  *
  * Threads:
- * Runs on a thread that native picks, which can be the calling thread. When the
- * completion names a queue, runs in mln_delivery_queue_dispatch() instead.
+ * Runs on a library thread.
  *
  * Lifetimes:
- * result, and everything it points to, stay valid until the callback returns.
+ * `url` and `out_response` stay valid until the callback returns.
  */
-typedef void (*mln_completion_callback)(
-  void* user_data, const mln_completion_result* result
+MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
+typedef mln_status (*mln_http_header_transform_callback)(
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
+  mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 );
 ```

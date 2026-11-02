@@ -3,11 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL backend context fields shared by OpenGL render targets.
+/// How a render session gets the OpenGL context that it renders with.
 /// </summary>
 /// <remarks>
-/// See <c>mln_open_gl_context_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// <para>Keep the objects that it names alive until a detach or disposal of the
+/// session completes, or an abandon of it returns.</para>
+/// <para>See <c>mln_open_gl_context_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct OpenGlContextDescriptor
 {
@@ -21,11 +23,6 @@ public readonly partial record struct OpenGlContextDescriptor
         this.Data = Data;
     }
 
-    /// <summary>
-    /// Whether the session shares its driver thread and graphics objects with
-    /// the host. A private EGL or WGL owned texture and a transferred WebGL
-    /// canvas are dedicated to their core worker.
-    /// </summary>
     public OpenGlContextOwnership Ownership { get; init; }
     public required OpenGlContextDescriptor.DataValue Data { get; init; }
 

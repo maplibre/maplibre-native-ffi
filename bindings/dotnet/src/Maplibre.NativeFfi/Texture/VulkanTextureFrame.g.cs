@@ -3,47 +3,30 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vulkan frame acquired from a texture ring.
+/// The Vulkan image of an acquired frame.
 /// </summary>
 /// <remarks>
 /// See <c>mln_vulkan_texture_frame</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Generation">
-/// Session generation that produced this frame.
-/// </param>
-/// <param name="Width">
-/// Physical Vulkan image width in device pixels.
-/// </param>
-/// <param name="Height">
-/// Physical Vulkan image height in device pixels.
-/// </param>
-/// <param name="ScaleFactor">
-/// UI-to-device pixel scale used for this frame.
-/// </param>
-/// <param name="FrameId">
-/// Opaque identity of this frame.
-/// </param>
 /// <param name="Slot">
-/// Ring slot that holds this frame. For a borrowed target, the index of its
-/// image in the descriptor's textures array.
+/// The image's index in the ring. For a borrowed ring, it indexes the
+/// descriptor's <c>textures</c>.
 /// </param>
 /// <param name="Image">
-/// Borrowed VkImage bit pattern. Valid until frame release.
+/// The VkImage.
 /// </param>
 /// <param name="ImageView">
-/// Borrowed VkImageView bit pattern. Valid until frame release.
+/// The VkImageView.
 /// </param>
 /// <param name="Device">
-/// Borrowed VkDevice. Valid until frame release.
+/// The image's VkDevice.
 /// </param>
 /// <param name="Format">
-/// Backend-native VkFormat value.
+/// The image's VkFormat.
 /// </param>
 /// <param name="Layout">
-/// Backend-native VkImageLayout value that the image is in:
-/// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
-/// descriptor's final_layout for a borrowed one.
+/// The VkImageLayout that the frame left the image in.
 /// </param>
 public readonly partial record struct VulkanTextureFrame(
     ulong Generation,

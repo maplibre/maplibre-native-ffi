@@ -8,7 +8,8 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Computes the physical device-pixel size of a logical extent.
+    /// Computes the size in pixels of a target with a logical size and scale
+    /// factor.
     /// </summary>
     /// <remarks>
     /// See <c>mln_logical_extent_physical_size</c> in the <see
@@ -31,7 +32,7 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Returns OpenGL context providers supported by this build.
+    /// Reports the OpenGL context platforms that this build of the library has.
     /// </summary>
     /// <remarks>
     /// See <c>mln_open_gl_supported_context_provider_mask</c> in the <see

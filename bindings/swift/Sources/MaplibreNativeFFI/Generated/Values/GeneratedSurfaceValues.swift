@@ -3,17 +3,20 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Metal attachment options for a native surface.
+/// A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
+/// `RenderSessionHandle.setMetalSurfaceTarget()`.
+///
+/// The session sets the layer's device, pixel format, and drawable size. It
+/// uses the layer until a replacement or release of the target completes, a
+/// detach or disposal of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Metal backend context. device is optional for Metal surfaces.
+  /// The MTLDevice to render with. A null device picks the system's default.
   public var context: MetalContextDescriptor
-  /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
+  /// Your CAMetalLayer.
   public var layer: NativePointer
   public init(
     extent: LogicalExtent,
@@ -41,19 +44,19 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL attachment options for a native surface.
+/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
+/// `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+///
+/// The session uses the surface until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
 ///
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Borrowed OpenGL context provider data.
   public var context: OpenGlContextDescriptor
-  /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
-  /// EGL, both required. Null for WebGL, whose context carries its canvas
-  /// binding.
+  /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
   public var surface: NativePointer
   public init(
     extent: LogicalExtent,
@@ -89,19 +92,21 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vulkan attachment options for a native surface.
+/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and
+/// `RenderSessionHandle.setVulkanSurfaceTarget()`.
+///
+/// The device must have VK_KHR_swapchain enabled, and the queue family of
+/// `graphics_queue_family_index` must support presenting to the surface. The
+/// session creates the swapchain. It uses the surface until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Borrowed Vulkan context. All handles are required. The device must support
-  /// VK_KHR_swapchain, and the queue family must support graphics and
-  /// presentation to this descriptor's surface.
   public var context: VulkanContextDescriptor
-  /// Borrowed VkSurfaceKHR bit pattern. Required.
+  /// Your VkSurfaceKHR.
   public var surface: UInt64
   public init(
     extent: LogicalExtent,

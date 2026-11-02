@@ -3,18 +3,17 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// WebGL context fields shared by OpenGL render targets in the browser.
+/// The WebGL context or canvas that a render session uses.
 /// </summary>
 /// <remarks>
 /// See <c>mln_web_gl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Context">
-/// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
+/// Your <c>EMSCRIPTEN_WEBGL_CONTEXT_HANDLE</c>, for an existing context.
 /// </param>
 /// <param name="CanvasSelector">
-/// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-/// canvas must still be transferable when attachment starts.
+/// The canvas's CSS selector, for a transferred canvas.
 /// </param>
 public readonly partial record struct WebGlContextDescriptor(
     WebGlContextKind Kind,

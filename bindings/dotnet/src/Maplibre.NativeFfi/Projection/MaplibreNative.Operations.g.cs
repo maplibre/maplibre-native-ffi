@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Converts spherical Mercator projected meters to a geographic coordinate.
+    /// Converts meters in the Web Mercator projection to a coordinate.
     /// </summary>
     /// <remarks>
     /// See <c>mln_lat_lng_for_projected_meters</c> in the <see
@@ -29,7 +29,7 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Converts a geographic coordinate to spherical Mercator projected meters.
+    /// Converts a coordinate to meters in the Web Mercator projection.
     /// </summary>
     /// <remarks>
     /// See <c>mln_projected_meters_for_lat_lng</c> in the <see

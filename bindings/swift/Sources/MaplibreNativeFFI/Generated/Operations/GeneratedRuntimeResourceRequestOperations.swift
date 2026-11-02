@@ -4,10 +4,14 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension ResourceRequestHandle {
-  /// Completes a C API resource provider request and consumes its handle.
+  /// Answers a resource request.
   ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the library cancelled the request.
   func complete(response: ResourceResponse) throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
@@ -23,7 +27,7 @@ public extension ResourceRequestHandle {
 }
 
 public extension ResourceRequestHandle {
-  /// Reports whether MapLibre has cancelled a C API resource provider request.
+  /// Reads whether the library cancelled a resource request.
   ///
   /// See `mln_resource_request_is_cancelled` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -38,7 +42,7 @@ public extension ResourceRequestHandle {
     } result: { value0 }
   }
 
-  /// Releases the provider's resource request handle without answering it.
+  /// Releases a resource request.
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -46,11 +50,11 @@ public extension ResourceRequestHandle {
     nativeClose { raw in mln_resource_request_release(raw) }
   }
 
-  /// Registers a callback that runs when MapLibre cancels a C API resource
-  /// provider request. The callback runs on the thread that discards the
-  /// request, never a host thread: the runtime's native scheduler thread when a
-  /// committed map or runtime command discards it, such as a style change or
-  /// map destruction, and a MapLibre worker thread otherwise.
+  /// Calls a callback when the library cancels a resource request.
+  ///
+  /// The callback never runs after the request is answered. A request takes one
+  /// cancel callback. When the library has already cancelled the request, the
+  /// call reports that instead and the callback never runs.
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -72,11 +76,14 @@ public extension ResourceRequestHandle {
 }
 
 public extension ResourceRequestHandle {
-  /// Hands an outstanding provider request to the built-in network loader and
-  /// consumes its handle.
+  /// Hands a resource request back to the library to load as usual.
   ///
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the library cancelled the request.
   func passThrough() throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Terminal disposition of one accepted frame demand.
+/// How a frame request finished.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_result</c> in the <see
@@ -10,39 +10,29 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public enum RenderResult : uint
 {
-    /// <summary>
-    /// A frame was rendered for acquisition, presentation, or ordered readback.
-    /// </summary>
     Rendered = 0,
 
     /// <summary>
-    /// No newer map update was available, the map had no complete frame to
-    /// draw, or the update extent differed from the target. The map publishes
-    /// another update when it has one. A demand with
-    /// <c>FrameDemandFlag.WaitForUpdate</c> waits for that update instead, and
-    /// finishes with this result only when a barrier ends its wait.
+    /// The map had nothing new to draw.
     /// </summary>
     NoUpdate = 1,
 
     /// <summary>
-    /// The target could not produce a frame. The attempt consumes nothing, so a
-    /// later demand with the same flags renders what this one would have. This
-    /// result does not cause a map update, so the host demands again when the
-    /// target can be ready, such as after a paced delay.
+    /// The target couldn't take a frame, such as while a window is hidden or
+    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Request a frame
+    /// again later.
     /// </summary>
     TargetNotReady = 2,
 
     /// <summary>
-    /// A newer demand with the same flags, neither of them forced, replaced
-    /// this demand. A still image's demand is never replaced, and never
-    /// replaces one.
+    /// A later request with the same flags replaced this one.
     /// </summary>
     Superseded = 3,
 
     /// <summary>
-    /// The session failed before this demand could produce a usable frame. Read
-    /// its saved failure with <c>RenderSessionHandle.GetFailure()</c>. Further
-    /// demands require disposing of this session and attaching a new one.
+    /// The session failed, and <c>RenderSessionHandle.GetFailure()</c> reports
+    /// why. Once <c>RenderSessionHandle.CloseAsync()</c> completes, you can
+    /// attach a new session.
     /// </summary>
     Failed = 4,
 }

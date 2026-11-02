@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// DEM raster encoding values.
+/// How a raster DEM tile encodes elevation in its colors.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_raster_dem_encoding</c> in the <see

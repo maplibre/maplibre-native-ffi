@@ -3,11 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Cancel callback for one handled resource request. The callback runs on the
-/// thread that discards the request, never a host thread: the runtime's native
-/// scheduler thread when a committed map or runtime command discards it, such
-/// as a style change or map destruction, and a MapLibre worker thread
-/// otherwise.
+/// A cancel callback, for <c>ResourceRequestHandle.SetCancelCallback()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_request_cancel_handler</c> in the <see
@@ -21,8 +17,5 @@ public readonly partial record struct ResourceRequestCancelHandler
         this.Callback = Callback;
     }
 
-    /// <summary>
-    /// Reports the request's cancellation.
-    /// </summary>
     public required ResourceRequestCancelCallback Callback { get; init; }
 }

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Three-component vector used by free camera options.
+/// A vector in three dimensions.
 /// </summary>
 /// <remarks>
 /// See <c>mln_vec3</c> in the <see

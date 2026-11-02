@@ -3,7 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Render backend support flags reported by this native library build.
+/// A render backend, as a bit in a set.
 ///
 /// See `mln_render_backend_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -22,7 +22,7 @@ public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
   public static let webGpu: RenderBackendFlag = .init(rawValue: 8)
 }
 
-/// Status values returned by status-returning functions.
+/// The result of a call or of asynchronous work.
 ///
 /// See `mln_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -36,25 +36,27 @@ public struct Status: RawRepresentable, CustomStringConvertible,
   }
 
   public static let ok: Status = .init(rawValue: 0)
-  /// A pointer, size field, mask, or handle argument was invalid.
+  /// An argument is invalid, such as malformed JSON or a value out of range.
   public static let invalidArgument: Status = .init(rawValue: -1)
-  /// The object is valid but not currently in a state that permits the call.
+  /// The call doesn't fit the current state, such as removing a source that a
+  /// layer still uses.
   public static let invalidState: Status = .init(rawValue: -2)
-  /// The handle is thread-affine and the call came from the wrong thread.
+  /// The call came from a thread that can't make it.
   public static let wrongThread: Status = .init(rawValue: -3)
-  /// The entry point or requested behavior is unavailable in this build.
+  /// The platform, the build, or the render target lacks the feature.
   public static let unsupported: Status = .init(rawValue: -4)
-  /// Native code failed; the diagnostic describes the error.
+  /// The library or the platform hit an error, such as a failed graphics driver
+  /// call.
   public static let nativeError: Status = .init(rawValue: -5)
-  /// The operation reached its terminal cancelled disposition.
+  /// The work stopped before it finished, such as when its handle was released.
   public static let cancelled: Status = .init(rawValue: -6)
-  /// A conflicting driver call or lifecycle transition is in flight.
+  /// Another call is still using the same object.
   public static let busy: Status = .init(rawValue: -7)
-  /// The render target or graphics receiver was irreversibly lost.
+  /// The render target can't be drawn to anymore.
   public static let targetLost: Status = .init(rawValue: -8)
-  /// A nonblocking drain or acquisition has nothing to return yet.
+  /// There is nothing to return yet, such as when no new frame is ready.
   public static let notReady: Status = .init(rawValue: -9)
-  /// A call named an ID with no live object behind it.
+  /// Nothing has the given ID.
   public static let notFound: Status = .init(rawValue: -10)
   public var description: String {
     switch rawValue {

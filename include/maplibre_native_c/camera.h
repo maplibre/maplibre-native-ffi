@@ -1,6 +1,6 @@
 /**
  * @file maplibre_native_c/camera.h
- * Public C API declarations for map camera and coordinate conversion.
+ * Move the camera, and set how the map shows and limits its view.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_CAMERA_H
@@ -18,79 +18,30 @@ extern "C" {
 #endif
 
 /**
- * Submits a debug-overlay command.
+ * Draws debugging overlays, such as tile borders, on the map.
  *
- * The committed mask is visible through mln_map_get_snapshot as
- * snapshot.debug_options.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options carries
- *   a bit outside mln_map_debug_flag, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mask fails.
+ * `options` replaces the overlays set before.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_debug_options(
   mln_map map, mln_map_debug_flags options, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
-/**
- * Submits a rendering-stats visibility command.
- *
- * The committed value is visible through mln_map_get_snapshot as
- * snapshot.rendering_stats_view_enabled.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the visibility fails.
- */
+/** Shows or hides an overlay of rendering statistics on the map. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
   mln_map map, bool enabled, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
-/**
- * Submits an ordered debug-log command.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the dump fails.
- */
+/** Logs debugging information about the map's style and sources. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_dump_debug_logs(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
- * Submits a copied viewport-options command.
+ * Sets how the map orients and constrains its view.
  *
- * The committed options are visible through mln_map_get_snapshot as
- * snapshot.view.viewport.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
+ * Settings that `options` doesn't set keep their current values.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_viewport_options(
@@ -98,20 +49,9 @@ MLN_API mln_status mln_map_set_viewport_options(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
- * Submits a copied tile-options command.
+ * Sets how the map chooses which tiles to load, and at what detail.
  *
- * The committed options are visible through mln_map_get_snapshot as
- * snapshot.tile.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
+ * Settings that `options` doesn't set keep their current values.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_tile_options(
@@ -120,35 +60,13 @@ MLN_API mln_status mln_map_set_tile_options(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits one atomic camera update.
+ * Moves the camera, at once or with an animation.
  *
- * The update is copied before return. The completion reports its terminal
- * disposition, the snapshot generation that the update published, and the
- * render update generation that includes it.
- * update->gesture_phase is applied around the camera write; see
- * mln_gesture_phase.
- *
- * Each selected camera field replaces that field's animation. Omitted fields
- * retain their animations and timing. A flight couples center and zoom;
- * replacing either stops both. An anchor couples center with all fields in its
- * update; replacing any of them stops that anchored update. Explicit center
- * takes precedence over anchor. Constraints apply to the combined camera.
- *
- * An ease without a duration applies immediately. Fly duration is derived from
- * flight distance and velocity when omitted. The command completion reports
- * application of the update, and update->animation.end_handler reports the end
- * of its transitions, including for a jump.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, update is null
- *   or undersized, update->mode or update->gesture_phase is out of range,
- *   update->camera or update->animation is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write fails.
+ * Camera fields that `update` doesn't set keep their values, and the update
+ * stops any running animation of the fields it sets. The function finishes
+ * when the map applies the update, before an animation ends. To learn when an
+ * animation ends, set an mln_camera_transition_handler in its animation
+ * options.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_update_camera(
@@ -157,30 +75,14 @@ MLN_API mln_status mln_map_update_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits one atomic relative camera update.
+ * Moves the camera relative to where it is, as a gesture does.
  *
- * The delta is copied before return. Its components and gesture phase apply in
- * one command: render sessions receive one render update for the whole delta,
- * and the completion reports its terminal disposition and the one snapshot
- * generation that the delta published. The command completion reports
- * application of the delta, and delta->animation.end_handler reports the end of
- * all its transitions once.
- *
- * Validation reads only the fields that delta->fields selects.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, delta is null or
- *   undersized, delta->fields carries an unknown bit, delta->gesture_phase is
- *   out of range, a selected offset, bearing, pitch, or anchor is not finite, a
- *   selected scale is not finite and positive, ANCHOR is selected without
- *   SCALE, BEARING, or PITCH, ANCHOR and OFFSET are selected with a positive
- *   animation duration, delta->animation is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write fails.
+ * `delta` can pan the map's content by an offset on the screen, scale the zoom,
+ * and add to the bearing and pitch. An anchor keeps one screen point in place
+ * while the scale, bearing, or pitch changes. An anchor needs one of those
+ * changes, and combines with an offset only when the delta has no animation.
+ * The function finishes when the map applies the delta, before an animation
+ * ends.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(
@@ -189,21 +91,10 @@ MLN_API mln_status mln_map_apply_camera_delta(
 ) MLN_NOEXCEPT;
 
 /**
- * Cancels the camera transitions running when this command commits.
+ * Stops every running camera animation where it is.
  *
- * Each cancelled command's end handler runs with
- * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED. Cancelling with no transition
- * running commits and changes nothing.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation fails.
+ * The end handler of each stopped animation reports
+ * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_transitions(
@@ -211,24 +102,11 @@ MLN_API mln_status mln_map_cancel_transitions(
 ) MLN_NOEXCEPT;
 
 /**
- * Cancels the camera transitions of the commands whose animation carried
- * transition_id, and leaves every other transition running.
+ * Stops the running camera animations whose animation options set
+ * `transition_id`.
  *
- * The command matches the commands running when it commits whose
- * mln_animation_options selected MLN_ANIMATION_OPTION_TRANSITION_ID with this
- * value. The transitions stop where they stand, and each matched command's
- * end handler runs with MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED. Cancelling an
- * identity that no running command carries commits and changes nothing.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation fails.
+ * Other animations keep running. The end handler of each stopped animation
+ * reports MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_camera_transition(
@@ -237,20 +115,10 @@ MLN_API mln_status mln_map_cancel_camera_transition(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered camera read.
+ * Reads the map's camera.
  *
- * The query observes every command accepted before it. The completion borrows
- * one mln_camera_query_result.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when reading the camera fails.
+ * The query reads the camera after the map applies the commands sent before
+ * it.
  */
 MLN_BINDING("execution=query;result=mln_camera_query_result")
 MLN_API mln_status mln_map_get_camera(
@@ -258,22 +126,10 @@ MLN_API mln_status mln_map_get_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered query for a camera that fits geographic bounds.
+ * Computes a camera that fits `bounds` in the map's view.
  *
- * Inputs are copied before this function returns. The query observes every
- * map command accepted before it. Pass null fit_options for default fitting
- * controls. The completion borrows one mln_camera_options.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, bounds is not a
- *   valid ordered pair of coordinates, or fit_options is undersized or carries
- *   an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit fails.
+ * The camera keeps the map's bearing and pitch unless `fit_options` sets them,
+ * and its zoom stays within the map's zoom limits.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
@@ -283,22 +139,11 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered query for a camera that fits geographic coordinates.
+ * Computes a camera that fits `coordinates` in the map's view.
  *
- * The query owns a copy of coordinates and fit_options. The completion borrows
- * one mln_camera_options.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, coordinates is
- *   null, coordinate_count is zero, a coordinate is out of range, or
- *   fit_options is undersized or carries an invalid field, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit fails.
+ * `coordinates` must not be empty. The camera keeps the map's bearing and pitch
+ * unless `fit_options` sets them, and its zoom stays within the map's zoom
+ * limits.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
@@ -310,21 +155,11 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered query for a camera that fits a GeoJSON geometry.
+ * Computes a camera that fits a GeoJSON geometry in the map's view.
  *
- * The query owns a copy of the geometry bytes and fit_options. The completion
- * borrows one mln_camera_options.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, geometry is not
- *   a GeoJSON Geometry, carries no coordinate, or fit_options is undersized or
- *   carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit fails.
+ * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+ * feature. The camera keeps the map's bearing and pitch unless `fit_options`
+ * sets them, and its zoom stays within the map's zoom limits.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
@@ -334,23 +169,10 @@ MLN_API mln_status mln_map_camera_for_geometry(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered wrapped-bounds query for a copied camera.
+ * Computes the area that the map would show with `camera`.
  *
- * The result is the hull of the top-left and bottom-right screen corners for
- * that camera in the current viewport. When bearing and pitch are zero, the
- * box equals the visible area. Those corners are the northwest and southeast
- * of the viewport. Longitudes stay in -180 to 180. The completion borrows one
- * mln_lat_lng_bounds.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection fails.
+ * Camera fields that `camera` doesn't set come from the map's camera. The
+ * longitudes stay between -180 and 180.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
@@ -359,25 +181,12 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered unwrapped-bounds query for a copied camera.
+ * Computes the area that the map would show with `camera`, without wrapping
+ * longitudes.
  *
- * The result is the axis-aligned hull of all four screen corners and the
- * center, which encompasses the projected viewport. Longitudes unwrap onto
- * the shortest path through the center. A viewport that crosses the
- * antimeridian reports values outside -180 to 180. A center exactly on the
- * antimeridian may resolve to 180 or -180 from floating-point rounding, so its
- * hull may extend past either end of that range. The completion borrows one
- * mln_lat_lng_bounds.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection fails.
+ * Camera fields that `camera` doesn't set come from the map's camera. The
+ * longitudes can fall outside -180 to 180, so a view across the antimeridian
+ * gives one continuous range.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
@@ -386,20 +195,10 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits a copied camera-constraint command.
+ * Limits the camera's center to an area, and its zoom and pitch to ranges.
  *
- * The committed constraints are visible through mln_map_get_snapshot as
- * snapshot.bounds.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the constraints fails.
+ * Limits that `options` doesn't set keep their current values. When the camera
+ * is outside the new limits, it moves inside them.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_bounds(
@@ -408,20 +207,10 @@ MLN_API mln_status mln_map_set_bounds(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits a copied free-camera command.
+ * Places the camera at a position and orientation in space.
  *
- * The committed options are visible through mln_map_get_snapshot as
- * snapshot.free_camera.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
+ * The map adjusts them to a camera that it can show, and stops running camera
+ * animations.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_free_camera_options(
@@ -430,22 +219,10 @@ MLN_API mln_status mln_map_set_free_camera_options(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits axonometric rendering options.
+ * Sets whether the map draws in perspective or axonometric projection, and how
+ * much it skews the view.
  *
- * The function copies mode before it returns. Only fields selected by
- * mode->fields affect the map. Unspecified fields keep their current native
- * values. The completion reports the terminal disposition and published
- * snapshot generation.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, mode is null,
- *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mode fails.
+ * Settings that `mode` doesn't set keep their current values.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_projection_mode(

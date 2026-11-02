@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One rule of a native HTTP header transform.
+/// Headers to add to the HTTP requests whose URL matches a pattern.
 /// </summary>
 /// <remarks>
 /// See <c>mln_http_header_rule</c> in the <see
@@ -27,20 +27,11 @@ public readonly partial record struct HttpHeaderRule
     }
 
     /// <summary>
-    /// The resource kinds to match. Zero selects every kind.
+    /// The kinds of resource that the rule covers. Zero covers every kind.
     /// </summary>
     public ResourceKindFlag Kinds { get; init; }
     public UrlMatchFlag Flags { get; init; }
-
-    /// <summary>
-    /// The URL or glob pattern to compare.
-    /// </summary>
     public string Url { get; init; } = "";
-
-    /// <summary>
-    /// The headers to set. Registration validates each one as
-    /// <c>HttpHeaderTransformResponse.SetHeader()</c> does.
-    /// </summary>
     public ImmutableArray<HttpHeader> Headers
     {
         get => HeadersStorage.AsImmutable();

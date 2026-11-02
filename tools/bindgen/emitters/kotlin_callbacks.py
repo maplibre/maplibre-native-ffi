@@ -281,8 +281,12 @@ def declaration_doc(value, values):
         if split(value, values):
             note = split_note(value, values)
             summary = f"{summary} {note}" if summary else note
+        # The thread note replaces the C threads.
         return docs.block_comment(
-            docs.Doc(value.native, summary, found.url if found else "", notes), symbol
+            replace(found, summary=summary, notes=notes, threads=())
+            if found
+            else docs.Doc(value.native, summary, notes=notes),
+            symbol,
         )
     if accepts_native(value, values) and found:
         factory = native_factory(value, values)
@@ -295,10 +299,9 @@ def declaration_doc(value, values):
         note = split_note(value, values)
     else:
         return doc(values.bound, value.native)
-    summary = f"{found.summary} {note}" if found else note
-    return docs.block_comment(
-        docs.Doc(value.native, summary, found.url if found else ""), symbol
-    )
+    if found is None:
+        return docs.block_comment(docs.Doc(value.native, note), symbol)
+    return docs.block_comment(replace(found, summary=f"{found.summary} {note}"), symbol)
 
 
 def declaration(value, values):

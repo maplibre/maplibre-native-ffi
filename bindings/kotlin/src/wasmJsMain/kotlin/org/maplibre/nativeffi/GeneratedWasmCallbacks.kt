@@ -11,21 +11,25 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * Process-global log callback. This is the Kotlin/Wasm queue form: the page receives each call
- * after native has answered it. The JVM, Android, and Kotlin/Native take `LogHandler`, whose
- * callback computes the answer.
+ * A log callback, for `setLogCallback()`. This is the Kotlin/Wasm queue form: the page receives
+ * each call after native has answered it. The JVM, Android, and Kotlin/Native take `LogHandler`,
+ * whose callback computes the answer.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class QueuedLogHandler(
-  /** Receives each record. */
   public val callback: QueuedLogCallback,
 )
 
 /**
- * Receives a MapLibre Native log record. The page receives the call after native has answered it,
- * so the callback returns nothing, and native answers `true` as it does for a queue.
+ * Receives a log message. The page receives the call after native has answered it, so the callback
+ * returns nothing, and native answers `true` as it does for a queue.
+ *
+ * Return true if you handled the message, or false to also send it to the platform's log.
  *
  * The page calls it when it dispatches the binding's delivery queue.
  *
@@ -39,15 +43,19 @@ public fun interface QueuedLogCallback {
 }
 
 /**
- * HTTP header transform state: a callback, or native header rules. This is the Kotlin/Wasm form,
- * which holds only native header rules, because the page cannot run Kotlin while native waits for
- * an answer. The JVM, Android, and Kotlin/Native take `HttpHeaderTransform`.
+ * Headers to add to HTTP requests, for `RuntimeHandle.setHttpHeaderTransform()`. This is the
+ * Kotlin/Wasm form, which holds only native header rules, because the page cannot run Kotlin while
+ * native waits for an answer. The JVM, Android, and Kotlin/Native take `HttpHeaderTransform`.
+ *
+ * Set either `callback` or `rules`, not both.
+ *
+ * Runs on a library thread.
  *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderTransformRules(
-  /** Header rules for a transform without a callback; empty with one. */
+  /** The first rule that matches a request adds its headers, and no other. */
   public val rules: List<HttpHeaderRule> = emptyList(),
 )
 
@@ -75,9 +83,12 @@ internal fun NativeCall.writeHttpHeaderTransformRules(value: HttpHeaderTransform
   allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransformRules(it, value) }
 
 /**
- * Installs a process-global MapLibre Native log callback. The callback runs synchronously on the
- * thread that emits the record, or on a MapLibre background thread for a severity that
- * `setLogAsyncSeverityMask()` dispatches asynchronously.
+ * Sends the log messages of every runtime in the process to a callback.
+ *
+ * The callback replaces the one set before.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -89,11 +100,19 @@ public fun setLogCallback(handler: QueuedLogHandler): Unit =
   }
 
 /**
- * Registers or replaces the runtime-scoped outgoing HTTP header transform. The callback runs
- * synchronously on a MapLibre worker or network thread.
+ * Adds headers to the runtime's HTTP requests.
+ *
+ * The transform replaces the one set before. In a browser or on OpenHarmony, serve the requests
+ * with `RuntimeHandle.setResourceProvider()` instead.
+ *
+ * Runs on a library thread.
  *
  * See `mln_runtime_set_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the library runs in a browser or on OpenHarmony.
  */
 public fun RuntimeHandle.setHttpHeaderTransform(
   transform: HttpHeaderTransformRules,

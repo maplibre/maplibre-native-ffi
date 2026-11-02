@@ -3,19 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Logical extent in UI pixels and the device-pixel scale.
+/// A size in logical pixels, and the physical pixels in each logical pixel.
 /// </summary>
 /// <remarks>
 /// See <c>mln_logical_extent</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Width">
-/// Width in UI pixels.
-/// </param>
-/// <param name="Height">
-/// Height in UI pixels.
-/// </param>
-/// <param name="ScaleFactor">
-/// Device pixels per UI pixel.
-/// </param>
 public readonly partial record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);

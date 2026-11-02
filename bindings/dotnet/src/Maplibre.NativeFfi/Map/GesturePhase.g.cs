@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Gesture boundary carried atomically with a camera update or delta.
+/// Where a camera change falls in a gesture that the user makes.
 /// </summary>
 /// <remarks>
 /// See <c>mln_gesture_phase</c> in the <see
@@ -11,30 +11,15 @@ namespace Maplibre.NativeFfi;
 public enum GesturePhase : uint
 {
     /// <summary>
-    /// The update carries no gesture boundary and leaves the flag as it is.
+    /// The change isn't part of a gesture.
     /// </summary>
     None = 0,
-
-    /// <summary>
-    /// Marks a gesture as in progress before the camera write. It does not
-    /// cancel running transitions; use
-    /// <c>MapHandle.CancelTransitionsAsync()</c> for that.
-    /// </summary>
     Begin = 1,
-
-    /// <summary>
-    /// Keeps the gesture marked as in progress before the camera write.
-    /// </summary>
     Update = 2,
-
-    /// <summary>
-    /// Clears the gesture flag after the camera write.
-    /// </summary>
     End = 3,
 
     /// <summary>
-    /// Cancels transitions running after the camera write, then clears the
-    /// gesture flag.
+    /// The platform cancelled the gesture. This also cancels camera changes.
     /// </summary>
     Cancel = 4,
 }

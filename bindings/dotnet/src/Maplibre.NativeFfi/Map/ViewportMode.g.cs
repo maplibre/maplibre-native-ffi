@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Viewport orientation modes used by <c>MapViewportOptions</c>.
+/// The vertical direction of the image that the map renders.
 /// </summary>
 /// <remarks>
 /// See <c>mln_viewport_mode</c> in the <see
@@ -11,5 +11,9 @@ namespace Maplibre.NativeFfi;
 public enum ViewportMode : uint
 {
     Default = 0,
+
+    /// <summary>
+    /// Renders the image upside down.
+    /// </summary>
     FlippedY = 1,
 }

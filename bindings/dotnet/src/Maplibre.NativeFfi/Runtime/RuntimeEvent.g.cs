@@ -3,29 +3,28 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One delivered runtime event.
+/// An event that a runtime or one of its maps raised.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Source">
-/// Source handle: the <c>RuntimeHandle</c> or <c>MapHandle</c> that source_type
-/// selects.
+/// The runtime or map that raised the event, as <c>source_type</c> says.
 /// </param>
 /// <param name="Generation">
-/// Map snapshot generation that the event reports, or zero when source_type is
-/// <c>RuntimeEventSourceType.Runtime</c>.
+/// For a map event, a map snapshot with this generation or a later one includes
+/// what the event reports. Zero for a runtime event.
 /// </param>
 /// <param name="Code">
-/// Secondary event detail whose meaning type selects; see
-/// <c>RuntimeEventType</c>.
+/// The <c>CameraChangeMode</c> for <c>RuntimeEventType.MapCameraWillChange</c>
+/// and <c>RuntimeEventType.MapCameraDidChange</c>.
 /// </param>
 /// <param name="Message">
-/// UTF-8 message, empty when this event carries no message.
-/// </param>
-/// <param name="Payload">
-/// Typed payload selected by payload_type.
+/// The error for an event that reports a failure, the image ID for
+/// <c>RuntimeEventType.MapStyleImageMissing</c>, or the source ID for
+/// <c>RuntimeEventType.MapSourceChanged</c> and
+/// <c>RuntimeEventType.MapTileAction</c>.
 /// </param>
 public readonly partial record struct RuntimeEvent(
     RuntimeEventType Type,

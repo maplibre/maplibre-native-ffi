@@ -89,9 +89,13 @@ def status_call(
     return f"try status.call(c.{function.name}, {tuple_}, {diagnostic});"
 
 
-def doc(bound: BoundApi, native: str, indent: str = "") -> str:
-    """The Zig doc comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), symbols(bound), indent)
+def doc(bound: BoundApi, native: str, indent: str = "", *, discard=False) -> str:
+    """The Zig doc comment of a declaration, or empty when it has none. With
+    `discard`, it documents a form that passes no completion."""
+    found = bound.doc(native)
+    return docs.line_comment(
+        docs.discarding(found) if discard else found, symbols(bound), indent
+    )
 
 
 def type_name(native: str) -> str:
@@ -198,13 +202,16 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{member}"
             for member in ("generation", "render_update_generation")
         },
+        parameter=parameter_name,
     )
 
 
-def documented(bound: BoundApi, native: str, code: str, marker: str) -> str:
+def documented(
+    bound: BoundApi, native: str, code: str, marker: str, *, discard=False
+) -> str:
     """Code with a declaration's comment before the line that starts it."""
     start = code.index(marker)
-    return code[:start] + doc(bound, native) + code[start:]
+    return code[:start] + doc(bound, native, discard=discard) + code[start:]
 
 
 def expose_parameter_names(plan, code, name):
@@ -316,6 +323,7 @@ def _lower(api: Api | BoundApi):
                             function.name,
                             expose_parameter_names(plan, code, name),
                             f"pub fn {name}(",
+                            discard=discard,
                         ),
                         name,
                     )

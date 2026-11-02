@@ -2,28 +2,30 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The queue family that holds a borrowed Vulkan image between frames.
+/// The queue family that a borrowed image goes to after each frame.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_image_owner</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para>With <c>VulkanImageOwner.External</c> or
+/// <c>VulkanImageOwner.Foreign</c>, acquire the image on your side before you
+/// read it. You don't need to release it back.</para>
+/// <para>See <c>mln_vulkan_image_owner</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public enum VulkanImageOwner : uint
 {
     /// <summary>
-    /// The context's graphics queue family keeps the image.
+    /// The image stays with the queue family of
+    /// <c>graphics_queue_family_index</c>.
     /// </summary>
     GraphicsQueue = 0,
 
     /// <summary>
-    /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
-    /// image's memory.
+    /// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
     /// </summary>
     External = 1,
 
     /// <summary>
-    /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must
-    /// enable VK_EXT_queue_family_foreign.
+    /// Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT.
     /// </summary>
     Foreign = 2,
 }

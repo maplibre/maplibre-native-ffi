@@ -3,15 +3,19 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// One rendered-feature query hit.
+/// A feature that a rendered feature query found.
 ///
 /// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeature: Equatable, Hashable, Sendable {
+  /// The feature, as a GeoJSON feature.
   public var feature: String
+  /// The layer that drew the feature.
   public var layerId: String
   public var sourceId: String
+  /// The feature's source layer, or empty when its source has none.
   public var sourceLayerId: String
+  /// The feature's state, as a JSON object.
   public var state: String
   public init(
     feature: String = "",
@@ -54,14 +58,15 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
   }
 }
 
-/// Options for rendered feature queries.
+/// Options for a rendered feature query.
 ///
 /// See `mln_rendered_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
-  /// Optional style layer IDs. When absent, all rendered layers are queried.
+  /// The layers to query. Without them, the query covers every layer.
   public var layerIds: [String]?
-  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  /// A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that
+  /// each feature must match. Empty matches every feature.
   public var filter: String
   public init(layerIds: [String]? = nil, filter: String = "") {
     self.layerIds = layerIds
@@ -99,7 +104,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Rendered feature query geometry descriptor.
+/// The screen area that a rendered feature query covers.
 ///
 /// See `mln_rendered_query_geometry` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -126,7 +131,7 @@ public enum RenderedQueryGeometry: Equatable, Hashable, Sendable {
   }
 }
 
-/// Screen-space box in logical map pixels.
+/// A rectangle of the screen, from its `min` corner to its `max` corner.
 ///
 /// See `mln_screen_box` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -151,12 +156,11 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
   }
 }
 
-/// Screen-space line string in logical map pixels.
+/// A line through points on the screen.
 ///
 /// See `mln_screen_line_string` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct ScreenLineString: Equatable, Hashable, Sendable {
-  /// Points.
   public var points: [ScreenPoint]
   public init(points: [ScreenPoint] = []) {
     self.points = points
@@ -180,12 +184,14 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
   }
 }
 
-/// One source-feature query hit.
+/// A feature that a source feature query found.
 ///
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeature: Equatable, Hashable, Sendable {
+  /// The feature, as a GeoJSON feature.
   public var feature: String
+  /// The feature's source layer, or empty when its source has none.
   public var sourceLayerId: String
   public init(feature: String = "", sourceLayerId: String = "") {
     self.feature = feature
@@ -207,14 +213,16 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
   }
 }
 
-/// Options for source feature queries.
+/// Options for a source feature query.
 ///
 /// See `mln_source_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
-  /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+  /// The source layers to query. A vector source finds features only in the
+  /// source layers named here.
   public var sourceLayerIds: [String]?
-  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  /// A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that
+  /// each feature must match. Empty matches every feature.
   public var filter: String
   public init(sourceLayerIds: [String]? = nil, filter: String = "") {
     self.sourceLayerIds = sourceLayerIds

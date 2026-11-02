@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One complete runtime style image.
+/// An image in the map's style.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_info</c> in the <see
@@ -11,19 +11,12 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record StyleImageInfo
 {
-    /// <summary>
-    /// Image width in pixels.
-    /// </summary>
     public uint Width { get; init; }
-
-    /// <summary>
-    /// Image height in pixels.
-    /// </summary>
     public uint Height { get; init; }
 
     /// <summary>
-    /// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes,
-    /// top row first.
+    /// The premultiplied RGBA pixels, in rows of <c>width</c> * 4 bytes, from
+    /// the top row down.
     /// </summary>
     public ImmutableArray<byte> Pixels
     {
@@ -31,54 +24,22 @@ public sealed record StyleImageInfo
         init => PixelsStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> PixelsStorage { get; init; }
-
-    /// <summary>
-    /// Horizontally stretchable intervals.
-    /// </summary>
     public ImmutableArray<ImageStretch> StretchX
     {
         get => StretchXStorage.AsImmutable();
         init => StretchXStorage = ValueArray.From(value);
     }
     internal ValueArray<ImageStretch> StretchXStorage { get; init; }
-
-    /// <summary>
-    /// Vertically stretchable intervals.
-    /// </summary>
     public ImmutableArray<ImageStretch> StretchY
     {
         get => StretchYStorage.AsImmutable();
         init => StretchYStorage = ValueArray.From(value);
     }
     internal ValueArray<ImageStretch> StretchYStorage { get; init; }
-
-    /// <summary>
-    /// Content box, when the image sets one.
-    /// </summary>
     public ImageContent? Content { get; init; }
-
-    /// <summary>
-    /// How the image fits text horizontally, when it sets this.
-    /// </summary>
     public StyleImageTextFit? TextFitWidth { get; init; }
-
-    /// <summary>
-    /// How the image fits text vertically, when it sets this.
-    /// </summary>
     public StyleImageTextFit? TextFitHeight { get; init; }
-
-    /// <summary>
-    /// Sprite pixel ratio.
-    /// </summary>
     public float PixelRatio { get; init; }
-
-    /// <summary>
-    /// Whether the image is a signed distance field icon.
-    /// </summary>
     public bool Sdf { get; init; }
-
-    /// <summary>
-    /// Whether the map keeps the image once no loaded tile uses it.
-    /// </summary>
     public bool KeepUnused { get; init; }
 }

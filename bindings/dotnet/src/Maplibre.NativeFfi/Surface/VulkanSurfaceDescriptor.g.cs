@@ -3,11 +3,17 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vulkan attachment options for a native surface.
+/// A Vulkan surface to present to, for <c>MapHandle.AttachVulkanSurface()</c>
+/// and <c>RenderSessionHandle.SetVulkanSurfaceTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_surface_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+/// <para>The device must have VK_KHR_swapchain enabled, and the queue family of
+/// <c>graphics_queue_family_index</c> must support presenting to the surface.
+/// The session creates the swapchain. It uses the surface until a replacement
+/// or release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.</para>
+/// <para>See <c>mln_vulkan_surface_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct VulkanSurfaceDescriptor
 {
@@ -23,21 +29,11 @@ public readonly partial record struct VulkanSurfaceDescriptor
         this.Surface = Surface;
     }
 
-    /// <summary>
-    /// Logical surface extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Borrowed Vulkan context. All handles are required. The device must
-    /// support VK_KHR_swapchain, and the queue family must support graphics and
-    /// presentation to this descriptor's surface.
-    /// </summary>
     public required VulkanContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// Borrowed VkSurfaceKHR bit pattern. Required.
+    /// Your VkSurfaceKHR.
     /// </summary>
     public required ulong Surface { get; init; }
 }

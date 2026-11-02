@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Attachment options for a graphics device texture target.
+/// The texture that <c>MapHandle.AttachGraphicsDeviceTexture()</c> draws into.
 /// </summary>
 /// <remarks>
 /// See <c>mln_graphics_device_texture_descriptor</c> in the <see
@@ -17,9 +17,5 @@ public readonly partial record struct GraphicsDeviceTextureDescriptor
         this.Extent = Extent;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
 }

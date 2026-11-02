@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Screen-space line string in logical map pixels.
+/// A line through points on the screen.
 /// </summary>
 /// <remarks>
 /// See <c>mln_screen_line_string</c> in the <see
@@ -16,9 +16,6 @@ public readonly partial record struct ScreenLineString
         this.Points = Points;
     }
 
-    /// <summary>
-    /// Points.
-    /// </summary>
     public ImmutableArray<ScreenPoint> Points
     {
         get => PointsStorage.AsImmutable();

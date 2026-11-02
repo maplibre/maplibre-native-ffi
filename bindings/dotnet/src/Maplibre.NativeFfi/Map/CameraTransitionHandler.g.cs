@@ -3,12 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Callback that one camera command copies to report the end of its
-/// transitions. The callback runs on the runtime worker.
+/// A callback for the end of a camera change, for <c>AnimationOptions</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_camera_transition_handler</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// <para>The callback runs once for each camera command, after every part of
+/// the change that the command started has ended.</para>
+/// <para>See <c>mln_camera_transition_handler</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct CameraTransitionHandler(
     CameraTransitionEndCallback? Callback

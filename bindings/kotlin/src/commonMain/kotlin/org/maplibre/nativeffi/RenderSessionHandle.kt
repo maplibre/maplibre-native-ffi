@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A render session, which renders one map to one render target.
+ * A render session draws a map into a surface or a texture.
  *
  * See `mln_render_session` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -39,7 +39,12 @@ internal constructor(
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Irreversibly ends session work and destroys the session's graphics objects where that is safe.
+   * Stops the session right away, without running its pending graphics work.
+   *
+   * Use it when the target's graphics objects are going away and a detach can't finish first.
+   * Pending work completes with `Status.TARGET_LOST`, and pending frame requests finish with
+   * `RenderResult.TARGET_NOT_READY`. Once the call returns, the library no longer uses your
+   * graphics objects, and you can attach another session to the map. Dispose the session afterward.
    *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -52,11 +57,19 @@ internal constructor(
     }
 
   /**
-   * Acquires the oldest rendered frame that is not already acquired. The frame owns its slot until
-   * release. The call is nonblocking.
+   * Takes a rendered frame from the session's texture ring, if one is ready.
+   *
+   * It takes the oldest frame that you haven't acquired. The session can render over a frame before
+   * you acquire it. While you hold a frame in every texture of the ring, new frames wait until you
+   * release one.
    *
    * See `mln_render_session_acquire_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when the session lacks `RenderSessionCapabilityFlag.FRAME_ACQUISITION`.
+   * - `Status.INVALID_STATE` when the session has failed.
    */
   public fun acquireFrame(): AcquiredFrameHandle? =
     nativeCall(this, binding) {
@@ -69,14 +82,17 @@ internal constructor(
     }
 
   /**
-   * Ends every frame demand that has not started with `RenderResult.NO_UPDATE` and completes after
-   * earlier driver work has finished. A running demand finishes its attempt and ends any wait for a
-   * map update or a free slot. After completion, a new frame demand is required to render again,
-   * except that a pending still image submits its next demand itself; see
-   * `MapHandle.requestStillImage()`.
+   * Ends the session's pending frame requests and waits for its earlier work.
+   *
+   * Frame requests that haven't started, including those that wait for a map update, finish with
+   * `RenderResult.NO_UPDATE`.
    *
    * See `mln_render_session_barrier` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session loses its target before the barrier runs.
    */
   public fun barrier(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -84,10 +100,15 @@ internal constructor(
     }
 
   /**
-   * Starts asynchronous renderer-data clearing.
+   * Clears the data that the session's renderer holds, such as loaded tiles, and draws the map
+   * again.
    *
    * See `mln_render_session_clear_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
   public fun clearData(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -95,17 +116,30 @@ internal constructor(
     }
 
   /**
-   * Starts normal graphics-owner teardown and map detachment.
+   * Detaches the session from its map and frees its graphics objects.
+   *
+   * Release every acquired frame first. Pending frame requests finish with
+   * `RenderResult.TARGET_NOT_READY`. Once the detach completes, the library no longer uses your
+   * graphics objects, and you can attach another session to the map. Dispose the session afterward.
    *
    * See `mln_render_session_detach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session loses its target before the detach runs.
    */
   public fun detach(): Deferred<Unit> =
     nativeUnit(this, binding) { check(C.mln_render_session_detach(handle, completion, diagnostic)) }
 
   /**
-   * Consumes a session in any state and retires it, then runs completion, if given, once the host
-   * may destroy the target's graphics objects.
+   * Releases the session in any state.
+   *
+   * An attached session driven by `RenderDriverKind.CORE_WORKER` detaches first unless you hold one
+   * of its frames. Any other session is abandoned as `RenderSessionHandle.abandon()` does. To free
+   * the graphics objects of a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`, detach
+   * it before you dispose it. Once the disposal completes, the library no longer uses your graphics
+   * objects.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -116,8 +150,13 @@ internal constructor(
     }
 
   /**
-   * Consumes a session in any state and retires it, then runs completion, if given, once the host
-   * may destroy the target's graphics objects.
+   * Releases the session in any state.
+   *
+   * An attached session driven by `RenderDriverKind.CORE_WORKER` detaches first unless you hold one
+   * of its frames. Any other session is abandoned as `RenderSessionHandle.abandon()` does. To free
+   * the graphics objects of a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`, detach
+   * it before you dispose it. Once the disposal completes, the library no longer uses your graphics
+   * objects.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -126,7 +165,7 @@ internal constructor(
     nativeClose(this, binding) { check(C.mln_render_session_dispose(handle, 0L, diagnostic)) }
 
   /**
-   * Drains every currently queued terminal frame result.
+   * Takes the frame results that the session has queued.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -146,10 +185,14 @@ internal constructor(
     }
 
   /**
-   * Starts asynchronous renderer diagnostic-log emission.
+   * Logs debugging information about the session's renderer.
    *
    * See `mln_render_session_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
   public fun dumpDebugLogs(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -157,7 +200,7 @@ internal constructor(
     }
 
   /**
-   * Returns the immutable capabilities fixed during attachment.
+   * Reads what the session supports.
    *
    * See `mln_render_session_get_capabilities` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -170,16 +213,23 @@ internal constructor(
     }
 
   /**
-   * Reports the session's first terminal failure from any native thread.
+   * Reports the error that made the session fail.
+   *
+   * The call fails with that error, and succeeds while the session hasn't failed.
    *
    * See `mln_render_session_get_failure` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session failed because it lost its target.
+   * - `Status.NATIVE_ERROR` when the session failed for another reason.
    */
   public fun getFailure(): Unit =
     nativeCall(this, binding) { check(C.mln_render_session_get_failure(handle, diagnostic)) }
 
   /**
-   * Copies the latest render-session snapshot from any native thread.
+   * Reads the session's current state.
    *
    * See `mln_render_session_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -192,7 +242,14 @@ internal constructor(
     }
 
   /**
-   * Starts a feature-extension query against the latest driver state.
+   * Reads a value that a source computes for one of its features.
+   *
+   * A clustered GeoJSON source answers the `supercluster` extension for a cluster feature. Its
+   * `extensionField` is `children` for the cluster's child features, `leaves` for the points in the
+   * cluster, or `expansion-zoom` for the zoom level where the cluster splits. For `leaves`,
+   * `arguments` can set `limit` and `offset`. Without `limit`, the result has up to 10 points and
+   * ignores `offset`. The result is JSON: a GeoJSON feature collection, a number, or null when the
+   * source has no answer.
    *
    * See `mln_render_session_query_feature_extensions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -220,8 +277,10 @@ internal constructor(
     }
 
   /**
-   * Starts a rendered-feature query against the last frame that the session rendered, so render
-   * after a camera or style change for a result that matches it.
+   * Finds the features that the session drew in an area of the screen.
+   *
+   * The query reads the last frame that the session rendered. A feature that several layers draw
+   * appears once for each layer.
    *
    * See `mln_render_session_query_rendered_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -256,8 +315,10 @@ internal constructor(
     }
 
   /**
-   * Starts a source-feature query against the tiles that the source loaded for rendering, which it
-   * loads only while a visible layer uses it.
+   * Finds the features of the source named `sourceId`.
+   *
+   * The query covers only the tiles that the source has loaded for the current view. A source loads
+   * tiles only while a visible layer uses it.
    *
    * See `mln_render_session_query_source_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -292,10 +353,17 @@ internal constructor(
     }
 
   /**
-   * Reads back the latest frame of the session's owned texture as premultiplied RGBA8.
+   * Reads the pixels of the last frame that the session rendered.
    *
    * See `mln_render_session_read_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when the session's capabilities lack
+   *   `RenderSessionCapabilityFlag.READBACK`.
+   * - `Status.INVALID_STATE` when the session hasn't rendered a frame since it attached, resized,
+   *   or changed its target.
    */
   public fun readTexture(): Deferred<TextureReadbackResult> =
     nativeSubmit(
@@ -307,10 +375,14 @@ internal constructor(
     }
 
   /**
-   * Starts best-effort release of renderer caches.
+   * Frees memory that the session's renderer can rebuild, such as caches.
    *
    * See `mln_render_session_reduce_memory_use` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
   public fun reduceMemoryUse(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -318,10 +390,21 @@ internal constructor(
     }
 
   /**
-   * Starts releasing the session's surface or borrowed texture ring while keeping its renderer.
+   * Lets go of the session's surface or textures, and keeps the rest of the session.
+   *
+   * Use it when the platform takes a surface away, such as when your app goes to the background.
+   * Release every acquired frame first. Until you give the session a new target, frame requests
+   * finish with `RenderResult.TARGET_NOT_READY`. Once the release completes, you can destroy the
+   * old target.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when the session renders into a ring that it created.
+   * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
+   * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */
   public fun releaseTarget(): Deferred<Unit> =
     nativeUnit(this, binding) {
@@ -329,12 +412,18 @@ internal constructor(
     }
 
   /**
-   * Requests a frame without waiting. Every accepted demand produces one terminal result record.
-   * Caller-driver sessions require service on the graphics thread. Core-worker sessions need no
-   * host service.
+   * Asks the session to render a frame.
+   *
+   * Call it once the attach completes. Every request finishes with one frame result that carries
+   * its token, and `RenderSessionHandle.drainFrameResults()` takes it. A request without
+   * `FrameDemandFlag.FORCE` replaces each pending request with the same flags.
    *
    * See `mln_render_session_request_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` when the session has failed.
    */
   public fun requestFrame(demand: FrameDemand): Unit =
     nativeCall(this, binding) {
@@ -342,14 +431,19 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered logical resize of the driver and the map. The driver applies the extent in
-   * order with its other work, and later driver work does not wait for the map. The completion runs
-   * after both have applied it and the map has published its snapshot. Frames render once a map
-   * update matches the applied extent; static and tile maps publish that update for their next
-   * still image.
+   * Resizes the session's target and its map.
+   *
+   * `extent` must keep the session's scale factor. To change the scale factor, give the session a
+   * new target or attach a new session. Release every acquired frame first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when the session renders into a borrowed ring. Give it new textures of
+   *   the new size instead.
+   * - `Status.TARGET_LOST` when the session loses its target before the resize applies.
    */
   public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -357,10 +451,11 @@ internal constructor(
     }
 
   /**
-   * Services every queued item for a caller-graphics-thread driver. The first successful service
-   * call fixes the session's graphics-thread identity; later calls from another native thread
-   * return `Status.WRONG_THREAD`. The target context must be current. Core-worker sessions return
-   * `Status.INVALID_STATE`.
+   * Runs the session's ready graphics work on your graphics thread.
+   *
+   * Use it with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and call it from the same thread every
+   * time. Call it each time `RenderSessionAttachOptions.driverWorkWake` is called, even while you
+   * request no frames, and until a detach completes. It returns once no work is ready.
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -371,7 +466,12 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered replacement of every texture of a caller-owned OpenGL ring.
+   * Replaces the OpenGL textures that a borrowed ring renders into.
+   *
+   * Use it to resize the ring, or to give the session textures again after
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must
+   * have as many textures as the old one, and the same context. Once the replacement completes, the
+   * session no longer uses the old textures.
    *
    * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -391,7 +491,11 @@ internal constructor(
     }
 
   /**
-   * Starts an ordered OpenGL surface replacement.
+   * Replaces the OpenGL surface that the session presents to.
+   *
+   * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, or to
+   * move it to another surface. The new surface must use the same context. Once the replacement
+   * completes, the session no longer uses the old surface.
    *
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

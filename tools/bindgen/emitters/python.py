@@ -866,8 +866,11 @@ def operation(
         if product
         else ""
     )
+    # A form that passes no completion reports none of its errors.
     documentation = docs.docstring(
-        values.api.doc(function.name),
+        docs.discarding(values.api.doc(function.name))
+        if discard or dropped_completion
+        else values.api.doc(function.name),
         symbols(values.api),
         "        ",
         ("Native resources remain valid only inside the `with` block.",)
@@ -1187,7 +1190,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         dispose = (
             f"""
     def dispose(self) -> None:
-{docs.docstring(bound.doc(handle.dispose), symbols(bound), "        ")}        self._native._exit()
+{docs.docstring(docs.discarding(bound.doc(handle.dispose)), symbols(bound), "        ")}        self._native._exit()
 """
             if public_dispose(handle)
             else ""

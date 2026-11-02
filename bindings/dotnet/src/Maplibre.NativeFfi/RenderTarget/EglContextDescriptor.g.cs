@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// EGL context fields shared by OpenGL render targets.
+/// The EGL objects that a render session makes its OpenGL context from.
 /// </summary>
 /// <remarks>
 /// See <c>mln_egl_context_descriptor</c> in the <see
@@ -28,37 +28,27 @@ public readonly partial record struct EglContextDescriptor
     }
 
     /// <summary>
-    /// Borrowed EGLDisplay. Required and kept initialized through teardown.
-    /// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the
-    /// whole process, so a shared display must stay initialized until every
-    /// session using it has detached or been destroyed. The host must not call
-    /// eglTerminate per session.
+    /// An <c>EGLDisplay</c>.
     /// </summary>
     public required NativePointer Display { get; init; }
 
     /// <summary>
-    /// Borrowed EGLConfig used to create the session context. Required. OpenGL
-    /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
+    /// An <c>EGLConfig</c>.
     /// </summary>
     public required NativePointer Config { get; init; }
 
     /// <summary>
-    /// Borrowed EGLContext whose share group the session context joins.
-    /// Required under shared ownership, where the session also takes its client
-    /// API from this context. A dedicated session joins no share group, so it
-    /// must be null there and names client_api instead.
+    /// Your <c>EGLContext</c>, for a shared context.
     /// </summary>
     public NativePointer ShareContext { get; init; }
 
     /// <summary>
-    /// Client API the session creates its context for. Required under dedicated
-    /// ownership. A shared session queries share_context for it, so this is
-    /// ignored there.
+    /// The API of a dedicated context. A shared context uses the API of yours.
     /// </summary>
     public OpenGlClientApi ClientApi { get; init; }
 
     /// <summary>
-    /// Optional eglGetProcAddress-compatible function for the host loader.
+    /// Your <c>eglGetProcAddress</c>, or null to use the system's.
     /// </summary>
     public NativePointer GetProcAddress { get; init; }
 }

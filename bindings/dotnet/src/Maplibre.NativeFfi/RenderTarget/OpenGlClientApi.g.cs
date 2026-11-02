@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL client API a dedicated EGL session creates its context for.
+/// The OpenGL API that a dedicated EGL context uses.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_client_api</c> in the <see
@@ -10,18 +10,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public enum OpenGlClientApi : uint
 {
-    /// <summary>
-    /// No client API is named.
-    /// </summary>
     Unspecified = 0,
-
-    /// <summary>
-    /// Desktop OpenGL, as EGL_OPENGL_API names it.
-    /// </summary>
     Gl = 1,
-
-    /// <summary>
-    /// OpenGL ES, as EGL_OPENGL_ES_API names it.
-    /// </summary>
     Gles = 2,
 }

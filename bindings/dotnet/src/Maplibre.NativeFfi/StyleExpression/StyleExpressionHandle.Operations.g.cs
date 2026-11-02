@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A parsed style expression, immutable and independent of any map.
+/// A parsed style expression.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_expression</c> in the <see
@@ -60,11 +60,19 @@ public sealed unsafe partial class StyleExpressionHandle
     }
 
     /// <summary>
-    /// Parses a style expression.
+    /// Parses a style
+    /// [expression](https://maplibre.org/maplibre-style-spec/expressions/) to
+    /// evaluate without a map.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_style_expression_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
+    /// <para>See <c>mln_style_expression_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>expression</c>
+    /// isn't a valid expression, or its result can't have the expected
+    /// type.</description></item>
+    /// </list>
     /// </remarks>
     public static StyleExpressionHandle Create(
         string expression,
@@ -89,11 +97,18 @@ public sealed unsafe partial class StyleExpressionHandle
     }
 
     /// <summary>
-    /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
+    /// Evaluates a style expression and writes its result as JSON.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_style_expression_evaluate</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
+    /// <para>A number in the result that isn't finite becomes null.</para>
+    /// <para>See <c>mln_style_expression_evaluate</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the expression
+    /// fails to evaluate, such as when it reads an input that <c>inputs</c>
+    /// doesn't set.</description></item>
+    /// </list>
     /// </remarks>
     public string Evaluate(StyleExpressionInputs? inputs = null)
     {
@@ -126,7 +141,7 @@ public sealed unsafe partial class StyleExpressionHandle
     }
 
     /// <summary>
-    /// Copies what a parsed expression depends on.
+    /// Reads what a style expression's result depends on.
     /// </summary>
     /// <remarks>
     /// See <c>mln_style_expression_get_info</c> in the <see

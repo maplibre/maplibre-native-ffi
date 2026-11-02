@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Complete metadata of one style source.
+/// A source in the map's style.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_info</c> in the <see
@@ -11,49 +11,19 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record StyleSourceInfo
 {
-    /// <summary>
-    /// Source ID.
-    /// </summary>
     public string Id { get; init; } = "";
     public StyleSourceType Type { get; init; }
-
-    /// <summary>
-    /// Whether the source is marked volatile.
-    /// </summary>
     public bool IsVolatile { get; init; }
-
-    /// <summary>
-    /// Attribution string, or empty when the source sets none.
-    /// </summary>
     public string Attribution { get; init; } = "";
-
-    /// <summary>
-    /// URL that the source loads from, or empty when it has none.
-    /// </summary>
     public string Url { get; init; } = "";
 
     /// <summary>
-    /// Inline TileJSON metadata, when the source was defined with it.
+    /// The tiles that the style lists in the source itself, instead of at a
+    /// URL.
     /// </summary>
     public StyleSourceTileInfo? TileJson { get; init; }
-
-    /// <summary>
-    /// Geographic bounds, when inline TileJSON sets them.
-    /// </summary>
     public LatLngBounds? Bounds { get; init; }
-
-    /// <summary>
-    /// Tile size in pixels, for a tile source.
-    /// </summary>
     public uint? TileSize { get; init; }
-
-    /// <summary>
-    /// Vector tile encoding, for a vector source.
-    /// </summary>
     public StyleVectorTileEncoding? VectorEncoding { get; init; }
-
-    /// <summary>
-    /// DEM raster encoding, when inline TileJSON sets one.
-    /// </summary>
     public StyleRasterDemEncoding? RasterEncoding { get; init; }
 }

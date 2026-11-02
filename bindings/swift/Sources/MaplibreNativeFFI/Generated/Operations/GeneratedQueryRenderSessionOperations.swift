@@ -4,7 +4,16 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Starts a feature-extension query against the latest driver state.
+  /// Reads a value that a source computes for one of its features.
+  ///
+  /// A clustered GeoJSON source answers the `supercluster` extension for a
+  /// cluster feature. Its `extensionField` is `children` for the cluster's
+  /// child features, `leaves` for the points in the cluster, or
+  /// `expansion-zoom` for the zoom level where the cluster splits. For
+  /// `leaves`, `arguments` can set `limit` and `offset`. Without `limit`, the
+  /// result has up to 10 points and ignores `offset`. The result is JSON: a
+  /// GeoJSON feature collection, a number, or null when the source has no
+  /// answer.
   ///
   /// See `mln_render_session_query_feature_extensions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -31,9 +40,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Starts a rendered-feature query against the last frame that the session
-  /// rendered, so render after a camera or style change for a result that
-  /// matches it.
+  /// Finds the features that the session drew in an area of the screen.
+  ///
+  /// The query reads the last frame that the session rendered. A feature that
+  /// several layers draw appears once for each layer.
   ///
   /// See `mln_render_session_query_rendered_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -56,8 +66,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Starts a source-feature query against the tiles that the source loaded for
-  /// rendering, which it loads only while a visible layer uses it.
+  /// Finds the features of the source named `sourceId`.
+  ///
+  /// The query covers only the tiles that the source has loaded for the current
+  /// view. A source loads tiles only while a visible layer uses it.
   ///
   /// See `mln_render_session_query_source_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).

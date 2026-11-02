@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Resource transform state. The callback runs on a MapLibre network thread.
+/// A resource transform callback, for
+/// <c>RuntimeHandle.SetResourceTransformAsync()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_transform</c> in the <see
@@ -17,8 +18,5 @@ public readonly partial record struct ResourceTransform
         this.Callback = Callback;
     }
 
-    /// <summary>
-    /// Asks for the URL of each network resource request.
-    /// </summary>
     public required ResourceTransformCallback Callback { get; init; }
 }

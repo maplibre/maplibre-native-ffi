@@ -2,8 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a session's OpenGL context relates to its driver thread and host
-/// graphics state.
+/// Whether a render session's OpenGL context shares objects with yours.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_context_ownership</c> in the <see
@@ -12,12 +11,12 @@ namespace Maplibre.NativeFfi;
 public enum OpenGlContextOwnership : uint
 {
     /// <summary>
-    /// The session shares its thread with host graphics work.
+    /// The session's context shares objects with your <c>share_context</c>.
     /// </summary>
     Shared = 0,
 
     /// <summary>
-    /// The session keeps its own OpenGL context current on its thread.
+    /// The session's context shares objects with no other context.
     /// </summary>
     Dedicated = 1,
 }

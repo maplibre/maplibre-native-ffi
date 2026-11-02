@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// What one evaluation reads.
+/// The inputs that a style expression reads while it evaluates.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_expression_inputs</c> in the <see
@@ -11,46 +11,44 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record StyleExpressionInputs
 {
-    /// <summary>
-    /// The value of the zoom expression.
-    /// </summary>
     public double? Zoom { get; init; }
 
     /// <summary>
-    /// The value of the heatmap-density and line-progress expressions, and of
-    /// the elevation expression in a color-relief layer.
+    /// The value that <c>heatmap-density</c> and <c>line-progress</c> read.
     /// </summary>
     public double? ColorRampParameter { get; init; }
 
     /// <summary>
-    /// The value of the elevation expression outside a color-relief layer.
+    /// The value that <c>elevation</c> reads when <c>color_ramp_parameter</c>
+    /// isn't set.
     /// </summary>
     public double? Elevation { get; init; }
 
     /// <summary>
-    /// One UTF-8 GeoJSON Feature that feature data expressions read.
+    /// The feature to evaluate against, as a GeoJSON feature, or empty for
+    /// none.
     /// </summary>
     public string Feature { get; init; } = "";
 
     /// <summary>
-    /// A UTF-8 JSON object that the feature-state expression reads.
+    /// The feature's state, as a JSON object, or empty for none.
     /// </summary>
     public string FeatureState { get; init; } = "";
 
     /// <summary>
-    /// A UTF-8 JSON object that the global-state expression reads.
+    /// The values that <c>global-state</c> reads, as a JSON object, or empty
+    /// for none.
     /// </summary>
     public string GlobalState { get; init; } = "";
 
     /// <summary>
-    /// The tile that holds the feature, which the within and distance
-    /// expressions need to place its geometry.
+    /// The tile that holds the feature. <c>within</c> and <c>distance</c> need
+    /// it to read the feature's geometry.
     /// </summary>
     public CanonicalTileId? CanonicalTileId { get; init; }
 
     /// <summary>
-    /// The image IDs that the image expression reports as available. The
-    /// expression reports any other ID as unavailable.
+    /// The IDs of the images that <c>image</c> treats as available.
     /// </summary>
     public ImmutableArray<string> AvailableImages
     {

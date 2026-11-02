@@ -1,6 +1,6 @@
 /**
  * @file maplibre_native_c/surface.h
- * Public C API declarations for surface render targets.
+ * Render a map to a window's surface.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_SURFACE_H
@@ -16,105 +16,81 @@
 extern "C" {
 #endif
 
-/** Metal attachment options for a native surface. */
+/**
+ * A Metal layer to render to, for mln_map_attach_metal_surface() and
+ * mln_render_session_set_metal_surface_target().
+ *
+ * The session sets the layer's device, pixel format, and drawable size. It uses
+ * the layer until a replacement or release of the target completes, a detach
+ * or disposal of the session completes, or an abandon of it returns.
+ */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   mln_logical_extent extent MLN_BINDING("required=true");
-  /** Metal backend context. device is optional for Metal surfaces. */
+  /** The MTLDevice to render with. A null device picks the system's default. */
   mln_metal_context_descriptor context;
-  /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
+  /** Your CAMetalLayer. */
   void* layer MLN_BINDING("required=true");
 } mln_metal_surface_descriptor;
 
-/** Vulkan attachment options for a native surface. */
+/**
+ * A Vulkan surface to present to, for mln_map_attach_vulkan_surface() and
+ * mln_render_session_set_vulkan_surface_target().
+ *
+ * The device must have VK_KHR_swapchain enabled, and the queue family of
+ * `graphics_queue_family_index` must support presenting to the surface. The
+ * session creates the swapchain. It uses the surface until a replacement or
+ * release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size;
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   mln_logical_extent extent MLN_BINDING("required=true");
-  /**
-   * Borrowed Vulkan context. All handles are required. The device must support
-   * VK_KHR_swapchain, and the queue family must support graphics and
-   * presentation to this descriptor's surface.
-   */
   mln_vulkan_context_descriptor context;
-  /** Borrowed VkSurfaceKHR bit pattern. Required. */
+  /** Your VkSurfaceKHR. */
   mln_vulkan_non_dispatchable_handle surface MLN_BINDING("required=true");
 } mln_vulkan_surface_descriptor;
 
-/** WebGPU attachment options for a native surface. */
+/**
+ * A WebGPU surface to present to, for mln_map_attach_web_gpu_surface() and
+ * mln_render_session_set_web_gpu_surface_target().
+ *
+ * The session configures the surface. It uses the surface until a replacement
+ * or release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ */
 typedef struct mln_web_gpu_surface_descriptor {
   uint32_t size;
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   mln_logical_extent extent MLN_BINDING("required=true");
-  /** Borrowed WebGPU context. device is required. */
   mln_web_gpu_context_descriptor context;
-  /**
-   * Borrowed WGPUSurface. Required, and must stay alive until the session ends,
-   * replaces it, or releases it. The session configures it for this device and
-   * extent, and unconfigures it then.
-   */
+  /** Your WGPUSurface. */
   void* surface MLN_BINDING("required=true");
-  /**
-   * WGPUTextureFormat to configure the surface with. Required. A browser host
-   * takes it from navigator.gpu.getPreferredCanvasFormat().
-   */
+  /** The WGPUTextureFormat to configure the surface with. */
   uint32_t format MLN_BINDING("required=true");
 } mln_web_gpu_surface_descriptor;
 
-/** OpenGL attachment options for a native surface. */
+/**
+ * An OpenGL surface to present to, for mln_map_attach_open_gl_surface() and
+ * mln_render_session_set_open_gl_surface_target().
+ *
+ * The session uses the surface until a replacement or release of the target
+ * completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
+ */
 typedef struct mln_open_gl_surface_descriptor {
   uint32_t size;
-  /**
-   * Logical surface extent. Required. A scale_factor that differs from the
-   * map's is accepted and logged as a warning.
-   */
   mln_logical_extent extent MLN_BINDING("required=true");
-  /** Borrowed OpenGL context provider data. */
   mln_open_gl_context_descriptor context;
-  /**
-   * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
-   * both required. Null for WebGL, whose context carries its canvas binding.
-   */
+  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it. */
   void* surface;
 } mln_open_gl_surface_descriptor;
 
 /**
- * Starts attachment of a Metal surface target.
- *
- * The descriptor and options are copied before return. An accepted attachment
- * retains the Metal layer and device before return. The completion reports
- * target initialization. A caller driver requires service on a thread where
- * the Metal context is usable.
+ * Creates a session that renders the map to a Metal layer.
  *
  * Returns:
- * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
- *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
- *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
- *   not succeeded.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or options
- *   enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver owns the target.
- * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
+ *   MLN_RENDER_BACKEND_FLAG_METAL.
  */
 MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_map_attach_metal_surface(
@@ -125,32 +101,11 @@ MLN_API mln_status mln_map_attach_metal_surface(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a Vulkan surface target.
- *
- * The descriptor and options are copied before return. The completion runs only
- * after the selected driver creates the swapchain.
+ * Creates a session that renders the map to a Vulkan surface.
  *
  * Returns:
- * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
- *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
- *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
- *   not succeeded.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver owns the target.
- * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
- * - MLN_STATUS_INVALID_ARGUMENT when the driver finds the context
- *   inconsistent, such as a physical device of another instance or a
- *   graphics_queue_family_index that names no graphics queue family.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
+ *   MLN_RENDER_BACKEND_FLAG_VULKAN.
  */
 MLN_BINDING(
   "execution=lifecycle;platforms=android,freebsd,linux,macos,ohos,windows"
@@ -163,32 +118,14 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of an OpenGL surface target.
+ * Creates a session that renders the map to an OpenGL surface.
  *
- * WGL, EGL, and existing WebGL contexts require
- * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. A transferred WebGL canvas requires
- * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent.
+ * The session needs MLN_RENDER_DRIVER_CORE_WORKER for a transferred WebGL
+ * canvas, and MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for any other context.
  *
  * Returns:
- * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
- *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
- *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
- *   not succeeded.
- * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
- *   context provider is unavailable; the requested driver does not match the
- *   context placement; or options enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver owns the target.
- * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when mln_open_gl_supported_context_provider_mask()
+ *   lacks the context's platform.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_map_attach_open_gl_surface(
@@ -199,31 +136,13 @@ MLN_API mln_status mln_map_attach_open_gl_surface(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a WebGPU surface target.
+ * Creates a session that renders the map to a WebGPU surface.
  *
- * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD in the
- * agent that created the WebGPU objects.
+ * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  *
  * Returns:
- * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
- *   options, or completion is null or undersized; a required backend handle is
- *   null; descriptor->extent has a zero width or height, a scale_factor that
- *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
- *   not succeeded.
- * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
- *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
- *   options enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver owns the target.
- * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
+ *   MLN_RENDER_BACKEND_FLAG_WEB_GPU.
  */
 MLN_BINDING("execution=lifecycle;platforms=web")
 MLN_API mln_status mln_map_attach_web_gpu_surface(
@@ -234,27 +153,12 @@ MLN_API mln_status mln_map_attach_web_gpu_surface(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered Metal surface replacement.
+ * Replaces the Metal layer that the session renders to.
  *
- * The descriptor is copied before return, and the session retains the
- * replacement layer and device.
- *
- * Returns:
- * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   descriptor->extent has a zero width or height, a scale_factor that is not
- *   finite and positive, or a scaled dimension past UINT32_MAX.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
- *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * Use it to give the session a layer again after
+ * mln_render_session_release_target(), or to move it to another layer. The
+ * new layer must use the same device. Once the replacement completes, the
+ * session no longer uses the old layer.
  */
 MLN_BINDING("execution=operation;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_render_session_set_metal_surface_target(
@@ -263,31 +167,16 @@ MLN_API mln_status mln_render_session_set_metal_surface_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered Vulkan surface replacement.
+ * Replaces the Vulkan surface that the session presents to.
  *
- * The descriptor is copied before return. The replacement must name the context
- * this session attached with.
- *
- * Returns:
- * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   descriptor->extent has a zero width or height, a scale_factor that is not
- *   finite and positive, or a scaled dimension past UINT32_MAX.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
- *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Use it to give the session a surface again after
+ * mln_render_session_release_target(), or to move it to another surface. The
+ * new surface must use the same context. Once the replacement completes, the
+ * session no longer uses the old surface.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context, or
- *   its surface cannot present from the context's graphics queue.
- * - MLN_STATUS_UNSUPPORTED when the replacement surface's color format or
- *   transform differs from those the session attached with.
- * - MLN_STATUS_NATIVE_ERROR when querying the replacement surface fails.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when the new surface needs a different color format
+ *   or pre-rotation support than the old one. Attach a new session instead.
  */
 MLN_BINDING(
   "execution=operation;platforms=android,freebsd,linux,macos,ohos,windows"
@@ -298,27 +187,12 @@ MLN_API mln_status mln_render_session_set_vulkan_surface_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered OpenGL surface replacement.
+ * Replaces the OpenGL surface that the session presents to.
  *
- * The descriptor is copied before return. The replacement must name the share
- * group this session attached with.
- *
- * Returns:
- * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   descriptor->extent has a zero width or height, a scale_factor that is not
- *   finite and positive, or a scaled dimension past UINT32_MAX.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
- *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another share group.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * Use it to give the session a surface again after
+ * mln_render_session_release_target(), or to move it to another surface. The
+ * new surface must use the same context. Once the replacement completes, the
+ * session no longer uses the old surface.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_set_open_gl_surface_target(
@@ -327,30 +201,16 @@ MLN_API mln_status mln_render_session_set_open_gl_surface_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered WebGPU surface replacement.
+ * Replaces the WebGPU surface that the session presents to.
  *
- * The descriptor is copied before return. The replacement must name the device
- * and queue this session attached with.
- *
- * Returns:
- * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   descriptor->extent has a zero width or height, a scale_factor that is not
- *   finite and positive, or a scaled dimension past UINT32_MAX.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
- *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Use it to give the session a surface again after
+ * mln_render_session_release_target(), or to move it to another surface. The
+ * new surface must use the same context. Once the replacement completes, the
+ * session no longer uses the old surface.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device or
- *   queue.
- * - MLN_STATUS_UNSUPPORTED when the replacement's format differs from the one
- *   the session attached with.
- * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
+ * - MLN_STATUS_UNSUPPORTED when the new `format` differs from the old one.
+ *   Attach a new session to change it.
  */
 MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_web_gpu_surface_target(

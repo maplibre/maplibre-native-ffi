@@ -8,11 +8,15 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Initializes Android platform services.
+    /// Gives the library the Java VM and the app context that it needs on
+    /// Android.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_android_init</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.
+    /// <para>Call it before creating a runtime. <c>jniEnv</c> is the calling
+    /// thread's <c>JNIEnv*</c>, and <c>context</c> is an Android
+    /// <c>Context</c>, such as the application.</para>
+    /// <para>See <c>mln_android_init</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
     public static void InitAndroid(NativePointer jniEnv, NativePointer context)

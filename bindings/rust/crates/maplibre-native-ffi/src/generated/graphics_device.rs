@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A GPU device that native code creates for texture render targets.
+    /// A GPU device that the library creates to render maps into textures.
     ///
     /// See `mln_graphics_device` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,10 +14,19 @@ native_owner! {
 }
 
 impl GraphicsDeviceHandle {
-    /// Creates a graphics device for this build's render backend.
+    /// Creates a GPU device for rendering maps into textures.
+    ///
+    /// Render sessions on several maps can share one device.
     ///
     /// See `mln_graphics_device_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when this build's render backend can't create a
+    ///   device.
+    /// - `Status::NativeError` when `adapter_index` names no GPU, or the
+    ///   platform can't create the device.
     pub fn create(options: Option<&GraphicsDeviceOptions>) -> Result<GraphicsDeviceHandle> {
         let mut call = Call::global();
         crate::abi::validate_abi_version()?;
@@ -30,6 +39,8 @@ impl GraphicsDeviceHandle {
     }
 
     /// Releases a graphics device.
+    ///
+    /// Render sessions on the device keep working until they detach.
     ///
     /// See `mln_graphics_device_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).

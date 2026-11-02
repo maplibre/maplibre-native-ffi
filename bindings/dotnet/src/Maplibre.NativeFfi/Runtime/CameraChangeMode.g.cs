@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Camera change kinds reported by camera will-change and did-change events.
+/// Whether a camera change jumps or animates.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_change_mode</c> in the <see
@@ -10,13 +10,6 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public enum CameraChangeMode : uint
 {
-    /// <summary>
-    /// The camera reached its new value without an animated transition.
-    /// </summary>
     Immediate = 0,
-
-    /// <summary>
-    /// The camera moved as part of an animated transition.
-    /// </summary>
     Animated = 1,
 }

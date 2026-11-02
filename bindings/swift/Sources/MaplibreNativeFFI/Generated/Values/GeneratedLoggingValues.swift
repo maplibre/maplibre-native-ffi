@@ -3,9 +3,14 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Receives a MapLibre Native log record. The callback runs synchronously on
-/// the thread that emits the record, or on a MapLibre background thread for a
-/// severity that `setLogAsyncSeverityMask()` dispatches asynchronously.
+/// Receives a log message.
+///
+/// Return true if you handled the message, or false to also send it to the
+/// platform's log.
+///
+/// Runs on the thread that logged the message, or on a background thread for
+/// the severities that `setLogAsyncSeverityMask()` selects. The callback can't
+/// call the library.
 ///
 /// A thrown error answers `false` and is reported to standard error.
 ///
@@ -18,7 +23,7 @@ public typealias LogCallback = @Sendable (
   _ message: String
 ) throws -> Bool
 
-/// Log event categories emitted by MapLibre Native.
+/// The part of the library that logged a message.
 ///
 /// See `mln_log_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -71,14 +76,15 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Process-global log callback. The callback runs synchronously on the thread
-/// that emits the record, or on a MapLibre background thread for a severity
-/// that `setLogAsyncSeverityMask()` dispatches asynchronously.
+/// A log callback, for `setLogCallback()`.
+///
+/// Runs on the thread that logged the message, or on a background thread for
+/// the severities that `setLogAsyncSeverityMask()` selects. The callback can't
+/// call the library.
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
-  /// Receives each record.
   public var callback: LogCallback
   public init(callback: @escaping LogCallback) {
     self.callback = callback
@@ -114,7 +120,7 @@ private func invokeLogHandlerCallback(
   }
 }
 
-/// Log severity values emitted by MapLibre Native.
+/// The severity of a log message.
 ///
 /// See `mln_log_severity` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -139,7 +145,7 @@ public struct LogSeverity: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Bitmask values for log severities dispatched asynchronously.
+/// A log severity, as a bit in a set.
 ///
 /// See `mln_log_severity_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -154,6 +160,8 @@ public struct LogSeverityFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let info: LogSeverityFlag = .init(rawValue: 2)
   public static let warning: LogSeverityFlag = .init(rawValue: 4)
   public static let error: LogSeverityFlag = .init(rawValue: 8)
+  /// The severities logged on a background thread until
+  /// `setLogAsyncSeverityMask()` changes them.
   public static let `default`: LogSeverityFlag = .init(rawValue: 6)
   public static let all: LogSeverityFlag = .init(rawValue: 14)
 }

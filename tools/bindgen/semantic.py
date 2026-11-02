@@ -606,7 +606,8 @@ class BoundApi:
         A registration record, and an operation that takes one directly, end
         with the threads of the callbacks that it registers. A registration
         nested in another record, such as a camera command's end handler,
-        carries them in its own record's documentation.
+        carries them in its own record's documentation. A callback or
+        operation exposes only the parameters that a host passes or receives.
         """
         index = docs.index(self.source)
 
@@ -625,8 +626,28 @@ class BoundApi:
                     index[value.native],
                     threads(value.native, value.registration.callbacks),
                 )
+        for native, callback in self.callbacks.items():
+            if native in index:
+                index[native] = docs.with_parameters(
+                    index[native],
+                    (
+                        parameter.name
+                        for parameter in callback.parameters
+                        if parameter.direction == "in"
+                        and parameter.name != callback.context
+                    ),
+                )
         for operation in self.operations:
             if operation.name in index:
+                # A binding sizes each array and text output itself.
+                lengths = {
+                    parameter.value.length
+                    for parameter in (*operation.inputs, *operation.outputs)
+                }
+                index[operation.name] = docs.with_parameters(
+                    index[operation.name],
+                    (p.name for p in operation.inputs if p.name not in lengths),
+                )
                 index[operation.name] = docs.with_threads(
                     index[operation.name],
                     (

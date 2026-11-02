@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  /// Starts creation of a map on the runtime.
+  /// Creates a map on `runtime`.
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -21,7 +21,11 @@ public extension RuntimeHandle {
     ) } adopt: { try MapHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts creating an offline region.
+  /// Creates an offline region in the runtime's cache file.
+  ///
+  /// `metadata` holds any bytes to store with the region, such as its name. The
+  /// region doesn't download until
+  /// `RuntimeHandle.setOfflineRegionDownloadState()` makes its download active.
   ///
   /// See `mln_runtime_create_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -42,10 +46,14 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Deletes an offline region.
+  /// Deletes the offline region `regionId` from the runtime's cache file.
   ///
   /// See `mln_runtime_delete_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func deleteOfflineRegion(_ bindingArg0: Int64) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_delete_offline_region(
@@ -57,7 +65,9 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Starts getting one offline region by ID.
+  /// Reads the offline region `regionId`.
+  ///
+  /// The result is null when the cache file has no region with that ID.
   ///
   /// See `mln_runtime_get_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -82,10 +92,14 @@ public extension RuntimeHandle {
     ) }
   }
 
-  /// Starts getting the current download status for an offline region.
+  /// Reads the download progress of the offline region `regionId`.
   ///
   /// See `mln_runtime_get_offline_region_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func getOfflineRegionStatus(_ bindingArg0: Int64) async throws
     -> OfflineRegionStatus
   {
@@ -101,10 +115,17 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Invalidates cached resources for an offline region.
+  /// Makes maps check each resource of the offline region `regionId` with the
+  /// server before they use it.
+  ///
+  /// The region keeps its resources.
   ///
   /// See `mln_runtime_invalidate_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func invalidateOfflineRegion(_ bindingArg0: Int64) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_invalidate_offline_region(
@@ -116,7 +137,7 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Starts listing the offline regions in the runtime database.
+  /// Lists the offline regions in the runtime's cache file.
   ///
   /// See `mln_runtime_list_offline_regions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -132,10 +153,20 @@ public extension RuntimeHandle {
     ) }
   }
 
-  /// Starts merging offline regions from another MapLibre offline database.
+  /// Copies the offline regions of another cache file into the runtime's cache
+  /// file.
+  ///
+  /// A region whose definition and metadata match one that the runtime's file
+  /// already has isn't copied again. The result lists the runtime's copy of
+  /// each region in the other file.
   ///
   /// See `mln_runtime_merge_offline_regions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
+  ///   database file.
   func mergeOfflineRegions(sideDatabasePath bindingArg0: String) async throws
     -> [OfflineRegionInfo]
   {
@@ -153,10 +184,16 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Sets an offline region's native download state.
+  /// Starts or pauses the download of the offline region `regionId`.
+  ///
+  /// A download stops when the runtime closes.
   ///
   /// See `mln_runtime_set_offline_region_download_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func setOfflineRegionDownloadState(
     _ bindingArg0: Int64,
     state bindingArg1: OfflineRegionDownloadState
@@ -172,10 +209,15 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Enables or disables runtime events for an offline region.
+  /// Sets whether the runtime reports the download progress of the offline
+  /// region `regionId` as events.
   ///
   /// See `mln_runtime_set_offline_region_observed` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func setOfflineRegionObserved(
     _ bindingArg0: Int64,
     observed bindingArg1: Bool
@@ -191,10 +233,14 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Starts updating opaque binary metadata for an offline region.
+  /// Replaces the metadata of the offline region `regionId`.
   ///
   /// See `mln_runtime_update_offline_region_metadata` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
   func updateOfflineRegionMetadata(
     _ bindingArg0: Int64,
     metadata bindingArg1: Data

@@ -5,10 +5,15 @@ import Foundation
 
 public extension MapHandle {
   #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
-    /// Starts attachment of a Metal surface target.
+    /// Creates a session that renders the map to a Metal layer.
     ///
     /// See `mln_map_attach_metal_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.metal`.
     func attachMetalSurface(
       descriptor bindingArg0: MetalSurfaceDescriptor,
       options bindingArg1: RenderSessionAttachOptions
@@ -29,10 +34,18 @@ public extension MapHandle {
     }
   #endif
 
-  /// Starts attachment of an OpenGL surface target.
+  /// Creates a session that renders the map to an OpenGL surface.
+  ///
+  /// The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
+  /// canvas, and `RenderDriverKind.callerGraphicsThread` for any other context.
   ///
   /// See `mln_map_attach_open_gl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
+  ///   the context's platform.
   func attachOpenGlSurface(
     descriptor bindingArg0: OpenGlSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -53,10 +66,15 @@ public extension MapHandle {
   }
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-    /// Starts attachment of a Vulkan surface target.
+    /// Creates a session that renders the map to a Vulkan surface.
     ///
     /// See `mln_map_attach_vulkan_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.vulkan`.
     func attachVulkanSurface(
       descriptor bindingArg0: VulkanSurfaceDescriptor,
       options bindingArg1: RenderSessionAttachOptions

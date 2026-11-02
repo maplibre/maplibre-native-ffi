@@ -3,13 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Payload for <c>RuntimeEventType.MapGlyphsRequested</c>,
-/// <c>RuntimeEventType.MapGlyphsLoaded</c>, and
-/// <c>RuntimeEventType.MapGlyphsError</c>.
+/// The details of a glyph event.
 /// </summary>
 /// <remarks>
-/// See <c>mln_runtime_event_glyphs</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// <para>The event covers the glyphs from <c>first</c> to <c>last</c>, both
+/// included.</para>
+/// <para>See <c>mln_runtime_event_glyphs</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct RuntimeEventGlyphs
 {
@@ -27,7 +27,7 @@ public readonly partial record struct RuntimeEventGlyphs
     }
 
     /// <summary>
-    /// Font names of the font stack, in the style's order.
+    /// The fonts that the glyphs come from, in order of preference.
     /// </summary>
     public ImmutableArray<string> FontStack
     {
@@ -35,21 +35,7 @@ public readonly partial record struct RuntimeEventGlyphs
         init => FontStackStorage = ValueArray.From(value);
     }
     internal ValueArray<string> FontStackStorage { get; init; }
-
-    /// <summary>
-    /// First glyph of the range.
-    /// </summary>
     public uint First { get; init; }
-
-    /// <summary>
-    /// Last glyph of the range, inclusive.
-    /// </summary>
     public uint Last { get; init; }
-
-    /// <summary>
-    /// Whether the range stands for a whole font file that the style's
-    /// font-faces names. MapLibre then loads the whole file, and first and last
-    /// do not describe the glyphs it holds.
-    /// </summary>
     public bool FontFace { get; init; }
 }

@@ -3,11 +3,16 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Metal attachment options for a native surface.
+/// A Metal layer to render to, for <c>MapHandle.AttachMetalSurface()</c> and
+/// <c>RenderSessionHandle.SetMetalSurfaceTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_metal_surface_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+/// <para>The session sets the layer's device, pixel format, and drawable size.
+/// It uses the layer until a replacement or release of the target completes, a
+/// detach or disposal of the session completes, or an abandon of it
+/// returns.</para>
+/// <para>See <c>mln_metal_surface_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct MetalSurfaceDescriptor
 {
@@ -23,20 +28,15 @@ public readonly partial record struct MetalSurfaceDescriptor
         this.Layer = Layer;
     }
 
-    /// <summary>
-    /// Logical surface extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
 
     /// <summary>
-    /// Metal backend context. device is optional for Metal surfaces.
+    /// The MTLDevice to render with. A null device picks the system's default.
     /// </summary>
     public MetalContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// <c>CAMetalLayer*</c> / <c>CA::MetalLayer*</c> retained by the session.
-    /// Required.
+    /// Your CAMetalLayer.
     /// </summary>
     public required NativePointer Layer { get; init; }
 }

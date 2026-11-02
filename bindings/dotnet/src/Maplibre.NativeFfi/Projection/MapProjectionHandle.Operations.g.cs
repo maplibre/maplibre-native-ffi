@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A standalone projection of one map view.
+/// A camera view for converting between screen points and coordinates.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_projection</c> in the <see
@@ -58,12 +58,14 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Creates a standalone projection of a view, such as the view of a
-    /// rendered frame or of a map snapshot.
+    /// Creates a projection that converts coordinates for one view of a map.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>Create it from the <c>view</c> of an <c>MapSnapshot</c> or an
+    /// <c>RenderFrameResult</c>. The projection doesn't follow the map, so
+    /// create a new one after the map's camera or size changes.</para>
+    /// <para>See <c>mln_map_projection_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public static MapProjectionHandle Create(MapView view)
     {
@@ -75,7 +77,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Copies the projection camera.
+    /// Reads the projection's camera.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_get_camera</c> in the <see
@@ -90,11 +92,12 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts a screen point to a geographic coordinate.
+    /// Finds the coordinate at a screen point.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_lat_lng_for_pixel</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>The longitude stays between -180 and 180.</para>
+    /// <para>See <c>mln_map_projection_lat_lng_for_pixel</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
@@ -112,11 +115,14 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// Finds the coordinate at a screen point, without wrapping its longitude.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_lat_lng_for_pixel_unwrapped</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>The longitude can fall outside -180 to 180, to show which copy of
+    /// the world the point is in.</para>
+    /// <para>See <c>mln_map_projection_lat_lng_for_pixel_unwrapped</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
     {
@@ -134,7 +140,8 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts screen points to geographic coordinates.
+    /// Finds the coordinates at several screen points, as
+    /// <c>MapProjectionHandle.LatLngForPixel()</c> does.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_lat_lngs_for_pixels</c> in the <see
@@ -165,7 +172,8 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts screen points to unwrapped geographic coordinates.
+    /// Finds the coordinates at several screen points, as
+    /// <c>MapProjectionHandle.LatLngForPixelUnwrapped()</c> does.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_lat_lngs_for_pixels_unwrapped</c> in the <see
@@ -196,12 +204,14 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Reads the ground distance covered by one logical map pixel at a latitude
-    /// for the helper camera zoom.
+    /// Computes how many meters one screen pixel covers at <c>latitude</c>, at
+    /// the projection's zoom.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_meters_per_pixel_at_latitude</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>The result ignores the camera's pitch.</para>
+    /// <para>See <c>mln_map_projection_meters_per_pixel_at_latitude</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public double MetersPerPixelAtLatitude(double latitude)
     {
@@ -219,11 +229,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts a geographic coordinate to a screen point.
+    /// Finds the screen point of a coordinate.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_pixel_for_lat_lng</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>The point is in the copy of the world nearest the camera's
+    /// center.</para>
+    /// <para>See <c>mln_map_projection_pixel_for_lat_lng</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
@@ -241,7 +253,8 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts geographic coordinates to screen points.
+    /// Finds the screen points of several coordinates, as
+    /// <c>MapProjectionHandle.PixelForLatLng()</c> does.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_pixels_for_lat_lngs</c> in the <see
@@ -272,11 +285,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Applies a camera update to a standalone projection.
+    /// Moves the projection's camera, without changing the map.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_projection_set_camera</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// <para>Camera fields that <c>camera</c> doesn't set keep their
+    /// values.</para>
+    /// <para>See <c>mln_map_projection_set_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void SetCamera(CameraOptions camera)
     {

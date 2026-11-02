@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Map rendering modes used when creating a map.
+/// When a map renders.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_mode</c> in the <see
@@ -11,17 +11,18 @@ namespace Maplibre.NativeFfi;
 public enum MapMode : uint
 {
     /// <summary>
-    /// Continuously updates as data arrives and map state changes.
+    /// Renders whenever the map changes.
     /// </summary>
     Continuous = 0,
 
     /// <summary>
-    /// Produces one-off still images of an arbitrary viewport.
+    /// Renders only when <c>MapHandle.RequestStillImageAsync()</c> asks for an
+    /// image.
     /// </summary>
     Static = 1,
 
     /// <summary>
-    /// Produces one-off still images for a single tile.
+    /// Renders still images of single tiles, as <c>MapMode.Static</c> does.
     /// </summary>
     Tile = 2,
 }

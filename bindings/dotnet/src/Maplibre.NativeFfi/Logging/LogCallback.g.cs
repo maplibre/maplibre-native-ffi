@@ -3,12 +3,14 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Receives a MapLibre Native log record. The callback runs synchronously on
-/// the thread that emits the record, or on a MapLibre background thread for a
-/// severity that <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
-/// asynchronously.
+/// Receives a log message.
 /// </summary>
 /// <remarks>
+/// <para>Return true if you handled the message, or false to also send it to
+/// the platform's log.</para>
+/// <para>Runs on the thread that logged the message, or on a background thread
+/// for the severities that <c>MaplibreNative.SetLogAsyncSeverityMask()</c>
+/// selects. The callback can't call the library.</para>
 /// <para>A thrown exception answers <c>false</c> and is reported to
 /// <c>MaplibreNative.CallbackException</c>.</para>
 /// <para>See <c>mln_log_callback</c> in the <see

@@ -1,6 +1,6 @@
 /**
  * @file maplibre_native_c/projection.h
- * Public C API declarations for projection helpers.
+ * Convert between coordinates, screen points, and projected meters.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_PROJECTION_H
@@ -17,30 +17,11 @@ extern "C" {
 #endif
 
 /**
- * Creates a standalone projection of a view, such as the view of a rendered
- * frame or of a map snapshot.
+ * Creates a projection that converts coordinates for one view of a map.
  *
- * Conversions match the transform that the view describes, whatever the
- * map's later camera, size, or constraints. The projection takes the view's
- * state as it is, with no camera jump, so a world copy, a zoom above the
- * map's maximum, or a pitch above the map's maximum converts as it was drawn.
- * The projection carries no camera constraints: mln_map_projection_set_camera()
- * applies only the view's constrain mode and MapLibre Native's absolute zoom
- * and pitch limits. For a camera that the map's constraints limit, use the
- * map's ordered camera queries, such as mln_map_camera_for_lat_lng_bounds().
- *
- * The caller owns the returned handle. out_projection must point to the null
- * handle. Projection calls are synchronous and serialized with each other.
- * This function needs no map or session and may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when view is null or undersized, a nested
- *   struct lacks a required field or carries an unknown one, a value is not
- *   finite or out of range, or the extent has a zero width or height or a
- *   scale_factor that is not finite and positive; or when out_projection is
- *   null or does not point to the null handle.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Create it from the `view` of an mln_map_snapshot or an
+ * mln_render_frame_result. The projection doesn't follow the map, so create a
+ * new one after the map's camera or size changes.
  */
 MLN_API mln_status mln_map_projection_create(
   const mln_map_view* view,
@@ -48,32 +29,12 @@ MLN_API mln_status mln_map_projection_create(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Releases a standalone projection.
- *
- * The release retires the handle, waits for projection calls already running on
- * other threads, and destroys the projection before it returns. A later call
- * with the retired handle returns MLN_STATUS_INVALID_STATE. A null or
- * already-released handle is a no-op. This function may be called from any
- * thread.
- */
+/** Releases a projection. */
 MLN_API void mln_map_projection_release(
   mln_map_projection projection
 ) MLN_NOEXCEPT;
 
-/**
- * Copies the projection camera.
- *
- * The function writes the camera to out_camera. The result observes every
- * earlier projection setter. This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or
- *   out_camera is null or undersized.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Reads the projection's camera. */
 MLN_API mln_status mln_map_projection_get_camera(
   mln_map_projection projection,
   mln_camera_options* out_camera MLN_BINDING("direction=out"),
@@ -81,19 +42,9 @@ MLN_API mln_status mln_map_projection_get_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Applies a camera update to a standalone projection.
+ * Moves the projection's camera, without changing the map.
  *
- * Only fields selected by camera->fields affect the projection. The update is
- * applied before this function returns, so a later read or conversion observes
- * it. The map's camera is unaffected. This function may be called from any
- * thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or camera
- *   is null, undersized, or carries an invalid field.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Camera fields that `camera` doesn't set keep their values.
  */
 MLN_API mln_status mln_map_projection_set_camera(
   mln_map_projection projection, const mln_camera_options* camera,
@@ -101,19 +52,9 @@ MLN_API mln_status mln_map_projection_set_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a geographic coordinate to a screen point.
+ * Finds the screen point of a coordinate.
  *
- * The output uses logical map pixels with an origin at the top-left of the
- * projection viewport. The coordinate converts in the world copy nearest the
- * camera center's unwrapped longitude. The result observes every earlier
- * projection setter. This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, out_point
- *   is null, or coordinate is out of range.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The point is in the copy of the world nearest the camera's center.
  */
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
@@ -122,19 +63,9 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a screen point to a geographic coordinate.
+ * Finds the coordinate at a screen point.
  *
- * The input uses logical map pixels with an origin at the top-left of the
- * projection viewport. The output longitude is wrapped to -180 to 180. The
- * result observes every earlier projection setter. This function may be called
- * from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
- *   out_coordinate is null, or point is not finite.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The longitude stays between -180 and 180.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
@@ -143,19 +74,10 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a screen point to an unwrapped geographic coordinate.
+ * Finds the coordinate at a screen point, without wrapping its longitude.
  *
- * The input uses logical map pixels with an origin at the top-left of the
- * projection viewport. The output longitude preserves the visible world copy
- * and may fall outside -180 to 180. The result observes every earlier
- * projection setter. This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
- *   out_coordinate is null, or point contains non-finite values.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The longitude can fall outside -180 to 180, to show which copy of the world
+ * the point is in.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
@@ -164,24 +86,11 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts geographic coordinates to screen points.
+ * Finds the screen points of several coordinates, as
+ * mln_map_projection_pixel_for_lat_lng() does.
  *
- * Each output matches what mln_map_projection_pixel_for_lat_lng() returns for
- * the coordinate at the same index. The caller provides space for
- * coordinate_count outputs, written in input order. An empty batch is valid,
- * and both arrays may be null when coordinate_count is zero. The whole input is
- * validated before any output is written, and on failure the output is
- * unchanged. The batch is one projection call, so it observes every earlier
- * projection setter and no setter on another thread lands partway through it.
- * This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
- *   array is null with a nonzero coordinate_count, or a coordinate is out of
- *   range.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Lifetimes:
+ * `out_points` must have room for `coordinate_count` points.
  */
 MLN_API mln_status mln_map_projection_pixels_for_lat_lngs(
   mln_map_projection projection,
@@ -193,23 +102,11 @@ MLN_API mln_status mln_map_projection_pixels_for_lat_lngs(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts screen points to geographic coordinates.
+ * Finds the coordinates at several screen points, as
+ * mln_map_projection_lat_lng_for_pixel() does.
  *
- * Each output matches what mln_map_projection_lat_lng_for_pixel() returns for
- * the point at the same index, with its longitude wrapped to -180 to 180. The
- * caller provides space for point_count outputs, written in input order. An
- * empty batch is valid, and both arrays may be null when point_count is zero.
- * The whole input is validated before any output is written, and on failure the
- * output is unchanged. The batch is one projection call, so it observes every
- * earlier projection setter and no setter on another thread lands partway
- * through it. This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
- *   array is null with a nonzero point_count, or a point is not finite.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Lifetimes:
+ * `out_coordinates` must have room for `point_count` coordinates.
  */
 MLN_API mln_status mln_map_projection_lat_lngs_for_pixels(
   mln_map_projection projection,
@@ -220,24 +117,11 @@ MLN_API mln_status mln_map_projection_lat_lngs_for_pixels(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts screen points to unwrapped geographic coordinates.
+ * Finds the coordinates at several screen points, as
+ * mln_map_projection_lat_lng_for_pixel_unwrapped() does.
  *
- * Each output matches what mln_map_projection_lat_lng_for_pixel_unwrapped()
- * returns for the point at the same index, with its longitude in the visible
- * world copy. The caller provides space for point_count outputs, written in
- * input order. An empty batch is valid, and both arrays may be null when
- * point_count is zero. The whole input is validated before any output is
- * written, and on failure the output is unchanged. The batch is one projection
- * call, so it observes every earlier projection setter and no setter on another
- * thread lands partway through it. This function may be called from any
- * thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
- *   array is null with a nonzero point_count, or a point is not finite.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * Lifetimes:
+ * `out_coordinates` must have room for `point_count` coordinates.
  */
 MLN_API mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
   mln_map_projection projection,
@@ -248,19 +132,10 @@ MLN_API mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
 ) MLN_NOEXCEPT;
 
 /**
- * Reads the ground distance covered by one logical map pixel at a latitude for
- * the helper camera zoom.
+ * Computes how many meters one screen pixel covers at `latitude`, at the
+ * projection's zoom.
  *
- * The scale uses MapLibre Native's zoom and latitude clamps.
- * This function may be called from any thread.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
- *   out_meters_per_pixel is null, or latitude is not finite or falls outside
- *   the range from -90 to 90 degrees.
- * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The result ignores the camera's pitch.
  */
 MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude,
@@ -268,30 +143,14 @@ MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Converts a geographic coordinate to spherical Mercator projected meters.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when out_meters is null or coordinate contains
- *   invalid latitude or longitude values.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Converts a coordinate to meters in the Web Mercator projection. */
 MLN_API mln_status mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate,
   mln_projected_meters* out_meters MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Converts spherical Mercator projected meters to a geographic coordinate.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when out_coordinate is null or meters contains
- *   non-finite values.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
+/** Converts meters in the Web Mercator projection to a coordinate. */
 MLN_API mln_status mln_lat_lng_for_projected_meters(
   mln_projected_meters meters,
   mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),

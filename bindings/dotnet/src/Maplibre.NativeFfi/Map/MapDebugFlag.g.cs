@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Debug overlay mask values for <c>MapHandle.SetDebugOptionsAsync()</c>.
+/// A debug overlay that the map draws.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_debug_flag</c> in the <see

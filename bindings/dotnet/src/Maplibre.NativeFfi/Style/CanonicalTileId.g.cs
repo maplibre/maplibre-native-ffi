@@ -3,8 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Canonical tile identity used by custom geometry and custom vector source
-/// callbacks.
+/// A tile's zoom level <c>z</c>, column <c>x</c>, and row <c>y</c>, with row 0
+/// at the north.
 /// </summary>
 /// <remarks>
 /// See <c>mln_canonical_tile_id</c> in the <see
