@@ -8,9 +8,9 @@ description: Pick the render target, and the guide, for how you show the map.
 import { LinkCard } from "@astrojs/starlight/components";
 
 A [](api:mln_render_session) draws one map into one target: a surface that
-presents to a window, or a texture that your code reads or draws. The
-[](api:mln_map_mode) decides when the map renders: continuously as it changes,
-or once for each image you request.
+presents to a window, or a texture that your code reads or draws. Set
+[](api:mln_map_mode) to define how the map renders: continuously for slippy
+maps, or once for each image you request.
 
 ```mermaid
 flowchart TD
@@ -28,7 +28,7 @@ flowchart TD
 <LinkCard
   title="Render images"
   href="/maplibre-native-ffi/guides/images/"
-  description="For a map that doesn't move, create it in static mode for a region you choose, or in tile mode for map tiles. The library creates a GPU device and a texture on it, and you read the pixels."
+  description="For a map that doesn't move, create it in static mode for a region you choose, or in tile mode for map tiles, and read the pixels of each image."
 />
 
 <LinkCard

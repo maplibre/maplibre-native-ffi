@@ -9,9 +9,9 @@ import { Aside } from "@astrojs/starlight/components";
 
 import Snippet from "../../../components/Snippet.astro";
 
-A style describes what a map shows. Its sources supply data, and its layers draw
-that data in order. This guide loads a style and changes its sources, layers,
-and images. Sources and layers use the JSON of the
+A style describes what a map shows: its sources supply data, and its layers draw
+that data in order. This guide shows how to load a style and change its sources,
+layers, and images. Sources and layers use the JSON of the
 [MapLibre style spec](https://maplibre.org/maplibre-style-spec/).
 
 ## Load a style
@@ -30,49 +30,49 @@ Set the style by URL with [](api:mln_map_set_style_url), or by JSON with
 ## Add a source and a layer
 
 Add a source by its ID and its JSON with [](api:mln_map_add_style_source_json).
-The JSON is the object that a style puts under `sources`. See
+The JSON is the same object that a style puts under `sources`. See
 [Sources](https://maplibre.org/maplibre-style-spec/sources/) in the style spec.
 
-Add a layer by its JSON with [](api:mln_map_add_style_layer_json). To draw it
-under another layer, give that layer's ID, or give no ID to draw it on top. See
+Add a layer by its JSON with [](api:mln_map_add_style_layer_json). It draws on
+top, unless you give the ID of a layer to draw it under. See
 [Layers](https://maplibre.org/maplibre-style-spec/layers/) in the style spec.
 
 <Snippet page="style" region="add" />
 
 For GeoJSON data in memory, prepare it as [](api:mln_geo_json_source_data)
 first, then add a GeoJSON source with [](api:mln_map_add_geo_json_source_data).
-You can prepare data on any thread. To update the source, prepare new data with
-the same options, and set it on the source with
+Preparing processes the data before it reaches the map, so you can do it on any
+thread, off your event loop. To update the source, set new prepared data with
 [](api:mln_map_set_geo_json_source_data).
 
 <Snippet page="style" region="geojson" />
 
-To remove a source and its layers, remove the layers with
-[](api:mln_map_remove_style_layer) first, then the source with
+To remove a source, first remove the layers that use it with
+[](api:mln_map_remove_style_layer), then the source with
 [](api:mln_map_remove_style_source).
 
 ## Change a layer
 
 Set a layer property by its style-spec name and a JSON value with
-[](api:mln_map_set_style_layer_property). The same call sets `visibility` and
-`filter`. A JSON null restores the default, and a value can be an
+[](api:mln_map_set_style_layer_property). This also covers `visibility` and
+`filter`. A value can be an
 [expression](https://maplibre.org/maplibre-style-spec/expressions/).
 
-Each change can show in its own frame. To show several changes in the same
-frame, send them between [](api:mln_map_begin_command_group) and
+Each change can show up in its own frame. To show several changes together, send
+them between [](api:mln_map_begin_command_group) and
 [](api:mln_map_end_command_group).
 
 <Snippet page="style" region="set-property" />
 
 ## Add an image
 
-Set a style image by its ID and premultiplied RGBA pixels with
-[](api:mln_map_set_style_image). A symbol layer draws the image by that ID in
+Add an image to the style by its ID and premultiplied RGBA pixels with
+[](api:mln_map_set_style_image). Symbol layers then draw it by that ID in
 `icon-image`.
 
 <Snippet page="style" region="image" />
 
-When a layer asks for an image that the style lacks, the map sends a
+When a layer asks for an image the style doesn't have, the map sends a
 missing-image event with the image's ID as its message. Set the image when the
 event arrives.
 

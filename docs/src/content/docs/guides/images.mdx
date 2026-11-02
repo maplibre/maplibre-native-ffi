@@ -7,56 +7,43 @@ description: Render still images of a map, and read their pixels.
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide renders still images of a map and reads their pixels, without a
-window. It starts with a runtime from
-[Create a map](/maplibre-native-ffi/guides/create-a-map/).
+This guide introduces how to render still images of a map. Start with a runtime
+from [Create a map](/maplibre-native-ffi/guides/create-a-map/).
 
-## Create the map
+## Create a static map
 
 Create a map with [](api:MLN_MAP_MODE_STATIC), at the image size you want in
 logical pixels. For a higher-resolution image, raise the scale factor: a scale
-factor of 2 doubles the image's width and height in pixels.
+factor of 2 doubles the image's width and height in pixels. Then set its style,
+as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#set-a-style).
 
 <Snippet page="images" region="map" />
 
-## Load a style
-
-Set the style URL with [](api:mln_map_set_style_url). You don't need to wait for
-the style to load, because the image request waits for it. To load style JSON,
-see [Style](/maplibre-native-ffi/guides/style/).
-
-<Snippet page="images" region="style" />
-
 ## Attach a texture
 
-Have the library create a [](api:mln_graphics_device), then attach a texture on
-that device to the map with [](api:mln_map_attach_graphics_device_texture), at
-the map's size. Wait for the attach to finish, and use the render session it
-returns. Close the device after you close the session.
+Maps render on your GPU, so you need a graphics context to render a map. If your
+app doesn't have a GPU context, the library can create one for you with
+[](api:mln_graphics_device). Attach a texture on that device to the map with
+[](api:mln_map_attach_graphics_device_texture), at the map's size. Use the
+render session it returns. Close the device after you close the session.
 
 <Snippet page="images" region="attach" />
 
 ## Render an image
 
-Jump the camera to the view you want. See
-[Move the camera](/maplibre-native-ffi/guides/camera/#move-the-camera).
+A static map renders only when you request an image. Jump the camera to the view
+you want, as in
+[Move the camera](/maplibre-native-ffi/guides/camera/#move-the-camera), then
+request a still image with [](api:mln_map_request_still_image).
 
 To change the image size, resize the render session with
 [](api:mln_render_session_resize), and it resizes the map too.
-
-Request a still image with [](api:mln_map_request_still_image), and wait for it.
-You don't need to wait for the camera or the resize first.
-
-A map renders one image at a time. Request the next image after this one
-finishes.
 
 <Snippet page="images" region="image" />
 
 ## Read the pixels
 
-Read the session's texture with [](api:mln_render_session_read_texture) after
-the image finishes. The result has RGBA pixels row by row, and the stride is the
-number of bytes in each row.
+Read the image's pixels with [](api:mln_render_session_read_texture).
 
 To use the images on the GPU instead, see
 [Render to a texture](/maplibre-native-ffi/guides/texture/).
